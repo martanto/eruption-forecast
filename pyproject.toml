@@ -11,8 +11,10 @@ license = {file = "LICENSE"}
 keywords = ["eruption", "forecast", "volcano", "volcanology", "seismic"]
 requires-python = ">=3.11"
 dependencies = [
+    "notebook>=7.4.7",
     "obspy",
     "pandas",
+    "pip>=25.2",
     "uv-build>=0.9.0",
 ]
 classifiers = [
@@ -24,6 +26,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
+    "notebook",
     "black[d]",
     "isort",
 ]

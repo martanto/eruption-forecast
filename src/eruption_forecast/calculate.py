@@ -1,8 +1,14 @@
 import os
+from typing import Optional, Self
+
+import numpy as np
+from multiprocessing import Pool
+
 import eruption_forecast
 import pandas as pd
 from obspy import read, UTCDateTime
-from datetime import datetime
+from datetime import datetime, timezone
+from functools import cached_property
 
 
 class Calculate:
@@ -10,24 +16,23 @@ class Calculate:
         self,
         station: str,
         channel: str,
+        start_date: str,
+        end_date: Optional[str] = None,
         network: str = "VG",
         location: str = "00",
-        source: str = "sds",
-        methods: list[str] | str = None,
-        start_date: str = None,
-        end_date: str = None,
+        methods: list[str] | Optional[str] = None,
         output_dir: str = "output",
         tremor_dir: str = "tremor",
         overwrite: bool = False,
-        filename_prefix: str = None,
-        n_jobs: int = 2,
+        filename_prefix: Optional[str] = None,
+        n_jobs: int = 1,
         cleanup_tmp_dir: bool = False,
         verbose: bool = False,
         debug: bool = False,
     ):
-        self.station = station
-        self.channel = channel
-        self.network = network
+        self.station = station.upper()
+        self.channel = channel.upper()
+        self.network = network.upper()
         self.location = location
 
         self.nslc = f"{network}.{station}.{location}.{channel}"
@@ -36,7 +41,7 @@ class Calculate:
         self.methods: list[str] = [methods] if isinstance(methods, str) else methods
 
         self.start_date: str = start_date
-        self.end_date: str = end_date
+        self.end_date: str = end_date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
 
         try:
             self.start_date_obj: datetime = datetime.strptime(start_date, "%Y-%m-%d")
@@ -46,11 +51,14 @@ class Calculate:
         except ValueError:
             raise ValueError(f"❌ Start date and end date must be in format YYYY-MM-DD")
 
+        self.dates: pd.DatetimeIndex = pd.date_range(
+            start=self.start_date, end=self.end_date
+        )
+        self.n_days: int = len(self.dates)
         self.overwrite = overwrite
         self.filename_prefix: str = filename_prefix
         self.cleanup_tmp_dir = cleanup_tmp_dir
         self.n_jobs = n_jobs
-        self.source = source
 
         self.verbose = verbose
         self.debug = debug
@@ -62,8 +70,11 @@ class Calculate:
 
         self._assert()
         self._check_directory(output_dir, tremor_dir)
+        self._source: Optional[str] = None
+        self._sds_dir: Optional[str] = None
+        self._client_url = "https://service.iris.edu"
 
-    @property
+    @cached_property
     def filename(self) -> str:
         default_filename = (
             f"{self.filename_prefix}_{self.nslc}_{self.start_date}_{self.end_date}"
@@ -73,6 +84,10 @@ class Calculate:
             if self.filename_prefix is None
             else f"{self.filename_prefix}_{default_filename}"
         )
+
+    @cached_property
+    def jobs(self):
+        return [(index, date) for index, date in enumerate(self.dates)]
 
     def _check_directory(self, output_dir: str, tremor_dir: str) -> None:
         self.output_dir: str = os.path.join(os.getcwd(), output_dir)
@@ -93,18 +108,42 @@ class Calculate:
                 method in self.methods
             ), f"❌ Method '{method}' not found. Choose from: {self.methods}"
 
-        assert self.source in [
-            "file",
-            "sds",
-            "server",
-        ], f"❌ Source '{self.source}' not found. Choose from: {self.source}"
+    def _run(self, index: int, date: datetime):
+        if self.verbose:
+            print(f":: Index {index}. Date: {date}")
+        return True
 
     def run(self):
-        for method in self.methods:
-            if method == "rsam":
-                self.rsam()
-            if method == "dsar":
-                self.dsar()
+        assert (
+            self._source in ["sds", "fdsn"]
+        ), (f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
+            f"to determine the data source before `run`.")
+
+        if self.verbose:
+            print(f":: Running on {self.n_jobs} jobs")
+            print(f":: NSLC: {self.nslc}")
+            print(f":: Start Date: {self.start_date}")
+            print(f":: End Date: {self.end_date}")
+
+        if self.n_jobs > 1:
+            pool = Pool(self.n_jobs)
+            pool.starmap(self._run, self.jobs)
+            pool.close()
+            pool.join()
+            return self
+
+        self._run(*self.jobs)
+        return self
+
+    def from_sds(self, sds_dir: str) -> Self:
+        self._source = "sds"
+        self._sds_dir = sds_dir
+        return self
+
+    def from_fdsn(self, client_url: Optional[str] = None) -> Self:
+        self._source = "fdsn"
+        self._client_url = client_url or self._client_url
+        return self
 
     def rsam(self):
         pass
