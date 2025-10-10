@@ -9,6 +9,7 @@ import pandas as pd
 from obspy import read, UTCDateTime
 from datetime import datetime, timezone
 from functools import cached_property
+from loguru import logger
 
 
 class Calculate:
@@ -41,7 +42,9 @@ class Calculate:
         self.methods: list[str] = [methods] if isinstance(methods, str) else methods
 
         self.start_date: str = start_date
-        self.end_date: str = end_date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        self.end_date: str = end_date or datetime.now(tz=timezone.utc).strftime(
+            "%Y-%m-%d"
+        )
 
         try:
             self.start_date_obj: datetime = datetime.strptime(start_date, "%Y-%m-%d")
@@ -63,16 +66,22 @@ class Calculate:
         self.verbose = verbose
         self.debug = debug
 
-        if debug:
-            print("⚠️ Debug mode is ON")
+        logger.info(f"Version: {eruption_forecast.__version__}")
 
-        print(f"Version: {eruption_forecast.__version__}")
+        self.output_dir: str = os.path.join(os.getcwd(), output_dir, "forecast")
+        self.station_dir: str = os.path.join(self.output_dir, self.nslc)
+        self.tremor_dir: str = os.path.join(self.station_dir, tremor_dir)
+        self.tmp_dir: str = os.path.join(self.tremor_dir, "_tmp")
+        self.log_dir = os.path.join(self.station_dir, "logs")
 
         self._assert()
-        self._check_directory(output_dir, tremor_dir)
+        self._check_directory()
         self._source: Optional[str] = None
         self._sds_dir: Optional[str] = None
         self._client_url = "https://service.iris.edu"
+
+        if debug:
+            print("⚠️ Debug mode is ON")
 
     @cached_property
     def filename(self) -> str:
@@ -89,18 +98,14 @@ class Calculate:
     def jobs(self):
         return [(index, date) for index, date in enumerate(self.dates)]
 
-    def _check_directory(self, output_dir: str, tremor_dir: str) -> None:
-        self.output_dir: str = os.path.join(os.getcwd(), output_dir)
+    def _check_directory(self) -> None:
         os.makedirs(self.output_dir, exist_ok=True)
-
-        self.tremor_dir: str = os.path.join(self.output_dir, tremor_dir)
-        os.makedirs(self.tremor_dir, exist_ok=True)
-
-        self.station_dir: str = os.path.join(self.tremor_dir, self.nslc)
         os.makedirs(self.station_dir, exist_ok=True)
-
-        self.tmp_dir: str = os.path.join(self.station_dir, "_tmp")
+        os.makedirs(self.tremor_dir, exist_ok=True)
         os.makedirs(self.tmp_dir, exist_ok=True)
+
+        if self.debug:
+            os.makedirs(self.log_dir, exist_ok=True)
 
     def _assert(self):
         for method in self.methods:
@@ -110,20 +115,24 @@ class Calculate:
 
     def _run(self, index: int, date: datetime):
         if self.verbose:
-            print(f":: Index {index}. Date: {date}")
+            logger.info(f"Index {index}. Date: {date}")
+
+        if self.debug:
+            logger.add(os.path.join(self.log_dir, "log.log"), enqueue=True)
+
         return True
 
     def run(self):
-        assert (
-            self._source in ["sds", "fdsn"]
-        ), (f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
-            f"to determine the data source before `run`.")
+        assert self._source in ["sds", "fdsn"], (
+            f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
+            f"to determine the data source before `run`."
+        )
 
         if self.verbose:
-            print(f":: Running on {self.n_jobs} jobs")
-            print(f":: NSLC: {self.nslc}")
-            print(f":: Start Date: {self.start_date}")
-            print(f":: End Date: {self.end_date}")
+            logger.info(f"Running on {self.n_jobs} jobs")
+            logger.info(f"NSLC: {self.nslc}")
+            logger.info(f"Start Date: {self.start_date}")
+            logger.info(f"End Date: {self.end_date}", end="\n\n")
 
         if self.n_jobs > 1:
             pool = Pool(self.n_jobs)
@@ -132,7 +141,8 @@ class Calculate:
             pool.join()
             return self
 
-        self._run(*self.jobs)
+        for job in self.jobs:
+            self._run(*job)
         return self
 
     def from_sds(self, sds_dir: str) -> Self:
