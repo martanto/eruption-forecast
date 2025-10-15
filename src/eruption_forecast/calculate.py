@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Optional, Self
 
 import numpy as np
@@ -54,6 +55,7 @@ class Calculate:
         except ValueError:
             raise ValueError(f"❌ Start date and end date must be in format YYYY-MM-DD")
 
+        self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
             start=self.start_date, end=self.end_date
         )
@@ -81,7 +83,7 @@ class Calculate:
         self._client_url = "https://service.iris.edu"
 
         if debug:
-            print("⚠️ Debug mode is ON")
+            logger.info("⚠️ Debug mode is ON")
 
     @cached_property
     def filename(self) -> str:
@@ -114,11 +116,12 @@ class Calculate:
             ), f"❌ Method '{method}' not found. Choose from: {self.methods}"
 
     def _run(self, index: int, date: datetime):
-        if self.verbose:
-            logger.info(f"Index {index}. Date: {date}")
+        # if self.verbose:
+            # logger.remove()
+            # logger.info(f"Index {index}. Date: {date}")
 
         if self.debug:
-            logger.add(os.path.join(self.log_dir, "log.log"), enqueue=True)
+            logger.debug(f"Index {index}. Date: {date}")
 
         return True
 
