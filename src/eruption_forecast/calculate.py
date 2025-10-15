@@ -7,7 +7,7 @@ from multiprocessing import Pool
 
 import eruption_forecast
 import pandas as pd
-from obspy import read, UTCDateTime
+from obspy import read, UTCDateTime, Stream
 from datetime import datetime, timezone
 from functools import cached_property
 from loguru import logger
@@ -75,6 +75,7 @@ class Calculate:
         self.tremor_dir: str = os.path.join(self.station_dir, tremor_dir)
         self.tmp_dir: str = os.path.join(self.tremor_dir, "_tmp")
         self.log_dir = os.path.join(self.station_dir, "logs")
+        self.results = []
 
         self._assert()
         self._check_directory()
@@ -115,15 +116,23 @@ class Calculate:
                 method in self.methods
             ), f"❌ Method '{method}' not found. Choose from: {self.methods}"
 
-    def _run(self, index: int, date: datetime):
-        # if self.verbose:
-            # logger.remove()
-            # logger.info(f"Index {index}. Date: {date}")
+    def get_stream(self):
+        if self._source == "sds":
+            return None
+        if self._source == "fdsn":
+            return Stream()
+        return Stream()
 
+    def _run(self, index: int, date: datetime):
         if self.debug:
             logger.debug(f"Index {index}. Date: {date}")
 
+        st = self.get_stream()
+
         return True
+
+    def _collectt_results(self, value):
+        return self.results.append(value)
 
     def run(self):
         assert self._source in ["sds", "fdsn"], (
