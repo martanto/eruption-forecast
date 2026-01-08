@@ -6,7 +6,9 @@ dist/
 wheels/
 /.idea
 *.egg-info
+/test
 
 # Virtual environments
 .venv
+.uv_cache
 *.log

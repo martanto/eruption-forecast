@@ -6,6 +6,7 @@ from importlib.metadata import version
 
 # Project imports
 from eruption_forecast.calculate import Calculate
+from eruption_forecast.label import Label
 
 __version__ = version("eruption-forecast")
 __author__ = "Martanto"
@@ -21,4 +22,5 @@ __all__ = [
     "__license__",
     "__copyright__",
     "Calculate",
+    "Label",
 ]

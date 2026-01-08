@@ -1,15 +1,89 @@
 import os
 from datetime import datetime
-from obspy import read, Stream
+from obspy import read, Stream, ObsPyReadingError
+from loguru import logger
+from typing import List
+
 
 class SDS:
-    def __init__(self, sds_dir: str, nslc: str):
+    def __init__(
+        self,
+        sds_dir: str,
+        station: str,
+        channel: str,
+        network: str = "VG",
+        location: str = "00",
+        verbose: bool = False,
+        debug: bool = False,
+    ):
         self.sds_dir = sds_dir
-        self.nslc = nslc
+        self.station = station.upper()
+        self.channel = channel.upper()
+        self.network = network.upper()
+        self.location = location.upper()
+        self.verbose = verbose
+        self.debug = debug
 
-        assert len(nslc.split(".")) == 3, ValueError("❌ NSLC format incorrect")
+        self.nslc = f"{network}.{station}.{location}.{channel}"
+        self.files: List[dict[str, str]] = []
 
-        self.network, self.station, self.location, self.channel = nslc.split('.')
+    def get_filepath(self, date: datetime) -> str:
+        """Get filepath for SDS data.
+
+        Args:
+            date (datetime): Date to get filepath for.
+        """
+        year = date.year
+        julian_day = date.strftime("%j")
+        data_dir = os.path.join(
+            self.sds_dir, str(year), self.network, self.station, f"{self.channel}.D"
+        )
+        filename = f"{self.nslc}.D.{year}.{julian_day}"
+        return os.path.join(data_dir, filename)
+
+    def load_stream(self, filepath: str, date_str: str) -> Stream:
+        """Get Stream data from SDS.
+
+        Args:
+            filepath (str): Path to SDS file.
+            date_str (str): Date to get data from.
+        """
+        try:
+            stream = read(filepath, format="MSEED")
+            file = {
+                "date": date_str,
+                "file": filepath,
+                "length": len(stream),
+            }
+
+            if len(stream) > 1:
+                stream = stream.merge(fill_value='interpolate')
+
+            self.files.append(file)
+            return stream
+        except ObsPyReadingError as e:
+            if self.debug:
+                logger.error(f"{datetime.now()} :: {filepath}\n{e}")
+            return Stream()
 
     def get(self, date: datetime) -> Stream:
-        return Stream()
+        """Get Stream data from SDS.
+
+        Args:
+            date (datetime): Date to get data from.
+        """
+        date_str = date.strftime("%Y-%m-%d")
+        filepath = self.get_filepath(date)
+        if not os.path.exists(filepath):
+            if self.debug:
+                logger.warning(f"{date_str} :: Data not exists in {filepath}")
+            return Stream()
+
+        stream = self.load_stream(filepath, date_str)
+
+        if self.verbose:
+            if len(stream) == 0:
+                logger.warning(f"{date_str} :: No trace(s) found in {filepath}")
+            else:
+                logger.info(f"{date_str} :: Stream loaded {filepath}")
+        return stream

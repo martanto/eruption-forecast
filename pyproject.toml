@@ -11,11 +11,13 @@ license = {file = "LICENSE"}
 keywords = ["eruption", "forecast", "volcano", "volcanology", "seismic"]
 requires-python = ">=3.11"
 dependencies = [
-    "loguru>=0.7.3",
-    "notebook>=7.4.7",
+    "loguru",
+    "notebook",
     "obspy",
     "pandas",
-    "pip>=25.2",
+    "pip",
+    "numba",
+    "tsfresh",
     "uv-build>=0.9.0",
 ]
 classifiers = [
