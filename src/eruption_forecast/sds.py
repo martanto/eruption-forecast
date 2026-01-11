@@ -50,15 +50,14 @@ class SDS:
         """
         try:
             stream = read(filepath, format="MSEED")
+
             file = {
                 "date": date_str,
                 "file": filepath,
                 "length": len(stream),
             }
 
-            if len(stream) > 1:
-                stream = stream.merge(fill_value='interpolate')
-
+            stream = stream.merge(fill_value="interpolate")
             self.files.append(file)
             return stream
         except ObsPyReadingError as e:
@@ -85,5 +84,9 @@ class SDS:
             if len(stream) == 0:
                 logger.warning(f"{date_str} :: No trace(s) found in {filepath}")
             else:
+                data_length = len(stream[0].data)
                 logger.info(f"{date_str} :: Stream loaded {filepath}")
+                logger.info(
+                    f"{date_str} :: {len(stream)} trace(s) found. Total data {data_length}"
+                )
         return stream

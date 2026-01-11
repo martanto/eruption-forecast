@@ -12,3 +12,4 @@ wheels/
 .venv
 .uv_cache
 *.log
+*.csv

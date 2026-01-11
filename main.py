@@ -4,9 +4,14 @@ def main():
     calculate = Calculate(
         station="OJN",
         channel="EHN",
-        start_date="2025-11-05",
-        end_date="2025-11-10",
-        n_jobs=2,
+        start_date="2025-07-01",
+        end_date="2025-07-31",
+        window_size=2,
+        day_to_forecast=2,
+        remove_outliers=True,
+        # value_multiplier=1.e9,
+        n_jobs=4,
+        overwrite=True,
         verbose=True,
         debug=True,
     )

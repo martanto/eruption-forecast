@@ -1,8 +1,10 @@
 import os
-from typing import Optional, Self
+from typing import Optional, Self, Any
 
 import shutil
 from multiprocessing import Pool
+
+from pandas.core.resample import DatetimeIndexResampler
 
 import eruption_forecast
 import pandas as pd
@@ -12,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from functools import cached_property
 from loguru import logger
 from .sds import SDS
+from .utils import detect_outliers
 
 
 class Calculate:
@@ -34,6 +37,8 @@ class Calculate:
         n_jobs: int = 1,
         volcano_code: Optional[str] = None,
         handle_zero_as_gap: bool = True,
+        remove_outliers: bool = True,
+        value_multiplier: Optional[float] = None,
         cleanup_tmp_dir: bool = False,
         verbose: bool = False,
         debug: bool = False,
@@ -67,6 +72,8 @@ class Calculate:
         self.n_jobs = n_jobs
         self.volcano_code = volcano_code
         self.handle_zero_as_gap = handle_zero_as_gap
+        self.remove_outliers = remove_outliers
+        self.value_multiplier = value_multiplier
         self.cleanup_tmp_dir = cleanup_tmp_dir
         self.verbose = verbose
         self.debug = debug
@@ -222,22 +229,23 @@ class Calculate:
 
         if not self.overwrite and os.path.exists(temp_file):
             df = pd.read_csv(temp_file, index_col=0, parse_dates=True)
-            self.dfs.append(df)
+            # self.dfs.append(df)
 
             if self.verbose:
                 logger.info(f"{date_str} :: File CSV loaded {temp_file}")
 
-            return True
+            return pd.DataFrame()
 
         if self.verbose:
             logger.debug(f"Jobs ID: {job_index}. Date: {date_str}")
 
-        stream = self.calculate(date)
+        df = self.calculate(date)
 
-        return True
+        return df
 
     def calculate(self, date: datetime):
         stream = self.stream(date).detrend(type="demean")
+        date_str = date.strftime("%Y-%m-%d")
 
         rsam_freq_bands: list[tuple[float, float]] = [
             (0.01, 0.1),
@@ -248,9 +256,7 @@ class Calculate:
         ]
 
         datetime_index = pd.date_range(
-            start=date,
-            end=date + timedelta(days=1),
-            freq = "10min", inclusive = "left"
+            start=date, end=date + timedelta(days=1), freq="10min", inclusive="left"
         )
 
         df = pd.DataFrame(index=datetime_index)
@@ -258,20 +264,31 @@ class Calculate:
         for method in self.methods:
             if method == "rsam":
                 for rsam_freq_band in rsam_freq_bands:
-                    self.calculate_rsam(stream.copy(), freq_bands=rsam_freq_band)
+                    column_name = f"rsam_{rsam_freq_band[0]}-{rsam_freq_band[1]}"
+                    rsam_series = self.calculate_rsam(
+                        stream.copy(), freq_bands=rsam_freq_band
+                    )
+                    df[column_name] = rsam_series.values
 
-        return stream
+        df.to_csv(os.path.join(self.tmp_dir, f"{date_str}.csv"), index=True, index_label='datetime')
+        if self.verbose:
+            logger.info(f"{date_str} :: File CSV saved {os.path.join(self.tmp_dir, date_str)}")
+
+        return df
 
     @staticmethod
     def trace_to_series(trace: Trace) -> pd.Series:
         index_time = pd.date_range(
             start=trace.stats.starttime.datetime,
-            periods=trace.stats.npts,
+            end=trace.stats.starttime.datetime + timedelta(days=1) - timedelta(milliseconds=1),
             freq="{}ms".format(trace.stats.delta * 1000),
         )
 
+        data = np.full(len(index_time), np.nan)
+        data[0:len(trace.data)] = np.abs(trace.data)
+
         series = pd.Series(
-            data=np.abs(trace.data),
+            data=data,
             index=index_time,
             name="values",
             dtype=trace.data.dtype,
@@ -281,17 +298,40 @@ class Calculate:
 
         return series
 
+    def delete_outliers(self, data: pd.Series, **kwargs) -> np.ndarray:
+        data = data.values
+
+        if self.remove_outliers:
+            outlier, outlier_index, _ = detect_outliers(data)
+            if outlier:
+                data = np.delete(data, outlier_index)
+
+        if "apply" in kwargs:
+            if "std" in kwargs["apply"]:
+                return np.std(data)
+
+        return np.mean(data)
+
     def calculate_rsam(
         self, stream: Stream, freq_bands: Optional[tuple[float, float]] = None
-    ):
-        if freq_bands:
-            if self.debug:
-                logger.debug(f"RSAM Filtering using {freq_bands}")
+    ) -> pd.Series:
+        start_datetime_str = stream[0].stats.starttime.strftime("%Y-%m-%d")
 
+        if freq_bands:
             freq_min, freq_max = freq_bands
             stream = stream.filter(
                 "bandpass", freqmin=freq_min, freqmax=freq_max, corners=4
             )
+            if self.debug:
+                logger.debug(
+                    f"{start_datetime_str} :: RSAM Filtered using {freq_bands}"
+                )
 
-        series = self.trace_to_series(stream[0]).resample(rule="10min")
+        series: pd.Series = self.trace_to_series(stream[0])
 
+        series = series.resample(rule="10min").apply(self.delete_outliers)
+
+        if self.value_multiplier:
+            series = series.apply(lambda values: values * self.value_multiplier)
+
+        return series

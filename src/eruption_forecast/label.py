@@ -154,8 +154,8 @@ class Label:
         Returns:
             pd.DataFrame
         """
-        number_of_sample_points_per_day = self.sampling_rate * 3600 * 24
-        total_sample_point = number_of_sample_points_per_day * self.window_size
+        number_of_sample_per_day = self.sampling_rate * 3600 * 24
+        total_sample_point = number_of_sample_per_day * self.window_size
         non_overlap_sample_points = (
             total_sample_point
             if self.window_overlap == 1.0
