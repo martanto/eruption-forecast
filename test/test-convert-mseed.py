@@ -10,6 +10,8 @@ from obspy.signal.filter import bandpass
 from scipy.integrate import cumulative_trapezoid
 import numpy as np
 from eruption_forecast.utils import detect_outliers
+from multiprocessing import Pool
+
 # %%
 sds_dir = r"D:\Data\OJN"
 network = 'VG'
@@ -18,9 +20,10 @@ station = "OJN"
 channel_type = 'D'
 location = '00'
 start_datetime = "2025-01-01"
-end_datetime = "2025-03-31"
+end_datetime = "2025-01-31"
 extends_data = True
 tmp_dir = r"D:\Projects\eruption-forecast\output\forecast\VG.OJN.00.EHN\tremor\tmp"
+tremor_dir = r"D:\Projects\eruption-forecast\output\forecast\VG.OJN.00.EHN\tremor"
 verbose = False
 # %%
 os.makedirs(tmp_dir, exist_ok=True)
@@ -117,6 +120,14 @@ def get_data_for_day(day_index, utc_start_datetime: UTCDateTime, _station, exten
     # recalculate based on day_index
     utc_start_datetime: UTCDateTime = utc_start_datetime + timedelta(days=day_index)
     start_date_str = utc_start_datetime.strftime("%Y-%m-%d")
+
+    print(start_date_str)
+
+    # Check if tmp file exists
+    filename = f"{start_date_str}.csv"
+    filepath = os.path.join(tmp_dir, filename)
+    if os.path.isfile(filepath):
+        return filepath
 
     # Load mseed
     stream = load_mseed(utc_start_datetime, extends=extends)
@@ -235,26 +246,50 @@ def get_data_for_day(day_index, utc_start_datetime: UTCDateTime, _station, exten
         columns.append(f"{ratio_name}_outlier")
 
     datas = np.array(datas)
-    index = pd.date_range(start_datetime_obj, start_datetime_obj+timedelta(days=1), freq='10min', inclusive="left")
+    index = pd.date_range(utc_start_datetime.datetime, utc_start_datetime.datetime+timedelta(days=1), freq='10min', inclusive="left")
     df = pd.DataFrame(zip(*datas), columns=columns, index=index)
-
-    filename = f"{start_date_str}.csv"
-    filepath = os.path.join(tmp_dir, filename)
+    df.index.name = "time"
     df.to_csv(filepath, index=True)
+
+    print(filepath)
 
     return filepath
 # %%
-def main():
+def merge_csv():
+    dfs = []
+    dates = pd.date_range(start_datetime_obj, end_datetime_obj, freq='D')
+    for date in dates:
+        date_str = date.strftime("%Y-%m-%d")
+        filename = f"{date_str}.csv"
+        filepath = os.path.join(tmp_dir, filename)
+        if os.path.exists(filepath):
+            df = pd.read_csv(filepath, index_col=0, parse_dates=True)
+            df = df.loc[~df.index.duplicated(keep='last')]
+            dfs.append(df)
+
+    df = pd.concat(dfs, ignore_index=False)
+    df.index.name = "time"
+    df = df.loc[~df.index.duplicated(keep='last')]
+    df.to_csv(os.path.join(tremor_dir, f"OJN_tremor_data.csv"), index=True)
+# %%
+def main(n_jobs: int = 1):
     files = []
 
     jobs = [[job_index, UTCDateTime(start_datetime_obj), "OJN.EHN.VG.00", extends_data]
             for job_index in range(n_days)]
 
-    for job in jobs:
-        filepath = get_data_for_day(*job)
-        if filepath:
-            files.append(filepath)
-            print(filepath)
+    if n_jobs == 1:
+        for job in jobs:
+            filepath = get_data_for_day(*job)
+            if filepath:
+                files.append(filepath)
+    else:
+        print(f"n_jobs: {n_jobs}")
+        p = Pool(n_jobs)
+        p.starmap(get_data_for_day, jobs)
+        p.close()
+        p.join()
 # %%
 if __name__ == "__main__":
-    main()
+    main(n_jobs=1)
+    merge_csv()

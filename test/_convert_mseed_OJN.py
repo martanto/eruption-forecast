@@ -173,7 +173,7 @@ def get_data_for_day(i,t0,station):
 
     sds_dir = r'D:\Data\OJN' #Tania: hard-code data directory
     network = 'VG'
-    channel = 'EHN'
+    channel = 'EHZ'
     channel_type = 'D'
     location = '00'
 
