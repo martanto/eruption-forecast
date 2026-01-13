@@ -12,7 +12,7 @@ def main():
         value_multiplier=1,
         n_jobs=1,
         overwrite=True,
-        verbose=False,
+        verbose=True,
         debug=False,
     )
 

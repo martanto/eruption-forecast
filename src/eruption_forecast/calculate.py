@@ -10,11 +10,14 @@ from typing import Optional, Self
 import numpy as np
 import pandas as pd
 from loguru import logger
+from matplotlib import pyplot as plt
 from obspy import Stream, UTCDateTime
+from obspy.signal.filter import bandpass
 
 # Project imports
 import eruption_forecast
 
+from .rsam import RSAM
 from .sds import SDS
 from .utils import delete_outliers, get_windows_information
 
@@ -75,7 +78,7 @@ class Calculate:
         self.n_jobs = n_jobs
         self.volcano_code = volcano_code
         self.handle_zero_as_gap = handle_zero_as_gap
-        self.remove_outliers = remove_outliers
+        self.remove_outlier = remove_outliers
         self.value_multiplier = value_multiplier
         self.interpolate = interpolate
         self.cleanup_tmp_dir = cleanup_tmp_dir
@@ -90,6 +93,14 @@ class Calculate:
             self.end_date_utc_datetime = UTCDateTime(self.end_date_obj)
         except ValueError:
             raise ValueError(f"Start date and end date must be in format YYYY-MM-DD")
+
+        self.freq_bands: list[tuple[float, float]] = [
+            (0.01, 0.1),
+            (0.1, 2),
+            (2, 5),
+            (4.5, 8),
+            (8, 16),
+        ]
 
         self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
@@ -124,6 +135,37 @@ class Calculate:
             logger.info(f"Station Directory: {self.station_dir}")
             logger.info(f"Tremor Directory: {self.tremor_dir}")
             logger.info(f"Overwrite: {self.overwrite}")
+            logger.info(f"Freq Bands: {self.freq_bands_alias}")
+
+    def change_freq_bands(self, freq_bands: list[tuple[float, float]]) -> Self:
+        """Change freq bands default values
+
+        Return:
+            Self
+        """
+        self.freq_bands = freq_bands
+        return self
+
+    @property
+    def freq_bands_alias(self) -> dict[str, tuple[float, float]]:
+        """Freq band with alias
+
+        Returns:
+            dict[str, tuple[float, float]]: Dict contains name and freq bands
+
+        Example:
+            {
+                'f0': (0.01, 0.1),
+                'f1': (0.1, 2),
+                'f2': (2, 5),
+                'f3': (4.5, 8),
+                'f4': (8, 16)
+            }
+        """
+        names = {}
+        for index, freq_band in enumerate(self.freq_bands):
+            names[f"f{index}"] = (freq_band[0], freq_band[1])
+        return names
 
     @cached_property
     def filename(self) -> str:
@@ -259,13 +301,7 @@ class Calculate:
         stream = self.stream(date).detrend(type="demean")
         date_str = date.strftime("%Y-%m-%d")
 
-        freq_bands: list[tuple[float, float]] = [
-            (0.01, 0.1),
-            (0.1, 2),
-            (2, 5),
-            (4.5, 8),
-            (8, 16),
-        ]
+        freq_bands = self.freq_bands_alias
 
         datetime_index = pd.date_range(
             start=date, end=date + timedelta(days=1), freq="10min", inclusive="left"
@@ -275,38 +311,116 @@ class Calculate:
 
         for method in self.methods:
             if method == "rsam":
-                for freq_band in freq_bands:
-                    column_name = f"rsam_{freq_band[0]}-{freq_band[1]}"
-                    rsam_series = self.calculate_rsam(
-                        stream.copy(), freq_bands=freq_band
+                for band_name, freq_band in freq_bands.items():
+                    column_name = f"rsam_{band_name}"
+                    df[column_name] = self.calculate_rsam(
+                        stream=stream.copy(),
+                        freq_min=freq_band[0],
+                        freq_max=freq_band[1],
+                        date=date,
+                    ).values
+
+            if method == "dsar":
+                if len(freq_bands) < 2:
+                    logger.warning(
+                        f"{date_str} :: DSAR needs at least 2 frequencies to calculate. "
+                        f"Your current freq_bands are {self.freq_bands}"
+                        f"Set using change_freq_bands(). "
+                        f"Example: change_freq_bands([(0.01, 0.1), (1.0, 2.0)])"
                     )
-                    df[column_name] = rsam_series.values
+                    continue
+
+                # Inetgrating
+                stream_integrate = stream.copy().integrate()
+
+                # Anchoring data to start time
+                trace = stream_integrate[0]
+                trace.data = trace.data - trace.data[0]
+                stream_integrate = Stream(trace)
+
+                # Filtering
+                filtered_streams: list[dict[str, str | Stream]] = []
+                for band_name, freq_band in freq_bands.items():
+                    if self.verbose:
+                        logger.info(f"{date_str} :: DSAR Calculating {freq_band}")
+
+                    filter_stream = stream_integrate.copy().filter(
+                            "bandpass",
+                            freqmin=freq_band[0],
+                            freqmax=freq_band[1],
+                            corners=4,
+                        )
+
+                    filtered_stream_dict: dict[str, str | Stream] = {
+                        "band_name": band_name,
+                        "filtered_stream": filter_stream,
+                    }
+                    filtered_streams.append(filtered_stream_dict)
+
+                # Calculate DSAR
+                len_freq_bands = len(freq_bands)
+                for index, filtered_stream in enumerate(filtered_streams):
+                    if index < (len_freq_bands - 1):
+                        first_band_name = filtered_stream["band_name"]
+                        first_filtered_stream = filtered_stream["filtered_stream"]
+
+                        second_band_name = filtered_streams[index + 1]["band_name"]
+                        second_filtered_stream = filtered_streams[index + 1][
+                            "filtered_stream"
+                        ]
+
+                        column_name = f"dsar_{first_band_name}-{second_band_name}"
+                        df[column_name] = self.calculate_dsar(
+                            first_filtered_stream=first_filtered_stream,
+                            second_filtered_stream=second_filtered_stream,
+                            date=date,
+                        ).values
 
         return df
 
     def calculate_rsam(
-        self, stream: Stream, freq_bands: Optional[tuple[float, float]] = None
+        self, stream: Stream, freq_min: float, freq_max: float, date: datetime
     ) -> pd.Series:
-        trace = stream[0].copy()
+        date_str = date.strftime("%Y-%m-%d")
 
-        start_datetime: datetime = trace.stats.starttime.datetime
-        start_datetime = start_datetime.replace(hour=0, minute=0, second=0)
+        rsam: RSAM = (
+            RSAM(
+                stream=stream,
+                verbose=self.verbose,
+                debug=self.debug,
+            )
+            .apply_filter(
+                freq_min=freq_min,
+                freq_max=freq_max,
+            )
+            .calculate(
+                value_multiplier=self.value_multiplier,
+                remove_outlier=self.remove_outlier,
+            )
+        )
 
-        start_datetime_str = start_datetime.strftime("%Y-%m-%d")
+        series = rsam.series.interpolate(method="linear")
 
-        # Filter data
-        if freq_bands:
-            freq_min, freq_max = freq_bands
-            trace.filter("bandpass", freqmin=freq_min, freqmax=freq_max, corners=4)
-            if self.debug:
-                logger.debug(
-                    f"{start_datetime_str} :: RSAM Filtered using {freq_bands}"
-                )
+        if self.verbose:
+            logger.info(f"{date_str} :: RSAM ({freq_min}, {freq_max}) calculation finished")
 
-        # building 10 minutes series data
-        trace_data = np.abs(trace.data)
+        return series
 
-        windows = get_windows_information(trace)
+    def calculate_dsar(
+        self,
+        first_filtered_stream: Stream,
+        second_filtered_stream: Stream,
+        date: datetime,
+    ) -> pd.Series:
+
+        date_str = date.strftime("%Y-%m-%d")
+        first_trace = first_filtered_stream[0]
+        second_trace = second_filtered_stream[0]
+
+        first_data = first_trace.data
+        second_data = second_trace.data
+
+        windows = get_windows_information(first_trace)
         total_window = windows["total_window"]
         sample_per_ten_minute = windows["samples_per_ten_minute"]
 
@@ -316,21 +430,29 @@ class Calculate:
             next_index = index_window + 1
             first_index = int(index_window * sample_per_ten_minute)
             last_index = int(next_index * sample_per_ten_minute)
-            ten_minutes_data = trace_data[first_index:last_index]
 
-            # Removing outlier
-            if self.remove_outliers:
-                ten_minutes_data = delete_outliers(ten_minutes_data)
+            first_ten_minutes_data = first_data[first_index:last_index]
+            second_ten_minutes_data = second_data[first_index:last_index]
 
-            index = start_datetime + timedelta(minutes=index_window * 10)
-            mean_data = np.mean(np.array(ten_minutes_data))
+            if self.remove_outlier:
+                first_ten_minutes_data = delete_outliers(first_ten_minutes_data)
+                second_ten_minutes_data = delete_outliers(second_ten_minutes_data)
+
+            mean_first_ten_minutes_data = np.mean(abs(first_ten_minutes_data))
+            mean_second_ten_minutes_data = np.mean(abs(second_ten_minutes_data))
+
+            index = date + timedelta(minutes=index_window * 10)
+            dsar = mean_first_ten_minutes_data / mean_second_ten_minutes_data
 
             indices.append(index)
-            data.append(mean_data)
+            data.append(dsar)
 
         series = pd.Series(data=data, index=indices, name="datetime")
 
-        if self.value_multiplier:
+        if self.value_multiplier > 1:
             series = series.apply(lambda values: values * self.value_multiplier)
+
+        if self.verbose:
+            logger.info(f"{date_str} :: DSAR calculation finished")
 
         return series
