@@ -1,20 +1,22 @@
+# Standard library imports
 import os
-from typing import Optional, Self, Any
-
 import shutil
-from multiprocessing import Pool
-
-from pandas.core.resample import DatetimeIndexResampler
-
-import eruption_forecast
-import pandas as pd
-import numpy as np
-from obspy import UTCDateTime, Stream, Trace
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import cached_property
+from multiprocessing import Pool
+from typing import Optional, Self
+
+# Third party imports
+import numpy as np
+import pandas as pd
 from loguru import logger
+from obspy import Stream, UTCDateTime
+
+# Project imports
+import eruption_forecast
+
 from .sds import SDS
-from .utils import detect_outliers
+from .utils import delete_outliers, get_windows
 
 
 class Calculate:
@@ -39,6 +41,7 @@ class Calculate:
         handle_zero_as_gap: bool = True,
         remove_outliers: bool = True,
         value_multiplier: Optional[float] = None,
+        interpolate: bool = False,
         cleanup_tmp_dir: bool = False,
         verbose: bool = False,
         debug: bool = False,
@@ -74,6 +77,7 @@ class Calculate:
         self.handle_zero_as_gap = handle_zero_as_gap
         self.remove_outliers = remove_outliers
         self.value_multiplier = value_multiplier
+        self.interpolate = interpolate
         self.cleanup_tmp_dir = cleanup_tmp_dir
         self.verbose = verbose
         self.debug = debug
@@ -97,7 +101,7 @@ class Calculate:
         self.log_dir = os.path.join(self.station_dir, "logs")
         self.results = []
         self.sds: SDS = SDS
-        self.dfs = []
+        self.tmp_files: list[str] = []
         self._source: Optional[str] = None
         self._sds_dir: Optional[str] = None
         self._client_url = "https://service.iris.edu"
@@ -220,34 +224,42 @@ class Calculate:
 
         return self
 
-    def run_job(self, job_index: int, date: datetime):
+    def run_job(self, job_index: int, date: datetime) -> None:
         date_str = date.strftime("%Y-%m-%d")
         temp_file = os.path.join(self.tmp_dir, f"{date_str}.csv")
 
-        if self.debug:
-            logger.debug(f"Job index {job_index}. Date: {date_str}")
+        logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
 
         if not self.overwrite and os.path.exists(temp_file):
-            df = pd.read_csv(temp_file, index_col=0, parse_dates=True)
-            # self.dfs.append(df)
+            self.tmp_files.append(temp_file)
 
             if self.verbose:
                 logger.info(f"{date_str} :: File CSV loaded {temp_file}")
 
-            return pd.DataFrame()
-
-        if self.verbose:
-            logger.debug(f"Jobs ID: {job_index}. Date: {date_str}")
+            return None
 
         df = self.calculate(date)
 
-        return df
+        df.to_csv(
+            temp_file,
+            index=True,
+            index_label="datetime",
+        )
+
+        self.tmp_files.append(temp_file)
+
+        if self.verbose:
+            logger.info(
+                f"{date_str} :: File CSV saved {os.path.join(self.tmp_dir, date_str)}"
+            )
+
+        return None
 
     def calculate(self, date: datetime):
         stream = self.stream(date).detrend(type="demean")
         date_str = date.strftime("%Y-%m-%d")
 
-        rsam_freq_bands: list[tuple[float, float]] = [
+        freq_bands: list[tuple[float, float]] = [
             (0.01, 0.1),
             (0.1, 2),
             (2, 5),
@@ -263,73 +275,60 @@ class Calculate:
 
         for method in self.methods:
             if method == "rsam":
-                for rsam_freq_band in rsam_freq_bands:
-                    column_name = f"rsam_{rsam_freq_band[0]}-{rsam_freq_band[1]}"
+                for freq_band in freq_bands:
+                    column_name = f"rsam_{freq_band[0]}-{freq_band[1]}"
                     rsam_series = self.calculate_rsam(
-                        stream.copy(), freq_bands=rsam_freq_band
+                        stream.copy(), freq_bands=freq_band
                     )
                     df[column_name] = rsam_series.values
 
-        df.to_csv(os.path.join(self.tmp_dir, f"{date_str}.csv"), index=True, index_label='datetime')
-        if self.verbose:
-            logger.info(f"{date_str} :: File CSV saved {os.path.join(self.tmp_dir, date_str)}")
-
         return df
-
-    @staticmethod
-    def trace_to_series(trace: Trace) -> pd.Series:
-        index_time = pd.date_range(
-            start=trace.stats.starttime.datetime,
-            end=trace.stats.starttime.datetime + timedelta(days=1) - timedelta(milliseconds=1),
-            freq="{}ms".format(trace.stats.delta * 1000),
-        )
-
-        data = np.full(len(index_time), np.nan)
-        data[0:len(trace.data)] = np.abs(trace.data)
-
-        series = pd.Series(
-            data=data,
-            index=index_time,
-            name="values",
-            dtype=trace.data.dtype,
-        )
-
-        series.index.name = "datetime"
-
-        return series
-
-    def delete_outliers(self, data: pd.Series, **kwargs) -> np.ndarray:
-        data = data.values
-
-        if self.remove_outliers:
-            outlier, outlier_index, _ = detect_outliers(data)
-            if outlier:
-                data = np.delete(data, outlier_index)
-
-        if "apply" in kwargs:
-            if "std" in kwargs["apply"]:
-                return np.std(data)
-
-        return np.mean(data)
 
     def calculate_rsam(
         self, stream: Stream, freq_bands: Optional[tuple[float, float]] = None
     ) -> pd.Series:
-        start_datetime_str = stream[0].stats.starttime.strftime("%Y-%m-%d")
+        trace = stream[0].copy()
 
+        start_datetime: datetime = trace.stats.starttime.datetime
+        start_datetime = start_datetime.replace(hour=0, minute=0, second=0)
+
+        start_datetime_str = start_datetime.strftime("%Y-%m-%d")
+
+        # Filter data
         if freq_bands:
             freq_min, freq_max = freq_bands
-            stream = stream.filter(
-                "bandpass", freqmin=freq_min, freqmax=freq_max, corners=4
-            )
+            trace.filter("bandpass", freqmin=freq_min, freqmax=freq_max, corners=4)
             if self.debug:
                 logger.debug(
                     f"{start_datetime_str} :: RSAM Filtered using {freq_bands}"
                 )
 
-        series: pd.Series = self.trace_to_series(stream[0])
+        # building 10 minutes series data
+        trace_data = np.abs(trace.data)
 
-        series = series.resample(rule="10min").apply(self.delete_outliers)
+        windows = get_windows(trace)
+        total_window = windows["total_window"]
+        sample_per_ten_minute = windows["samples_per_ten_minute"]
+
+        indices = []
+        data = []
+        for index_window in range(total_window):
+            next_index = index_window + 1
+            first_index = int(index_window * sample_per_ten_minute)
+            last_index = int(next_index * sample_per_ten_minute)
+            ten_minutes_data = trace_data[first_index:last_index]
+
+            # Removing outlier
+            if self.remove_outliers:
+                ten_minutes_data = delete_outliers(ten_minutes_data)
+
+            index = start_datetime + timedelta(minutes=index_window * 10)
+            mean_data = np.mean(np.array(ten_minutes_data))
+
+            indices.append(index)
+            data.append(mean_data)
+
+        series = pd.Series(data=data, index=indices, name="datetime")
 
         if self.value_multiplier:
             series = series.apply(lambda values: values * self.value_multiplier)

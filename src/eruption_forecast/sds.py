@@ -1,8 +1,12 @@
+# Standard library imports
 import os
 from datetime import datetime
-from obspy import read, Stream, ObsPyReadingError
-from loguru import logger
 from typing import List
+
+# Third party imports
+import numpy as np
+from loguru import logger
+from obspy import ObsPyReadingError, Stream, read
 
 
 class SDS:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Third party imports
+# Standard library imports
 from importlib.metadata import version
 
 # Project imports
