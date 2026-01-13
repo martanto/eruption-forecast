@@ -10,9 +10,7 @@ from typing import Optional, Self
 import numpy as np
 import pandas as pd
 from loguru import logger
-from matplotlib import pyplot as plt
 from obspy import Stream, UTCDateTime
-from obspy.signal.filter import bandpass
 
 # Project imports
 import eruption_forecast
@@ -281,7 +279,6 @@ class Calculate:
             return None
 
         df = self.calculate(date)
-
         df.to_csv(
             temp_file,
             index=True,
@@ -320,6 +317,11 @@ class Calculate:
                         date=date,
                     ).values
 
+                    if self.verbose:
+                        logger.info(
+                            f"{date_str} :: RSAM ({column_name}) calculation finished"
+                        )
+
             if method == "dsar":
                 if len(freq_bands) < 2:
                     logger.warning(
@@ -341,15 +343,15 @@ class Calculate:
                 # Filtering
                 filtered_streams: list[dict[str, str | Stream]] = []
                 for band_name, freq_band in freq_bands.items():
-                    if self.verbose:
+                    if self.debug:
                         logger.info(f"{date_str} :: DSAR Calculating {freq_band}")
 
                     filter_stream = stream_integrate.copy().filter(
-                            "bandpass",
-                            freqmin=freq_band[0],
-                            freqmax=freq_band[1],
-                            corners=4,
-                        )
+                        "bandpass",
+                        freqmin=freq_band[0],
+                        freqmax=freq_band[1],
+                        corners=4,
+                    )
 
                     filtered_stream_dict: dict[str, str | Stream] = {
                         "band_name": band_name,
@@ -361,20 +363,25 @@ class Calculate:
                 len_freq_bands = len(freq_bands)
                 for index, filtered_stream in enumerate(filtered_streams):
                     if index < (len_freq_bands - 1):
-                        first_band_name = filtered_stream["band_name"]
                         first_filtered_stream = filtered_stream["filtered_stream"]
-
-                        second_band_name = filtered_streams[index + 1]["band_name"]
                         second_filtered_stream = filtered_streams[index + 1][
                             "filtered_stream"
                         ]
 
+                        first_band_name = filtered_stream["band_name"]
+                        second_band_name = filtered_streams[index + 1]["band_name"]
                         column_name = f"dsar_{first_band_name}-{second_band_name}"
+
                         df[column_name] = self.calculate_dsar(
                             first_filtered_stream=first_filtered_stream,
                             second_filtered_stream=second_filtered_stream,
                             date=date,
                         ).values
+
+                        if self.verbose:
+                            logger.info(
+                                f"{date_str} :: DSAR ({column_name}) calculation finished"
+                            )
 
         return df
 
@@ -400,9 +407,6 @@ class Calculate:
         )
 
         series = rsam.series.interpolate(method="linear")
-
-        if self.verbose:
-            logger.info(f"{date_str} :: RSAM ({freq_min}, {freq_max}) calculation finished")
 
         return series
 
@@ -434,25 +438,31 @@ class Calculate:
             first_ten_minutes_data = first_data[first_index:last_index]
             second_ten_minutes_data = second_data[first_index:last_index]
 
-            if self.remove_outlier:
+            length_ten_minutes_data = len(first_ten_minutes_data)
+            minimum_samples = int(np.ceil(0.3 * length_ten_minutes_data))
+
+            if self.debug and (length_ten_minutes_data == 0):
+                logger.debug(f"{date_str} :: 10 minutes data empty for index_window = {index_window} or ten_minutes_data[{first_index}:{last_index}]")
+
+            if self.remove_outlier and (length_ten_minutes_data > minimum_samples):
                 first_ten_minutes_data = delete_outliers(first_ten_minutes_data)
                 second_ten_minutes_data = delete_outliers(second_ten_minutes_data)
 
-            mean_first_ten_minutes_data = np.mean(abs(first_ten_minutes_data))
-            mean_second_ten_minutes_data = np.mean(abs(second_ten_minutes_data))
-
             index = date + timedelta(minutes=index_window * 10)
-            dsar = mean_first_ten_minutes_data / mean_second_ten_minutes_data
+
+            dsar = np.nan
+            if length_ten_minutes_data > 0:
+                mean_first_ten_minutes_data = np.mean(abs(first_ten_minutes_data))
+                mean_second_ten_minutes_data = np.mean(abs(second_ten_minutes_data))
+                dsar = mean_first_ten_minutes_data / mean_second_ten_minutes_data
 
             indices.append(index)
             data.append(dsar)
 
         series = pd.Series(data=data, index=indices, name="datetime")
+        series = series.interpolate(method="linear")
 
         if self.value_multiplier > 1:
             series = series.apply(lambda values: values * self.value_multiplier)
-
-        if self.verbose:
-            logger.info(f"{date_str} :: DSAR calculation finished")
 
         return series

@@ -84,13 +84,13 @@ class SDS:
 
         stream = self.load_stream(filepath, date_str)
 
-        if self.verbose:
-            if len(stream) == 0:
-                logger.warning(f"{date_str} :: No trace(s) found in {filepath}")
-            else:
-                data_length = len(stream[0].data)
-                logger.info(f"{date_str} :: Stream loaded {filepath}")
-                logger.info(
-                    f"{date_str} :: {len(stream)} trace(s) found. Total data {data_length}"
-                )
+        if len(stream) == 0:
+            logger.warning(f"{date_str} :: No trace(s) found in {filepath}")
+        elif self.verbose:
+            data_length = len(stream[0].data)
+            logger.info(f"{date_str} :: Stream loaded {filepath}")
+            logger.info(
+                f"{date_str} :: {len(stream)} trace(s) found. Total data {data_length}"
+            )
+
         return stream

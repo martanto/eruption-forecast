@@ -5,6 +5,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from obspy import Trace
+from loguru import logger
 
 
 def detect_outliers(
@@ -85,15 +86,15 @@ def get_windows_information(trace: Trace) -> dict[str, int | float]:
 
     sample_window = int(np.ceil(number_of_samples / samples_per_ten_minute))
 
-    if sample_window == total_window:
-        return {
-            "number_of_samples": number_of_samples,
-            "samples_per_day": samples_per_day,
-            "samples_per_ten_minute": samples_per_ten_minute,
-            "total_window": total_window,
-            "sample_window": sample_window,
-        }
+    if sample_window != total_window:
+        logger.warning(
+            f"sample_window ({sample_window}) not the same as total_window ({total_window})"
+        )
 
-    raise ValueError(
-        f"sample_window ({sample_window}) not the same as total_window {total_window}"
-    )
+    return {
+        "number_of_samples": number_of_samples,
+        "samples_per_day": samples_per_day,
+        "samples_per_ten_minute": samples_per_ten_minute,
+        "total_window": total_window,
+        "sample_window": sample_window,
+    }

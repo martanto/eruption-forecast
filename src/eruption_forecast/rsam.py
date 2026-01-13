@@ -63,12 +63,21 @@ class RSAM:
             last_index = int(next_index * sample_per_ten_minute)
             ten_minutes_data = trace_data[first_index:last_index]
 
+            length_ten_minutes_data = len(ten_minutes_data)
+            minimum_samples = int(np.ceil(0.3 * length_ten_minutes_data))
+
+            if self.debug and (length_ten_minutes_data == 0):
+                logger.debug(f"{self.start_datetime_str} :: 10 minutes data empty for index_window = {index_window} or ten_minutes_data[{first_index}:{last_index}]")
+
             # Removing outlier
-            if remove_outlier:
+            if remove_outlier and (length_ten_minutes_data > minimum_samples):
                 ten_minutes_data = delete_outliers(ten_minutes_data)
 
             index = start_datetime + timedelta(minutes=index_window * 10)
-            mean_data = np.mean(np.array(ten_minutes_data))
+
+            mean_data = np.nan
+            if length_ten_minutes_data > 0:
+                mean_data = np.mean(np.array(ten_minutes_data))
 
             indices.append(index)
             data.append(mean_data)
