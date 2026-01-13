@@ -16,7 +16,7 @@ from obspy import Stream, UTCDateTime
 import eruption_forecast
 
 from .sds import SDS
-from .utils import delete_outliers, get_windows
+from .utils import delete_outliers, get_windows_information
 
 
 class Calculate:
@@ -306,7 +306,7 @@ class Calculate:
         # building 10 minutes series data
         trace_data = np.abs(trace.data)
 
-        windows = get_windows(trace)
+        windows = get_windows_information(trace)
         total_window = windows["total_window"]
         sample_per_ten_minute = windows["samples_per_ten_minute"]
 

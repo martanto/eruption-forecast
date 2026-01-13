@@ -42,6 +42,14 @@ def detect_outliers(
 
 
 def delete_outliers(data: np.ndarray) -> np.ndarray:
+    """Delete outlier based on z-score
+
+    Args:
+        data (np.ndarray): Array of data from trace
+
+    Returns:
+        np.ndarray: Array of data from trace after z-score
+    """
     outlier, outlier_index, _ = detect_outliers(data)
     if outlier:
         data = np.delete(data, outlier_index)
@@ -49,7 +57,25 @@ def delete_outliers(data: np.ndarray) -> np.ndarray:
     return data
 
 
-def get_windows(trace: Trace) -> dict[str, int | float]:
+def get_windows_information(trace: Trace) -> dict[str, int | float]:
+    """Get windows and samples information from Trace
+
+    Args:
+        trace (Trace): Trace
+
+    Returns:
+        dict[str, int | float]: Windows and samples information
+
+    Example:
+        Returns examples:
+            {
+                "number_of_samples": number_of_samples,
+                "samples_per_day": samples_per_day,
+                "samples_per_ten_minute": samples_per_ten_minute,
+                "total_window": total_window,
+                "sample_window": sample_window,
+            }
+    """
     sampling_rate = trace.stats.sampling_rate
     number_of_samples = trace.stats.npts
 
