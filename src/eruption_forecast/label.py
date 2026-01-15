@@ -10,6 +10,24 @@ from loguru import logger
 
 
 class Label:
+    """Label class.
+    Use this class to generate label for machine learning.
+    Set value to 1 if eruption is recorded in the window.
+    Set value to 0 if eruption is not recorded in the window.
+
+    Args:
+        start_date (str | datetime): Start date.
+        end_date (str | datetime): End date.
+        window_size (int): Window size.
+        window_overlap (float): Window overlap.
+        sampling_rate (float | int): Sampling rate.
+        day_to_forecast (int): Day to forecast.
+        eruption_dates (list[str]): Eruption dates.
+        output_dir (Optional[str], optional): Output directory. Defaults to None.
+        verbose (bool, optional): Verbose mode. Defaults to False.
+        debug (bool, optional): Debug mode. Defaults to False.
+    """
+
     def __init__(
         self,
         start_date: str | datetime,
@@ -71,7 +89,7 @@ class Label:
         self.filepath = os.path.join(label_dir, self.filename)
 
         # Validate
-        self._assert()
+        self.validate()
 
         # Verbose and debugging
         if debug:
@@ -93,6 +111,7 @@ class Label:
         Returns:
             pd.Series
         """
+        self.assert_eruption_dates()
         return pd.Series(self.df["is_erupted"], name="is_erupted")
 
     @cached_property
@@ -102,11 +121,13 @@ class Label:
         Returns:
             pd.Series
         """
-        self._assert_eruption_dates()
         return self.y
 
-    def _assert(self) -> None:
+    def validate(self) -> None:
         """Asserting properties
+
+        Raises:
+            AssertionError: If any of the properties are invalid
 
         Returns:
             None
@@ -138,8 +159,11 @@ class Label:
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.label_dir, exist_ok=True)
 
-    def _assert_eruption_dates(self) -> None:
+    def assert_eruption_dates(self) -> None:
         """Ensuring there is eruption between start date and end date
+
+        Raises:
+            AssertionError: If there is no eruption between start date and end date
 
         Returns:
             None
@@ -212,6 +236,6 @@ class Label:
         self.df = df
         self.df_erupted = df[df["is_erupted"] > 0]
 
-        self._assert_eruption_dates()
+        self.assert_eruption_dates()
 
         return self

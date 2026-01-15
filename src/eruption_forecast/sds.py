@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import List
 
 # Third party imports
-import numpy as np
 from loguru import logger
 from obspy import ObsPyReadingError, Stream, read
 

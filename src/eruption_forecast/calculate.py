@@ -116,7 +116,7 @@ class Calculate:
         self._client_url = "https://service.iris.edu"
 
         # Validate
-        self._assert()
+        self.validate()
 
         # Verbose and debugging
         if debug:
@@ -146,10 +146,10 @@ class Calculate:
 
     @property
     def freq_bands_alias(self) -> dict[str, tuple[float, float]]:
-        """Freq band with alias
+        """Freq band with alias.
 
         Returns:
-            dict[str, tuple[float, float]]: Dict contains name and freq bands
+            dict[str, tuple[float, float]]: Dict contains band alias and freq bands
 
         Example:
             {
@@ -180,6 +180,11 @@ class Calculate:
 
     @logger.catch
     def create_temporary_dir(self):
+        """Create temporary directory.
+
+        Returns:
+            None
+        """
         if self.cleanup_tmp_dir:
             if self.verbose:
                 logger.info(f"Cleaning up temp dir: {self.tmp_dir}")
@@ -188,7 +193,12 @@ class Calculate:
         os.makedirs(self.tmp_dir, exist_ok=True)
         return self
 
-    def _check_directory(self) -> None:
+    def create_directories(self) -> None:
+        """Create the directories.
+
+        Returns:
+            None
+        """
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.station_dir, exist_ok=True)
         os.makedirs(self.tremor_dir, exist_ok=True)
@@ -197,7 +207,17 @@ class Calculate:
         if self.debug:
             os.makedirs(self.log_dir, exist_ok=True)
 
-    def _assert(self):
+    def validate(self):
+        """Assert the input parameters.
+
+        Raises:
+            ValueError: If start date is after end date
+            AssertionError: If window overlap is not between 0 and 1
+            AssertionError: If method is not found
+
+        Returns:
+            None
+        """
         if self.start_date_utc_datetime > self.end_date_utc_datetime:
             raise ValueError(
                 f"Start date {self.start_date} must be before end date {self.end_date}"
@@ -212,9 +232,17 @@ class Calculate:
                 method in self.methods
             ), f"Method '{method}' not found. Choose between: {self.methods}"
 
-        self._check_directory()
+        self.create_directories()
 
     def stream(self, date: datetime = None) -> Stream:
+        """Get the stream for a specific date.
+
+        Args:
+            date (datetime, optional): Date. Defaults to None.
+
+        Returns:
+            Stream: Stream
+        """
         assert self._source in ["sds", "fdsn"], (
             f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
             f"to determine the data source before `run`."
@@ -228,6 +256,15 @@ class Calculate:
         return Stream()
 
     def from_sds(self, sds_dir: str) -> Self:
+        """Set the data source to Seiscomp Data Structure (SDS).
+        https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
+
+        Args:
+            sds_dir (str): Root SDS directory
+
+        Returns:
+            Self
+        """
         self._source = "sds"
         self._sds_dir = sds_dir
         self.sds = SDS(
@@ -242,11 +279,24 @@ class Calculate:
         return self
 
     def from_fdsn(self, client_url: Optional[str] = None) -> Self:
+        """Set the data source to FDSN.
+
+        Args:
+            client_url (Optional[str], optional): Client URL. Defaults to None.
+
+        Returns:
+            Self
+        """
         self._source = "fdsn"
         self._client_url = client_url or self._client_url
         return self
 
     def run(self):
+        """Run the calculation based on n_jobs.
+
+        Returns:
+            Self
+        """
         self.create_temporary_dir()
 
         if self.n_jobs == 1:
@@ -265,6 +315,15 @@ class Calculate:
         return self
 
     def run_job(self, job_index: int, date: datetime) -> None:
+        """Run a job for a specific date.
+
+        Args:
+            job_index (int): Job index
+            date (datetime): Date to run the job
+
+        Returns:
+            None
+        """
         date_str = date.strftime("%Y-%m-%d")
         temp_file = os.path.join(self.tmp_dir, f"{date_str}.csv")
 
@@ -294,10 +353,20 @@ class Calculate:
 
         return None
 
-    def calculate(self, date: datetime):
+    def calculate(self, date: datetime) -> pd.DataFrame:
+        """Calculate tremor data.
+        Those method calculate the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
+
+        Args:
+            date (datetime): Date to calculate
+
+        Returns:
+            pd.DataFrame: Tremor data
+        """
         stream = self.stream(date).detrend(type="demean")
         date_str = date.strftime("%Y-%m-%d")
 
+        # Frequency bands
         freq_bands = self.freq_bands_alias
 
         datetime_index = pd.date_range(
@@ -310,6 +379,7 @@ class Calculate:
             if method == "rsam":
                 for band_name, freq_band in freq_bands.items():
                     column_name = f"rsam_{band_name}"
+
                     df[column_name] = self.calculate_rsam(
                         stream=stream.copy(),
                         freq_min=freq_band[0],
@@ -340,7 +410,7 @@ class Calculate:
                 trace.data = trace.data - trace.data[0]
                 stream_integrate = Stream(trace)
 
-                # Filtering
+                # Filter and integrate stream based on freq_bands. Then save it to a list
                 filtered_streams: list[dict[str, str | Stream]] = []
                 for band_name, freq_band in freq_bands.items():
                     if self.debug:
@@ -442,7 +512,10 @@ class Calculate:
             minimum_samples = int(np.ceil(0.3 * length_ten_minutes_data))
 
             if self.debug and (length_ten_minutes_data == 0):
-                logger.debug(f"{date_str} :: 10 minutes data empty for index_window = {index_window} or ten_minutes_data[{first_index}:{last_index}]")
+                logger.debug(
+                    f"{date_str} :: 10 minutes data empty for index_window = {index_window} "
+                    f"or ten_minutes_data[{first_index}:{last_index}]"
+                )
 
             if self.remove_outlier and (length_ten_minutes_data > minimum_samples):
                 first_ten_minutes_data = delete_outliers(first_ten_minutes_data)
