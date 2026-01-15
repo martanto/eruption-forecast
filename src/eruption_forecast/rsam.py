@@ -1,6 +1,6 @@
 # Standard library imports
-from datetime import datetime, timedelta
-from typing import Optional, Self
+from datetime import datetime
+from typing import Callable, Self
 
 # Third party imports
 import numpy as np
@@ -60,11 +60,11 @@ class RSAM:
         return self
 
     def calculate(
-        self, 
+        self,
         window_duration_minutes: int = 10,
-        metric_function: callable = np.mean,
-        value_multiplier: float = 1.0, 
-        remove_outlier: bool = True
+        metric_function: Callable[[np.ndarray], float] = np.mean,
+        value_multiplier: float = 1.0,
+        remove_outliers: bool = True,
         minimum_completion_ratio: float = 0.3,
     ) -> Self:
         """Calculate metrics for defined time windows of a Trace.
@@ -73,7 +73,7 @@ class RSAM:
             window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
             metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
             value_multiplier (float, optional): Value multiplier. Defaults to 1.0.
-            remove_outlier (bool, optional): Remove outlier. Defaults to True.
+            remove_outliers (bool, optional): Remove outlier. Defaults to True.
             minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate metric. Defaults to 0.3.
 
         Returns:
@@ -82,12 +82,12 @@ class RSAM:
         trace = self.trace
 
         series = calculate_window_metrics(
-            trace,
-            window_duration_minutes,
-            metric_function,
-            value_multiplier,
-            remove_outlier,
-            minimum_completion_ratio,
+            trace=trace,
+            window_duration_minutes=window_duration_minutes,
+            metric_function=metric_function,
+            remove_outliers=remove_outliers,
+            value_multiplier=value_multiplier,
+            minimum_completion_ratio=minimum_completion_ratio,
             absolute_value=True,
         )
 

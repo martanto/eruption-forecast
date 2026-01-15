@@ -1,7 +1,7 @@
 # Standard library imports
 import os
 from datetime import datetime
-from typing import List
+from typing import List, Any
 
 # Third party imports
 from loguru import logger
@@ -28,7 +28,7 @@ class SDS:
         self.debug = debug
 
         self.nslc = f"{network}.{station}.{location}.{channel}"
-        self.files: List[dict[str, str]] = []
+        self.files: List[dict[str, Any]] = []
 
     def get_filepath(self, date: datetime) -> str:
         """Get filepath for SDS data.

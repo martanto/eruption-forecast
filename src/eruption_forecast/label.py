@@ -74,7 +74,6 @@ class Label:
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
         self.n_days: int = (end_date - start_date).days
-        self.labels = []
         self.df: pd.DataFrame = pd.DataFrame()
         self.df_erupted: pd.DataFrame = pd.DataFrame()
         self.output_dir = output_dir
@@ -141,19 +140,19 @@ class Label:
         )
 
         assert self.window_size > 0, "window_size must be > 0"
-        assert (
-            self.window_size < self.n_days
-        ), f"window_size must be less than {self.n_days} days)"
+        assert self.window_size < self.n_days, (
+            f"window_size must be less than {self.n_days} days)"
+        )
 
-        assert (
-            0 < self.window_overlap <= 1.0
-        ), "window_overlap must be between 0 and/ or equal 1"
+        assert 0 < self.window_overlap <= 1.0, (
+            "window_overlap must be between 0 and/ or equal 1"
+        )
         assert self.sampling_rate > 0, "sampling_rate must be > 0"
 
         assert self.day_to_forecast > 0, "day_to_forecast must be > 0"
-        assert (
-            self.day_to_forecast < self.n_days
-        ), f"day_to_forecast must be less than {self.n_days} days)"
+        assert self.day_to_forecast < self.n_days, (
+            f"day_to_forecast must be less than {self.n_days} days)"
+        )
 
         # Ensuring output directory exists
         os.makedirs(self.output_dir, exist_ok=True)
@@ -225,7 +224,7 @@ class Label:
                     f"Date of eruption must be in YYYY-MM-DD format."
                 )
             start_eruption = end_eruption - timedelta(days=self.day_to_forecast)
-            for index, row in df.loc[start_eruption:end_eruption].iterrows():
+            for index, row in df.loc[start_eruption:end_eruption].iterrows():  # type: ignore
                 df.loc[index, "is_erupted"] = 1
 
         df["datetime"] = df.index

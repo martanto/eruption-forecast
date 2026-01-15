@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Optional, Self
+from typing import Optional, Self, Any
 
 # Third party imports
 import numpy as np
@@ -15,6 +15,7 @@ from obspy import Stream, UTCDateTime
 # Project imports
 import eruption_forecast
 
+from .dsar import DSAR
 from .rsam import RSAM
 from .sds import SDS
 from .utils import delete_outliers, get_windows_information
@@ -48,8 +49,6 @@ class Calculate:
         debug: bool = False,
     ):
         # Set DEFAULT parameter
-        if methods is None:
-            methods = ["rsam", "dsar"]
         end_date = end_date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
         network = network or "VG"
         location = location or "00"
@@ -62,12 +61,14 @@ class Calculate:
         self.channel = channel.upper()
         self.start_date: str = start_date
         self.end_date: str = end_date
-        self.window_size: int = window_size
-        self.window_overlap: float = window_overlap
-        self.day_to_forecast: int = day_to_forecast
+        self.window_size: int = window_size or 3
+        self.window_overlap: float = window_overlap or 0.75
+        self.day_to_forecast: int = day_to_forecast or 1
         self.network = network or "VG"
         self.location = location or "00"
-        self.methods: list[str] = [methods] if isinstance(methods, str) else methods
+        self.methods: list[str] = (
+            [methods] if isinstance(methods, str) else list(methods or ["rsam", "dsar"])
+        )
         self.output_dir: str = output_dir
         self.station_dir: str = station_dir
         self.tremor_dir: str = os.path.join(station_dir, tremor_dir)
@@ -76,7 +77,7 @@ class Calculate:
         self.n_jobs = n_jobs
         self.volcano_code = volcano_code
         self.handle_zero_as_gap = handle_zero_as_gap
-        self.remove_outlier = remove_outliers
+        self.remove_outliers = remove_outliers
         self.value_multiplier = value_multiplier
         self.interpolate = interpolate
         self.cleanup_tmp_dir = cleanup_tmp_dir
@@ -108,8 +109,8 @@ class Calculate:
         self.nslc = nslc
         self.tmp_dir: str = os.path.join(self.tremor_dir, "_tmp")
         self.log_dir = os.path.join(self.station_dir, "logs")
-        self.results = []
-        self.sds: SDS = SDS
+        self.results: list[Any] = []
+        self.sds: Optional[SDS] = None
         self.tmp_files: list[str] = []
         self._source: Optional[str] = None
         self._sds_dir: Optional[str] = None
@@ -175,11 +176,11 @@ class Calculate:
         )
 
     @cached_property
-    def jobs(self):
+    def jobs(self) -> list[tuple[int, datetime]]:
         return [(job_index, date) for job_index, date in enumerate(self.dates)]
 
     @logger.catch
-    def create_temporary_dir(self):
+    def create_temporary_dir(self) -> Self:
         """Create temporary directory.
 
         Returns:
@@ -207,7 +208,7 @@ class Calculate:
         if self.debug:
             os.makedirs(self.log_dir, exist_ok=True)
 
-    def validate(self):
+    def validate(self) -> None:
         """Assert the input parameters.
 
         Raises:
@@ -223,18 +224,18 @@ class Calculate:
                 f"Start date {self.start_date} must be before end date {self.end_date}"
             )
 
-        assert (
-            0 < self.window_overlap <= 1
-        ), f"Window overlap must be between 0 and 1. Default 0.75."
+        assert 0 < self.window_overlap <= 1, (
+            f"Window overlap must be between 0 and 1. Default 0.75."
+        )
 
         for method in self.methods:
-            assert (
-                method in self.methods
-            ), f"Method '{method}' not found. Choose between: {self.methods}"
+            assert method in self.methods, (
+                f"Method '{method}' not found. Choose between: {self.methods}"
+            )
 
         self.create_directories()
 
-    def stream(self, date: datetime = None) -> Stream:
+    def stream(self, date: Optional[datetime] = None) -> Stream:
         """Get the stream for a specific date.
 
         Args:
@@ -243,12 +244,13 @@ class Calculate:
         Returns:
             Stream: Stream
         """
+        assert date is not None, "Date must be provided"
         assert self._source in ["sds", "fdsn"], (
             f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
             f"to determine the data source before `run`."
         )
 
-        if self._source == "sds":
+        if self._source == "sds" and self.sds:
             return self.sds.get(date)
         if self._source == "fdsn":
             return Stream()
@@ -291,7 +293,7 @@ class Calculate:
         self._client_url = client_url or self._client_url
         return self
 
-    def run(self):
+    def run(self) -> Self:
         """Run the calculation based on n_jobs.
 
         Returns:
@@ -375,6 +377,11 @@ class Calculate:
 
         df = pd.DataFrame(index=datetime_index)
 
+        # Initialize DSAR
+        dsar = DSAR(
+            remove_outliers=self.remove_outliers, verbose=self.verbose, debug=self.debug
+        )
+
         for method in self.methods:
             if method == "rsam":
                 for band_name, freq_band in freq_bands.items():
@@ -433,19 +440,18 @@ class Calculate:
                 len_freq_bands = len(freq_bands)
                 for index, filtered_stream in enumerate(filtered_streams):
                     if index < (len_freq_bands - 1):
-                        first_filtered_stream = filtered_stream["filtered_stream"]
-                        second_filtered_stream = filtered_streams[index + 1][
-                            "filtered_stream"
-                        ]
-
                         first_band_name = filtered_stream["band_name"]
                         second_band_name = filtered_streams[index + 1]["band_name"]
                         column_name = f"dsar_{first_band_name}-{second_band_name}"
 
-                        df[column_name] = self.calculate_dsar(
-                            first_filtered_stream=first_filtered_stream,
-                            second_filtered_stream=second_filtered_stream,
-                            date=date,
+                        first_stream = filtered_stream["filtered_stream"]
+                        second_stream = filtered_streams[index + 1]["filtered_stream"]
+
+                        # Use the new DSAR class
+                        df[column_name] = dsar.calculate(
+                            first_stream=first_stream,
+                            second_stream=second_stream,
+                            value_multiplier=self.value_multiplier or 1.0,
                         ).values
 
                         if self.verbose:
@@ -471,71 +477,11 @@ class Calculate:
                 freq_max=freq_max,
             )
             .calculate(
-                value_multiplier=self.value_multiplier,
-                remove_outlier=self.remove_outlier,
+                value_multiplier=self.value_multiplier or 1.0,
+                remove_outliers=self.remove_outliers,
             )
         )
 
         series = rsam.series.interpolate(method="linear")
-
-        return series
-
-    def calculate_dsar(
-        self,
-        first_filtered_stream: Stream,
-        second_filtered_stream: Stream,
-        date: datetime,
-    ) -> pd.Series:
-
-        date_str = date.strftime("%Y-%m-%d")
-        first_trace = first_filtered_stream[0]
-        second_trace = second_filtered_stream[0]
-
-        first_data = first_trace.data
-        second_data = second_trace.data
-
-        windows = get_windows_information(first_trace)
-        total_window = windows["total_window"]
-        sample_per_ten_minute = windows["samples_per_ten_minute"]
-
-        indices = []
-        data = []
-        for index_window in range(total_window):
-            next_index = index_window + 1
-            first_index = int(index_window * sample_per_ten_minute)
-            last_index = int(next_index * sample_per_ten_minute)
-
-            first_ten_minutes_data = first_data[first_index:last_index]
-            second_ten_minutes_data = second_data[first_index:last_index]
-
-            length_ten_minutes_data = len(first_ten_minutes_data)
-            minimum_samples = int(np.ceil(0.3 * length_ten_minutes_data))
-
-            if self.debug and (length_ten_minutes_data == 0):
-                logger.debug(
-                    f"{date_str} :: 10 minutes data empty for index_window = {index_window} "
-                    f"or ten_minutes_data[{first_index}:{last_index}]"
-                )
-
-            if self.remove_outlier and (length_ten_minutes_data > minimum_samples):
-                first_ten_minutes_data = delete_outliers(first_ten_minutes_data)
-                second_ten_minutes_data = delete_outliers(second_ten_minutes_data)
-
-            index = date + timedelta(minutes=index_window * 10)
-
-            dsar = np.nan
-            if length_ten_minutes_data > 0:
-                mean_first_ten_minutes_data = np.mean(abs(first_ten_minutes_data))
-                mean_second_ten_minutes_data = np.mean(abs(second_ten_minutes_data))
-                dsar = mean_first_ten_minutes_data / mean_second_ten_minutes_data
-
-            indices.append(index)
-            data.append(dsar)
-
-        series = pd.Series(data=data, index=indices, name="datetime")
-        series = series.interpolate(method="linear")
-
-        if self.value_multiplier > 1:
-            series = series.apply(lambda values: values * self.value_multiplier)
 
         return series
