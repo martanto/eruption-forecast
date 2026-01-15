@@ -12,6 +12,13 @@ from .utils import calculate_window_metrics
 
 
 class DSAR:
+    """Calculate Displacement Seismic Amplitude Ratio (DSAR).
+
+    Args:
+        remove_outliers (bool, optional): Whether to remove outliers. Defaults to True.
+        verbose (bool, optional): Whether to enable verbose logging. Defaults to False.
+        debug (bool, optional): Whether to enable debug logging. Defaults to False.
+    """
     def __init__(
         self, remove_outliers: bool = True, verbose: bool = False, debug: bool = False
     ) -> None:

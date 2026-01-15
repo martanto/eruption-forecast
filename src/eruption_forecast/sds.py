@@ -9,6 +9,36 @@ from obspy import ObsPyReadingError, Stream, read
 
 
 class SDS:
+    """Seiscom Data Structure (SDS) class.
+
+    Get more information about SDS format from:
+    https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
+    
+    Args:
+        sds_dir (str): Path to SDS directory.
+        station (str): Station name.
+        channel (str): Channel name.
+        network (str, optional): Network name. Defaults to "VG".
+        location (str, optional): Location name. Defaults to "00".
+        verbose (bool, optional): Verbose mode. Defaults to False.
+        debug (bool, optional): Debug mode. Defaults to False.
+
+    Attributes:
+        sds_dir (str): Path to SDS directory.
+        station (str): Station name.
+        channel (str): Channel name.
+        network (str): Network name.
+        location (str): Location name.
+        verbose (bool): Verbose mode.
+        debug (bool): Debug mode.
+        nslc (str): NSLC name.
+        files (List[dict[str, Any]]): List of files.
+
+    Methods:
+        get_filepath(date: datetime) -> str: Get filepath for SDS data.
+        load_stream(filepath: str, date_str: str) -> Stream: Get Stream data from SDS.
+        get(date: datetime) -> Stream: Get Stream data from SDS.
+    """
     def __init__(
         self,
         sds_dir: str,

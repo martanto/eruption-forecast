@@ -22,6 +22,33 @@ from .utils import delete_outliers, get_windows_information
 
 
 class Calculate:
+    """Calculate Tremor Data from seismic data.
+
+    Args:
+        station (str): Seismic station code.
+        channel (str): Seismic channel code.
+        start_date (str): Start date for data processing (YYYY-MM-DD).
+        end_date (Optional[str]): End date for data processing (YYYY-MM-DD).
+        window_size (Optional[int]): Size of the processing window in minutes. Defaults to 3.
+        window_overlap (Optional[float]): Overlap between windows as a fraction. Defaults to 0.75.
+        day_to_forecast (Optional[int]): Number of days to forecast ahead. Defaults to 1.
+        network (str): Seismic network code. Defaults to "VG".
+        location (str): Seismic location code. Defaults to "00".
+        methods (Optional[str]): Calculation methods to apply.
+        output_dir (str): Directory for output files. Defaults to "output".
+        tremor_dir (str): Directory for tremor data. Defaults to "tremor".
+        overwrite (bool): Whether to overwrite existing files. Defaults to False.
+        filename_prefix (Optional[str]): Prefix for generated filenames.
+        n_jobs (int): Number of parallel jobs to use. Defaults to 1.
+        volcano_code (Optional[str]): Code representing the volcano.
+        handle_zero_as_gap (bool): If True, treats zero values as data gaps. Defaults to True.
+        remove_outliers (bool): If True, removes outliers from the data. Defaults to True.
+        value_multiplier (Optional[float]): Scaling factor for seismic values.
+        interpolate (bool): If True, interpolates missing data points. Defaults to False.
+        cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
+        verbose (bool): If True, enables verbose logging. Defaults to False.
+        debug (bool): If True, enables debug mode. Defaults to False.
+    """
     def __init__(
         self,
         station: str,
