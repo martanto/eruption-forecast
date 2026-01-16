@@ -2,15 +2,16 @@
 import os
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Optional, Self
+from typing import Optional, Self, Literal
 
 # Third party imports
 import pandas as pd
 from loguru import logger
 
 
-class Label:
-    """Label class.
+class LabelBuilder:
+    """LabelBuilder class.
+
     Use this class to generate label for machine learning.
     Set value to 1 if eruption is recorded in the window.
     Set value to 0 if eruption is not recorded in the window.
@@ -79,6 +80,7 @@ class Label:
         self.n_days: int = (end_date - start_date).days
         self.df: pd.DataFrame = pd.DataFrame()
         self.df_erupted: pd.DataFrame = pd.DataFrame()
+        self.df_eruptions: dict[str, pd.DataFrame] = {}
         self.output_dir = output_dir
         self.label_dir = label_dir
         self.filename = (
@@ -105,6 +107,12 @@ class Label:
             logger.info(f"Sampling Rate: {sampling_rate}")
             logger.info(f"Day To Forecast: {day_to_forecast}")
             logger.info(f"Label File: {self.filepath}")
+
+    def __repr__(self) -> str:
+        return f"LabelBuilder({self.start_date_str}, {self.end_date_str}, {self.window_size}, {self.window_overlap}, {self.sampling_rate}, {self.day_to_forecast}, {self.eruption_dates})"
+
+    def __str__(self) -> str:
+        return f"LabelBuilder({self.start_date_str}, {self.end_date_str}, {self.window_size}, {self.window_overlap}, {self.sampling_rate}, {self.day_to_forecast}, {self.eruption_dates})"
 
     @cached_property
     def y(self) -> pd.Series:
@@ -143,19 +151,19 @@ class Label:
         )
 
         assert self.window_size > 0, "window_size must be > 0"
-        assert self.window_size < self.n_days, (
-            f"window_size must be less than {self.n_days} days)"
-        )
+        assert (
+            self.window_size < self.n_days
+        ), f"window_size must be less than {self.n_days} days)"
 
-        assert 0 < self.window_overlap <= 1.0, (
-            "window_overlap must be between 0 and/ or equal 1"
-        )
+        assert (
+            0 < self.window_overlap <= 1.0
+        ), "window_overlap must be between 0 and/ or equal 1"
         assert self.sampling_rate > 0, "sampling_rate must be > 0"
 
         assert self.day_to_forecast > 0, "day_to_forecast must be > 0"
-        assert self.day_to_forecast < self.n_days, (
-            f"day_to_forecast must be less than {self.n_days} days)"
-        )
+        assert (
+            self.day_to_forecast < self.n_days
+        ), f"day_to_forecast must be less than {self.n_days} days)"
 
         # Ensuring output directory exists
         os.makedirs(self.output_dir, exist_ok=True)
@@ -200,6 +208,7 @@ class Label:
         )
 
         df = pd.DataFrame(index=dates)
+        df.index.name = "datetime"
         df["is_erupted"] = 0
 
         return df
@@ -215,33 +224,68 @@ class Label:
         """
         df = self.initiate_label()
 
+        # Create id column to use as data ID reference with tremor data
+        # such as RSAM, DSAR or MSNoise
+        df["id"] = range(len(df))
+        df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
+
         eruption_dates = self.eruption_dates
 
         # Update eruption value with 1
         for eruption in eruption_dates:
             try:
-                end_eruption = datetime.strptime(eruption, "%Y-%m-%d")
+                day_of_eruption = datetime.strptime(eruption, "%Y-%m-%d")
+
+                # Start of eruption date should be at 00:00:00
+                start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
+                start_eruption = start_eruption.replace(hour=0, minute=0, second=0)
+
+                # End of eruption date should be at 23:59:59
+                end_eruption = day_of_eruption.replace(hour=23, minute=59, second=59)
             except ValueError:
                 raise ValueError(
                     f"Eruption date is {eruption}. "
                     f"Date of eruption must be in YYYY-MM-DD format."
                 )
-            start_eruption = end_eruption - timedelta(days=self.day_to_forecast)
+
+            # Set eruption value with 1 for range of eruption date
             for index, row in df.loc[start_eruption:end_eruption].iterrows():  # type: ignore
                 df.loc[index, "is_erupted"] = 1
 
-        df["datetime"] = df.index
-        df.reset_index(drop=True, inplace=True)
-        df["id"] = df.index
-        df = df[["id", "datetime", "is_erupted"]]
+            # Append eruption date as dict key with df_eruptions
+            self.df_eruptions[eruption] = df.loc[start_eruption:end_eruption]
 
         self.df = df
         self.df_erupted = df[df["is_erupted"] > 0]
 
         self.assert_eruption_dates()
+        self.save()
 
         return self
 
-    def save(self) -> None:
-        """Save label file"""
-        self.df.to_csv(self.filepath, index=False)
+    def save(self, file_type: Literal["csv", "xlsx"] = "csv") -> Self:
+        """Save label file
+
+        Args:
+            file_type (Literal["csv", "xlsx"]): File type to save. Defaults to "csv".
+
+        Returns:
+            Self
+        """
+        df = self.df
+        filepath = self.filepath
+
+        if file_type == "xlsx":
+            filepath = self.filepath.replace(".csv", ".xlsx")
+            df.to_excel(filepath, index=True)
+
+            # Update filepath as an excel file
+            self.filepath = filepath
+            return self
+
+        df.to_csv(filepath, index=True)
+
+        if self.verbose:
+            logger.info(f"Label saved to {filepath}")
+
+        return self

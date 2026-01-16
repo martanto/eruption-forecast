@@ -13,7 +13,7 @@ class SDS:
 
     Get more information about SDS format from:
     https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
-    
+
     Args:
         sds_dir (str): Path to SDS directory.
         station (str): Station name.
@@ -39,6 +39,7 @@ class SDS:
         load_stream(filepath: str, date_str: str) -> Stream: Get Stream data from SDS.
         get(date: datetime) -> Stream: Get Stream data from SDS.
     """
+
     def __init__(
         self,
         sds_dir: str,

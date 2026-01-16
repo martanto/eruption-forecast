@@ -49,6 +49,7 @@ class Calculate:
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
     """
+
     def __init__(
         self,
         station: str,
@@ -251,14 +252,14 @@ class Calculate:
                 f"Start date {self.start_date} must be before end date {self.end_date}"
             )
 
-        assert 0 < self.window_overlap <= 1, (
-            f"Window overlap must be between 0 and 1. Default 0.75."
-        )
+        assert (
+            0 < self.window_overlap <= 1
+        ), f"Window overlap must be between 0 and 1. Default 0.75."
 
         for method in self.methods:
-            assert method in self.methods, (
-                f"Method '{method}' not found. Choose between: {self.methods}"
-            )
+            assert (
+                method in self.methods
+            ), f"Method '{method}' not found. Choose between: {self.methods}"
 
         self.create_directories()
 
