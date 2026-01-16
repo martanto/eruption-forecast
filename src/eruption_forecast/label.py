@@ -15,14 +15,17 @@ class Label:
     Set value to 1 if eruption is recorded in the window.
     Set value to 0 if eruption is not recorded in the window.
 
+    The label dataframe can be accessed through df property.
+    The label series can be accessed through y property.
+
     Args:
-        start_date (str | datetime): Start date.
-        end_date (str | datetime): End date.
-        window_size (int): Window size.
-        window_overlap (float): Window overlap.
-        sampling_rate (float | int): Sampling rate.
-        day_to_forecast (int): Day to forecast.
-        eruption_dates (list[str]): Eruption dates.
+        start_date (str | datetime): Start date in YYYY-MM-DD format.
+        end_date (str | datetime): End date in YYYY-MM-DD format.
+        window_size (int): Window size in days.
+        window_overlap (float): Window overlap in days. Range from 0 to 1.
+        sampling_rate (float | int): Sampling rate in Hz.
+        day_to_forecast (int): Day to forecast in days.
+        eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
         output_dir (Optional[str], optional): Output directory. Defaults to None.
         verbose (bool, optional): Verbose mode. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
@@ -238,3 +241,7 @@ class Label:
         self.assert_eruption_dates()
 
         return self
+
+    def save(self) -> None:
+        """Save label file"""
+        self.df.to_csv(self.filepath, index=False)
