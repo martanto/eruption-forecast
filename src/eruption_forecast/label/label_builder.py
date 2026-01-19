@@ -23,7 +23,7 @@ class LabelBuilder:
         start_date (str | datetime): Start date in YYYY-MM-DD format.
         end_date (str | datetime): End date in YYYY-MM-DD format.
         window_size (int): Window size in days.
-        window_overlap (float): Window overlap in days. Range from 0 to 1.
+        window_overlap (int): Window overlap in hours. Range from 1 to maximum window size in hours.
         sampling_rate (float | int): Sampling rate in Hz.
         day_to_forecast (int): Day to forecast in days.
         eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
@@ -37,7 +37,7 @@ class LabelBuilder:
         start_date: str | datetime,
         end_date: str | datetime,
         window_size: int,
-        window_overlap: float,
+        window_overlap: int,
         sampling_rate: float | int,
         day_to_forecast: int,
         eruption_dates: list[str],
@@ -68,7 +68,7 @@ class LabelBuilder:
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
         self.window_size: int = int(window_size)
-        self.window_overlap: float = float(window_overlap)
+        self.window_overlap: int = int(window_overlap)
         self.sampling_rate: float = float(sampling_rate)
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = eruption_dates
@@ -297,6 +297,7 @@ class LabelBuilder:
             None
         """
         minimal_end_date = self.start_date + timedelta(days=7)
+
         assert self.start_date < self.end_date, "start_date must be less than end_date"
 
         assert self.n_days >= 7, (
@@ -309,9 +310,12 @@ class LabelBuilder:
             self.window_size < self.n_days
         ), f"window_size must be less than {self.n_days} days)"
 
+        # Maximum window overlap is the window size in hours
+        maximum_window_overlap = self.window_size * 24
         assert (
-            0 < self.window_overlap <= 1.0
-        ), "window_overlap must be between 0 and/ or equal 1"
+            0 < self.window_overlap <= maximum_window_overlap
+        ), f"window_overlap must be between 0 and/ or equal {maximum_window_overlap} hours. \
+        Suggestion: set to 6, 12, or 24 hours"
         assert self.sampling_rate > 0, "sampling_rate must be > 0"
 
         assert self.day_to_forecast > 0, "day_to_forecast must be > 0"
@@ -344,20 +348,11 @@ class LabelBuilder:
         Returns:
             pd.DataFrame
         """
-        number_of_sample_per_day = self.sampling_rate * 3600 * 24
-        total_sample_point = number_of_sample_per_day * self.window_size
-        non_overlap_sample_points = (
-            total_sample_point
-            if self.window_overlap == 1.0
-            else (1 - self.window_overlap) * total_sample_point
-        )
-        non_overlap_in_seconds = timedelta(
-            seconds=non_overlap_sample_points / self.sampling_rate
-        )
+        freq_in_hours = timedelta(hours=self.window_overlap)
         dates = pd.date_range(
             start=self.start_date,
             end=self.end_date,
-            freq=non_overlap_in_seconds,
+            freq=freq_in_hours,
             inclusive="both",
         )
 
