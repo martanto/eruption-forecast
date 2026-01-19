@@ -37,6 +37,7 @@ def detect_outliers(
     # Z-score = (X - μ) / σ
     z_score = (outlier_value - np.mean(data)) / np.std(data)
 
+    # If z_score is greater than 10^outlier_threshold or 3σ, it is an outlier
     if z_score > 10**outlier_threshold:
         return True, int(outlier_index), float(outlier_value)
 
@@ -56,7 +57,6 @@ def delete_outliers(data: np.ndarray) -> np.ndarray:
 
     if outlier:
         data = np.delete(data, int(outlier_index))
-        data = delete_outliers(data)
 
     return data
 

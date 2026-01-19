@@ -2,7 +2,7 @@
 import os
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Optional, Self, Literal
+from typing import Literal, Optional, Self
 
 # Third party imports
 import pandas as pd
@@ -41,6 +41,7 @@ class LabelBuilder:
         sampling_rate: float | int,
         day_to_forecast: int,
         eruption_dates: list[str],
+        volcano_id: str,
         output_dir: Optional[str] = None,
         verbose: bool = False,
         debug: bool = False,
@@ -66,21 +67,22 @@ class LabelBuilder:
         # Set DEFAULT properties
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
-        self.window_size: int = window_size
-        self.window_overlap: float = window_overlap
-        self.sampling_rate: float = sampling_rate
-        self.day_to_forecast: int = day_to_forecast
+        self.window_size: int = int(window_size)
+        self.window_overlap: float = float(window_overlap)
+        self.sampling_rate: float = float(sampling_rate)
+        self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = eruption_dates
-        self.verbose: bool = verbose
-        self.debug: bool = debug
+        self.volcano_id: str = str(volcano_id)
+        self.verbose: bool = bool(verbose)
+        self.debug: bool = bool(debug)
 
         # Set ADDITIONAL properties
+        self._df: pd.DataFrame = pd.DataFrame()
+        self._df_eruption: pd.DataFrame = pd.DataFrame()
+        self._df_eruptions: dict[str, pd.DataFrame] = {}
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
         self.n_days: int = (end_date - start_date).days
-        self.df: pd.DataFrame = pd.DataFrame()
-        self.df_erupted: pd.DataFrame = pd.DataFrame()
-        self.df_eruptions: dict[str, pd.DataFrame] = {}
         self.output_dir = output_dir
         self.label_dir = label_dir
         self.filename = (
@@ -109,10 +111,146 @@ class LabelBuilder:
             logger.info(f"Label File: {self.filepath}")
 
     def __repr__(self) -> str:
-        return f"LabelBuilder({self.start_date_str}, {self.end_date_str}, {self.window_size}, {self.window_overlap}, {self.sampling_rate}, {self.day_to_forecast}, {self.eruption_dates})"
+        return (
+            f"LabelBuilder({self.start_date_str}, "
+            f"{self.end_date_str}, "
+            f"{self.window_size}, "
+            f"{self.window_overlap}, "
+            f"{self.sampling_rate}, "
+            f"{self.day_to_forecast}, "
+            f"{self.eruption_dates}), "
+            f"{self.volcano_id}"
+        )
 
     def __str__(self) -> str:
-        return f"LabelBuilder({self.start_date_str}, {self.end_date_str}, {self.window_size}, {self.window_overlap}, {self.sampling_rate}, {self.day_to_forecast}, {self.eruption_dates})"
+        return self.__repr__()
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """Labels DataFrame property
+
+        Asserts:
+            self._df must not empty
+
+        Returns:
+            pd.DataFrame
+        """
+        assert not self._df.empty, "Please call 'build' method first to create labels"
+
+        return self._df
+
+    @df.setter
+    def df(self, df: pd.DataFrame) -> None:
+        """Labels DataFrame setter
+
+        Asserts:
+            df must be a pandas DataFrame
+            df index must be a datetime index
+            df must have an 'id' column
+            df must have a 'is_erupted' column
+
+        Args:
+            df (pd.DataFrame): Labels to set
+
+        Returns:
+            None
+        """
+        self.validate_columns(df)
+        self._df = df
+
+    @property
+    def df_eruption(self) -> pd.DataFrame:
+        """Eruputed Labels DataFrame property
+
+        Asserts:
+            self._df_eruption must not empty
+
+        Returns:
+            pd.DataFrame
+        """
+        assert (
+            not self._df_eruption.empty
+        ), "Please call 'build' method first to create erupted labels"
+
+        return self._df_eruption
+
+    @df_eruption.setter
+    def df_eruption(self, df: pd.DataFrame) -> None:
+        """Eruputed Labels DataFrame setter
+
+        Asserts:
+            df must be a pandas DataFrame
+            df index must be a datetime index
+            df must have an 'id' column
+            df must have a 'is_erupted' column
+
+        Args:
+            df (pd.DataFrame): Labels to set
+
+        Returns:
+            None
+        """
+        self.validate_columns(df)
+        self._df_eruption = df
+
+    @property
+    def df_eruptions(self) -> dict[str, pd.DataFrame]:
+        """Eruputed Windows DataFrame property
+
+        Asserts:
+            self._df_eruptions must not empty
+
+        Returns:
+            dict[str, pd.DataFrame]:
+                str: eruption date in YYYY-MM-DD format
+                pd.DataFrame: eruption dataframe
+        """
+        assert (
+            len(self._df_eruptions) > 0
+        ), "Please call 'build' method first to create erupted labels"
+
+        return self._df_eruptions
+
+    @df_eruptions.setter
+    def df_eruptions(self, df_dict: dict[str, pd.DataFrame]) -> None:
+        """Eruputed Windows DataFrame setter
+
+        Asserts:
+            df_dict must be a dictionary
+            df_dict must have string keys. And each key must be a valid date in YYYY-MM-DD format
+            df_dict must have pandas DataFrame values
+
+        Args:
+            df_dict (dict[str, pd.DataFrame]): Eruputed Windows to set
+
+        Returns:
+            None
+        """
+        assert isinstance(df_dict, dict), "df_dict must be a dictionary"
+
+        # Ensuring keys are strings and valid dates
+        assert all(
+            isinstance(key, str) for key in df_dict.keys()
+        ), "df_dict must have string keys"
+        assert all(
+            pd.to_datetime(key).strftime("%Y-%m-%d") == key for key in df_dict.keys()
+        ), "df_dict must have string keys. And each key must be a valid date in YYYY-MM-DD format"
+        assert all(
+            isinstance(value, pd.DataFrame) for value in df_dict.values()
+        ), "df_dict must have pandas DataFrame values"
+
+        # Ensuring values are DataFrames with datetime index and required columns
+        assert all(
+            isinstance(value.index, pd.DatetimeIndex) for value in df_dict.values()
+        ), "df index must be a datetime index"
+        assert all(
+            "id" in value.columns for value in df_dict.values()
+        ), "df must have an 'id' column"
+        assert all(
+            "is_erupted" in value.columns for value in df_dict.values()
+        ), "df must have an 'is_erupted' column"
+
+        self._df_eruptions.update(df_dict)
 
     @cached_property
     def y(self) -> pd.Series:
@@ -121,8 +259,8 @@ class LabelBuilder:
         Returns:
             pd.Series
         """
-        self.assert_eruption_dates()
-        return pd.Series(self.df["is_erupted"], name="is_erupted")
+        df = self.df
+        return pd.Series(df["is_erupted"], name="is_erupted")
 
     @cached_property
     def labels(self) -> pd.Series:
@@ -132,6 +270,22 @@ class LabelBuilder:
             pd.Series
         """
         return self.y
+
+    def validate_columns(self, df: pd.DataFrame) -> None:
+        """Asserting columns
+
+        Raises:
+            AssertionError: If any of the columns are invalid
+
+        Returns:
+            None
+        """
+        assert isinstance(df, pd.DataFrame), "df must be a pandas DataFrame"
+        assert isinstance(
+            df.index, pd.DatetimeIndex
+        ), "df index must be a datetime index"
+        assert "id" in df.columns, "df must have an 'id' column"
+        assert "is_erupted" in df.columns, "df must have an 'is_erupted' column"
 
     def validate(self) -> None:
         """Asserting properties
@@ -178,7 +332,7 @@ class LabelBuilder:
         Returns:
             None
         """
-        assert len(self.df_erupted) > 0, (
+        assert len(self.df_eruption) > 0, (
             f"No eruption recorded between date "
             f"{self.start_date_str} and {self.end_date_str}. "
             f"Your eruption_dates: {self.eruption_dates}"
@@ -213,11 +367,21 @@ class LabelBuilder:
 
         return df
 
-    def create(self, save: bool = False) -> Self:
-        """Create label based on eruption dates
+    def save_eruption_dates(self) -> None:
+        """Save eruption dates to csv file"""
+        filename = os.path.join(self.label_dir, "eruption_dates.csv")
 
-        Args:
-            save (bool): Save label file
+        df = pd.DataFrame(self.eruption_dates, columns=["eruption_date"])
+        df.index.name = "id"
+        df["volcano_id"] = self.volcano_id
+        df = df[["volcano_id", "eruption_date"]]
+        df.to_csv(filename, index=True)
+
+        if self.verbose:
+            logger.info(f"Eruption dates saved to {filename}")
+
+    def build(self) -> Self:
+        """Build label based on eruption dates
 
         Returns:
             Self
@@ -253,10 +417,10 @@ class LabelBuilder:
                 df.loc[index, "is_erupted"] = 1
 
             # Append eruption date as dict key with df_eruptions
-            self.df_eruptions[eruption] = df.loc[start_eruption:end_eruption]
+            self.df_eruptions = {eruption: df.loc[start_eruption:end_eruption]}
 
         self.df = df
-        self.df_erupted = df[df["is_erupted"] > 0]
+        self.df_eruption = df[df["is_erupted"] > 0]
 
         self.assert_eruption_dates()
         self.save()
@@ -287,5 +451,8 @@ class LabelBuilder:
 
         if self.verbose:
             logger.info(f"Label saved to {filepath}")
+
+        # Save eruption dates
+        self.save_eruption_dates()
 
         return self

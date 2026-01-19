@@ -1,14 +1,16 @@
 # Standard library imports
+import glob
 import os
 import shutil
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Optional, Self, Any
+from typing import Any, Optional, Self
 
 # Third party imports
 import numpy as np
 import pandas as pd
+from jupyter_client.jsonutil import parse_date
 from loguru import logger
 from obspy import Stream, UTCDateTime
 
@@ -21,7 +23,7 @@ from .sds import SDS
 from .utils import delete_outliers, get_windows_information
 
 
-class Calculate:
+class CalculateTremor:
     """Calculate Tremor Data from seismic data.
 
     Args:
@@ -135,7 +137,7 @@ class Calculate:
         )
         self.n_days: int = len(self.dates)
         self.nslc = nslc
-        self.tmp_dir: str = os.path.join(self.tremor_dir, "_tmp")
+        self.tmp_dir: str = os.path.join(self.tremor_dir, "tmp")
         self.log_dir = os.path.join(self.station_dir, "logs")
         self.results: list[Any] = []
         self.sds: Optional[SDS] = None
@@ -342,6 +344,9 @@ class Calculate:
         pool.close()
         pool.join()
 
+        # Merge calculated tremor CSV files from tmp dir
+        self.save_tremor(self.tmp_dir, self.tremor_dir)
+
         return self
 
     def run_job(self, job_index: int, date: datetime) -> None:
@@ -513,3 +518,33 @@ class Calculate:
         series = rsam.series.interpolate(method="linear")
 
         return series
+
+    @staticmethod
+    def save_tremor(tmp_dir: str, tremor_dir: Optional[str] = None) -> str:
+        """Save calculated tremor data to file.
+
+        Args:
+            tmp_dir (str): Temporary dir where calculated tremor saved
+            tremor_dir (str, optional): Directory where tremor data will be saved. Defaults to None.
+
+        Returns:
+            str: Tremor data location
+        """
+        assert os.path.isdir(tmp_dir), f"Directory {tmp_dir} does not exist"
+
+        files = glob.glob(os.path.join(tmp_dir, "*.csv"))
+        assert len(files) > 0, f"File(s) not found in {tmp_dir}"
+
+        tremor_dir = tmp_dir.replace("tmp", "") if tremor_dir is None else tremor_dir
+        os.makedirs(tremor_dir, exist_ok=True)
+
+        df = pd.concat(
+            [
+                pd.read_csv(file, index_col="datetime", parse_dates=True)
+                for file in sorted(files)
+            ],
+            sort=True,
+        )
+
+        df.to_csv(os.path.join(tremor_dir, "tremor.csv"), index=True)
+        return os.path.join(tremor_dir, "tremor.csv")

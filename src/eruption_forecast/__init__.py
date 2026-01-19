@@ -5,8 +5,10 @@
 from importlib.metadata import version
 
 # Project imports
-from eruption_forecast.calculate import Calculate
-from eruption_forecast.label import LabelBuilder
+from eruption_forecast.calculate import CalculateTremor
+from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.label.label_data import LabelData
 
 __version__ = version("eruption-forecast")
 __author__ = "Martanto"
@@ -21,6 +23,8 @@ __all__ = [
     "__author_email__",
     "__license__",
     "__copyright__",
-    "Calculate",
+    "CalculateTremor",
     "LabelBuilder",
+    "LabelData",
+    "FeaturesBuilder",
 ]
