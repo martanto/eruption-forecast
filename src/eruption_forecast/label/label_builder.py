@@ -8,6 +8,9 @@ from typing import Literal, Optional, Self
 import pandas as pd
 from loguru import logger
 
+# Project imports
+from eruption_forecast.utils import construct_windows
+
 
 class LabelBuilder:
     """LabelBuilder class.
@@ -23,7 +26,7 @@ class LabelBuilder:
         start_date (str | datetime): Start date in YYYY-MM-DD format.
         end_date (str | datetime): End date in YYYY-MM-DD format.
         window_size (int): Window size in days.
-        window_overlap (int): Window overlap in hours. Range from 1 to maximum window size in hours.
+        window_step (int): Window overlap in hours. Range from 1 to maximum window size in hours.
         sampling_rate (float | int): Sampling rate in Hz.
         day_to_forecast (int): Day to forecast in days.
         eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
@@ -37,7 +40,7 @@ class LabelBuilder:
         start_date: str | datetime,
         end_date: str | datetime,
         window_size: int,
-        window_overlap: int,
+        window_step: int,
         sampling_rate: float | int,
         day_to_forecast: int,
         eruption_dates: list[str],
@@ -49,13 +52,17 @@ class LabelBuilder:
         # Set DEFAULT parameter
         if isinstance(start_date, str):
             try:
-                start_date = datetime.strptime(start_date, "%Y-%m-%d")
+                start_date = datetime.strptime(start_date, "%Y-%m-%d").replace(
+                    hour=0, minute=0, second=0
+                )
             except ValueError:
                 raise ValueError("start_date must be in YYYY-MM-DD format")
 
         if isinstance(end_date, str):
             try:
-                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+                end_date = datetime.strptime(end_date, "%Y-%m-%d").replace(
+                    hour=23, minute=59, second=59
+                )
             except ValueError:
                 raise ValueError("end_date must be in YYYY-MM-DD format")
 
@@ -68,7 +75,7 @@ class LabelBuilder:
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
         self.window_size: int = int(window_size)
-        self.window_overlap: int = int(window_overlap)
+        self.window_step: int = int(window_step)
         self.sampling_rate: float = float(sampling_rate)
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = eruption_dates
@@ -88,7 +95,7 @@ class LabelBuilder:
         self.filename = (
             f"label_{start_date_str}_{end_date_str}"
             f"_ws-{window_size}"
-            f"_wo-{window_overlap}"
+            f"_step-{window_step}"
             f"_sr-{sampling_rate}"
             f"_dtf-{day_to_forecast}.csv"
         )
@@ -102,20 +109,20 @@ class LabelBuilder:
             logger.info("⚠️ Debug mode is ON")
 
         if verbose:
-            logger.info(f"Start Date: {start_date_str}")
-            logger.info(f"End Date: {end_date_str}")
-            logger.info(f"Window Size: {window_size}")
-            logger.info(f"Window Overlap: {window_overlap}")
-            logger.info(f"Sampling Rate: {sampling_rate}")
-            logger.info(f"Day To Forecast: {day_to_forecast}")
-            logger.info(f"Label File: {self.filepath}")
+            logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
+            logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
+            logger.info(f"Window Size (days): {window_size}")
+            logger.info(f"Window Step (hours): {window_step}")
+            logger.info(f"Sampling Rate (Hz): {sampling_rate}")
+            logger.info(f"Day To Forecast (days): {day_to_forecast}")
+            logger.info(f"Volcano ID: {volcano_id}")
 
     def __repr__(self) -> str:
         return (
             f"LabelBuilder({self.start_date_str}, "
             f"{self.end_date_str}, "
             f"{self.window_size}, "
-            f"{self.window_overlap}, "
+            f"{self.window_step}, "
             f"{self.sampling_rate}, "
             f"{self.day_to_forecast}, "
             f"{self.eruption_dates}), "
@@ -311,10 +318,10 @@ class LabelBuilder:
         ), f"window_size must be less than {self.n_days} days)"
 
         # Maximum window overlap is the window size in hours
-        maximum_window_overlap = self.window_size * 24
+        maximum_window_step = self.window_size * 24
         assert (
-            0 < self.window_overlap <= maximum_window_overlap
-        ), f"window_overlap must be between 0 and/ or equal {maximum_window_overlap} hours. \
+            0 < self.window_step <= maximum_window_step
+        ), f"window_step must be between 0 and/ or equal {maximum_window_step} hours. \
         Suggestion: set to 6, 12, or 24 hours"
         assert self.sampling_rate > 0, "sampling_rate must be > 0"
 
@@ -348,16 +355,7 @@ class LabelBuilder:
         Returns:
             pd.DataFrame
         """
-        freq_in_hours = timedelta(hours=self.window_overlap)
-        dates = pd.date_range(
-            start=self.start_date,
-            end=self.end_date,
-            freq=freq_in_hours,
-            inclusive="both",
-        )
-
-        df = pd.DataFrame(index=dates)
-        df.index.name = "datetime"
+        df = construct_windows(self.window_step, self.start_date, self.end_date)
         df["is_erupted"] = 0
 
         return df
@@ -401,6 +399,11 @@ class LabelBuilder:
 
                 # End of eruption date should be at 23:59:59
                 end_eruption = day_of_eruption.replace(hour=23, minute=59, second=59)
+
+                # Stop if eruption date is beyond the end date
+                if end_eruption > self.end_date:
+                    break
+
             except ValueError:
                 raise ValueError(
                     f"Eruption date is {eruption}. "

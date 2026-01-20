@@ -1,6 +1,6 @@
 # Standard library imports
 from datetime import datetime, timedelta
-from typing import Optional, Callable
+from typing import Callable, Union
 
 # Third party imports
 import numpy as np
@@ -11,7 +11,7 @@ from obspy import Trace
 
 def detect_outliers(
     data: np.ndarray, outlier_threshold: float = 0.5
-) -> tuple[bool, int | float, float]:
+) -> tuple[bool, Union[int, float], float]:
     """Detect outliers in an array and return an array with outliers
     using z-score ((X - μ) / σ)
 
@@ -20,7 +20,7 @@ def detect_outliers(
         outlier_threshold (float, optional): Degree of outliers. Defaults to 0.5.
 
     Returns:
-        tuple[bool, int | float, float]:
+        tuple[bool, Union[int, float], float]:
             outlier (bool) : true if outlier is detected, false otherwise.
             outlier_index : Index of the outlier
             outlier_value : Value of the outlier
@@ -64,7 +64,7 @@ def delete_outliers(data: np.ndarray) -> np.ndarray:
 def get_windows_information(
     trace: Trace,
     window_duration_minutes: int = 10,
-) -> dict[str, int | float]:
+) -> dict[str, Union[int, float]]:
     """Get windows and samples information from Trace
 
     Args:
@@ -72,7 +72,7 @@ def get_windows_information(
         window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
 
     Returns:
-        dict[str, int | float]: Windows and samples information
+        dict[str, Union[int, float]]: Windows and samples information
 
     Example:
         Returns examples:
@@ -180,3 +180,40 @@ def calculate_window_metrics(
         data_points.append(metric_value)
 
     return pd.Series(data=data_points, index=indices, name="datetime", dtype=float)
+
+
+def construct_windows(
+    window_step: int,
+    start_date: Union[str, datetime],
+    end_date: Union[str, datetime],
+) -> pd.DataFrame:
+    """Construct windows for label and tremor data
+
+    Args:
+        window_step (int): Step size in hours
+        start_date (Union[str, datetime]): Start date
+        end_date (Union[str, datetime]): End date
+
+    Returns:
+        pd.DataFrame
+    """
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+    start_date = start_date.replace(hour=0, minute=0, second=0)
+    end_date = end_date.replace(hour=23, minute=59, second=59)
+
+    freq_in_hours = timedelta(hours=window_step)
+    dates = pd.date_range(
+        start=start_date,
+        end=end_date,
+        freq=freq_in_hours,
+        inclusive="both",
+    )
+
+    df = pd.DataFrame(index=dates)
+    df.index.name = "datetime"
+
+    return df
