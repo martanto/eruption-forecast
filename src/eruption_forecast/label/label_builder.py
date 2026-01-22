@@ -26,7 +26,8 @@ class LabelBuilder:
         start_date (str | datetime): Start date in YYYY-MM-DD format.
         end_date (str | datetime): End date in YYYY-MM-DD format.
         window_size (int): Window size in days.
-        window_step (int): Window overlap in hours. Range from 1 to maximum window size in hours.
+        window_step (int): Window step size.
+        window_step_unit (Literal["minutes", "hours"]): Unit of window step.
         sampling_rate (float | int): Sampling rate in Hz.
         day_to_forecast (int): Day to forecast in days.
         eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
@@ -41,6 +42,7 @@ class LabelBuilder:
         end_date: str | datetime,
         window_size: int,
         window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
         sampling_rate: float | int,
         day_to_forecast: int,
         eruption_dates: list[str],
@@ -76,6 +78,7 @@ class LabelBuilder:
         self.end_date: datetime = end_date
         self.window_size: int = int(window_size)
         self.window_step: int = int(window_step)
+        self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.sampling_rate: float = float(sampling_rate)
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = eruption_dates
@@ -95,7 +98,7 @@ class LabelBuilder:
         self.filename = (
             f"label_{start_date_str}_{end_date_str}"
             f"_ws-{window_size}"
-            f"_step-{window_step}"
+            f"_step-{window_step}-{window_step_unit}"
             f"_sr-{sampling_rate}"
             f"_dtf-{day_to_forecast}.csv"
         )
@@ -112,7 +115,7 @@ class LabelBuilder:
             logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
             logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
             logger.info(f"Window Size (days): {window_size}")
-            logger.info(f"Window Step (hours): {window_step}")
+            logger.info(f"Window Step ({window_step_unit}): {window_step}")
             logger.info(f"Sampling Rate (Hz): {sampling_rate}")
             logger.info(f"Day To Forecast (days): {day_to_forecast}")
             logger.info(f"Volcano ID: {volcano_id}")
@@ -123,6 +126,7 @@ class LabelBuilder:
             f"{self.end_date_str}, "
             f"{self.window_size}, "
             f"{self.window_step}, "
+            f"{self.window_step_unit}, "
             f"{self.sampling_rate}, "
             f"{self.day_to_forecast}, "
             f"{self.eruption_dates}), "
@@ -317,12 +321,22 @@ class LabelBuilder:
             self.window_size < self.n_days
         ), f"window_size must be less than {self.n_days} days)"
 
+        assert self.window_step_unit in [
+            "minutes",
+            "hours",
+        ], "window_step_unit must be 'minutes' or 'hours'"
+
         # Maximum window overlap is the window size in hours
-        maximum_window_step = self.window_size * 24
+        if self.window_step_unit == "minutes":
+            maximum_window_step = self.window_size * 60 * 24
+        else:
+            maximum_window_step = self.window_size * 24
+
         assert (
             0 < self.window_step <= maximum_window_step
-        ), f"window_step must be between 0 and/ or equal {maximum_window_step} hours. \
-        Suggestion: set to 6, 12, or 24 hours"
+        ), f"window_step must be between 1 and/ or equal {maximum_window_step} {self.window_step_unit}. \
+        Suggestion: set to 6, 12, or 24 {self.window_step_unit}"
+
         assert self.sampling_rate > 0, "sampling_rate must be > 0"
 
         assert self.day_to_forecast > 0, "day_to_forecast must be > 0"
@@ -355,7 +369,9 @@ class LabelBuilder:
         Returns:
             pd.DataFrame
         """
-        df = construct_windows(self.window_step, self.start_date, self.end_date)
+        df = construct_windows(
+            self.window_step, self.window_step_unit, self.start_date, self.end_date
+        )
         df["is_erupted"] = 0
 
         return df

@@ -1,6 +1,6 @@
 # Standard library imports
 from datetime import datetime, timedelta
-from typing import Callable, Union
+from typing import Callable, Literal, Union
 
 # Third party imports
 import numpy as np
@@ -184,19 +184,36 @@ def calculate_window_metrics(
 
 def construct_windows(
     window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
     start_date: Union[str, datetime],
     end_date: Union[str, datetime],
 ) -> pd.DataFrame:
     """Construct windows for label and tremor data
 
     Args:
-        window_step (int): Step size in hours
+        window_step (int): Step size
+        window_step_unit (Literal["minutes", "hours"]): Unit of window step.
         start_date (Union[str, datetime]): Start date
         end_date (Union[str, datetime]): End date
 
     Returns:
         pd.DataFrame
     """
+    assert isinstance(window_step, int), "window_step must be an integer"
+    assert isinstance(window_step_unit, str), "window_step_unit must be a string"
+    assert isinstance(
+        start_date, (str, datetime)
+    ), "start_date must be a string or datetime"
+    assert isinstance(
+        end_date, (str, datetime)
+    ), "end_date must be a string or datetime"
+
+    assert window_step > 0, "window_step must be > 0"
+    assert window_step_unit in [
+        "minutes",
+        "hours",
+    ], "window_step_unit must be 'minutes' or 'hours'"
+
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d")
     if isinstance(end_date, str):
@@ -205,7 +222,11 @@ def construct_windows(
     start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = end_date.replace(hour=23, minute=59, second=59)
 
-    freq_in_hours = timedelta(hours=window_step)
+    if window_step_unit == "minutes":
+        freq_in_hours = timedelta(minutes=window_step)
+    else:
+        freq_in_hours = timedelta(hours=window_step)
+
     dates = pd.date_range(
         start=start_date,
         end=end_date,
