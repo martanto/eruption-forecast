@@ -332,10 +332,11 @@ class LabelBuilder:
         else:
             maximum_window_step = self.window_size * 24
 
-        assert (
-            0 < self.window_step <= maximum_window_step
-        ), f"window_step must be between 1 and/ or equal {maximum_window_step} {self.window_step_unit}. \
-        Suggestion: set to 6, 12, or 24 {self.window_step_unit}"
+        assert 0 < self.window_step <= maximum_window_step, (
+            f"window_step must be less than or equal to {maximum_window_step} "
+            f"{self.window_step_unit}. \\n"
+            f"window_step: {self.window_step}, maximum_window_step: {maximum_window_step}"
+        )
 
         assert self.sampling_rate > 0, "sampling_rate must be > 0"
 

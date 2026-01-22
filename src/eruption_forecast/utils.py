@@ -201,6 +201,10 @@ def construct_windows(
     """
     assert isinstance(window_step, int), "window_step must be an integer"
     assert isinstance(window_step_unit, str), "window_step_unit must be a string"
+    assert window_step_unit in [
+        "minutes",
+        "hours",
+    ], "window_step_unit must be 'minutes' or 'hours'"
     assert isinstance(
         start_date, (str, datetime)
     ), "start_date must be a string or datetime"
@@ -209,15 +213,25 @@ def construct_windows(
     ), "end_date must be a string or datetime"
 
     assert window_step > 0, "window_step must be > 0"
-    assert window_step_unit in [
-        "minutes",
-        "hours",
-    ], "window_step_unit must be 'minutes' or 'hours'"
 
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d")
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, "%Y-%m-%d")
+    assert start_date < end_date, "start_date must be less than end_date"
+
+    n_days = (end_date - start_date).days
+
+    if window_step_unit == "minutes":
+        maximum_window_step = n_days * 60 * 24
+    else:
+        maximum_window_step = n_days * 24
+
+    assert window_step <= maximum_window_step, (
+        f"window_step must be less than or equal to {maximum_window_step} "
+        f"{window_step_unit}. \\n"
+        f"window_step: {window_step}, maximum_window_step: {maximum_window_step}"
+    )
 
     start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = end_date.replace(hour=23, minute=59, second=59)
