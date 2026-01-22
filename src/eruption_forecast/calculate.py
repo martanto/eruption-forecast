@@ -5,13 +5,15 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Any, Optional, Self
+from typing import Any, Literal, Optional, Self, Tuple
 
 # Third party imports
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 from jupyter_client.jsonutil import parse_date
 from loguru import logger
+from matplotlib import pyplot as plt
 from obspy import Stream, UTCDateTime
 
 # Project imports
@@ -48,6 +50,8 @@ class CalculateTremor:
         value_multiplier (Optional[float]): Scaling factor for seismic values.
         interpolate (bool): If True, interpolates missing data points. Defaults to False.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
+        plot_tmp (bool): If True, plot temporary results for quick view.
+        plot_tremor (bool): If True, plot tremor results for quick view.
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
     """
@@ -75,6 +79,9 @@ class CalculateTremor:
         value_multiplier: Optional[float] = None,
         interpolate: bool = False,
         cleanup_tmp_dir: bool = False,
+        plot_tmp: bool = False,
+        plot_tremor: bool = False,
+        overwrite_plot: bool = False,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -83,8 +90,11 @@ class CalculateTremor:
         network = network or "VG"
         location = location or "00"
         nslc = f"{network}.{station}.{location}.{channel}"
-        output_dir = os.path.join(os.getcwd(), output_dir, "forecast")
+        output_dir = os.path.join(os.getcwd(), output_dir)
         station_dir = os.path.join(output_dir, nslc)
+        forecast_dir = os.path.join(station_dir, "forecast")
+        tremor_dir = os.path.join(station_dir, "tremor")
+        figures_dir = os.path.join(station_dir, "figures")
 
         # Set DEFAULT properties
         self.station = station.upper()
@@ -101,7 +111,8 @@ class CalculateTremor:
         )
         self.output_dir: str = output_dir
         self.station_dir: str = station_dir
-        self.tremor_dir: str = os.path.join(station_dir, tremor_dir)
+        self.forecast_dir: str = forecast_dir
+        self.tremor_dir: str = tremor_dir
         self.overwrite = overwrite
         self.filename_prefix = filename_prefix
         self.n_jobs = n_jobs
@@ -111,10 +122,15 @@ class CalculateTremor:
         self.value_multiplier = value_multiplier
         self.interpolate = interpolate
         self.cleanup_tmp_dir = cleanup_tmp_dir
+        self.plot_tmp = plot_tmp
+        self.plot_tremor = plot_tremor
+        self.overwrite_plot = overwrite_plot
         self.verbose = verbose
         self.debug = debug
 
         # Set ADDITIONAL properties
+        self.df: pd.DataFrame = pd.DataFrame()
+
         try:
             self.start_date_obj: datetime = datetime.strptime(start_date, "%Y-%m-%d")
             self.end_date_obj: datetime = datetime.strptime(end_date, "%Y-%m-%d")
@@ -142,6 +158,8 @@ class CalculateTremor:
         self.results: list[Any] = []
         self.sds: Optional[SDS] = None
         self.tmp_files: list[str] = []
+        self.figures_dir = figures_dir
+        self.figures_tmp_dir = os.path.join(figures_dir, "tmp")
         self._source: Optional[str] = None
         self._sds_dir: Optional[str] = None
         self._client_url = "https://service.iris.edu"
@@ -224,6 +242,7 @@ class CalculateTremor:
         os.makedirs(self.tmp_dir, exist_ok=True)
         return self
 
+    @logger.catch
     def create_directories(self) -> None:
         """Create the directories.
 
@@ -234,6 +253,9 @@ class CalculateTremor:
         os.makedirs(self.station_dir, exist_ok=True)
         os.makedirs(self.tremor_dir, exist_ok=True)
         os.makedirs(self.tmp_dir, exist_ok=True)
+
+        if self.plot_tmp:
+            os.makedirs(self.figures_tmp_dir, exist_ok=True)
 
         if self.debug:
             os.makedirs(self.log_dir, exist_ok=True)
@@ -249,10 +271,12 @@ class CalculateTremor:
         Returns:
             None
         """
-        if self.start_date_utc_datetime > self.end_date_utc_datetime:
-            raise ValueError(
-                f"Start date {self.start_date} must be before end date {self.end_date}"
-            )
+        assert (
+            self.n_jobs > 0
+        ), f"Number of jobs must be greater than 0. Your value: {self.n_jobs}"
+        assert (
+            self.start_date_utc_datetime < self.end_date_utc_datetime
+        ), f"Start date {self.start_date} must be before end date {self.end_date}"
 
         assert (
             0 < self.window_overlap <= 1
@@ -334,18 +358,22 @@ class CalculateTremor:
         if self.n_jobs == 1:
             for job in self.jobs:
                 self.run_job(*job)
-            return self
 
-        if self.verbose:
-            logger.info(f"Running on {self.n_jobs} job(s)")
+        if self.n_jobs > 1:
+            if self.verbose:
+                logger.info(f"Running on {self.n_jobs} job(s)")
 
-        pool = Pool(self.n_jobs)
-        pool.starmap(self.run_job, self.jobs)
-        pool.close()
-        pool.join()
+            pool = Pool(self.n_jobs)
+            pool.starmap(self.run_job, self.jobs)
+            pool.close()
+            pool.join()
 
         # Merge calculated tremor CSV files from tmp dir
-        self.save_tremor(self.tmp_dir, self.tremor_dir)
+        _, df = self.concat_tremor_data(self.tmp_dir, self.tremor_dir)
+        self.df = df
+
+        if self.plot_tremor:
+            self.plot(df, plot_type="tremor")
 
         return self
 
@@ -373,12 +401,19 @@ class CalculateTremor:
             return None
 
         df = self.calculate(date)
+
+        # save tremor data
         df.to_csv(
             temp_file,
             index=True,
             index_label="datetime",
         )
 
+        # plot tremor data
+        if self.plot_tmp:
+            self.plot(df, plot_type="tmp")
+
+        # save tremor data
         self.tmp_files.append(temp_file)
 
         if self.verbose:
@@ -519,16 +554,100 @@ class CalculateTremor:
 
         return series
 
+    def plot(
+        self,
+        df: pd.DataFrame,
+        plot_type: Literal["tmp", "tremor"] = "tmp",
+    ) -> None:
+        """Plot tremor data
+
+        Args:
+            df (pd.DataFrame): Tremor data
+            plot_type (Literal["tmp", "tremor"]): Type of plot to be saved. Defaults to "tmp".
+
+        Returns:
+            None
+        """
+        overwrite = self.overwrite_plot or self.overwrite
+        start_date: pd.Timestamp = df.index[0]
+        end_date: pd.Timestamp = df.index[-1]
+
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+
+        # Save plot to tmp directory
+        figure_dir = self.figures_tmp_dir if plot_type == "tmp" else self.figures_dir
+        figure_name = (
+            start_date_str
+            if plot_type == "tmp"
+            else f"tremor_{start_date_str}_{end_date_str}"
+        )
+        filepath = os.path.join(figure_dir, f"{figure_name}.png")
+
+        # Define date locator and formatter based on plot type
+        date_locator = (
+            mdates.HourLocator(interval=2)
+            if plot_type == "tmp"
+            else mdates.DayLocator(interval=14)
+        )
+        date_formatter = (
+            mdates.DateFormatter("%H:%M")
+            if plot_type == "tmp"
+            else mdates.DateFormatter("%Y-%m-%d")
+        )
+
+        if os.path.exists(filepath) and not overwrite:
+            logger.info(f"{start_date_str} :: Plot already exists at {filepath}")
+            return
+
+        columns = df.columns
+        n_rows = len(columns)
+        fig, axs = plt.subplots(
+            nrows=n_rows, ncols=1, figsize=(10, 1.2 * n_rows), sharex=True
+        )
+
+        for index, column in enumerate(columns):
+            ax = axs[index] if n_rows > 1 else axs
+            ax.plot(
+                df.index,
+                df[column],
+                color="black",
+                linewidth=1,
+                label=column,
+                alpha=0.8,
+            )
+            ax.set_xlim(start_date, end_date)
+            ax.legend(loc="upper left", fontsize=8, frameon=False)
+
+            ax.xaxis.set_major_locator(date_locator)
+            ax.xaxis.set_major_formatter(date_formatter)
+            for label in ax.get_xticklabels(which="major"):
+                label.set(rotation=30, horizontalalignment="right", fontsize=8)
+
+            if index == (n_rows - 1):
+                ax.set_xlabel(
+                    start_date_str if plot_type == "tmp" else self.nslc, fontsize=10
+                )
+
+        plt.tight_layout()
+        plt.savefig(filepath, dpi=100)
+        plt.close()
+
+        if self.verbose:
+            logger.info(f"{start_date_str} :: Plot saved to {filepath}")
+
     @staticmethod
-    def save_tremor(tmp_dir: str, tremor_dir: Optional[str] = None) -> str:
-        """Save calculated tremor data to file.
+    def concat_tremor_data(
+        tmp_dir: str, tremor_dir: Optional[str] = None
+    ) -> Tuple[str, pd.DataFrame]:
+        """Concatenate calculated tremor data from tmp dir to tremor dir.
 
         Args:
             tmp_dir (str): Temporary dir where calculated tremor saved
             tremor_dir (str, optional): Directory where tremor data will be saved. Defaults to None.
 
         Returns:
-            str: Tremor data location
+            Tuple[str, pd.DataFrame]: Tremor data location and tremor data
         """
         assert os.path.isdir(tmp_dir), f"Directory {tmp_dir} does not exist"
 
@@ -546,5 +665,9 @@ class CalculateTremor:
             sort=True,
         )
 
-        df.to_csv(os.path.join(tremor_dir, "tremor.csv"), index=True)
-        return os.path.join(tremor_dir, "tremor.csv")
+        tremor_filepath = os.path.join(tremor_dir, "tremor.csv")
+        df.to_csv(tremor_filepath, index=True)
+
+        logger.info(f"Tremor data saved to {tremor_filepath}")
+
+        return tremor_filepath, df
