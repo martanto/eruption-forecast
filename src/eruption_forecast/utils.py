@@ -15,14 +15,14 @@ def detect_outliers(
     """Detect outliers in an array using z-score ((X - μ) / σ)
 
     Args:
-        data (np.ndarray): Array of data from trace
-        outlier_threshold (float, optional): Degree of outliers. Defaults to 0.5.
+        data (np.ndarray): Array of data from a trace.
+        outlier_threshold (float, optional): Outlier threshold degree. Defaults to 0.5.
 
     Returns:
         tuple[bool, Union[int, float], float]:
-            outlier (bool) : true if outlier is detected, false otherwise.
-            outlier_index : Index of the outlier
-            outlier_value : Value of the outlier
+            outlier (bool): True if outlier is detected, False otherwise.
+            outlier_index: Index of the outlier.
+            outlier_value: Value of the outlier.
     """
     if isinstance(data, pd.Series):
         data = data.values
@@ -44,13 +44,13 @@ def detect_outliers(
 
 
 def delete_outliers(data: np.ndarray) -> np.ndarray:
-    """Delete outliers from an array
+    """Remove outliers from an array.
 
     Args:
-        data (np.ndarray): Array of data
+        data (np.ndarray): Array of data.
 
     Returns:
-        np.ndarray: Array without outliers
+        np.ndarray: Array without outliers.
     """
     outlier, outlier_index, _ = detect_outliers(data)
 
@@ -64,17 +64,17 @@ def get_windows_information(
     trace: Trace,
     window_duration_minutes: int = 10,
 ) -> dict[str, Union[int, float]]:
-    """Get window and sample information from a Trace
+    """Get window and sample information from an ObsPy Trace.
 
     Args:
-        trace (Trace): Trace
+        trace (Trace): ObsPy Trace object.
         window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
 
     Returns:
-        dict[str, Union[int, float]]: Window and sample information
+        dict[str, Union[int, float]]: Window and sample information.
 
     Example:
-        Returns examples:
+        Example return value:
             {
                 "number_of_samples": number_of_samples,
                 "samples_per_day": samples_per_day,
@@ -84,7 +84,7 @@ def get_windows_information(
             }
     """
     if not isinstance(trace, Trace):
-        raise TypeError("Input must be an Obspy Trace object")
+        raise TypeError("Input must be an ObsPy Trace object")
 
     sampling_rate = trace.stats.sampling_rate
     number_of_samples = trace.stats.npts
@@ -96,7 +96,7 @@ def get_windows_information(
 
     if sample_window != total_windows:
         logger.warning(
-            f"sample_window ({sample_window}) not the same as total_windows ({total_windows})"
+            f"sample_window ({sample_window}) is not the same as total_windows ({total_windows})"
         )
 
     return {
@@ -117,22 +117,22 @@ def calculate_window_metrics(
     absolute_value: bool = False,
     value_multiplier: float = 1.0,
 ) -> pd.Series:
-    """Calculate metrics for defined time windows of a Trace.
+    """Calculate metrics for defined time windows of an ObsPy Trace.
 
     Args:
-        trace (Trace): Obspy Trace object.
+        trace (Trace): ObsPy Trace object.
         window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
         metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
         remove_outliers (bool, optional): Whether to remove outliers before calculation. Defaults to True.
-        minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate metric. Defaults to 0.3.
-        absolute_value (bool, optional): Whether to calculate absolute value. Defaults to False.
-        value_multiplier (float, optional): Multiplier for metric value. Defaults to 1.0.
+        minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate the metric. Defaults to 0.3.
+        absolute_value (bool, optional): Whether to use absolute values. Defaults to False.
+        value_multiplier (float, optional): Multiplier for the metric value. Defaults to 1.0.
 
     Returns:
         pd.Series: Series containing the calculated metrics with datetime index.
     """
     if not isinstance(trace, Trace):
-        raise TypeError("Input must be an Obspy Trace object")
+        raise TypeError("Input must be an ObsPy Trace object")
 
     start_datetime = trace.stats.starttime.datetime
     start_datetime = start_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -187,16 +187,16 @@ def construct_windows(
     start_date: Union[str, datetime],
     end_date: Union[str, datetime],
 ) -> pd.DataFrame:
-    """Construct windows for label and tremor data
+    """Construct time windows for label and tremor data.
 
     Args:
-        window_step (int): Step size
+        window_step (int): Step size between windows.
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
-        start_date (Union[str, datetime]): Start date
-        end_date (Union[str, datetime]): End date
+        start_date (Union[str, datetime]): Start date in YYYY-MM-DD format or datetime object.
+        end_date (Union[str, datetime]): End date in YYYY-MM-DD format or datetime object.
 
     Returns:
-        pd.DataFrame
+        pd.DataFrame: DataFrame with datetime index representing time windows.
     """
     window_step, window_step_unit = validate_window_step(window_step, window_step_unit)
     start_date, end_date, n_days = validate_date_ranges(start_date, end_date)
@@ -207,21 +207,21 @@ def construct_windows(
 
     assert window_step <= maximum_window_step, (
         f"window_step must be less than or equal to {maximum_window_step} "
-        f"{window_step_unit}. \\n"
+        f"{window_step_unit}.\n"
         f"window_step: {window_step}, maximum_window_step: {maximum_window_step}"
     )
 
     start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = end_date.replace(hour=23, minute=59, second=59)
 
-    freq_in_hours = timedelta(hours=window_step)
+    freq = timedelta(hours=window_step)
     if window_step_unit == "minutes":
-        freq_in_hours = timedelta(minutes=window_step)
+        freq = timedelta(minutes=window_step)
 
     dates = pd.date_range(
         start=start_date,
         end=end_date,
-        freq=freq_in_hours,
+        freq=freq,
         inclusive="both",
     )
 
@@ -234,14 +234,14 @@ def construct_windows(
 def to_datetime(
     date: Union[str, datetime], variable_name: Optional[str] = None
 ) -> datetime:
-    """Ensure date object is a datetime object
+    """Ensure date object is a datetime object.
 
     Args:
-        date (str): Date string
-        variable_name (str, optional): Variable name. Defaults to None.
+        date (Union[str, datetime]): Date string in YYYY-MM-DD format or datetime object.
+        variable_name (str, optional): Variable name for error messages. Defaults to None.
 
     Returns:
-        datetime: Datetime
+        datetime: Datetime object.
     """
     if isinstance(date, datetime):
         return date
@@ -252,24 +252,24 @@ def to_datetime(
         return datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
         raise ValueError(
-            f"{variable_name} value {date} " f"is not valid YYYY-MM-DD format."
+            f"{variable_name} value {date} is not in valid YYYY-MM-DD format."
         )
 
 
 def validate_date_ranges(
     start_date: Union[str, datetime], end_date: Union[str, datetime]
 ) -> Tuple[datetime, datetime, int]:
-    """Validate date ranges
+    """Validate date range.
 
     Args:
-        start_date (Union[str, datetime]): Start date in YYYY-MM-DD format.
-        end_date (Union[str, datetime]): End date in YYYY-MM-DD format.
+        start_date (Union[str, datetime]): Start date in YYYY-MM-DD format or datetime object.
+        end_date (Union[str, datetime]): End date in YYYY-MM-DD format or datetime object.
 
-    Raise:
-        ValueError: Date ranges are not valid.
+    Raises:
+        ValueError: If date range is not valid.
 
     Returns:
-        Tuple[datetime, datetime, int]: start date, end date, and total number of days
+        Tuple[datetime, datetime, int]: Start date, end date, and total number of days.
     """
     if isinstance(start_date, str):
         start_date: datetime = to_datetime(start_date)
@@ -292,17 +292,17 @@ def validate_window_step(
     window_step: int,
     window_step_unit: Literal["minutes", "hours"],
 ) -> Tuple[int, Literal["minutes", "hours"]]:
-    """Validate window step and step unit
+    """Validate window step and step unit.
 
     Args:
-        window_step (int): Step size
+        window_step (int): Step size between windows.
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
 
-    Raise:
-        ValueError: Window step or unit is invalid.
+    Raises:
+        ValueError: If window step or unit is invalid.
 
     Returns:
-        Tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes, hours)
+        Tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes or hours).
     """
     assert isinstance(window_step, int), ValueError(
         f"window_step must be an integer. Your value is {window_step}"
