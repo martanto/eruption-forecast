@@ -2,7 +2,7 @@
 import os
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Literal, Optional, Self
+from typing import Literal, Optional, Self, Union
 
 # Third party imports
 import pandas as pd
@@ -28,7 +28,6 @@ class LabelBuilder:
         window_size (int): Window size in days.
         window_step (int): Window step size.
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
-        sampling_rate (float | int): Sampling rate in Hz.
         day_to_forecast (int): Day to forecast in days.
         eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
         output_dir (Optional[str], optional): Output directory. Defaults to None.
@@ -38,12 +37,11 @@ class LabelBuilder:
 
     def __init__(
         self,
-        start_date: str | datetime,
-        end_date: str | datetime,
+        start_date: Union[str, datetime],
+        end_date: Union[str, datetime],
         window_size: int,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
-        sampling_rate: float | int,
         day_to_forecast: int,
         eruption_dates: list[str],
         volcano_id: str,
@@ -79,7 +77,6 @@ class LabelBuilder:
         self.window_size: int = int(window_size)
         self.window_step: int = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
-        self.sampling_rate: float = float(sampling_rate)
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = eruption_dates
         self.volcano_id: str = str(volcano_id)
@@ -99,7 +96,6 @@ class LabelBuilder:
             f"label_{start_date_str}_{end_date_str}"
             f"_ws-{window_size}"
             f"_step-{window_step}-{window_step_unit}"
-            f"_sr-{sampling_rate}"
             f"_dtf-{day_to_forecast}.csv"
         )
         self.filepath = os.path.join(label_dir, self.filename)
@@ -116,7 +112,6 @@ class LabelBuilder:
             logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
             logger.info(f"Window Size (days): {window_size}")
             logger.info(f"Window Step ({window_step_unit}): {window_step}")
-            logger.info(f"Sampling Rate (Hz): {sampling_rate}")
             logger.info(f"Day To Forecast (days): {day_to_forecast}")
             logger.info(f"Volcano ID: {volcano_id}")
 
@@ -127,7 +122,6 @@ class LabelBuilder:
             f"{self.window_size}, "
             f"{self.window_step}, "
             f"{self.window_step_unit}, "
-            f"{self.sampling_rate}, "
             f"{self.day_to_forecast}, "
             f"{self.eruption_dates}), "
             f"{self.volcano_id}"
@@ -337,8 +331,6 @@ class LabelBuilder:
             f"{self.window_step_unit}. \\n"
             f"window_step: {self.window_step}, maximum_window_step: {maximum_window_step}"
         )
-
-        assert self.sampling_rate > 0, "sampling_rate must be > 0"
 
         assert self.day_to_forecast > 0, "day_to_forecast must be > 0"
         assert (

@@ -5,13 +5,11 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Any, Literal, Optional, Self, Tuple
+from typing import Literal, Optional, Self, Tuple
 
 # Third party imports
 import matplotlib.dates as mdates
-import numpy as np
 import pandas as pd
-from jupyter_client.jsonutil import parse_date
 from loguru import logger
 from matplotlib import pyplot as plt
 from obspy import Stream, UTCDateTime
@@ -19,10 +17,9 @@ from obspy import Stream, UTCDateTime
 # Project imports
 import eruption_forecast
 
-from .dsar import DSAR
-from .rsam import RSAM
-from .sds import SDS
-from .utils import delete_outliers, get_windows_information
+from eruption_forecast.dsar import DSAR
+from eruption_forecast.rsam import RSAM
+from eruption_forecast.sds import SDS
 
 
 class CalculateTremor:
@@ -33,22 +30,16 @@ class CalculateTremor:
         channel (str): Seismic channel code.
         start_date (str): Start date for data processing (YYYY-MM-DD).
         end_date (Optional[str]): End date for data processing (YYYY-MM-DD).
-        window_size (Optional[int]): Size of the processing window in minutes. Defaults to 3.
-        window_overlap (Optional[float]): Overlap between windows as a fraction. Defaults to 0.75.
-        day_to_forecast (Optional[int]): Number of days to forecast ahead. Defaults to 1.
         network (str): Seismic network code. Defaults to "VG".
         location (str): Seismic location code. Defaults to "00".
         methods (Optional[str]): Calculation methods to apply.
         output_dir (str): Directory for output files. Defaults to "output".
-        tremor_dir (str): Directory for tremor data. Defaults to "tremor".
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
         filename_prefix (Optional[str]): Prefix for generated filenames.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
         volcano_code (Optional[str]): Code representing the volcano.
-        handle_zero_as_gap (bool): If True, treats zero values as data gaps. Defaults to True.
         remove_outliers (bool): If True, removes outliers from the data. Defaults to True.
         value_multiplier (Optional[float]): Scaling factor for seismic values.
-        interpolate (bool): If True, interpolates missing data points. Defaults to False.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
         plot_tmp (bool): If True, plot temporary results for quick view.
         plot_tremor (bool): If True, plot tremor results for quick view.
@@ -62,22 +53,16 @@ class CalculateTremor:
         channel: str,
         start_date: str,
         end_date: Optional[str] = None,
-        window_size: Optional[int] = 3,
-        window_overlap: Optional[float] = 0.75,
-        day_to_forecast: Optional[int] = 1,
         network: str = "VG",
         location: str = "00",
         methods: Optional[str] = None,
         output_dir: str = "output",
-        tremor_dir: str = "tremor",
         overwrite: bool = False,
         filename_prefix: Optional[str] = None,
         n_jobs: int = 1,
         volcano_code: Optional[str] = None,
-        handle_zero_as_gap: bool = True,
         remove_outliers: bool = True,
         value_multiplier: Optional[float] = None,
-        interpolate: bool = False,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = False,
         plot_tremor: bool = False,
@@ -101,9 +86,6 @@ class CalculateTremor:
         self.channel = channel.upper()
         self.start_date: str = start_date
         self.end_date: str = end_date
-        self.window_size: int = window_size or 3
-        self.window_overlap: float = window_overlap or 0.75
-        self.day_to_forecast: int = day_to_forecast or 1
         self.network = network or "VG"
         self.location = location or "00"
         self.methods: list[str] = (
@@ -117,10 +99,8 @@ class CalculateTremor:
         self.filename_prefix = filename_prefix
         self.n_jobs = n_jobs
         self.volcano_code = volcano_code
-        self.handle_zero_as_gap = handle_zero_as_gap
         self.remove_outliers = remove_outliers
         self.value_multiplier = value_multiplier
-        self.interpolate = interpolate
         self.cleanup_tmp_dir = cleanup_tmp_dir
         self.plot_tmp = plot_tmp
         self.plot_tremor = plot_tremor
@@ -155,7 +135,6 @@ class CalculateTremor:
         self.nslc = nslc
         self.tmp_dir: str = os.path.join(self.tremor_dir, "tmp")
         self.log_dir = os.path.join(self.station_dir, "logs")
-        self.results: list[Any] = []
         self.sds: Optional[SDS] = None
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
@@ -198,7 +177,7 @@ class CalculateTremor:
         """Freq band with alias.
 
         Returns:
-            dict[str, tuple[float, float]]: Dict contains band alias and freq bands
+            dict[str, tuple[float, float]]: Contains band alias and freq min and max.
 
         Example:
             {
@@ -277,10 +256,6 @@ class CalculateTremor:
         assert (
             self.start_date_utc_datetime < self.end_date_utc_datetime
         ), f"Start date {self.start_date} must be before end date {self.end_date}"
-
-        assert (
-            0 < self.window_overlap <= 1
-        ), f"Window overlap must be between 0 and 1. Default 0.75."
 
         for method in self.methods:
             assert (
@@ -582,7 +557,8 @@ class CalculateTremor:
             if plot_type == "tmp"
             else f"tremor_{start_date_str}_{end_date_str}"
         )
-        filepath = os.path.join(figure_dir, f"{figure_name}.png")
+        unix_timestamp = int(datetime.now().timestamp())
+        filepath = os.path.join(figure_dir, f"{figure_name}_{unix_timestamp}.png")
 
         # Define date locator and formatter based on plot type
         date_locator = (
