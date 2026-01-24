@@ -2,26 +2,19 @@
 import os
 from datetime import datetime
 from functools import cached_property
+from pathlib import Path
 from typing import Union
 
 # Third party imports
 import pandas as pd
 
-from eruption_forecast.utils import str_to_datetime
+# Project imports
+from eruption_forecast.utils import to_datetime
 
 
 class LabelData:
     def __init__(self, label_csv: str):
         self.label_csv = label_csv
-
-        # Example basename: label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv
-        # ws-1 -> window_size = 1 (days)
-        # step-12-hours -> window_step = 12 (hours)
-        # dtf-2 -> day_to_forecast = 2 (days)
-        filename = os.path.basename(self.label_csv)
-        self.filename = filename
-        self.basename = filename.split(".")[0]
-        self.filetype = filename.split(".")[1]
 
         self.validate()
 
@@ -34,8 +27,8 @@ class LabelData:
             day_to_forecast,
         ) = self.basename.split("_")
 
-        start_date = str_to_datetime(start_date_str)
-        end_date = str_to_datetime(end_date_str)
+        start_date = to_datetime(start_date_str)
+        end_date = to_datetime(end_date_str)
         window_step_and_unit = window_step_and_unit.split("-")
 
         self.start_date: datetime = start_date
@@ -46,16 +39,6 @@ class LabelData:
         self.window_step = int(window_step_and_unit[1])
         self.window_unit = window_step_and_unit[2]
         self.day_to_forecast = int(day_to_forecast.split("-")[1])
-        self.parameters: dict[str, Union[str, datetime, int]] = {
-            "start_date": start_date,
-            "end_date": end_date,
-            "start_date_str": start_date_str,
-            "end_date_str": end_date_str,
-            "window_size": self.window_size,
-            "window_step": self.window_step,
-            "window_unit": self.window_unit,
-            "day_to_forecast": self.day_to_forecast,
-        }
 
     def validate(self) -> None:
         """Validate label filename
@@ -114,7 +97,7 @@ class LabelData:
         )
 
         # Asserting window step.
-        # Expected example: stap-10-minutes or step-12-hours
+        # Expected example: step-10-minutes or step-12-hours
         # window_steps = ["step", "10", "minutes"]
         window_steps = window_step.split("-")
         starts_with = window_steps[0]
@@ -138,6 +121,50 @@ class LabelData:
             f"Day to forecast should be integer in days. "
             f"Expected format: dtf-X where 'X' is an integer. Got: dtf-{day_to_forecast}"
         )
+
+    @cached_property
+    def filename(self) -> str:
+        """Get the filename
+
+        Returns:
+            str: filename
+        """
+
+        # Example basename: label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv
+        # ws-1 -> window_size = 1 (days)
+        # step-12-hours -> window_step = 12 (hours)
+        # dtf-2 -> day_to_forecast = 2 (days)
+        return os.path.basename(self.label_csv)
+
+    @cached_property
+    def basename(self) -> str:
+        """Get the basename"""
+        return self.filename.split(".")[0]
+
+    @cached_property
+    def filetype(self) -> str:
+        """Get the filetype"""
+        return self.filename.split(".")[1]
+
+    @cached_property
+    def parameters(self) -> dict[str, Union[str, datetime, int]]:
+        """Get the parameters
+
+        Returns:
+            dict[str, Union[str, datetime, int]]: Label parameters
+        """
+        parameters: dict[str, Union[str, datetime, int]] = {
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "start_date_str": self.start_date_str,
+            "end_date_str": self.end_date_str,
+            "window_size": self.window_size,
+            "window_step": self.window_step,
+            "window_unit": self.window_unit,
+            "day_to_forecast": self.day_to_forecast,
+        }
+
+        return parameters
 
     @cached_property
     def df(self) -> pd.DataFrame:

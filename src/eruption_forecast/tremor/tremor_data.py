@@ -1,10 +1,11 @@
-# Third party imports
+# Standard library imports
 import os
-import numpy as np
-from typing import Tuple, Union
 from datetime import datetime
 from functools import cached_property
+from typing import Tuple, Union
 
+# Third party imports
+import numpy as np
 import pandas as pd
 
 
@@ -13,7 +14,12 @@ class TremorData:
         self.tremor_csv = tremor_csv
         self.validate()
 
-    def validate(self):
+    def validate(self) -> None:
+        """Validate tremor data
+
+        Raises:
+            ValueError: If tremor data is invalid
+        """
         assert os.path.exists(self.tremor_csv), ValueError(
             f"{self.tremor_csv} does not exist"
         )
@@ -57,12 +63,12 @@ class TremorData:
         """Get number of days in tremor data"""
         return int((self.end_date - self.start_date).days)
 
-    def validate_sampling(self) -> Tuple[bool, int]:
-        """Check the number of periods in tremor data in seconds
+    def validate_sampling_rate(self) -> Tuple[bool, int]:
+        """Check if the tremor data has consistent sampling periods in seconds
 
         Returns:
-            bool: Return true if, sampling period has the same period
-            int: Return sampling periods in seconds
+            bool: Return true if sampling period is consistent
+            int: Return sampling period in seconds
         """
         df = self.df.copy()
         df["_time"] = df.index

@@ -2,10 +2,10 @@
 import glob
 import os
 import shutil
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Literal, Optional, Self, Tuple
+from typing import Literal, Optional, Self, Tuple, Union
 
 # Third party imports
 import matplotlib.dates as mdates
@@ -16,10 +16,10 @@ from obspy import Stream, UTCDateTime
 
 # Project imports
 import eruption_forecast
-
 from eruption_forecast.dsar import DSAR
 from eruption_forecast.rsam import RSAM
 from eruption_forecast.sds import SDS
+from eruption_forecast.utils import to_datetime
 
 
 class CalculateTremor:
@@ -37,7 +37,6 @@ class CalculateTremor:
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
         filename_prefix (Optional[str]): Prefix for generated filenames.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
-        volcano_code (Optional[str]): Code representing the volcano.
         remove_outliers (bool): If True, removes outliers from the data. Defaults to True.
         value_multiplier (Optional[float]): Scaling factor for seismic values.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
@@ -49,10 +48,10 @@ class CalculateTremor:
 
     def __init__(
         self,
+        start_date: Union[str, datetime],
+        end_date: Union[str, datetime],
         station: str,
         channel: str,
-        start_date: str,
-        end_date: Optional[str] = None,
         network: str = "VG",
         location: str = "00",
         methods: Optional[str] = None,
@@ -60,7 +59,6 @@ class CalculateTremor:
         overwrite: bool = False,
         filename_prefix: Optional[str] = None,
         n_jobs: int = 1,
-        volcano_code: Optional[str] = None,
         remove_outliers: bool = True,
         value_multiplier: Optional[float] = None,
         cleanup_tmp_dir: bool = False,
@@ -71,7 +69,8 @@ class CalculateTremor:
         debug: bool = False,
     ):
         # Set DEFAULT parameter
-        end_date = end_date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        start_date = to_datetime(start_date)
+        end_date = to_datetime(end_date)
         network = network or "VG"
         location = location or "00"
         nslc = f"{network}.{station}.{location}.{channel}"
@@ -84,8 +83,8 @@ class CalculateTremor:
         # Set DEFAULT properties
         self.station = station.upper()
         self.channel = channel.upper()
-        self.start_date: str = start_date
-        self.end_date: str = end_date
+        self.start_date: datetime = start_date
+        self.end_date: datetime = end_date
         self.network = network or "VG"
         self.location = location or "00"
         self.methods: list[str] = (
@@ -98,7 +97,6 @@ class CalculateTremor:
         self.overwrite = overwrite
         self.filename_prefix = filename_prefix
         self.n_jobs = n_jobs
-        self.volcano_code = volcano_code
         self.remove_outliers = remove_outliers
         self.value_multiplier = value_multiplier
         self.cleanup_tmp_dir = cleanup_tmp_dir
@@ -110,15 +108,10 @@ class CalculateTremor:
 
         # Set ADDITIONAL properties
         self.df: pd.DataFrame = pd.DataFrame()
-
-        try:
-            self.start_date_obj: datetime = datetime.strptime(start_date, "%Y-%m-%d")
-            self.end_date_obj: datetime = datetime.strptime(end_date, "%Y-%m-%d")
-            self.start_date_utc_datetime = UTCDateTime(self.start_date_obj)
-            self.end_date_utc_datetime = UTCDateTime(self.end_date_obj)
-        except ValueError:
-            raise ValueError(f"Start date and end date must be in format YYYY-MM-DD")
-
+        self.start_date_str: str = start_date.strftime("%Y-%m-%d")
+        self.end_date_str: str = end_date.strftime("%Y-%m-%d")
+        self.start_date_utc_datetime = UTCDateTime(self.start_date)
+        self.end_date_utc_datetime = UTCDateTime(self.end_date)
         self.freq_bands: list[tuple[float, float]] = [
             (0.01, 0.1),
             (0.1, 2),
@@ -154,8 +147,8 @@ class CalculateTremor:
             logger.info(f"Version: {eruption_forecast.__version__}")
             logger.info(f"Running on {self.n_jobs} job(s)")
             logger.info(f"NSLC: {self.nslc}")
-            logger.info(f"Start Date: {self.start_date}")
-            logger.info(f"End Date: {self.end_date}")
+            logger.info(f"Start Date: {self.start_date_str}")
+            logger.info(f"End Date: {self.end_date_str}")
             logger.info(f"Total Days: {self.n_days}")
             logger.info(f"Output Directory: {self.output_dir}")
             logger.info(f"Station Directory: {self.station_dir}")
@@ -195,7 +188,7 @@ class CalculateTremor:
 
     @cached_property
     def filename(self) -> str:
-        default_filename = f"{self.nslc}_{self.start_date}_{self.end_date}"
+        default_filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}"
         return (
             default_filename
             if self.filename_prefix is None
@@ -204,6 +197,11 @@ class CalculateTremor:
 
     @cached_property
     def jobs(self) -> list[tuple[int, datetime]]:
+        """Generate jobs for multiprocessing
+
+        Returns:
+            list[tuple[int, datetime]]: List of job index and datetime
+        """
         return [(job_index, date) for job_index, date in enumerate(self.dates)]
 
     @logger.catch
@@ -255,7 +253,7 @@ class CalculateTremor:
         ), f"Number of jobs must be greater than 0. Your value: {self.n_jobs}"
         assert (
             self.start_date_utc_datetime < self.end_date_utc_datetime
-        ), f"Start date {self.start_date} must be before end date {self.end_date}"
+        ), f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
 
         for method in self.methods:
             assert (
@@ -328,7 +326,7 @@ class CalculateTremor:
         Returns:
             Self
         """
-        self.create_temporary_dir()
+        self.create_temporary_dir(self)
 
         if self.n_jobs == 1:
             for job in self.jobs:
@@ -400,7 +398,7 @@ class CalculateTremor:
 
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor data.
-        Those method calculate the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
+        This method calculates the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
 
         Args:
             date (datetime): Date to calculate
@@ -434,7 +432,6 @@ class CalculateTremor:
                         stream=stream.copy(),
                         freq_min=freq_band[0],
                         freq_max=freq_band[1],
-                        date=date,
                     ).values
 
                     if self.verbose:
@@ -505,10 +502,8 @@ class CalculateTremor:
         return df
 
     def calculate_rsam(
-        self, stream: Stream, freq_min: float, freq_max: float, date: datetime
+        self, stream: Stream, freq_min: float, freq_max: float
     ) -> pd.Series:
-        date_str = date.strftime("%Y-%m-%d")
-
         rsam: RSAM = (
             RSAM(
                 stream=stream,

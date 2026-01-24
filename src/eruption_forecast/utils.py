@@ -1,6 +1,6 @@
 # Standard library imports
 from datetime import datetime, timedelta
-from typing import Callable, Literal, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
 # Third party imports
 import numpy as np
@@ -12,8 +12,7 @@ from obspy import Trace
 def detect_outliers(
     data: np.ndarray, outlier_threshold: float = 0.5
 ) -> tuple[bool, Union[int, float], float]:
-    """Detect outliers in an array and return an array with outliers
-    using z-score ((X - μ) / σ)
+    """Detect outliers in an array using z-score ((X - μ) / σ)
 
     Args:
         data (np.ndarray): Array of data from trace
@@ -65,14 +64,14 @@ def get_windows_information(
     trace: Trace,
     window_duration_minutes: int = 10,
 ) -> dict[str, Union[int, float]]:
-    """Get windows and samples information from Trace
+    """Get window and sample information from a Trace
 
     Args:
         trace (Trace): Trace
         window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
 
     Returns:
-        dict[str, Union[int, float]]: Windows and samples information
+        dict[str, Union[int, float]]: Window and sample information
 
     Example:
         Returns examples:
@@ -199,33 +198,12 @@ def construct_windows(
     Returns:
         pd.DataFrame
     """
-    assert isinstance(window_step, int), "window_step must be an integer"
-    assert isinstance(window_step_unit, str), "window_step_unit must be a string"
-    assert window_step_unit in [
-        "minutes",
-        "hours",
-    ], "window_step_unit must be 'minutes' or 'hours'"
-    assert isinstance(
-        start_date, (str, datetime)
-    ), "start_date must be a string or datetime"
-    assert isinstance(
-        end_date, (str, datetime)
-    ), "end_date must be a string or datetime"
+    window_step, window_step_unit = validate_window_step(window_step, window_step_unit)
+    start_date, end_date, n_days = validate_date_ranges(start_date, end_date)
 
-    assert window_step > 0, "window_step must be > 0"
-
-    if isinstance(start_date, str):
-        start_date = datetime.strptime(start_date, "%Y-%m-%d")
-    if isinstance(end_date, str):
-        end_date = datetime.strptime(end_date, "%Y-%m-%d")
-    assert start_date < end_date, "start_date must be less than end_date"
-
-    n_days = (end_date - start_date).days
-
+    maximum_window_step = n_days * 24
     if window_step_unit == "minutes":
         maximum_window_step = n_days * 60 * 24
-    else:
-        maximum_window_step = n_days * 24
 
     assert window_step <= maximum_window_step, (
         f"window_step must be less than or equal to {maximum_window_step} "
@@ -236,10 +214,9 @@ def construct_windows(
     start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = end_date.replace(hour=23, minute=59, second=59)
 
+    freq_in_hours = timedelta(hours=window_step)
     if window_step_unit == "minutes":
         freq_in_hours = timedelta(minutes=window_step)
-    else:
-        freq_in_hours = timedelta(hours=window_step)
 
     dates = pd.date_range(
         start=start_date,
@@ -252,3 +229,92 @@ def construct_windows(
     df.index.name = "datetime"
 
     return df
+
+
+def to_datetime(
+    date: Union[str, datetime], variable_name: Optional[str] = None
+) -> datetime:
+    """Ensure date object is a datetime object
+
+    Args:
+        date (str): Date string
+        variable_name (str, optional): Variable name. Defaults to None.
+
+    Returns:
+        datetime: Datetime
+    """
+    if isinstance(date, datetime):
+        return date
+
+    variable_name = f"{variable_name}" if variable_name else "Date"
+
+    try:
+        return datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(
+            f"{variable_name} value {date} " f"is not valid YYYY-MM-DD format."
+        )
+
+
+def validate_date_ranges(
+    start_date: Union[str, datetime], end_date: Union[str, datetime]
+) -> Tuple[datetime, datetime, int]:
+    """Validate date ranges
+
+    Args:
+        start_date (Union[str, datetime]): Start date in YYYY-MM-DD format.
+        end_date (Union[str, datetime]): End date in YYYY-MM-DD format.
+
+    Raise:
+        ValueError: Date ranges are not valid.
+
+    Returns:
+        Tuple[datetime, datetime, int]: start date, end date, and total number of days
+    """
+    if isinstance(start_date, str):
+        start_date: datetime = to_datetime(start_date)
+    if isinstance(end_date, str):
+        end_date: datetime = to_datetime(end_date)
+
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+
+    assert start_date < end_date, ValueError(
+        f"Start date ({start_date_str}) should be less than end date ({end_date_str})"
+    )
+
+    n_days: int = int((end_date - start_date).days)
+
+    return start_date, end_date, n_days
+
+
+def validate_window_step(
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+) -> Tuple[int, Literal["minutes", "hours"]]:
+    """Validate window step and step unit
+
+    Args:
+        window_step (int): Step size
+        window_step_unit (Literal["minutes", "hours"]): Unit of window step.
+
+    Raise:
+        ValueError: Window step or unit is invalid.
+
+    Returns:
+        Tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes, hours)
+    """
+    assert isinstance(window_step, int), ValueError(
+        f"window_step must be an integer. Your value is {window_step}"
+    )
+    assert isinstance(window_step_unit, str), ValueError(
+        f"window_step_unit must be a string. Your value is {window_step_unit}"
+    )
+    assert window_step_unit in [
+        "minutes",
+        "hours",
+    ], ValueError(
+        f"window_step_unit must be 'minutes' or 'hours'. Your value is {window_step_unit}"
+    )
+
+    return window_step, window_step_unit

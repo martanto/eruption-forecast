@@ -1,7 +1,7 @@
 # Standard library imports
 import os
 from datetime import datetime
-from typing import List, Any
+from typing import Any, List
 
 # Third party imports
 from loguru import logger
@@ -9,7 +9,7 @@ from obspy import ObsPyReadingError, Stream, read
 
 
 class SDS:
-    """Seiscom Data Structure (SDS) class.
+    """SeisComP Data Structure (SDS) class.
 
     Get more information about SDS format from:
     https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html

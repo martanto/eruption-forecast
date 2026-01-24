@@ -9,7 +9,7 @@ import pandas as pd
 from loguru import logger
 
 # Project imports
-from eruption_forecast.utils import construct_windows
+from eruption_forecast.utils import construct_windows, to_datetime
 
 
 class LabelBuilder:
@@ -50,22 +50,8 @@ class LabelBuilder:
         debug: bool = False,
     ):
         # Set DEFAULT parameter
-        if isinstance(start_date, str):
-            try:
-                start_date = datetime.strptime(start_date, "%Y-%m-%d").replace(
-                    hour=0, minute=0, second=0
-                )
-            except ValueError:
-                raise ValueError("start_date must be in YYYY-MM-DD format")
-
-        if isinstance(end_date, str):
-            try:
-                end_date = datetime.strptime(end_date, "%Y-%m-%d").replace(
-                    hour=23, minute=59, second=59
-                )
-            except ValueError:
-                raise ValueError("end_date must be in YYYY-MM-DD format")
-
+        start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
+        end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
         start_date_str: str = start_date.strftime("%Y-%m-%d")
         end_date_str: str = end_date.strftime("%Y-%m-%d")
         output_dir = output_dir or os.path.join(os.getcwd(), "output")
@@ -165,7 +151,7 @@ class LabelBuilder:
 
     @property
     def df_eruption(self) -> pd.DataFrame:
-        """Eruputed Labels DataFrame property
+        """Erupted Labels DataFrame property
 
         Asserts:
             self._df_eruption must not empty
@@ -181,7 +167,7 @@ class LabelBuilder:
 
     @df_eruption.setter
     def df_eruption(self, df: pd.DataFrame) -> None:
-        """Eruputed Labels DataFrame setter
+        """Erupted Labels DataFrame setter
 
         Asserts:
             df must be a pandas DataFrame
@@ -200,7 +186,7 @@ class LabelBuilder:
 
     @property
     def df_eruptions(self) -> dict[str, pd.DataFrame]:
-        """Eruputed Windows DataFrame property
+        """Erupted Windows DataFrame property
 
         Asserts:
             self._df_eruptions must not empty
@@ -218,7 +204,7 @@ class LabelBuilder:
 
     @df_eruptions.setter
     def df_eruptions(self, df_dict: dict[str, pd.DataFrame]) -> None:
-        """Eruputed Windows DataFrame setter
+        """Erupted Windows DataFrame setter
 
         Asserts:
             df_dict must be a dictionary
@@ -226,7 +212,7 @@ class LabelBuilder:
             df_dict must have pandas DataFrame values
 
         Args:
-            df_dict (dict[str, pd.DataFrame]): Eruputed Windows to set
+            df_dict (dict[str, pd.DataFrame]): Erupted Windows to set
 
         Returns:
             None
@@ -277,7 +263,7 @@ class LabelBuilder:
         return self.y
 
     def validate_columns(self, df: pd.DataFrame) -> None:
-        """Asserting columns
+        """Validate columns
 
         Raises:
             AssertionError: If any of the columns are invalid
@@ -293,7 +279,7 @@ class LabelBuilder:
         assert "is_erupted" in df.columns, "df must have an 'is_erupted' column"
 
     def validate(self) -> None:
-        """Asserting properties
+        """Validate properties
 
         Raises:
             AssertionError: If any of the properties are invalid
@@ -342,7 +328,7 @@ class LabelBuilder:
         os.makedirs(self.label_dir, exist_ok=True)
 
     def assert_eruption_dates(self) -> None:
-        """Ensuring there is eruption between start date and end date
+        """Ensure there is an eruption between start date and end date
 
         Raises:
             AssertionError: If there is no eruption between start date and end date
@@ -357,7 +343,7 @@ class LabelBuilder:
         )
 
     def initiate_label(self) -> pd.DataFrame:
-        """Initiate label value with zero values (no eruption)
+        """Initialize label values with zeros (no eruption)
 
         Returns:
             pd.DataFrame

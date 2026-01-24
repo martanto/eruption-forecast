@@ -7,16 +7,17 @@ import pandas as pd
 from loguru import logger
 
 # Project imports
-from eruption_forecast.tremor.tremor_data import TremorData
-from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.label.label_data import LabelData
-from eruption_forecast.utils import construct_windows, validate_date_ranges
+from eruption_forecast.tremor.tremor_data import TremorData
 
 
 class FeaturesBuilder:
     """Features builder class
 
     Args:
+        tremor_csv (str): Path to tremor CSV file.
+        label_csv (str): Path to label CSV file.
+        output_dir (str): Output directory path.
         verbose (bool, optional): Verbose mode. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
     """
@@ -35,7 +36,7 @@ class FeaturesBuilder:
 
         # Set DEFAULT properties
         self.tremor_data: TremorData = tremor_data
-        self.training_label: LabelData = label_data
+        self.label_data: LabelData = label_data
         self.output_dir = output_dir
         self.verbose = verbose
         self.debug = debug

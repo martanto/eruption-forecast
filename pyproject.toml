@@ -13,8 +13,8 @@ requires-python = ">=3.11"
 dependencies = [
     "loguru",
     "notebook",
-    "obspy",
-    "pandas",
+    "obspy>=1.4.2",
+    "pandas>=3.0.0",
     "pip",
     "numba",
     "tsfresh",
