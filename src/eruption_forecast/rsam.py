@@ -21,12 +21,7 @@ class RSAM:
     """
 
     def __init__(self, stream: Stream, verbose: bool = False, debug: bool = False):
-        trace: Trace = stream[0].copy()
-
-        self.stream = stream.copy()
-        self.verbose = verbose
-        self.debug = debug
-
+        trace: Trace = stream[0]
         start_datetime: datetime = trace.stats.starttime.datetime
 
         self.trace = trace
@@ -34,6 +29,9 @@ class RSAM:
         self.start_datetime_str = start_datetime.strftime("%Y-%m-%d")
         self.is_filtered = False
         self.series: pd.Series = pd.Series(dtype=float)
+
+        self.verbose = verbose
+        self.debug = debug
 
     def apply_filter(self, freq_min: float, freq_max: float) -> Self:
         """Apply filter to the trace.
@@ -66,6 +64,7 @@ class RSAM:
         value_multiplier: float = 1.0,
         remove_outliers: bool = True,
         minimum_completion_ratio: float = 0.3,
+        interpolate: bool = True,
     ) -> Self:
         """Calculate metrics for defined time windows of a Trace.
 
@@ -75,6 +74,7 @@ class RSAM:
             value_multiplier (float, optional): Value multiplier. Defaults to 1.0.
             remove_outliers (bool, optional): Remove outlier. Defaults to True.
             minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate metric. Defaults to 0.3.
+            interpolate (bool, optional): Interpolate data. Defaults to True.
 
         Returns:
             Self: RSAM object
@@ -94,6 +94,9 @@ class RSAM:
         if value_multiplier > 1:
             series = series.apply(lambda values: values * value_multiplier)
 
+        if interpolate:
+            series = series.interpolate(method="linear")
+
         self.series = series
 
-        return self
+        return series

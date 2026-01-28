@@ -38,6 +38,7 @@ class CalculateTremor:
         filename_prefix (Optional[str]): Prefix for generated filenames.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
         remove_outliers (bool): If True, removes outliers from the data. Defaults to True.
+        interpolate (bool): If True, interpolates the data. Defaults to True.
         value_multiplier (Optional[float]): Scaling factor for seismic values.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
         plot_tmp (bool): If True, plot temporary results for quick view.
@@ -60,6 +61,7 @@ class CalculateTremor:
         filename_prefix: Optional[str] = None,
         n_jobs: int = 1,
         remove_outliers: bool = True,
+        interpolate: bool = True,
         value_multiplier: Optional[float] = None,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = False,
@@ -98,6 +100,7 @@ class CalculateTremor:
         self.filename_prefix = filename_prefix
         self.n_jobs = n_jobs
         self.remove_outliers = remove_outliers
+        self.interpolate = interpolate
         self.value_multiplier = value_multiplier
         self.cleanup_tmp_dir = cleanup_tmp_dir
         self.plot_tmp = plot_tmp
@@ -204,7 +207,6 @@ class CalculateTremor:
         """
         return [(job_index, date) for job_index, date in enumerate(self.dates)]
 
-    @logger.catch
     def create_temporary_dir(self) -> Self:
         """Create temporary directory.
 
@@ -277,12 +279,14 @@ class CalculateTremor:
             f"to determine the data source before `run`."
         )
 
-        if self._source == "sds" and self.sds:
-            return self.sds.get(date)
-        if self._source == "fdsn":
-            return Stream()
+        stream = Stream()
 
-        return Stream()
+        if self._source == "sds" and self.sds:
+            stream = self.sds.get(date)
+        if self._source == "fdsn":
+            stream = Stream()
+
+        return stream.detrend(type="demean")
 
     def from_sds(self, sds_dir: str) -> Self:
         """Set the data source to Seiscomp Data Structure (SDS).
@@ -326,7 +330,7 @@ class CalculateTremor:
         Returns:
             Self
         """
-        self.create_temporary_dir(self)
+        self.create_temporary_dir()
 
         if self.n_jobs == 1:
             for job in self.jobs:
@@ -406,7 +410,7 @@ class CalculateTremor:
         Returns:
             pd.DataFrame: Tremor data
         """
-        stream = self.stream(date).detrend(type="demean")
+        stream = self.stream(date)
         date_str = date.strftime("%Y-%m-%d")
 
         # Frequency bands
@@ -477,6 +481,7 @@ class CalculateTremor:
                     filtered_streams.append(filtered_stream_dict)
 
                 # Calculate DSAR
+                first_dsar = None
                 len_freq_bands = len(freq_bands)
                 for index, filtered_stream in enumerate(filtered_streams):
                     if index < (len_freq_bands - 1):
@@ -485,6 +490,9 @@ class CalculateTremor:
                         column_name = f"dsar_{first_band_name}-{second_band_name}"
 
                         first_stream = filtered_stream["filtered_stream"]
+                        if first_dsar is not None:
+                            first_stream = first_dsar
+
                         second_stream = filtered_streams[index + 1]["filtered_stream"]
 
                         # Use the new DSAR class
@@ -494,17 +502,21 @@ class CalculateTremor:
                             value_multiplier=self.value_multiplier or 1.0,
                         ).values
 
+                        first_dsar = dsar.first_dsar
+
                         if self.verbose:
                             logger.info(
                                 f"{date_str} :: DSAR ({column_name}) calculation finished"
                             )
+
+                        del filtered_stream
 
         return df
 
     def calculate_rsam(
         self, stream: Stream, freq_min: float, freq_max: float
     ) -> pd.Series:
-        rsam: RSAM = (
+        series = (
             RSAM(
                 stream=stream,
                 verbose=self.verbose,
@@ -517,10 +529,9 @@ class CalculateTremor:
             .calculate(
                 value_multiplier=self.value_multiplier or 1.0,
                 remove_outliers=self.remove_outliers,
+                interpolate=True,
             )
         )
-
-        series = rsam.series.interpolate(method="linear")
 
         return series
 

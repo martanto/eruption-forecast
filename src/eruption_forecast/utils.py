@@ -52,6 +52,9 @@ def delete_outliers(data: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Array without outliers.
     """
+    if np.sum(data) == 0:
+        return np.array([])
+
     outlier, outlier_index, _ = detect_outliers(data)
 
     if outlier:
@@ -156,9 +159,9 @@ def calculate_window_metrics(
         minimum_samples = int(np.ceil(minimum_completion_ratio * length_window_data))
 
         # Initialize metric_value to np.nan
-        metric_value = np.nan
+        metric_value = window_data[0] if length_window_data == 1 else np.nan
 
-        if length_window_data > 0:
+        if length_window_data > 1:
             if remove_outliers and (length_window_data > minimum_samples):
                 window_data = delete_outliers(window_data)
 
@@ -176,7 +179,7 @@ def calculate_window_metrics(
         )
 
         indices.append(window_time)
-        data_points.append(metric_value)
+        data_points.append(float(metric_value))
 
     return pd.Series(data=data_points, index=indices, name="datetime", dtype=float)
 
