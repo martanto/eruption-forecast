@@ -3,22 +3,22 @@ import glob
 import os
 import shutil
 from datetime import datetime, timedelta
-from functools import cached_property
+from functools import cached_property, lru_cache
 from multiprocessing import Pool
 from typing import Optional, Self, Tuple, Union
 
 # Third party imports
+import numpy as np
 import pandas as pd
 from obspy import Stream, Trace, UTCDateTime
 
 # Project imports
 import eruption_forecast
-from eruption_forecast.dsar import DSAR
 from eruption_forecast.logger import logger
 from eruption_forecast.plot import plot_tremor
 from eruption_forecast.rsam import RSAM
 from eruption_forecast.sds import SDS
-from eruption_forecast.utils import to_datetime
+from eruption_forecast.utils import calculate_window_metrics, to_datetime
 
 
 class CalculateTremor:
@@ -88,6 +88,8 @@ class CalculateTremor:
         self.end_date: datetime = end_date
         self.network = network or "VG"
         self.location = location or "00"
+
+        # TODO: Add shanon entropy, and kurtosis
         self.methods: list[str] = (
             [methods] if isinstance(methods, str) else list(methods or ["rsam", "dsar"])
         )
@@ -286,7 +288,7 @@ class CalculateTremor:
 
         self.create_directories()
 
-    def stream(self, date: Optional[datetime] = None) -> Stream:
+    def get_stream(self, date: Optional[datetime] = None) -> Stream:
         """Get the stream for a specific date.
 
         Args:
@@ -439,6 +441,7 @@ class CalculateTremor:
 
         return None
 
+    @lru_cache(maxsize=128)
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor data.
         This method calculates the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
@@ -449,41 +452,23 @@ class CalculateTremor:
         Returns:
             pd.DataFrame: Tremor data
         """
-        stream = self.stream(date)
+        stream = self.get_stream(date)
         date_str = date.strftime("%Y-%m-%d")
 
-        # Frequency bands
-        freq_bands = self.freq_bands_alias
-
+        # Build tremor DataFrame index
         datetime_index = pd.date_range(
             start=date, end=date + timedelta(days=1), freq="10min", inclusive="left"
         )
 
+        # Init tremor DataFrame without tremor values
         df = pd.DataFrame(index=datetime_index)
-
-        # Initialize DSAR
-        dsar = DSAR(
-            remove_outliers=self.remove_outliers, verbose=self.verbose, debug=self.debug
-        )
 
         for method in self.methods:
             if method == "rsam":
-                for band_name, freq_band in freq_bands.items():
-                    column_name = f"rsam_{band_name}"
-
-                    df[column_name] = self.calculate_rsam(
-                        stream=stream.copy(),
-                        freq_min=freq_band[0],
-                        freq_max=freq_band[1],
-                    ).values
-
-                    if self.verbose:
-                        logger.info(
-                            f"{date_str} :: RSAM ({column_name}) calculation finished"
-                        )
+                df = self.calculate_rsam(date_str, df, stream)
 
             if method == "dsar":
-                if len(freq_bands) < 2:
+                if len(self.freq_bands_alias) < 2:
                     logger.warning(
                         f"{date_str} :: DSAR needs at least 2 frequencies to calculate. "
                         f"Your current freq_bands are {self.freq_bands}"
@@ -491,95 +476,137 @@ class CalculateTremor:
                         f"Example: change_freq_bands([(0.01, 0.1), (1.0, 2.0)])"
                     )
                     continue
-
-                # Inetgrating
-                stream_integrate = stream.copy().integrate()
-
-                # Anchoring data to start time
-                trace: Trace = stream_integrate[0]
-                trace.data = trace.data - trace.data[0]
-                stream_integrate = Stream(trace)
-
-                # Filter and integrate stream based on freq_bands. Then save it to a list
-                filtered_streams: list[dict[str, str | Stream]] = []
-                for band_name, freq_band in freq_bands.items():
-                    if self.debug:
-                        logger.info(f"{date_str} :: DSAR Calculating {freq_band}")
-
-                    filter_stream = stream_integrate.copy().filter(
-                        "bandpass",
-                        freqmin=freq_band[0],
-                        freqmax=freq_band[1],
-                        corners=4,
-                    )
-
-                    filtered_stream_dict: dict[str, str | Stream] = {
-                        "band_name": band_name,
-                        "filtered_stream": filter_stream,
-                    }
-                    filtered_streams.append(filtered_stream_dict)
-
-                    del filter_stream
-
-                # Calculate DSAR
-                first_dsar = None
-                len_freq_bands = len(freq_bands)
-                for index, filtered_stream in enumerate(filtered_streams):
-                    if index < (len_freq_bands - 1):
-                        first_band_name = filtered_stream["band_name"]
-                        second_band_name = filtered_streams[index + 1]["band_name"]
-                        column_name = f"dsar_{first_band_name}-{second_band_name}"
-
-                        if first_dsar is not None:
-                            first_stream = pd.Series(first_dsar)
-                        else:
-                            first_stream: Stream = filtered_stream["filtered_stream"]
-
-                        second_stream: Stream = filtered_streams[index + 1][
-                            "filtered_stream"
-                        ]
-
-                        # Use the new DSAR class
-                        df[column_name] = dsar.calculate(
-                            first_stream=first_stream,
-                            second_stream=second_stream,
-                            value_multiplier=self.value_multiplier or 1.0,
-                        ).values
-
-                        first_dsar = dsar.first_dsar
-
-                        if self.verbose:
-                            logger.info(
-                                f"{date_str} :: DSAR ({column_name}) calculation finished"
-                            )
-
-                        del filtered_stream
+                df = self.calculate_dsar(date_str, df, stream)
 
         return df
 
-    def calculate_rsam(
-        self, stream: Stream, freq_min: float, freq_max: float
-    ) -> pd.Series:
-        series = (
-            RSAM(
-                stream=stream,
-                verbose=self.verbose,
-                debug=self.debug,
+    def calculate_dsar(
+        self, date_str: str, df: pd.DataFrame, stream: Stream
+    ) -> pd.DataFrame:
+        """Calculate DSAR for a given date
+
+        Args:
+            date_str (str): Date to calculate DSAR for
+            df (pd.DataFrame): Tremor data with datetime index
+            stream (Stream): Obspy Stream object
+
+        Returns:
+            pd.DataFrame: DSAR data
+        """
+        needs_original = "rsam" in self.methods and self.methods.index(
+            "dsar"
+        ) < self.methods.index("rsam")
+
+        if needs_original:
+            stream_integrated = stream.copy().integrate()
+        else:
+            stream_integrated = stream.integrate()
+
+        trace: Trace = stream_integrated[0]
+        trace.data = trace.data - trace.data[0]
+        stream_integrated = Stream(trace)
+
+        # Sequential processing: filter -> calculate -> free -> repeat
+        prev_series = None
+        prev_band_name = None
+        freq_bands = self.freq_bands_alias
+
+        for band_name, freq_band in freq_bands.items():
+            if self.debug:
+                logger.info(f"{date_str} :: DSAR Calculating {freq_band}")
+
+            # Filter a copy
+            filtered_stream = stream_integrated.copy().filter(
+                "bandpass",
+                freqmin=freq_band[0],
+                freqmax=freq_band[1],
+                corners=4,
             )
-            .apply_filter(
-                freq_min=freq_min,
-                freq_max=freq_max,
-            )
-            .calculate(
-                value_multiplier=self.value_multiplier or 1.0,
+
+            # Extract the amplitude series immediately
+            current_series = calculate_window_metrics(
+                trace=filtered_stream[0],
+                window_duration_minutes=10,
+                metric_function=np.mean,
                 remove_outliers=self.remove_outliers,
-                interpolate=True,
+                minimum_completion_ratio=0.3,
+                absolute_value=True,
             )
+
+            # Free the filtered stream immediately
+            del filtered_stream
+
+            # Calculate DSAR ratio if we have previous series
+            if prev_series is not None:
+                column_name = f"dsar_{prev_band_name}-{band_name}"
+                dsar_series = prev_series / current_series
+
+                if self.value_multiplier and self.value_multiplier > 1:
+                    dsar_series = dsar_series * self.value_multiplier
+
+                df[column_name] = dsar_series.values
+
+                if self.verbose:
+                    logger.info(
+                        f"{date_str} :: DSAR ({column_name}) calculation finished"
+                    )
+
+            # Store current for next iteration (only Series, not full Stream)
+            prev_series = current_series
+            prev_band_name = band_name
+
+        # Clean up
+        del prev_series, stream_integrated
+        return df
+
+    def calculate_rsam(
+        self, date_str: str, df: pd.DataFrame, stream: Stream
+    ) -> pd.DataFrame:
+        """Calculate RSAM for a given date
+
+        Args:
+            date_str (str): Date to calculate RSAM for
+            df (pd.DataFrame): Tremor data with datetime index
+            stream (Stream): Obspy Stream object
+
+        Returns:
+            pd.DataFrame: Tremor data
+        """
+        assert isinstance(df.index, pd.DatetimeIndex), ValueError(
+            f"Index of dataframe should be pd.DatetimeIndex"
         )
 
-        del stream
+        freq_bands = self.freq_bands_alias
 
-        return series
+        for band_name, freq_band in freq_bands.items():
+            column_name = f"rsam_{band_name}"
+
+            stream_copy = stream.copy()
+
+            df[column_name] = (
+                RSAM(
+                    stream=stream_copy,
+                    verbose=self.verbose,
+                    debug=self.debug,
+                )
+                .apply_filter(
+                    freq_min=freq_band[0],
+                    freq_max=freq_band[1],
+                )
+                .calculate(
+                    value_multiplier=self.value_multiplier or 1.0,
+                    remove_outliers=self.remove_outliers,
+                    interpolate=True,
+                )
+                .values
+            )
+
+            del stream_copy
+
+            if self.verbose:
+                logger.info(f"{date_str} :: RSAM ({column_name}) calculation finished")
+
+        return df
 
     @staticmethod
     def concat_tremor_data(
