@@ -533,6 +533,8 @@ class CalculateTremor:
                 absolute_value=True,
             )
 
+            current_series = current_series.interpolate(method="linear")
+
             # Free the filtered stream immediately
             del filtered_stream
 
