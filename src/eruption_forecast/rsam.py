@@ -65,7 +65,7 @@ class RSAM:
         remove_outliers: bool = True,
         minimum_completion_ratio: float = 0.3,
         interpolate: bool = True,
-    ) -> Self:
+    ) -> pd.Series:
         """Calculate metrics for defined time windows of a Trace.
 
         Args:

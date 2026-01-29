@@ -1,6 +1,6 @@
 # Standard library imports
 from datetime import datetime
-from typing import Literal, Self, Union
+from typing import Union
 
 # Third party imports
 import pandas as pd

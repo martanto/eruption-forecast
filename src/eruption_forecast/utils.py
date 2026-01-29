@@ -25,7 +25,7 @@ def detect_outliers(
             outlier_value: Value of the outlier.
     """
     if isinstance(data, pd.Series):
-        data = data.values
+        data = np.array(data.values)
 
     outlier_index = np.argmax(data)
     outlier_value = data[outlier_index]
@@ -275,9 +275,9 @@ def validate_date_ranges(
         Tuple[datetime, datetime, int]: Start date, end date, and total number of days.
     """
     if isinstance(start_date, str):
-        start_date: datetime = to_datetime(start_date)
+        start_date = to_datetime(start_date)
     if isinstance(end_date, str):
-        end_date: datetime = to_datetime(end_date)
+        end_date = to_datetime(end_date)
 
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")

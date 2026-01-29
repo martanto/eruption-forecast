@@ -5,7 +5,7 @@ from typing import Any, List
 
 # Third party imports
 from loguru import logger
-from obspy import ObsPyReadingError, Stream, read
+from obspy import ObsPyReadingError, Stream, read, Trace
 
 
 class SDS:
@@ -117,7 +117,8 @@ class SDS:
         if len(stream) == 0:
             logger.warning(f"{date_str} :: No trace(s) found in {filepath}")
         elif self.verbose:
-            data_length = len(stream[0].data)
+            trace: Trace = stream[0]
+            data_length = len(trace.data)
             logger.info(f"{date_str} :: Stream loaded {filepath}")
             logger.info(
                 f"{date_str} :: {len(stream)} trace(s) found. Total data {data_length}"

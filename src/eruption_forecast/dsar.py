@@ -4,7 +4,7 @@ from typing import Optional, Union
 # Third party imports
 import numpy as np
 import pandas as pd
-from obspy import Stream
+from obspy import Stream, Trace
 
 from .utils import calculate_window_metrics
 
@@ -56,10 +56,20 @@ class DSAR:
         """
         # Calculate mean of absolute values for both streams
         # Note: We use absolute_value=True inside calculate_window_metrics
-        first_dsar = first_stream
         if isinstance(first_stream, Stream):
-            first_dsar = calculate_window_metrics(
-                trace=first_stream[0],
+            trace: Trace = first_stream[0]
+            first_stream = calculate_window_metrics(
+                trace=trace,
+                window_duration_minutes=window_duration_minutes,
+                metric_function=np.mean,
+                remove_outliers=self.remove_outliers,
+                minimum_completion_ratio=minimum_completion_ratio,
+                absolute_value=True,
+            )
+        if isinstance(second_stream, Stream):
+            trace: Trace = second_stream[0]
+            second_stream = calculate_window_metrics(
+                trace=trace,
                 window_duration_minutes=window_duration_minutes,
                 metric_function=np.mean,
                 remove_outliers=self.remove_outliers,
@@ -67,29 +77,21 @@ class DSAR:
                 absolute_value=True,
             )
 
-        second_dsar = second_stream
-        if isinstance(second_stream, Stream):
-            second_dsar = calculate_window_metrics(
-                trace=second_stream[0],
-                window_duration_minutes=window_duration_minutes,
-                metric_function=np.mean,
-                remove_outliers=self.remove_outliers,
-                minimum_completion_ratio=minimum_completion_ratio,
-                absolute_value=True,
-            )
+        first_dsar: pd.Series = first_stream
+        second_dsar: pd.Series = second_stream
 
         self.first_dsar = first_dsar
-        self.second_dsar = second_dsar
+        self.second_dsar: pd.Series[float] = pd.Series(second_dsar)
 
         # Calculate DSAR ratio
         # Pandas handles division of Series with same index automatically
-        series = first_dsar / second_dsar
+        series: pd.Series[float] = first_dsar / second_dsar
 
         if value_multiplier > 1:
-            series = series.apply(lambda x: x * value_multiplier)
+            series: pd.Series[float] = series.apply(lambda x: x * value_multiplier)
 
         if interpolate:
-            series = series.interpolate(method="linear")
+            series: pd.Series[float] = series.interpolate(method="linear")
 
         self.series = series
 

@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from functools import cached_property
-from typing import Tuple, Union
+from typing import Tuple, Optional
 
 # Third party imports
 import numpy as np
@@ -63,27 +63,39 @@ class TremorData:
         """Get number of days in tremor data"""
         return int((self.end_date - self.start_date).days)
 
-    def validate_sampling_rate(self) -> Tuple[bool, int]:
+    def check_sampling_consistency(
+        self, tolerance: Optional[float] = 0.001
+    ) -> Tuple[bool, int]:
         """Check if the tremor data has consistent sampling periods in seconds
+
+        Args:
+            tolerance (optional, float): Tolerance in seconds for considering sampling periods as equal (default: 0.001).
 
         Returns:
             bool: Return true if sampling period is consistent
             int: Return sampling period in seconds
         """
         df = self.df.copy()
-        df["_time"] = df.index
 
-        first_datetime = df.index[0].to_pydatetime()
-        second_datetime = df.index[1].to_pydatetime()
-        timedelta_seconds = int((second_datetime - first_datetime).seconds)
-
-        # Validate
-        check = (
-            all(df["_time"].diff()[1:] == np.timedelta64(timedelta_seconds, "s"))
-            == True
+        # Validate input
+        assert len(df) > 2, ValueError(
+            "DataFrame must have at least 2 rows to check sampling consistency"
+        )
+        assert isinstance(df.index, pd.DatetimeIndex), ValueError(
+            "DataFrame index must be DatetimeIndex"
         )
 
-        if check:
-            return True, timedelta_seconds
+        time_diffs = pd.Series(df.index).diff().dt.total_seconds()
 
-        return False, timedelta_seconds
+        # Remove the first NaN value from diff
+        time_diffs = pd.Series(time_diffs).dropna()
+
+        expected_period = int(time_diffs.iloc[0])
+
+        if len(time_diffs) == 0:
+            return True, expected_period
+
+        # Check if all periods are within tolerance of the expected period
+        is_consistent = bool(np.all(np.abs(time_diffs - expected_period) <= tolerance))
+
+        return is_consistent, expected_period

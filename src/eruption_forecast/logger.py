@@ -7,7 +7,7 @@ import sys
 import os
 from loguru import logger
 
-# Remove default handler
+# Init default handler
 logger.remove()
 
 # Define default log directory
@@ -136,5 +136,3 @@ def set_log_directory(log_dir: str):
     )
 
     logger.info(f"Log directory changed to: {DEFAULT_LOG_DIR}")
-
-

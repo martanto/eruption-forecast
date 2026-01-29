@@ -12,7 +12,7 @@ import matplotlib.dates as mdates
 import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
-from obspy import Stream, UTCDateTime
+from obspy import Stream, UTCDateTime, Trace
 
 # Project imports
 import eruption_forecast
@@ -457,7 +457,7 @@ class CalculateTremor:
                 stream_integrate = stream.copy().integrate()
 
                 # Anchoring data to start time
-                trace = stream_integrate[0]
+                trace: Trace = stream_integrate[0]
                 trace.data = trace.data - trace.data[0]
                 stream_integrate = Stream(trace)
 
@@ -489,11 +489,14 @@ class CalculateTremor:
                         second_band_name = filtered_streams[index + 1]["band_name"]
                         column_name = f"dsar_{first_band_name}-{second_band_name}"
 
-                        first_stream = filtered_stream["filtered_stream"]
                         if first_dsar is not None:
-                            first_stream = first_dsar
+                            first_stream = pd.Series(first_dsar)
+                        else:
+                            first_stream: Stream = filtered_stream["filtered_stream"]
 
-                        second_stream = filtered_streams[index + 1]["filtered_stream"]
+                        second_stream: Stream = filtered_streams[index + 1][
+                            "filtered_stream"
+                        ]
 
                         # Use the new DSAR class
                         df[column_name] = dsar.calculate(
