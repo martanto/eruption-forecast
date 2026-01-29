@@ -4,10 +4,10 @@ from typing import Union
 
 # Third party imports
 import pandas as pd
-from loguru import logger
 
 # Project imports
 from eruption_forecast.label.label_data import LabelData
+from eruption_forecast.logger import logger
 from eruption_forecast.tremor.tremor_data import TremorData
 
 

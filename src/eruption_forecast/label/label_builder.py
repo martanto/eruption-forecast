@@ -6,9 +6,9 @@ from typing import Literal, Optional, Self, Union
 
 # Third party imports
 import pandas as pd
-from loguru import logger
 
 # Project imports
+from eruption_forecast.logger import logger
 from eruption_forecast.utils import construct_windows, to_datetime
 
 

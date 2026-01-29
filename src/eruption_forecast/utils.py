@@ -5,8 +5,10 @@ from typing import Callable, Literal, Optional, Tuple, Union
 # Third party imports
 import numpy as np
 import pandas as pd
-from loguru import logger
 from obspy import Trace
+
+# Project imports
+from eruption_forecast.logger import logger
 
 
 def detect_outliers(

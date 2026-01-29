@@ -5,18 +5,17 @@ import shutil
 from datetime import datetime, timedelta
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Literal, Optional, Self, Tuple, Union
+from typing import Optional, Self, Tuple, Union
 
 # Third party imports
-import matplotlib.dates as mdates
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from obspy import Stream, UTCDateTime, Trace
+from obspy import Stream, Trace, UTCDateTime
 
 # Project imports
 import eruption_forecast
 from eruption_forecast.dsar import DSAR
+from eruption_forecast.logger import logger
+from eruption_forecast.plot import plot_tremor
 from eruption_forecast.rsam import RSAM
 from eruption_forecast.sds import SDS
 from eruption_forecast.utils import to_datetime
@@ -42,7 +41,7 @@ class CalculateTremor:
         value_multiplier (Optional[float]): Scaling factor for seismic values.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
         plot_tmp (bool): If True, plot temporary results for quick view.
-        plot_tremor (bool): If True, plot tremor results for quick view.
+        save_plot (bool): If True, save tremor results for quick view.
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
     """
@@ -65,7 +64,7 @@ class CalculateTremor:
         value_multiplier: Optional[float] = None,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = False,
-        plot_tremor: bool = False,
+        save_plot: bool = False,
         overwrite_plot: bool = False,
         verbose: bool = False,
         debug: bool = False,
@@ -104,7 +103,7 @@ class CalculateTremor:
         self.value_multiplier = value_multiplier
         self.cleanup_tmp_dir = cleanup_tmp_dir
         self.plot_tmp = plot_tmp
-        self.plot_tremor = plot_tremor
+        self.save_plot = save_plot
         self.overwrite_plot = overwrite_plot
         self.verbose = verbose
         self.debug = debug
@@ -165,6 +164,29 @@ class CalculateTremor:
         Return:
             Self
         """
+        assert isinstance(freq_bands, list), ValueError(
+            "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
+        )
+
+        for freqs in freq_bands:
+            assert isinstance(freqs, tuple), ValueError(
+                f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
+                f"Example (0.1,1.0). Your values are: {freqs}"
+            )
+            assert len(freqs) == 2, ValueError(
+                f"Frequencies must have two elements. Example (0.1,1.0)."
+                f"Your values are: {freqs}"
+            )
+
+            freq_min, freq_max = freqs
+            assert isinstance(freq_min, float) or isinstance(freq_min, int), ValueError(
+                f"Freq minimum must be float or int. Your value is: {freq_min}"
+            )
+            assert isinstance(freq_max, float) or isinstance(freq_max, int), ValueError(
+                f"Freq maximum must be float or int. Your value is: {freq_max}"
+            )
+            assert freq_min < freq_max, ValueError()
+
         self.freq_bands = freq_bands
         return self
 
@@ -349,8 +371,16 @@ class CalculateTremor:
         _, df = self.concat_tremor_data(self.tmp_dir, self.tremor_dir)
         self.df = df
 
-        if self.plot_tremor:
-            self.plot(df, plot_type="tremor")
+        if self.save_plot:
+            plot_tremor(
+                df=df,
+                interval=14,
+                interval_unit="days",
+                figure_dir=self.figures_dir,
+                title=self.nslc,
+                overwrite=self.overwrite,
+                verbose=self.verbose,
+            )
 
         return self
 
@@ -388,7 +418,16 @@ class CalculateTremor:
 
         # plot tremor data
         if self.plot_tmp:
-            self.plot(df, plot_type="tmp")
+            plot_tremor(
+                df=df,
+                interval=2,
+                interval_unit="hours",
+                filename=f"{date_str}.png",
+                figure_dir=self.figures_tmp_dir,
+                title=date_str,
+                overwrite=self.overwrite,
+                verbose=self.verbose,
+            )
 
         # save tremor data
         self.tmp_files.append(temp_file)
@@ -480,6 +519,8 @@ class CalculateTremor:
                     }
                     filtered_streams.append(filtered_stream_dict)
 
+                    del filter_stream
+
                 # Calculate DSAR
                 first_dsar = None
                 len_freq_bands = len(freq_bands)
@@ -536,90 +577,9 @@ class CalculateTremor:
             )
         )
 
+        del stream
+
         return series
-
-    def plot(
-        self,
-        df: pd.DataFrame,
-        plot_type: Literal["tmp", "tremor"] = "tmp",
-    ) -> None:
-        """Plot tremor data
-
-        Args:
-            df (pd.DataFrame): Tremor data
-            plot_type (Literal["tmp", "tremor"]): Type of plot to be saved. Defaults to "tmp".
-
-        Returns:
-            None
-        """
-        overwrite = self.overwrite_plot or self.overwrite
-        start_date: pd.Timestamp = df.index[0]
-        end_date: pd.Timestamp = df.index[-1]
-
-        start_date_str = start_date.strftime("%Y-%m-%d")
-        end_date_str = end_date.strftime("%Y-%m-%d")
-
-        # Save plot to tmp directory
-        figure_dir = self.figures_tmp_dir if plot_type == "tmp" else self.figures_dir
-        figure_name = (
-            start_date_str
-            if plot_type == "tmp"
-            else f"tremor_{start_date_str}_{end_date_str}"
-        )
-        unix_timestamp = int(datetime.now().timestamp())
-        filepath = os.path.join(figure_dir, f"{figure_name}_{unix_timestamp}.png")
-
-        # Define date locator and formatter based on plot type
-        date_locator = (
-            mdates.HourLocator(interval=2)
-            if plot_type == "tmp"
-            else mdates.DayLocator(interval=14)
-        )
-        date_formatter = (
-            mdates.DateFormatter("%H:%M")
-            if plot_type == "tmp"
-            else mdates.DateFormatter("%Y-%m-%d")
-        )
-
-        if os.path.exists(filepath) and not overwrite:
-            logger.info(f"{start_date_str} :: Plot already exists at {filepath}")
-            return
-
-        columns = df.columns
-        n_rows = len(columns)
-        fig, axs = plt.subplots(
-            nrows=n_rows, ncols=1, figsize=(10, 1.2 * n_rows), sharex=True
-        )
-
-        for index, column in enumerate(columns):
-            ax = axs[index] if n_rows > 1 else axs
-            ax.plot(
-                df.index,
-                df[column],
-                color="black",
-                linewidth=1,
-                label=column,
-                alpha=0.8,
-            )
-            ax.set_xlim(start_date, end_date)
-            ax.legend(loc="upper left", fontsize=8, frameon=False)
-
-            ax.xaxis.set_major_locator(date_locator)
-            ax.xaxis.set_major_formatter(date_formatter)
-            for label in ax.get_xticklabels(which="major"):
-                label.set(rotation=30, horizontalalignment="right", fontsize=8)
-
-            if index == (n_rows - 1):
-                ax.set_xlabel(
-                    start_date_str if plot_type == "tmp" else self.nslc, fontsize=10
-                )
-
-        plt.tight_layout()
-        plt.savefig(filepath, dpi=100)
-        plt.close()
-
-        if self.verbose:
-            logger.info(f"{start_date_str} :: Plot saved to {filepath}")
 
     @staticmethod
     def concat_tremor_data(

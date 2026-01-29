@@ -4,8 +4,10 @@ from datetime import datetime
 from typing import Any, List
 
 # Third party imports
-from loguru import logger
-from obspy import ObsPyReadingError, Stream, read, Trace
+from obspy import ObsPyReadingError, Stream, Trace, read
+
+# Project imports
+from eruption_forecast.logger import logger
 
 
 class SDS:

@@ -3,15 +3,18 @@ Centralized logger module using loguru for the package.
 This provides a single logger instance that all modules can import and use.
 """
 
-import sys
+# Standard library imports
 import os
+import sys
+
+# Third party imports
 from loguru import logger
 
 # Init default handler
 logger.remove()
 
 # Define default log directory
-DEFAULT_LOG_DIR = os.path.join(os.path.expanduser("~"), ".my_package", "logs")
+DEFAULT_LOG_DIR = os.path.join(os.getcwd(), "logs")
 os.makedirs(DEFAULT_LOG_DIR, exist_ok=True)
 
 # Add console handler with custom format
@@ -24,7 +27,7 @@ logger.add(
 
 # Add file handler with rotation
 logger.add(
-    os.path.join(DEFAULT_LOG_DIR, "app_{time:YYYY-MM-DD}.log"),
+    os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
     rotation="00:00",  # Rotate at midnight
     retention="30 days",  # Keep logs for 30 days
     compression="zip",  # Compress rotated logs
@@ -74,7 +77,7 @@ def set_log_level(level: str):
 
     # Re-add file handlers (keep their original levels)
     logger.add(
-        os.path.join(DEFAULT_LOG_DIR, "app_{time:YYYY-MM-DD}.log"),
+        os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
         rotation="00:00",
         retention="30 days",
         compression="zip",
@@ -116,7 +119,7 @@ def set_log_directory(log_dir: str):
     )
 
     logger.add(
-        os.path.join(DEFAULT_LOG_DIR, "app_{time:YYYY-MM-DD}.log"),
+        os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
         rotation="00:00",
         retention="30 days",
         compression="zip",

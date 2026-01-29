@@ -8,7 +8,8 @@ import pandas as pd
 from loguru import logger
 from obspy import Stream, Trace
 
-from .utils import calculate_window_metrics
+# Project imports
+from eruption_forecast.utils import calculate_window_metrics
 
 
 class RSAM:
