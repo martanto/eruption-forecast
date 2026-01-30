@@ -137,6 +137,7 @@ class CalculateTremor:
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
         self.figures_tmp_dir = os.path.join(figures_dir, "tmp")
+        self.tremor_csv = None
         self._source: Optional[str] = None
         self._sds_dir: Optional[str] = None
         self._client_url = "https://service.iris.edu"
@@ -146,7 +147,7 @@ class CalculateTremor:
 
         # Verbose and debugging
         if debug:
-            logger.info("⚠️ Debug mode is ON")
+            logger.info("⚠️ Calculate Tremor :: Debug mode is ON")
 
         if self.verbose:
             logger.info(f"Version: {eruption_forecast.__version__}")
@@ -246,7 +247,6 @@ class CalculateTremor:
         os.makedirs(self.tmp_dir, exist_ok=True)
         return self
 
-    @logger.catch
     def create_directories(self) -> None:
         """Create the directories.
 
@@ -371,12 +371,13 @@ class CalculateTremor:
             pool.join()
 
         # Merge calculated tremor CSV files from tmp dir
-        _, df = self.concat_tremor_data(self.tmp_dir, self.tremor_dir)
-        self.df = df
+        self.tremor_csv, self.df = self.concat_tremor_data(
+            self.tmp_dir, self.tremor_dir
+        )
 
         if self.save_plot:
             plot_tremor(
-                df=df,
+                df=self.df,
                 interval=14,
                 interval_unit="days",
                 figure_dir=self.figures_dir,
@@ -387,6 +388,7 @@ class CalculateTremor:
 
         return self
 
+    @logger.catch
     def run_job(self, job_index: int, date: datetime) -> None:
         """Run a job for a specific date.
 

@@ -8,9 +8,9 @@ from importlib.metadata import version
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.label.label_data import LabelData
+from eruption_forecast.model.forecast_model import ForecastModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.tremor.tremor_data import TremorData
-from eruption_forecast.model.forecast_model import ForecastModel
 
 __version__ = version("eruption-forecast")
 __author__ = "Martanto"
@@ -27,8 +27,8 @@ __all__ = [
     "__copyright__",
     "CalculateTremor",
     "LabelBuilder",
-    "LabelData",
-    "TremorData",
     "FeaturesBuilder",
     "ForecastModel",
+    "LabelData",
+    "TremorData",
 ]

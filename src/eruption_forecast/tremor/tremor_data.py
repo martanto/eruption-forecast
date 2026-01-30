@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Tuple, Self
+from typing import Optional, Tuple
 
 # Third party imports
 import numpy as np

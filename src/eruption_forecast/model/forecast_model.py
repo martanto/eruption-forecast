@@ -1,15 +1,12 @@
 # Standard library imports
-from typing import Any
-
-from eruption_forecast import TremorData
-from typing import Literal
-from eruption_forecast import CalculateTremor
 import os
 from datetime import datetime
-from typing import Optional, Self, Union
-from eruption_forecast.utils import to_datetime
+from typing import Literal, Optional, Self, Union
+
+# Project imports
+from eruption_forecast import CalculateTremor, TremorData
 from eruption_forecast.logger import logger
-import pandas as pd
+from eruption_forecast.utils import to_datetime
 
 
 class ForecastModel:
@@ -30,7 +27,6 @@ class ForecastModel:
         output_dir (str): Directory for output files. Defaults to "output".
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
-        calculate_tremor (CalculateTremor): CalculateTremor object. Defaults to None.
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
     """
@@ -60,7 +56,6 @@ class ForecastModel:
         location = location or "00"
         output_dir = output_dir or os.path.join(os.getcwd(), "output")
         nslc = f"{network}.{station}.{location}.{channel}"
-        snlc = f"{station}.{network}.{location}.{channel}"
 
         # Set DEFAULT properties
         self.station = station
@@ -90,6 +85,8 @@ class ForecastModel:
             "output_dir": output_dir,
             "overwrite": overwrite,
             "n_jobs": n_jobs,
+            "verbose": verbose,
+            "debug": debug,
         }
 
         # Will be set after calculate tremor
@@ -98,7 +95,7 @@ class ForecastModel:
 
         # Verbose and debugging
         if debug:
-            logger.info("⚠️ Debug mode is ON")
+            logger.info("⚠️ Forecast Model :: Debug mode is ON")
 
         if verbose:
             logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
@@ -144,7 +141,6 @@ class ForecastModel:
 
         Args:
             source (optional, Literal["sds", "fdsn"]): Seismic data source
-            recalculate (optional, bool): Recalculate tremor. Default false.
             methods (Optional[str]): Calculation methods to apply.
             filename_prefix (Optional[str]): Prefix for generated filenames.
             remove_outliers (bool): If True, removes outliers from the data. Defaults to True.
@@ -192,21 +188,18 @@ class ForecastModel:
 
             calculate = calculate.from_sds(sds_dir=sds_dir).run()
             self.tremor_data = TremorData(calculate.df)
+            self.tremor_data.csv = calculate.tremor_csv
 
         # TODO: Get data from FDSN services
         if source == "fdsn":
             # calculate = calculate.from_fdsn(client_url=client_url).run()
-            logger.error(f"FDNN source is not supported.")
+            logger.error(f"FDSN source is not yet supported. Client url: {client_url}")
             raise
 
         return self
 
-    def train(self):
-        return Self
+    def train(self) -> Self:
+        return self
 
-    def predict(self, data):
-        return Self
-
-    @property
-    def calculate(self):
-        return self._calculate
+    def predict(self):
+        return self
