@@ -42,6 +42,7 @@ class CalculateTremor:
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
         plot_tmp (bool): If True, plot temporary results for quick view.
         save_plot (bool): If True, save tremor results for quick view.
+        overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
     """
@@ -380,7 +381,7 @@ class CalculateTremor:
                 interval_unit="days",
                 figure_dir=self.figures_dir,
                 title=self.nslc,
-                overwrite=self.overwrite,
+                overwrite=self.overwrite or self.overwrite_plot,
                 verbose=self.verbose,
             )
 

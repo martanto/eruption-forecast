@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Self
 
 # Third party imports
 import numpy as np
@@ -10,26 +10,46 @@ import pandas as pd
 
 
 class TremorData:
-    def __init__(self, tremor_csv: str):
-        self.tremor_csv = tremor_csv
-        self.validate()
+    def __init__(
+        self,
+        df: Optional[pd.DataFrame] = None,
+        verbose: bool = False,
+        debug: bool = False,
+    ) -> None:
+        self.verbose = verbose
+        self.debug = debug
+        self.csv: str = None
+        self.df = df if df is not None else pd.DataFrame()
 
-    def validate(self) -> None:
-        """Validate tremor data
+    def from_csv(self, tremor_csv: str) -> pd.DataFrame:
+        """Load tremor data from csv file
 
-        Raises:
-            ValueError: If tremor data is invalid
+        Args:
+            tremor_csv (str): Path to tremor csv file
+
+        Returns:
+            self: Return self
         """
-        assert os.path.exists(self.tremor_csv), ValueError(
-            f"{self.tremor_csv} does not exist"
-        )
+        assert os.path.exists(tremor_csv), ValueError(f"{tremor_csv} does not exist")
 
-    @cached_property
-    def df(self) -> pd.DataFrame:
-        """Get tremor data as pandas DataFrame"""
-        df = pd.read_csv(self.tremor_csv, index_col="datetime", parse_dates=True)
+        df = pd.read_csv(self.csv, index_col="datetime", parse_dates=True)
         df.sort_index(inplace=True)
+        self._df = df
+        self.csv = tremor_csv
         return df
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """Load tremor dataframe"""
+        assert len(self._df) > 0, ValueError(
+            "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
+        )
+        return self._df
+
+    @df.setter
+    def df(self, df: pd.DataFrame) -> None:
+        """Set tremor dataframe"""
+        self._df = df
 
     @cached_property
     def columns(self) -> list[str]:
