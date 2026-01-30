@@ -38,6 +38,16 @@ class LabelData:
         self.window_step = int(window_step_and_unit[1])
         self.window_unit = window_step_and_unit[2]
         self.day_to_forecast = int(day_to_forecast.split("-")[1])
+        self.kwargs = {
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "start_date_str": self.start_date_str,
+            "end_date_str": self.end_date_str,
+            "window_size": self.window_size,
+            "window_step": self.window_step,
+            "window_unit": self.window_unit,
+            "day_to_forecast": self.day_to_forecast,
+        }
 
     def validate(self) -> None:
         """Validate label filename
@@ -122,6 +132,11 @@ class LabelData:
         )
 
     @cached_property
+    def df(self) -> pd.DataFrame:
+        """Get label dataframe from file"""
+        return pd.read_csv(self.label_csv, index_col="datetime", parse_dates=True)
+
+    @cached_property
     def filename(self) -> str:
         """Get the filename
 
@@ -164,8 +179,3 @@ class LabelData:
         }
 
         return parameters
-
-    @cached_property
-    def df(self) -> pd.DataFrame:
-        """Get label dataframe from file"""
-        return pd.read_csv(self.label_csv, index_col="datetime", parse_dates=True)

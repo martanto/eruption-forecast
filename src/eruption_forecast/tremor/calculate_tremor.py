@@ -132,7 +132,6 @@ class CalculateTremor:
         self.n_days: int = len(self.dates)
         self.nslc = nslc
         self.tmp_dir: str = os.path.join(self.tremor_dir, "tmp")
-        self.log_dir = os.path.join(self.station_dir, "logs")
         self.sds: Optional[SDS] = None
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
@@ -260,9 +259,6 @@ class CalculateTremor:
 
         if self.plot_tmp:
             os.makedirs(self.figures_tmp_dir, exist_ok=True)
-
-        if self.debug:
-            os.makedirs(self.log_dir, exist_ok=True)
 
     def validate(self) -> None:
         """Assert the input parameters.

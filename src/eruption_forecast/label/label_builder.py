@@ -7,6 +7,8 @@ from typing import Literal, Optional, Self, Union
 # Third party imports
 import pandas as pd
 
+from eruption_forecast.label.label_data import LabelData
+
 # Project imports
 from eruption_forecast.logger import logger
 from eruption_forecast.utils import construct_windows, to_datetime
@@ -85,14 +87,14 @@ class LabelBuilder:
             f"_step-{window_step}-{window_step_unit}"
             f"_dtf-{day_to_forecast}.csv"
         )
-        self.filepath = os.path.join(label_dir, self.filename)
+        self.csv = os.path.join(label_dir, self.filename)
 
         # Validate
         self.validate()
 
         # Verbose and debugging
         if debug:
-            logger.info("⚠️ Debug mode is ON")
+            logger.info("⚠️ Label Builder :: Debug mode is ON")
 
         if verbose:
             logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
@@ -235,9 +237,9 @@ class LabelBuilder:
         assert all(
             isinstance(value.index, pd.DatetimeIndex) for value in df_dict.values()
         ), "df index must be a datetime index"
-        assert all(
-            "id" in value.columns for value in df_dict.values()
-        ), "df must have an 'id' column"
+        assert all("id" in value.columns for value in df_dict.values()), ValueError(
+            f"df must have an 'id' column. Your columns"
+        )
         assert all(
             "is_erupted" in value.columns for value in df_dict.values()
         ), "df must have an 'is_erupted' column"
@@ -262,6 +264,40 @@ class LabelBuilder:
             pd.Series
         """
         return self.y
+
+    def update_df_eruptions(self, df: pd.DataFrame) -> Self:
+        # Update eruption value with 1
+        for eruption in self.eruption_dates:
+            try:
+                day_of_eruption = to_datetime(eruption)
+
+                # Move the start of eruption to number of day_to_forecast
+                start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
+
+                # Set start time of eruption to 00:00:00
+                start_eruption = start_eruption.replace(hour=0, minute=0, second=0)
+
+                # Set end time of eruption to at 23:59:59
+                end_eruption = day_of_eruption.replace(hour=23, minute=59, second=59)
+
+                # Stop if eruption date is beyond the end date
+                if end_eruption > self.end_date:
+                    continue
+
+            except ValueError:
+                raise ValueError(
+                    f"Eruption date is {eruption}. "
+                    f"Date of eruption must be in YYYY-MM-DD format."
+                )
+
+            # Set eruption value with 1 for range of eruption date
+            for index, row in df.loc[start_eruption:end_eruption].iterrows():  # type: ignore
+                df.loc[index, "is_erupted"] = 1
+
+            # Append eruption date as dict key with df_eruptions
+            self.df_eruptions = {eruption: df.loc[start_eruption:end_eruption]}
+
+        return self
 
     def validate_columns(self, df: pd.DataFrame) -> None:
         """Validate columns
@@ -328,20 +364,22 @@ class LabelBuilder:
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.label_dir, exist_ok=True)
 
-    def assert_eruption_dates(self) -> None:
+    def assert_eruption_dates(self) -> Self:
         """Ensure there is an eruption between start date and end date
 
         Raises:
             AssertionError: If there is no eruption between start date and end date
 
         Returns:
-            None
+            self
         """
         assert len(self.df_eruption) > 0, (
             f"No eruption recorded between date "
             f"{self.start_date_str} and {self.end_date_str}. "
             f"Your eruption_dates: {self.eruption_dates}"
         )
+
+        return self
 
     def initiate_label(self) -> pd.DataFrame:
         """Initialize label values with zeros (no eruption)
@@ -369,55 +407,45 @@ class LabelBuilder:
         if self.verbose:
             logger.info(f"Eruption dates saved to {filename}")
 
+    def from_csv(self, csv: str) -> pd.DataFrame:
+        """Get label values dataframe
+
+        Returns:
+            pd.DataFrame
+        """
+        label_data = LabelData(label_csv=csv)
+
+        if self.verbose:
+            logger.info(f"Label data loaded from {csv}")
+
+        return label_data.df
+
     def build(self) -> Self:
         """Build label based on eruption dates
 
         Returns:
             Self
         """
-        df = self.initiate_label()
 
-        # Create id column to use as data ID reference with tremor data
-        # such as RSAM, DSAR or MSNoise
-        df["id"] = range(len(df))
-        df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
+        # Check if label csv is exists
+        file_exists = os.path.isfile(self.csv)
 
-        eruption_dates = self.eruption_dates
+        # Load or initiate the dataframe
+        df = self.from_csv(self.csv) if file_exists else self.initiate_label()
 
-        # Update eruption value with 1
-        for eruption in eruption_dates:
-            try:
-                day_of_eruption = datetime.strptime(eruption, "%Y-%m-%d")
+        if not file_exists:
+            # Create id column to use as data ID reference with tremor data
+            # such as RSAM, DSAR or MSNoise
+            df["id"] = range(len(df))
+            df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
 
-                # Start of eruption date should be at 00:00:00
-                start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
-                start_eruption = start_eruption.replace(hour=0, minute=0, second=0)
-
-                # End of eruption date should be at 23:59:59
-                end_eruption = day_of_eruption.replace(hour=23, minute=59, second=59)
-
-                # Stop if eruption date is beyond the end date
-                if end_eruption > self.end_date:
-                    break
-
-            except ValueError:
-                raise ValueError(
-                    f"Eruption date is {eruption}. "
-                    f"Date of eruption must be in YYYY-MM-DD format."
-                )
-
-            # Set eruption value with 1 for range of eruption date
-            for index, row in df.loc[start_eruption:end_eruption].iterrows():  # type: ignore
-                df.loc[index, "is_erupted"] = 1
-
-            # Append eruption date as dict key with df_eruptions
-            self.df_eruptions = {eruption: df.loc[start_eruption:end_eruption]}
-
+        self.update_df_eruptions(df)
         self.df = df
         self.df_eruption = df[df["is_erupted"] > 0]
 
-        self.assert_eruption_dates()
-        self.save()
+        if not file_exists:
+            self.assert_eruption_dates()
+            self.save()
 
         return self
 
@@ -431,14 +459,14 @@ class LabelBuilder:
             Self
         """
         df = self.df
-        filepath = self.filepath
+        filepath = self.csv
 
         if file_type == "xlsx":
-            filepath = self.filepath.replace(".csv", ".xlsx")
+            filepath = self.csv.replace(".csv", ".xlsx")
             df.to_excel(filepath, index=True)
 
             # Update filepath as an excel file
-            self.filepath = filepath
+            self.csv = filepath
             return self
 
         df.to_csv(filepath, index=True)

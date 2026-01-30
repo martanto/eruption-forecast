@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Literal, Optional, Self, Union
 
 # Project imports
-from eruption_forecast import CalculateTremor, TremorData
+from eruption_forecast.tremor.calculate_tremor import CalculateTremor
+from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.utils import to_datetime
 
@@ -54,8 +56,8 @@ class ForecastModel:
         output_dir = output_dir or os.path.join(os.getcwd(), "output")
         network = network or "VG"
         location = location or "00"
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
         nslc = f"{network}.{station}.{location}.{channel}"
+        output_dir = output_dir or os.path.join(os.getcwd(), "output")
 
         # Set DEFAULT properties
         self.station = station
@@ -89,9 +91,18 @@ class ForecastModel:
             "debug": debug,
         }
 
-        # Will be set after calculate tremor
+        # Will be set after calculate() method called
+        self.calculate_tremor: Optional[CalculateTremor] = None
         self.tremor_data: Optional[TremorData] = None
-        self._calculate: Optional[CalculateTremor] = None
+        self.tremor_csv: Optional[str] = None
+        self.station_dir: Optional[str] = None
+
+        # WIll be set after train() method called
+        self.label_builder: Optional[LabelBuilder] = None
+        self.label_csv: Optional[str] = None
+
+        # Validate
+        self.validate()
 
         # Verbose and debugging
         if debug:
@@ -106,6 +117,17 @@ class ForecastModel:
             logger.info(f"Location: {self.location}")
             logger.info(f"Channel: {self.channel}")
             logger.info(f"Output Dir: {self.output_dir}")
+
+    def validate(self) -> None:
+        """Validate properties
+
+        Raises:
+            AssertionError: If any of the properties are invalid
+
+        Returns:
+            None
+        """
+        return None
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
         """Load calculate tremor data from CSV file
@@ -177,7 +199,7 @@ class ForecastModel:
         if debug:
             calculate.debug = True
 
-        self._calculate = calculate
+        self.calculate_tremor = calculate
 
         if source == "sds":
             assert sds_dir is not None, ValueError(
@@ -187,8 +209,6 @@ class ForecastModel:
             assert os.path.isdir(sds_dir), ValueError(f"SDS dir {sds_dir} not exists.")
 
             calculate = calculate.from_sds(sds_dir=sds_dir).run()
-            self.tremor_data = TremorData(calculate.df)
-            self.tremor_data.csv = calculate.tremor_csv
 
         # TODO: Get data from FDSN services
         if source == "fdsn":
@@ -196,9 +216,55 @@ class ForecastModel:
             logger.error(f"FDSN source is not yet supported. Client url: {client_url}")
             raise
 
+        self.tremor_data = TremorData(calculate.df)
+        self.tremor_data.csv = calculate.tremor_csv
+        self.tremor_csv = calculate.tremor_csv
+        self.station_dir = calculate.station_dir
+
         return self
 
-    def train(self) -> Self:
+    def train(
+        self,
+        window_size: int,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+        day_to_forecast: int,
+        eruption_dates: list[str],
+        output_dir: Optional[str] = None,
+    ) -> Self:
+        """Build training model.
+
+        Args:
+            window_size (int): Window size in days.
+            window_step (int): Window step size.
+            window_step_unit (Literal["minutes", "hours"]): Unit of window step.
+            day_to_forecast (int): Day to forecast in days.
+            eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
+            output_dir (Optional[str], optional): Output directory. Defaults to None.
+
+        Returns:
+            self (Self): ForecastModel object
+        """
+
+        output_dir = output_dir or self.station_dir
+
+        label_builder = LabelBuilder(
+            start_date=self.start_date,
+            end_date=self.end_date,
+            window_size=window_size,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            day_to_forecast=day_to_forecast,
+            eruption_dates=eruption_dates,
+            volcano_id=self.volcano_id,
+            output_dir=output_dir,
+            verbose=self.verbose,
+            debug=self.debug,
+        ).build()
+
+        self.label_builder = label_builder
+        self.label_csv = label_builder.csv
+
         return self
 
     def predict(self):
