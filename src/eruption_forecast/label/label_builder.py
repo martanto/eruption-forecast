@@ -7,11 +7,10 @@ from typing import Literal, Optional, Self, Union
 # Third party imports
 import pandas as pd
 
-from eruption_forecast.label.label_data import LabelData
-
 # Project imports
+from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.logger import logger
-from eruption_forecast.utils import construct_windows, to_datetime
+from eruption_forecast.utils import construct_windows, sort_dates, to_datetime
 
 
 class LabelBuilder:
@@ -67,7 +66,7 @@ class LabelBuilder:
         self.window_step: int = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
-        self.eruption_dates: list[str] = eruption_dates
+        self.eruption_dates: list[str] = sort_dates(eruption_dates)
         self.volcano_id: str = str(volcano_id)
         self.verbose: bool = bool(verbose)
         self.debug: bool = bool(debug)
@@ -299,7 +298,8 @@ class LabelBuilder:
 
         return self
 
-    def validate_columns(self, df: pd.DataFrame) -> None:
+    @staticmethod
+    def validate_columns(df: pd.DataFrame) -> None:
         """Validate columns
 
         Raises:
@@ -364,22 +364,20 @@ class LabelBuilder:
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.label_dir, exist_ok=True)
 
-    def assert_eruption_dates(self) -> Self:
+    def assert_eruption_dates(self) -> None:
         """Ensure there is an eruption between start date and end date
 
         Raises:
             AssertionError: If there is no eruption between start date and end date
 
         Returns:
-            self
+            None
         """
         assert len(self.df_eruption) > 0, (
             f"No eruption recorded between date "
             f"{self.start_date_str} and {self.end_date_str}. "
             f"Your eruption_dates: {self.eruption_dates}"
         )
-
-        return self
 
     def initiate_label(self) -> pd.DataFrame:
         """Initialize label values with zeros (no eruption)
@@ -441,7 +439,15 @@ class LabelBuilder:
 
         self.update_df_eruptions(df)
         self.df = df
-        self.df_eruption = df[df["is_erupted"] > 0]
+
+        df_eruption = df[df["is_erupted"] > 0]
+        assert not df_eruption.empty, ValueError(
+            f"No eruption between start date ({self.start_date_str}) and end date ({self.end_date_str}). "
+            f"Your eruption_dates: {self.eruption_dates}. "
+            f"Please change your start_date and end_date parameters. "
+        )
+
+        self.df_eruption = df_eruption
 
         if not file_exists:
             self.assert_eruption_dates()

@@ -5,8 +5,10 @@ from functools import cached_property
 from typing import Optional, Tuple
 
 # Third party imports
-import numpy as np
 import pandas as pd
+
+# Project imports
+from eruption_forecast.utils import check_sampling_consistency
 
 
 class TremorData:
@@ -83,39 +85,15 @@ class TremorData:
         """Get number of days in tremor data"""
         return int((self.end_date - self.start_date).days)
 
-    def check_sampling_consistency(
-        self, tolerance: Optional[float] = 0.001
-    ) -> Tuple[bool, int]:
-        """Check if the tremor data has consistent sampling periods in seconds
-
-        Args:
-            tolerance (optional, float): Tolerance in seconds for considering sampling periods as equal (default: 0.001).
+    def check_consistency(self) -> Tuple[bool, pd.DataFrame, pd.DataFrame]:
+        """Check consistency of tremor data.
 
         Returns:
-            bool: Return true if sampling period is consistent
-            int: Return sampling period in seconds
+            bool: True if consistent. False otherwise.
+            pd.DataFrame: Conisntency DataFrame with pd.DatetimeIndex.
+            pd.DataFrame: Inconisntency DataFrame with pd.DatetimeIndex.
         """
-        df = self.df.copy()
-
-        # Validate input
-        assert len(df) > 2, ValueError(
-            "DataFrame must have at least 2 rows to check sampling consistency"
+        return check_sampling_consistency(
+            df=self.df,
+            verbose=self.verbose,
         )
-        assert isinstance(df.index, pd.DatetimeIndex), ValueError(
-            "DataFrame index must be DatetimeIndex"
-        )
-
-        time_diffs = pd.Series(df.index).diff().dt.total_seconds()
-
-        # Remove the first NaN value from diff
-        time_diffs = pd.Series(time_diffs).dropna()
-
-        expected_period = int(time_diffs.iloc[0])
-
-        if len(time_diffs) == 0:
-            return True, expected_period
-
-        # Check if all periods are within tolerance of the expected period
-        is_consistent = bool(np.all(np.abs(time_diffs - expected_period) <= tolerance))
-
-        return is_consistent, expected_period

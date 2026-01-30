@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import Literal, Optional, Self, Union
 
 # Project imports
-from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
+from eruption_forecast.tremor.calculate_tremor import CalculateTremor
+from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.utils import to_datetime
 
 
@@ -102,7 +102,6 @@ class ForecastModel:
         self.label_csv: Optional[str] = None
 
         # Validate
-        self.validate()
 
         # Verbose and debugging
         if debug:
@@ -117,17 +116,6 @@ class ForecastModel:
             logger.info(f"Location: {self.location}")
             logger.info(f"Channel: {self.channel}")
             logger.info(f"Output Dir: {self.output_dir}")
-
-    def validate(self) -> None:
-        """Validate properties
-
-        Raises:
-            AssertionError: If any of the properties are invalid
-
-        Returns:
-            None
-        """
-        return None
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
         """Load calculate tremor data from CSV file

@@ -323,3 +323,83 @@ def validate_window_step(
     )
 
     return window_step, window_step_unit
+
+
+def sort_dates(dates: list[str]) -> list[str]:
+    """Convert the list of dates into a pandas Series.
+
+    Args:
+        dates (list[str]): List of dates.
+
+    Returns:
+        list[str]: List of dates.
+    """
+    date_series = pd.Series(dates)
+    date_series = date_series.apply(pd.to_datetime, format="%Y-%m-%d").sort_values()
+    date_list: list[str] = list(date_series.dt.strftime("%Y-%m-%d"))
+
+    return date_list
+
+
+def check_sampling_consistency(
+    df: pd.DataFrame,
+    expected_freq: str = "10min",
+    tolerance: str = "1min",
+    verbose: bool = False,
+) -> Tuple[bool, pd.DataFrame, pd.DataFrame]:
+    """
+    Check 10-minute sampling rate consistency, identify inconsistencies, and remove them.
+
+    Args:
+        df (pd.DataFrame): DataFrame with pd.DatetimeIndex.
+        expected_freq (optional, str): Expected sampling frequency. Defaults to "10min".
+        tolerance (optional, str): Tolerance in seconds for considering sampling periods as equal (default: "1min").
+        verbose (optional, bool): Print detailed information. Defaults to False.
+
+    Returns:
+        bool: True if consistent. False otherwise.
+        pd.DataFrame: Conisntency DataFrame with pd.DatetimeIndex.
+        pd.DataFrame: Inconisntency DataFrame with pd.DatetimeIndex.
+    """
+    assert len(df) > 2, ValueError(
+        "DataFrame must have at least 2 rows to check sampling consistency"
+    )
+    assert isinstance(df.index, pd.DatetimeIndex), ValueError(
+        "DataFrame index must be DatetimeIndex"
+    )
+
+    df = df.sort_index()
+
+    # Calculate time differences between consecutive timestamps
+    time_diffs = df.index.to_series().diff()
+
+    # Expected time difference
+    expected_diff = pd.Timedelta(expected_freq)
+    tolerance_diff = pd.Timedelta(tolerance)
+
+    # Find inconsistent sampling rates (outside tolerance range)
+    lower_bound = expected_diff - tolerance_diff
+    upper_bound = expected_diff + tolerance_diff
+
+    # First row will be NaT (no previous timestamp), so we skip it
+    inconsistent_mask = ~((time_diffs >= lower_bound) & (time_diffs <= upper_bound))
+    inconsistent_mask.iloc[0] = False
+
+    # Get inconsistent data
+    inconsistent_data = df[inconsistent_mask]
+
+    # Get consistent data (remove inconsistencies)
+    consistent_data = df[~inconsistent_mask]
+
+    is_consistent = True if inconsistent_data.empty else False
+
+    if verbose:
+        print(f"Total rows: {len(df)}")
+        print(f"Inconsistent rows found: {len(inconsistent_data)}")
+        print(f"Consistent rows: {len(consistent_data)}")
+
+        if len(inconsistent_data) > 0:
+            print(f"\nInconsistent time differences:")
+            print(time_diffs[inconsistent_mask].describe())
+
+    return is_consistent, consistent_data, inconsistent_data
