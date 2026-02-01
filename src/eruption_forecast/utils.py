@@ -56,7 +56,7 @@ def detect_maximum_outlier(
 
 
 def remove_maximum_outlier(
-    data: np.ndarray, mask_zero_value: bool = False
+    data: np.ndarray, mask_zero_value: bool = True
 ) -> np.ndarray:
     """Remove outliers from an array.
 
@@ -84,7 +84,7 @@ def remove_maximum_outlier(
 def remove_outliers(
     data: np.ndarray,
     outlier_threshold: float = 3.0,
-    mask_zero_value: bool = False,
+    mask_zero_value: bool = True,
     return_outliers: bool = False,
 ) -> np.ndarray:
     """
