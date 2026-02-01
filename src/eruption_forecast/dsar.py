@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Optional, Union
+from typing import Optional, Union, Literal
 
 # Third party imports
 import numpy as np
@@ -13,15 +13,18 @@ class DSAR:
     """Calculate Displacement Seismic Amplitude Ratio (DSAR).
 
     Args:
-        remove_outliers (bool, optional): Whether to remove outliers. Defaults to True.
+        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
         verbose (bool, optional): Whether to enable verbose logging. Defaults to False.
         debug (bool, optional): Whether to enable debug logging. Defaults to False.
     """
 
     def __init__(
-        self, remove_outliers: bool = True, verbose: bool = False, debug: bool = False
+        self,
+        remove_outlier_method: Literal["maximum", "all"] = "maximum",
+        verbose: bool = False,
+        debug: bool = False,
     ) -> None:
-        self.remove_outliers = remove_outliers
+        self.remove_outlier_method = remove_outlier_method
 
         self.first_dsar: Optional[pd.Series] = None
         self.second_dsar: Optional[pd.Series] = None
@@ -62,7 +65,7 @@ class DSAR:
                 trace=trace,
                 window_duration_minutes=window_duration_minutes,
                 metric_function=np.mean,
-                remove_outliers=self.remove_outliers,
+                remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=minimum_completion_ratio,
                 absolute_value=True,
             )
@@ -72,7 +75,7 @@ class DSAR:
                 trace=trace,
                 window_duration_minutes=window_duration_minutes,
                 metric_function=np.mean,
-                remove_outliers=self.remove_outliers,
+                remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=minimum_completion_ratio,
                 absolute_value=True,
             )

@@ -23,6 +23,12 @@ class TremorData:
         self.csv: str = None
         self.df = df if df is not None else pd.DataFrame()
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(csv={self.csv}, df={self.df}, "
+            f"verbose={self.verbose}, debug={self.debug})"
+        )
+
     def from_csv(self, tremor_csv: str) -> pd.DataFrame:
         """Load tremor data from csv file
 

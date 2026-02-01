@@ -111,7 +111,7 @@ class SDS:
         filepath = self.get_filepath(date)
         if not os.path.exists(filepath):
             if self.debug:
-                logger.warning(f"{date_str} :: Data not exists in {filepath}")
+                logger.warning(f"{date_str} :: Miniseed data not exists in {filepath}")
             return Stream()
 
         stream = self.load_stream(filepath, date_str)

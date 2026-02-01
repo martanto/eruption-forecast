@@ -11,14 +11,27 @@ from obspy import Trace
 from eruption_forecast.logger import logger
 
 
-def detect_outliers(
-    data: np.ndarray, outlier_threshold: float = 0.5
+def mask_zero_values(data: np.ndarray) -> np.ndarray:
+    """Masking zero values in an array.
+
+    Args:
+        data (np.ndarray): Array of data.
+
+    Returns:
+        np.ndarray: Data without zero values.
+    """
+    non_zero_mask = data != 0.0
+    return data[non_zero_mask]
+
+
+def detect_maximum_outlier(
+    data: np.ndarray, outlier_threshold: float = 3.0
 ) -> tuple[bool, Union[int, float], float]:
     """Detect outliers in an array using z-score ((X - μ) / σ)
 
     Args:
         data (np.ndarray): Array of data from a trace.
-        outlier_threshold (float, optional): Outlier threshold degree. Defaults to 0.5.
+        outlier_threshold (float, optional): Outlier threshold degree. Defaults to 3.0.
 
     Returns:
         tuple[bool, Union[int, float], float]:
@@ -26,9 +39,6 @@ def detect_outliers(
             outlier_index: Index of the outlier.
             outlier_value: Value of the outlier.
     """
-    if isinstance(data, pd.Series):
-        data = np.array(data.values)
-
     outlier_index = np.argmax(data)
     outlier_value = data[outlier_index]
 
@@ -39,30 +49,85 @@ def detect_outliers(
     z_score = (outlier_value - np.mean(data)) / np.std(data)
 
     # If z_score is greater than 10^outlier_threshold or 3σ, it is an outlier
-    if z_score > 10**outlier_threshold:
+    if z_score > outlier_threshold:
         return True, int(outlier_index), float(outlier_value)
 
     return False, np.nan, np.nan
 
 
-def delete_outliers(data: np.ndarray) -> np.ndarray:
+def remove_maximum_outlier(
+    data: np.ndarray, mask_zero_value: bool = False
+) -> np.ndarray:
     """Remove outliers from an array.
 
     Args:
         data (np.ndarray): Array of data.
+        mask_zero_value (bool, optional): Mask zero values. Defaults to True.
 
     Returns:
         np.ndarray: Array without outliers.
     """
-    if np.sum(data) == 0:
+    if mask_zero_value:
+        data = mask_zero_values(data)
+
+    if (len(data) == 0) or (np.sum(data) == 0):
         return np.array([])
 
-    outlier, outlier_index, _ = detect_outliers(data)
+    outlier, outlier_index, _ = detect_maximum_outlier(data)
 
     if outlier:
         data = np.delete(data, int(outlier_index))
 
     return data
+
+
+def remove_outliers(
+    data: np.ndarray,
+    outlier_threshold: float = 3.0,
+    mask_zero_value: bool = False,
+    return_outliers: bool = False,
+) -> np.ndarray:
+    """
+    Remove outliers from numpy array based on standard deviation threshold.
+    Zero values are masked before outlier detection.
+
+    Args:
+        data (np.ndarray): Array of data.
+        outlier_threshold (float, optional): Outlier threshold degree in standart deviation. Defaults to 3.0.
+        mask_zero_value (bool, optional): Mask zero values. Defaults to False.
+        return_outliers (bool, optional): Whether to return outliers. Defaults to False.
+
+    Returns:
+        np.ndarray: Array without outliers.
+    """
+    # Mask zero values
+    if mask_zero_value:
+        data = mask_zero_values(data)
+
+    if (len(data) == 0) or (np.sum(data) == 0):
+        return np.array([])
+
+    # Calculate mean and std from non-zero values only
+    mean = np.mean(data)
+    std = np.std(data)
+
+    if std == 0:
+        return data
+
+    # Calculate z-scores for non-zero values
+    z_scores = np.abs((data - mean) / std)
+
+    # Create mask for non-outliers
+    non_outlier_mask = z_scores <= outlier_threshold
+
+    # Get filtered data and outliers
+    filtered_data = data[non_outlier_mask]
+    outliers = data[~non_outlier_mask]
+
+    if return_outliers:
+        return outliers
+
+    return filtered_data
 
 
 def get_windows_information(
@@ -117,7 +182,8 @@ def calculate_window_metrics(
     trace: Trace,
     window_duration_minutes: int = 10,
     metric_function: Callable[[np.ndarray], float] = np.mean,
-    remove_outliers: bool = True,
+    remove_outlier_method: Optional[Literal["maximum", "all"]] = None,
+    mask_zero_value: bool = False,
     minimum_completion_ratio: float = 0.3,
     absolute_value: bool = False,
     value_multiplier: float = 1.0,
@@ -128,7 +194,8 @@ def calculate_window_metrics(
         trace (Trace): ObsPy Trace object.
         window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
         metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
-        remove_outliers (bool, optional): Whether to remove outliers before calculation. Defaults to True.
+        mask_zero_value (bool, optional): Mask zero values. Defaults to False.
+        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
         minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate the metric. Defaults to 0.3.
         absolute_value (bool, optional): Whether to use absolute values. Defaults to False.
         value_multiplier (float, optional): Multiplier for the metric value. Defaults to 1.0.
@@ -163,13 +230,18 @@ def calculate_window_metrics(
         # Initialize metric_value to np.nan
         metric_value = window_data[0] if length_window_data == 1 else np.nan
 
-        if length_window_data > 1:
-            if remove_outliers and (length_window_data > minimum_samples):
-                window_data = delete_outliers(window_data)
+        if remove_outlier_method and (length_window_data > minimum_samples):
+            window_data = (
+                remove_maximum_outlier(window_data, mask_zero_value=mask_zero_value)
+                if remove_outlier_method == "maximum"
+                else remove_outliers(window_data, mask_zero_value=mask_zero_value)
+            )
 
             # Re-check length after outlier removal just in case,
-            # though delete_outliers mostly removes one
+            # though remove_maximum_outlier mostly removes one
             if len(window_data) > 0:
+
+                # Update metric value
                 metric_value = metric_function(window_data)
 
                 if value_multiplier != 1.0 and not np.isnan(metric_value):

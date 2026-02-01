@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime, timedelta
 from functools import cached_property, lru_cache
 from multiprocessing import Pool
-from typing import Optional, Self, Tuple, Union
+from typing import Optional, Self, Union, Literal
 
 # Third party imports
 import numpy as np
@@ -34,15 +34,15 @@ class CalculateTremor:
         methods (Optional[str]): Calculation methods to apply.
         output_dir (str): Directory for output files. Defaults to "output".
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
-        filename_prefix (Optional[str]): Prefix for generated filenames.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
-        remove_outliers (bool): If True, removes outliers from the data. Defaults to True.
+        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
         interpolate (bool): If True, interpolates the data. Defaults to True.
         value_multiplier (Optional[float]): Scaling factor for seismic values.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
         plot_tmp (bool): If True, plot temporary results for quick view.
         save_plot (bool): If True, save tremor results for quick view.
         overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
+        filename_prefix (Optional[str]): Prefix for generated filenames.
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
     """
@@ -58,15 +58,15 @@ class CalculateTremor:
         methods: Optional[str] = None,
         output_dir: str = "output",
         overwrite: bool = False,
-        filename_prefix: Optional[str] = None,
         n_jobs: int = 1,
-        remove_outliers: bool = True,
+        remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
         value_multiplier: Optional[float] = None,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = False,
         save_plot: bool = False,
         overwrite_plot: bool = False,
+        filename_prefix: Optional[str] = None,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -101,7 +101,7 @@ class CalculateTremor:
         self.overwrite = overwrite
         self.filename_prefix = filename_prefix
         self.n_jobs = n_jobs
-        self.remove_outliers = remove_outliers
+        self.remove_outlier_method = remove_outlier_method
         self.interpolate = interpolate
         self.value_multiplier = value_multiplier
         self.cleanup_tmp_dir = cleanup_tmp_dir
@@ -131,15 +131,16 @@ class CalculateTremor:
         )
         self.n_days: int = len(self.dates)
         self.nslc = nslc
-        self.tmp_dir: str = os.path.join(self.tremor_dir, "tmp")
+        self.tmp_dir: str = os.path.join(tremor_dir, "tmp")
         self.sds: Optional[SDS] = None
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
         self.figures_tmp_dir = os.path.join(figures_dir, "tmp")
-        self.tremor_csv = None
+        self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
         self._source: Optional[str] = None
         self._sds_dir: Optional[str] = None
         self._client_url = "https://service.iris.edu"
+        self.csv = os.path.join(tremor_dir, self.filename)
 
         # Validate
         self.validate()
@@ -160,6 +161,27 @@ class CalculateTremor:
             logger.info(f"Tremor Directory: {self.tremor_dir}")
             logger.info(f"Overwrite: {self.overwrite}")
             logger.info(f"Freq Bands: {self.freq_bands_alias}")
+
+    def __str__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(Version: {eruption_forecast.__version__}). "
+            f"Running on {self.n_jobs} job(s) from {self.start_date_str} "
+            f"to {self.end_date_str} ({self.n_days} days). Using {self.nslc} "
+            f"and frequency bands: {self.freq_bands_alias}. "
+            f"Tremor calculation saved to {self.csv}"
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(start_date={self.start_date_str}, "
+            f"end_date={self.end_date_str}, station={self.station}, network={self.network}, "
+            f"channel={self.channel}, location={self.location}, methods={self.methods}, "
+            f"output_dir={self.output_dir}, overwrite={self.overwrite}, n_jobs={self.n_jobs}, "
+            f"remove_outlier_method={self.remove_outlier_method}, interpolate={self.interpolate}, "
+            f"value_multiplier={self.value_multiplier}, cleanup_tmp_dir={self.cleanup_tmp_dir}, "
+            f"plot_tmp={self.plot_tmp}, save_plot={self.save_plot}, overwrite_plot={self.overwrite_plot}, "
+            f"csv={self.csv}, verbose={self.verbose}, debug={self.debug})"
+        )
 
     def change_freq_bands(self, freq_bands: list[tuple[float, float]]) -> Self:
         """Change freq bands default values
@@ -214,14 +236,21 @@ class CalculateTremor:
             names[f"f{index}"] = (freq_band[0], freq_band[1])
         return names
 
-    @cached_property
+    @property
     def filename(self) -> str:
-        default_filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}"
+        """Return defaut filename"""
+        # Example: tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31
         return (
-            default_filename
+            f"tremor_{self._filename}"
             if self.filename_prefix is None
-            else f"{self.filename_prefix}_{default_filename}"
+            else f"{self.filename_prefix}_{self._filename}"
         )
+
+    @filename.setter
+    def filename(self, filename: str) -> None:
+        if not filename.endswith(".csv"):
+            filename = f"{filename}.csv"
+        self._filename = filename
 
     @cached_property
     def jobs(self) -> list[tuple[int, datetime]]:
@@ -307,7 +336,7 @@ class CalculateTremor:
         if self._source == "fdsn":
             stream = Stream()
 
-        return stream.detrend(type="demean")
+        return stream
 
     def from_sds(self, sds_dir: str) -> Self:
         """Set the data source to Seiscomp Data Structure (SDS).
@@ -351,6 +380,13 @@ class CalculateTremor:
         Returns:
             Self
         """
+        csv = self.csv
+
+        if not self.overwrite and os.path.isfile(csv):
+            logger.info(f"Load tremor from file: {csv}")
+            self.df = pd.read_csv(csv, index_col=0, parse_dates=True)
+            return self
+
         self.create_temporary_dir()
 
         if self.n_jobs == 1:
@@ -367,13 +403,22 @@ class CalculateTremor:
             pool.join()
 
         # Merge calculated tremor CSV files from tmp dir
-        self.tremor_csv, self.df = self.concat_tremor_data(
-            self.tmp_dir, self.tremor_dir
-        )
+        df = self.concat_tremor_data(self.tmp_dir, self.tremor_dir)
+
+        start_date = df.index[0].strftime("%Y-%m-%d")
+        end_date = df.index[-1].strftime("%Y-%m-%d")
+
+        # Update filename with latest datetime index from df
+        filename = f"tremor_{self.nslc}_{start_date}-{end_date}"
+        csv = os.path.join(self.tremor_dir, f"{filename}.csv")
+
+        df.to_csv(csv, index=True)
+
+        logger.info(f"Tremor data saved to {csv}")
 
         if self.save_plot:
             plot_tremor(
-                df=self.df,
+                df=df,
                 interval=14,
                 interval_unit="days",
                 figure_dir=self.figures_dir,
@@ -381,6 +426,10 @@ class CalculateTremor:
                 overwrite=self.overwrite or self.overwrite_plot,
                 verbose=self.verbose,
             )
+
+        self.df = df
+        self.filename = filename
+        self.csv = csv
 
         return self
 
@@ -409,6 +458,10 @@ class CalculateTremor:
             return None
 
         df = self.calculate(date)
+
+        # Return None if df is empty. No data to process
+        if df.empty:
+            return None
 
         # save tremor data
         df.to_csv(
@@ -452,6 +505,12 @@ class CalculateTremor:
             pd.DataFrame: Tremor data
         """
         stream = self.get_stream(date)
+
+        # Return empty dataframe if stream is empty
+        # (no traces found or miniseed file not exists)
+        if len(stream) == 0:
+            return pd.DataFrame()
+
         date_str = date.strftime("%Y-%m-%d")
 
         # Build tremor DataFrame index
@@ -527,7 +586,7 @@ class CalculateTremor:
                 trace=filtered_stream[0],
                 window_duration_minutes=10,
                 metric_function=np.mean,
-                remove_outliers=self.remove_outliers,
+                remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=0.3,
                 absolute_value=True,
             )
@@ -596,7 +655,7 @@ class CalculateTremor:
                 )
                 .calculate(
                     value_multiplier=self.value_multiplier or 1.0,
-                    remove_outliers=self.remove_outliers,
+                    remove_outlier_method=self.remove_outlier_method,
                     interpolate=True,
                 )
                 .values
@@ -612,7 +671,7 @@ class CalculateTremor:
     @staticmethod
     def concat_tremor_data(
         tmp_dir: str, tremor_dir: Optional[str] = None
-    ) -> Tuple[str, pd.DataFrame]:
+    ) -> pd.DataFrame:
         """Concatenate calculated tremor data from tmp dir to tremor dir.
 
         Args:
@@ -620,7 +679,7 @@ class CalculateTremor:
             tremor_dir (str, optional): Directory where tremor data will be saved. Defaults to None.
 
         Returns:
-            Tuple[str, pd.DataFrame]: Tremor data location and tremor data
+            pd.DataFrame: Tremor data
         """
         assert os.path.isdir(tmp_dir), f"Directory {tmp_dir} does not exist"
 
@@ -638,9 +697,4 @@ class CalculateTremor:
             sort=True,
         )
 
-        tremor_filepath = os.path.join(tremor_dir, "tremor.csv")
-        df.to_csv(tremor_filepath, index=True)
-
-        logger.info(f"Tremor data saved to {tremor_filepath}")
-
-        return tremor_filepath, df
+        return df.sort_index()
