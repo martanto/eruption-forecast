@@ -18,7 +18,13 @@ from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.tremor.tremor_data import TremorData
-from eruption_forecast.utils import to_datetime, validate_columns, validate_date_ranges
+from eruption_forecast.utils import (
+    to_datetime,
+    validate_columns,
+    validate_date_ranges,
+    construct_windows,
+    concat_features as utils_concat_features,
+)
 
 
 class ForecastModel:
@@ -136,6 +142,18 @@ class ForecastModel:
         # Will be set after build_features() called
         self.FeaturesBuilder: Optional[FeaturesBuilder] = None
         self.features_data: pd.DataFrame = pd.DataFrame()
+        self.features_csv: Optional[str] = None
+
+        # Will be set after extract_features() called
+        self.extract_features_csvs: set[str] = set()
+        self.relevant_features_csvs: set[str] = set()
+
+        # Will be set after concat_features() called
+        self.extracted_features_csv: str = None
+        self.extracted_relevant_csv: str = None
+
+        # Will be set after predict() called
+        self.prediction_features_csvs = set()
 
         # Base filename without extension
         self.basename: Optional[str] = None
@@ -304,12 +322,43 @@ class ForecastModel:
         self.default_fc_parameters = default_fc_parameters
         return default_fc_parameters
 
+    def concat_features(self) -> Self:
+        """Concatenate features from calculation."""
+        if len(self.extract_features_csvs) > 0:
+            csv_list = list(self.extract_features_csvs)
+            if self.verbose:
+                logger.info(f"Concatenating extracted features from calculation.")
+            filepath = os.path.join(
+                self.features_dir,
+                f"extracted_features_{self.start_date_str}-{self.end_date_str}.csv",
+            )
+            self.extracted_features_csv = utils_concat_features(
+                csv_list, filepath, return_as_filepath=True
+            )
+
+        if len(self.relevant_features_csvs) > 0:
+            csv_list = list(self.relevant_features_csvs)
+            if self.verbose:
+                logger.info(
+                    f"Concatenating relevant extracted features from calculation."
+                )
+            filepath = os.path.join(
+                self.features_dir,
+                f"extracted_relevant_{self.start_date_str}-{self.end_date_str}.csv",
+            )
+            self.extracted_relevant_csv = utils_concat_features(
+                csv_list, filepath, return_as_filepath=True
+            )
+
+        return self
+
     def extract_features(
         self,
         exclude_features: Optional[Union[list[str], bool]] = None,
         tremor_columns: Optional[list[str]] = None,
         use_relevant_features: bool = False,
         overwrite: bool = False,
+        concat_features: bool = True,
         n_jobs: Optional[int] = None,
     ) -> Self:
         """Extract features from tremor data.
@@ -319,6 +368,7 @@ class ForecastModel:
             tremor_columns (list[str]): List of tremor columns to extract.
             use_relevant_features (bool): If True, extract features using relevant features.
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
+            concat_features (bool): If True, concat all features
             n_jobs (int): Number of parallel jobs. Defaults to None.
 
         Returns:
@@ -331,7 +381,9 @@ class ForecastModel:
 
         overwrite = overwrite or self.overwrite
         label_data = self.label_data
-        prefix_filename = "extracted_relevant" if use_relevant_features else "extracted"
+        prefix_filename = (
+            "extracted_relevant" if use_relevant_features else "extracted_features"
+        )
 
         if use_relevant_features and self.verbose:
             logger.info(f"Extracting features using relevant features")
@@ -361,6 +413,7 @@ class ForecastModel:
             "default_fc_parameters": default_fc_parameters,
         }
 
+        traning_features_csvs = set()
         for column in features_data.columns.tolist():
             if column in ["id", "datetime"]:
                 continue
@@ -375,6 +428,7 @@ class ForecastModel:
                     logger.info(
                         f"Extracted features for {column} saved in: {extracted_csv} "
                     )
+                traning_features_csvs.add(extracted_csv)
                 continue
 
             df = features_data[["id", "datetime", column]]
@@ -394,7 +448,18 @@ class ForecastModel:
             extracted_features.index.name = "id"
             extracted_features.to_csv(extracted_csv, index=True)
 
+            # Add extracted csvs to list
+            traning_features_csvs.add(extracted_csv)
+
             logger.info(f"Extracted features for {column} saved in: {extracted_csv} ")
+
+        if use_relevant_features:
+            self.relevant_features_csvs.update(traning_features_csvs)
+        else:
+            self.extract_features_csvs.update(traning_features_csvs)
+
+        if concat_features:
+            self.concat_features()
 
         return self
 
@@ -444,8 +509,17 @@ class ForecastModel:
 
         # Sync label with features matrix
         label_data = label_data[label_data["id"].isin(features_builder.unique_ids)]
+
+        label_csv = os.path.join(
+            self.features_dir,
+            f"label_{self.start_date_str}-{self.end_date_str}.csv",
+        )
+        label_data.to_csv(label_csv, index=True)
+
         self.features_data = features_data
+        self.features_csv = features_builder.csv
         self.label_data = label_data
+        self.label_csv = label_csv
 
         return self
 
@@ -455,8 +529,8 @@ class ForecastModel:
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: Optional[Union[str, datetime]] = None,
+        end_date: Optional[Union[str, datetime]] = None,
         output_dir: Optional[str] = None,
         tremor_columns: Optional[list[str]] = None,
         verbose: Optional[bool] = None,
@@ -571,5 +645,38 @@ class ForecastModel:
 
         return self
 
-    def predict(self):
+    def predict(
+        self,
+        start_date: Union[str, datetime],
+        end_date: Union[str, datetime],
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+        output_dir: Optional[str] = None,
+        verbose: Optional[bool] = None,
+    ):
+        verbose = verbose or self.verbose
+
+        start_date = to_datetime(start_date)
+        end_date = to_datetime(end_date)
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+
+        output_dir = output_dir or os.path.join(self.station_dir, "predict")
+        os.makedirs(output_dir, exist_ok=True)
+
+        filename = f"predict_window_{start_date_str}-{end_date_str}_ws-{window_step}{window_step_unit}.csv"
+        predict_window_csv = os.path.join(output_dir, filename)
+
+        df_predict_window = construct_windows(
+            start_date=start_date,
+            end_date=end_date,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+        )
+
+        df_predict_window.to_csv(predict_window_csv, index=True)
+
+        if verbose:
+            logger.info(f"Prediction window saved to: {predict_window_csv}")
+
         return self

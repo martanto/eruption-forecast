@@ -61,6 +61,7 @@ class FeaturesBuilder:
         self.end_date = df_tremor.index[-1]
         self.features_matrix: pd.DataFrame = pd.DataFrame()
         self.unique_ids: list[int] = None
+        self.csv: Optional[str] = None
 
         # Validate
         self.validate()
@@ -160,6 +161,7 @@ class FeaturesBuilder:
 
         if verbose:
             logger.info(f"Group features per ID label")
+
         features: list[pd.DataFrame] = []
 
         # TODO: Check sampling period consistency
@@ -205,6 +207,7 @@ class FeaturesBuilder:
             self.save_features_per_method(features_matrix)
 
         self.features_matrix = features_matrix
+        self.csv = feature_csv
         self.unique_ids = features_matrix["id"].unique()
 
         logger.info(f"Features matrix saved to: {feature_csv}")

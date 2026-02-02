@@ -259,18 +259,18 @@ def calculate_window_metrics(
 
 
 def construct_windows(
-    window_step: int,
-    window_step_unit: Literal["minutes", "hours"],
     start_date: Union[str, datetime],
     end_date: Union[str, datetime],
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
 ) -> pd.DataFrame:
     """Construct time windows for label and tremor data.
 
     Args:
-        window_step (int): Step size between windows.
-        window_step_unit (Literal["minutes", "hours"]): Unit of window step.
         start_date (Union[str, datetime]): Start date in YYYY-MM-DD format or datetime object.
         end_date (Union[str, datetime]): End date in YYYY-MM-DD format or datetime object.
+        window_step (int): Step size between windows.
+        window_step_unit (Literal["minutes", "hours"]): Unit of window step.
 
     Returns:
         pd.DataFrame: DataFrame with datetime index representing time windows.
@@ -498,3 +498,30 @@ def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
             f"Columns available are: {df.columns}"
         )
     return None
+
+
+def concat_features(
+    csv_list: list[str], filepath: str, return_as_filepath: bool = False
+) -> Union[str, Tuple[str, pd.DataFrame]]:
+    """Concatenate features from csv_list into one dataframe.
+
+    Args:
+        csv_list (list[str]): List of csv files.
+        filepath (str): Filepath to save csv file.
+        return_as_filepath (bool, optional): Return as CSV filepath. Defaults to False.
+
+    Returns:
+        str: Filepath of csv file.
+        (str, pd.DataFrame): Filepath and DataFrame
+    """
+    assert len(csv_list) > 1, ValueError(
+        f"Requires at least 2 CSV files. Total your CSV file is {len(csv_list)}"
+    )
+
+    df = pd.concat([pd.read_csv(file, index_col=0) for file in csv_list], axis=1)
+    df.to_csv(filepath, index=True)
+
+    if return_as_filepath:
+        return filepath
+
+    return filepath, df

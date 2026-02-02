@@ -386,7 +386,10 @@ class LabelBuilder:
             pd.DataFrame
         """
         df = construct_windows(
-            self.window_step, self.window_step_unit, self.start_date, self.end_date
+            start_date=self.start_date,
+            end_date=self.end_date,
+            window_step=self.window_step,
+            window_step_unit=self.window_step_unit,
         )
         df["is_erupted"] = 0
 
