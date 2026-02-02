@@ -475,3 +475,26 @@ def check_sampling_consistency(
             print(time_diffs[inconsistent_mask].describe())
 
     return is_consistent, consistent_data, inconsistent_data
+
+
+def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
+    """Validate columns in dataframe.
+
+    Args:
+        df (pd.DataFrame): DataFrame with pd.DatetimeIndex.
+        columns (list[str]): List of columns to validate.
+
+    Raises:
+        ValueError: If columns are invalid.
+
+    Returns:
+        None
+    """
+    for column in columns:
+        if column in ["id", "datetime"]:
+            continue
+        assert column in df.columns.tolist(), ValueError(
+            f"Column {column} not exists in dataframe. "
+            f"Columns available are: {df.columns}"
+        )
+    return None

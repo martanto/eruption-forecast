@@ -1,7 +1,7 @@
 # Standard library imports
 from datetime import datetime
 from functools import lru_cache
-from typing import Callable, Self, Literal
+from typing import Callable, Literal, Self
 
 # Third party imports
 import numpy as np

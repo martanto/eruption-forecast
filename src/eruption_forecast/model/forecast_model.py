@@ -3,14 +3,22 @@ import os
 from datetime import datetime, timedelta
 from typing import Literal, Optional, Self, Union
 
+# Third party imports
 import pandas as pd
+from tsfresh import extract_features as tsfresh_extract_features
+from tsfresh import (
+    extract_relevant_features,
+)
+from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
+from tsfresh.utilities.dataframe_functions import impute
 
 # Project imports
+from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.tremor.tremor_data import TremorData
-from eruption_forecast.utils import to_datetime
+from eruption_forecast.utils import to_datetime, validate_columns, validate_date_ranges
 
 
 class ForecastModel:
@@ -64,6 +72,7 @@ class ForecastModel:
         output_dir = output_dir or os.path.join(os.getcwd(), "output")
         station_dir = os.path.join(output_dir, nslc)
         training_dir = os.path.join(station_dir, "training")
+        features_dir = os.path.join(station_dir, "features")
 
         # Set DEFAULT properties
         self.station = station
@@ -87,6 +96,7 @@ class ForecastModel:
         self.nslc = nslc
         self.station_dir = station_dir
         self.training_dir = training_dir
+        self.features_dir = features_dir
         self.kwargs = {
             "station": station,
             "channel": channel,
@@ -99,20 +109,36 @@ class ForecastModel:
             "n_jobs": n_jobs,
         }
 
+        # Default feature calculator (fc) parameters
+        self.default_fc_parameters = ComprehensiveFCParameters()
+        self.excludes_features: set[str] = {
+            "agg_linear_trend",
+            "linear_trend_timewise",
+            "length",
+            "has_duplicate_max",
+            "has_duplicate_min",
+            "has_duplicate",
+        }
+
         # Will be set after calculate() method called
         self.CalculateTremor: Optional[CalculateTremor] = None
         self.TremorData: Optional[TremorData] = None
-        self.tremor_data: pd.DataFrame = None
+        self.tremor_data: pd.DataFrame = pd.DataFrame()
         self.tremor_csv: Optional[str] = None
 
         # WIll be set after train() method called
         self.LabelBuilder: Optional[LabelBuilder] = None
-        self.label_data: pd.DataFrame = None
+        self.label_data: pd.DataFrame = pd.DataFrame()
         self.label_csv: Optional[str] = None
+        self.total_eruption_class: Optional[int] = None
+        self.total_non_eruption_class: Optional[int] = None
+
+        # Will be set after build_features() called
+        self.FeaturesBuilder: Optional[FeaturesBuilder] = None
+        self.features_data: pd.DataFrame = pd.DataFrame()
 
         # Base filename without extension
         self.basename: Optional[str] = None
-        self._id = f"{start_date_str}_{end_date_str}_{nslc}_ws-{window_size}"
 
         # Validate
 
@@ -140,9 +166,9 @@ class ForecastModel:
             self (Self)
         """
         tremor_data = TremorData()
-        self.TremorData = TremorData()
-        self.TremorData.csv = tremor_csv
+        self.TremorData = tremor_data
         self.tremor_data = tremor_data.from_csv(tremor_csv)
+        self.TremorData.csv = tremor_csv
         self.tremor_csv = tremor_csv
         return self
 
@@ -235,46 +261,216 @@ class ForecastModel:
 
         # Update self.start_date and self.end_date based on calculated tremor data
         if self.start_date_minus_window_size < tremor_data.start_date:
-            self.start_date_minus_window_size = tremor_data.start_date
+            self.start_date = tremor_data.start_date
+            self.start_date_str = tremor_data.start_date_str
             if self.verbose:
                 logger.info(
-                    f"start_date_minus_window_size parameter: {self.start_date_minus_window_size} updated to "
+                    f"start_date parameter: {self.start_date_minus_window_size} updated to "
                     f"tremor start date: {tremor_data.start_date}"
                 )
 
         if self.end_date > tremor_data.end_date:
             self.end_date = tremor_data.end_date
+            self.end_date_str = tremor_data.end_date_str
             if self.verbose:
                 logger.info(
-                    f"start_date parameter: {self.end_date} updated to "
+                    f"end_date parameter: {self.end_date} updated to "
                     f"tremor end date: {tremor_data.end_date}"
                 )
 
         # Update tremor data based on update self.start_date or self.end_date
-        self.tremor_data = df_tremor.loc[
-            self.start_date_minus_window_size : self.end_date
-        ]
+        self.tremor_data = df_tremor.loc[self.start_date : self.end_date]
 
         return self
 
-    def train(
+    def drop_features(self, excludes_features: list[str]) -> ComprehensiveFCParameters:
+        """Drop features from calculation.
+
+        Args:
+            excludes_features (list[str]): List of features to exclude from calculation.
+
+        Returns:
+            ComprehensiveFCParameters: tsfresh ComprehensiveFCParameters
+        """
+        default_fc_parameters = self.default_fc_parameters
+        self.excludes_features.update(excludes_features)
+
+        if len(self.excludes_features) > 0:
+            default_fc_parameters_data = default_fc_parameters.data
+            for feature in self.excludes_features:
+                if feature in list(default_fc_parameters_data.keys()):
+                    default_fc_parameters.pop(feature)
+
+        self.default_fc_parameters = default_fc_parameters
+        return default_fc_parameters
+
+    def extract_features(
+        self,
+        exclude_features: Optional[Union[list[str], bool]] = None,
+        tremor_columns: Optional[list[str]] = None,
+        use_relevant_features: bool = False,
+        overwrite: bool = False,
+        n_jobs: Optional[int] = None,
+    ) -> Self:
+        """Extract features from tremor data.
+
+        Args:
+            exclude_features (Optional[list[str]]): List features calculator to be excluded.
+            tremor_columns (list[str]): List of tremor columns to extract.
+            use_relevant_features (bool): If True, extract features using relevant features.
+            overwrite (bool): If True, overwrite existing feature files. Defaults to False.
+            n_jobs (int): Number of parallel jobs. Defaults to None.
+
+        Returns:
+            self (Self): ForecastModel object
+        """
+        features_data = self.features_data
+        if tremor_columns is not None:
+            validate_columns(self.features_data, tremor_columns)
+            features_data = features_data[["id", "datetime", *tremor_columns]]
+
+        overwrite = overwrite or self.overwrite
+        label_data = self.label_data
+        prefix_filename = "extracted_relevant" if use_relevant_features else "extracted"
+
+        if use_relevant_features and self.verbose:
+            logger.info(f"Extracting features using relevant features")
+
+        # Get label data as a target
+        y = label_data["is_erupted"]
+        y.index = label_data["id"]
+
+        # Extract features per method
+        extract_features_dir = os.path.join(self.features_dir, "extract_features")
+        os.makedirs(extract_features_dir, exist_ok=True)
+
+        # Exclude features from calculation
+        default_fc_parameters = self.default_fc_parameters
+
+        if exclude_features is not None:
+            if isinstance(exclude_features, list):
+                default_fc_parameters = self.drop_features(exclude_features)
+            if isinstance(exclude_features, bool):
+                if not exclude_features:
+                    self.excludes_features = {}
+
+        extract_params = {
+            "column_id": "id",
+            "column_sort": "datetime",
+            "n_jobs": n_jobs or self.n_jobs,
+            "default_fc_parameters": default_fc_parameters,
+        }
+
+        for column in features_data.columns.tolist():
+            if column in ["id", "datetime"]:
+                continue
+
+            extracted_csv = os.path.join(
+                extract_features_dir, f"{prefix_filename}_{column}.csv"
+            )
+
+            # Skip if extracted features already exists
+            if not overwrite and os.path.isfile(extracted_csv):
+                if self.verbose:
+                    logger.info(
+                        f"Extracted features for {column} saved in: {extracted_csv} "
+                    )
+                continue
+
+            df = features_data[["id", "datetime", column]]
+
+            if self.verbose:
+                logger.info(f"Extracting {column} features. ")
+
+            if use_relevant_features:
+                extracted_features = extract_relevant_features(df, y, **extract_params)
+            else:
+                extracted_features = tsfresh_extract_features(
+                    df,
+                    impute_function=impute,
+                    **extract_params,
+                )
+
+            extracted_features.index.name = "id"
+            extracted_features.to_csv(extracted_csv, index=True)
+
+            logger.info(f"Extracted features for {column} saved in: {extracted_csv} ")
+
+        return self
+
+    def build_features(
+        self,
+        output_dir: Optional[str] = None,
+        tremor_columns: Optional[list[str]] = None,
+        save_per_method: bool = True,
+        save_tmp_feature: bool = False,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ) -> Self:
+        """Build features from tremor data.
+
+        Args:
+            output_dir (Optional[str]): Directory to save features to. Defaults to None.
+            tremor_columns (list[str]): List of tremor columns to extract. Defaults to None.
+            save_tmp_feature (bool): If True, save features temporarily. Defaults to False.
+            save_per_method (bool): If True, save features per method. Defaults to True.
+            overwrite (bool): If True, overwrite existing feature files. Defaults to False.
+            verbose (bool): If True, show progress. Defaults to False.
+
+        Returns:
+            self (Self): ForecastModel object
+        """
+        label_data = self.label_data
+        output_dir = output_dir or self.features_dir
+        verbose = verbose or self.verbose
+
+        features_builder = FeaturesBuilder(
+            df_tremor=self.tremor_data,
+            df_label=label_data,
+            output_dir=output_dir,
+            window_size=self.window_size,
+            tremor_columns=tremor_columns,
+            overwrite=overwrite or self.overwrite,
+            verbose=verbose or self.verbose,
+        )
+
+        self.FeaturesBuilder = features_builder
+        features_filename = f"features_{self.start_date_str}-{self.end_date_str}_ws-{self.window_size}.csv"
+        features_data = features_builder.build(
+            save_tmp_feature=save_tmp_feature,
+            save_per_method=save_per_method,
+            filename=features_filename,
+        )
+
+        # Sync label with features matrix
+        label_data = label_data[label_data["id"].isin(features_builder.unique_ids)]
+        self.features_data = features_data
+        self.label_data = label_data
+
+        return self
+
+    def build_label(
         self,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         output_dir: Optional[str] = None,
         tremor_columns: Optional[list[str]] = None,
         verbose: Optional[bool] = None,
         debug: Optional[bool] = None,
     ) -> Self:
-        """Build training model.
+        """Build label.
 
         Args:
             window_step (int): Window step size.
             window_step_unit (Literal["minutes", "hours"]): Unit of window step.
             day_to_forecast (int): Day to forecast in days.
             eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
+            start_date (str, optional): Override self.start_date.
+            end_date (str, optional): Override self.end_date.
             output_dir (Optional[str], optional): Output directory. Defaults to None.
             tremor_columns (Optional[list[str]], optional): Columns to select. Defaults to None.
             verbose (bool): If True, enables verbose logging. Defaults to False.
@@ -283,14 +479,30 @@ class ForecastModel:
         Returns:
             self (Self): ForecastModel object
         """
+        tremor_data = self.tremor_data
+        train_start_date: Union[str, datetime] = start_date or self.start_date
+        train_end_date: Union[str, datetime] = end_date or self.end_date
+
+        # Validating
+        validate_date_ranges(train_start_date, train_end_date)
+
+        assert isinstance(tremor_data, pd.DataFrame) and (
+            len(tremor_data) > 0
+        ), ValueError(
+            f"Tremor data not found/loaded. "
+            f"Please run calculate() or load_tremor_data() method first."
+        )
+        if tremor_columns:
+            validate_columns(tremor_data, tremor_columns)
+
         verbose = verbose or self.verbose
         debug = debug or self.debug
 
         output_dir = output_dir or self.station_dir
 
         label_builder = LabelBuilder(
-            start_date=self.start_date,
-            end_date=self.end_date,
+            start_date=to_datetime(train_start_date),
+            end_date=to_datetime(train_end_date),
             window_size=self.window_size,
             window_step=window_step,
             window_step_unit=window_step_unit,
@@ -304,36 +516,20 @@ class ForecastModel:
 
         df_label = label_builder.df
 
-        self.LabelBuilder = label_builder
-        self.label_csv = label_builder.csv
-
         # Build output directory
         basename = os.path.basename(label_builder.csv).split(".csv")[0]
-        self.basename = basename
-
-        # Set training and features matrix directory
-        training_label_dir = os.path.join(self.training_dir, basename)
-        features_matrix_dir = os.path.join(training_label_dir, "features_matrix")
-
-        os.makedirs(training_label_dir, exist_ok=True)
-        os.makedirs(features_matrix_dir, exist_ok=True)
 
         # Load tremor and select specific columns
-        df_tremor = self.tremor_data.copy()
+        df_tremor = tremor_data.copy()
         if tremor_columns is not None:
-            for column in tremor_columns:
-                assert column in df_tremor.columns, ValueError(
-                    f"Column {column} not exists in tremor data"
-                )
             df_tremor = df_tremor[tremor_columns]
         df_tremor.sort_index(ascending=True, inplace=True)
 
-        # Ensuring tremor data is within label data range
-        tremor_start_date_obj: pd.Timestamp = df_tremor.index[0]
-        tremor_end_date_obj: pd.Timestamp = df_tremor.index[-1]
-
+        # Ensuring label data is within tremor data range
         label_start_date_obj: pd.Timestamp = df_label.index[0]
         label_end_date_obj: pd.Timestamp = df_label.index[-1]
+        tremor_start_date_obj: pd.Timestamp = df_tremor.index[0]
+        tremor_end_date_obj: pd.Timestamp = df_tremor.index[-1]
 
         assert tremor_start_date_obj <= label_start_date_obj, ValueError(
             f"Training start date ({tremor_start_date_obj}) should be after/equal "
@@ -346,9 +542,32 @@ class ForecastModel:
             f"Change your training end date before/equal {tremor_end_date_obj}."
         )
 
+        # Set properties
+        self.LabelBuilder = label_builder
+        self.label_csv = label_builder.csv
+        self.basename = basename
+
         # Omitting label data (df) based on window step
         df_label = df_label.loc[self.start_date :]
+
+        if df_label.empty:
+            raise ValueError(f"Label from start date {self.start_date} is empty.")
+
         self.label_data = df_label
+
+        # Get target class numbers. Check if the data is balanced or not
+        self.total_eruption_class = len(label_builder.df_eruption)
+        self.total_non_eruption_class = (
+            len(label_builder.df) - self.total_eruption_class
+        )
+        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
+
+        if verbose:
+            logger.info(
+                f"Total number of eruptions: {self.total_eruption_class}. "
+                f"Total number of non-eruptions: {self.total_non_eruption_class}. "
+                f"Class ratio (eruption againts non eruptions): {class_ratio}"
+            )
 
         return self
 

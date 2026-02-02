@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime, timedelta
 from functools import cached_property, lru_cache
 from multiprocessing import Pool
-from typing import Optional, Self, Union, Literal
+from typing import Literal, Optional, Self, Union
 
 # Third party imports
 import numpy as np

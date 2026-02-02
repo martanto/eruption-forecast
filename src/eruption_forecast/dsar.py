@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Optional, Union, Literal
+from typing import Literal, Optional, Union
 
 # Third party imports
 import numpy as np
