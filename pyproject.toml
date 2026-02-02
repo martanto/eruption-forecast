@@ -15,10 +15,12 @@ dependencies = [
     "notebook",
     "obspy>=1.4.2",
     "pandas>=3.0.0",
+    "numpy==2.3.5",
     "pip",
     "numba",
     "tsfresh",
     "uv-build>=0.9.0",
+    "imbalanced-learn>=0.14.1",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
