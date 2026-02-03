@@ -75,8 +75,8 @@ class ForecastModel:
         # Setup directories
         network = network or "VG"
         location = location or "00"
-        nslc, output_dir, station_dir, training_dir, features_dir = (
-            self._setup_directories(network, station, location, channel, output_dir)
+        nslc, output_dir, station_dir, features_dir = self._setup_directories(
+            network, station, location, channel, output_dir
         )
 
         # Set DEFAULT properties (core parameters)
@@ -100,7 +100,6 @@ class ForecastModel:
         self.end_date_str = end_date_str
         self.nslc = nslc
         self.station_dir = station_dir
-        self.training_dir = training_dir
         self.features_dir = features_dir
 
         # Initialize feature parameters
@@ -189,7 +188,7 @@ class ForecastModel:
         location: str,
         channel: str,
         output_dir: Optional[str],
-    ) -> tuple[str, str, str, str, str]:
+    ) -> tuple[str, str, str, str]:
         """Setup directory structure for forecast model outputs.
 
         Creates the NSLC (Network.Station.Location.Channel) identifier and
@@ -203,15 +202,14 @@ class ForecastModel:
             output_dir: Base output directory. Defaults to 'output' in current directory.
 
         Returns:
-            Tuple of (nslc, output_dir, station_dir, training_dir, features_dir)
+            Tuple of (nslc, output_dir, station_dir, features_dir)
         """
         nslc = f"{network}.{station}.{location}.{channel}"
         output_dir = output_dir or os.path.join(os.getcwd(), "output")
         station_dir = os.path.join(output_dir, nslc)
-        training_dir = os.path.join(station_dir, "training")
         features_dir = os.path.join(station_dir, "features")
 
-        return nslc, output_dir, station_dir, training_dir, features_dir
+        return nslc, output_dir, station_dir, features_dir
 
     def _initialize_feature_parameters(
         self,
@@ -649,7 +647,6 @@ class ForecastModel:
         # Create directories
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.station_dir, exist_ok=True)
-        os.makedirs(self.training_dir, exist_ok=True)
         os.makedirs(self.features_dir, exist_ok=True)
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
