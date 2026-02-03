@@ -11,9 +11,11 @@ wheels/
 # Virtual environments
 .venv
 /logs
+/output
 .uv_cache
 .mypy_cache
 .ruff_cache
 *.log
 *.csv
 *.png
+*.ipynb
