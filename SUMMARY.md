@@ -811,5 +811,39 @@ tests/
 
 ---
 
+## Permissions & Authority
+
+**Date:** 2026-02-03 20:25:00
+
+**Full Refactoring Authority Granted:**
+
+The developer has granted comprehensive permissions for this refactoring project:
+
+✅ **Directory Structure**
+- Full authority to reorganize directory structure
+- Can move, rename, or restructure any directories
+- Can create new organizational hierarchies
+
+✅ **File Management**
+- Complete permission to edit any existing files
+- Authority to create new files as needed
+- Can refactor, split, or merge files
+
+✅ **Code Refactoring**
+- Full permission to refactor all code
+- Can change implementations while maintaining functionality
+- Can introduce new patterns and architectures
+
+✅ **Breaking Changes**
+- Allowed if they improve code quality
+- Must maintain backward compatibility where reasonable
+- Document any breaking changes clearly
+
+**Scope:** Entire eruption-forecast package
+**Goal:** Production-ready, maintainable, robust codebase
+**Approach:** Systematic phase-by-phase refactoring
+
+---
+
 **Reviewed by:** Claude Sonnet 4.5
-**Last Updated:** 2026-02-03 20:18:00
+**Last Updated:** 2026-02-03 20:25:00
