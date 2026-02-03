@@ -13,6 +13,11 @@ from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import impute
 
 # Project imports
+from eruption_forecast.features.constants import (
+    DATETIME_COLUMN,
+    ERUPTED_COLUMN,
+    ID_COLUMN,
+)
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
@@ -66,7 +71,7 @@ class ForecastModel:
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
-    ):
+    ) -> None:
         # Normalize dates
         start_date, end_date, start_date_str, end_date_str = normalize_dates(
             start_date, end_date
@@ -140,8 +145,9 @@ class ForecastModel:
         # Base filename without extension
         self.basename: Optional[str] = None
 
-        # Validate
+        # Validate and create directories
         self.validate()
+        self.create_directories()
 
         # Verbose and debugging
         if debug:
@@ -374,7 +380,7 @@ class ForecastModel:
 
         if tremor_columns is not None:
             validate_columns(self.features_data, tremor_columns)
-            features_data = features_data[["id", "datetime", *tremor_columns]]
+            features_data = features_data[[ID_COLUMN, DATETIME_COLUMN, *tremor_columns]]
 
         return features_data
 
@@ -406,8 +412,8 @@ class ForecastModel:
 
         # Build extraction parameters
         return {
-            "column_id": "id",
-            "column_sort": "datetime",
+            "column_id": ID_COLUMN,
+            "column_sort": DATETIME_COLUMN,
             "n_jobs": n_jobs or self.n_jobs,
             "default_fc_parameters": default_fc_parameters,
         }
@@ -454,7 +460,7 @@ class ForecastModel:
             return extracted_csv
 
         # Prepare data for extraction
-        df = features_data[["id", "datetime", column]]
+        df = features_data[[ID_COLUMN, DATETIME_COLUMN, column]]
 
         if self.verbose:
             logger.info(f"Extracting features for {column}")
@@ -470,7 +476,7 @@ class ForecastModel:
             )
 
         # Save to CSV
-        extracted_features.index.name = "id"
+        extracted_features.index.name = ID_COLUMN
         extracted_features.to_csv(extracted_csv, index=True)
 
         logger.info(f"Extracted features for {column} saved: {extracted_csv}")
@@ -590,12 +596,11 @@ class ForecastModel:
     def validate(self) -> None:
         """Validate initialization parameters.
 
-        Validates that all required parameters are properly set and creates
-        necessary directories. Follows the pattern used in LabelBuilder and
-        FeaturesBuilder classes.
+        Validates that all required parameters are properly set. Follows
+        the pattern used in LabelBuilder and FeaturesBuilder classes.
 
         Raises:
-            ValueError: If any parameters are invalid
+            ValueError: If any parameters are invalid.
         """
         # Validate window size
         if self.window_size <= 0:
@@ -620,19 +625,20 @@ class ForecastModel:
         if not self.volcano_id.strip():
             raise ValueError("volcano_id cannot be empty")
 
-        # Create directories
+    def create_directories(self) -> None:
+        """Create output directories if they don't exist."""
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.station_dir, exist_ok=True)
         os.makedirs(self.features_dir, exist_ok=True)
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
-        """Load calculate tremor data from CSV file
+        """Load calculate tremor data from CSV file.
 
         Args:
-            tremor_csv (str): Tremor CSV file
+            tremor_csv: Path to tremor CSV file.
 
         Returns:
-            self (Self)
+            Self for method chaining.
         """
         tremor_data = TremorData()
         self.TremorData = tremor_data
@@ -664,7 +670,7 @@ class ForecastModel:
             source (optional, Literal["sds", "fdsn"]): Seismic data source
             methods (Optional[str]): Calculation methods to apply.
             filename_prefix (Optional[str]): Prefix for generated filenames.
-            remove_outlier_method (bool): If True, removes outliers from the data. Defaults to True.
+            remove_outlier_method ("all" or "maximum"): Method for outlier removal. Defaults to "maximum".
             interpolate (bool): If True, interpolates the data. Defaults to True.
             value_multiplier (Optional[float]): Scaling factor for seismic values.
             cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
@@ -742,7 +748,7 @@ class ForecastModel:
         if len(self.extract_features_csvs) > 0:
             csv_list = list(self.extract_features_csvs)
             if self.verbose:
-                logger.info(f"Concatenating extracted features from calculation.")
+                logger.info("Concatenating extracted features from calculation.")
             filepath = os.path.join(
                 self.features_dir,
                 f"extracted_features_{self.start_date_str}-{self.end_date_str}.csv",
@@ -755,7 +761,7 @@ class ForecastModel:
             csv_list = list(self.relevant_features_csvs)
             if self.verbose:
                 logger.info(
-                    f"Concatenating relevant extracted features from calculation."
+                    "Concatenating relevant extracted features from calculation."
                 )
             filepath = os.path.join(
                 self.features_dir,
@@ -807,8 +813,8 @@ class ForecastModel:
             logger.info("Extracting features using relevant features")
 
         # Prepare target labels
-        y = label_data["is_erupted"]
-        y.index = label_data["id"]
+        y = label_data[ERUPTED_COLUMN]
+        y.index = label_data[ID_COLUMN]
 
         # Setup extraction directory
         extract_features_dir = os.path.join(self.features_dir, "extract_features")
@@ -820,7 +826,7 @@ class ForecastModel:
         # Extract features for each column
         extracted_csvs = set()
         for column in features_data.columns.tolist():
-            if column in ["id", "datetime"]:
+            if column in [ID_COLUMN, DATETIME_COLUMN]:
                 continue
 
             csv_path = self._extract_features_for_column(
@@ -895,9 +901,9 @@ class ForecastModel:
 
         # Sync label with features matrix
         if len(features_builder.unique_ids) == 0:
-            raise ValueError(f"Features builder does not have unique ids.")
+            raise ValueError("Features builder does not have unique ids.")
 
-        label_data = label_data[label_data["id"].isin(features_builder.unique_ids)]
+        label_data = label_data[label_data[ID_COLUMN].isin(features_builder.unique_ids)]
 
         label_csv = os.path.join(
             self.features_dir,
@@ -1006,8 +1012,29 @@ class ForecastModel:
         window_step_unit: Literal["minutes", "hours"],
         output_dir: Optional[str] = None,
         verbose: Optional[bool] = None,
-    ):
+    ) -> Self:
+        """Generate prediction windows for eruption forecasting.
+
+        Constructs sliding time windows over the given date range and saves
+        them to a CSV file.  Note: actual model inference is not yet
+        implemented — this method only prepares the prediction window layout.
+
+        Args:
+            start_date: Start date for prediction windows.
+            end_date: End date for prediction windows.
+            window_step: Step size between consecutive windows.
+            window_step_unit: Unit of the window step ("minutes" or "hours").
+            output_dir: Directory to write the prediction CSV.
+                Defaults to ``<station_dir>/predictions``.
+            verbose: Override instance verbose flag.
+
+        Returns:
+            Self for method chaining.
+        """
         verbose = verbose or self.verbose
+
+        if verbose:
+            logger.info("predict() started")
 
         start_date = to_datetime(start_date)
         end_date = to_datetime(end_date)
@@ -1017,7 +1044,7 @@ class ForecastModel:
         output_dir = output_dir or os.path.join(self.station_dir, "predictions")
         os.makedirs(output_dir, exist_ok=True)
 
-        filename = f"predict_window_{start_date_str}-{end_date_str}_ws-{window_step}{window_step_unit}.csv"
+        filename = f"predict_window_{start_date_str}-{end_date_str}_step-{window_step}{window_step_unit}.csv"
         predict_window_csv = os.path.join(output_dir, filename)
 
         df_predict_window = construct_windows(
@@ -1026,6 +1053,8 @@ class ForecastModel:
             window_step=window_step,
             window_step_unit=window_step_unit,
         )
+
+        logger.debug(f"Generated {len(df_predict_window)} prediction windows")
 
         df_predict_window.to_csv(predict_window_csv, index=True)
 
