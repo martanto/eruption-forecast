@@ -508,6 +508,9 @@ class ForecastModel:
         )
 
         # Sync label with features matrix
+        if len(features_builder.unique_ids) == 0:
+            raise ValueError(f"Features builder does not have unique ids.")
+
         label_data = label_data[label_data["id"].isin(features_builder.unique_ids)]
 
         label_csv = os.path.join(

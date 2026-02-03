@@ -46,7 +46,7 @@ def plot_tremor(
 
     start_date: pd.Timestamp = df.index[0]
     end_date: pd.Timestamp = df.index[-1]
-    n_days = int((start_date - end_date).days)
+    n_days = int((end_date - start_date).days)
 
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")

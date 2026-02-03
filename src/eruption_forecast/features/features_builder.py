@@ -43,7 +43,7 @@ class FeaturesBuilder:
         )
         features_tmp_dir = os.path.join(output_dir, "tmp")
         df_tremor = df_tremor.sort_index()
-        df_label.sort_index()
+        df_label.sort_index(inplace=True)
 
         # Set DEFAULT properties
         self.df_tremor: pd.DataFrame = df_tremor
@@ -60,7 +60,7 @@ class FeaturesBuilder:
         self.start_date = df_label.index[0] - timedelta(days=self.window_size)
         self.end_date = df_tremor.index[-1]
         self.features_matrix: pd.DataFrame = pd.DataFrame()
-        self.unique_ids: list[int] = None
+        self.unique_ids: list[int] = []
         self.csv: Optional[str] = None
 
         # Validate

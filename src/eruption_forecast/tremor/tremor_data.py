@@ -40,7 +40,7 @@ class TremorData:
         """
         assert os.path.exists(tremor_csv), ValueError(f"{tremor_csv} does not exist")
 
-        df = pd.read_csv(self.csv, index_col="datetime", parse_dates=True)
+        df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df.sort_index(inplace=True)
         self._df = df
         self.csv = tremor_csv
