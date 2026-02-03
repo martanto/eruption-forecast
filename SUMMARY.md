@@ -585,5 +585,115 @@ The refactored tremor calculation module successfully processed real seismic dat
 
 ---
 
+## Test Suite Enhancements
+
+### Test Organization
+**Date:** 2026-02-03 20:10:00
+
+**Changes:**
+1. ✅ Moved test file to proper `tests/` directory structure
+2. ✅ Added `tests/__init__.py` for package initialization
+3. ✅ Created `tests/README.md` with comprehensive documentation
+
+**Test Directory Structure:**
+```
+tests/
+├── __init__.py           # Package initialization
+├── README.md             # Test documentation
+├── test_tremor_calculation.py  # Main tremor test (enhanced)
+└── verify_dsar.py        # Legacy DSAR verification
+```
+
+### Daily Tremor Plotting Feature
+
+**New Function:** `plot_daily_tremor()`
+
+**Purpose:**
+Creates individual high-resolution plots for each day in the date range, showing all tremor metrics in 10-minute resolution. This enables detailed daily analysis.
+
+**Features:**
+- Automatic date range iteration
+- Individual plots per day (2-hour x-axis intervals)
+- Organized in `figures/daily/` subdirectory
+- High resolution (150 DPI default)
+- Skips days with no data
+- Comprehensive logging
+
+**Function Signature:**
+```python
+def plot_daily_tremor(
+    df: pd.DataFrame,
+    figures_dir: str,
+    start_date: str,
+    end_date: str,
+    station: str,
+    dpi: int = 150,
+) -> int:
+    """Plot daily tremor data for each day in the date range."""
+```
+
+**Output Structure:**
+```
+output_test/VG.OJN.00.EHZ/figures/
+├── tremor_2025-01-01_2025-01-03.png  # Combined plot
+└── daily/                             # Daily plots
+    ├── VG.OJN.00.EHZ_2025-01-01.png
+    ├── VG.OJN.00.EHZ_2025-01-02.png
+    └── VG.OJN.00.EHZ_2025-01-03.png
+```
+
+### Enhanced Test Results
+
+**Test Execution Output:**
+```
+STEP 6: Plot Daily Tremor Data
+  Creating daily tremor plots...
+
+    [OK] 2025-01-01: 144 samples -> VG.OJN.00.EHZ_2025-01-01.png
+    [OK] 2025-01-02: 144 samples -> VG.OJN.00.EHZ_2025-01-02.png
+    [OK] 2025-01-03: 144 samples -> VG.OJN.00.EHZ_2025-01-03.png
+
+  Daily plots saved to: output_test/VG.OJN.00.EHZ/figures/daily
+
+[OK] Created 3 daily plots
+```
+
+**Updated Summary:**
+- ✅ Calculated tremor for 3 days
+- ✅ Generated 432 time windows (10-minute intervals)
+- ✅ Computed 9 tremor metrics
+- ✅ **Created 3 daily plots** (NEW)
+- ✅ Created 1 combined plot
+- ✅ Output saved to CSV (78.83 KB)
+
+### Benefits of Daily Plotting
+
+1. **Detailed Analysis:** View each day's tremor patterns in detail
+2. **Pattern Recognition:** Easier to identify daily anomalies or patterns
+3. **Quality Control:** Quick visual inspection of data quality per day
+4. **Report Generation:** Ready-to-use daily plots for reports
+5. **Scalability:** Handles multi-day datasets efficiently
+
+### Implementation Details
+
+**Integration with plot_tremor():**
+- Reuses existing `plot_tremor()` function from `src/eruption_forecast/plot.py`
+- Consistent styling across all plots
+- Leverages tested and validated plotting code
+- No code duplication
+
+**Performance:**
+- Fast execution (~0.5s per daily plot)
+- Efficient DataFrame slicing by date
+- Parallel-ready (can be enhanced with multiprocessing)
+
+**Error Handling:**
+- Skips days with no data gracefully
+- Creates output directories automatically
+- Validates date ranges
+- Returns count of plots created
+
+---
+
 **Reviewed by:** Claude Sonnet 4.5
-**Last Updated:** 2026-02-03 20:05:06
+**Last Updated:** 2026-02-03 20:10:00

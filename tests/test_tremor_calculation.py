@@ -4,21 +4,111 @@
 This script tests the refactored tremor calculation module with real SDS data
 from the OJN station for 3 days (2025-01-01 to 2025-01-03).
 
+Tests include:
+- Tremor calculation (RSAM + DSAR)
+- Daily tremor plotting
+- Output validation
+
 Author: Refactoring Phase 1
 Date: 2026-02-03
 """
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add src to path for imports
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
+from eruption_forecast.plot import plot_tremor
 from eruption_forecast.logger import logger
+import pandas as pd
+
+
+def plot_daily_tremor(
+    df: pd.DataFrame,
+    figures_dir: str,
+    start_date: str,
+    end_date: str,
+    station: str,
+    dpi: int = 150,
+) -> int:
+    """Plot daily tremor data for each day in the date range.
+
+    Creates individual plots for each day showing all tremor metrics
+    in 10-minute resolution. This is useful for detailed daily analysis.
+
+    Args:
+        df (pd.DataFrame): Tremor DataFrame with DatetimeIndex
+        figures_dir (str): Directory to save figures
+        start_date (str): Start date (YYYY-MM-DD)
+        end_date (str): End date (YYYY-MM-DD)
+        station (str): Station identifier (NSLC format)
+        dpi (int, optional): Plot resolution. Defaults to 150.
+
+    Returns:
+        int: Number of daily plots created
+
+    Examples:
+        >>> plot_daily_tremor(df, "figures/", "2025-01-01", "2025-01-03", "VG.OJN.00.EHZ")
+        3
+    """
+    print("  Creating daily tremor plots...")
+    print()
+
+    # Create daily plots subdirectory
+    daily_dir = os.path.join(figures_dir, "daily")
+    os.makedirs(daily_dir, exist_ok=True)
+
+    # Parse dates
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+
+    # Generate date range
+    current_date = start
+    plots_created = 0
+
+    while current_date <= end:
+        date_str = current_date.strftime("%Y-%m-%d")
+
+        # Filter data for this specific day
+        day_start = current_date.replace(hour=0, minute=0, second=0)
+        day_end = current_date.replace(hour=23, minute=59, second=59)
+
+        # Select data for this day
+        daily_df = df[(df.index >= day_start) & (df.index <= day_end)]
+
+        if len(daily_df) > 0:
+            # Create filename
+            filename = f"{station}_{date_str}.png"
+
+            # Plot using the existing plot_tremor function
+            plot_tremor(
+                df=daily_df,
+                interval=2,  # 2-hour intervals for x-axis
+                interval_unit="hours",
+                filename=filename,
+                figure_dir=daily_dir,
+                title=f"{station} - {date_str}",
+                overwrite=True,
+                dpi=dpi,
+                verbose=False,
+            )
+
+            plots_created += 1
+            print(f"    [OK] {date_str}: {len(daily_df)} samples -> {filename}")
+        else:
+            print(f"    [SKIP] {date_str}: No data available")
+
+        # Move to next day
+        current_date += timedelta(days=1)
+
+    print()
+    print(f"  Daily plots saved to: {daily_dir}")
+    return plots_created
 
 
 def test_tremor_calculation():
@@ -195,6 +285,22 @@ def test_tremor_calculation():
             print()
 
         print("=" * 80)
+        print("STEP 6: Plot Daily Tremor Data")
+        print("=" * 80)
+
+        # Test daily plotting functionality
+        daily_plots_created = plot_daily_tremor(
+            df=df,
+            figures_dir=figures_dir,
+            start_date=start_date,
+            end_date=end_date,
+            station=tremor_calc.nslc
+        )
+
+        print(f"[OK] Created {daily_plots_created} daily tremor plots")
+        print()
+
+        print("=" * 80)
         print("[OK] ALL TESTS PASSED!")
         print("=" * 80)
         print()
@@ -202,6 +308,7 @@ def test_tremor_calculation():
         print(f"  - Calculated tremor for {tremor_calc.n_days} days")
         print(f"  - Generated {len(df)} time windows (10-minute intervals)")
         print(f"  - Computed {len(df.columns)} tremor metrics")
+        print(f"  - Created {daily_plots_created} daily plots")
         print(f"  - Output saved to: {result.csv}")
         print()
 
