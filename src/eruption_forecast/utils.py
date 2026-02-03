@@ -583,3 +583,27 @@ def significant_features(
     feature_selector.fit_transform(features, labels)  # type: ignore
 
     return pd.DataFrame()
+
+
+def normalize_dates(
+    start_date: Union[str, datetime],
+    end_date: Union[str, datetime],
+) -> tuple[datetime, datetime, str, str]:
+    """Normalize start and end dates to standard format.
+
+    Converts date strings to datetime objects and formats them consistently.
+    Start date is set to 00:00:00, end date is set to 23:59:59.
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format or datetime object.
+        end_date: End date in YYYY-MM-DD format or datetime object.
+
+    Returns:
+        Tuple of (start_date, end_date, start_date_str, end_date_str)
+    """
+    start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
+    end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+
+    return start_date, end_date, start_date_str, end_date_str

@@ -25,6 +25,7 @@ from eruption_forecast.utils import (
     validate_date_ranges,
     construct_windows,
     concat_features as utils_concat_features,
+    normalize_dates,
 )
 
 
@@ -68,7 +69,7 @@ class ForecastModel:
         debug: bool = False,
     ):
         # Normalize dates
-        start_date, end_date, start_date_str, end_date_str = self._normalize_dates(
+        start_date, end_date, start_date_str, end_date_str = normalize_dates(
             start_date, end_date
         )
 
@@ -157,32 +158,8 @@ class ForecastModel:
             logger.info(f"Channel: {self.channel}")
             logger.info(f"Output Dir: {self.output_dir}")
 
-    def _normalize_dates(
-        self,
-        start_date: Union[str, datetime],
-        end_date: Union[str, datetime],
-    ) -> tuple[datetime, datetime, str, str]:
-        """Normalize start and end dates to standard format.
-
-        Converts date strings to datetime objects and formats them consistently.
-        Start date is set to 00:00:00, end date is set to 23:59:59.
-
-        Args:
-            start_date: Start date in YYYY-MM-DD format or datetime object.
-            end_date: End date in YYYY-MM-DD format or datetime object.
-
-        Returns:
-            Tuple of (start_date, end_date, start_date_str, end_date_str)
-        """
-        start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
-        end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
-        start_date_str = start_date.strftime("%Y-%m-%d")
-        end_date_str = end_date.strftime("%Y-%m-%d")
-
-        return start_date, end_date, start_date_str, end_date_str
-
+    @staticmethod
     def _setup_directories(
-        self,
         network: str,
         station: str,
         location: str,
@@ -211,9 +188,8 @@ class ForecastModel:
 
         return nslc, output_dir, station_dir, features_dir
 
-    def _initialize_feature_parameters(
-        self,
-    ) -> tuple[ComprehensiveFCParameters, set[str]]:
+    @staticmethod
+    def _initialize_feature_parameters() -> tuple[ComprehensiveFCParameters, set[str]]:
         """Initialize tsfresh feature extraction parameters with defaults.
 
         Sets up default feature calculators from tsfresh's ComprehensiveFCParameters
@@ -302,8 +278,9 @@ class ForecastModel:
 
         return calculate
 
+    @staticmethod
     def _calculate_from_sds(
-        self, calculate: CalculateTremor, sds_dir: Optional[str]
+        calculate: CalculateTremor, sds_dir: Optional[str]
     ) -> CalculateTremor:
         """Calculate tremor from SDS data source.
 
@@ -501,8 +478,8 @@ class ForecastModel:
 
         return extracted_csv
 
+    @staticmethod
     def _validate_tremor_for_labeling(
-        self,
         tremor_data: pd.DataFrame,
         tremor_columns: Optional[list[str]],
     ) -> None:
@@ -550,8 +527,8 @@ class ForecastModel:
 
         return df_tremor
 
+    @staticmethod
     def _validate_label_tremor_date_range(
-        self,
         df_label: pd.DataFrame,
         df_tremor: pd.DataFrame,
     ) -> None:
