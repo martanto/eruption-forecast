@@ -15,9 +15,8 @@ dependencies = [
     "notebook",
     "obspy>=1.4.2",
     "pandas>=3.0.0",
-    "numpy==2.3.5",
+    "numpy>=2.3.5",
     "pip",
-    "numba",
     "tsfresh",
     "uv-build>=0.9.0",
     "imbalanced-learn>=0.14.1",
@@ -40,7 +39,12 @@ dev = [
     "pandas-stubs>=2.3.3.260113",
     "ipykernel>=7.1.0",
     "pyrefly>=0.50.1",
+    "scipy-stubs>=1.17.0.2",
 ]
+
+[tool.pydocstyle]
+convention = "google"
+add-ignore = ["D100", "D104"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
