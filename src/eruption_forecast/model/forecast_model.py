@@ -753,6 +753,116 @@ class ForecastModel:
 
         return self
 
+    def _validate_tremor_for_labeling(
+        self,
+        tremor_data: pd.DataFrame,
+        tremor_columns: Optional[list[str]],
+    ) -> None:
+        """Validate tremor data is available for label building.
+
+        Checks that tremor data is loaded and that specified columns exist.
+
+        Args:
+            tremor_data: Tremor dataframe
+            tremor_columns: Columns to validate
+
+        Raises:
+            ValueError: If tremor data is not loaded or columns are invalid
+        """
+        if not isinstance(tremor_data, pd.DataFrame) or len(tremor_data) == 0:
+            raise ValueError(
+                "Tremor data not found/loaded. "
+                "Please run calculate() or load_tremor_data() method first."
+            )
+
+        if tremor_columns:
+            validate_columns(tremor_data, tremor_columns)
+
+    def _prepare_tremor_for_labeling(
+        self,
+        tremor_columns: Optional[list[str]],
+    ) -> pd.DataFrame:
+        """Prepare tremor data for label building.
+
+        Creates a copy of tremor data and optionally selects specific columns.
+        Sorts the data by datetime index.
+
+        Args:
+            tremor_columns: Specific columns to select, or None for all
+
+        Returns:
+            Prepared tremor dataframe
+        """
+        df_tremor = self.tremor_data.copy()
+
+        if tremor_columns is not None:
+            df_tremor = df_tremor[tremor_columns]
+
+        df_tremor.sort_index(ascending=True, inplace=True)
+
+        return df_tremor
+
+    def _validate_label_tremor_date_range(
+        self,
+        df_label: pd.DataFrame,
+        df_tremor: pd.DataFrame,
+    ) -> None:
+        """Validate label date range falls within tremor data range.
+
+        Ensures that the label windows are completely covered by available
+        tremor data, preventing gaps in feature extraction.
+
+        Args:
+            df_label: Label dataframe with datetime index
+            df_tremor: Tremor dataframe with datetime index
+
+        Raises:
+            ValueError: If label dates fall outside tremor data range
+        """
+        label_start_date: pd.Timestamp = df_label.index[0]
+        label_end_date: pd.Timestamp = df_label.index[-1]
+        tremor_start_date: pd.Timestamp = df_tremor.index[0]
+        tremor_end_date: pd.Timestamp = df_tremor.index[-1]
+
+        if tremor_start_date > label_start_date:
+            raise ValueError(
+                f"Training start date ({label_start_date}) should be after/equal "
+                f"to tremor start date ({tremor_start_date}). "
+                f"Change your training start date to after/equal {tremor_start_date}."
+            )
+
+        if tremor_end_date < label_end_date:
+            raise ValueError(
+                f"Training end date ({label_end_date}) should be before/equal "
+                f"to tremor end date ({tremor_end_date}). "
+                f"Change your training end date to before/equal {tremor_end_date}."
+            )
+
+    def _calculate_eruption_statistics(
+        self,
+        label_builder: LabelBuilder,
+    ) -> None:
+        """Calculate and log eruption class statistics.
+
+        Computes the number of eruption and non-eruption windows, and their
+        ratio. Logs statistics if verbose mode is enabled.
+
+        Args:
+            label_builder: LabelBuilder instance with built labels
+        """
+        self.total_eruption_class = len(label_builder.df_eruption)
+        self.total_non_eruption_class = (
+            len(label_builder.df) - self.total_eruption_class
+        )
+        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
+
+        if self.verbose:
+            logger.info(
+                f"Total number of eruptions: {self.total_eruption_class}. "
+                f"Total number of non-eruptions: {self.total_non_eruption_class}. "
+                f"Class ratio (eruption vs non-eruptions): {class_ratio}"
+            )
+
     def build_label(
         self,
         window_step: int,
@@ -766,7 +876,11 @@ class ForecastModel:
         verbose: Optional[bool] = None,
         debug: Optional[bool] = None,
     ) -> Self:
-        """Build label.
+        """Build labels for eruption forecasting.
+
+        Creates labeled time windows for training machine learning models.
+        Each window is labeled as erupted (1) or not erupted (0) based on
+        eruption dates and forecast horizon.
 
         Args:
             window_step (int): Window step size.
@@ -783,27 +897,19 @@ class ForecastModel:
         Returns:
             self (Self): ForecastModel object
         """
+        # Setup parameters
         tremor_data = self.tremor_data
-        train_start_date: Union[str, datetime] = start_date or self.start_date
-        train_end_date: Union[str, datetime] = end_date or self.end_date
-
-        # Validating
-        validate_date_ranges(train_start_date, train_end_date)
-
-        assert isinstance(tremor_data, pd.DataFrame) and (
-            len(tremor_data) > 0
-        ), ValueError(
-            f"Tremor data not found/loaded. "
-            f"Please run calculate() or load_tremor_data() method first."
-        )
-        if tremor_columns:
-            validate_columns(tremor_data, tremor_columns)
-
+        train_start_date = start_date or self.start_date
+        train_end_date = end_date or self.end_date
         verbose = verbose or self.verbose
         debug = debug or self.debug
-
         output_dir = output_dir or self.station_dir
 
+        # Validate inputs
+        validate_date_ranges(train_start_date, train_end_date)
+        self._validate_tremor_for_labeling(tremor_data, tremor_columns)
+
+        # Build labels
         label_builder = LabelBuilder(
             start_date=to_datetime(train_start_date),
             end_date=to_datetime(train_end_date),
@@ -818,40 +924,19 @@ class ForecastModel:
             debug=debug,
         ).build()
 
+        # Prepare tremor data
+        df_tremor = self._prepare_tremor_for_labeling(tremor_columns)
         df_label = label_builder.df
 
-        # Build output directory
-        basename = os.path.basename(label_builder.csv).split(".csv")[0]
+        # Validate date ranges
+        self._validate_label_tremor_date_range(df_label, df_tremor)
 
-        # Load tremor and select specific columns
-        df_tremor = tremor_data.copy()
-        if tremor_columns is not None:
-            df_tremor = df_tremor[tremor_columns]
-        df_tremor.sort_index(ascending=True, inplace=True)
-
-        # Ensuring label data is within tremor data range
-        label_start_date_obj: pd.Timestamp = df_label.index[0]
-        label_end_date_obj: pd.Timestamp = df_label.index[-1]
-        tremor_start_date_obj: pd.Timestamp = df_tremor.index[0]
-        tremor_end_date_obj: pd.Timestamp = df_tremor.index[-1]
-
-        assert tremor_start_date_obj <= label_start_date_obj, ValueError(
-            f"Training start date ({tremor_start_date_obj}) should be after/equal "
-            f"to tremor start date ({label_start_date_obj}). "
-            f"Change your training start date after/equal {tremor_start_date_obj}."
-        )
-        assert tremor_end_date_obj >= label_end_date_obj, ValueError(
-            f"Training end date ({tremor_end_date_obj}) should be before/equal "
-            f"to tremor end date ({label_start_date_obj}). "
-            f"Change your training end date before/equal {tremor_end_date_obj}."
-        )
-
-        # Set properties
+        # Set label properties
         self.LabelBuilder = label_builder
         self.label_csv = label_builder.csv
-        self.basename = basename
+        self.basename = os.path.basename(label_builder.csv).split(".csv")[0]
 
-        # Omitting label data (df) based on window step
+        # Filter labels from start_date onwards
         df_label = df_label.loc[self.start_date :]
 
         if df_label.empty:
@@ -859,19 +944,8 @@ class ForecastModel:
 
         self.label_data = df_label
 
-        # Get target class numbers. Check if the data is balanced or not
-        self.total_eruption_class = len(label_builder.df_eruption)
-        self.total_non_eruption_class = (
-            len(label_builder.df) - self.total_eruption_class
-        )
-        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
-
-        if verbose:
-            logger.info(
-                f"Total number of eruptions: {self.total_eruption_class}. "
-                f"Total number of non-eruptions: {self.total_non_eruption_class}. "
-                f"Class ratio (eruption againts non eruptions): {class_ratio}"
-            )
+        # Calculate and log statistics
+        self._calculate_eruption_statistics(label_builder)
 
         return self
 
