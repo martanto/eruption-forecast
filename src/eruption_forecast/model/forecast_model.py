@@ -1015,7 +1015,7 @@ class ForecastModel:
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")
 
-        output_dir = output_dir or os.path.join(self.station_dir, "predict")
+        output_dir = output_dir or os.path.join(self.station_dir, "predictions")
         os.makedirs(output_dir, exist_ok=True)
 
         filename = f"predict_window_{start_date_str}-{end_date_str}_ws-{window_step}{window_step_unit}.csv"

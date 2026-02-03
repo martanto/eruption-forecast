@@ -521,6 +521,10 @@ def concat_features(
     )
 
     df = pd.concat([pd.read_csv(file, index_col=0) for file in csv_list], axis=1)
+
+    if df.empty:
+        raise ValueError("There is no data in the csv files.")
+
     df.to_csv(filepath, index=True)
 
     if return_as_filepath:
@@ -536,6 +540,8 @@ def random_under_sampler(
     random_state: int = 42,
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """Randomly under sampling features.
+
+    Handling imbalance dataset of eruption and non-eruption.
 
     Args:
         features (pd.DataFrame): Features dataframe.
@@ -556,33 +562,31 @@ def random_under_sampler(
     return features, labels
 
 
-def significant_features(
+def get_significant_features(
     features: pd.DataFrame,
     labels: pd.Series,
-    number_of_significant_features: int = 20,
     n_jobs: int = 1,
-    ml_task: str = "classification",
-) -> pd.DataFrame:
+) -> pd.Series:
     """Get significant features.
 
     Args:
         features (pd.DataFrame): Features dataframe.
         labels (pd.Series): Labels dataframe.
         number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
-        n_jobs (int, optional): Number of jobs. Defaults to 1.
-        ml_task (str, optional): Task to use. Defaults to "classification".
+        n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
     Returns:
-        pd.DataFrame: Significant features.
+        pd.Series: Significant features.
     """
-    feature_selector = FeatureSelector(
-        n_jobs=n_jobs,
-        ml_task=ml_task,
-    )
+    selector = FeatureSelector(n_jobs=n_jobs, ml_task="classification")
+    selector.fit_transform(X=features, y=labels)  # type: ignore
 
-    feature_selector.fit_transform(features, labels)  # type: ignore
+    _significant_features = pd.Series(selector.p_values, index=features.columns)
+    _significant_features = _significant_features.sort_values()
+    _significant_features.name = "values"
+    _significant_features.index.name = "features"
 
-    return pd.DataFrame()
+    return _significant_features
 
 
 def normalize_dates(

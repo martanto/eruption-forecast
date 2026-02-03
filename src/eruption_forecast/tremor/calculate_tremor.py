@@ -394,16 +394,18 @@ class CalculateTremor:
 
         if self.n_jobs == 1:
             for job in self.jobs:
-                self.run_job(*job)
+                temp_file = self.run_job(*job)
+                if temp_file is not None:
+                    self.tmp_files.append(temp_file)
 
         if self.n_jobs > 1:
             if self.verbose:
                 logger.info(f"Running on {self.n_jobs} job(s)")
 
-            pool = Pool(self.n_jobs)
-            pool.starmap(self.run_job, self.jobs)
-            pool.close()
-            pool.join()
+            with Pool(self.n_jobs) as pool:
+                tmp_files = pool.starmap(self.run_job, self.jobs)
+                tmp_files = [tmp_file for tmp_file in tmp_files if tmp_file is not None]
+                self.tmp_files.extend(tmp_files)
 
         # Merge calculated tremor CSV files from tmp dir
         df = self.concat_tremor_data(self.tmp_dir, self.tremor_dir)
@@ -437,7 +439,7 @@ class CalculateTremor:
         return self
 
     @logger.catch
-    def run_job(self, job_index: int, date: datetime) -> None:
+    def run_job(self, job_index: int, date: datetime) -> Union[str, None]:
         """Run a job for a specific date.
 
         Args:
@@ -445,7 +447,8 @@ class CalculateTremor:
             date (datetime): Date to run the job
 
         Returns:
-            None
+            str: CSV filepath
+            None: Not saved, if dataframe is empty
         """
         date_str = date.strftime("%Y-%m-%d")
         temp_file = os.path.join(self.tmp_dir, f"{date_str}.csv")
@@ -453,16 +456,13 @@ class CalculateTremor:
         logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
 
         if not self.overwrite and os.path.exists(temp_file):
-            self.tmp_files.append(temp_file)
-
             if self.verbose:
                 logger.info(f"{date_str} :: File CSV loaded {temp_file}")
-
-            return None
+            return temp_file
 
         df = self.calculate(date)
 
-        # Return None if df is empty. No data to process
+        # Pass if df is empty. No data to process
         if df.empty:
             return None
 
@@ -486,15 +486,12 @@ class CalculateTremor:
                 verbose=self.verbose,
             )
 
-        # save tremor data
-        self.tmp_files.append(temp_file)
-
         if self.verbose:
             logger.info(
                 f"{date_str} :: File CSV saved {os.path.join(self.tmp_dir, date_str)}"
             )
 
-        return None
+        return temp_file
 
     @lru_cache(maxsize=128)
     def calculate(self, date: datetime) -> pd.DataFrame:

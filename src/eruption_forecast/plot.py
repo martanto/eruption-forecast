@@ -90,13 +90,7 @@ def plot_tremor(
 
     for index, column in enumerate(columns):
         ax = axs[index] if n_rows > 1 else axs
-        ax.grid(
-            True,
-            linestyle="-.",
-            axis="both",
-            alpha=0.5,
-        )
-
+        ax.grid(True, linestyle="-.", axis="both", alpha=0.5)
         ax.plot(
             df.index,
             df[column],
@@ -122,5 +116,73 @@ def plot_tremor(
 
     if verbose:
         logger.info(f"{start_date_str} :: Plot saved to {filepath}")
+
+    return None
+
+
+def plot_significant_features(
+    df: pd.DataFrame,
+    filepath: str,
+    number_of_features: int = 50,
+    top_features: int = 20,
+    title: Optional[str] = None,
+    figsize=(3, 12),
+    features_column: str = "features",
+    values_column: str = "values",
+    dpi: int = 100,
+    overwrite: bool = True,
+):
+    """Plot significant features
+
+    Args:
+        df (pd.DataFrame): Significant features data
+        filepath (str): Save filepath location.
+        number_of_features (int, optional): Number of features. Defaults to 50.
+        top_features (int, optional): Number of top features. Defaults to 20.
+        title (Optional[str], optional): Plot title. Defaults to None.
+        figsize (tuple, optional): Figure size. Defaults to (3, 12).
+        features_column (str, optional): Features column name. Defaults to "features".
+        values_column (str, optional): Values column name. Defaults to "values".
+        dpi (int, optional): DPI. Defaults to 100.
+        overwrite (bool, optional): Overwrite. Defaults to True.
+
+    Returns:
+        None
+    """
+    if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
+        return None
+
+    if features_column not in df.columns:
+        try:
+            df[features_column] = df.index
+        except ValueError:
+            raise ValueError(f"Features column: {features_column} does not exist")
+
+    df.dropna(inplace=True)
+    df = df.head(number_of_features)
+    df = df.iloc[::-1]
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    ax.grid(True, linestyle="-.", axis="both", alpha=0.3)
+    ax.barh(df[features_column], df[values_column], height=0.5)
+    ax.axhline(
+        df.index[top_features - 1],
+        color="red",
+        linestyle="--",
+        label=f"Top {top_features} Fts",
+    )
+
+    ax.title.set_text(title or f"{number_of_features} Significant Features")
+
+    for label in ax.get_xticklabels(which="major"):
+        label.set(rotation=90, horizontalalignment="right", fontsize=6)
+
+    ax.legend(frameon=False)
+
+    plt.ylim(-0.5, number_of_features - 0.5)
+    plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
+    plt.close()
+
+    del df
 
     return None
