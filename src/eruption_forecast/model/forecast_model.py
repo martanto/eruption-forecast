@@ -1,4 +1,5 @@
 # Standard library imports
+from typing import Any
 import os
 from datetime import datetime, timedelta
 from typing import Literal, Optional, Self, Union
@@ -101,25 +102,44 @@ class ForecastModel:
         self.station_dir = station_dir
         self.training_dir = training_dir
         self.features_dir = features_dir
-        self.kwargs = {
-            "station": station,
-            "channel": channel,
-            "network": network,
-            "location": location,
-            "start_date": start_date,
-            "end_date": end_date,
-            "output_dir": output_dir,
-            "overwrite": overwrite,
-            "n_jobs": n_jobs,
-        }
 
         # Initialize feature parameters
         self.default_fc_parameters, self.excludes_features = (
             self._initialize_feature_parameters()
         )
 
-        # Initialize state properties
-        self._initialize_state_properties()
+        # Initialize state properties (set during lifecycle)
+        # Will be set after calculate() method called
+        self.CalculateTremor: Optional[CalculateTremor] = None
+        self.TremorData: Optional[TremorData] = None
+        self.tremor_data: pd.DataFrame = pd.DataFrame()
+        self.tremor_csv: Optional[str] = None
+
+        # Will be set after build_label() method called
+        self.LabelBuilder: Optional[LabelBuilder] = None
+        self.label_data: pd.DataFrame = pd.DataFrame()
+        self.label_csv: Optional[str] = None
+        self.total_eruption_class: Optional[int] = None
+        self.total_non_eruption_class: Optional[int] = None
+
+        # Will be set after build_features() called
+        self.FeaturesBuilder: Optional[FeaturesBuilder] = None
+        self.features_data: pd.DataFrame = pd.DataFrame()
+        self.features_csv: Optional[str] = None
+
+        # Will be set after extract_features() called
+        self.extract_features_csvs: set[str] = set()
+        self.relevant_features_csvs: set[str] = set()
+
+        # Will be set after concat_features() called
+        self.extracted_features_csv: Optional[str] = None
+        self.extracted_relevant_csv: Optional[str] = None
+
+        # Will be set after predict() called
+        self.prediction_features_csvs: set[str] = set()
+
+        # Base filename without extension
+        self.basename: Optional[str] = None
 
         # Validate
         self.validate()
@@ -216,106 +236,6 @@ class ForecastModel:
 
         return default_fc_parameters, excludes_features
 
-    def _initialize_state_properties(self) -> None:
-        """Initialize state properties for different lifecycle stages.
-
-        State properties are set as different methods are called during
-        the forecast model lifecycle:
-
-        - calculate(): Sets CalculateTremor, TremorData, tremor_data, tremor_csv
-        - build_label(): Sets LabelBuilder, label_data, label_csv, eruption stats
-        - build_features(): Sets FeaturesBuilder, features_data, features_csv
-        - extract_features(): Sets extract_features_csvs, relevant_features_csvs
-        - concat_features(): Sets extracted_features_csv, extracted_relevant_csv
-        - predict(): Sets prediction_features_csvs
-        """
-        # Will be set after calculate() method called
-        self.CalculateTremor: Optional[CalculateTremor] = None
-        self.TremorData: Optional[TremorData] = None
-        self.tremor_data: pd.DataFrame = pd.DataFrame()
-        self.tremor_csv: Optional[str] = None
-
-        # WIll be set after train() method called
-        self.LabelBuilder: Optional[LabelBuilder] = None
-        self.label_data: pd.DataFrame = pd.DataFrame()
-        self.label_csv: Optional[str] = None
-        self.total_eruption_class: Optional[int] = None
-        self.total_non_eruption_class: Optional[int] = None
-
-        # Will be set after build_features() called
-        self.FeaturesBuilder: Optional[FeaturesBuilder] = None
-        self.features_data: pd.DataFrame = pd.DataFrame()
-        self.features_csv: Optional[str] = None
-
-        # Will be set after extract_features() called
-        self.extract_features_csvs: set[str] = set()
-        self.relevant_features_csvs: set[str] = set()
-
-        # Will be set after concat_features() called
-        self.extracted_features_csv: Optional[str] = None
-        self.extracted_relevant_csv: Optional[str] = None
-
-        # Will be set after predict() called
-        self.prediction_features_csvs: set[str] = set()
-
-        # Base filename without extension
-        self.basename: Optional[str] = None
-
-    def validate(self) -> None:
-        """Validate initialization parameters.
-
-        Validates that all required parameters are properly set and creates
-        necessary directories. Follows the pattern used in LabelBuilder and
-        FeaturesBuilder classes.
-
-        Raises:
-            ValueError: If any parameters are invalid
-        """
-        # Validate window size
-        if self.window_size <= 0:
-            raise ValueError(
-                f"window_size must be greater than 0. Got: {self.window_size}"
-            )
-
-        # Validate n_jobs
-        if self.n_jobs <= 0:
-            raise ValueError(f"n_jobs must be greater than 0. Got: {self.n_jobs}")
-
-        # Validate date ranges
-        validate_date_ranges(self.start_date, self.end_date)
-
-        # Validate strings are not empty
-        if not self.station.strip():
-            raise ValueError("station cannot be empty")
-
-        if not self.channel.strip():
-            raise ValueError("channel cannot be empty")
-
-        if not self.volcano_id.strip():
-            raise ValueError("volcano_id cannot be empty")
-
-        # Create directories
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.station_dir, exist_ok=True)
-        os.makedirs(self.training_dir, exist_ok=True)
-        os.makedirs(self.features_dir, exist_ok=True)
-
-    def load_tremor_data(self, tremor_csv: str) -> Self:
-        """Load calculate tremor data from CSV file
-
-        Args:
-            tremor_csv (str): Tremor CSV file
-
-        Returns:
-            self (Self)
-        """
-        tremor_data = TremorData()
-        self.TremorData = tremor_data
-        self.tremor_data = tremor_data.from_csv(tremor_csv)
-        self.TremorData.csv = tremor_csv
-        self.tremor_csv = tremor_csv
-        return self
-
     def _setup_calculate_tremor(
         self,
         methods: Optional[str],
@@ -354,11 +274,17 @@ class ForecastModel:
         verbose = verbose or self.verbose
         debug = debug or self.debug
 
-        # Update start_date to include window_size buffer
-        kwargs = self.kwargs.copy()
-        kwargs["start_date"] = self.start_date_minus_window_size
-
+        # Create CalculateTremor with explicit parameters for type safety
         calculate = CalculateTremor(
+            station=self.station,
+            channel=self.channel,
+            network=self.network,
+            location=self.location,
+            start_date=self.start_date_minus_window_size,
+            end_date=self.end_date,
+            output_dir=self.output_dir,
+            overwrite=self.overwrite,
+            n_jobs=self.n_jobs,
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
@@ -368,7 +294,6 @@ class ForecastModel:
             plot_tmp=plot_tmp,
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
-            **kwargs,
         )
 
         if verbose:
@@ -452,6 +377,296 @@ class ForecastModel:
                     f"end_date parameter: {self.end_date} updated to "
                     f"tremor end date: {tremor_data.end_date}"
                 )
+
+    def _prepare_features_data(
+        self,
+        tremor_columns: Optional[list[str]],
+    ) -> pd.DataFrame:
+        """Prepare features data by filtering columns if specified.
+
+        Validates that specified columns exist and returns a filtered dataframe
+        containing only id, datetime, and the specified tremor columns.
+
+        Args:
+            tremor_columns: Specific columns to extract, or None for all
+
+        Returns:
+            Filtered features dataframe
+
+        Raises:
+            ValueError: If specified columns don't exist in features_data
+        """
+        features_data = self.features_data
+
+        if tremor_columns is not None:
+            validate_columns(self.features_data, tremor_columns)
+            features_data = features_data[["id", "datetime", *tremor_columns]]
+
+        return features_data
+
+    def _prepare_extraction_parameters(
+        self,
+        exclude_features: Optional[Union[list[str], bool]],
+        n_jobs: Optional[int],
+    ) -> dict[str, Any]:
+        """Prepare parameters for tsfresh feature extraction.
+
+        Handles feature exclusion logic and builds the parameter dictionary
+        for tsfresh feature extraction functions.
+
+        Args:
+            exclude_features: Features to exclude from calculation
+            n_jobs: Number of parallel jobs
+
+        Returns:
+            Dictionary of extraction parameters for tsfresh
+        """
+        # Handle feature exclusion
+        default_fc_parameters = self.default_fc_parameters
+
+        if exclude_features is not None:
+            if isinstance(exclude_features, list):
+                default_fc_parameters = self.drop_features(exclude_features)
+            elif isinstance(exclude_features, bool) and not exclude_features:
+                self.excludes_features = set()
+
+        # Build extraction parameters
+        return {
+            "column_id": "id",
+            "column_sort": "datetime",
+            "n_jobs": n_jobs or self.n_jobs,
+            "default_fc_parameters": default_fc_parameters,
+        }
+
+    def _extract_features_for_column(
+        self,
+        features_data: pd.DataFrame,
+        column: str,
+        y: pd.Series,
+        extract_params: dict[str, Any],
+        use_relevant_features: bool,
+        prefix_filename: str,
+        extract_features_dir: str,
+        overwrite: bool,
+    ) -> Optional[str]:
+        """Extract features for a single tremor column.
+
+        Performs tsfresh feature extraction for one column, either using
+        all features or only relevant features based on correlation with labels.
+
+        Args:
+            features_data: Features dataframe with id, datetime, and tremor columns
+            column: Column name to extract features from
+            y: Target labels
+            extract_params: Parameters for tsfresh extraction
+            use_relevant_features: Whether to use relevant features only
+            prefix_filename: Prefix for output filename
+            extract_features_dir: Directory to save extracted features
+            overwrite: Whether to overwrite existing files
+
+        Returns:
+            Path to extracted features CSV, or None if skipped
+        """
+        extracted_csv = os.path.join(
+            extract_features_dir, f"{prefix_filename}_{column}.csv"
+        )
+
+        # Skip if already exists and not overwriting
+        if not overwrite and os.path.isfile(extracted_csv):
+            if self.verbose:
+                logger.info(
+                    f"Extracted features for {column} already exist: {extracted_csv}"
+                )
+            return extracted_csv
+
+        # Prepare data for extraction
+        df = features_data[["id", "datetime", column]]
+
+        if self.verbose:
+            logger.info(f"Extracting features for {column}")
+
+        # Extract features
+        if use_relevant_features:
+            extracted_features = extract_relevant_features(df, y, **extract_params)
+        else:
+            extracted_features = tsfresh_extract_features(
+                df,
+                impute_function=impute,
+                **extract_params,
+            )
+
+        # Save to CSV
+        extracted_features.index.name = "id"
+        extracted_features.to_csv(extracted_csv, index=True)
+
+        logger.info(f"Extracted features for {column} saved: {extracted_csv}")
+
+        return extracted_csv
+
+    def _validate_tremor_for_labeling(
+        self,
+        tremor_data: pd.DataFrame,
+        tremor_columns: Optional[list[str]],
+    ) -> None:
+        """Validate tremor data is available for label building.
+
+        Checks that tremor data is loaded and that specified columns exist.
+
+        Args:
+            tremor_data: Tremor dataframe
+            tremor_columns: Columns to validate
+
+        Raises:
+            ValueError: If tremor data is not loaded or columns are invalid
+        """
+        if not isinstance(tremor_data, pd.DataFrame) or len(tremor_data) == 0:
+            raise ValueError(
+                "Tremor data not found/loaded. "
+                "Please run calculate() or load_tremor_data() method first."
+            )
+
+        if tremor_columns:
+            validate_columns(tremor_data, tremor_columns)
+
+    def _prepare_tremor_for_labeling(
+        self,
+        tremor_columns: Optional[list[str]],
+    ) -> pd.DataFrame:
+        """Prepare tremor data for label building.
+
+        Creates a copy of tremor data and optionally selects specific columns.
+        Sorts the data by datetime index.
+
+        Args:
+            tremor_columns: Specific columns to select, or None for all
+
+        Returns:
+            Prepared tremor dataframe
+        """
+        df_tremor = self.tremor_data.copy()
+
+        if tremor_columns is not None:
+            df_tremor = df_tremor[tremor_columns]
+
+        df_tremor.sort_index(ascending=True, inplace=True)
+
+        return df_tremor
+
+    def _validate_label_tremor_date_range(
+        self,
+        df_label: pd.DataFrame,
+        df_tremor: pd.DataFrame,
+    ) -> None:
+        """Validate label date range falls within tremor data range.
+
+        Ensures that the label windows are completely covered by available
+        tremor data, preventing gaps in feature extraction.
+
+        Args:
+            df_label: Label dataframe with datetime index
+            df_tremor: Tremor dataframe with datetime index
+
+        Raises:
+            ValueError: If label dates fall outside tremor data range
+        """
+        label_start_date: pd.Timestamp = df_label.index[0]
+        label_end_date: pd.Timestamp = df_label.index[-1]
+        tremor_start_date: pd.Timestamp = df_tremor.index[0]
+        tremor_end_date: pd.Timestamp = df_tremor.index[-1]
+
+        if tremor_start_date > label_start_date:
+            raise ValueError(
+                f"Training start date ({label_start_date}) should be after/equal "
+                f"to tremor start date ({tremor_start_date}). "
+                f"Change your training start date to after/equal {tremor_start_date}."
+            )
+
+        if tremor_end_date < label_end_date:
+            raise ValueError(
+                f"Training end date ({label_end_date}) should be before/equal "
+                f"to tremor end date ({tremor_end_date}). "
+                f"Change your training end date to before/equal {tremor_end_date}."
+            )
+
+    def _calculate_eruption_statistics(
+        self,
+        label_builder: LabelBuilder,
+    ) -> None:
+        """Calculate and log eruption class statistics.
+
+        Computes the number of eruption and non-eruption windows, and their
+        ratio. Logs statistics if verbose mode is enabled.
+
+        Args:
+            label_builder: LabelBuilder instance with built labels
+        """
+        self.total_eruption_class = len(label_builder.df_eruption)
+        self.total_non_eruption_class = (
+            len(label_builder.df) - self.total_eruption_class
+        )
+        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
+
+        if self.verbose:
+            logger.info(
+                f"Total number of eruptions: {self.total_eruption_class}. "
+                f"Total number of non-eruptions: {self.total_non_eruption_class}. "
+                f"Class ratio (eruption vs non-eruptions): {class_ratio}"
+            )
+
+    def validate(self) -> None:
+        """Validate initialization parameters.
+
+        Validates that all required parameters are properly set and creates
+        necessary directories. Follows the pattern used in LabelBuilder and
+        FeaturesBuilder classes.
+
+        Raises:
+            ValueError: If any parameters are invalid
+        """
+        # Validate window size
+        if self.window_size <= 0:
+            raise ValueError(
+                f"window_size must be greater than 0. Got: {self.window_size}"
+            )
+
+        # Validate n_jobs
+        if self.n_jobs <= 0:
+            raise ValueError(f"n_jobs must be greater than 0. Got: {self.n_jobs}")
+
+        # Validate date ranges
+        validate_date_ranges(self.start_date, self.end_date)
+
+        # Validate strings are not empty
+        if not self.station.strip():
+            raise ValueError("station cannot be empty")
+
+        if not self.channel.strip():
+            raise ValueError("channel cannot be empty")
+
+        if not self.volcano_id.strip():
+            raise ValueError("volcano_id cannot be empty")
+
+        # Create directories
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.station_dir, exist_ok=True)
+        os.makedirs(self.training_dir, exist_ok=True)
+        os.makedirs(self.features_dir, exist_ok=True)
+
+    def load_tremor_data(self, tremor_csv: str) -> Self:
+        """Load calculate tremor data from CSV file
+
+        Args:
+            tremor_csv (str): Tremor CSV file
+
+        Returns:
+            self (Self)
+        """
+        tremor_data = TremorData()
+        self.TremorData = tremor_data
+        self.tremor_data = tremor_data.from_csv(tremor_csv)
+        self.TremorData.csv = tremor_csv
+        self.tremor_csv = tremor_csv
+        return self
 
     def calculate(
         self,
@@ -578,131 +793,6 @@ class ForecastModel:
             )
 
         return self
-
-    def _prepare_features_data(
-        self,
-        tremor_columns: Optional[list[str]],
-    ) -> pd.DataFrame:
-        """Prepare features data by filtering columns if specified.
-
-        Validates that specified columns exist and returns a filtered dataframe
-        containing only id, datetime, and the specified tremor columns.
-
-        Args:
-            tremor_columns: Specific columns to extract, or None for all
-
-        Returns:
-            Filtered features dataframe
-
-        Raises:
-            ValueError: If specified columns don't exist in features_data
-        """
-        features_data = self.features_data
-
-        if tremor_columns is not None:
-            validate_columns(self.features_data, tremor_columns)
-            features_data = features_data[["id", "datetime", *tremor_columns]]
-
-        return features_data
-
-    def _prepare_extraction_parameters(
-        self,
-        exclude_features: Optional[Union[list[str], bool]],
-        n_jobs: Optional[int],
-    ) -> dict[str, any]:
-        """Prepare parameters for tsfresh feature extraction.
-
-        Handles feature exclusion logic and builds the parameter dictionary
-        for tsfresh feature extraction functions.
-
-        Args:
-            exclude_features: Features to exclude from calculation
-            n_jobs: Number of parallel jobs
-
-        Returns:
-            Dictionary of extraction parameters for tsfresh
-        """
-        # Handle feature exclusion
-        default_fc_parameters = self.default_fc_parameters
-
-        if exclude_features is not None:
-            if isinstance(exclude_features, list):
-                default_fc_parameters = self.drop_features(exclude_features)
-            elif isinstance(exclude_features, bool) and not exclude_features:
-                self.excludes_features = set()
-
-        # Build extraction parameters
-        return {
-            "column_id": "id",
-            "column_sort": "datetime",
-            "n_jobs": n_jobs or self.n_jobs,
-            "default_fc_parameters": default_fc_parameters,
-        }
-
-    def _extract_features_for_column(
-        self,
-        features_data: pd.DataFrame,
-        column: str,
-        y: pd.Series,
-        extract_params: dict[str, any],
-        use_relevant_features: bool,
-        prefix_filename: str,
-        extract_features_dir: str,
-        overwrite: bool,
-    ) -> Optional[str]:
-        """Extract features for a single tremor column.
-
-        Performs tsfresh feature extraction for one column, either using
-        all features or only relevant features based on correlation with labels.
-
-        Args:
-            features_data: Features dataframe with id, datetime, and tremor columns
-            column: Column name to extract features from
-            y: Target labels
-            extract_params: Parameters for tsfresh extraction
-            use_relevant_features: Whether to use relevant features only
-            prefix_filename: Prefix for output filename
-            extract_features_dir: Directory to save extracted features
-            overwrite: Whether to overwrite existing files
-
-        Returns:
-            Path to extracted features CSV, or None if skipped
-        """
-        extracted_csv = os.path.join(
-            extract_features_dir, f"{prefix_filename}_{column}.csv"
-        )
-
-        # Skip if already exists and not overwriting
-        if not overwrite and os.path.isfile(extracted_csv):
-            if self.verbose:
-                logger.info(
-                    f"Extracted features for {column} already exist: {extracted_csv}"
-                )
-            return extracted_csv
-
-        # Prepare data for extraction
-        df = features_data[["id", "datetime", column]]
-
-        if self.verbose:
-            logger.info(f"Extracting features for {column}")
-
-        # Extract features
-        if use_relevant_features:
-            extracted_features = extract_relevant_features(df, y, **extract_params)
-        else:
-            extracted_features = tsfresh_extract_features(
-                df,
-                impute_function=impute,
-                **extract_params,
-            )
-
-        # Save to CSV
-        extracted_features.index.name = "id"
-        extracted_features.to_csv(extracted_csv, index=True)
-
-        logger.info(f"Extracted features for {column} saved: {extracted_csv}")
-
-        return extracted_csv
 
     def extract_features(
         self,
@@ -848,116 +938,6 @@ class ForecastModel:
         self.label_csv = label_csv
 
         return self
-
-    def _validate_tremor_for_labeling(
-        self,
-        tremor_data: pd.DataFrame,
-        tremor_columns: Optional[list[str]],
-    ) -> None:
-        """Validate tremor data is available for label building.
-
-        Checks that tremor data is loaded and that specified columns exist.
-
-        Args:
-            tremor_data: Tremor dataframe
-            tremor_columns: Columns to validate
-
-        Raises:
-            ValueError: If tremor data is not loaded or columns are invalid
-        """
-        if not isinstance(tremor_data, pd.DataFrame) or len(tremor_data) == 0:
-            raise ValueError(
-                "Tremor data not found/loaded. "
-                "Please run calculate() or load_tremor_data() method first."
-            )
-
-        if tremor_columns:
-            validate_columns(tremor_data, tremor_columns)
-
-    def _prepare_tremor_for_labeling(
-        self,
-        tremor_columns: Optional[list[str]],
-    ) -> pd.DataFrame:
-        """Prepare tremor data for label building.
-
-        Creates a copy of tremor data and optionally selects specific columns.
-        Sorts the data by datetime index.
-
-        Args:
-            tremor_columns: Specific columns to select, or None for all
-
-        Returns:
-            Prepared tremor dataframe
-        """
-        df_tremor = self.tremor_data.copy()
-
-        if tremor_columns is not None:
-            df_tremor = df_tremor[tremor_columns]
-
-        df_tremor.sort_index(ascending=True, inplace=True)
-
-        return df_tremor
-
-    def _validate_label_tremor_date_range(
-        self,
-        df_label: pd.DataFrame,
-        df_tremor: pd.DataFrame,
-    ) -> None:
-        """Validate label date range falls within tremor data range.
-
-        Ensures that the label windows are completely covered by available
-        tremor data, preventing gaps in feature extraction.
-
-        Args:
-            df_label: Label dataframe with datetime index
-            df_tremor: Tremor dataframe with datetime index
-
-        Raises:
-            ValueError: If label dates fall outside tremor data range
-        """
-        label_start_date: pd.Timestamp = df_label.index[0]
-        label_end_date: pd.Timestamp = df_label.index[-1]
-        tremor_start_date: pd.Timestamp = df_tremor.index[0]
-        tremor_end_date: pd.Timestamp = df_tremor.index[-1]
-
-        if tremor_start_date > label_start_date:
-            raise ValueError(
-                f"Training start date ({label_start_date}) should be after/equal "
-                f"to tremor start date ({tremor_start_date}). "
-                f"Change your training start date to after/equal {tremor_start_date}."
-            )
-
-        if tremor_end_date < label_end_date:
-            raise ValueError(
-                f"Training end date ({label_end_date}) should be before/equal "
-                f"to tremor end date ({tremor_end_date}). "
-                f"Change your training end date to before/equal {tremor_end_date}."
-            )
-
-    def _calculate_eruption_statistics(
-        self,
-        label_builder: LabelBuilder,
-    ) -> None:
-        """Calculate and log eruption class statistics.
-
-        Computes the number of eruption and non-eruption windows, and their
-        ratio. Logs statistics if verbose mode is enabled.
-
-        Args:
-            label_builder: LabelBuilder instance with built labels
-        """
-        self.total_eruption_class = len(label_builder.df_eruption)
-        self.total_non_eruption_class = (
-            len(label_builder.df) - self.total_eruption_class
-        )
-        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
-
-        if self.verbose:
-            logger.info(
-                f"Total number of eruptions: {self.total_eruption_class}. "
-                f"Total number of non-eruptions: {self.total_non_eruption_class}. "
-                f"Class ratio (eruption vs non-eruptions): {class_ratio}"
-            )
 
     def build_label(
         self,
