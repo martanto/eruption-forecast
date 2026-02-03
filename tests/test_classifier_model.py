@@ -261,3 +261,244 @@ class TestClassifierModelTrain:
             X = pd.read_csv(features_csv, index_col=0)
             predictions = loaded.predict(X)
             assert len(predictions) == len(X)
+
+
+# ---------------------------------------------------------------------------
+# ClassifierModel — evaluate
+# ---------------------------------------------------------------------------
+
+
+class TestClassifierModelEvaluate:
+    """Test ClassifierModel.evaluate() behaviour."""
+
+    def test_evaluate_returns_dataframe(self) -> None:
+        """evaluate() returns a DataFrame with correct structure."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            results = model.evaluate(save_results=False)
+
+            # 2 models + MEAN + STD rows
+            assert len(results) == 4
+            assert "model" in results.columns
+            assert "accuracy" in results.columns
+            assert "f1" in results.columns
+            assert "roc_auc" in results.columns
+            assert results.iloc[-2]["model"] == "MEAN"
+            assert results.iloc[-1]["model"] == "STD"
+
+    def test_evaluate_saves_csv(self) -> None:
+        """evaluate() saves results to CSV when save_results=True."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            model.evaluate(save_results=True)
+
+            csv_path = os.path.join(out, "evaluation_results.csv")
+            assert os.path.isfile(csv_path)
+
+            loaded = pd.read_csv(csv_path)
+            assert len(loaded) == 4
+
+    def test_evaluate_custom_filename(self) -> None:
+        """evaluate() uses custom filename when provided."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            model.evaluate(save_results=True, output_filename="custom_eval.csv")
+
+            assert os.path.isfile(os.path.join(out, "custom_eval.csv"))
+
+    def test_evaluate_no_models_raises(self) -> None:
+        """evaluate() raises ValueError when no models exist."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            # Do NOT train
+
+            with pytest.raises(ValueError, match="No trained models found"):
+                model.evaluate()
+
+    def test_evaluate_metrics_in_range(self) -> None:
+        """All evaluation metrics are in valid ranges."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=3, grid_params=_FAST_GRID, n_splits=2)
+
+            results = model.evaluate(save_results=False)
+
+            # Check model rows (exclude MEAN and STD)
+            model_rows = results[~results["model"].isin(["MEAN", "STD"])]
+
+            for _, row in model_rows.iterrows():
+                assert 0 <= row["accuracy"] <= 1
+                assert 0 <= row["precision"] <= 1
+                assert 0 <= row["recall"] <= 1
+                assert 0 <= row["f1"] <= 1
+                assert 0 <= row["roc_auc"] <= 1
+
+
+# ---------------------------------------------------------------------------
+# ClassifierModel — get_classification_report
+# ---------------------------------------------------------------------------
+
+
+class TestClassifierModelClassificationReport:
+    """Test ClassifierModel.get_classification_report() behaviour."""
+
+    def test_classification_report_returns_string(self) -> None:
+        """get_classification_report() returns a string."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            report = model.get_classification_report()
+
+            assert isinstance(report, str)
+            assert "precision" in report
+            assert "recall" in report
+            assert "f1-score" in report
+            assert "Not Erupted" in report
+            assert "Erupted" in report
+
+    def test_classification_report_no_models_raises(self) -> None:
+        """get_classification_report() raises ValueError when no models exist."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+
+            with pytest.raises(ValueError, match="No trained models found"):
+                model.get_classification_report()
+
+    def test_classification_report_invalid_index_raises(self) -> None:
+        """get_classification_report() raises IndexError for out-of-range index."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            with pytest.raises(IndexError, match="out of range"):
+                model.get_classification_report(model_index=10)
+
+
+# ---------------------------------------------------------------------------
+# ClassifierModel — get_feature_importances
+# ---------------------------------------------------------------------------
+
+
+class TestClassifierModelFeatureImportances:
+    """Test ClassifierModel.get_feature_importances() behaviour."""
+
+    def test_feature_importances_returns_dataframe(self) -> None:
+        """get_feature_importances() returns a DataFrame with correct columns."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_features=5)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            importances = model.get_feature_importances()
+
+            assert isinstance(importances, pd.DataFrame)
+            assert "feature" in importances.columns
+            assert "importance" in importances.columns
+            assert len(importances) == 5
+
+    def test_feature_importances_sorted_descending(self) -> None:
+        """get_feature_importances() returns importances sorted descending."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_features=5)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            importances = model.get_feature_importances()
+
+            values = importances["importance"].tolist()
+            assert values == sorted(values, reverse=True)
+
+    def test_feature_importances_top_n(self) -> None:
+        """get_feature_importances(top_n=3) returns only top 3 features."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp, n_features=10)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+
+            importances = model.get_feature_importances(top_n=3)
+
+            assert len(importances) == 3
+
+    def test_feature_importances_no_models_raises(self) -> None:
+        """get_feature_importances() raises ValueError when no models exist."""
+        with tempfile.TemporaryDirectory() as tmp:
+            features_csv, label_csv = _write_synthetic_csvs(tmp)
+            out = os.path.join(tmp, "out")
+            model = ClassifierModel(
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=out,
+            )
+
+            with pytest.raises(ValueError, match="No trained models found"):
+                model.get_feature_importances()

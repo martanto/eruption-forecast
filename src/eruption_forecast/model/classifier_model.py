@@ -11,9 +11,19 @@ from multiprocessing import Pool
 
 # Third party imports
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV, ShuffleSplit
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import GridSearchCV, ShuffleSplit, train_test_split
 
 # Project imports
 from eruption_forecast.features.constants import (
@@ -182,7 +192,7 @@ class ClassifierModel:
         grid_search = GridSearchCV(
             estimator=clf, param_grid=grid_params, cv=cv, n_jobs=1
         )
-        grid_search.fit(features, labels)
+        grid_search.fit(features, labels) # type: ignore
 
         joblib.dump(grid_search.best_estimator_, model_filepath)
 
@@ -247,3 +257,266 @@ class ClassifierModel:
                 self.model_paths.extend(paths)
 
         return None
+
+    def evaluate(
+        self,
+        test_size: float = 0.2,
+        random_state: int = 42,
+        save_results: bool = True,
+        output_filename: str | None = None,
+    ) -> pd.DataFrame:
+        """Evaluate trained models on a held-out test set.
+
+        Loads all trained model files from the output directory and evaluates
+        each on a stratified test split. Computes accuracy, precision, recall,
+        F1-score, and ROC AUC for each model, then aggregates statistics.
+
+        Args:
+            test_size (float, optional): Fraction of data for test set.
+                Defaults to 0.2.
+            random_state (int, optional): Random state for train/test split.
+                Defaults to 42.
+            save_results (bool, optional): Save evaluation results to CSV.
+                Defaults to True.
+            output_filename (str, optional): Custom filename for results CSV.
+                Defaults to ``evaluation_results.csv``.
+
+        Returns:
+            pd.DataFrame: DataFrame with evaluation metrics for each model
+                and aggregate statistics (mean, std) in the last two rows.
+
+        Raises:
+            ValueError: If no trained models are found in the output directory.
+        """
+        # Find all model files
+        model_files = sorted(
+            [
+                f
+                for f in os.listdir(self.output_dir)
+                if f.startswith("model_") and f.endswith(".pkl")
+            ]
+        )
+
+        if not model_files:
+            raise ValueError(
+                f"No trained models found in {self.output_dir}. "
+                "Run train() first to create model files."
+            )
+
+        if self.verbose:
+            logger.info(f"Evaluating {len(model_files)} models...")
+
+        # Create stratified train/test split
+        X_train, X_test, y_train, y_test = train_test_split(
+            self.df_features,
+            self.df_labels,
+            test_size=test_size,
+            stratify=self.df_labels,
+            random_state=random_state,
+        )
+
+        if self.verbose:
+            logger.info(
+                f"Test set: {len(X_test)} samples "
+                f"(positive: {y_test.sum()}, negative: {len(y_test) - y_test.sum()})"
+            )
+
+        # Evaluate each model
+        results: list[dict] = []
+
+        for model_file in model_files:
+            model_path = os.path.join(self.output_dir, model_file)
+            model = joblib.load(model_path)
+
+            # Predictions
+            y_pred = model.predict(X_test)
+            y_proba = model.predict_proba(X_test)[:, 1]
+
+            # Metrics
+            metrics = {
+                "model": model_file,
+                "accuracy": accuracy_score(y_test, y_pred),
+                "precision": precision_score(y_test, y_pred, zero_division=0),
+                "recall": recall_score(y_test, y_pred, zero_division=0),
+                "f1": f1_score(y_test, y_pred, zero_division=0),
+                "roc_auc": roc_auc_score(y_test, y_proba),
+            }
+
+            # Confusion matrix elements
+            tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+            metrics["true_negatives"] = tn
+            metrics["false_positives"] = fp
+            metrics["false_negatives"] = fn
+            metrics["true_positives"] = tp
+
+            results.append(metrics)
+
+            if self.debug:
+                logger.debug(
+                    f"{model_file}: acc={metrics['accuracy']:.3f}, "
+                    f"f1={metrics['f1']:.3f}, auc={metrics['roc_auc']:.3f}"
+                )
+
+        # Create DataFrame
+        df_results = pd.DataFrame(results)
+
+        # Calculate aggregate statistics
+        numeric_cols = [
+            "accuracy",
+            "precision",
+            "recall",
+            "f1",
+            "roc_auc",
+            "true_negatives",
+            "false_positives",
+            "false_negatives",
+            "true_positives",
+        ]
+
+        mean_row: dict[str, str | float] = {"model": "MEAN"}
+        std_row: dict[str, str | float] = {"model": "STD"}
+
+        for col in numeric_cols:
+            mean_row[col] = float(df_results[col].mean())
+            std_row[col] = float(df_results[col].std())
+
+        df_results = pd.concat(
+            [df_results, pd.DataFrame([mean_row, std_row])], ignore_index=True
+        )
+
+        if self.verbose:
+            logger.info(
+                f"Evaluation complete. "
+                f"Mean accuracy: {mean_row['accuracy']:.3f} (+/- {std_row['accuracy']:.3f}), "
+                f"Mean F1: {mean_row['f1']:.3f} (+/- {std_row['f1']:.3f}), "
+                f"Mean ROC AUC: {mean_row['roc_auc']:.3f} (+/- {std_row['roc_auc']:.3f})"
+            )
+
+        # Save results
+        if save_results:
+            output_filename = output_filename or "evaluation_results.csv"
+            output_path = os.path.join(self.output_dir, output_filename)
+            df_results.to_csv(output_path, index=False)
+
+            if self.verbose:
+                logger.info(f"Evaluation results saved to {output_path}")
+
+        return df_results
+
+    def get_classification_report(
+        self,
+        model_index: int = 0,
+        test_size: float = 0.2,
+        random_state: int = 42,
+    ) -> str:
+        """Get detailed classification report for a specific model.
+
+        Args:
+            model_index (int, optional): Index of the model file to evaluate
+                (sorted alphabetically). Defaults to 0 (first model).
+            test_size (float, optional): Fraction of data for test set.
+                Defaults to 0.2.
+            random_state (int, optional): Random state for train/test split.
+                Defaults to 42.
+
+        Returns:
+            str: Formatted classification report from sklearn.
+
+        Raises:
+            ValueError: If no trained models are found.
+            IndexError: If model_index is out of range.
+        """
+        model_files = sorted(
+            [
+                f
+                for f in os.listdir(self.output_dir)
+                if f.startswith("model_") and f.endswith(".pkl")
+            ]
+        )
+
+        if not model_files:
+            raise ValueError(
+                f"No trained models found in {self.output_dir}. "
+                "Run train() first to create model files."
+            )
+
+        if model_index >= len(model_files):
+            raise IndexError(
+                f"model_index {model_index} is out of range. "
+                f"Only {len(model_files)} models available."
+            )
+
+        model_path = os.path.join(self.output_dir, model_files[model_index])
+        model = joblib.load(model_path)
+
+        # Create stratified train/test split
+        X_train, X_test, y_train, y_test = train_test_split(
+            self.df_features,
+            self.df_labels,
+            test_size=test_size,
+            stratify=self.df_labels,
+            random_state=random_state,
+        )
+
+        y_pred = model.predict(X_test)
+
+        report: str = classification_report(
+            y_test, y_pred, target_names=["Not Erupted", "Erupted"]
+        )
+        return report
+
+    def get_feature_importances(
+        self,
+        model_index: int = 0,
+        top_n: int | None = None,
+    ) -> pd.DataFrame:
+        """Get feature importances from a specific trained model.
+
+        Args:
+            model_index (int, optional): Index of the model file to use
+                (sorted alphabetically). Defaults to 0 (first model).
+            top_n (int, optional): Return only top N features. If None,
+                returns all features. Defaults to None.
+
+        Returns:
+            pd.DataFrame: DataFrame with feature names and importance scores,
+                sorted by importance descending.
+
+        Raises:
+            ValueError: If no trained models are found.
+            IndexError: If model_index is out of range.
+        """
+        model_files = sorted(
+            [
+                f
+                for f in os.listdir(self.output_dir)
+                if f.startswith("model_") and f.endswith(".pkl")
+            ]
+        )
+
+        if not model_files:
+            raise ValueError(
+                f"No trained models found in {self.output_dir}. "
+                "Run train() first to create model files."
+            )
+
+        if model_index >= len(model_files):
+            raise IndexError(
+                f"model_index {model_index} is out of range. "
+                f"Only {len(model_files)} models available."
+            )
+
+        model_path = os.path.join(self.output_dir, model_files[model_index])
+        model = joblib.load(model_path)
+
+        importances = model.feature_importances_
+        feature_names = self.df_features.columns.tolist()
+
+        df_importance = pd.DataFrame(
+            {"feature": feature_names, "importance": importances}
+        ).sort_values("importance", ascending=False)
+
+        if top_n is not None:
+            df_importance = df_importance.head(top_n)
+
+        return df_importance.reset_index(drop=True)

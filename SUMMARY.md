@@ -714,13 +714,86 @@ DEFAULT_GRID_PARAMS: dict[str, list] = {
 | `TestClassifierModelValidate` | validate() does not recreate deleted dirs — 1 test |
 | `TestClassifierModelTrain` | saves 2 models, returns None, skip-existing mtime unchanged, loaded model is RF, loaded model can predict — 5 tests |
 
-**Full suite:** `uv run pytest tests/ -v` → **69 passed**, 0 failures
+**Full suite:** `uv run pytest tests/ -v` → **81 passed**, 0 failures
 
 **Type checking:** `uv run pyrefly check src/` → **0 errors**
 
 ## Breaking Changes
 
 **None.** New file only.  The only change to an existing file is the addition of `scikit-learn>=1.4` to `pyproject.toml` (already a transitive dependency).
+
+---
+
+# Phase 6: Model Evaluation ✅
+
+**Status:** COMPLETE & TESTED
+**Date:** 2026-02-03
+
+## Summary
+
+Added comprehensive model evaluation capabilities to `ClassifierModel`. Three new methods enable evaluation of trained RandomForest models: `evaluate()` for batch metrics across all models, `get_classification_report()` for detailed per-model reports, and `get_feature_importances()` for feature analysis.
+
+## New Methods
+
+### `evaluate()`
+Evaluates all trained models on a held-out stratified test set.
+
+**Metrics computed:**
+- Accuracy
+- Precision
+- Recall
+- F1-score
+- ROC AUC
+- Confusion matrix (TP, TN, FP, FN)
+
+**Features:**
+- Aggregates statistics (mean, std) across all models
+- Saves results to CSV
+- Stratified train/test split preserves class distribution
+
+### `get_classification_report()`
+Returns sklearn's detailed classification report for a specific model.
+
+**Output includes:**
+- Per-class precision, recall, F1-score
+- Support counts
+- Macro/weighted averages
+
+### `get_feature_importances()`
+Extracts feature importances from a trained RandomForest model.
+
+**Features:**
+- Sorted by importance (descending)
+- Optional `top_n` parameter to limit results
+
+## Files Modified / Created
+
+| File | Action |
+|------|--------|
+| `src/eruption_forecast/model/classifier_model.py` | Modified — added 3 evaluation methods |
+| `tests/test_classifier_model.py` | Modified — added 12 new tests |
+| `TODO.md` | Created — task tracking |
+| `SUMMARY.md` | Updated — this section |
+
+## Testing
+
+**Command:** `uv run pytest tests/test_classifier_model.py -v`
+
+**Result:** 23 tests passed (11 existing + 12 new)
+
+| Class | Tests |
+|-------|-------|
+| `TestClassifierModelEvaluate` | returns DataFrame, saves CSV, custom filename, no models raises, metrics in range — 5 tests |
+| `TestClassifierModelClassificationReport` | returns string, no models raises, invalid index raises — 3 tests |
+| `TestClassifierModelFeatureImportances` | returns DataFrame, sorted descending, top_n works, no models raises — 4 tests |
+
+**Full suite:** `uv run pytest tests/ -v` → **81 passed**, 0 failures
+
+**Type checking:** `uv run pyrefly check src/` → **0 errors**
+
+## Breaking Changes
+
+**None.** Additive changes only — three new methods on existing class.
 
 ---
 
@@ -732,12 +805,13 @@ DEFAULT_GRID_PARAMS: dict[str, list] = {
 - ✅ Phase 3: Feature Extraction + Model Training - **100% Complete**
 - ✅ Phase 4: ForecastModel Pipeline Orchestrator - **100% Complete**
 - ✅ Phase 5: ClassifierModel — RandomForest + GridSearchCV - **100% Complete**
+- ✅ Phase 6: Model Evaluation - **100% Complete**
 
 ### Package-Wide Improvements
 - ✅ Fixed 62+ assertion anti-patterns
 - ✅ Fixed 5 critical logic bugs (incl. can_skip inversion, format string typo)
 - ✅ Fixed 1 critical separation-of-concerns bug (C1, Phase 4)
-- ✅ Added 800+ lines of tests (69 tests, all passing)
+- ✅ Added 900+ lines of tests (81 tests, all passing)
 - ✅ Complete type hints (pyrefly 0 errors)
 - ✅ Comprehensive docstrings (Google style)
 - ✅ Extracted constants modules (label/, features/) — used consistently across model/
