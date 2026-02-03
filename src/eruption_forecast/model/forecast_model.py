@@ -579,6 +579,131 @@ class ForecastModel:
 
         return self
 
+    def _prepare_features_data(
+        self,
+        tremor_columns: Optional[list[str]],
+    ) -> pd.DataFrame:
+        """Prepare features data by filtering columns if specified.
+
+        Validates that specified columns exist and returns a filtered dataframe
+        containing only id, datetime, and the specified tremor columns.
+
+        Args:
+            tremor_columns: Specific columns to extract, or None for all
+
+        Returns:
+            Filtered features dataframe
+
+        Raises:
+            ValueError: If specified columns don't exist in features_data
+        """
+        features_data = self.features_data
+
+        if tremor_columns is not None:
+            validate_columns(self.features_data, tremor_columns)
+            features_data = features_data[["id", "datetime", *tremor_columns]]
+
+        return features_data
+
+    def _prepare_extraction_parameters(
+        self,
+        exclude_features: Optional[Union[list[str], bool]],
+        n_jobs: Optional[int],
+    ) -> dict[str, any]:
+        """Prepare parameters for tsfresh feature extraction.
+
+        Handles feature exclusion logic and builds the parameter dictionary
+        for tsfresh feature extraction functions.
+
+        Args:
+            exclude_features: Features to exclude from calculation
+            n_jobs: Number of parallel jobs
+
+        Returns:
+            Dictionary of extraction parameters for tsfresh
+        """
+        # Handle feature exclusion
+        default_fc_parameters = self.default_fc_parameters
+
+        if exclude_features is not None:
+            if isinstance(exclude_features, list):
+                default_fc_parameters = self.drop_features(exclude_features)
+            elif isinstance(exclude_features, bool) and not exclude_features:
+                self.excludes_features = set()
+
+        # Build extraction parameters
+        return {
+            "column_id": "id",
+            "column_sort": "datetime",
+            "n_jobs": n_jobs or self.n_jobs,
+            "default_fc_parameters": default_fc_parameters,
+        }
+
+    def _extract_features_for_column(
+        self,
+        features_data: pd.DataFrame,
+        column: str,
+        y: pd.Series,
+        extract_params: dict[str, any],
+        use_relevant_features: bool,
+        prefix_filename: str,
+        extract_features_dir: str,
+        overwrite: bool,
+    ) -> Optional[str]:
+        """Extract features for a single tremor column.
+
+        Performs tsfresh feature extraction for one column, either using
+        all features or only relevant features based on correlation with labels.
+
+        Args:
+            features_data: Features dataframe with id, datetime, and tremor columns
+            column: Column name to extract features from
+            y: Target labels
+            extract_params: Parameters for tsfresh extraction
+            use_relevant_features: Whether to use relevant features only
+            prefix_filename: Prefix for output filename
+            extract_features_dir: Directory to save extracted features
+            overwrite: Whether to overwrite existing files
+
+        Returns:
+            Path to extracted features CSV, or None if skipped
+        """
+        extracted_csv = os.path.join(
+            extract_features_dir, f"{prefix_filename}_{column}.csv"
+        )
+
+        # Skip if already exists and not overwriting
+        if not overwrite and os.path.isfile(extracted_csv):
+            if self.verbose:
+                logger.info(
+                    f"Extracted features for {column} already exist: {extracted_csv}"
+                )
+            return extracted_csv
+
+        # Prepare data for extraction
+        df = features_data[["id", "datetime", column]]
+
+        if self.verbose:
+            logger.info(f"Extracting features for {column}")
+
+        # Extract features
+        if use_relevant_features:
+            extracted_features = extract_relevant_features(df, y, **extract_params)
+        else:
+            extracted_features = tsfresh_extract_features(
+                df,
+                impute_function=impute,
+                **extract_params,
+            )
+
+        # Save to CSV
+        extracted_features.index.name = "id"
+        extracted_features.to_csv(extracted_csv, index=True)
+
+        logger.info(f"Extracted features for {column} saved: {extracted_csv}")
+
+        return extracted_csv
+
     def extract_features(
         self,
         exclude_features: Optional[Union[list[str], bool]] = None,
@@ -588,7 +713,11 @@ class ForecastModel:
         concat_features: bool = True,
         n_jobs: Optional[int] = None,
     ) -> Self:
-        """Extract features from tremor data.
+        """Extract features from tremor data using tsfresh.
+
+        Applies time-series feature extraction to each tremor column, either
+        extracting all comprehensive features or only statistically relevant
+        features based on correlation with eruption labels.
 
         Args:
             exclude_features (Optional[list[str]]): List features calculator to be excluded.
@@ -601,11 +730,10 @@ class ForecastModel:
         Returns:
             self (Self): ForecastModel object
         """
-        features_data = self.features_data
-        if tremor_columns is not None:
-            validate_columns(self.features_data, tremor_columns)
-            features_data = features_data[["id", "datetime", *tremor_columns]]
+        # Prepare data
+        features_data = self._prepare_features_data(tremor_columns)
 
+        # Setup parameters
         overwrite = overwrite or self.overwrite
         label_data = self.label_data
         prefix_filename = (
@@ -613,78 +741,46 @@ class ForecastModel:
         )
 
         if use_relevant_features and self.verbose:
-            logger.info(f"Extracting features using relevant features")
+            logger.info("Extracting features using relevant features")
 
-        # Get label data as a target
+        # Prepare target labels
         y = label_data["is_erupted"]
         y.index = label_data["id"]
 
-        # Extract features per method
+        # Setup extraction directory
         extract_features_dir = os.path.join(self.features_dir, "extract_features")
         os.makedirs(extract_features_dir, exist_ok=True)
 
-        # Exclude features from calculation
-        default_fc_parameters = self.default_fc_parameters
+        # Prepare extraction parameters
+        extract_params = self._prepare_extraction_parameters(exclude_features, n_jobs)
 
-        if exclude_features is not None:
-            if isinstance(exclude_features, list):
-                default_fc_parameters = self.drop_features(exclude_features)
-            if isinstance(exclude_features, bool):
-                if not exclude_features:
-                    self.excludes_features = {}
-
-        extract_params = {
-            "column_id": "id",
-            "column_sort": "datetime",
-            "n_jobs": n_jobs or self.n_jobs,
-            "default_fc_parameters": default_fc_parameters,
-        }
-
-        traning_features_csvs = set()
+        # Extract features for each column
+        extracted_csvs = set()
         for column in features_data.columns.tolist():
             if column in ["id", "datetime"]:
                 continue
 
-            extracted_csv = os.path.join(
-                extract_features_dir, f"{prefix_filename}_{column}.csv"
+            csv_path = self._extract_features_for_column(
+                features_data=features_data,
+                column=column,
+                y=y,
+                extract_params=extract_params,
+                use_relevant_features=use_relevant_features,
+                prefix_filename=prefix_filename,
+                extract_features_dir=extract_features_dir,
+                overwrite=overwrite,
             )
 
-            # Skip if extracted features already exists
-            if not overwrite and os.path.isfile(extracted_csv):
-                if self.verbose:
-                    logger.info(
-                        f"Extracted features for {column} saved in: {extracted_csv} "
-                    )
-                traning_features_csvs.add(extracted_csv)
-                continue
+            if csv_path:
+                extracted_csvs.add(csv_path)
 
-            df = features_data[["id", "datetime", column]]
-
-            if self.verbose:
-                logger.info(f"Extracting {column} features. ")
-
-            if use_relevant_features:
-                extracted_features = extract_relevant_features(df, y, **extract_params)
-            else:
-                extracted_features = tsfresh_extract_features(
-                    df,
-                    impute_function=impute,
-                    **extract_params,
-                )
-
-            extracted_features.index.name = "id"
-            extracted_features.to_csv(extracted_csv, index=True)
-
-            # Add extracted csvs to list
-            traning_features_csvs.add(extracted_csv)
-
-            logger.info(f"Extracted features for {column} saved in: {extracted_csv} ")
-
+        # Update tracked CSVs
         if use_relevant_features:
-            self.relevant_features_csvs.update(traning_features_csvs)
+            self.relevant_features_csvs.update(extracted_csvs)
         else:
-            self.extract_features_csvs.update(traning_features_csvs)
+            self.extract_features_csvs.update(extracted_csvs)
 
+        # Concatenate if requested
         if concat_features:
             self.concat_features()
 
