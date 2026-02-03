@@ -66,21 +66,19 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ):
-        # Set DEFAULT parameter
-        start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
-        end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
-        start_date_str: str = start_date.strftime("%Y-%m-%d")
-        end_date_str: str = end_date.strftime("%Y-%m-%d")
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
+        # Normalize dates
+        start_date, end_date, start_date_str, end_date_str = self._normalize_dates(
+            start_date, end_date
+        )
+
+        # Setup directories
         network = network or "VG"
         location = location or "00"
-        nslc = f"{network}.{station}.{location}.{channel}"
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
-        station_dir = os.path.join(output_dir, nslc)
-        training_dir = os.path.join(station_dir, "training")
-        features_dir = os.path.join(station_dir, "features")
+        nslc, output_dir, station_dir, training_dir, features_dir = (
+            self._setup_directories(network, station, location, channel, output_dir)
+        )
 
-        # Set DEFAULT properties
+        # Set DEFAULT properties (core parameters)
         self.station = station
         self.channel = channel
         self.start_date: datetime = start_date
@@ -95,7 +93,7 @@ class ForecastModel:
         self.verbose = verbose
         self.debug = debug
 
-        # Set ADDITIONAL properties
+        # Set ADDITIONAL properties (derived values)
         self.start_date_minus_window_size = start_date - timedelta(days=window_size)
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
@@ -115,9 +113,99 @@ class ForecastModel:
             "n_jobs": n_jobs,
         }
 
-        # Default feature calculator (fc) parameters
-        self.default_fc_parameters = ComprehensiveFCParameters()
-        self.excludes_features: set[str] = {
+        # Initialize feature parameters
+        self.default_fc_parameters, self.excludes_features = (
+            self._initialize_feature_parameters()
+        )
+
+        # Initialize state properties
+        self._initialize_state_properties()
+
+        # Validate
+        self.validate()
+
+        # Verbose and debugging
+        if debug:
+            logger.info("⚠️ Forecast Model :: Debug mode is ON")
+
+        if verbose:
+            logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
+            logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
+            logger.info(f"Volcano ID: {self.volcano_id}")
+            logger.info(f"Network: {self.network}")
+            logger.info(f"Station: {self.station}")
+            logger.info(f"Location: {self.location}")
+            logger.info(f"Channel: {self.channel}")
+            logger.info(f"Output Dir: {self.output_dir}")
+
+    def _normalize_dates(
+        self,
+        start_date: Union[str, datetime],
+        end_date: Union[str, datetime],
+    ) -> tuple[datetime, datetime, str, str]:
+        """Normalize start and end dates to standard format.
+
+        Converts date strings to datetime objects and formats them consistently.
+        Start date is set to 00:00:00, end date is set to 23:59:59.
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format or datetime object.
+            end_date: End date in YYYY-MM-DD format or datetime object.
+
+        Returns:
+            Tuple of (start_date, end_date, start_date_str, end_date_str)
+        """
+        start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
+        end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+
+        return start_date, end_date, start_date_str, end_date_str
+
+    def _setup_directories(
+        self,
+        network: str,
+        station: str,
+        location: str,
+        channel: str,
+        output_dir: Optional[str],
+    ) -> tuple[str, str, str, str, str]:
+        """Setup directory structure for forecast model outputs.
+
+        Creates the NSLC (Network.Station.Location.Channel) identifier and
+        builds the directory structure for storing model outputs.
+
+        Args:
+            network: Network code
+            station: Station code
+            location: Location code
+            channel: Channel code
+            output_dir: Base output directory. Defaults to 'output' in current directory.
+
+        Returns:
+            Tuple of (nslc, output_dir, station_dir, training_dir, features_dir)
+        """
+        nslc = f"{network}.{station}.{location}.{channel}"
+        output_dir = output_dir or os.path.join(os.getcwd(), "output")
+        station_dir = os.path.join(output_dir, nslc)
+        training_dir = os.path.join(station_dir, "training")
+        features_dir = os.path.join(station_dir, "features")
+
+        return nslc, output_dir, station_dir, training_dir, features_dir
+
+    def _initialize_feature_parameters(
+        self,
+    ) -> tuple[ComprehensiveFCParameters, set[str]]:
+        """Initialize tsfresh feature extraction parameters with defaults.
+
+        Sets up default feature calculators from tsfresh's ComprehensiveFCParameters
+        and defines a set of features to exclude from calculation.
+
+        Returns:
+            Tuple of (default_fc_parameters, excludes_features)
+        """
+        default_fc_parameters = ComprehensiveFCParameters()
+        excludes_features: set[str] = {
             "agg_linear_trend",
             "linear_trend_timewise",
             "length",
@@ -126,6 +214,21 @@ class ForecastModel:
             "has_duplicate",
         }
 
+        return default_fc_parameters, excludes_features
+
+    def _initialize_state_properties(self) -> None:
+        """Initialize state properties for different lifecycle stages.
+
+        State properties are set as different methods are called during
+        the forecast model lifecycle:
+
+        - calculate(): Sets CalculateTremor, TremorData, tremor_data, tremor_csv
+        - build_label(): Sets LabelBuilder, label_data, label_csv, eruption stats
+        - build_features(): Sets FeaturesBuilder, features_data, features_csv
+        - extract_features(): Sets extract_features_csvs, relevant_features_csvs
+        - concat_features(): Sets extracted_features_csv, extracted_relevant_csv
+        - predict(): Sets prediction_features_csvs
+        """
         # Will be set after calculate() method called
         self.CalculateTremor: Optional[CalculateTremor] = None
         self.TremorData: Optional[TremorData] = None
@@ -149,30 +252,53 @@ class ForecastModel:
         self.relevant_features_csvs: set[str] = set()
 
         # Will be set after concat_features() called
-        self.extracted_features_csv: str = None
-        self.extracted_relevant_csv: str = None
+        self.extracted_features_csv: Optional[str] = None
+        self.extracted_relevant_csv: Optional[str] = None
 
         # Will be set after predict() called
-        self.prediction_features_csvs = set()
+        self.prediction_features_csvs: set[str] = set()
 
         # Base filename without extension
         self.basename: Optional[str] = None
 
-        # Validate
+    def validate(self) -> None:
+        """Validate initialization parameters.
 
-        # Verbose and debugging
-        if debug:
-            logger.info("⚠️ Forecast Model :: Debug mode is ON")
+        Validates that all required parameters are properly set and creates
+        necessary directories. Follows the pattern used in LabelBuilder and
+        FeaturesBuilder classes.
 
-        if verbose:
-            logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
-            logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
-            logger.info(f"Volcano ID: {self.volcano_id}")
-            logger.info(f"Network: {self.network}")
-            logger.info(f"Station: {self.station}")
-            logger.info(f"Location: {self.location}")
-            logger.info(f"Channel: {self.channel}")
-            logger.info(f"Output Dir: {self.output_dir}")
+        Raises:
+            ValueError: If any parameters are invalid
+        """
+        # Validate window size
+        if self.window_size <= 0:
+            raise ValueError(
+                f"window_size must be greater than 0. Got: {self.window_size}"
+            )
+
+        # Validate n_jobs
+        if self.n_jobs <= 0:
+            raise ValueError(f"n_jobs must be greater than 0. Got: {self.n_jobs}")
+
+        # Validate date ranges
+        validate_date_ranges(self.start_date, self.end_date)
+
+        # Validate strings are not empty
+        if not self.station.strip():
+            raise ValueError("station cannot be empty")
+
+        if not self.channel.strip():
+            raise ValueError("channel cannot be empty")
+
+        if not self.volcano_id.strip():
+            raise ValueError("volcano_id cannot be empty")
+
+        # Create directories
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.station_dir, exist_ok=True)
+        os.makedirs(self.training_dir, exist_ok=True)
+        os.makedirs(self.features_dir, exist_ok=True)
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
         """Load calculate tremor data from CSV file
