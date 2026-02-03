@@ -91,7 +91,9 @@ eruption_forecast/
 │   ├── features_builder.py
 │   └── constants.py
 ├── model/               # Forecasting models
-│   └── forecast_model.py
+│   ├── forecast_model.py
+│   ├── build_model.py
+│   └── classifier_model.py
 ├── sds.py              # SDS file handling
 ├── utils.py            # Shared utilities
 ├── plot.py             # Visualization
@@ -141,7 +143,7 @@ Systematic **phase-by-phase refactoring** covering all major modules:
 2. **Phase 2:** Label Building Module ✅ **COMPLETE**
 3. **Phase 3:** Feature Extraction + Model Training Module ✅ **COMPLETE**
 4. **Phase 4:** ForecastModel Pipeline Orchestrator ✅ **COMPLETE**
-5. **Phase 5:** Testing & Documentation (Ongoing)
+5. **Phase 5:** ClassifierModel — RandomForest + GridSearchCV ✅ **COMPLETE**
 
 ### Goals
 
@@ -656,6 +658,72 @@ Refactoring of `ForecastModel` (`model/forecast_model.py`, 1036 lines) — the p
 
 ---
 
+# Phase 5: ClassifierModel — RandomForest + GridSearchCV ✅
+
+**Status:** COMPLETE & TESTED
+**Date:** 2026-02-03
+
+## Summary
+
+New `ClassifierModel` class in `model/classifier_model.py`.  Mirrors `TrainModel`'s data-loading, validation, directory-creation, and per-seed `Pool` loop.  Replaces the tsfresh significance filter with `GridSearchCV(RandomForestClassifier)` using `ShuffleSplit` as the CV strategy.  Each seed persists its best estimator via `joblib.dump`.
+
+## Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| `state = random_state + seed` drives `ShuffleSplit.random_state` | Mirrors `build_model.py` seed arithmetic |
+| `max_features` grid is `["sqrt", "log2", None]` | `"auto"` removed in sklearn 1.4; imbalanced-learn >= 0.14.1 pulls sklearn >= 1.4 |
+| `joblib.dump(grid_search.best_estimator_, …)` | Persists the actual trained RF, not the `GridSearchCV` wrapper |
+| `GridSearchCV` `n_jobs=1` always | Outer loop already uses `Pool(n_jobs)`; nesting parallelism on Windows (spawn) would fork-bomb |
+| Default output: `output/models/prediction/` | Matches user-specified layout |
+| File naming: `model_{state:05d}.pkl` | Mirrors `{state:05d}.csv` pattern in `TrainModel` |
+| Class NOT added to `__init__.py` exports | `TrainModel` isn't exported either — consistent |
+| `scikit-learn>=1.4` added to `pyproject.toml` | Direct sklearn import made explicit (was only a transitive dep via imbalanced-learn) |
+
+## Module-level constant
+
+```python
+DEFAULT_GRID_PARAMS: dict[str, list] = {
+    "n_estimators": [10, 30, 100],
+    "max_depth": [3, 5, 7],
+    "criterion": ["gini", "entropy"],
+    "max_features": ["sqrt", "log2", None],
+}
+```
+
+54 grid combinations (3 × 3 × 2 × 3).
+
+## Files Modified / Created
+
+| File | Action |
+|------|--------|
+| `pyproject.toml` | Added `scikit-learn>=1.4` to `[project] dependencies` |
+| `src/eruption_forecast/model/classifier_model.py` | Created — `ClassifierModel` class |
+| `tests/test_classifier_model.py` | Created — 11 unit tests |
+| `SUMMARY.md` | Updated — this section |
+
+## Testing
+
+**Command:** `uv run pytest tests/test_classifier_model.py -v`
+
+**Result:** 11 tests passed
+
+| Class | Tests |
+|-------|-------|
+| `TestClassifierModelInit` | valid init, empty features, empty labels, mismatched lengths, nested dir creation — 5 tests |
+| `TestClassifierModelValidate` | validate() does not recreate deleted dirs — 1 test |
+| `TestClassifierModelTrain` | saves 2 models, returns None, skip-existing mtime unchanged, loaded model is RF, loaded model can predict — 5 tests |
+
+**Full suite:** `uv run pytest tests/ -v` → **69 passed**, 0 failures
+
+**Type checking:** `uv run pyrefly check src/` → **0 errors**
+
+## Breaking Changes
+
+**None.** New file only.  The only change to an existing file is the addition of `scikit-learn>=1.4` to `pyproject.toml` (already a transitive dependency).
+
+---
+
 ## Overall Progress
 
 ### Completed Phases
@@ -663,15 +731,13 @@ Refactoring of `ForecastModel` (`model/forecast_model.py`, 1036 lines) — the p
 - ✅ Phase 2: Label Building - **100% Complete**
 - ✅ Phase 3: Feature Extraction + Model Training - **100% Complete**
 - ✅ Phase 4: ForecastModel Pipeline Orchestrator - **100% Complete**
-
-### In Progress
-- 🔄 Phase 5: Testing & Documentation - **65% Complete**
+- ✅ Phase 5: ClassifierModel — RandomForest + GridSearchCV - **100% Complete**
 
 ### Package-Wide Improvements
 - ✅ Fixed 62+ assertion anti-patterns
 - ✅ Fixed 5 critical logic bugs (incl. can_skip inversion, format string typo)
 - ✅ Fixed 1 critical separation-of-concerns bug (C1, Phase 4)
-- ✅ Added 700+ lines of tests (58 tests, all passing)
+- ✅ Added 800+ lines of tests (69 tests, all passing)
 - ✅ Complete type hints (pyrefly 0 errors)
 - ✅ Comprehensive docstrings (Google style)
 - ✅ Extracted constants modules (label/, features/) — used consistently across model/
@@ -692,6 +758,7 @@ tests/
 ├── test_label_builder.py          # Label module tests (17 tests)
 ├── test_features_builder.py       # Features + TrainModel tests (28 tests)
 ├── test_forecast_model.py         # ForecastModel tests (12 tests)
+├── test_classifier_model.py       # ClassifierModel tests (11 tests)
 └── verify_dsar.py                 # Legacy DSAR verification
 ```
 

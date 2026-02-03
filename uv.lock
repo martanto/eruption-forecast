@@ -531,6 +531,7 @@ dependencies = [
     { name = "obspy" },
     { name = "pandas" },
     { name = "pip" },
+    { name = "scikit-learn" },
     { name = "tsfresh" },
     { name = "uv-build" },
 ]
@@ -555,6 +556,7 @@ requires-dist = [
     { name = "obspy", specifier = ">=1.4.2" },
     { name = "pandas", specifier = ">=3.0.0" },
     { name = "pip" },
+    { name = "scikit-learn", specifier = ">=1.4" },
     { name = "tsfresh" },
     { name = "uv-build", specifier = ">=0.9.0" },
 ]
