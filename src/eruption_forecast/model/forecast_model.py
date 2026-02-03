@@ -316,49 +316,46 @@ class ForecastModel:
         self.tremor_csv = tremor_csv
         return self
 
-    def calculate(
+    def _setup_calculate_tremor(
         self,
-        source: Literal["sds", "fdsn"] = "sds",
-        methods: Optional[str] = None,
-        filename_prefix: Optional[str] = None,
-        remove_outlier_method: Literal["all", "maximum"] = "maximum",
-        interpolate: bool = True,
-        value_multiplier: Optional[float] = None,
-        cleanup_tmp_dir: bool = False,
-        plot_tmp: bool = True,
-        save_plot: bool = True,
-        overwrite_plot: bool = False,
-        sds_dir: Optional[str] = None,
-        client_url: str = "https://service.iris.edu",
-        verbose: Optional[bool] = None,
-        debug: Optional[bool] = None,
-    ) -> Self:
-        """Calculate Tremor Data
+        methods: Optional[str],
+        filename_prefix: Optional[str],
+        remove_outlier_method: Literal["all", "maximum"],
+        interpolate: bool,
+        value_multiplier: Optional[float],
+        cleanup_tmp_dir: bool,
+        plot_tmp: bool,
+        save_plot: bool,
+        overwrite_plot: bool,
+        verbose: Optional[bool],
+        debug: Optional[bool],
+    ) -> CalculateTremor:
+        """Setup CalculateTremor instance with configuration.
+
+        Creates and configures a CalculateTremor instance with all necessary
+        parameters. Updates start_date to include window_size buffer.
 
         Args:
-            source (optional, Literal["sds", "fdsn"]): Seismic data source
-            methods (Optional[str]): Calculation methods to apply.
-            filename_prefix (Optional[str]): Prefix for generated filenames.
-            remove_outlier_method (bool): If True, removes outliers from the data. Defaults to True.
-            interpolate (bool): If True, interpolates the data. Defaults to True.
-            value_multiplier (Optional[float]): Scaling factor for seismic values.
-            cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
-            plot_tmp (bool): If True, plot temporary results for quick view.
-            save_plot (bool): If True, save tremor results for quick view.
-            overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
-            sds_dir (str): SDS directory location. Must be provided if source is 'sds'.
-            client_url (str): URL to FDSN service. Default to https://service.iris.edu
-            verbose (bool): If True, enables verbose logging. Defaults to False.
-            debug (bool): If True, enables debug mode. Defaults to False.
+            methods: Calculation methods to apply
+            filename_prefix: Prefix for generated filenames
+            remove_outlier_method: Method for outlier removal
+            interpolate: Whether to interpolate data
+            value_multiplier: Scaling factor for values
+            cleanup_tmp_dir: Whether to clean temporary directory
+            plot_tmp: Whether to plot temporary results
+            save_plot: Whether to save plots
+            overwrite_plot: Whether to overwrite existing plots
+            verbose: Enable verbose logging
+            debug: Enable debug mode
 
         Returns:
-            self (Self): ForecastModel object
+            Configured CalculateTremor instance
         """
         verbose = verbose or self.verbose
         debug = debug or self.debug
 
-        # Update "start_date" key arguments
-        kwargs = self.kwargs
+        # Update start_date to include window_size buffer
+        kwargs = self.kwargs.copy()
         kwargs["start_date"] = self.start_date_minus_window_size
 
         calculate = CalculateTremor(
@@ -380,30 +377,63 @@ class ForecastModel:
         if debug:
             calculate.debug = True
 
-        self.CalculateTremor = calculate
+        return calculate
 
-        if source == "sds":
-            assert sds_dir is not None, ValueError(
-                f"You chose 'sds' as source, please provide 'sds_dir' parameter. "
-                f"Example: calculate(source='sds', sds_dir='converted')"
+    def _calculate_from_sds(
+        self, calculate: CalculateTremor, sds_dir: Optional[str]
+    ) -> CalculateTremor:
+        """Calculate tremor from SDS data source.
+
+        Args:
+            calculate: CalculateTremor instance
+            sds_dir: Path to SDS directory
+
+        Returns:
+            Calculated CalculateTremor instance with data
+
+        Raises:
+            ValueError: If sds_dir is None or doesn't exist
+        """
+        if sds_dir is None:
+            raise ValueError(
+                "You chose 'sds' as source, please provide 'sds_dir' parameter. "
+                "Example: calculate(source='sds', sds_dir='converted')"
             )
-            assert os.path.isdir(sds_dir), ValueError(f"SDS dir {sds_dir} not exists.")
 
-            calculate = calculate.from_sds(sds_dir=sds_dir).run()
+        if not os.path.isdir(sds_dir):
+            raise ValueError(f"SDS dir {sds_dir} not exists.")
 
-        # TODO: Get data from FDSN services
-        if source == "fdsn":
-            # calculate = calculate.from_fdsn(client_url=client_url).run()
-            logger.error(f"FDSN source is not yet supported. Client url: {client_url}")
-            raise
+        return calculate.from_sds(sds_dir=sds_dir).run()
 
-        tremor_data = TremorData(calculate.df)
-        df_tremor = tremor_data.df
-        self.TremorData = tremor_data
-        self.TremorData.csv = calculate.csv
-        self.tremor_csv = calculate.csv
+    def _calculate_from_fdsn(
+        self, calculate: CalculateTremor, client_url: str
+    ) -> CalculateTremor:
+        """Calculate tremor from FDSN data source.
 
-        # Update self.start_date and self.end_date based on calculated tremor data
+        Args:
+            calculate: CalculateTremor instance
+            client_url: FDSN service URL
+
+        Returns:
+            Calculated CalculateTremor instance with data
+
+        Raises:
+            NotImplementedError: FDSN source is not yet supported
+        """
+        logger.error(f"FDSN source is not yet supported. Client url: {client_url}")
+        raise NotImplementedError("FDSN source is not yet supported")
+
+    def _adjust_dates_to_tremor_range(self, tremor_data: TremorData) -> None:
+        """Adjust start_date and end_date to match available tremor data.
+
+        Updates self.start_date, self.end_date, and their string representations
+        if they fall outside the tremor data range. Logs changes if verbose mode
+        is enabled.
+
+        Args:
+            tremor_data: TremorData instance with date range
+        """
+        # Adjust start date if earlier than tremor start
         if self.start_date_minus_window_size < tremor_data.start_date:
             self.start_date = tremor_data.start_date
             self.start_date_str = tremor_data.start_date_str
@@ -413,6 +443,7 @@ class ForecastModel:
                     f"tremor start date: {tremor_data.start_date}"
                 )
 
+        # Adjust end date if later than tremor end
         if self.end_date > tremor_data.end_date:
             self.end_date = tremor_data.end_date
             self.end_date_str = tremor_data.end_date_str
@@ -422,8 +453,78 @@ class ForecastModel:
                     f"tremor end date: {tremor_data.end_date}"
                 )
 
-        # Update tremor data based on update self.start_date or self.end_date
-        self.tremor_data = df_tremor.loc[self.start_date : self.end_date]
+    def calculate(
+        self,
+        source: Literal["sds", "fdsn"] = "sds",
+        methods: Optional[str] = None,
+        filename_prefix: Optional[str] = None,
+        remove_outlier_method: Literal["all", "maximum"] = "maximum",
+        interpolate: bool = True,
+        value_multiplier: Optional[float] = None,
+        cleanup_tmp_dir: bool = False,
+        plot_tmp: bool = True,
+        save_plot: bool = True,
+        overwrite_plot: bool = False,
+        sds_dir: Optional[str] = None,
+        client_url: str = "https://service.iris.edu",
+        verbose: Optional[bool] = None,
+        debug: Optional[bool] = None,
+    ) -> Self:
+        """Calculate Tremor Data from seismic data source.
+
+        Args:
+            source (optional, Literal["sds", "fdsn"]): Seismic data source
+            methods (Optional[str]): Calculation methods to apply.
+            filename_prefix (Optional[str]): Prefix for generated filenames.
+            remove_outlier_method (bool): If True, removes outliers from the data. Defaults to True.
+            interpolate (bool): If True, interpolates the data. Defaults to True.
+            value_multiplier (Optional[float]): Scaling factor for seismic values.
+            cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
+            plot_tmp (bool): If True, plot temporary results for quick view.
+            save_plot (bool): If True, save tremor results for quick view.
+            overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
+            sds_dir (str): SDS directory location. Must be provided if source is 'sds'.
+            client_url (str): URL to FDSN service. Default to https://service.iris.edu
+            verbose (bool): If True, enables verbose logging. Defaults to False.
+            debug (bool): If True, enables debug mode. Defaults to False.
+
+        Returns:
+            self (Self): ForecastModel object
+        """
+        # Setup CalculateTremor instance
+        calculate = self._setup_calculate_tremor(
+            methods=methods,
+            filename_prefix=filename_prefix,
+            remove_outlier_method=remove_outlier_method,
+            interpolate=interpolate,
+            value_multiplier=value_multiplier,
+            cleanup_tmp_dir=cleanup_tmp_dir,
+            plot_tmp=plot_tmp,
+            save_plot=save_plot,
+            overwrite_plot=overwrite_plot,
+            verbose=verbose,
+            debug=debug,
+        )
+
+        self.CalculateTremor = calculate
+
+        # Calculate from appropriate source
+        if source == "sds":
+            calculate = self._calculate_from_sds(calculate, sds_dir)
+        elif source == "fdsn":
+            calculate = self._calculate_from_fdsn(calculate, client_url)
+
+        # Wrap calculated data
+        tremor_data = TremorData(calculate.df)
+        self.TremorData = tremor_data
+        self.TremorData.csv = calculate.csv
+        self.tremor_csv = calculate.csv
+
+        # Adjust dates to match tremor data availability
+        self._adjust_dates_to_tremor_range(tremor_data)
+
+        # Slice tremor data to adjusted date range
+        self.tremor_data = tremor_data.df.loc[self.start_date : self.end_date]
 
         return self
 
