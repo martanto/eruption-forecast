@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from obspy import Stream, Trace
 
+# Project imports
 from eruption_forecast.utils import calculate_window_metrics
 
 

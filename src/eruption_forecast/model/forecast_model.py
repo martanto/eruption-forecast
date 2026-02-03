@@ -1,8 +1,7 @@
 # Standard library imports
-from typing import Any
 import os
 from datetime import datetime, timedelta
-from typing import Literal, Optional, Self, Union
+from typing import Any, Literal, Optional, Self, Union
 
 # Third party imports
 import pandas as pd
@@ -19,13 +18,13 @@ from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.utils import concat_features as utils_concat_features
 from eruption_forecast.utils import (
+    construct_windows,
+    normalize_dates,
     to_datetime,
     validate_columns,
     validate_date_ranges,
-    construct_windows,
-    concat_features as utils_concat_features,
-    normalize_dates,
 )
 
 

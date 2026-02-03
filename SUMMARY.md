@@ -594,6 +594,14 @@ uv run pytest tests/ --cov=eruption_forecast
 
 ---
 
+## Rules
+
+1. **SUMMARY.md must be updated after every completed task.** Any finished task — bug fix, refactor, new feature, test, documentation change — must have its outcome recorded here before moving on.
+2. **Run `uv run isort src/` before every commit.** Imports must be sorted before staging and committing.
+3. **Type checker is pyrefly, not mypy.** Use `uv run pyrefly check src/` for type checking. mypy has been removed from the project.
+
+---
+
 ## Permissions & Authority
 
 **Date:** 2026-02-03

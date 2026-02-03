@@ -8,10 +8,18 @@ from typing import Literal, Optional, Self, Union
 import pandas as pd
 
 # Project imports
-from eruption_forecast.label.constants import MIN_DATE_RANGE_DAYS, VALID_WINDOW_STEP_UNITS
+from eruption_forecast.label.constants import (
+    MIN_DATE_RANGE_DAYS,
+    VALID_WINDOW_STEP_UNITS,
+)
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.logger import logger  # type: ignore[attr-defined]
-from eruption_forecast.utils import construct_windows, normalize_dates, sort_dates, to_datetime
+from eruption_forecast.utils import (
+    construct_windows,
+    normalize_dates,
+    sort_dates,
+    to_datetime,
+)
 
 
 class LabelBuilder:

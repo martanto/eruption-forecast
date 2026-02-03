@@ -1,13 +1,18 @@
-import pandas as pd
+# Standard library imports
 import os
-from typing import Optional, Union
-from eruption_forecast.utils import (
-    random_under_sampler,
-    get_significant_features,
-)
-from eruption_forecast.plot import plot_significant_features
-from eruption_forecast.logger import logger
 from multiprocessing import Pool
+from typing import Optional, Union
+
+# Third party imports
+import pandas as pd
+
+# Project imports
+from eruption_forecast.logger import logger
+from eruption_forecast.plot import plot_significant_features
+from eruption_forecast.utils import (
+    get_significant_features,
+    random_under_sampler,
+)
 
 
 class TrainModel:

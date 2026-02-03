@@ -16,8 +16,8 @@ from obspy import Stream, Trace, UTCDateTime
 import eruption_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.plot import plot_tremor
-from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.sds import SDS
+from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.utils import calculate_window_metrics, to_datetime
 
 

@@ -5,8 +5,8 @@ from typing import Callable, Literal, Optional, Tuple, Union
 # Third party imports
 import numpy as np
 import pandas as pd
-from obspy import Trace
 from imblearn.under_sampling import RandomUnderSampler
+from obspy import Trace
 from tsfresh.transformers import FeatureSelector
 
 # Project imports

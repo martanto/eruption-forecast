@@ -34,7 +34,6 @@ classifiers = [
 dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
-    "mypy>=1.0.0",
     "isort>=5.12.0",
     "pandas-stubs>=2.3.3.260113",
     "ipykernel>=7.1.0",
@@ -96,22 +95,6 @@ lint.ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-
-[tool.mypy]
-python_version = "3.11"
-check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_return_any = true
-strict_equality = true
-
-[[tool.mypy.overrides]]
-module = "obspy.*"
-ignore_missing_imports = true
 
 [tool.isort]
 profile = "black"
