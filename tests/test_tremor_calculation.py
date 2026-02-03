@@ -26,6 +26,34 @@ from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.plot import plot_tremor
 from eruption_forecast.logger import logger
 import pandas as pd
+import shutil
+
+
+def cleanup_test_output(output_dir: str) -> bool:
+    """Clean up test output directory after test completion.
+
+    Removes all files and directories created during testing to keep
+    the repository clean. Test outputs are temporary and should not
+    be committed.
+
+    Args:
+        output_dir (str): Root output directory to remove
+
+    Returns:
+        bool: True if cleanup successful, False otherwise
+
+    Examples:
+        >>> cleanup_test_output("tests/output")
+        True
+    """
+    try:
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+            return True
+        return True  # Already clean
+    except Exception as e:
+        print(f"  [WARN] Cleanup error: {e}")
+        return False
 
 
 def plot_daily_tremor(
@@ -127,7 +155,10 @@ def test_tremor_calculation():
     location = "00"
     start_date = "2025-01-01"
     end_date = "2025-01-03"
-    output_dir = "output_test"
+
+    # Use tests directory for output (will be cleaned up after test)
+    tests_dir = Path(__file__).parent
+    output_dir = str(tests_dir / "output")
 
     print(f"Configuration:")
     print(f"  SDS Directory: {sds_dir}")
@@ -301,6 +332,19 @@ def test_tremor_calculation():
         print()
 
         print("=" * 80)
+        print("STEP 7: Cleanup Test Output")
+        print("=" * 80)
+
+        # Clean up test output directory
+        cleanup_success = cleanup_test_output(output_dir)
+
+        if cleanup_success:
+            print(f"[OK] Test output cleaned up: {output_dir}")
+        else:
+            print(f"[WARN] Could not fully clean up: {output_dir}")
+        print()
+
+        print("=" * 80)
         print("[OK] ALL TESTS PASSED!")
         print("=" * 80)
         print()
@@ -310,6 +354,7 @@ def test_tremor_calculation():
         print(f"  - Computed {len(df.columns)} tremor metrics")
         print(f"  - Created {daily_plots_created} daily plots")
         print(f"  - Output saved to: {result.csv}")
+        print(f"  - Cleanup: {'Success' if cleanup_success else 'Partial'}")
         print()
 
         return True

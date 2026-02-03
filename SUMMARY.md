@@ -695,5 +695,121 @@ STEP 6: Plot Daily Tremor Data
 
 ---
 
+## Test Output Management
+
+### Automatic Cleanup
+**Date:** 2026-02-03 20:18:00
+
+**New Rule:** All test outputs are contained within `tests/` directory and automatically cleaned up after test completion.
+
+**Implementation:**
+
+#### Output Location
+```python
+# Test outputs go to tests/output/ instead of project root
+tests_dir = Path(__file__).parent
+output_dir = str(tests_dir / "output")
+```
+
+#### Cleanup Function
+```python
+def cleanup_test_output(output_dir: str) -> bool:
+    """Clean up test output directory after test completion.
+
+    Removes all files and directories created during testing to keep
+    the repository clean. Test outputs are temporary and should not
+    be committed.
+    """
+    try:
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+            return True
+        return True  # Already clean
+    except Exception as e:
+        print(f"  [WARN] Cleanup error: {e}")
+        return False
+```
+
+#### Test Execution Flow
+```
+STEP 1: Initialize CalculateTremor
+STEP 2: Set Data Source (SDS)
+STEP 3: Run Tremor Calculation
+STEP 4: Validate Results
+STEP 5: Check Output Files
+STEP 6: Plot Daily Tremor Data
+STEP 7: Cleanup Test Output  ⭐ NEW
+```
+
+**Test Output:**
+```
+================================================================================
+STEP 7: Cleanup Test Output
+================================================================================
+[OK] Test output cleaned up: D:\Projects\eruption-forecast\tests\output
+
+Summary:
+  - Calculated tremor for 3 days
+  - Generated 432 time windows (10-minute intervals)
+  - Computed 9 tremor metrics
+  - Created 3 daily plots
+  - Output saved to: tests/output/VG.OJN.00.EHZ/tremor/...
+  - Cleanup: Success  ✅
+```
+
+**Benefits:**
+
+1. **Clean Repository**
+   - No test artifacts in git status
+   - No accidental commits of test data
+   - Professional project structure
+
+2. **Self-Contained Tests**
+   - All test outputs in tests/ directory
+   - Easy to identify test vs production output
+   - Clear separation of concerns
+
+3. **Automatic Cleanup**
+   - No manual deletion needed
+   - Runs after every test
+   - Fails gracefully with warnings
+
+4. **CI/CD Ready**
+   - Tests don't leave artifacts
+   - Multiple test runs don't conflict
+   - Fresh state for each test run
+
+**Updated .gitignore:**
+```gitignore
+# Test outputs (cleaned up automatically)
+tests/output/
+```
+
+**Directory Structure During Test:**
+```
+tests/
+├── output/                    # Created during test
+│   └── VG.OJN.00.EHZ/
+│       ├── tremor/
+│       │   ├── tmp/           # Daily CSVs
+│       │   └── *.csv          # Merged data
+│       └── figures/
+│           ├── *.png          # Combined plot
+│           └── daily/*.png    # Daily plots
+└── (cleaned up after test)    ✅
+```
+
+**After Test Completion:**
+```
+tests/
+├── __init__.py
+├── README.md
+├── test_tremor_calculation.py
+└── verify_dsar.py
+(No output directory - cleaned!)  ✅
+```
+
+---
+
 **Reviewed by:** Claude Sonnet 4.5
-**Last Updated:** 2026-02-03 20:10:00
+**Last Updated:** 2026-02-03 20:18:00
