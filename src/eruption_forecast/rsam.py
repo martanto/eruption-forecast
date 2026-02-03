@@ -75,7 +75,7 @@ class RSAM:
             window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
             metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
             value_multiplier (float, optional): Value multiplier. Defaults to 1.0.
-            remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
+            remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
             minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate metric. Defaults to 0.3.
             interpolate (bool, optional): Interpolate data. Defaults to True.
 

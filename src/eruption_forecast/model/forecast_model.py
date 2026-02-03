@@ -258,7 +258,7 @@ class ForecastModel:
 
         if source == "sds":
             assert sds_dir is not None, ValueError(
-                f"You choose 'sds' as source please provid 'sds_dir' paramater."
+                f"You chose 'sds' as source, please provide 'sds_dir' parameter. "
                 f"Example: calculate(source='sds', sds_dir='converted')"
             )
             assert os.path.isdir(sds_dir), ValueError(f"SDS dir {sds_dir} not exists.")

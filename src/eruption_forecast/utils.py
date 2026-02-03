@@ -6,6 +6,8 @@ from typing import Callable, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from obspy import Trace
+from imblearn.under_sampling import RandomUnderSampler
+from tsfresh.transformers import FeatureSelector
 
 # Project imports
 from eruption_forecast.logger import logger
@@ -93,7 +95,7 @@ def remove_outliers(
 
     Args:
         data (np.ndarray): Array of data.
-        outlier_threshold (float, optional): Outlier threshold degree in standart deviation. Defaults to 3.0.
+        outlier_threshold (float, optional): Outlier threshold degree in standard deviation. Defaults to 3.0.
         mask_zero_value (bool, optional): Mask zero values. Defaults to False.
         return_outliers (bool, optional): Whether to return outliers. Defaults to False.
 
@@ -195,7 +197,7 @@ def calculate_window_metrics(
         window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
         metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
         mask_zero_value (bool, optional): Mask zero values. Defaults to False.
-        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
+        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
         minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate the metric. Defaults to 0.3.
         absolute_value (bool, optional): Whether to use absolute values. Defaults to False.
         value_multiplier (float, optional): Multiplier for the metric value. Defaults to 1.0.
@@ -430,8 +432,8 @@ def check_sampling_consistency(
 
     Returns:
         bool: True if consistent. False otherwise.
-        pd.DataFrame: Conisntency DataFrame with pd.DatetimeIndex.
-        pd.DataFrame: Inconisntency DataFrame with pd.DatetimeIndex.
+        pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
+        pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
     """
     assert len(df) > 2, ValueError(
         "DataFrame must have at least 2 rows to check sampling consistency"
@@ -494,7 +496,7 @@ def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
         if column in ["id", "datetime"]:
             continue
         assert column in df.columns.tolist(), ValueError(
-            f"Column {column} not exists in dataframe. "
+            f"Column {column} does not exist in dataframe. "
             f"Columns available are: {df.columns}"
         )
     return None
@@ -525,3 +527,59 @@ def concat_features(
         return filepath
 
     return filepath, df
+
+
+def random_under_sampler(
+    features: pd.DataFrame,
+    labels: pd.Series,
+    sampling_strategy: Union[str, float] = "auto",
+    random_state: int = 42,
+) -> Tuple[pd.DataFrame, pd.Series]:
+    """Randomly under sampling features.
+
+    Args:
+        features (pd.DataFrame): Features dataframe.
+        labels (pd.Series): Labels dataframe.
+        sampling_strategy (str, optional): Sampling strategy. Defaults to "auto".
+        random_state (int, optional): Random state. Defaults to 42.
+
+    Returns:
+        pd.DataFrame: Randomly under sampling features.
+        pd.Series: Randomly under sampling labels.
+    """
+    sampler = RandomUnderSampler(
+        sampling_strategy=sampling_strategy, random_state=random_state
+    )
+
+    features, labels = sampler.fit_resample(features, labels)
+
+    return features, labels
+
+
+def significant_features(
+    features: pd.DataFrame,
+    labels: pd.Series,
+    number_of_significant_features: int = 20,
+    n_jobs: int = 1,
+    ml_task: str = "classification",
+) -> pd.DataFrame:
+    """Get significant features.
+
+    Args:
+        features (pd.DataFrame): Features dataframe.
+        labels (pd.Series): Labels dataframe.
+        number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
+        n_jobs (int, optional): Number of jobs. Defaults to 1.
+        ml_task (str, optional): Task to use. Defaults to "classification".
+
+    Returns:
+        pd.DataFrame: Significant features.
+    """
+    feature_selector = FeatureSelector(
+        n_jobs=n_jobs,
+        ml_task=ml_task,
+    )
+
+    feature_selector.fit_transform(features, labels)  # type: ignore
+
+    return pd.DataFrame()

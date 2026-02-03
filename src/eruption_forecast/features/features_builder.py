@@ -199,7 +199,7 @@ class FeaturesBuilder:
             logger.error(f"Features matrix is empty")
             raise Exception(f"Features matrix is empty")
 
-        # Save all features and labesl for training
+        # Save all features and labels for training
         features_matrix.to_csv(feature_csv, index=False)
 
         # Save features per method/columns

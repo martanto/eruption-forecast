@@ -96,8 +96,8 @@ class TremorData:
 
         Returns:
             bool: True if consistent. False otherwise.
-            pd.DataFrame: Conisntency DataFrame with pd.DatetimeIndex.
-            pd.DataFrame: Inconisntency DataFrame with pd.DatetimeIndex.
+            pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
+            pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
         """
         return check_sampling_consistency(
             df=self.df,

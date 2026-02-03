@@ -351,7 +351,7 @@ class LabelBuilder:
 
         assert 0 < self.window_step <= maximum_window_step, (
             f"window_step must be less than or equal to {maximum_window_step} "
-            f"{self.window_step_unit}. \\n"
+            f"{self.window_step_unit}.\n"
             f"window_step: {self.window_step}, maximum_window_step: {maximum_window_step}"
         )
 

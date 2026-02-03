@@ -35,7 +35,7 @@ class CalculateTremor:
         output_dir (str): Directory for output files. Defaults to "output".
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
-        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
+        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
         interpolate (bool): If True, interpolates the data. Defaults to True.
         value_multiplier (Optional[float]): Scaling factor for seismic values.
         cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
@@ -184,10 +184,13 @@ class CalculateTremor:
         )
 
     def change_freq_bands(self, freq_bands: list[tuple[float, float]]) -> Self:
-        """Change freq bands default values
+        """Change frequency bands default values.
 
-        Return:
-            Self
+        Args:
+            freq_bands (list[tuple[float, float]]): List of frequency band tuples.
+
+        Returns:
+            Self: CalculateTremor object.
         """
         assert isinstance(freq_bands, list), ValueError(
             "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"

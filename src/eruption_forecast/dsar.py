@@ -13,7 +13,7 @@ class DSAR:
     """Calculate Displacement Seismic Amplitude Ratio (DSAR).
 
     Args:
-        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Default value to "maximum"
+        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
         verbose (bool, optional): Whether to enable verbose logging. Defaults to False.
         debug (bool, optional): Whether to enable debug logging. Defaults to False.
     """

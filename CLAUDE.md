@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Python Package Manager
-This package is using UV (https://docs.astral.sh/uv/) as package manager. 
+This package is using UV (https://docs.astral.sh/uv/) as package manager.
 
 ## Project Overview
 
@@ -164,7 +164,7 @@ These data classes use `@cached_property` for efficient access to derived attrib
 Core utilities used throughout the package:
 - `calculate_window_metrics()`: Calculates metrics over time windows with outlier removal
 - `construct_windows()`: Creates time window DataFrames for labeling
-- `detect_outliers()` / `delete_outliers()`: Z-score based outlier detection
+- `detect_maximum_outlier()` / `delete_outliers()`: Z-score based outlier detection
 - `to_datetime()`: Date string validation and conversion
 - `validate_date_ranges()`: Ensures start_date < end_date
 - `validate_window_step()`: Validates window step parameters
