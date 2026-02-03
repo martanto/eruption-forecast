@@ -1,0 +1,36 @@
+{
+  "respectGitignore": true,
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix grammar and improve clarity in utils.py docstrings\n\nImprove docstring quality across all utility functions:\n- Standardize punctuation and capitalization\n- Fix \"Obspy\" to correct \"ObsPy\" capitalization\n- Change \"Delete outliers\" to \"Remove outliers\" for clarity\n- Improve parameter descriptions with format specifications\n- Fix \"Raise:\" to \"Raises:\" \\(correct docstring format\\)\n- Change \"true/false\" to \"True/False\" for Python boolean style\n- Add periods to all docstring descriptions for consistency\n- Enhance example documentation clarity\n- Fix escape sequence \\(\\\\n to \\\\n\\)\n- Rename variable freq_in_hours to freq for better clarity\n- Improve wording: \"not the same as\" to \"is not the same as\"\n- Change singular/plural where appropriate \\(ranges -> range\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git restore:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: Break down ForecastModel.build_label\\(\\) method\n\n- Add _validate_tremor_for_labeling\\(\\) helper for tremor validation\n- Add _prepare_tremor_for_labeling\\(\\) helper for tremor data preparation\n- Add _validate_label_tremor_date_range\\(\\) helper for date range validation\n- Add _calculate_eruption_statistics\\(\\) helper for statistics calculation\n- Refactor build_label\\(\\) to use helpers, reducing from 121 lines to 66 lines\n\nEach validation step is now isolated and reusable. Statistics calculation\nis separated from the main flow. All changes maintain 100% backward compatibility.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: Break down ForecastModel.extract_features\\(\\) method\n\n- Add _prepare_features_data\\(\\) helper for column filtering\n- Add _prepare_extraction_parameters\\(\\) helper for parameter setup\n- Add _extract_features_for_column\\(\\) helper for single column extraction\n- Refactor extract_features\\(\\) to use helpers, reducing from 110 lines to 56 lines\n\nFeature extraction logic is now isolated and testable. Single-column extraction\ncan be tested independently. All changes maintain 100% backward compatibility.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\ndocs: Add CHANGELOG.md for refactoring changes\n\nDocument comprehensive refactoring of ForecastModel class:\n- List all 16 new helper methods added across 4 phases\n- Document line count improvements \\(465 → 252 lines in main methods\\)\n- Note 100% backward compatibility maintained\n- Include testing recommendations\n- Provide migration guide \\(no migration needed\\)\n\nThe CHANGELOG follows Keep a Changelog format and provides complete\ndocumentation of the refactoring effort for future reference.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: Reorganize ForecastModel methods and fix linter issues\n\n1. Remove unused _initialize_state_properties\\(\\) method\n   - Method was not called anywhere after moving initialization to __init__\n   - Reduces code complexity and eliminates dead code\n\n2. Reorganize methods following Python conventions\n   - __init__ method first\n   - All private helper methods \\(_*\\) grouped together\n   - All public methods come after private methods\n   - Improves code readability and maintainability\n\n3. Fix type checking error in _setup_calculate_tremor\n   - Replace **kwargs unpacking with explicit parameters\n   - Resolves Pylance \"bad-argument-type\" error\n   - Better type safety and IDE support\n\nMethod order now:\n- __init__ and 14 private helpers\n- Then 9 public methods \\(validate, load_tremor_data, calculate, etc.\\)\n\nAll functionality preserved, only organizational changes.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(python:*)",
+      "Bash(uv run:*)",
+      "Bash(git checkout:*)",
+      "Bash(dir:*)"
+    ],
+    "deny": [
+      "Read(*.csv)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(*.ipynb)",
+      "Read(./.uv_cache/**)",
+      "Read(./.venv/**)",
+      "Read(./examples/**)",
+      "Edit(*.csv)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(*.ipynb)",
+      "Edit(./.uv_cache/**)",
+      "Edit(./.venv/**)",
+      "Edit(./examples/**)"
+    ]
+  }
+}

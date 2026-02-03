@@ -20,7 +20,7 @@ class TremorData:
     ) -> None:
         self.verbose = verbose
         self.debug = debug
-        self.csv: str = None
+        self.csv: Optional[str] = None
         self.df = df if df is not None else pd.DataFrame()
 
     def __repr__(self) -> str:
@@ -36,9 +36,13 @@ class TremorData:
             tremor_csv (str): Path to tremor csv file
 
         Returns:
-            self: Return self
+            pd.DataFrame: Tremor dataframe
+
+        Raises:
+            FileNotFoundError: If tremor CSV file does not exist
         """
-        assert os.path.exists(tremor_csv), ValueError(f"{tremor_csv} does not exist")
+        if not os.path.exists(tremor_csv):
+            raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
 
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df.sort_index(inplace=True)
@@ -48,10 +52,18 @@ class TremorData:
 
     @property
     def df(self) -> pd.DataFrame:
-        """Load tremor dataframe"""
-        assert len(self._df) > 0, ValueError(
-            "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
-        )
+        """Load tremor dataframe
+
+        Returns:
+            pd.DataFrame: Tremor dataframe
+
+        Raises:
+            ValueError: If tremor dataframe is empty
+        """
+        if len(self._df) == 0:
+            raise ValueError(
+                "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
+            )
         return self._df
 
     @df.setter

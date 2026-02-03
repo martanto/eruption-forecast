@@ -14,43 +14,83 @@ from eruption_forecast.logger import logger
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
-    """Masking zero values in an array.
+    """Remove zero values from an array.
 
     Args:
-        data (np.ndarray): Array of data.
+        data (np.ndarray): Input array of numerical data.
 
     Returns:
-        np.ndarray: Data without zero values.
+        np.ndarray: Array with zero values removed.
+
+    Examples:
+        >>> mask_zero_values(np.array([1, 0, 2, 0, 3]))
+        array([1, 2, 3])
     """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input must be a numpy array")
+
     non_zero_mask = data != 0.0
     return data[non_zero_mask]
 
 
 def detect_maximum_outlier(
     data: np.ndarray, outlier_threshold: float = 3.0
-) -> tuple[bool, Union[int, float], float]:
-    """Detect outliers in an array using z-score ((X - μ) / σ)
+) -> Tuple[bool, Union[int, float], float]:
+    """Detect if maximum value in array is an outlier using z-score method.
+
+    Uses z-score ((X - μ) / σ) to determine if the maximum value in the array
+    is statistically an outlier. A value is considered an outlier if its z-score
+    exceeds the threshold (default 3.0, equivalent to 3 standard deviations).
 
     Args:
-        data (np.ndarray): Array of data from a trace.
-        outlier_threshold (float, optional): Outlier threshold degree. Defaults to 3.0.
+        data (np.ndarray): Array of numerical data.
+        outlier_threshold (float, optional): Z-score threshold for outlier detection.
+            Defaults to 3.0 (3 standard deviations).
 
     Returns:
-        tuple[bool, Union[int, float], float]:
-            outlier (bool): True if outlier is detected, False otherwise.
-            outlier_index: Index of the outlier.
-            outlier_value: Value of the outlier.
+        Tuple[bool, Union[int, float], float]:
+            - is_outlier (bool): True if maximum value is an outlier
+            - outlier_index (int | float): Index of the maximum value, or np.nan if no outlier
+            - outlier_value (float): Maximum value, or np.nan if no outlier
+
+    Raises:
+        TypeError: If input is not a numpy array
+        ValueError: If array is empty or outlier_threshold is not positive
+
+    Examples:
+        >>> detect_maximum_outlier(np.array([1, 2, 3, 100]))  # 100 is outlier
+        (True, 3, 100.0)
+        >>> detect_maximum_outlier(np.array([1, 2, 3, 4]))  # No outlier
+        (False, nan, nan)
     """
-    outlier_index = np.argmax(data)
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input must be a numpy array")
+
+    if len(data) == 0:
+        raise ValueError("Cannot detect outliers in empty array")
+
+    if outlier_threshold <= 0:
+        raise ValueError("Outlier threshold must be positive")
+
+    # Handle NaN values
+    if np.any(np.isnan(data)):
+        data = data[~np.isnan(data)]
+        if len(data) == 0:
+            return False, np.nan, np.nan
+
+    outlier_index = np.argmax(np.abs(data))
     outlier_value = data[outlier_index]
 
-    if np.std(data) == 0:
-        return True, int(outlier_index), float(outlier_value)
+    # If all values are identical, no outlier exists
+    std = np.std(data)
+    if std == 0:
+        return False, np.nan, np.nan
 
-    # Z-score = (X - μ) / σ
-    z_score = (outlier_value - np.mean(data)) / np.std(data)
+    # Calculate z-score: Z = (X - μ) / σ
+    mean = np.mean(data)
+    z_score = abs((outlier_value - mean) / std)
 
-    # If z_score is greater than 10^outlier_threshold or 3σ, it is an outlier
+    # Check if z-score exceeds threshold
     if z_score > outlier_threshold:
         return True, int(outlier_index), float(outlier_value)
 
@@ -58,27 +98,55 @@ def detect_maximum_outlier(
 
 
 def remove_maximum_outlier(
-    data: np.ndarray, mask_zero_value: bool = True
+    data: np.ndarray, mask_zero_value: bool = True, outlier_threshold: float = 3.0
 ) -> np.ndarray:
-    """Remove outliers from an array.
+    """Remove single maximum outlier from array using z-score method.
+
+    Detects if the maximum value (by absolute value) is an outlier and removes it.
+    Optionally masks zero values before outlier detection.
 
     Args:
-        data (np.ndarray): Array of data.
-        mask_zero_value (bool, optional): Mask zero values. Defaults to True.
+        data (np.ndarray): Input array of numerical data.
+        mask_zero_value (bool, optional): If True, remove zero values before processing.
+            Defaults to True.
+        outlier_threshold (float, optional): Z-score threshold for outlier detection.
+            Defaults to 3.0.
 
     Returns:
-        np.ndarray: Array without outliers.
+        np.ndarray: Array with maximum outlier removed (if detected).
+
+    Raises:
+        TypeError: If input is not a numpy array
+
+    Examples:
+        >>> remove_maximum_outlier(np.array([1, 2, 3, 100]))
+        array([1, 2, 3])
     """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input must be a numpy array")
+
+    # Make a copy to avoid modifying the original
+    data = data.copy()
+
+    # Optionally mask zero values
     if mask_zero_value:
         data = mask_zero_values(data)
 
-    if (len(data) == 0) or (np.sum(data) == 0):
+    # Return empty array if no data left
+    if len(data) == 0:
         return np.array([])
 
-    outlier, outlier_index, _ = detect_maximum_outlier(data)
+    # Detect and remove maximum outlier
+    try:
+        is_outlier, outlier_index, _ = detect_maximum_outlier(
+            data, outlier_threshold=outlier_threshold
+        )
 
-    if outlier:
-        data = np.delete(data, int(outlier_index))
+        if is_outlier and not np.isnan(outlier_index):
+            data = np.delete(data, int(outlier_index))
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Could not detect outlier: {e}")
+        return data
 
     return data
 
@@ -89,37 +157,69 @@ def remove_outliers(
     mask_zero_value: bool = True,
     return_outliers: bool = False,
 ) -> np.ndarray:
-    """
-    Remove outliers from numpy array based on standard deviation threshold.
-    Zero values are masked before outlier detection.
+    """Remove all outliers from array based on z-score threshold.
+
+    Iteratively removes all values whose z-score exceeds the threshold.
+    Unlike remove_maximum_outlier which removes only one value, this function
+    removes all outliers in a single pass.
 
     Args:
-        data (np.ndarray): Array of data.
-        outlier_threshold (float, optional): Outlier threshold degree in standard deviation. Defaults to 3.0.
-        mask_zero_value (bool, optional): Mask zero values. Defaults to False.
-        return_outliers (bool, optional): Whether to return outliers. Defaults to False.
+        data (np.ndarray): Input array of numerical data.
+        outlier_threshold (float, optional): Z-score threshold in standard deviations.
+            Defaults to 3.0 (3σ).
+        mask_zero_value (bool, optional): If True, remove zero values before processing.
+            Defaults to True.
+        return_outliers (bool, optional): If True, return outliers instead of filtered data.
+            Defaults to False.
 
     Returns:
-        np.ndarray: Array without outliers.
+        np.ndarray: Array with outliers removed, or array of outliers if return_outliers=True.
+
+    Raises:
+        TypeError: If input is not a numpy array
+        ValueError: If outlier_threshold is not positive
+
+    Examples:
+        >>> remove_outliers(np.array([1, 2, 3, 100, 200]))
+        array([1, 2, 3])
+        >>> remove_outliers(np.array([1, 2, 3, 100, 200]), return_outliers=True)
+        array([100, 200])
     """
-    # Mask zero values
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input must be a numpy array")
+
+    if outlier_threshold <= 0:
+        raise ValueError("Outlier threshold must be positive")
+
+    # Make a copy to avoid modifying the original
+    data = data.copy()
+
+    # Optionally mask zero values
     if mask_zero_value:
         data = mask_zero_values(data)
 
-    if (len(data) == 0) or (np.sum(data) == 0):
+    # Return empty array if no data left
+    if len(data) == 0:
         return np.array([])
 
-    # Calculate mean and std from non-zero values only
+    # Handle NaN values
+    if np.any(np.isnan(data)):
+        data = data[~np.isnan(data)]
+        if len(data) == 0:
+            return np.array([])
+
+    # Calculate mean and standard deviation
     mean = np.mean(data)
     std = np.std(data)
 
+    # If all values are identical, no outliers exist
     if std == 0:
-        return data
+        return np.array([]) if return_outliers else data
 
-    # Calculate z-scores for non-zero values
+    # Calculate z-scores: Z = |X - μ| / σ
     z_scores = np.abs((data - mean) / std)
 
-    # Create mask for non-outliers
+    # Create mask for non-outliers (z-score <= threshold)
     non_outlier_mask = z_scores <= outlier_threshold
 
     # Get filtered data and outliers
@@ -284,11 +384,12 @@ def construct_windows(
     if window_step_unit == "minutes":
         maximum_window_step = n_days * 60 * 24
 
-    assert window_step <= maximum_window_step, (
-        f"window_step must be less than or equal to {maximum_window_step} "
-        f"{window_step_unit}.\n"
-        f"window_step: {window_step}, maximum_window_step: {maximum_window_step}"
-    )
+    if window_step > maximum_window_step:
+        raise ValueError(
+            f"window_step must be less than or equal to {maximum_window_step} "
+            f"{window_step_unit}.\n"
+            f"window_step: {window_step}, maximum_window_step: {maximum_window_step}"
+        )
 
     start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = end_date.replace(hour=23, minute=59, second=59)
@@ -358,9 +459,10 @@ def validate_date_ranges(
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
 
-    assert start_date < end_date, ValueError(
-        f"Start date ({start_date_str}) should be less than end date ({end_date_str})"
-    )
+    if start_date >= end_date:
+        raise ValueError(
+            f"Start date ({start_date_str}) should be less than end date ({end_date_str})"
+        )
 
     n_days: int = int((end_date - start_date).days)
 
@@ -383,18 +485,18 @@ def validate_window_step(
     Returns:
         Tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes or hours).
     """
-    assert isinstance(window_step, int), ValueError(
-        f"window_step must be an integer. Your value is {window_step}"
-    )
-    assert isinstance(window_step_unit, str), ValueError(
-        f"window_step_unit must be a string. Your value is {window_step_unit}"
-    )
-    assert window_step_unit in [
-        "minutes",
-        "hours",
-    ], ValueError(
-        f"window_step_unit must be 'minutes' or 'hours'. Your value is {window_step_unit}"
-    )
+    if not isinstance(window_step, int):
+        raise TypeError(
+            f"window_step must be an integer. Your value is {window_step}"
+        )
+    if not isinstance(window_step_unit, str):
+        raise TypeError(
+            f"window_step_unit must be a string. Your value is {window_step_unit}"
+        )
+    if window_step_unit not in ["minutes", "hours"]:
+        raise ValueError(
+            f"window_step_unit must be 'minutes' or 'hours'. Your value is {window_step_unit}"
+        )
 
     return window_step, window_step_unit
 
@@ -435,12 +537,12 @@ def check_sampling_consistency(
         pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
         pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
     """
-    assert len(df) > 2, ValueError(
-        "DataFrame must have at least 2 rows to check sampling consistency"
-    )
-    assert isinstance(df.index, pd.DatetimeIndex), ValueError(
-        "DataFrame index must be DatetimeIndex"
-    )
+    if len(df) <= 2:
+        raise ValueError(
+            "DataFrame must have at least 2 rows to check sampling consistency"
+        )
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("DataFrame index must be DatetimeIndex")
 
     df = df.sort_index()
 
@@ -495,10 +597,11 @@ def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
     for column in columns:
         if column in ["id", "datetime"]:
             continue
-        assert column in df.columns.tolist(), ValueError(
-            f"Column {column} does not exist in dataframe. "
-            f"Columns available are: {df.columns}"
-        )
+        if column not in df.columns.tolist():
+            raise ValueError(
+                f"Column {column} does not exist in dataframe. "
+                f"Columns available are: {df.columns}"
+            )
     return None
 
 
@@ -516,9 +619,10 @@ def concat_features(
         str: Filepath of csv file.
         (str, pd.DataFrame): Filepath and DataFrame
     """
-    assert len(csv_list) > 1, ValueError(
-        f"Requires at least 2 CSV files. Total your CSV file is {len(csv_list)}"
-    )
+    if len(csv_list) <= 1:
+        raise ValueError(
+            f"Requires at least 2 CSV files. Total your CSV file is {len(csv_list)}"
+        )
 
     df = pd.concat([pd.read_csv(file, index_col=0) for file in csv_list], axis=1)
 

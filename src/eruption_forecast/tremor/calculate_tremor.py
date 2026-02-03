@@ -191,29 +191,42 @@ class CalculateTremor:
 
         Returns:
             Self: CalculateTremor object.
+
+        Raises:
+            TypeError: If freq_bands is not a list or contains non-tuple elements
+            ValueError: If frequency values are invalid
         """
-        assert isinstance(freq_bands, list), ValueError(
-            "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
-        )
+        if not isinstance(freq_bands, list):
+            raise TypeError(
+                "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
+            )
 
         for freqs in freq_bands:
-            assert isinstance(freqs, tuple), ValueError(
-                f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
-                f"Example (0.1,1.0). Your values are: {freqs}"
-            )
-            assert len(freqs) == 2, ValueError(
-                f"Frequencies must have two elements. Example (0.1,1.0)."
-                f"Your values are: {freqs}"
-            )
+            if not isinstance(freqs, tuple):
+                raise TypeError(
+                    f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
+                    f"Example (0.1,1.0). Your values are: {freqs}"
+                )
+            if len(freqs) != 2:
+                raise ValueError(
+                    f"Frequencies must have two elements. Example (0.1,1.0). "
+                    f"Your values are: {freqs}"
+                )
 
             freq_min, freq_max = freqs
-            assert isinstance(freq_min, float) or isinstance(freq_min, int), ValueError(
-                f"Freq minimum must be float or int. Your value is: {freq_min}"
-            )
-            assert isinstance(freq_max, float) or isinstance(freq_max, int), ValueError(
-                f"Freq maximum must be float or int. Your value is: {freq_max}"
-            )
-            assert freq_min < freq_max, ValueError()
+            if not isinstance(freq_min, (float, int)):
+                raise TypeError(
+                    f"Freq minimum must be float or int. Your value is: {freq_min}"
+                )
+            if not isinstance(freq_max, (float, int)):
+                raise TypeError(
+                    f"Freq maximum must be float or int. Your value is: {freq_max}"
+                )
+            if freq_min >= freq_max:
+                raise ValueError(
+                    f"Freq minimum must be less than freq maximum. "
+                    f"Got: {freq_min} >= {freq_max}"
+                )
 
         self.freq_bands = freq_bands
         return self
@@ -293,27 +306,29 @@ class CalculateTremor:
             os.makedirs(self.figures_tmp_dir, exist_ok=True)
 
     def validate(self) -> None:
-        """Assert the input parameters.
+        """Validate input parameters.
 
         Raises:
-            ValueError: If start date is after end date
-            AssertionError: If window overlap is not between 0 and 1
-            AssertionError: If method is not found
+            ValueError: If n_jobs is invalid, dates are invalid, or method is not found
 
         Returns:
             None
         """
-        assert (
-            self.n_jobs > 0
-        ), f"Number of jobs must be greater than 0. Your value: {self.n_jobs}"
-        assert (
-            self.start_date_utc_datetime < self.end_date_utc_datetime
-        ), f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
+        if self.n_jobs <= 0:
+            raise ValueError(
+                f"Number of jobs must be greater than 0. Your value: {self.n_jobs}"
+            )
+        if self.start_date_utc_datetime >= self.end_date_utc_datetime:
+            raise ValueError(
+                f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
+            )
 
+        valid_methods = ["rsam", "dsar"]
         for method in self.methods:
-            assert (
-                method in self.methods
-            ), f"Method '{method}' not found. Choose between: {self.methods}"
+            if method not in valid_methods:
+                raise ValueError(
+                    f"Method '{method}' not found. Choose between: {valid_methods}"
+                )
 
         self.create_directories()
 
@@ -325,12 +340,17 @@ class CalculateTremor:
 
         Returns:
             Stream: Stream
+
+        Raises:
+            ValueError: If date is None or data source not set
         """
-        assert date is not None, "Date must be provided"
-        assert self._source in ["sds", "fdsn"], (
-            f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
-            f"to determine the data source before `run`."
-        )
+        if date is None:
+            raise ValueError("Date must be provided")
+        if self._source not in ["sds", "fdsn"]:
+            raise ValueError(
+                "Please choose a data source. Use `from_sds()` or `from_fdsn()` method "
+                "to determine the data source before `run()`."
+            )
 
         stream = Stream()
 
@@ -541,39 +561,60 @@ class CalculateTremor:
     def calculate_dsar(
         self, date_str: str, df: pd.DataFrame, stream: Stream
     ) -> pd.DataFrame:
-        """Calculate DSAR for a given date
+        """Calculate Displacement Seismic Amplitude Ratio (DSAR) for a given date.
+
+        DSAR is calculated as the ratio of mean absolute amplitudes between consecutive
+        frequency bands after integration of the seismic signal. The integration converts
+        velocity to displacement, and ratios are computed between adjacent frequency bands.
 
         Args:
-            date_str (str): Date to calculate DSAR for
-            df (pd.DataFrame): Tremor data with datetime index
-            stream (Stream): Obspy Stream object
+            date_str (str): Date to calculate DSAR for (YYYY-MM-DD format)
+            df (pd.DataFrame): Tremor data with DatetimeIndex
+            stream (Stream): ObsPy Stream object containing seismic trace
 
         Returns:
-            pd.DataFrame: DSAR data
+            pd.DataFrame: DataFrame with DSAR columns added (dsar_f0-f1, dsar_f1-f2, etc.)
+
+        Raises:
+            ValueError: If stream is empty or has no traces
+            TypeError: If dataframe index is not DatetimeIndex
         """
+        # Validate inputs
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("DataFrame index must be DatetimeIndex")
+
+        if len(stream) == 0:
+            raise ValueError(f"{date_str} :: Stream is empty, cannot calculate DSAR")
+
+        # Determine if we need to preserve original stream for RSAM calculation
         needs_original = "rsam" in self.methods and self.methods.index(
             "dsar"
         ) < self.methods.index("rsam")
 
+        # Integrate stream to convert velocity to displacement
         if needs_original:
             stream_integrated = stream.copy().integrate()
         else:
             stream_integrated = stream.integrate()
 
+        # Remove DC component (subtract first value)
         trace: Trace = stream_integrated[0]
         trace.data = trace.data - trace.data[0]
         stream_integrated = Stream(trace)
 
         # Sequential processing: filter -> calculate -> free -> repeat
-        prev_series = None
-        prev_band_name = None
+        # This approach minimizes memory usage by processing one band at a time
+        prev_series: Optional[pd.Series] = None
+        prev_band_name: Optional[str] = None
         freq_bands = self.freq_bands_alias
 
         for band_name, freq_band in freq_bands.items():
             if self.debug:
-                logger.info(f"{date_str} :: DSAR Calculating {freq_band}")
+                logger.debug(
+                    f"{date_str} :: DSAR - Processing frequency band {band_name}: {freq_band}"
+                )
 
-            # Filter a copy
+            # Apply bandpass filter to stream copy
             filtered_stream = stream_integrated.copy().filter(
                 "bandpass",
                 freqmin=freq_band[0],
@@ -581,7 +622,7 @@ class CalculateTremor:
                 corners=4,
             )
 
-            # Extract the amplitude series immediately
+            # Extract amplitude series with outlier removal
             current_series = calculate_window_metrics(
                 trace=filtered_stream[0],
                 window_duration_minutes=10,
@@ -589,34 +630,43 @@ class CalculateTremor:
                 remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=0.3,
                 absolute_value=True,
+                value_multiplier=1.0,  # Don't multiply yet, do it once on ratio
             )
 
+            # Interpolate missing values
             current_series = current_series.interpolate(method="linear")
 
-            # Free the filtered stream immediately
+            # Free filtered stream immediately to reduce memory footprint
             del filtered_stream
 
-            # Calculate DSAR ratio if we have previous series
+            # Calculate DSAR ratio between consecutive frequency bands
             if prev_series is not None:
                 column_name = f"dsar_{prev_band_name}-{band_name}"
-                dsar_series = prev_series / current_series
 
+                # Calculate ratio: low_freq / high_freq
+                # Replace inf and -inf values (from division by zero) with NaN
+                dsar_series = prev_series / current_series
+                dsar_series = dsar_series.replace([np.inf, -np.inf], np.nan)
+
+                # Apply value multiplier if specified
                 if self.value_multiplier and self.value_multiplier > 1:
                     dsar_series = dsar_series * self.value_multiplier
 
+                # Store in dataframe
                 df[column_name] = dsar_series.values
 
                 if self.verbose:
                     logger.info(
-                        f"{date_str} :: DSAR ({column_name}) calculation finished"
+                        f"{date_str} :: DSAR ({column_name}) calculation completed"
                     )
 
-            # Store current for next iteration (only Series, not full Stream)
+            # Store current series for next iteration
             prev_series = current_series
             prev_band_name = band_name
 
-        # Clean up
+        # Clean up memory
         del prev_series, stream_integrated
+
         return df
 
     def calculate_rsam(
@@ -631,10 +681,12 @@ class CalculateTremor:
 
         Returns:
             pd.DataFrame: Tremor data
+
+        Raises:
+            TypeError: If dataframe index is not DatetimeIndex
         """
-        assert isinstance(df.index, pd.DatetimeIndex), ValueError(
-            f"Index of dataframe should be pd.DatetimeIndex"
-        )
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index of dataframe should be pd.DatetimeIndex")
 
         freq_bands = self.freq_bands_alias
 
@@ -680,11 +732,16 @@ class CalculateTremor:
 
         Returns:
             pd.DataFrame: Tremor data
+
+        Raises:
+            FileNotFoundError: If tmp_dir doesn't exist or no CSV files found
         """
-        assert os.path.isdir(tmp_dir), f"Directory {tmp_dir} does not exist"
+        if not os.path.isdir(tmp_dir):
+            raise FileNotFoundError(f"Directory {tmp_dir} does not exist")
 
         files = glob.glob(os.path.join(tmp_dir, "*.csv"))
-        assert len(files) > 0, f"File(s) not found in {tmp_dir}"
+        if len(files) == 0:
+            raise FileNotFoundError(f"No CSV files found in {tmp_dir}")
 
         tremor_dir = tmp_dir.replace("tmp", "") if tremor_dir is None else tremor_dir
         os.makedirs(tremor_dir, exist_ok=True)
