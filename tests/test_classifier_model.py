@@ -17,7 +17,6 @@ from sklearn.ensemble import RandomForestClassifier
 from eruption_forecast.features.constants import ERUPTED_COLUMN, ID_COLUMN
 from eruption_forecast.model.classifier_model import ClassifierModel
 
-
 # ---------------------------------------------------------------------------
 # Helpers — synthetic data factories
 # ---------------------------------------------------------------------------

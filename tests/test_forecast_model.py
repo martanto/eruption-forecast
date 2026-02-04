@@ -12,7 +12,6 @@ import pytest
 
 from eruption_forecast.model.forecast_model import ForecastModel
 
-
 # ---------------------------------------------------------------------------
 # Helpers — default constructor kwargs
 # ---------------------------------------------------------------------------
@@ -20,17 +19,17 @@ from eruption_forecast.model.forecast_model import ForecastModel
 
 def _valid_kwargs(output_dir: str) -> dict:
     """Return a minimal set of valid kwargs for ForecastModel.__init__."""
-    return dict(
-        station="OJN",
-        channel="EHZ",
-        start_date="2020-01-01",
-        end_date="2020-01-10",
-        window_size=1,
-        volcano_id="VOLCANO_001",
-        network="VG",
-        location="00",
-        output_dir=output_dir,
-    )
+    return {
+        "station": "OJN",
+        "channel": "EHZ",
+        "start_date": "2020-01-01",
+        "end_date": "2020-01-10",
+        "window_size": 1,
+        "volcano_id": "VOLCANO_001",
+        "network": "VG",
+        "location": "00",
+        "output_dir": output_dir,
+    }
 
 
 # ---------------------------------------------------------------------------

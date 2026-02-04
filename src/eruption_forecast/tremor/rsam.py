@@ -1,7 +1,8 @@
 # Standard library imports
+from collections.abc import Callable
 from datetime import datetime
 from functools import lru_cache
-from typing import Callable, Literal, Self
+from typing import Literal, Self
 
 # Third party imports
 import numpy as np

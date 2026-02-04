@@ -22,11 +22,12 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.plot import plot_tremor
-from eruption_forecast.logger import logger
-import pandas as pd
 import shutil
+
+import pandas as pd
+
+from eruption_forecast.plot import plot_tremor
+from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 
 
 def cleanup_test_output(output_dir: str) -> bool:
@@ -160,7 +161,7 @@ def test_tremor_calculation():
     tests_dir = Path(__file__).parent
     output_dir = str(tests_dir / "output")
 
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  SDS Directory: {sds_dir}")
     print(f"  Station: {station}")
     print(f"  Channel: {channel}")
@@ -200,7 +201,7 @@ def test_tremor_calculation():
             save_plot=True,
         )
 
-        print(f"[OK] CalculateTremor initialized")
+        print("[OK] CalculateTremor initialized")
         print(f"   NSLC: {tremor_calc.nslc}")
         print(f"   Frequency Bands: {tremor_calc.freq_bands_alias}")
         print(f"   Methods: {tremor_calc.methods}")
@@ -212,7 +213,7 @@ def test_tremor_calculation():
         print("-" * 80)
 
         tremor_calc.from_sds(sds_dir=sds_dir)
-        print(f"[OK] Data source set to SDS")
+        print("[OK] Data source set to SDS")
         print(f"   SDS Path: {tremor_calc.sds.sds_dir}")
         print()
 
@@ -223,7 +224,7 @@ def test_tremor_calculation():
         result = tremor_calc.run()
 
         print()
-        print(f"[OK] Tremor calculation completed successfully!")
+        print("[OK] Tremor calculation completed successfully!")
         print(f"   Output CSV: {result.csv}")
         print()
 
@@ -244,16 +245,16 @@ def test_tremor_calculation():
             print(f"  - {col}")
         print()
 
-        print(f"Date Range:")
+        print("Date Range:")
         print(f"  Start: {df.index[0]}")
         print(f"  End: {df.index[-1]}")
         print()
 
-        print(f"First 5 rows:")
+        print("First 5 rows:")
         print(df.head())
         print()
 
-        print(f"Statistics:")
+        print("Statistics:")
         print(df.describe())
         print()
 
@@ -348,7 +349,7 @@ def test_tremor_calculation():
         print("[OK] ALL TESTS PASSED!")
         print("=" * 80)
         print()
-        print(f"Summary:")
+        print("Summary:")
         print(f"  - Calculated tremor for {tremor_calc.n_days} days")
         print(f"  - Generated {len(df)} time windows (10-minute intervals)")
         print(f"  - Computed {len(df.columns)} tremor metrics")

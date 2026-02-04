@@ -2,7 +2,6 @@
 import os
 from datetime import datetime
 from functools import cached_property
-from typing import Union
 
 # Third party imports
 import pandas as pd
@@ -273,7 +272,7 @@ class LabelData:
         return self.filename.split(".")[1]
 
     @cached_property
-    def parameters(self) -> dict[str, Union[str, datetime, int]]:
+    def parameters(self) -> dict[str, str | datetime | int]:
         """Get all parameters extracted from the label filename.
 
         Returns:
@@ -294,7 +293,7 @@ class LabelData:
             >>> params['day_to_forecast']
             2
         """
-        parameters: dict[str, Union[str, datetime, int]] = {
+        parameters: dict[str, str | datetime | int] = {
             "start_date": self.start_date,
             "end_date": self.end_date,
             "start_date_str": self.start_date_str,

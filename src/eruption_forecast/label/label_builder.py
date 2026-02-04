@@ -2,7 +2,7 @@
 import os
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Literal, Optional, Self, Union
+from typing import Literal, Self
 
 # Third party imports
 import pandas as pd
@@ -88,15 +88,15 @@ class LabelBuilder:
 
     def __init__(
         self,
-        start_date: Union[str, datetime],
-        end_date: Union[str, datetime],
+        start_date: str | datetime,
+        end_date: str | datetime,
         window_size: int,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
         volcano_id: str,
-        output_dir: Optional[str] = None,
+        output_dir: str | None = None,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -214,7 +214,9 @@ class LabelBuilder:
             pd.DataFrame: The erupted labels dataframe
         """
         if self._df_eruption.empty:
-            raise ValueError("Please call 'build' method first to create erupted labels")
+            raise ValueError(
+                "Please call 'build' method first to create erupted labels"
+            )
 
         return self._df_eruption
 
@@ -250,7 +252,9 @@ class LabelBuilder:
                 pd.DataFrame: eruption dataframe
         """
         if len(self._df_eruptions) == 0:
-            raise ValueError("Please call 'build' method first to create erupted labels")
+            raise ValueError(
+                "Please call 'build' method first to create erupted labels"
+            )
 
         return self._df_eruptions
 
@@ -277,7 +281,9 @@ class LabelBuilder:
         # Validate keys are strings and valid dates
         for key in df_dict.keys():
             if not isinstance(key, str):
-                raise TypeError(f"All keys must be strings. Got key with type: {type(key)}")
+                raise TypeError(
+                    f"All keys must be strings. Got key with type: {type(key)}"
+                )
 
             try:
                 parsed_date = pd.to_datetime(key).strftime("%Y-%m-%d")
@@ -372,7 +378,7 @@ class LabelBuilder:
                     continue
 
             except ValueError:
-                raise ValueError(
+                raise ValueError(  # noqa: B904
                     f"Eruption date is {eruption}. "
                     f"Date of eruption must be in YYYY-MM-DD format."
                 )
@@ -410,9 +416,7 @@ class LabelBuilder:
             raise TypeError(f"df must be a pandas DataFrame, got {type(df)}")
 
         if not isinstance(df.index, pd.DatetimeIndex):
-            raise TypeError(
-                f"df index must be a DatetimeIndex, got {type(df.index)}"
-            )
+            raise TypeError(f"df index must be a DatetimeIndex, got {type(df.index)}")
 
         if "id" not in df.columns:
             raise ValueError(
@@ -480,9 +484,7 @@ class LabelBuilder:
             )
 
         if self.day_to_forecast <= 0:
-            raise ValueError(
-                f"day_to_forecast must be > 0, got {self.day_to_forecast}"
-            )
+            raise ValueError(f"day_to_forecast must be > 0, got {self.day_to_forecast}")
 
         if self.day_to_forecast >= self.n_days:
             raise ValueError(
@@ -655,7 +657,7 @@ class LabelBuilder:
             total_count = len(df)
             logger.info(
                 f"Label building complete: {erupted_count} erupted windows out of {total_count} total "
-                f"({erupted_count/total_count*100:.2f}%)"
+                f"({erupted_count / total_count * 100:.2f}%)"
             )
 
         if not file_exists:

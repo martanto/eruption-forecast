@@ -1,6 +1,6 @@
 # Standard library imports
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 # Third party imports
 import matplotlib.dates as mdates
@@ -15,12 +15,12 @@ def plot_tremor(
     df: pd.DataFrame,
     interval: int = 1,
     interval_unit: Literal["hours", "days"] = "hours",
-    filename: Optional[str] = None,
-    figure_dir: Optional[str] = None,
-    title: Optional[str] = None,
+    filename: str | None = None,
+    figure_dir: str | None = None,
+    title: str | None = None,
     overwrite: bool = True,
     dpi: int = 100,
-    selected_columns: Optional[list[str]] = None,
+    selected_columns: list[str] | None = None,
     verbose: bool = False,
 ) -> None:
     """Plot tremor data
@@ -125,7 +125,7 @@ def plot_significant_features(
     filepath: str,
     number_of_features: int = 50,
     top_features: int = 20,
-    title: Optional[str] = None,
+    title: str | None = None,
     figsize=(3, 12),
     features_column: str = "features",
     values_column: str = "values",
@@ -156,7 +156,9 @@ def plot_significant_features(
         try:
             df[features_column] = df.index
         except ValueError:
-            raise ValueError(f"Features column: {features_column} does not exist")
+            raise ValueError(  # noqa: B904
+                f"Features column: {features_column} does not exist"
+            )  # noqa: B904
 
     df.dropna(inplace=True)
     df = df.head(number_of_features)

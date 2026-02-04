@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Literal, Optional, Union
+from typing import Literal
 
 # Third party imports
 import numpy as np
@@ -27,17 +27,17 @@ class DSAR:
     ) -> None:
         self.remove_outlier_method = remove_outlier_method
 
-        self.first_dsar: Optional[pd.Series] = None
-        self.second_dsar: Optional[pd.Series] = None
-        self.series: Optional[pd.Series] = None
+        self.first_dsar: pd.Series | None = None
+        self.second_dsar: pd.Series | None = None
+        self.series: pd.Series | None = None
 
         self.verbose = verbose
         self.debug = debug
 
     def calculate(
         self,
-        first_stream: Union[Stream, pd.Series],
-        second_stream: Union[Stream, pd.Series],
+        first_stream: Stream | pd.Series,
+        second_stream: Stream | pd.Series,
         window_duration_minutes: int = 10,
         value_multiplier: float = 1.0,
         minimum_completion_ratio: float = 0.3,

@@ -1,7 +1,7 @@
 # Standard library imports
 import os
 from datetime import datetime, timedelta
-from typing import Any, Literal, Optional, Self, Union
+from typing import Any, Literal, Self
 
 # Third party imports
 import pandas as pd
@@ -60,13 +60,13 @@ class ForecastModel:
         self,
         station: str,
         channel: str,
-        start_date: Union[str, datetime],
-        end_date: Union[str, datetime],
+        start_date: str | datetime,
+        end_date: str | datetime,
         window_size: int,
         volcano_id: str,
         network: str = "VG",
         location: str = "00",
-        output_dir: Optional[str] = None,
+        output_dir: str | None = None,
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
@@ -114,36 +114,36 @@ class ForecastModel:
 
         # Initialize state properties (set during lifecycle)
         # Will be set after calculate() method called
-        self.CalculateTremor: Optional[CalculateTremor] = None
-        self.TremorData: Optional[TremorData] = None
+        self.CalculateTremor: CalculateTremor | None = None
+        self.TremorData: TremorData | None = None
         self.tremor_data: pd.DataFrame = pd.DataFrame()
-        self.tremor_csv: Optional[str] = None
+        self.tremor_csv: str | None = None
 
         # Will be set after build_label() method called
-        self.LabelBuilder: Optional[LabelBuilder] = None
+        self.LabelBuilder: LabelBuilder | None = None
         self.label_data: pd.DataFrame = pd.DataFrame()
-        self.label_csv: Optional[str] = None
-        self.total_eruption_class: Optional[int] = None
-        self.total_non_eruption_class: Optional[int] = None
+        self.label_csv: str | None = None
+        self.total_eruption_class: int | None = None
+        self.total_non_eruption_class: int | None = None
 
         # Will be set after build_features() called
-        self.FeaturesBuilder: Optional[FeaturesBuilder] = None
+        self.FeaturesBuilder: FeaturesBuilder | None = None
         self.features_data: pd.DataFrame = pd.DataFrame()
-        self.features_csv: Optional[str] = None
+        self.features_csv: str | None = None
 
         # Will be set after extract_features() called
         self.extract_features_csvs: set[str] = set()
         self.relevant_features_csvs: set[str] = set()
 
         # Will be set after concat_features() called
-        self.extracted_features_csv: Optional[str] = None
-        self.extracted_relevant_csv: Optional[str] = None
+        self.extracted_features_csv: str | None = None
+        self.extracted_relevant_csv: str | None = None
 
         # Will be set after predict() called
         self.prediction_features_csvs: set[str] = set()
 
         # Base filename without extension
-        self.basename: Optional[str] = None
+        self.basename: str | None = None
 
         # Validate and create directories
         self.validate()
@@ -169,7 +169,7 @@ class ForecastModel:
         station: str,
         location: str,
         channel: str,
-        output_dir: Optional[str],
+        output_dir: str | None,
     ) -> tuple[str, str, str, str]:
         """Setup directory structure for forecast model outputs.
 
@@ -217,17 +217,17 @@ class ForecastModel:
 
     def _setup_calculate_tremor(
         self,
-        methods: Optional[str],
-        filename_prefix: Optional[str],
+        methods: str | None,
+        filename_prefix: str | None,
         remove_outlier_method: Literal["all", "maximum"],
         interpolate: bool,
-        value_multiplier: Optional[float],
+        value_multiplier: float | None,
         cleanup_tmp_dir: bool,
         plot_tmp: bool,
         save_plot: bool,
         overwrite_plot: bool,
-        verbose: Optional[bool],
-        debug: Optional[bool],
+        verbose: bool | None,
+        debug: bool | None,
     ) -> CalculateTremor:
         """Setup CalculateTremor instance with configuration.
 
@@ -285,7 +285,7 @@ class ForecastModel:
 
     @staticmethod
     def _calculate_from_sds(
-        calculate: CalculateTremor, sds_dir: Optional[str]
+        calculate: CalculateTremor, sds_dir: str | None
     ) -> CalculateTremor:
         """Calculate tremor from SDS data source.
 
@@ -360,7 +360,7 @@ class ForecastModel:
 
     def _prepare_features_data(
         self,
-        tremor_columns: Optional[list[str]],
+        tremor_columns: list[str] | None,
     ) -> pd.DataFrame:
         """Prepare features data by filtering columns if specified.
 
@@ -386,8 +386,8 @@ class ForecastModel:
 
     def _prepare_extraction_parameters(
         self,
-        exclude_features: Optional[Union[list[str], bool]],
-        n_jobs: Optional[int],
+        exclude_features: list[str] | bool | None,
+        n_jobs: int | None,
     ) -> dict[str, Any]:
         """Prepare parameters for tsfresh feature extraction.
 
@@ -428,7 +428,7 @@ class ForecastModel:
         prefix_filename: str,
         extract_features_dir: str,
         overwrite: bool,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Extract features for a single tremor column.
 
         Performs tsfresh feature extraction for one column, either using
@@ -486,7 +486,7 @@ class ForecastModel:
     @staticmethod
     def _validate_tremor_for_labeling(
         tremor_data: pd.DataFrame,
-        tremor_columns: Optional[list[str]],
+        tremor_columns: list[str] | None,
     ) -> None:
         """Validate tremor data is available for label building.
 
@@ -510,7 +510,7 @@ class ForecastModel:
 
     def _prepare_tremor_for_labeling(
         self,
-        tremor_columns: Optional[list[str]],
+        tremor_columns: list[str] | None,
     ) -> pd.DataFrame:
         """Prepare tremor data for label building.
 
@@ -650,19 +650,19 @@ class ForecastModel:
     def calculate(
         self,
         source: Literal["sds", "fdsn"] = "sds",
-        methods: Optional[str] = None,
-        filename_prefix: Optional[str] = None,
+        methods: str | None = None,
+        filename_prefix: str | None = None,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
-        value_multiplier: Optional[float] = None,
+        value_multiplier: float | None = None,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = True,
         save_plot: bool = True,
         overwrite_plot: bool = False,
-        sds_dir: Optional[str] = None,
+        sds_dir: str | None = None,
         client_url: str = "https://service.iris.edu",
-        verbose: Optional[bool] = None,
-        debug: Optional[bool] = None,
+        verbose: bool | None = None,
+        debug: bool | None = None,
     ) -> Self:
         """Calculate Tremor Data from seismic data source.
 
@@ -775,12 +775,12 @@ class ForecastModel:
 
     def extract_features(
         self,
-        exclude_features: Optional[Union[list[str], bool]] = None,
-        tremor_columns: Optional[list[str]] = None,
+        exclude_features: list[str] | bool | None = None,
+        tremor_columns: list[str] | None = None,
         use_relevant_features: bool = False,
         overwrite: bool = False,
         concat_features: bool = True,
-        n_jobs: Optional[int] = None,
+        n_jobs: int | None = None,
     ) -> Self:
         """Extract features from tremor data using tsfresh.
 
@@ -857,8 +857,8 @@ class ForecastModel:
 
     def build_features(
         self,
-        output_dir: Optional[str] = None,
-        tremor_columns: Optional[list[str]] = None,
+        output_dir: str | None = None,
+        tremor_columns: list[str] | None = None,
         save_per_method: bool = True,
         save_tmp_feature: bool = False,
         overwrite: bool = False,
@@ -924,12 +924,12 @@ class ForecastModel:
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
-        start_date: Optional[Union[str, datetime]] = None,
-        end_date: Optional[Union[str, datetime]] = None,
-        output_dir: Optional[str] = None,
-        tremor_columns: Optional[list[str]] = None,
-        verbose: Optional[bool] = None,
-        debug: Optional[bool] = None,
+        start_date: str | datetime | None = None,
+        end_date: str | datetime | None = None,
+        output_dir: str | None = None,
+        tremor_columns: list[str] | None = None,
+        verbose: bool | None = None,
+        debug: bool | None = None,
     ) -> Self:
         """Build labels for eruption forecasting.
 
@@ -1006,12 +1006,12 @@ class ForecastModel:
 
     def predict(
         self,
-        start_date: Union[str, datetime],
-        end_date: Union[str, datetime],
+        start_date: str | datetime,
+        end_date: str | datetime,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
-        output_dir: Optional[str] = None,
-        verbose: Optional[bool] = None,
+        output_dir: str | None = None,
+        verbose: bool | None = None,
     ) -> Self:
         """Generate prediction windows for eruption forecasting.
 

@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime, timedelta
 from functools import cached_property, lru_cache
 from multiprocessing import Pool
-from typing import Literal, Optional, Self, Union
+from typing import Literal, Self
 
 # Third party imports
 import numpy as np
@@ -49,24 +49,24 @@ class CalculateTremor:
 
     def __init__(
         self,
-        start_date: Union[str, datetime],
-        end_date: Union[str, datetime],
+        start_date: str | datetime,
+        end_date: str | datetime,
         station: str,
         channel: str,
         network: str = "VG",
         location: str = "00",
-        methods: Optional[str] = None,
+        methods: str | None = None,
         output_dir: str = "output",
         overwrite: bool = False,
         n_jobs: int = 1,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
-        value_multiplier: Optional[float] = None,
+        value_multiplier: float | None = None,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = False,
         save_plot: bool = False,
         overwrite_plot: bool = False,
-        filename_prefix: Optional[str] = None,
+        filename_prefix: str | None = None,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -132,13 +132,13 @@ class CalculateTremor:
         self.n_days: int = len(self.dates)
         self.nslc = nslc
         self.tmp_dir: str = os.path.join(tremor_dir, "tmp")
-        self.sds: Optional[SDS] = None
+        self.sds: SDS | None = None
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
         self.figures_tmp_dir = os.path.join(figures_dir, "tmp")
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
-        self._source: Optional[str] = None
-        self._sds_dir: Optional[str] = None
+        self._source: str | None = None
+        self._sds_dir: str | None = None
         self._client_url = "https://service.iris.edu"
         self.csv = os.path.join(tremor_dir, self.filename)
 
@@ -332,7 +332,7 @@ class CalculateTremor:
 
         self.create_directories()
 
-    def get_stream(self, date: Optional[datetime] = None) -> Stream:
+    def get_stream(self, date: datetime | None = None) -> Stream:
         """Get the stream for a specific date.
 
         Args:
@@ -384,7 +384,7 @@ class CalculateTremor:
         )
         return self
 
-    def from_fdsn(self, client_url: Optional[str] = None) -> Self:
+    def from_fdsn(self, client_url: str | None = None) -> Self:
         """Set the data source to FDSN.
 
         Args:
@@ -459,7 +459,7 @@ class CalculateTremor:
         return self
 
     @logger.catch
-    def run_job(self, job_index: int, date: datetime) -> Union[str, None]:
+    def run_job(self, job_index: int, date: datetime) -> str | None:
         """Run a job for a specific date.
 
         Args:
@@ -604,8 +604,8 @@ class CalculateTremor:
 
         # Sequential processing: filter -> calculate -> free -> repeat
         # This approach minimizes memory usage by processing one band at a time
-        prev_series: Optional[pd.Series] = None
-        prev_band_name: Optional[str] = None
+        prev_series: pd.Series | None = None
+        prev_band_name: str | None = None
         freq_bands = self.freq_bands_alias
 
         for band_name, freq_band in freq_bands.items():
@@ -722,7 +722,7 @@ class CalculateTremor:
 
     @staticmethod
     def concat_tremor_data(
-        tmp_dir: str, tremor_dir: Optional[str] = None
+        tmp_dir: str, tremor_dir: str | None = None
     ) -> pd.DataFrame:
         """Concatenate calculated tremor data from tmp dir to tremor dir.
 

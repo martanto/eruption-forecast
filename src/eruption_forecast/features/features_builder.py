@@ -1,7 +1,7 @@
 # Standard library imports
 import os
 from datetime import timedelta
-from typing import Optional, Self
+from typing import Self
 
 # Third party imports
 import pandas as pd
@@ -9,7 +9,6 @@ import pandas as pd
 # Project imports
 from eruption_forecast.features.constants import (
     DATETIME_COLUMN,
-    ERUPTED_COLUMN,
     ID_COLUMN,
     REQUIRED_LABEL_COLUMNS,
     SECONDS_PER_DAY,
@@ -49,7 +48,7 @@ class FeaturesBuilder:
         df_label: pd.DataFrame,
         output_dir: str,
         window_size: int,
-        tremor_columns: Optional[list[str]] = None,
+        tremor_columns: list[str] | None = None,
         overwrite: bool = False,
         verbose: bool = False,
         debug: bool = False,
@@ -79,7 +78,7 @@ class FeaturesBuilder:
         self.end_date = df_tremor.index[-1]
         self.features_matrix: pd.DataFrame = pd.DataFrame()
         self.unique_ids: list[int] = []
-        self.csv: Optional[str] = None
+        self.csv: str | None = None
 
         # Validate and create directories
         self.validate()
@@ -168,7 +167,7 @@ class FeaturesBuilder:
         self,
         save_tmp_feature: bool = False,
         save_per_method: bool = True,
-        filename: Optional[str] = None,
+        filename: str | None = None,
         verbose: bool = False,
     ) -> pd.DataFrame:
         df_label = self.df_label.loc[self.start_date : self.end_date]
@@ -190,7 +189,7 @@ class FeaturesBuilder:
             os.makedirs(self.features_tmp_dir, exist_ok=True)
 
         if verbose:
-            logger.info(f"Group features per ID label")
+            logger.info("Group features per ID label")
 
         features: list[pd.DataFrame] = []
 
@@ -205,12 +204,16 @@ class FeaturesBuilder:
             df_tremor_sliced = df_tremor.loc[start_datetime:end_datetime]
 
             if len(df_tremor_sliced) == total_window:
-                logger.debug(f"Window id={column_id}: accepted ({total_window} samples)")
+                logger.debug(
+                    f"Window id={column_id}: accepted ({total_window} samples)"
+                )
 
                 df_tremor_sliced = df_tremor_sliced.sort_index(ascending=True)
                 df_tremor_sliced.reset_index(inplace=True)
                 df_tremor_sliced[ID_COLUMN] = column_id
-                df_tremor_sliced = df_tremor_sliced[[ID_COLUMN, DATETIME_COLUMN, *columns]]
+                df_tremor_sliced = df_tremor_sliced[
+                    [ID_COLUMN, DATETIME_COLUMN, *columns]
+                ]
 
                 features.append(df_tremor_sliced)
 

@@ -12,14 +12,13 @@ import pytest
 
 from eruption_forecast.features.constants import (
     DATETIME_COLUMN,
-    ID_COLUMN,
     ERUPTED_COLUMN,
+    ID_COLUMN,
     REQUIRED_LABEL_COLUMNS,
     SECONDS_PER_DAY,
     SIGNIFICANT_FEATURES_FILENAME,
 )
 from eruption_forecast.features.features_builder import FeaturesBuilder
-
 
 # ---------------------------------------------------------------------------
 # Helpers — synthetic data factories
@@ -304,7 +303,7 @@ class TestFeaturesBuilderSavePerMethod:
                 output_dir=tmp,
                 window_size=1,
             )
-            result = fb.build(save_per_method=True)
+            fb.build(save_per_method=True)
             method_dir = os.path.join(tmp, "method")
             assert os.path.isdir(method_dir)
             # Should have one file per tremor column (rsam_f0, dsar_f0-f1)

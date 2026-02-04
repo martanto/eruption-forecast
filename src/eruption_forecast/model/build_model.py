@@ -1,7 +1,6 @@
 # Standard library imports
 import os
 from multiprocessing import Pool
-from typing import Optional, Union
 
 # Third party imports
 import pandas as pd
@@ -48,7 +47,7 @@ class TrainModel:
         self,
         features_csv: str,
         label_csv: str,
-        output_dir: Optional[str] = None,
+        output_dir: str | None = None,
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
@@ -65,6 +64,10 @@ class TrainModel:
 
         df_labels = df_labels[ERUPTED_COLUMN]
         output_dir = output_dir or os.path.join(os.getcwd(), "output", "predictions")
+        model_prediction_dir = output_dir or os.path.join(
+            os.getcwd(), "output", "models", "prediction"
+        )
+
         significant_features_dir = os.path.join(output_dir, "significant_features")
         all_features_dir = os.path.join(output_dir, "all_features")
 
@@ -82,6 +85,7 @@ class TrainModel:
 
         # Set ADDITIONAL properties
         self.significant_features_dir = significant_features_dir
+        self.model_prediction_dir = model_prediction_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
         self.all_figures_dir = all_figures_dir
@@ -101,7 +105,9 @@ class TrainModel:
         """
         len_features = self.df_features.shape[0]
         len_labels = self.df_labels.shape[0]
-        logger.debug(f"Validating: {len_features} feature rows, {len_labels} label rows")
+        logger.debug(
+            f"Validating: {len_features} feature rows, {len_labels} label rows"
+        )
 
         if len_features == 0:
             raise ValueError("Features cannot be empty. Check your features CSV file.")
@@ -119,6 +125,7 @@ class TrainModel:
     def create_directories(self) -> None:
         """Create required output directories."""
         os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.model_prediction_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
 
     def concat_significant_features(self) -> pd.DataFrame:
@@ -135,7 +142,7 @@ class TrainModel:
         df = pd.concat([pd.read_csv(file) for file in self.csvs], ignore_index=True)
 
         if df.empty:
-            raise ValueError(f"No data found inside csv files.")
+            raise ValueError("No data found inside csv files.")
 
         df.to_csv(
             os.path.join(self.output_dir, SIGNIFICANT_FEATURES_FILENAME), index=False
@@ -148,7 +155,7 @@ class TrainModel:
         seed: int,
         random_state: int,
         number_of_significant_features: int = 20,
-        sampling_strategy: Union[str, float] = 0.75,
+        sampling_strategy: str | float = 0.75,
         overwrite: bool = False,
         save_features: bool = False,
         plot_features: bool = False,
@@ -213,11 +220,10 @@ class TrainModel:
         random_state: int = 0,
         total_seed: int = 500,
         number_of_significant_features: int = 20,
-        sampling_strategy: Union[str, float] = 0.75,
+        sampling_strategy: str | float = 0.75,
         save_features: bool = False,
         plot_features: bool = False,
         overwrite: bool = False,
-        verbose: bool = False,
     ) -> None:
         overwrite = overwrite or self.overwrite
 
