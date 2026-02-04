@@ -10,7 +10,7 @@
 
 ## High Priority
 
-- [ ] Add Gradient Boosting classifier (GradientBoostingClassifier or XGBoost)
+- [x] Add Gradient Boosting classifier (GradientBoostingClassifier or XGBoost)
 - [ ] Implement TimeSeriesSplit for proper temporal cross-validation
 - [ ] Add model persistence with joblib (save/load trained models)
 - [ ] Expand grid parameters for neural network (hidden_layer_sizes too limited)

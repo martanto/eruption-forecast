@@ -141,11 +141,12 @@ The current workflow follows a well-structured approach for binary classificatio
 
 ### Available Classifiers
 
-The package supports 7 classifiers through `ClassifierModel`:
+The package supports 8 classifiers through `ClassifierModel`:
 
 | ID | Classifier | Best For | Pros | Cons |
 |----|------------|----------|------|------|
 | `rf` | Random Forest | **Default choice** | Robust, handles non-linear, feature importance | Can overfit small datasets |
+| `gb` | Gradient Boosting | **Imbalanced data** | Excellent for tabular data, feature importance | Slower training, prone to overfit |
 | `svm` | Support Vector Machine | High-dimensional data | Effective in high dimensions | Slow on large datasets, needs scaling |
 | `lr` | Logistic Regression | Baseline, interpretable | Fast, probability estimates | Assumes linear separability |
 | `nn` | MLP Neural Network | Complex patterns | Learns complex relationships | Needs more data, slower training |
@@ -168,11 +169,16 @@ clf = ClassifierModel("rf")
 model, grid = clf.model_and_grid
 ```
 
-#### 2. **Alternative: Gradient Boosting (Recommended Addition)**
-Consider adding XGBoost or LightGBM:
+#### 2. **Alternative: Gradient Boosting (`gb`)**
+Now available in the package:
 - Better handling of imbalanced data
 - Often outperforms RF on tabular data
 - Built-in feature importance
+
+```python
+clf = ClassifierModel("gb")
+model, grid = clf.model_and_grid
+```
 
 #### 3. **For Interpretability: Logistic Regression (`lr`)**
 - Provides probability scores
@@ -238,7 +244,26 @@ best_model = max(results, key=results.get)
 }
 ```
 
-### 2. Support Vector Machine (`svm`)
+### 2. Gradient Boosting (`gb`)
+
+**Grid Size:** 216 combinations (3 × 3 × 3 × 2 × 2 × 2)
+
+| Parameter | Values | Recommendation |
+|-----------|--------|----------------|
+| `n_estimators` | [50, 100, 200] | Good range for most datasets |
+| `max_depth` | [3, 5, 7] | Shallow trees prevent overfitting |
+| `learning_rate` | [0.01, 0.1, 0.2] | Lower rates need more estimators |
+| `subsample` | [0.8, 1.0] | 0.8 adds stochasticity, reduces overfit |
+| `min_samples_split` | [2, 5] | Higher values prevent overfitting |
+| `min_samples_leaf` | [1, 2] | Higher values create more generalized trees |
+
+**Usage:**
+```python
+clf = ClassifierModel("gb")
+model, grid = clf.model_and_grid
+```
+
+### 3. Support Vector Machine (`svm`)
 
 **Grid Size:** 120 combinations (5 × 3 × 4 × 2)
 
@@ -260,7 +285,7 @@ pipeline = Pipeline([
 ])
 ```
 
-### 3. Logistic Regression (`lr`)
+### 4. Logistic Regression (`lr`)
 
 **Grid Size:** 15 combinations (3 × 5)
 
@@ -280,7 +305,7 @@ pipeline = Pipeline([
 }
 ```
 
-### 4. Neural Network / MLP (`nn`)
+### 5. Neural Network / MLP (`nn`)
 
 **Grid Size:** 8 combinations (4 × 2)
 
@@ -302,7 +327,7 @@ pipeline = Pipeline([
 }
 ```
 
-### 5. Decision Tree (`dt`)
+### 6. Decision Tree (`dt`)
 
 **Grid Size:** 18 combinations (3 × 2 × 3)
 
@@ -323,7 +348,7 @@ pipeline = Pipeline([
 }
 ```
 
-### 6. K-Nearest Neighbors (`knn`)
+### 7. K-Nearest Neighbors (`knn`)
 
 **Grid Size:** 24 combinations (4 × 2 × 3)
 
@@ -335,7 +360,7 @@ pipeline = Pipeline([
 
 **Note:** KNN requires feature scaling and is slow on large datasets.
 
-### 7. Gaussian Naive Bayes (`nb`)
+### 8. Gaussian Naive Bayes (`nb`)
 
 **Grid Size:** 1 combination
 
@@ -356,6 +381,8 @@ pipeline = Pipeline([
 | **Type Annotations** | Fixed `dict[str, any]` → `dict[str, Any]` |
 | **Deprecated Parameters** | Removed `max_features="auto"` (deprecated in sklearn 1.4) |
 | **Documentation** | Enhanced method descriptions with usage examples |
+| **New Classifier** | Added GradientBoostingClassifier (`"gb"`) with 216-combination hyperparameter grid |
+| **Random State** | Added configurable `random_state` parameter to ClassifierModel for reproducibility |
 
 ### Code Quality Metrics
 
@@ -372,14 +399,9 @@ pipeline = Pipeline([
 
 ### Short-term Improvements
 
-1. **Add Gradient Boosting Models**
-   ```python
-   # Add to classifier_model.py
-   from sklearn.ensemble import GradientBoostingClassifier
-
-   if self.classifier == "gb":
-       return GradientBoostingClassifier(random_state=42)
-   ```
+1. **~~Add Gradient Boosting Models~~** ✓ COMPLETED
+   - Added `GradientBoostingClassifier` as `"gb"` classifier
+   - Includes optimized hyperparameter grid (216 combinations)
 
 2. **Implement TimeSeriesSplit**
    ```python
@@ -468,6 +490,12 @@ model, grid = clf.model_and_grid
 ```python
 # Random Forest (recommended)
 clf = ClassifierModel("rf")
+
+# Gradient Boosting (imbalanced data)
+clf = ClassifierModel("gb")
+
+# With reproducible random state
+clf = ClassifierModel("rf", random_state=42)
 
 # Logistic Regression (interpretable)
 clf = ClassifierModel("lr")
