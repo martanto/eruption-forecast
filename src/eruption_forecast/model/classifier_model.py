@@ -2,7 +2,7 @@
 from typing import Any, Literal, Self
 
 # Third party imports
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
@@ -23,12 +23,15 @@ class ClassifierModel:
         - knn: K-Nearest Neighbors
         - dt: Decision Tree (with balanced class weights)
         - rf: Random Forest (with balanced class weights)
+        - gb: Gradient Boosting (handles imbalanced data well)
         - nn: Multi-Layer Perceptron Neural Network
         - nb: Gaussian Naive Bayes
         - lr: Logistic Regression (with balanced class weights)
 
     Args:
         classifier: Classifier type identifier.
+        random_state: Random seed for reproducibility. Applies to classifiers
+            that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
 
     Example:
         >>> # Create a Random Forest classifier
@@ -37,8 +40,12 @@ class ClassifierModel:
         >>> print(grid)
         {'n_estimators': [10, 30, 100], 'max_depth': [3, 5, 7], ...}
 
+        >>> # Create a Gradient Boosting classifier with random state
+        >>> clf = ClassifierModel("gb", random_state=42)
+        >>> model, grid = clf.model_and_grid
+
         >>> # Custom grid parameters
-        >>> clf = ClassifierModel("rf")
+        >>> clf = ClassifierModel("rf", random_state=123)
         >>> clf.grid = {"n_estimators": [50, 100, 200], "max_depth": [5, 10]}
 
         >>> # Chain model and grid updates
@@ -48,13 +55,19 @@ class ClassifierModel:
         ... )
     """
 
-    def __init__(self, classifier: Literal["svm", "knn", "dt", "rf", "nn", "nb", "lr"]):
+    def __init__(
+        self,
+        classifier: Literal["svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr"],
+        random_state: int | None = None,
+    ):
         self.classifier = classifier
+        self.random_state = random_state
         self._model: (
             SVC
             | KNeighborsClassifier
             | DecisionTreeClassifier
             | RandomForestClassifier
+            | GradientBoostingClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -109,6 +122,18 @@ class ClassifierModel:
                 "max_features": ["sqrt", "log2", None],
             }
 
+        if self.classifier == "gb" or isinstance(
+            self.model, GradientBoostingClassifier
+        ):
+            return {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [3, 5, 7],
+                "learning_rate": [0.01, 0.1, 0.2],
+                "subsample": [0.8, 1.0],
+                "min_samples_split": [2, 5],
+                "min_samples_leaf": [1, 2],
+            }
+
         if self.classifier == "nn" or isinstance(self.model, MLPClassifier):
             return {
                 "activation": ["identity", "logistic", "tanh", "relu"],
@@ -139,6 +164,7 @@ class ClassifierModel:
         | KNeighborsClassifier
         | DecisionTreeClassifier
         | RandomForestClassifier
+        | GradientBoostingClassifier
         | MLPClassifier
         | GaussianNB
         | LogisticRegression
@@ -163,25 +189,36 @@ class ClassifierModel:
             return self._model
 
         if self.classifier == "svm":
-            return SVC(class_weight="balanced")
+            return SVC(class_weight="balanced", random_state=self.random_state)
 
         if self.classifier == "knn":
             return KNeighborsClassifier()
 
         if self.classifier == "dt":
-            return DecisionTreeClassifier(class_weight="balanced")
+            return DecisionTreeClassifier(
+                class_weight="balanced", random_state=self.random_state
+            )
 
         if self.classifier == "rf":
-            return RandomForestClassifier(class_weight="balanced")
+            return RandomForestClassifier(
+                class_weight="balanced", random_state=self.random_state
+            )
+
+        if self.classifier == "gb":
+            return GradientBoostingClassifier(random_state=self.random_state)
 
         if self.classifier == "nn":
-            return MLPClassifier(alpha=1, max_iter=1000)
+            return MLPClassifier(
+                alpha=1, max_iter=1000, random_state=self.random_state
+            )
 
         if self.classifier == "nb":
             return GaussianNB()
 
         if self.classifier == "lr":
-            return LogisticRegression(class_weight="balanced")
+            return LogisticRegression(
+                class_weight="balanced", random_state=self.random_state
+            )
 
         raise ValueError(f"Unknown classifier: {self.classifier}")
 
@@ -193,6 +230,7 @@ class ClassifierModel:
             | KNeighborsClassifier
             | DecisionTreeClassifier
             | RandomForestClassifier
+            | GradientBoostingClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -212,6 +250,7 @@ class ClassifierModel:
             | KNeighborsClassifier
             | DecisionTreeClassifier
             | RandomForestClassifier
+            | GradientBoostingClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -226,8 +265,10 @@ class ClassifierModel:
                 KNeighborsClassifier,
                 DecisionTreeClassifier,
                 RandomForestClassifier,
+                GradientBoostingClassifier,
                 MLPClassifier,
-                GaussianNB, LogisticRegression
+                GaussianNB,
+                LogisticRegression
             ]): Model classifier
             grid (dict[str, Any]): Grid parameters
 
