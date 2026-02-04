@@ -3,9 +3,9 @@ import glob
 import os
 import shutil
 from datetime import datetime, timedelta
-from functools import cached_property, lru_cache
+from functools import cached_property
 from multiprocessing import Pool
-from typing import Literal, Optional, Self, Union
+from typing import Literal, Self
 
 # Third party imports
 import numpy as np
@@ -16,8 +16,8 @@ from obspy import Stream, Trace, UTCDateTime
 import eruption_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.plot import plot_tremor
-from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.sds import SDS
+from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.utils import calculate_window_metrics, to_datetime
 
 
@@ -49,24 +49,24 @@ class CalculateTremor:
 
     def __init__(
         self,
-        start_date: Union[str, datetime],
-        end_date: Union[str, datetime],
+        start_date: str | datetime,
+        end_date: str | datetime,
         station: str,
         channel: str,
         network: str = "VG",
         location: str = "00",
-        methods: Optional[str] = None,
+        methods: str | None = None,
         output_dir: str = "output",
         overwrite: bool = False,
         n_jobs: int = 1,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
-        value_multiplier: Optional[float] = None,
+        value_multiplier: float | None = None,
         cleanup_tmp_dir: bool = False,
         plot_tmp: bool = False,
         save_plot: bool = False,
         overwrite_plot: bool = False,
-        filename_prefix: Optional[str] = None,
+        filename_prefix: str | None = None,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -80,7 +80,7 @@ class CalculateTremor:
         station_dir = os.path.join(output_dir, nslc)
         forecast_dir = os.path.join(station_dir, "forecast")
         tremor_dir = os.path.join(station_dir, "tremor")
-        figures_dir = os.path.join(station_dir, "figures")
+        figures_dir = os.path.join(tremor_dir, "figures")
 
         # Set DEFAULT properties
         self.station = station.upper()
@@ -132,13 +132,12 @@ class CalculateTremor:
         self.n_days: int = len(self.dates)
         self.nslc = nslc
         self.tmp_dir: str = os.path.join(tremor_dir, "tmp")
-        self.sds: Optional[SDS] = None
+        self.sds: SDS | None = None
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
-        self.figures_tmp_dir = os.path.join(figures_dir, "tmp")
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
-        self._source: Optional[str] = None
-        self._sds_dir: Optional[str] = None
+        self._source: str | None = None
+        self._sds_dir: str | None = None
         self._client_url = "https://service.iris.edu"
         self.csv = os.path.join(tremor_dir, self.filename)
 
@@ -191,29 +190,42 @@ class CalculateTremor:
 
         Returns:
             Self: CalculateTremor object.
+
+        Raises:
+            TypeError: If freq_bands is not a list or contains non-tuple elements
+            ValueError: If frequency values are invalid
         """
-        assert isinstance(freq_bands, list), ValueError(
-            "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
-        )
+        if not isinstance(freq_bands, list):
+            raise TypeError(
+                "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
+            )
 
         for freqs in freq_bands:
-            assert isinstance(freqs, tuple), ValueError(
-                f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
-                f"Example (0.1,1.0). Your values are: {freqs}"
-            )
-            assert len(freqs) == 2, ValueError(
-                f"Frequencies must have two elements. Example (0.1,1.0)."
-                f"Your values are: {freqs}"
-            )
+            if not isinstance(freqs, tuple):
+                raise TypeError(
+                    f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
+                    f"Example (0.1,1.0). Your values are: {freqs}"
+                )
+            if len(freqs) != 2:
+                raise ValueError(
+                    f"Frequencies must have two elements. Example (0.1,1.0). "
+                    f"Your values are: {freqs}"
+                )
 
             freq_min, freq_max = freqs
-            assert isinstance(freq_min, float) or isinstance(freq_min, int), ValueError(
-                f"Freq minimum must be float or int. Your value is: {freq_min}"
-            )
-            assert isinstance(freq_max, float) or isinstance(freq_max, int), ValueError(
-                f"Freq maximum must be float or int. Your value is: {freq_max}"
-            )
-            assert freq_min < freq_max, ValueError()
+            if not isinstance(freq_min, (float, int)):
+                raise TypeError(
+                    f"Freq minimum must be float or int. Your value is: {freq_min}"
+                )
+            if not isinstance(freq_max, (float, int)):
+                raise TypeError(
+                    f"Freq maximum must be float or int. Your value is: {freq_max}"
+                )
+            if freq_min >= freq_max:
+                raise ValueError(
+                    f"Freq minimum must be less than freq maximum. "
+                    f"Got: {freq_min} >= {freq_max}"
+                )
 
         self.freq_bands = freq_bands
         return self
@@ -290,34 +302,36 @@ class CalculateTremor:
         os.makedirs(self.tmp_dir, exist_ok=True)
 
         if self.plot_tmp:
-            os.makedirs(self.figures_tmp_dir, exist_ok=True)
+            os.makedirs(self.figures_dir, exist_ok=True)
 
     def validate(self) -> None:
-        """Assert the input parameters.
+        """Validate input parameters.
 
         Raises:
-            ValueError: If start date is after end date
-            AssertionError: If window overlap is not between 0 and 1
-            AssertionError: If method is not found
+            ValueError: If n_jobs is invalid, dates are invalid, or method is not found
 
         Returns:
             None
         """
-        assert (
-            self.n_jobs > 0
-        ), f"Number of jobs must be greater than 0. Your value: {self.n_jobs}"
-        assert (
-            self.start_date_utc_datetime < self.end_date_utc_datetime
-        ), f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
+        if self.n_jobs <= 0:
+            raise ValueError(
+                f"Number of jobs must be greater than 0. Your value: {self.n_jobs}"
+            )
+        if self.start_date_utc_datetime >= self.end_date_utc_datetime:
+            raise ValueError(
+                f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
+            )
 
+        valid_methods = ["rsam", "dsar"]
         for method in self.methods:
-            assert (
-                method in self.methods
-            ), f"Method '{method}' not found. Choose between: {self.methods}"
+            if method not in valid_methods:
+                raise ValueError(
+                    f"Method '{method}' not found. Choose between: {valid_methods}"
+                )
 
         self.create_directories()
 
-    def get_stream(self, date: Optional[datetime] = None) -> Stream:
+    def get_stream(self, date: datetime | None = None) -> Stream:
         """Get the stream for a specific date.
 
         Args:
@@ -325,12 +339,17 @@ class CalculateTremor:
 
         Returns:
             Stream: Stream
+
+        Raises:
+            ValueError: If date is None or data source not set
         """
-        assert date is not None, "Date must be provided"
-        assert self._source in ["sds", "fdsn"], (
-            f"❌ Please choose a data source. Use `from_sds` or from `from_fdsn` method "
-            f"to determine the data source before `run`."
-        )
+        if date is None:
+            raise ValueError("Date must be provided")
+        if self._source not in ["sds", "fdsn"]:
+            raise ValueError(
+                "Please choose a data source. Use `from_sds()` or `from_fdsn()` method "
+                "to determine the data source before `run()`."
+            )
 
         stream = Stream()
 
@@ -364,7 +383,7 @@ class CalculateTremor:
         )
         return self
 
-    def from_fdsn(self, client_url: Optional[str] = None) -> Self:
+    def from_fdsn(self, client_url: str | None = None) -> Self:
         """Set the data source to FDSN.
 
         Args:
@@ -426,7 +445,8 @@ class CalculateTremor:
                 df=df,
                 interval=14,
                 interval_unit="days",
-                figure_dir=self.figures_dir,
+                figure_dir=self.tremor_dir,
+                filename=filename,
                 title=self.nslc,
                 overwrite=self.overwrite or self.overwrite_plot,
                 verbose=self.verbose,
@@ -439,7 +459,7 @@ class CalculateTremor:
         return self
 
     @logger.catch
-    def run_job(self, job_index: int, date: datetime) -> Union[str, None]:
+    def run_job(self, job_index: int, date: datetime) -> str | None:
         """Run a job for a specific date.
 
         Args:
@@ -452,10 +472,17 @@ class CalculateTremor:
         """
         date_str = date.strftime("%Y-%m-%d")
         temp_file = os.path.join(self.tmp_dir, f"{date_str}.csv")
+        temp_plot = os.path.join(self.figures_dir, f"{date_str}.png")
 
         logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
 
-        if not self.overwrite and os.path.exists(temp_file):
+        can_skip = (
+            not self.overwrite
+            and os.path.exists(temp_file)
+            and (not self.plot_tmp and os.path.exists(temp_plot))
+        )
+
+        if can_skip:
             if self.verbose:
                 logger.info(f"{date_str} :: File CSV loaded {temp_file}")
             return temp_file
@@ -480,7 +507,7 @@ class CalculateTremor:
                 interval=2,
                 interval_unit="hours",
                 filename=f"{date_str}.png",
-                figure_dir=self.figures_tmp_dir,
+                figure_dir=self.figures_dir,
                 title=date_str,
                 overwrite=self.overwrite,
                 verbose=self.verbose,
@@ -493,7 +520,6 @@ class CalculateTremor:
 
         return temp_file
 
-    @lru_cache(maxsize=128)
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor data.
         This method calculates the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
@@ -536,44 +562,68 @@ class CalculateTremor:
                     continue
                 df = self.calculate_dsar(date_str, df, stream)
 
+        if self.verbose:
+            logger.info(f"{date_str} :: Calculation finished.")
+
         return df
 
     def calculate_dsar(
         self, date_str: str, df: pd.DataFrame, stream: Stream
     ) -> pd.DataFrame:
-        """Calculate DSAR for a given date
+        """Calculate Displacement Seismic Amplitude Ratio (DSAR) for a given date.
+
+        DSAR is calculated as the ratio of mean absolute amplitudes between consecutive
+        frequency bands after integration of the seismic signal. The integration converts
+        velocity to displacement, and ratios are computed between adjacent frequency bands.
 
         Args:
-            date_str (str): Date to calculate DSAR for
-            df (pd.DataFrame): Tremor data with datetime index
-            stream (Stream): Obspy Stream object
+            date_str (str): Date to calculate DSAR for (YYYY-MM-DD format)
+            df (pd.DataFrame): Tremor data with DatetimeIndex
+            stream (Stream): ObsPy Stream object containing seismic trace
 
         Returns:
-            pd.DataFrame: DSAR data
+            pd.DataFrame: DataFrame with DSAR columns added (dsar_f0-f1, dsar_f1-f2, etc.)
+
+        Raises:
+            ValueError: If stream is empty or has no traces
+            TypeError: If dataframe index is not DatetimeIndex
         """
+        # Validate inputs
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("DataFrame index must be DatetimeIndex")
+
+        if len(stream) == 0:
+            raise ValueError(f"{date_str} :: Stream is empty, cannot calculate DSAR")
+
+        # Determine if we need to preserve original stream for RSAM calculation
         needs_original = "rsam" in self.methods and self.methods.index(
             "dsar"
         ) < self.methods.index("rsam")
 
+        # Integrate stream to convert velocity to displacement
         if needs_original:
             stream_integrated = stream.copy().integrate()
         else:
             stream_integrated = stream.integrate()
 
+        # Remove DC component (subtract first value)
         trace: Trace = stream_integrated[0]
         trace.data = trace.data - trace.data[0]
         stream_integrated = Stream(trace)
 
         # Sequential processing: filter -> calculate -> free -> repeat
-        prev_series = None
-        prev_band_name = None
+        # This approach minimizes memory usage by processing one band at a time
+        prev_series: pd.Series | None = None
+        prev_band_name: str | None = None
         freq_bands = self.freq_bands_alias
 
         for band_name, freq_band in freq_bands.items():
             if self.debug:
-                logger.info(f"{date_str} :: DSAR Calculating {freq_band}")
+                logger.debug(
+                    f"{date_str} :: DSAR - Processing frequency band {band_name}: {freq_band}"
+                )
 
-            # Filter a copy
+            # Apply bandpass filter to stream copy
             filtered_stream = stream_integrated.copy().filter(
                 "bandpass",
                 freqmin=freq_band[0],
@@ -581,7 +631,7 @@ class CalculateTremor:
                 corners=4,
             )
 
-            # Extract the amplitude series immediately
+            # Extract amplitude series with outlier removal
             current_series = calculate_window_metrics(
                 trace=filtered_stream[0],
                 window_duration_minutes=10,
@@ -589,34 +639,43 @@ class CalculateTremor:
                 remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=0.3,
                 absolute_value=True,
+                value_multiplier=1.0,  # Don't multiply yet, do it once on ratio
             )
 
+            # Interpolate missing values
             current_series = current_series.interpolate(method="linear")
 
-            # Free the filtered stream immediately
+            # Free filtered stream immediately to reduce memory footprint
             del filtered_stream
 
-            # Calculate DSAR ratio if we have previous series
+            # Calculate DSAR ratio between consecutive frequency bands
             if prev_series is not None:
                 column_name = f"dsar_{prev_band_name}-{band_name}"
-                dsar_series = prev_series / current_series
 
+                # Calculate ratio: low_freq / high_freq
+                # Replace inf and -inf values (from division by zero) with NaN
+                dsar_series = prev_series / current_series
+                dsar_series = dsar_series.replace([np.inf, -np.inf], np.nan)
+
+                # Apply value multiplier if specified
                 if self.value_multiplier and self.value_multiplier > 1:
                     dsar_series = dsar_series * self.value_multiplier
 
+                # Store in dataframe
                 df[column_name] = dsar_series.values
 
                 if self.verbose:
-                    logger.info(
-                        f"{date_str} :: DSAR ({column_name}) calculation finished"
+                    logger.debug(
+                        f"{date_str} :: DSAR ({column_name}) calculation completed."
                     )
 
-            # Store current for next iteration (only Series, not full Stream)
+            # Store current series for next iteration
             prev_series = current_series
             prev_band_name = band_name
 
-        # Clean up
+        # Clean up memory
         del prev_series, stream_integrated
+
         return df
 
     def calculate_rsam(
@@ -631,10 +690,12 @@ class CalculateTremor:
 
         Returns:
             pd.DataFrame: Tremor data
+
+        Raises:
+            TypeError: If dataframe index is not DatetimeIndex
         """
-        assert isinstance(df.index, pd.DatetimeIndex), ValueError(
-            f"Index of dataframe should be pd.DatetimeIndex"
-        )
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index of dataframe should be pd.DatetimeIndex")
 
         freq_bands = self.freq_bands_alias
 
@@ -664,14 +725,14 @@ class CalculateTremor:
             del stream_copy
 
             if self.verbose:
-                logger.info(f"{date_str} :: RSAM ({column_name}) calculation finished")
+                logger.debug(
+                    f"{date_str} :: RSAM ({column_name}) calculation completed."
+                )
 
         return df
 
     @staticmethod
-    def concat_tremor_data(
-        tmp_dir: str, tremor_dir: Optional[str] = None
-    ) -> pd.DataFrame:
+    def concat_tremor_data(tmp_dir: str, tremor_dir: str | None = None) -> pd.DataFrame:
         """Concatenate calculated tremor data from tmp dir to tremor dir.
 
         Args:
@@ -680,11 +741,16 @@ class CalculateTremor:
 
         Returns:
             pd.DataFrame: Tremor data
+
+        Raises:
+            FileNotFoundError: If tmp_dir doesn't exist or no CSV files found
         """
-        assert os.path.isdir(tmp_dir), f"Directory {tmp_dir} does not exist"
+        if not os.path.isdir(tmp_dir):
+            raise FileNotFoundError(f"Directory {tmp_dir} does not exist")
 
         files = glob.glob(os.path.join(tmp_dir, "*.csv"))
-        assert len(files) > 0, f"File(s) not found in {tmp_dir}"
+        if len(files) == 0:
+            raise FileNotFoundError(f"No CSV files found in {tmp_dir}")
 
         tremor_dir = tmp_dir.replace("tmp", "") if tremor_dir is None else tremor_dir
         os.makedirs(tremor_dir, exist_ok=True)

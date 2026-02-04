@@ -1,7 +1,7 @@
 # Standard library imports
+from collections.abc import Callable
 from datetime import datetime
-from functools import lru_cache
-from typing import Callable, Literal, Self
+from typing import Literal, Self
 
 # Third party imports
 import numpy as np
@@ -59,7 +59,6 @@ class RSAM:
 
         return self
 
-    @lru_cache(maxsize=128)
     def calculate(
         self,
         window_duration_minutes: int = 10,
@@ -80,7 +79,7 @@ class RSAM:
             interpolate (bool, optional): Interpolate data. Defaults to True.
 
         Returns:
-            Self: RSAM object
+            pd.Series: Series containing calculated RSAM metrics with datetime index.
         """
         trace = self.trace
 
@@ -94,8 +93,8 @@ class RSAM:
             absolute_value=True,
         )
 
-        if value_multiplier > 1:
-            series = series.apply(lambda values: values * value_multiplier)
+        # Note: value_multiplier is already applied in calculate_window_metrics
+        # No need to apply it again here
 
         if interpolate:
             series = series.interpolate(method="linear")

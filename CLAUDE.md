@@ -5,6 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Python Package Manager
 This package is using UV (https://docs.astral.sh/uv/) as package manager.
 
+## Claude Code Guidelines
+
+- Always use available skills whenever possible when executing commands (e.g., use the scikit-learn skill for ML tasks, matplotlib/seaborn skills for plotting, etc.)
+
+## Rules
+
+1. **SUMMARY.md must be updated after every completed task.** Any finished task — bug fix, refactor, new feature, test, documentation change — must have its outcome recorded in SUMMARY.md before moving on.
+2. **TODO.md tracks pending work.** Use TODO.md for next things to do. Check off items when complete and add new items as they arise.
+3. **Run `uv run isort src/` before every commit.** Imports must be sorted before staging and committing.
+4. **Type checker is pyrefly, not mypy.** Use `uv run pyrefly check src/` for type checking. mypy has been removed from the project.
+5. **All `uv` commands are permitted.** `uv sync`, `uv run`, `uv pip install/uninstall`, `uv lock`, etc. — no need to ask.
+
 ## Project Overview
 
 `eruption-forecast` is a Python package for volcanic eruption forecasting using seismic data analysis. The package processes seismic tremor data, extracts features, builds labels, and creates forecast models to predict volcanic eruptions based on time-series seismic measurements.
@@ -28,8 +40,8 @@ uv run black src/
 # Lint with ruff
 uv run ruff check src/
 
-# Type checking with mypy
-uv run mypy src/
+# Type checking with pyrefly
+uv run pyrefly check src/
 
 # Sort imports with isort
 uv run isort src/
@@ -221,11 +233,9 @@ output/
 
 ## Type Checking Configuration
 
-The project uses strict mypy settings (see `pyproject.toml`):
-- `disallow_untyped_defs = true`
-- `disallow_incomplete_defs = true`
+The project uses pyrefly for type checking (mypy has been removed):
+- Run with: `uv run pyrefly check src/`
 - All functions must have complete type annotations
-- Exception: `obspy` types are ignored via mypy overrides
 
 ## Common Workflows
 

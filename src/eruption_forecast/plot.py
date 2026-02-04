@@ -1,6 +1,7 @@
 # Standard library imports
 import os
-from typing import Literal, Optional
+from pathlib import Path
+from typing import Literal
 
 # Third party imports
 import matplotlib.dates as mdates
@@ -15,12 +16,12 @@ def plot_tremor(
     df: pd.DataFrame,
     interval: int = 1,
     interval_unit: Literal["hours", "days"] = "hours",
-    filename: Optional[str] = None,
-    figure_dir: Optional[str] = None,
-    title: Optional[str] = None,
+    filename: str | None = None,
+    figure_dir: str | None = None,
+    title: str | None = None,
     overwrite: bool = True,
     dpi: int = 100,
-    selected_columns: Optional[list[str]] = None,
+    selected_columns: list[str] | None = None,
     verbose: bool = False,
 ) -> None:
     """Plot tremor data
@@ -51,7 +52,10 @@ def plot_tremor(
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
 
-    default_filename = f"tremor_{start_date_str}_{end_date_str}.png"
+    if filename is not None:
+        filename = Path(filename).stem
+
+    default_filename = f"tremor_{start_date_str}_{end_date_str}"
     default_title = (
         f"{start_date_str}" if n_days == 0 else f"{start_date_str}_{end_date_str}"
     )
@@ -62,8 +66,7 @@ def plot_tremor(
     os.makedirs(figure_dir, exist_ok=True)
 
     filename = filename or default_filename
-    filename = filename if len(filename.split(".")) > 1 else f"{filename}.png"
-    filepath = os.path.join(figure_dir, f"{filename}")
+    filepath = os.path.join(figure_dir, f"{filename}.png")
 
     if os.path.exists(filepath) and not overwrite:
         if verbose:
@@ -125,7 +128,7 @@ def plot_significant_features(
     filepath: str,
     number_of_features: int = 50,
     top_features: int = 20,
-    title: Optional[str] = None,
+    title: str | None = None,
     figsize=(3, 12),
     features_column: str = "features",
     values_column: str = "values",
@@ -156,7 +159,9 @@ def plot_significant_features(
         try:
             df[features_column] = df.index
         except ValueError:
-            raise ValueError(f"Features column: {features_column} does not exist")
+            raise ValueError(  # noqa: B904
+                f"Features column: {features_column} does not exist"
+            )  # noqa: B904
 
     df.dropna(inplace=True)
     df = df.head(number_of_features)

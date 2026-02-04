@@ -2,7 +2,6 @@
 import os
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Tuple
 
 # Third party imports
 import pandas as pd
@@ -14,13 +13,13 @@ from eruption_forecast.utils import check_sampling_consistency
 class TremorData:
     def __init__(
         self,
-        df: Optional[pd.DataFrame] = None,
+        df: pd.DataFrame | None = None,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
         self.verbose = verbose
         self.debug = debug
-        self.csv: str = None
+        self.csv: str | None = None
         self.df = df if df is not None else pd.DataFrame()
 
     def __repr__(self) -> str:
@@ -36,9 +35,13 @@ class TremorData:
             tremor_csv (str): Path to tremor csv file
 
         Returns:
-            self: Return self
+            pd.DataFrame: Tremor dataframe
+
+        Raises:
+            FileNotFoundError: If tremor CSV file does not exist
         """
-        assert os.path.exists(tremor_csv), ValueError(f"{tremor_csv} does not exist")
+        if not os.path.exists(tremor_csv):
+            raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
 
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df.sort_index(inplace=True)
@@ -48,10 +51,18 @@ class TremorData:
 
     @property
     def df(self) -> pd.DataFrame:
-        """Load tremor dataframe"""
-        assert len(self._df) > 0, ValueError(
-            "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
-        )
+        """Load tremor dataframe
+
+        Returns:
+            pd.DataFrame: Tremor dataframe
+
+        Raises:
+            ValueError: If tremor dataframe is empty
+        """
+        if len(self._df) == 0:
+            raise ValueError(
+                "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
+            )
         return self._df
 
     @df.setter
@@ -91,7 +102,7 @@ class TremorData:
         """Get number of days in tremor data"""
         return int((self.end_date - self.start_date).days)
 
-    def check_consistency(self) -> Tuple[bool, pd.DataFrame, pd.DataFrame]:
+    def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame]:
         """Check consistency of tremor data.
 
         Returns:

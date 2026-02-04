@@ -1,0 +1,32 @@
+{
+  "respectGitignore": true,
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git push:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(python:*)",
+      "Bash(uv:*)",
+      "Bash(git checkout:*)",
+      "Bash(dir:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [
+      "Read(*.csv)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(*.ipynb)",
+      "Read(./.uv_cache/**)",
+      "Read(./.venv/**)",
+      "Read(./output/**)",
+      "Edit(*.csv)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(*.ipynb)",
+      "Edit(./.uv_cache/**)",
+      "Edit(./.venv/**)",
+      "Edit(./output/**)"
+    ]
+  }
+}
