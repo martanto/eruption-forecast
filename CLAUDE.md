@@ -18,6 +18,17 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 5. **All `uv` commands are permitted.** `uv sync`, `uv run`, `uv pip install/uninstall`, `uv lock`, etc. — no need to ask.
 6. **Create a new branch before commits or modifications.** Always create a new branch with `claude/` prefix before making any commits or code modifications (e.g., `claude/fix-docstrings`, `claude/add-feature-x`).
 
+## Testing
+
+Testing is not mandatory, but if needed, you can use the following test data:
+
+- **Input directory (SDS format):** `D:\Data\OJN`
+- **Start date:** `2025-03-16`
+- **End date:** `2025-03-22`
+- **Eruption date:** `2025-03-20`
+
+See `main.py` for a complete usage example of the pipeline.
+
 ## Project Overview
 
 `eruption-forecast` is a Python package for volcanic eruption forecasting using seismic data analysis. The package processes seismic tremor data, extracts features, builds labels, and creates forecast models to predict volcanic eruptions based on time-series seismic measurements.
