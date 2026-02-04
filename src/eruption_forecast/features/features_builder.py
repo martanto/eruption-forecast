@@ -175,6 +175,8 @@ class FeaturesBuilder:
         window_size = self.window_size
         verbose = verbose or self.verbose
         filename = filename or "features.csv"
+        tremor_start_date = df_tremor.index[0].strftime("%Y-%m-%d")
+        tremor_end_date = df_tremor.index[-1].strftime("%Y-%m-%d")
 
         columns = df_tremor.columns.tolist()
         feature_csv = os.path.join(self.output_dir, filename)
@@ -191,6 +193,7 @@ class FeaturesBuilder:
         if verbose:
             logger.info("Group features per ID label")
 
+        # Save sliced tremor data based on label ID and/or datetime
         features: list[pd.DataFrame] = []
 
         # TODO: Check sampling period consistency
@@ -234,8 +237,13 @@ class FeaturesBuilder:
 
         # Concat features matrix
         if len(features) == 0:
-            logger.error("Features matrix is empty")
-            raise ValueError("Features matrix is empty")
+            error_message = (
+                f"Tremor data between date {self.start_date.strftime('%Y-%m-%d')} "
+                f"to {self.end_date.strftime('%Y-%m-%d')} are not found. "
+                f"Tremor data available from {tremor_start_date} to {tremor_end_date}."
+            )
+            logger.error(error_message)
+            raise ValueError(error_message)
 
         features_matrix = pd.concat(features, ignore_index=False)
 
