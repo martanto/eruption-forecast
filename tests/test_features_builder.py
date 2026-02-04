@@ -103,9 +103,7 @@ class TestFeaturesBuilderInit:
 
     def test_non_datetime_label_index_raises_type_error(self) -> None:
         """TypeError when df_label index is not DatetimeIndex."""
-        df_bad = pd.DataFrame(
-            {ID_COLUMN: [1], ERUPTED_COLUMN: [0]}, index=[0]
-        )
+        df_bad = pd.DataFrame({ID_COLUMN: [1], ERUPTED_COLUMN: [0]}, index=[0])
         with pytest.raises(TypeError, match="df_label.index is not a DatetimeIndex"):
             FeaturesBuilder(
                 df_tremor=_make_tremor_df(),
@@ -337,7 +335,9 @@ class TestFeaturesBuilderSavePerMethod:
 # ---------------------------------------------------------------------------
 
 
-def _write_synthetic_csvs(tmp: str, n_features: int = 10, n_samples: int = 20) -> tuple[str, str]:
+def _write_synthetic_csvs(
+    tmp: str, n_features: int = 10, n_samples: int = 20
+) -> tuple[str, str]:
     """Write synthetic features and label CSVs for TrainModel tests.
 
     Returns (features_csv, label_csv) paths.
@@ -370,7 +370,7 @@ class TestTrainModelValidation:
 
     def test_valid_initialization(self) -> None:
         """TrainModel initialises without error on valid data."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
             features_csv, label_csv = _write_synthetic_csvs(tmp)
@@ -383,17 +383,15 @@ class TestTrainModelValidation:
 
     def test_empty_features_raises_value_error(self) -> None:
         """ValueError when features CSV has zero rows."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
             # Empty features
-            pd.DataFrame(columns=["feat_0"]).to_csv(
-                os.path.join(tmp, "features.csv")
-            )
+            pd.DataFrame(columns=["feat_0"]).to_csv(os.path.join(tmp, "features.csv"))
             # Non-empty labels (won't matter — features checked first)
-            pd.DataFrame(
-                {ID_COLUMN: [0], ERUPTED_COLUMN: [0]}
-            ).to_csv(os.path.join(tmp, "labels.csv"), index=False)
+            pd.DataFrame({ID_COLUMN: [0], ERUPTED_COLUMN: [0]}).to_csv(
+                os.path.join(tmp, "labels.csv"), index=False
+            )
 
             with pytest.raises(ValueError, match="Features cannot be empty"):
                 TrainModel(
@@ -404,13 +402,11 @@ class TestTrainModelValidation:
 
     def test_empty_labels_raises_value_error(self) -> None:
         """ValueError when label CSV has zero rows."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
             # 5-row features
-            pd.DataFrame({"feat_0": range(5)}).to_csv(
-                os.path.join(tmp, "features.csv")
-            )
+            pd.DataFrame({"feat_0": range(5)}).to_csv(os.path.join(tmp, "features.csv"))
             # Empty labels — only header
             pd.DataFrame(columns=[ID_COLUMN, ERUPTED_COLUMN]).to_csv(
                 os.path.join(tmp, "labels.csv"), index=False
@@ -425,15 +421,15 @@ class TestTrainModelValidation:
 
     def test_mismatched_lengths_raises_value_error(self) -> None:
         """ValueError when features and labels row counts differ."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
             pd.DataFrame({"feat_0": range(10)}).to_csv(
                 os.path.join(tmp, "features.csv")
             )
-            pd.DataFrame(
-                {ID_COLUMN: range(5), ERUPTED_COLUMN: [0] * 5}
-            ).to_csv(os.path.join(tmp, "labels.csv"), index=False)
+            pd.DataFrame({ID_COLUMN: range(5), ERUPTED_COLUMN: [0] * 5}).to_csv(
+                os.path.join(tmp, "labels.csv"), index=False
+            )
 
             with pytest.raises(ValueError, match="do not match"):
                 TrainModel(
@@ -444,7 +440,7 @@ class TestTrainModelValidation:
 
     def test_output_directories_created(self) -> None:
         """create_directories() produces expected subdirectories."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
             features_csv, label_csv = _write_synthetic_csvs(tmp)
@@ -459,15 +455,13 @@ class TestTrainModelValidation:
 
     def test_errors_are_value_error_not_assertion_error(self) -> None:
         """Confirm validation raises ValueError, not AssertionError."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
-            pd.DataFrame({"feat_0": range(3)}).to_csv(
-                os.path.join(tmp, "features.csv")
+            pd.DataFrame({"feat_0": range(3)}).to_csv(os.path.join(tmp, "features.csv"))
+            pd.DataFrame({ID_COLUMN: range(7), ERUPTED_COLUMN: [0] * 7}).to_csv(
+                os.path.join(tmp, "labels.csv"), index=False
             )
-            pd.DataFrame(
-                {ID_COLUMN: range(7), ERUPTED_COLUMN: [0] * 7}
-            ).to_csv(os.path.join(tmp, "labels.csv"), index=False)
 
             # Must be ValueError — never AssertionError
             with pytest.raises(ValueError):
@@ -488,7 +482,7 @@ class TestIntegration:
 
     def test_features_builder_output_loads_in_train_model(self) -> None:
         """CSV produced by FeaturesBuilder can be consumed by TrainModel."""
-        from eruption_forecast.model.build_model import TrainModel
+        from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
             # 1. Build features
