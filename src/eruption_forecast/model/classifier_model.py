@@ -12,6 +12,42 @@ from sklearn.tree import DecisionTreeClassifier
 
 
 class ClassifierModel:
+    """Manages machine learning classifiers and their hyperparameter grids.
+
+    Provides a unified interface for selecting and configuring classifiers
+    for eruption prediction. Each classifier comes with predefined
+    hyperparameter grids optimized for GridSearchCV.
+
+    Supported classifiers:
+        - svm: Support Vector Machine (SVC with balanced class weights)
+        - knn: K-Nearest Neighbors
+        - dt: Decision Tree (with balanced class weights)
+        - rf: Random Forest (with balanced class weights)
+        - nn: Multi-Layer Perceptron Neural Network
+        - nb: Gaussian Naive Bayes
+        - lr: Logistic Regression (with balanced class weights)
+
+    Args:
+        classifier: Classifier type identifier.
+
+    Example:
+        >>> # Create a Random Forest classifier
+        >>> clf = ClassifierModel("rf")
+        >>> model, grid = clf.model_and_grid
+        >>> print(grid)
+        {'n_estimators': [10, 30, 100], 'max_depth': [3, 5, 7], ...}
+
+        >>> # Custom grid parameters
+        >>> clf = ClassifierModel("rf")
+        >>> clf.grid = {"n_estimators": [50, 100, 200], "max_depth": [5, 10]}
+
+        >>> # Chain model and grid updates
+        >>> clf = ClassifierModel("svm").update_model_and_grid(
+        ...     SVC(kernel="rbf"),
+        ...     {"C": [0.1, 1, 10]}
+        ... )
+    """
+
     def __init__(self, classifier: Literal["svm", "knn", "dt", "rf", "nn", "nb", "lr"]):
         self.classifier = classifier
         self._model: (
@@ -28,10 +64,17 @@ class ClassifierModel:
 
     @property
     def grid(self) -> dict[str, Any]:
-        """Grid parameter for cross-validation
+        """Hyperparameter grid for cross-validation.
+
+        Returns default grid if none set, otherwise returns custom grid.
 
         Returns:
-            dict[str, Any]: Grid parameters
+            dict[str, Any]: Dictionary mapping parameter names to lists of values.
+
+        Example:
+            >>> clf = ClassifierModel("rf")
+            >>> print(clf.grid["n_estimators"])
+            [10, 30, 100]
         """
         if self._grid is not None:
             return self._grid
@@ -55,7 +98,7 @@ class ClassifierModel:
             return {
                 "max_depth": [3, 5, 7],
                 "criterion": ["gini", "entropy"],
-                "max_features": ["auto", "sqrt", "log2", None],
+                "max_features": ["sqrt", "log2", None],
             }
 
         if self.classifier == "rf" or isinstance(self.model, RandomForestClassifier):
@@ -63,7 +106,7 @@ class ClassifierModel:
                 "n_estimators": [10, 30, 100],
                 "max_depth": [3, 5, 7],
                 "criterion": ["gini", "entropy"],
-                "max_features": ["auto", "sqrt", "log2", None],
+                "max_features": ["sqrt", "log2", None],
             }
 
         if self.classifier == "nn" or isinstance(self.model, MLPClassifier):
@@ -100,18 +143,21 @@ class ClassifierModel:
         | GaussianNB
         | LogisticRegression
     ):
-        """Model classifier
+        """Get the classifier model instance.
+
+        Returns a new instance of the classifier with default settings
+        if none has been set. Most classifiers use balanced class weights
+        to handle the imbalanced eruption/non-eruption data.
 
         Returns:
-            Model:
-                SVC: Support Vector Machine
-                KNeighborsClassifier: K-Nearest Neighbors
-                DecisionTreeClassifier: Decision Tree
-                RandomForestClassifier: Random Forest Classifier
-                MLPClassifier: MLP (Neural Network)
-                GaussianNB: Gaussian Naive Bayes
-                LogisticRegression: Logistic Regression
-            Grid (dict[str, any]): Grid Parameters
+            Classifier instance (SVC, KNeighborsClassifier, DecisionTreeClassifier,
+            RandomForestClassifier, MLPClassifier, GaussianNB, or LogisticRegression).
+
+        Example:
+            >>> clf = ClassifierModel("rf")
+            >>> model = clf.model
+            >>> print(type(model).__name__)
+            'RandomForestClassifier'
         """
         if self._model is not None:
             return self._model
@@ -183,7 +229,7 @@ class ClassifierModel:
                 MLPClassifier,
                 GaussianNB, LogisticRegression
             ]): Model classifier
-            grid (dict[str, any]): Grid parameters
+            grid (dict[str, Any]): Grid parameters
 
         Returns:
             Self: ClassifierModel

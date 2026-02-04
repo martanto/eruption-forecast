@@ -147,7 +147,7 @@ uv run black src/
 uv run ruff check src/
 
 # Type checking
-uv run mypy src/
+uv run pyrefly check src/
 
 # Sort imports
 uv run isort src/
@@ -204,25 +204,84 @@ Orchestrates the complete pipeline:
 
 ## Pipeline Workflow
 
+```mermaid
+flowchart TD
+    subgraph Input["📥 Input Data"]
+        A[("🌋 Raw Seismic Data<br/>(SDS/FDSN)")]
+        B[("📅 Eruption Dates")]
+    end
+
+    subgraph Tremor["⚡ Tremor Calculation"]
+        C["CalculateTremor"]
+        C1["RSAM<br/>(Amplitude)"]
+        C2["DSAR<br/>(Ratios)"]
+        C --> C1
+        C --> C2
+    end
+
+    subgraph Label["🏷️ Label Building"]
+        D["LabelBuilder"]
+        D1["Sliding Windows"]
+        D2["Binary Labels<br/>(erupted: 0/1)"]
+        D --> D1
+        D1 --> D2
+    end
+
+    subgraph Features["🔬 Feature Extraction"]
+        E["FeaturesBuilder"]
+        F["tsfresh<br/>(700+ features)"]
+        E --> F
+    end
+
+    subgraph Training["🤖 Model Training"]
+        G["TrainModel"]
+        G1["RandomUnderSampler<br/>(Class Balancing)"]
+        G2["Feature Selection<br/>(Multi-seed)"]
+        G --> G1
+        G1 --> G2
+    end
+
+    subgraph Prediction["🎯 Prediction"]
+        H["ClassifierModel"]
+        H1["GridSearchCV"]
+        H2["Random Forest<br/>SVM / LR / NN"]
+        H --> H1
+        H1 --> H2
+    end
+
+    subgraph Output["📤 Output"]
+        I[("🔮 Eruption<br/>Predictions")]
+    end
+
+    A --> C
+    C1 --> E
+    C2 --> E
+    B --> D
+    D2 --> E
+    F --> G
+    G2 --> H
+    H2 --> I
+
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style I fill:#e8f5e9
+    style C fill:#f3e5f5
+    style D fill:#fff8e1
+    style E fill:#e8eaf6
+    style G fill:#fce4ec
+    style H fill:#e0f2f1
 ```
-Raw Seismic Data (SDS/FDSN)
-         ↓
-  CalculateTremor (RSAM/DSAR)
-         ↓
-  Tremor CSV (10-min sampling)
-         ↓
-  LabelBuilder (with eruption dates)
-         ↓
-  Label CSV (binary: erupted/not)
-         ↓
-  FeaturesBuilder (tsfresh)
-         ↓
-  Feature Matrix
-         ↓
-  ForecastModel (training)
-         ↓
-  Eruption Predictions
-```
+
+### Pipeline Overview
+
+| Stage | Component | Input | Output |
+|-------|-----------|-------|--------|
+| 1 | **CalculateTremor** | Raw seismic data (SDS/FDSN) | Tremor CSV (RSAM + DSAR, 10-min intervals) |
+| 2 | **LabelBuilder** | Eruption dates + parameters | Label CSV (binary: erupted/not) |
+| 3 | **FeaturesBuilder** | Tremor CSV + Label CSV | Feature matrix (time windows) |
+| 4 | **tsfresh** | Feature matrix | Extracted features (700+ per column) |
+| 5 | **TrainModel** | Extracted features + labels | Significant features (multi-seed) |
+| 6 | **ClassifierModel** | Significant features | Trained model + predictions |
 
 ## Data Formats
 
@@ -279,7 +338,7 @@ set_log_directory("/custom/log/path")
 ### Development Dependencies
 - black (code formatting)
 - ruff (linting)
-- mypy (type checking)
+- pyrefly (type checking)
 - isort (import sorting)
 - pytest (testing)
 
@@ -348,4 +407,4 @@ This project uses:
 
 **Version:** 0.1.0
 **Status:** Active Development
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-02-04
