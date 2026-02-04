@@ -23,17 +23,19 @@ from eruption_forecast.utils import (
 class TrainModel:
     """Train feature-selection models over multiple random seeds.
 
-    Loads pre-extracted features and labels, runs randomised under-sampling
+    Loads pre-extracted features and labels, runs randomized under-sampling
     followed by tsfresh feature selection for each seed, and collects the
     top-N significant features per seed into a single output CSV.
+
+    This multi-seed approach provides robust feature selection by averaging
+    feature importance across many random data splits, reducing the risk
+    of overfitting to a particular train/test split.
 
     Args:
         features_csv (str): Path to the extracted features CSV file.
         label_csv (str): Path to the label CSV file.
         output_dir (str, optional): Directory for output files. Defaults to
             ``<cwd>/output/trainings``.
-        overwrite (bool, optional): Overwrite existing output files.
-            Defaults to False.
         n_jobs (int, optional): Number of parallel workers. Defaults to 1.
         verbose (bool, optional): Verbose logging. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
@@ -41,6 +43,21 @@ class TrainModel:
     Raises:
         ValueError: If features or labels are empty, or their lengths
             do not match.
+
+    Example:
+        >>> trainer = TrainModel(
+        ...     features_csv="output/features/extracted_features.csv",
+        ...     label_csv="output/features/label_features.csv",
+        ...     output_dir="output/trainings",
+        ...     n_jobs=4,
+        ... )
+        >>> trainer.train(
+        ...     random_state=0,
+        ...     total_seed=100,
+        ...     number_of_significant_features=20,
+        ...     sampling_strategy=0.75,
+        ... )
+        >>> # Results saved to output/trainings/significant_features.csv
     """
 
     def __init__(
@@ -234,18 +251,33 @@ class TrainModel:
         plot_significant_features: bool = False,
         overwrite: bool = False,
     ) -> None:
-        """Train the model.
+        """Train feature selection models across multiple random seeds.
+
+        For each seed, performs:
+        1. Random under-sampling to balance eruption/non-eruption classes
+        2. Feature significance testing using tsfresh
+        3. Saves top-N significant features to CSV
 
         Args:
-            random_state (int, optional): Initial random state. Defaults to 0.
-            total_seed (int, optional): Total random state. Defaults to 500.
-            number_of_significant_features (int, optional): Number of significant features.
-            sampling_strategy (str, optional): Sampling strategy. Defaults to 0.75.
-            save_all_features (bool, optional): Whether to save all features. Defaults to False.
-            plot_significant_features (bool, optional): Whether to plot significant features. Defaults to False.
-            overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
+            random_state (int, optional): Initial random state seed. Defaults to 0.
+            total_seed (int, optional): Total number of seeds to run. Defaults to 500.
+            number_of_significant_features (int, optional): Number of top features
+                to save per seed. Defaults to 20.
+            sampling_strategy (str | float, optional): Under-sampling ratio for
+                balancing classes. Defaults to 0.75.
+            save_all_features (bool, optional): Save all features per seed,
+                not just top-N. Defaults to False.
+            plot_significant_features (bool, optional): Generate feature importance
+                plots. Defaults to False.
+            overwrite (bool, optional): Overwrite existing output files.
+                Defaults to False.
 
-
+        Example:
+            >>> trainer.train(
+            ...     random_state=42,
+            ...     total_seed=100,
+            ...     number_of_significant_features=20,
+            ... )
         """
         if save_all_features:
             os.makedirs(self.all_features_dir, exist_ok=True)

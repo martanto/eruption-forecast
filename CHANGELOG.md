@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improved - Documentation & ML Analysis (2026-02-04)
+
+Comprehensive documentation improvements, grammar fixes, and machine learning workflow analysis.
+
+**Grammar & Spelling Fixes:**
+- Fixed "aftrer" → "after" in `forecast_model.py:147`
+- Fixed "Whether to each significant features" → "Whether to plot each significant feature" in `forecast_model.py:1043`
+- Fixed "Exracted" → "Extracted" in `utils.py:844`
+- Fixed `dict[str, any]` → `dict[str, Any]` in `classifier_model.py:186`
+
+**Docstring Improvements:**
+- Added comprehensive examples to `ForecastModel` class docstring
+- Added examples to `ClassifierModel` class and properties
+- Added examples to `TrainModel` class and `train()` method
+- Added examples to `FeaturesBuilder` class and `build()` method
+- Enhanced `get_significant_features()` and `random_under_sampler()` docstrings
+
+**Bug Fixes:**
+- Removed deprecated `max_features="auto"` from Decision Tree and Random Forest grids (deprecated in sklearn 1.4+)
+
+**Documentation Updates:**
+- Rewrote `SUMMARY.md` with comprehensive ML workflow analysis
+- Added model comparison table (7 classifiers)
+- Added grid parameter analysis for each model
+- Added recommendations for model selection
+- Updated `TODO.md` with new improvement tasks
+- Updated `README.md` to use `pyrefly` instead of `mypy`
+- Added Rule #6 to `CLAUDE.md`: Create branch with `claude/` prefix before modifications
+
+**Files Modified:**
+- `src/eruption_forecast/model/forecast_model.py`
+- `src/eruption_forecast/model/classifier_model.py`
+- `src/eruption_forecast/model/train_model.py`
+- `src/eruption_forecast/features/features_builder.py`
+- `src/eruption_forecast/utils.py`
+- `SUMMARY.md`
+- `TODO.md`
+- `README.md`
+- `CLAUDE.md`
+- `CHANGELOG.md`
+
+**Branch:** `claude/docstring-improvements`
+
+**Contributors:**
+- Claude Opus 4.5 <noreply@anthropic.com>
+
+---
+
 ### Refactored - ForecastModel Class (2025-02-03)
 
 Major refactoring of `src/eruption_forecast/model/forecast_model.py` to improve code maintainability, testability, and readability. The refactoring breaks down long methods into smaller, focused helper methods following established patterns in the codebase (LabelBuilder, FeaturesBuilder, CalculateTremor).
@@ -262,7 +310,7 @@ When reviewing code changes:
 - ✅ Verbose/debug logging preserved
 - ✅ Error messages improved with clearer context
 - ✅ Docstrings follow Google format
-- ✅ Type hints comprehensive (mypy compliant)
+- ✅ Type hints comprehensive (pyrefly compliant)
 - ✅ Consistent with LabelBuilder/FeaturesBuilder patterns
 
 ---

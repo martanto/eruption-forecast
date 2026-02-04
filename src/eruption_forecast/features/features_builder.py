@@ -21,7 +21,10 @@ class FeaturesBuilder:
 
     Slices tremor time-series into fixed-size windows aligned with label
     windows, then concatenates them into a single feature matrix suitable
-    for downstream model training.
+    for downstream model training with tsfresh.
+
+    The feature matrix contains one row per time sample within each window,
+    with columns for window ID, datetime, and tremor metrics (RSAM/DSAR).
 
     Args:
         df_tremor (pd.DataFrame): Tremor dataframe with DatetimeIndex.
@@ -40,6 +43,22 @@ class FeaturesBuilder:
         TypeError: If df_tremor or df_label index is not a DatetimeIndex.
         ValueError: If required label columns are missing or requested
             tremor columns do not exist.
+
+    Example:
+        >>> import pandas as pd
+        >>> # Prepare tremor data (10-minute intervals)
+        >>> df_tremor = pd.read_csv("tremor.csv", index_col=0, parse_dates=True)
+        >>> df_label = pd.read_csv("labels.csv", index_col=0, parse_dates=True)
+        >>> builder = FeaturesBuilder(
+        ...     df_tremor=df_tremor,
+        ...     df_label=df_label,
+        ...     output_dir="output/features",
+        ...     window_size=1,  # 1-day windows
+        ...     tremor_columns=["rsam_f0", "rsam_f1", "dsar_f0-f1"],
+        ... )
+        >>> features_matrix = builder.build(save_per_method=True)
+        >>> print(features_matrix.shape)
+        (14400, 5)  # 100 windows × 144 samples/day, 5 columns
     """
 
     def __init__(
@@ -170,6 +189,33 @@ class FeaturesBuilder:
         filename: str | None = None,
         verbose: bool = False,
     ) -> pd.DataFrame:
+        """Build the feature matrix from tremor and label data.
+
+        Iterates through each label window, extracts the corresponding
+        tremor data slice, validates sample count, and concatenates
+        into a unified feature matrix.
+
+        Args:
+            save_tmp_feature (bool, optional): Save individual window CSVs
+                for debugging. Defaults to False.
+            save_per_method (bool, optional): Save separate CSV per tremor
+                column. Defaults to True.
+            filename (str, optional): Output filename. Defaults to "features.csv".
+            verbose (bool, optional): Override instance verbose flag.
+                Defaults to False.
+
+        Returns:
+            pd.DataFrame: Feature matrix with columns [id, datetime, ...tremor_cols].
+
+        Raises:
+            ValueError: If no valid tremor data found for any label windows.
+
+        Example:
+            >>> features = builder.build(
+            ...     save_per_method=True,
+            ...     filename="tremor_features_2024.csv",
+            ... )
+        """
         df_label = self.df_label.loc[self.start_date : self.end_date]
         df_tremor = self.df_tremor
         window_size = self.window_size

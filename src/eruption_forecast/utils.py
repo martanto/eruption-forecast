@@ -818,19 +818,28 @@ def random_under_sampler(
     sampling_strategy: str | float = "auto",
     random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Randomly under sampling features.
+    """Apply random under-sampling to balance classes.
 
-    Handling imbalance dataset of eruption and non-eruption.
+    Handles imbalanced eruption/non-eruption datasets by randomly removing
+    samples from the majority class (non-eruption) to match the minority
+    class (eruption) based on the sampling strategy.
 
     Args:
         features (pd.DataFrame): Features dataframe.
-        labels (pd.Series): Labels dataframe.
-        sampling_strategy (str, optional): Sampling strategy. Defaults to "auto".
-        random_state (int, optional): Random state. Defaults to 42.
+        labels (pd.Series): Binary labels series.
+        sampling_strategy (str | float, optional): Sampling ratio or strategy.
+            Float value represents desired ratio of minority/majority.
+            Defaults to "auto".
+        random_state (int, optional): Random seed for reproducibility.
+            Defaults to 42.
 
     Returns:
-        pd.DataFrame: Randomly under sampling features.
-        pd.Series: Randomly under sampling labels.
+        tuple[pd.DataFrame, pd.Series]: Balanced (features, labels).
+
+    Example:
+        >>> balanced_X, balanced_y = random_under_sampler(
+        ...     features, labels, sampling_strategy=0.75, random_state=42
+        ... )
     """
     sampler = RandomUnderSampler(
         sampling_strategy=sampling_strategy, random_state=random_state
@@ -846,15 +855,23 @@ def get_significant_features(
     labels: pd.Series | pd.DataFrame,
     n_jobs: int = 1,
 ) -> pd.Series:
-    """Get significant features.
+    """Get significant features ranked by p-value.
+
+    Uses tsfresh's FeatureSelector to identify features with statistically
+    significant correlation to the target labels.
 
     Args:
-        features (pd.DataFrame): Exracted features dataframe.
-        labels (pd.Series | pd.DataFrame): Labels in series or dataframe.
+        features (pd.DataFrame): Extracted features dataframe from tsfresh.
+        labels (pd.Series | pd.DataFrame): Binary eruption labels.
         n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
     Returns:
-        pd.Series: Significant features.
+        pd.Series: Features sorted by p-value (ascending), with feature
+            names as index and p-values as values.
+
+    Example:
+        >>> significant = get_significant_features(features_df, labels_series)
+        >>> top_10_features = significant.head(10).index.tolist()
     """
     if isinstance(labels, pd.DataFrame):
         labels = to_series(labels, column_value="is_erupted")

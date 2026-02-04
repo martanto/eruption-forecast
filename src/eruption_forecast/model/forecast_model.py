@@ -37,17 +37,20 @@ from eruption_forecast.utils import (
 class ForecastModel:
     """Create forecast model from seismic data.
 
-    CalculateTremor: Calculate Tremor data from seismic data.
-    Build Label and extract features for training.
-    Predict based on training data.
+    Orchestrates the complete eruption forecasting pipeline:
+    1. Calculate tremor data from seismic data (RSAM/DSAR metrics)
+    2. Build labels for supervised learning
+    3. Extract time-series features using tsfresh
+    4. Train classification models
+    5. Generate predictions
 
     Args:
-        station (str): Seismic station code.
-        channel (str): Seismic channel code.
+        station (str): Seismic station code (e.g., "OJN").
+        channel (str): Seismic channel code (e.g., "EHZ").
         start_date (str | datetime): Start date in YYYY-MM-DD format.
         end_date (str | datetime): End date in YYYY-MM-DD format.
-        window_size (int): Window size in days. Used to create label and training data.
-        volcano_id (str): Volcano ID. To set and forecast ID.
+        window_size (int): Window size in days for training data windows.
+        volcano_id (str): Volcano identifier for output naming.
         network (str): Seismic network code. Defaults to "VG".
         location (str): Seismic location code. Defaults to "00".
         output_dir (str): Directory for output files. Defaults to "output".
@@ -55,6 +58,24 @@ class ForecastModel:
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
         verbose (bool): If True, enables verbose logging. Defaults to False.
         debug (bool): If True, enables debug mode. Defaults to False.
+
+    Example:
+        >>> model = ForecastModel(
+        ...     station="OJN",
+        ...     channel="EHZ",
+        ...     start_date="2024-01-01",
+        ...     end_date="2024-06-30",
+        ...     window_size=1,
+        ...     volcano_id="LEWOTOBI",
+        ... )
+        >>> model.calculate(source="sds", sds_dir="data/sds")
+        >>> model.build_label(
+        ...     window_step=12,
+        ...     window_step_unit="hours",
+        ...     day_to_forecast=2,
+        ...     eruption_dates=["2024-03-15", "2024-05-20"],
+        ... )
+        >>> model.build_features().extract_features().train()
     """
 
     def __init__(
@@ -144,7 +165,7 @@ class ForecastModel:
         # Will be set after predict() called
         self.prediction_features_csvs: set[str] = set()
 
-        # Will be set aftrer train() called
+        # Will be set after train() called
         self.TrainModel: TrainModel | None = None
 
         # Base filename without extension
@@ -1040,7 +1061,7 @@ class ForecastModel:
             number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
             sampling_strategy (str, optional): Sampling strategy. Defaults to 0.75.
             save_all_features (bool, optional): Whether to save ALL features. Defaults to False.
-            plot_significant_features (bool, optional): Whether to each significant features. Defaults to False.
+            plot_significant_features (bool, optional): Whether to plot each significant feature. Defaults to False.
             n_jobs (int, optional): Number of jobs. Defaults to 1.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
