@@ -1,16 +1,168 @@
 # Standard library imports
+import functools
+import os
+import time
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Callable, Literal, Optional, Tuple, Union
+from typing import Any, Literal
 
 # Third party imports
 import numpy as np
 import pandas as pd
+from imblearn.pipeline import Pipeline
 from imblearn.under_sampling import RandomUnderSampler
 from obspy import Trace
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedShuffleSplit,
+    train_test_split,
+)
 from tsfresh.transformers import FeatureSelector
 
 # Project imports
 from eruption_forecast.logger import logger
+from eruption_forecast.model.classifier_model import ClassifierModel
+
+
+def timer(name: str | None = None, verbose: bool = True):
+    """
+    Decorator factory for timing functions.
+
+    Args:
+        name: Custom name for the operation (defaults to function name)
+        verbose: Whether to print timing results
+
+    Returns:
+        Decorated function
+
+    Example:
+        @timer()
+        def my_function():
+            time.sleep(1)
+    """
+
+    def decorator(func: Callable) -> Callable:
+        operation_name = name if name else func.__name__
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            end = time.perf_counter()
+            elapsed = timedelta(seconds=end - start).seconds
+            hours, remainder = divmod(elapsed, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if verbose:
+                print("==" * 50)
+                print(
+                    f"|| {operation_name}: took {hours:02d} hours, {minutes:02d} minutes, {seconds:02d} seconds"
+                )
+                print("==" * 50)
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def create_model_predictions(
+    features: pd.DataFrame,
+    labels: pd.Series,
+    classifier: ClassifierModel,
+    model_dir: str,
+    sampling_strategy: str | float = 0.75,
+    scoring: str = "balanced_accuracy",
+    random_state: int = 42,
+    cv: Any = None,
+    overwrite: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Create model predictions based on specific classifier.
+
+    Args:
+        features (pd.DataFrame): Extracted features DataFrame.
+        labels (pd.Series): Labels DataFrame.
+        classifier (ClassifierModel): Classifier model.
+        model_dir (str): Output directory for model predictions.
+        sampling_strategy (str, float, optional): Sampling strategy for feature selection. Defaults to 75.
+        random_state (int, optional): Random state for feature selection. Defaults to 42.
+        scoring (str, optional): Cross validation scoring strategy. Defaults to "balanced_accuracy".
+        cv (Any, optional): Cross-validation strategy. Defaults to StratifiedShuffleSplit.
+        overwrite (bool, optional): Whether to overwrite existing predictions. Defaults to False.
+        verbose (bool, optional): Verbosity strategy. Defaults to False.
+
+    Returns:
+        None
+    """
+    classifier_model, param_grid = classifier.model_and_grid
+
+    classifier_name = type(classifier_model).__name__
+    classifier_dir = os.path.join(model_dir, classifier_name)
+    filename = f"{classifier_name}_{random_state:05d}.pkl"
+    filepath = os.path.join(classifier_dir, filename)
+
+    if not overwrite and os.path.isfile(filepath):
+        if verbose:
+            logger.debug(f"Model prediction exists at: {filepath}")
+        return None
+
+    features = get_significant_features(features=features, labels=labels)
+    features_train, features_test, labels_train, labels_test = train_test_split(
+        features,
+        labels,
+        test_size=0.2,
+        random_state=random_state,
+        stratify=labels,  # type: ignore
+    )
+
+    if cv is None:
+        cv = StratifiedShuffleSplit(
+            n_splits=5, test_size=0.2, random_state=random_state
+        )
+
+    pipeline = Pipeline(
+        [
+            (
+                "undersampler",
+                RandomUnderSampler(
+                    sampling_strategy=sampling_strategy, random_state=random_state
+                ),
+            ),
+            ("classifier", classifier_model),
+        ]
+    )
+
+    grid_search = GridSearchCV(
+        estimator=pipeline,
+        param_grid=param_grid,
+        cv=cv,
+        scoring=scoring,
+        n_jobs=-1,
+        error_score=np.nan,
+        verbose=verbose,
+    )
+
+    grid_search.fit(features_train, labels_train)
+    best_model = grid_search.best_estimator_
+
+    # TODO: Saved prediction result
+    labels_pred = best_model.predict(features_test)
+    labels_pred_proba = grid_search.predict_proba(features_test)
+
+    results = {
+        "model": classifier_model,
+        "predictions": labels_pred,
+        "probabilities": labels_pred_proba,
+        "best_params": grid_search.best_params_,
+        # "feature_names": feature_names,  # if relevant
+    }
+
+    if verbose:
+        logger.debug(f"Best parameters {random_state:05d}: {grid_search.best_params_}")
+        logger.debug(f"Best score {random_state:05d}: {grid_search.best_score_:.4f}")
+
+    # TODO: Save model
+    return None
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -35,7 +187,7 @@ def mask_zero_values(data: np.ndarray) -> np.ndarray:
 
 def detect_maximum_outlier(
     data: np.ndarray, outlier_threshold: float = 3.0
-) -> Tuple[bool, Union[int, float], float]:
+) -> tuple[bool, int | float, float]:
     """Detect if maximum value in array is an outlier using z-score method.
 
     Uses z-score ((X - μ) / σ) to determine if the maximum value in the array
@@ -48,7 +200,7 @@ def detect_maximum_outlier(
             Defaults to 3.0 (3 standard deviations).
 
     Returns:
-        Tuple[bool, Union[int, float], float]:
+        tuple[bool, Union[int, float], float]:
             - is_outlier (bool): True if maximum value is an outlier
             - outlier_index (int | float): Index of the maximum value, or np.nan if no outlier
             - outlier_value (float): Maximum value, or np.nan if no outlier
@@ -235,7 +387,7 @@ def remove_outliers(
 def get_windows_information(
     trace: Trace,
     window_duration_minutes: int = 10,
-) -> dict[str, Union[int, float]]:
+) -> dict[str, int | float]:
     """Get window and sample information from an ObsPy Trace.
 
     Args:
@@ -284,7 +436,7 @@ def calculate_window_metrics(
     trace: Trace,
     window_duration_minutes: int = 10,
     metric_function: Callable[[np.ndarray], float] = np.mean,
-    remove_outlier_method: Optional[Literal["maximum", "all"]] = None,
+    remove_outlier_method: Literal["maximum", "all"] | None = None,
     mask_zero_value: bool = False,
     minimum_completion_ratio: float = 0.3,
     absolute_value: bool = False,
@@ -342,7 +494,6 @@ def calculate_window_metrics(
             # Re-check length after outlier removal just in case,
             # though remove_maximum_outlier mostly removes one
             if len(window_data) > 0:
-
                 # Update metric value
                 metric_value = metric_function(window_data)
 
@@ -361,8 +512,8 @@ def calculate_window_metrics(
 
 
 def construct_windows(
-    start_date: Union[str, datetime],
-    end_date: Union[str, datetime],
+    start_date: str | datetime,
+    end_date: str | datetime,
     window_step: int,
     window_step_unit: Literal["minutes", "hours"],
 ) -> pd.DataFrame:
@@ -411,9 +562,35 @@ def construct_windows(
     return df
 
 
-def to_datetime(
-    date: Union[str, datetime], variable_name: Optional[str] = None
-) -> datetime:
+def to_series(
+    df: pd.DataFrame, column_value: str, column_index: str = "id"
+) -> pd.Series:
+    """Return DataFrame into Series.
+
+    Args:
+        df (pd.DataFrame): DataFrame with datetime index representing time windows.
+        column_value (str): Column name to be used as value in series.
+        column_index (str, optional): Column name to be used as value in series. Defaults to "id".
+
+    Returns:
+        pd.Series: Series.
+    """
+    if column_value not in df.columns:
+        raise ValueError(
+            f"Param column_value ({column_value}) not in columns in DataFrame."
+        )
+
+    if column_index not in df.columns:
+        raise ValueError(
+            f"Param column_index ({column_index}) not in columns in DataFrame."
+        )
+
+    series = pd.Series(df[column_value])
+    series.index = df[column_index]
+    return series
+
+
+def to_datetime(date: str | datetime, variable_name: str | None = None) -> datetime:
     """Ensure date object is a datetime object.
 
     Args:
@@ -431,14 +608,14 @@ def to_datetime(
     try:
         return datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
-        raise ValueError(
+        raise ValueError(  # noqa: B904
             f"{variable_name} value {date} is not in valid YYYY-MM-DD format."
         )
 
 
 def validate_date_ranges(
-    start_date: Union[str, datetime], end_date: Union[str, datetime]
-) -> Tuple[datetime, datetime, int]:
+    start_date: str | datetime, end_date: str | datetime
+) -> tuple[datetime, datetime, int]:
     """Validate date range.
 
     Args:
@@ -449,7 +626,7 @@ def validate_date_ranges(
         ValueError: If date range is not valid.
 
     Returns:
-        Tuple[datetime, datetime, int]: Start date, end date, and total number of days.
+        tuple[datetime, datetime, int]: Start date, end date, and total number of days.
     """
     if isinstance(start_date, str):
         start_date = to_datetime(start_date)
@@ -472,7 +649,7 @@ def validate_date_ranges(
 def validate_window_step(
     window_step: int,
     window_step_unit: Literal["minutes", "hours"],
-) -> Tuple[int, Literal["minutes", "hours"]]:
+) -> tuple[int, Literal["minutes", "hours"]]:
     """Validate window step and step unit.
 
     Args:
@@ -483,12 +660,10 @@ def validate_window_step(
         ValueError: If window step or unit is invalid.
 
     Returns:
-        Tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes or hours).
+        tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes or hours).
     """
     if not isinstance(window_step, int):
-        raise TypeError(
-            f"window_step must be an integer. Your value is {window_step}"
-        )
+        raise TypeError(f"window_step must be an integer. Your value is {window_step}")
     if not isinstance(window_step_unit, str):
         raise TypeError(
             f"window_step_unit must be a string. Your value is {window_step_unit}"
@@ -522,7 +697,7 @@ def check_sampling_consistency(
     expected_freq: str = "10min",
     tolerance: str = "1min",
     verbose: bool = False,
-) -> Tuple[bool, pd.DataFrame, pd.DataFrame]:
+) -> tuple[bool, pd.DataFrame, pd.DataFrame]:
     """
     Check 10-minute sampling rate consistency, identify inconsistencies, and remove them.
 
@@ -575,7 +750,7 @@ def check_sampling_consistency(
         print(f"Consistent rows: {len(consistent_data)}")
 
         if len(inconsistent_data) > 0:
-            print(f"\nInconsistent time differences:")
+            print("\nInconsistent time differences:")
             print(time_diffs[inconsistent_mask].describe())
 
     return is_consistent, consistent_data, inconsistent_data
@@ -607,7 +782,7 @@ def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
 
 def concat_features(
     csv_list: list[str], filepath: str, return_as_filepath: bool = False
-) -> Union[str, Tuple[str, pd.DataFrame]]:
+) -> str | tuple[str, pd.DataFrame]:
     """Concatenate features from csv_list into one dataframe.
 
     Args:
@@ -640,9 +815,9 @@ def concat_features(
 def random_under_sampler(
     features: pd.DataFrame,
     labels: pd.Series,
-    sampling_strategy: Union[str, float] = "auto",
+    sampling_strategy: str | float = "auto",
     random_state: int = 42,
-) -> Tuple[pd.DataFrame, pd.Series]:
+) -> tuple[pd.DataFrame, pd.Series]:
     """Randomly under sampling features.
 
     Handling imbalance dataset of eruption and non-eruption.
@@ -668,24 +843,26 @@ def random_under_sampler(
 
 def get_significant_features(
     features: pd.DataFrame,
-    labels: pd.Series,
+    labels: pd.Series | pd.DataFrame,
     n_jobs: int = 1,
 ) -> pd.Series:
     """Get significant features.
 
     Args:
-        features (pd.DataFrame): Features dataframe.
-        labels (pd.Series): Labels dataframe.
-        number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
+        features (pd.DataFrame): Exracted features dataframe.
+        labels (pd.Series | pd.DataFrame): Labels in series or dataframe.
         n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
     Returns:
         pd.Series: Significant features.
     """
+    if isinstance(labels, pd.DataFrame):
+        labels = to_series(labels, column_value="is_erupted")
+
     selector = FeatureSelector(n_jobs=n_jobs, ml_task="classification")
     selector.fit_transform(X=features, y=labels)  # type: ignore
 
-    _significant_features = pd.Series(selector.p_values, index=features.columns)
+    _significant_features = pd.Series(selector.p_values, index=selector.features)
     _significant_features = _significant_features.sort_values()
     _significant_features.name = "values"
     _significant_features.index.name = "features"
@@ -694,8 +871,8 @@ def get_significant_features(
 
 
 def normalize_dates(
-    start_date: Union[str, datetime],
-    end_date: Union[str, datetime],
+    start_date: str | datetime,
+    end_date: str | datetime,
 ) -> tuple[datetime, datetime, str, str]:
     """Normalize start and end dates to standard format.
 
@@ -707,7 +884,7 @@ def normalize_dates(
         end_date: End date in YYYY-MM-DD format or datetime object.
 
     Returns:
-        Tuple of (start_date, end_date, start_date_str, end_date_str)
+        tuple of (start_date, end_date, start_date_str, end_date_str)
     """
     start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
     end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)

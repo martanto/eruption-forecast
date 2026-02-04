@@ -3,7 +3,7 @@ import glob
 import os
 import shutil
 from datetime import datetime, timedelta
-from functools import cached_property, lru_cache
+from functools import cached_property
 from multiprocessing import Pool
 from typing import Literal, Self
 
@@ -80,7 +80,7 @@ class CalculateTremor:
         station_dir = os.path.join(output_dir, nslc)
         forecast_dir = os.path.join(station_dir, "forecast")
         tremor_dir = os.path.join(station_dir, "tremor")
-        figures_dir = os.path.join(station_dir, "figures")
+        figures_dir = os.path.join(tremor_dir, "figures")
 
         # Set DEFAULT properties
         self.station = station.upper()
@@ -135,7 +135,6 @@ class CalculateTremor:
         self.sds: SDS | None = None
         self.tmp_files: list[str] = []
         self.figures_dir = figures_dir
-        self.figures_tmp_dir = os.path.join(figures_dir, "tmp")
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
         self._source: str | None = None
         self._sds_dir: str | None = None
@@ -303,7 +302,7 @@ class CalculateTremor:
         os.makedirs(self.tmp_dir, exist_ok=True)
 
         if self.plot_tmp:
-            os.makedirs(self.figures_tmp_dir, exist_ok=True)
+            os.makedirs(self.figures_dir, exist_ok=True)
 
     def validate(self) -> None:
         """Validate input parameters.
@@ -446,7 +445,8 @@ class CalculateTremor:
                 df=df,
                 interval=14,
                 interval_unit="days",
-                figure_dir=self.figures_dir,
+                figure_dir=self.tremor_dir,
+                filename=filename,
                 title=self.nslc,
                 overwrite=self.overwrite or self.overwrite_plot,
                 verbose=self.verbose,
@@ -472,10 +472,17 @@ class CalculateTremor:
         """
         date_str = date.strftime("%Y-%m-%d")
         temp_file = os.path.join(self.tmp_dir, f"{date_str}.csv")
+        temp_plot = os.path.join(self.figures_dir, f"{date_str}.png")
 
         logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
 
-        if not self.overwrite and os.path.exists(temp_file):
+        can_skip = (
+            not self.overwrite
+            and os.path.exists(temp_file)
+            and (not self.plot_tmp and os.path.exists(temp_plot))
+        )
+
+        if can_skip:
             if self.verbose:
                 logger.info(f"{date_str} :: File CSV loaded {temp_file}")
             return temp_file
@@ -500,7 +507,7 @@ class CalculateTremor:
                 interval=2,
                 interval_unit="hours",
                 filename=f"{date_str}.png",
-                figure_dir=self.figures_tmp_dir,
+                figure_dir=self.figures_dir,
                 title=date_str,
                 overwrite=self.overwrite,
                 verbose=self.verbose,
@@ -513,7 +520,6 @@ class CalculateTremor:
 
         return temp_file
 
-    @lru_cache(maxsize=128)
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor data.
         This method calculates the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
@@ -555,6 +561,9 @@ class CalculateTremor:
                     )
                     continue
                 df = self.calculate_dsar(date_str, df, stream)
+
+        if self.verbose:
+            logger.info(f"{date_str} :: Calculation finished.")
 
         return df
 
@@ -656,8 +665,8 @@ class CalculateTremor:
                 df[column_name] = dsar_series.values
 
                 if self.verbose:
-                    logger.info(
-                        f"{date_str} :: DSAR ({column_name}) calculation completed"
+                    logger.debug(
+                        f"{date_str} :: DSAR ({column_name}) calculation completed."
                     )
 
             # Store current series for next iteration
@@ -716,14 +725,14 @@ class CalculateTremor:
             del stream_copy
 
             if self.verbose:
-                logger.info(f"{date_str} :: RSAM ({column_name}) calculation finished")
+                logger.debug(
+                    f"{date_str} :: RSAM ({column_name}) calculation completed."
+                )
 
         return df
 
     @staticmethod
-    def concat_tremor_data(
-        tmp_dir: str, tremor_dir: str | None = None
-    ) -> pd.DataFrame:
+    def concat_tremor_data(tmp_dir: str, tremor_dir: str | None = None) -> pd.DataFrame:
         """Concatenate calculated tremor data from tmp dir to tremor dir.
 
         Args:

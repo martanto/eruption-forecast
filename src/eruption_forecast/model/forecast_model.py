@@ -21,6 +21,7 @@ from eruption_forecast.features.constants import (
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
+from eruption_forecast.model.train_model import TrainModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.utils import concat_features as utils_concat_features
@@ -132,6 +133,7 @@ class ForecastModel:
         self.features_csv: str | None = None
 
         # Will be set after extract_features() called
+        self.use_relevant_features: bool = False
         self.extract_features_csvs: set[str] = set()
         self.relevant_features_csvs: set[str] = set()
 
@@ -141,6 +143,9 @@ class ForecastModel:
 
         # Will be set after predict() called
         self.prediction_features_csvs: set[str] = set()
+
+        # Will be set aftrer train() called
+        self.TrainModel: TrainModel | None = None
 
         # Base filename without extension
         self.basename: str | None = None
@@ -313,6 +318,7 @@ class ForecastModel:
     def _calculate_from_fdsn(
         self, calculate: CalculateTremor, client_url: str
     ) -> CalculateTremor:
+        # TODO: Calculate using FDSN
         """Calculate tremor from FDSN data source.
 
         Args:
@@ -853,6 +859,8 @@ class ForecastModel:
         if concat_features:
             self.concat_features()
 
+        self.use_relevant_features = use_relevant_features
+
         return self
 
     def build_features(
@@ -892,7 +900,7 @@ class ForecastModel:
         )
 
         self.FeaturesBuilder = features_builder
-        features_filename = f"features_{self.start_date_str}-{self.end_date_str}_ws-{self.window_size}.csv"
+        features_filename = f"tremor_features_{self.start_date_str}-{self.end_date_str}_ws-{self.window_size}.csv"
         features_data = features_builder.build(
             save_tmp_feature=save_tmp_feature,
             save_per_method=save_per_method,
@@ -907,7 +915,7 @@ class ForecastModel:
 
         label_csv = os.path.join(
             self.features_dir,
-            f"label_{self.start_date_str}-{self.end_date_str}.csv",
+            f"label_features_{self.start_date_str}-{self.end_date_str}.csv",
         )
         label_data.to_csv(label_csv, index=True)
 
@@ -1001,6 +1009,89 @@ class ForecastModel:
 
         # Calculate and log statistics
         self._calculate_eruption_statistics(label_builder)
+
+        return self
+
+    def train(
+        self,
+        extracted_features_csv: str | None = None,
+        label_csv: str | None = None,
+        use_relevant_features: bool = False,
+        output_dir: str | None = None,
+        random_state: int = 0,
+        total_seed: int = 500,
+        number_of_significant_features: int = 20,
+        sampling_strategy: str | float = 0.75,
+        save_all_features: bool = False,
+        plot_significant_features: bool = False,
+        n_jobs: int = 1,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ) -> Self:
+        """Training model using extracted features and labels.
+
+        Args:
+            extracted_features_csv (str | None): Path to extracted features.
+            label_csv (str | None): Path to label.csv
+            use_relevant_features (bool, optional): Whether to use relevant features. Defaults to False.
+            output_dir (str, optional): Path to output directory. Defaults to None.
+            random_state (int, optional): Initiate random seed. Defaults to 0.
+            total_seed (int, optional): Total random seed. Defaults to 500.
+            number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
+            sampling_strategy (str, optional): Sampling strategy. Defaults to 0.75.
+            save_all_features (bool, optional): Whether to save ALL features. Defaults to False.
+            plot_significant_features (bool, optional): Whether to each significant features. Defaults to False.
+            n_jobs (int, optional): Number of jobs. Defaults to 1.
+            overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
+            verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
+
+        Returns:
+            self (Self): ForecastModel object
+        """
+        features_csv = extracted_features_csv or self.extracted_features_csv
+        if use_relevant_features or self.use_relevant_features:
+            features_csv = self.extracted_relevant_csv
+        if features_csv is None or not os.path.exists(features_csv):
+            error_msg = f"Features CSV not found: {features_csv}"
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+
+        label_csv = label_csv or self.label_csv
+        if label_csv is None or not os.path.exists(label_csv):
+            error_msg = f"Label CSV not found: {label_csv}"
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+
+        output_dir = output_dir or os.path.join(self.station_dir, "trainings")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Disable running multiprocessing inside multiprocessing
+        if self.n_jobs > 1:
+            n_jobs = 1
+            logger.info(
+                f"Disable running multiprocessing inside multiprocessing, "
+                f"since {self.n_jobs} more than 1."
+            )
+
+        train_model = TrainModel(
+            features_csv=features_csv,
+            label_csv=label_csv,
+            output_dir=output_dir,
+            verbose=verbose or self.verbose,
+            n_jobs=n_jobs,
+        )
+
+        train_model.train(
+            random_state=random_state,
+            total_seed=total_seed,
+            number_of_significant_features=number_of_significant_features,
+            sampling_strategy=sampling_strategy,
+            save_all_features=save_all_features,
+            plot_significant_features=plot_significant_features,
+            overwrite=overwrite or self.overwrite,
+        )
+
+        self.TrainModel = train_model
 
         return self
 

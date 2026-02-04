@@ -1,7 +1,6 @@
 # Standard library imports
 from collections.abc import Callable
 from datetime import datetime
-from functools import lru_cache
 from typing import Literal, Self
 
 # Third party imports
@@ -60,7 +59,6 @@ class RSAM:
 
         return self
 
-    @lru_cache(maxsize=128)
     def calculate(
         self,
         window_duration_minutes: int = 10,

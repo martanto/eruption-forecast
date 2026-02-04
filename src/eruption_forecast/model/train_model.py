@@ -13,7 +13,7 @@ from eruption_forecast.features.constants import (
     SIGNIFICANT_FEATURES_FILENAME,
 )
 from eruption_forecast.logger import logger
-from eruption_forecast.plot import plot_significant_features
+from eruption_forecast.plot import plot_significant_features as plot_significant
 from eruption_forecast.utils import (
     get_significant_features,
     random_under_sampler,
@@ -28,10 +28,10 @@ class TrainModel:
     top-N significant features per seed into a single output CSV.
 
     Args:
-        features_csv (str): Path to the features CSV file.
+        features_csv (str): Path to the extracted features CSV file.
         label_csv (str): Path to the label CSV file.
         output_dir (str, optional): Directory for output files. Defaults to
-            ``<cwd>/output/predictions``.
+            ``<cwd>/output/trainings``.
         overwrite (bool, optional): Overwrite existing output files.
             Defaults to False.
         n_jobs (int, optional): Number of parallel workers. Defaults to 1.
@@ -48,7 +48,6 @@ class TrainModel:
         features_csv: str,
         label_csv: str,
         output_dir: str | None = None,
-        overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
@@ -63,9 +62,9 @@ class TrainModel:
             df_labels = df_labels.drop(DATETIME_COLUMN, axis=1)
 
         df_labels = df_labels[ERUPTED_COLUMN]
-        output_dir = output_dir or os.path.join(os.getcwd(), "output", "predictions")
-        model_prediction_dir = output_dir or os.path.join(
-            os.getcwd(), "output", "models", "prediction"
+        output_dir = output_dir or os.path.join(os.getcwd(), "output", "trainings")
+        training_dir = output_dir or os.path.join(
+            os.getcwd(), "output", "models", "trainings"
         )
 
         significant_features_dir = os.path.join(output_dir, "significant_features")
@@ -79,13 +78,12 @@ class TrainModel:
         self.df_labels = df_labels
         self.n_jobs = int(n_jobs)
         self.output_dir = output_dir
-        self.overwrite = overwrite
         self.verbose = verbose
         self.debug = debug
 
         # Set ADDITIONAL properties
         self.significant_features_dir = significant_features_dir
-        self.model_prediction_dir = model_prediction_dir
+        self.training_dir = training_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
         self.all_figures_dir = all_figures_dir
@@ -125,11 +123,16 @@ class TrainModel:
     def create_directories(self) -> None:
         """Create required output directories."""
         os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.model_prediction_dir, exist_ok=True)
+        os.makedirs(self.training_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
 
-    def concat_significant_features(self) -> pd.DataFrame:
+    def concat_significant_features(
+        self, number_of_significant_features: int | None = None
+    ) -> pd.DataFrame:
         """Concatenate significant features.
+
+        Args:
+            number_of_significant_features (int, optional): Number of significant features.
 
         Returns:
             pd.DataFrame: Significant features.
@@ -147,6 +150,12 @@ class TrainModel:
         df.to_csv(
             os.path.join(self.output_dir, SIGNIFICANT_FEATURES_FILENAME), index=False
         )
+
+        if (
+            number_of_significant_features is not None
+            and number_of_significant_features > 0
+        ):
+            pass
 
         return df
 
@@ -203,7 +212,7 @@ class TrainModel:
         if save_features:
             significant_features.to_csv(all_features_filepath, index=True)
             if plot_features:
-                plot_significant_features(
+                plot_significant(
                     df=pd.DataFrame(significant_features).reset_index(),
                     filepath=all_figures_filepath,
                     overwrite=overwrite,
@@ -221,16 +230,27 @@ class TrainModel:
         total_seed: int = 500,
         number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
-        save_features: bool = False,
-        plot_features: bool = False,
+        save_all_features: bool = False,
+        plot_significant_features: bool = False,
         overwrite: bool = False,
     ) -> None:
-        overwrite = overwrite or self.overwrite
+        """Train the model.
 
-        if save_features:
+        Args:
+            random_state (int, optional): Initial random state. Defaults to 0.
+            total_seed (int, optional): Total random state. Defaults to 500.
+            number_of_significant_features (int, optional): Number of significant features.
+            sampling_strategy (str, optional): Sampling strategy. Defaults to 0.75.
+            save_all_features (bool, optional): Whether to save all features. Defaults to False.
+            plot_significant_features (bool, optional): Whether to plot significant features. Defaults to False.
+            overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
+
+
+        """
+        if save_all_features:
             os.makedirs(self.all_features_dir, exist_ok=True)
 
-        if plot_features:
+        if plot_significant_features:
             os.makedirs(self.all_figures_dir, exist_ok=True)
 
         jobs = [
@@ -240,8 +260,8 @@ class TrainModel:
                 number_of_significant_features,
                 sampling_strategy,
                 overwrite,
-                save_features,
-                plot_features,
+                save_all_features,
+                plot_significant_features,
             )
             for seed in range(total_seed)
         ]

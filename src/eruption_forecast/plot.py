@@ -1,5 +1,6 @@
 # Standard library imports
 import os
+from pathlib import Path
 from typing import Literal
 
 # Third party imports
@@ -51,7 +52,10 @@ def plot_tremor(
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
 
-    default_filename = f"tremor_{start_date_str}_{end_date_str}.png"
+    if filename is not None:
+        filename = Path(filename).stem
+
+    default_filename = f"tremor_{start_date_str}_{end_date_str}"
     default_title = (
         f"{start_date_str}" if n_days == 0 else f"{start_date_str}_{end_date_str}"
     )
@@ -62,8 +66,7 @@ def plot_tremor(
     os.makedirs(figure_dir, exist_ok=True)
 
     filename = filename or default_filename
-    filename = filename if len(filename.split(".")) > 1 else f"{filename}.png"
-    filepath = os.path.join(figure_dir, f"{filename}")
+    filepath = os.path.join(figure_dir, f"{filename}.png")
 
     if os.path.exists(filepath) and not overwrite:
         if verbose:

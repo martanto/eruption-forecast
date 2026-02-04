@@ -1,6 +1,8 @@
 from eruption_forecast import ForecastModel
-from eruption_forecast.model.build_model import TrainModel
+from eruption_forecast.utils import timer
 
+
+@timer("Calculate Tremor")
 def main():
     sds_dir = r"D:\Data\OJN"
 
@@ -28,7 +30,9 @@ def main():
 
     fm = ForecastModel(overwrite=False, **params)
 
-    fm.calculate(sds_dir=sds_dir, remove_outlier_method="maximum").build_label(
+    fm.calculate(
+        source="sds", sds_dir=sds_dir, remove_outlier_method="maximum"
+    ).build_label(
         start_date="2025-01-01",
         end_date="2025-07-24",
         day_to_forecast=2,
@@ -36,7 +40,9 @@ def main():
         window_step_unit="hours",
         eruption_dates=eruptions,
         verbose=True,
-    ).build_features(overwrite=False, verbose=True).extract_features(
+    ).build_features(
+        save_per_method=True, overwrite=False, verbose=True
+    ).extract_features(
         use_relevant_features=False,
         overwrite=False,
         tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
@@ -50,33 +56,17 @@ def main():
         ],
         concat_features=True,
         n_jobs=4,
-    )
-
-def train():
-    features_csv = r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\features\extracted_features_2025-01-01-2025-09-28.csv"
-    label_csv = r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\features\label_2025-01-01-2025-09-28.csv"
-
-    train_model = TrainModel(
-        features_csv=features_csv,
-        label_csv=label_csv,
-        output_dir=r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\predictions",
-        overwrite=False,
-        verbose=False,
-        n_jobs=4,
-    )
-
-    train_model.train(
+    ).train(
         sampling_strategy=0.75,
         random_state=0,
         total_seed=500,
         number_of_significant_features=20,
-        save_features=True,
-        plot_features=True,
+        save_all_features=True,
+        plot_significant_features=True,
         overwrite=False,
-        verbose=False,
+        verbose=True,
     )
 
 
 if __name__ == "__main__":
-    # main()
-    train()
+    main()
