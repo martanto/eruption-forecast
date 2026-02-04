@@ -213,7 +213,7 @@ class SDS:
             sampling_rate = trace.stats.sampling_rate
             duration = n_samples / sampling_rate if sampling_rate > 0 else 0
 
-            logger.info(f"{date_str} :: Stream loaded successfully")
+            logger.debug(f"{date_str} :: Stream loaded successfully")
             logger.info(
                 f"{date_str} :: {len(stream)} trace(s), {n_samples} samples, "
                 f"{duration:.1f}s duration @ {sampling_rate}Hz"
