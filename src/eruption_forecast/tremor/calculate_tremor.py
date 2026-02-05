@@ -58,7 +58,6 @@ class CalculateTremor:
         methods: str | None = None,
         output_dir: str = "output",
         overwrite: bool = False,
-        n_jobs: int = 1,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
         value_multiplier: float | None = None,
@@ -67,6 +66,7 @@ class CalculateTremor:
         save_plot: bool = False,
         overwrite_plot: bool = False,
         filename_prefix: str | None = None,
+        n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -479,12 +479,11 @@ class CalculateTremor:
         can_skip = (
             not self.overwrite
             and os.path.exists(temp_file)
-            and (not self.plot_tmp and os.path.exists(temp_plot))
+            and (not self.plot_tmp or os.path.exists(temp_plot))
         )
 
         if can_skip:
-            if self.verbose:
-                logger.info(f"{date_str} :: File CSV loaded {temp_file}")
+            logger.info(f"{date_str} :: File Exists: {temp_file}")
             return temp_file
 
         df = self.calculate(date)
