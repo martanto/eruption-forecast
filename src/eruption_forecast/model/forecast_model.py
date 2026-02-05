@@ -252,8 +252,9 @@ class ForecastModel:
         plot_tmp: bool,
         save_plot: bool,
         overwrite_plot: bool,
-        verbose: bool | None,
-        debug: bool | None,
+        n_jobs: int | None = None,
+        verbose: bool = False,
+        debug: bool = False,
     ) -> CalculateTremor:
         """Setup CalculateTremor instance with configuration.
 
@@ -270,6 +271,7 @@ class ForecastModel:
             plot_tmp: Whether to plot temporary results
             save_plot: Whether to save plots
             overwrite_plot: Whether to overwrite existing plots
+            n_jobs: Number of jobs to run in parallel. Isolated on this method only
             verbose: Enable verbose logging
             debug: Enable debug mode
 
@@ -289,7 +291,7 @@ class ForecastModel:
             end_date=self.end_date,
             output_dir=self.output_dir,
             overwrite=self.overwrite,
-            n_jobs=self.n_jobs,
+            n_jobs=n_jobs or self.n_jobs,
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
@@ -414,7 +416,7 @@ class ForecastModel:
     def _prepare_extraction_parameters(
         self,
         exclude_features: list[str] | bool | None,
-        n_jobs: int | None,
+        n_jobs: int | None = None,
     ) -> dict[str, Any]:
         """Prepare parameters for tsfresh feature extraction.
 
@@ -423,7 +425,7 @@ class ForecastModel:
 
         Args:
             exclude_features: Features to exclude from calculation
-            n_jobs: Number of parallel jobs
+            n_jobs: Number of parallel jobs. Default to None.
 
         Returns:
             Dictionary of extraction parameters for tsfresh
@@ -635,10 +637,6 @@ class ForecastModel:
                 f"window_size must be greater than 0. Got: {self.window_size}"
             )
 
-        # Validate n_jobs
-        if self.n_jobs <= 0:
-            raise ValueError(f"n_jobs must be greater than 0. Got: {self.n_jobs}")
-
         # Validate date ranges
         validate_date_ranges(self.start_date, self.end_date)
 
@@ -683,13 +681,14 @@ class ForecastModel:
         interpolate: bool = True,
         value_multiplier: float | None = None,
         cleanup_tmp_dir: bool = False,
-        plot_tmp: bool = True,
-        save_plot: bool = True,
+        plot_tmp: bool = False,
+        save_plot: bool = False,
         overwrite_plot: bool = False,
         sds_dir: str | None = None,
         client_url: str = "https://service.iris.edu",
-        verbose: bool | None = None,
-        debug: bool | None = None,
+        n_jobs: int | None = None,
+        verbose: bool = False,
+        debug: bool = False,
     ) -> Self:
         """Calculate Tremor Data from seismic data source.
 
@@ -706,6 +705,7 @@ class ForecastModel:
             overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
             sds_dir (str): SDS directory location. Must be provided if source is 'sds'.
             client_url (str): URL to FDSN service. Default to https://service.iris.edu
+            n_jobs: Number of jobs to run in parallel. Isolated on this method only
             verbose (bool): If True, enables verbose logging. Defaults to False.
             debug (bool): If True, enables debug mode. Defaults to False.
 
@@ -723,8 +723,9 @@ class ForecastModel:
             plot_tmp=plot_tmp,
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
-            verbose=verbose,
-            debug=debug,
+            n_jobs=n_jobs or self.n_jobs,
+            verbose=verbose or self.verbose,
+            debug=debug or self.debug,
         )
 
         self.CalculateTremor = calculate
@@ -1069,6 +1070,11 @@ class ForecastModel:
         Returns:
             self (Self): ForecastModel object
         """
+        if verbose or self.verbose:
+            print("=" * 50)
+            print("|| Training model")
+            print("=" * 50)
+
         features_csv = extracted_features_csv or self.extracted_features_csv
         if use_relevant_features or self.use_relevant_features:
             features_csv = self.extracted_relevant_csv
@@ -1085,14 +1091,6 @@ class ForecastModel:
 
         output_dir = output_dir or os.path.join(self.station_dir, "trainings")
         os.makedirs(output_dir, exist_ok=True)
-
-        # Disable running multiprocessing inside multiprocessing
-        if self.n_jobs > 1:
-            n_jobs = 1
-            logger.info(
-                f"Disable running multiprocessing inside multiprocessing, "
-                f"since {self.n_jobs} more than 1."
-            )
 
         train_model = TrainModel(
             features_csv=features_csv,
