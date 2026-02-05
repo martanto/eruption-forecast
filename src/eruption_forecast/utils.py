@@ -1,7 +1,5 @@
 # Standard library imports
-import functools
 import os
-import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -22,47 +20,6 @@ from tsfresh.transformers import FeatureSelector
 # Project imports
 from eruption_forecast.logger import logger
 from eruption_forecast.model.classifier_model import ClassifierModel
-
-
-def timer(name: str | None = None, verbose: bool = True):
-    """
-    Decorator factory for timing functions.
-
-    Args:
-        name: Custom name for the operation (defaults to function name)
-        verbose: Whether to print timing results
-
-    Returns:
-        Decorated function
-
-    Example:
-        @timer()
-        def my_function():
-            time.sleep(1)
-    """
-
-    def decorator(func: Callable) -> Callable:
-        operation_name = name if name else func.__name__
-
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            start = time.perf_counter()
-            result = func(*args, **kwargs)
-            end = time.perf_counter()
-            elapsed = timedelta(seconds=end - start).seconds
-            hours, remainder = divmod(elapsed, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            if verbose:
-                print("==" * 50)
-                print(
-                    f"|| {operation_name}: took {hours:02d} hours, {minutes:02d} minutes, {seconds:02d} seconds"
-                )
-                print("==" * 50)
-            return result
-
-        return wrapper
-
-    return decorator
 
 
 def create_model_predictions(
