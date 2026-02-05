@@ -88,7 +88,7 @@ class TrainModel:
         all_features_dir = os.path.join(output_dir, "all_features")
 
         figures_dir = os.path.join(output_dir, "figures")
-        all_figures_dir = os.path.join(figures_dir, "all_figures")
+        significant_figures_dir = os.path.join(figures_dir, "significant")
 
         # Set DEFAULT properties
         self.df_features = df_features
@@ -103,7 +103,7 @@ class TrainModel:
         self.training_dir = training_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
-        self.all_figures_dir = all_figures_dir
+        self.significant_figures_dir = significant_figures_dir
         self.csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
 
@@ -193,7 +193,9 @@ class TrainModel:
             self.significant_features_dir, f"{state:05d}.csv"
         )
         all_features_filepath = os.path.join(self.all_features_dir, f"{state:05d}.csv")
-        all_figures_filepath = os.path.join(self.all_figures_dir, f"{state:05d}.jpg")
+        all_figures_filepath = os.path.join(
+            self.significant_figures_dir, f"{state:05d}.jpg"
+        )
 
         # Skip if files already exist
         can_skip = (
@@ -283,7 +285,7 @@ class TrainModel:
             os.makedirs(self.all_features_dir, exist_ok=True)
 
         if plot_significant_features:
-            os.makedirs(self.all_figures_dir, exist_ok=True)
+            os.makedirs(self.significant_figures_dir, exist_ok=True)
 
         jobs = [
             (
