@@ -179,9 +179,6 @@ def plot_significant_features(
 
     ax.title.set_text(title or f"{number_of_features} Significant Features")
 
-    for label in ax.get_xticklabels(which="major"):
-        label.set(rotation=90, horizontalalignment="right", fontsize=6)
-
     ax.legend(frameon=False)
 
     plt.ylim(-0.5, number_of_features - 0.5)
