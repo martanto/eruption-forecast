@@ -148,37 +148,37 @@ class FeaturesBuilder:
         """Create required output directories."""
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def save_features_per_method(self, features_matrix: pd.DataFrame) -> Self:
+    def save_tremor_per_method(self, df_tremor: pd.DataFrame) -> Self:
         """Save each tremor metric column as a separate CSV file.
 
         Args:
-            features_matrix (pd.DataFrame): Full features matrix containing
+            df_tremor (pd.DataFrame): Full features matrix containing
                 id, datetime, and one or more tremor metric columns.
 
         Returns:
             Self: The FeaturesBuilder instance for method chaining.
         """
-        feature_method_dir = os.path.join(self.output_dir, "method")
-        os.makedirs(feature_method_dir, exist_ok=True)
+        tremor_per_method_dir = os.path.join(self.output_dir, "tremor_per_method")
+        os.makedirs(tremor_per_method_dir, exist_ok=True)
 
-        for column in features_matrix.columns.tolist():
+        for column in df_tremor.columns.tolist():
             if column in [ID_COLUMN, DATETIME_COLUMN]:
                 continue
 
-            feature_matrix_filename = f"features_{column}.csv"
-            feature_matrix_filepath = os.path.join(
-                feature_method_dir, feature_matrix_filename
+            tremor_method_filename = f"tremor_{column}.csv"
+            tremor_method_filepath = os.path.join(
+                tremor_per_method_dir, tremor_method_filename
             )
 
             # Skip if exists
-            if not self.overwrite and (os.path.isfile(feature_matrix_filepath)):
+            if not self.overwrite and (os.path.isfile(tremor_method_filepath)):
                 continue
 
-            df_feature_matrix = features_matrix[[ID_COLUMN, DATETIME_COLUMN, column]]
-            df_feature_matrix.to_csv(feature_matrix_filepath, index=True)
+            df_feature_matrix = df_tremor[[ID_COLUMN, DATETIME_COLUMN, column]]
+            df_feature_matrix.to_csv(tremor_method_filepath, index=False)
 
             if self.verbose:
-                logger.info(f"Features {column} is saved to: {feature_matrix_filepath}")
+                logger.info(f"Features {column} is saved to: {tremor_method_filepath}")
 
         return self
 
@@ -298,7 +298,7 @@ class FeaturesBuilder:
 
         # Save features per method/columns
         if save_per_method:
-            self.save_features_per_method(features_matrix)
+            self.save_tremor_per_method(features_matrix)
 
         self.features_matrix = features_matrix
         self.csv = feature_csv
