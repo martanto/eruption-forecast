@@ -131,7 +131,7 @@ def plot_significant_features(
     title: str | None = None,
     figsize=(3, 12),
     features_column: str = "features",
-    values_column: str = "values",
+    values_column: str = "p_values",
     dpi: int = 100,
     overwrite: bool = True,
 ):
@@ -145,7 +145,7 @@ def plot_significant_features(
         title (Optional[str], optional): Plot title. Defaults to None.
         figsize (tuple, optional): Figure size. Defaults to (3, 12).
         features_column (str, optional): Features column name. Defaults to "features".
-        values_column (str, optional): Values column name. Defaults to "values".
+        values_column (str, optional): Values column name. Defaults to "p_values".
         dpi (int, optional): DPI. Defaults to 100.
         overwrite (bool, optional): Overwrite. Defaults to True.
 
@@ -171,7 +171,7 @@ def plot_significant_features(
     ax.grid(True, linestyle="-.", axis="both", alpha=0.3)
     ax.barh(df[features_column], df[values_column], height=0.5)
     ax.axhline(
-        df.index[top_features - 1],
+        df.index[top_features],
         color="red",
         linestyle="--",
         label=f"Top {top_features} Fts",
