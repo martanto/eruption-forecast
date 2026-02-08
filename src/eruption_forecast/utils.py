@@ -713,12 +713,15 @@ def check_sampling_consistency(
     return is_consistent, consistent_data, inconsistent_data
 
 
-def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
+def validate_columns(
+    df: pd.DataFrame, columns: list[str], exclude_columns: list[str] | None = None
+) -> None:
     """Validate columns in dataframe.
 
     Args:
         df (pd.DataFrame): DataFrame with pd.DatetimeIndex.
         columns (list[str]): List of columns to validate.
+        exclude_columns (list[str] | None): List of columns to exclude. Defaults to None.
 
     Raises:
         ValueError: If columns are invalid.
@@ -726,26 +729,27 @@ def validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
     Returns:
         None
     """
+    if exclude_columns is None:
+        exclude_columns = []
+
     for column in columns:
-        if column in ["id", "datetime"]:
+        if column in exclude_columns:
             continue
         if column not in df.columns.tolist():
             raise ValueError(
                 f"Column {column} does not exist in dataframe. "
-                f"Columns available are: {df.columns}"
+                f"Columns available are: {df.columns}. "
+                f"{df.head(5)}"
             )
     return None
 
 
-def concat_features(
-    csv_list: list[str], filepath: str, return_as_filepath: bool = False
-) -> str | tuple[str, pd.DataFrame]:
+def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFrame]:
     """Concatenate features from csv_list into one dataframe.
 
     Args:
         csv_list (list[str]): List of csv files.
         filepath (str): Filepath to save csv file.
-        return_as_filepath (bool, optional): Return as CSV filepath. Defaults to False.
 
     Returns:
         str: Filepath of csv file.
@@ -762,9 +766,6 @@ def concat_features(
         raise ValueError("There is no data in the csv files.")
 
     df.to_csv(filepath, index=True)
-
-    if return_as_filepath:
-        return filepath
 
     return filepath, df
 
@@ -838,7 +839,7 @@ def get_significant_features(
 
     _significant_features = pd.Series(selector.p_values, index=selector.features)
     _significant_features = _significant_features.sort_values()
-    _significant_features.name = "values"
+    _significant_features.name = "p_values"
     _significant_features.index.name = "features"
 
     return _significant_features
