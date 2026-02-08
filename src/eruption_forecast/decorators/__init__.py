@@ -1,3 +1,4 @@
+# Standard library imports
 import functools
 import inspect
 import time
@@ -6,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
+# Project imports
 from eruption_forecast.decorators.decorator_class import (
     AutoSaveDict,
     SerializationWrapper,

@@ -559,11 +559,18 @@ class ForecastModel:
     def validate(self) -> None:
         """Validate initialization parameters.
 
-        Validates that all required parameters are properly set. Follows
-        the pattern used in LabelBuilder and FeaturesBuilder classes.
+        Ensures that window_size is positive, date ranges are valid,
+        and required string parameters (station, channel, volcano_id)
+        are not empty.
 
         Raises:
-            ValueError: If any parameters are invalid.
+            ValueError: If window_size is <= 0, date ranges are invalid
+                (start_date >= end_date), or required string parameters
+                (station, channel, volcano_id) are empty.
+
+        Example:
+            >>> model = ForecastModel(...)
+            >>> model.validate()  # Called automatically in __init__
         """
         # Validate window size
         if self.window_size <= 0:
@@ -585,19 +592,46 @@ class ForecastModel:
             raise ValueError("volcano_id cannot be empty")
 
     def create_directories(self) -> None:
-        """Create output directories if they don't exist."""
+        """Create required output directory structure.
+
+        Creates the main output directory, station-specific directory,
+        and features subdirectory. Called automatically during initialization.
+
+        Example:
+            >>> model = ForecastModel(...)
+            >>> model.create_directories()  # Called in __init__
+            >>> # Creates: output/, output/VG.OJN.00.EHZ/, output/VG.OJN.00.EHZ/features/
+        """
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.station_dir, exist_ok=True)
         os.makedirs(self.features_dir, exist_ok=True)
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
-        """Load calculate tremor data from CSV file.
+        """Load pre-calculated tremor data from CSV file.
+
+        Loads tremor data from a previously calculated tremor CSV file
+        instead of recalculating from raw seismic data. Use this method
+        when you already have tremor metrics calculated.
 
         Args:
-            tremor_csv: Path to tremor CSV file.
+            tremor_csv (str): Path to the tremor CSV file containing
+                columns like rsam_f0, rsam_f1, dsar_f0-f1, etc.
 
         Returns:
-            Self for method chaining.
+            Self: ForecastModel instance for method chaining.
+                Sets self.tremor_data, self.TremorData, and self.tremor_csv.
+
+        Example:
+            >>> model = ForecastModel(
+            ...     station="OJN",
+            ...     channel="EHZ",
+            ...     start_date="2025-01-01",
+            ...     end_date="2025-06-30",
+            ...     window_size=1,
+            ...     volcano_id="LEWOTOBI"
+            ... )
+            >>> model.load_tremor_data("output/VG.OJN.00.EHZ/tremor/tremor.csv")
+            >>> # Now ready to build labels and extract features
         """
         tremor_data = TremorData()
         self.TremorData = tremor_data

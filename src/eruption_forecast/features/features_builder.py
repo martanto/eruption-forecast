@@ -158,14 +158,23 @@ class FeaturesBuilder:
     def exclude_features(
         self, excludes_features: list[str]
     ) -> ComprehensiveFCParameters:
-        """Exclude features from calulation.
+        """Exclude specific features from tsfresh feature calculation.
+
+        Updates the internal set of excluded features and removes them from
+        the default feature calculation parameters.
 
         Args:
-            excludes_features (list[str]): List of features to exclude from calculation.
+            excludes_features (list[str]): List of tsfresh feature names to
+                exclude from calculation (e.g., ["length", "has_duplicate"]).
 
         Returns:
-            ComprehensiveFCParameters: tsfresh ComprehensiveFCParameters
+            ComprehensiveFCParameters: Updated tsfresh feature calculation
+                parameters with specified features removed.
 
+        Example:
+            >>> builder = FeaturesBuilder(...)
+            >>> params = builder.exclude_features(["length", "has_duplicate"])
+            >>> # Features will be extracted without these calculators
         """
         default_fc_parameters = self.default_fc_parameters
         self.excludes_features.update(excludes_features)
@@ -277,15 +286,29 @@ class FeaturesBuilder:
     def concat_features(
         self, csv_list: list[str], filename: str
     ) -> tuple[str, pd.DataFrame]:
-        """Concatenate features from calculation.
+        """Concatenate extracted features from multiple CSV files.
+
+        Merges feature CSVs from individual tremor columns into a single
+        unified features DataFrame and saves to disk.
 
         Args:
-            csv_list (list[str]): List of csv files to concat.
-            filename: Prefix for output filename
+            csv_list (list[str]): List of paths to extracted feature CSV files.
+            filename (str): Output filename (without extension).
 
         Returns:
-             filepath (str) : CSV output file
-             extracted_df (pd.DataFrame) : Features extracted from calculation
+            tuple[str, pd.DataFrame]: A tuple containing:
+                - filepath (str): Path to the concatenated features CSV file.
+                - features_df (pd.DataFrame): Concatenated features DataFrame.
+
+        Raises:
+            FileNotFoundError: If csv_list is empty.
+
+        Example:
+            >>> builder = FeaturesBuilder(...)
+            >>> csv_files = ["features_rsam_f0.csv", "features_rsam_f1.csv"]
+            >>> filepath, df = builder.concat_features(csv_files, "all_features")
+            >>> print(df.shape)
+            (100, 1500)  # 100 windows, 1500 features
         """
         if len(csv_list) == 0:
             raise FileNotFoundError("Extracted features CSV not found.")
@@ -314,17 +337,49 @@ class FeaturesBuilder:
         select_tremor_columns: list[str] | None = None,
         exclude_features: list[str] | None = None,
     ) -> pd.DataFrame:
-        """Extract features from tremor data using tsfresh.
+        """Extract time-series features from tremor matrix using tsfresh.
 
-        Applies time-series feature extraction to each tremor column, either
-        extracting all comprehensive features or only statistically relevant
-        features based on correlation with eruption labels.
+        Applies tsfresh feature extraction to each tremor column independently,
+        either extracting all comprehensive features or only statistically
+        relevant features based on correlation with eruption labels.
+
+        The method processes each tremor column separately, extracts features,
+        saves them to individual CSVs, then concatenates all features into
+        a single DataFrame.
 
         Args:
-            select_tremor_columns (list[str], optional): Subset of tremor columns to
-                use. If None, all columns are used. Defaults to None.
-            exclude_features (Optional[list[str]]): List features calculator to be excluded.
-            use_relevant_features (bool): If True, extract features using relevant features.
+            use_relevant_features (bool, optional): If True, uses tsfresh's
+                extract_relevant_features() to select only statistically
+                significant features. If False, extracts all features.
+                Defaults to False.
+            select_tremor_columns (list[str], optional): Subset of tremor
+                column names to process (e.g., ["rsam_f0", "dsar_f0-f1"]).
+                If None, all tremor columns are used. Defaults to None.
+            exclude_features (list[str], optional): List of tsfresh feature
+                calculator names to exclude (e.g., ["length", "has_duplicate"]).
+                Defaults to None.
+
+        Returns:
+            pd.DataFrame: Extracted features DataFrame with shape (n_windows, n_features).
+                Index is the window ID from labels. Saves results to CSV files
+                in the output directory.
+
+        Raises:
+            ValueError: If select_tremor_columns contains invalid column names.
+
+        Example:
+            >>> builder = FeaturesBuilder(
+            ...     tremor_matrix_df=tremor_matrix,
+            ...     label_df=labels,
+            ...     output_dir="output/features"
+            ... )
+            >>> features = builder.extract_features(
+            ...     select_tremor_columns=["rsam_f0", "rsam_f1"],
+            ...     exclude_features=["length"],
+            ...     use_relevant_features=False
+            ... )
+            >>> print(features.shape)
+            (100, 1500)  # 100 windows, ~750 features per column
         """
         label_df = self.label_df
 

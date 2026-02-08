@@ -115,9 +115,21 @@ class TrainModel:
     def validate(self) -> None:
         """Validate that features and labels are non-empty and aligned.
 
+        Checks that both features and labels DataFrames contain data
+        and that they have matching row counts (same number of windows).
+
         Raises:
-            ValueError: If features or labels are empty, or their row
-                counts do not match.
+            ValueError: If features DataFrame is empty (0 rows).
+            ValueError: If labels DataFrame is empty (0 rows).
+            ValueError: If the number of rows in features and labels
+                do not match.
+
+        Example:
+            >>> trainer = TrainModel(
+            ...     features_csv="features.csv",
+            ...     label_csv="labels.csv"
+            ... )
+            >>> trainer.validate()  # Called automatically in __init__
         """
         len_features = self.df_features.shape[0]
         len_labels = self.df_labels.shape[0]
@@ -139,21 +151,53 @@ class TrainModel:
             )
 
     def create_directories(self) -> None:
-        """Create required output directories."""
+        """Create required output directories for training results.
+
+        Creates the main output directory and subdirectory for storing
+        significant features CSVs. Called automatically during initialization.
+
+        Example:
+            >>> trainer = TrainModel(...)
+            >>> trainer.create_directories()  # Called in __init__
+            >>> # Creates: output_dir/ and output_dir/significant_features/
+        """
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
 
     def concat_significant_features(
         self, number_of_significant_features: int | None = None, plot: bool = False
     ) -> pd.DataFrame:
-        """Concatenate significant features.
+        """Concatenate significant features from all training seeds.
+
+        Merges significant feature CSVs from all random seeds, aggregates
+        by feature name to count occurrences across seeds, and saves the
+        top-N most frequently selected features.
 
         Args:
-            number_of_significant_features (int, optional): Number of significant features.
-            plot (bool, optional): Whether to plot the significant features.
+            number_of_significant_features (int, optional): Number of top
+                features to save separately. If provided, creates a separate
+                CSV with the most frequently occurring features across seeds.
+                Defaults to None.
+            plot (bool, optional): If True, generates a plot of the top
+                features. Defaults to False.
 
         Returns:
-            pd.DataFrame: Significant features.
+            pd.DataFrame: Concatenated significant features with counts of
+                how many times each feature appeared across all seeds.
+
+        Raises:
+            ValueError: If no CSV files are found in self.csvs.
+            ValueError: If concatenated DataFrame is empty.
+
+        Example:
+            >>> trainer = TrainModel(...)
+            >>> trainer.train(total_seed=100)
+            >>> df = trainer.concat_significant_features(
+            ...     number_of_significant_features=20,
+            ...     plot=True
+            ... )
+            >>> print(df.head())
+            # Shows features and their occurrence counts across seeds
         """
         if len(self.csvs) == 0:
             raise ValueError(
@@ -214,6 +258,39 @@ class TrainModel:
         save_features: bool = False,
         plot_features: bool = False,
     ) -> str:
+        """Train feature selection for a single random seed.
+
+        Performs random under-sampling on the features and labels,
+        applies tsfresh feature significance testing, and saves the
+        top-N significant features to CSV.
+
+        Args:
+            seed (int): Seed number (0 to total_seed-1).
+            random_state (int): Base random state value.
+            number_of_significant_features (int, optional): Number of top
+                features to save for this seed. Defaults to 20.
+            sampling_strategy (str | float, optional): Under-sampling ratio
+                for balancing eruption/non-eruption classes. Defaults to 0.75.
+            overwrite (bool, optional): If True, overwrites existing output
+                files. Defaults to False.
+            save_features (bool, optional): If True, saves all ranked features
+                (not just top-N). Defaults to False.
+            plot_features (bool, optional): If True, generates a feature
+                importance plot. Defaults to False.
+
+        Returns:
+            str: Path to the saved significant features CSV file.
+
+        Example:
+            >>> trainer = TrainModel(...)
+            >>> csv_path = trainer._train(
+            ...     seed=0,
+            ...     random_state=42,
+            ...     number_of_significant_features=20
+            ... )
+            >>> print(csv_path)
+            "output/trainings/significant_features/00042.csv"
+        """
         state = random_state + seed
         logger.debug(f"_train: seed={seed}, random_state={random_state}, state={state}")
 

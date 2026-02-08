@@ -125,11 +125,18 @@ class TremorMatrixBuilder:
         self.create_directories()
 
     def validate(self) -> None:
-        """Validate label and tremor dataframe columns and date ranges.
+        """Validate label and tremor DataFrame columns and date ranges.
+
+        Checks that required label columns exist and adjusts start/end dates
+        to fit within the available tremor data range.
 
         Raises:
-            ValueError: If required label columns are missing or requested
-                tremor columns do not exist in the tremor dataframe.
+            ValueError: If required label columns ('id', 'is_erupted') are
+                missing from the label DataFrame.
+
+        Example:
+            >>> builder = TremorMatrixBuilder(...)
+            >>> builder.validate()  # Called automatically during __init__
         """
         label_columns = self.label_df.columns.tolist()
 
@@ -155,19 +162,35 @@ class TremorMatrixBuilder:
                 logger.info(f"end_date updated to: {self.end_date}")
 
     def create_directories(self) -> None:
-        """Create required output directories."""
+        """Create required output directories.
+
+        Creates the main output directory for storing tremor matrix files.
+        Called automatically during initialization.
+
+        Example:
+            >>> builder = TremorMatrixBuilder(...)
+            >>> builder.create_directories()  # Called in __init__
+        """
         os.makedirs(self.output_dir, exist_ok=True)
 
     def save_matrix_per_method(self, tremor_df: pd.DataFrame) -> Self:
         """Save each tremor metric column as a separate CSV file.
 
+        Creates individual CSV files for each tremor method column
+        (e.g., rsam_f0, dsar_f0-f1) in a subdirectory for easier
+        debugging and analysis.
+
         Args:
-            tremor_df (pd.DataFrame): Full features matrix containing
-                id, datetime, and one or more tremor metric columns.
-                Indexed by pd.DatetimeIndex.
+            tremor_df (pd.DataFrame): Full tremor matrix containing
+                'id', 'datetime', and tremor metric columns (rsam_*, dsar_*).
 
         Returns:
-            Self: The FeaturesBuilder instance for method chaining.
+            Self: The TremorMatrixBuilder instance for method chaining.
+
+        Example:
+            >>> builder = TremorMatrixBuilder(...)
+            >>> builder.save_matrix_per_method(tremor_matrix)
+            >>> # Creates files: tremor_matrix_rsam_f0.csv, tremor_matrix_rsam_f1.csv, etc.
         """
         tremor_matrix_per_method_dir = os.path.join(
             self.output_dir, "tremor_matrix_per_method"
@@ -206,6 +229,40 @@ class TremorMatrixBuilder:
         tremor_columns: list[str],
         save_tremor_matrix_per_id: bool = False,
     ) -> pd.DataFrame:
+        """Build tremor matrices by slicing tremor data for each label window.
+
+        Iterates through each label window, extracts the corresponding tremor
+        time slice, validates sample count, adds window ID, and concatenates
+        all windows into a unified matrix.
+
+        Args:
+            tremor_df (pd.DataFrame): Full tremor DataFrame with DatetimeIndex.
+            filtered_label_df (pd.DataFrame): Filtered label DataFrame with
+                DatetimeIndex and columns 'id' and 'is_erupted'.
+            tremor_sampling_period (int): Sampling period in seconds (e.g., 600
+                for 10-minute intervals).
+            tremor_columns (list[str]): List of tremor column names to include.
+            save_tremor_matrix_per_id (bool, optional): If True, saves individual
+                CSV files for each window ID (generates many files).
+                Defaults to False.
+
+        Returns:
+            pd.DataFrame: Unified tremor matrix with columns ['id', 'datetime',
+                *tremor_columns]. Each row represents one time sample within a window.
+
+        Raises:
+            ValueError: If no valid tremor windows are found within the date range.
+
+        Example:
+            >>> matrices = builder._build_tremor_matrices(
+            ...     tremor_df=tremor_data,
+            ...     filtered_label_df=labels,
+            ...     tremor_sampling_period=600,
+            ...     tremor_columns=["rsam_f0", "rsam_f1"]
+            ... )
+            >>> print(matrices.shape)
+            (14400, 4)  # 100 windows × 144 samples/day, 4 columns
+        """
         tremor_matrices: list[pd.DataFrame] = []
 
         if save_tremor_matrix_per_id:
@@ -280,43 +337,63 @@ class TremorMatrixBuilder:
         save_tremor_matrix_per_method: bool = True,
         save_tremor_matrix_per_id: bool = False,
     ) -> Self:
-        """Build tremor matrix using tremor and label for each label window.
+        """Build tremor matrix by aligning tremor data with label windows.
 
-        Tremor matrix columns consist of "id", "datetime" and result from various methods
-        such as RSAM and DSAR which processed for different frequency bands.
-        The column "id" represent the "id" from label dataset.
+        Constructs a unified tremor matrix where each row represents one time
+        sample, and rows are grouped by window ID from the label dataset.
+        The matrix contains 'id', 'datetime', and tremor metric columns
+        (RSAM, DSAR across frequency bands).
 
-        This method iterates through each label window, extracts the corresponding
-        tremor data slice, validates sample count, and concatenates
-        into a unified new tremor matrix.
+        This method:
+        1. Iterates through each label window
+        2. Slices tremor data for the window's date range
+        3. Validates the sample count matches window_size expectations
+        4. Adds the window 'id' column
+        5. Concatenates all windows into a unified DataFrame
+        6. Saves the result to CSV
 
         Args:
-            select_tremor_columns (list[str], optional): Subset of tremor columns to
-                use. If None, all columns are used. Defaults to None.
-            tremor_matrix_filename (str, optional): Override default generated filename. Defaults to "features.csv".
-            save_tremor_matrix_per_method (bool, optional): Save separate CSV per tremor
-                column. Defaults to True.
-            save_tremor_matrix_per_id (bool, optional): BE CAREFULL, IT WILL GENERATE A LOT OF FILES.
-                Save individual windowed tremor CSVs for debugging. Defaults to False.
-            verbose (bool, optional): Override instance verbose flag.
-                Defaults to False.
-
-        Raises:
-            ValueError: If no valid tremor data found for any label windows.
-
-        Example:
-            >>> tremor_matrix = TremorMatrixBuilder(...).build(
-            ...     save_tremor_matrix_per_method=True,
-            ...     tremor_matrix_filename="sliced_tremor_matrix.csv",
-            ... )
+            select_tremor_columns (list[str], optional): Subset of tremor
+                column names to include (e.g., ["rsam_f0", "dsar_f0-f1"]).
+                If None, all tremor columns are used. Defaults to None.
+            tremor_matrix_filename (str, optional): Override the default
+                auto-generated filename. Defaults to None.
+            save_tremor_matrix_per_method (bool, optional): If True, saves
+                individual CSVs for each tremor column method in a subdirectory.
+                Defaults to True.
+            save_tremor_matrix_per_id (bool, optional): **WARNING: Generates
+                many files!** If True, saves individual CSV files for each
+                window ID for debugging purposes. Defaults to False.
 
         Returns:
-            Self: TremorMatrixBuilder instance
+            Self: TremorMatrixBuilder instance for method chaining.
+                Sets self.df and self.csv attributes.
+
+        Raises:
+            ValueError: If no valid tremor data is found for any label windows
+                within the specified date range.
+            ValueError: If select_tremor_columns contains invalid column names.
+
+        Example:
+            >>> builder = TremorMatrixBuilder(
+            ...     tremor_df=tremor_data,
+            ...     label_df=labels,
+            ...     output_dir="output/features",
+            ...     window_size=1
+            ... )
+            >>> builder.build(
+            ...     select_tremor_columns=["rsam_f0", "rsam_f1"],
+            ...     save_tremor_matrix_per_method=True
+            ... )
+            >>> print(builder.df.shape)
+            (14400, 4)  # 100 windows × 144 samples/window
+            >>> print(builder.csv)
+            "output/features/tremor_matrix_unified_2025-01-01_2025-09-28_ws-1.csv"
         """
         verbose = self.verbose
 
         # Build filename
-        # Example filenmae: unified_tremor_matrix_2025-01-01_2025-09-28_ws-2.csv
+        # Example filename: tremor_matrix_unified_2025-01-01_2025-09-28_ws-2.csv
         tremor_matrix_filename = tremor_matrix_filename or self.tremor_matrix_filename
         tremor_matrix_csv = os.path.join(self.output_dir, tremor_matrix_filename)
 

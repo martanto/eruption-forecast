@@ -10,8 +10,8 @@ from sklearn.ensemble import (
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (
     BaseCrossValidator,
-    StratifiedShuffleSplit,
     StratifiedKFold,
+    StratifiedShuffleSplit,
     TimeSeriesSplit,
 )
 from sklearn.naive_bayes import GaussianNB

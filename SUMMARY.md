@@ -2,8 +2,8 @@
 
 **Project:** eruption-forecast - Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
-**Branch:** `dev/predictions`
-**Last Updated:** 2026-02-04
+**Branch:** `claude/add-timeseries-ensemble`
+**Last Updated:** 2026-02-09
 
 ---
 
@@ -55,7 +55,8 @@ eruption_forecast/
 ├── model/               # ML models and training
 │   ├── forecast_model.py    # Pipeline orchestrator
 │   ├── train_model.py       # Multi-seed training
-│   └── classifier_model.py  # Classifier management
+│   ├── classifier_model.py  # Classifier management
+│   └── model_evaluator.py   # Evaluation, export, and plotting
 ├── utils.py             # Shared utilities
 ├── sds.py               # SDS file handling
 ├── plot.py              # Visualization
@@ -123,17 +124,18 @@ The current workflow follows a well-structured approach for binary classificatio
 | Feature Robustness | 500-seed feature selection | Reduces overfitting to single split |
 | Class Imbalance | Under-sampling + balanced weights | Handles rare eruption events |
 | Hyperparameter Tuning | GridSearchCV with stratified CV | Optimal parameter selection |
-| Multi-model Support | 7 classifiers available | Flexibility for different data characteristics |
+| Multi-model Support | 9 classifiers available | Flexibility for different data characteristics |
 
 ### Current Limitations & Recommendations
 
-| Limitation | Recommendation |
-|------------|----------------|
-| No ensemble methods | Add VotingClassifier combining top models |
-| Fixed feature selection | Consider Recursive Feature Elimination (RFE) |
-| No temporal validation | Implement TimeSeriesSplit for proper temporal evaluation |
-| No probability calibration | Add CalibratedClassifierCV for better probability estimates |
-| No model persistence | Add joblib serialization for production deployment |
+| Limitation | Status | Recommendation |
+|------------|--------|----------------|
+| ~~No ensemble methods~~ | ✅ RESOLVED | VotingClassifier now available (`"voting"`) |
+| Fixed feature selection | Pending | Consider Recursive Feature Elimination (RFE) |
+| ~~No temporal validation~~ | ✅ RESOLVED | TimeSeriesSplit now available (`cv_strategy="timeseries"`) |
+| No probability calibration | Pending | Add CalibratedClassifierCV for better probability estimates |
+| ~~No model persistence~~ | ✅ RESOLVED | ModelEvaluator.export_model() with joblib |
+| ~~No evaluation metrics~~ | ✅ RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
 
 ---
 
@@ -141,7 +143,7 @@ The current workflow follows a well-structured approach for binary classificatio
 
 ### Available Classifiers
 
-The package supports 8 classifiers through `ClassifierModel`:
+The package supports 9 classifiers through `ClassifierModel`:
 
 | ID | Classifier | Best For | Pros | Cons |
 |----|------------|----------|------|------|
@@ -153,6 +155,7 @@ The package supports 8 classifiers through `ClassifierModel`:
 | `dt` | Decision Tree | Interpretability | Easy to visualize, fast | Prone to overfitting |
 | `knn` | K-Nearest Neighbors | Small datasets | Simple, no training | Slow prediction, needs scaling |
 | `nb` | Gaussian Naive Bayes | Quick baseline | Very fast, works with small data | Strong independence assumption |
+| `voting` | VotingClassifier Ensemble | **Best accuracy** | Combines multiple models, robust predictions | Slower training, more complex |
 
 ### Recommended Model Selection Strategy
 
@@ -196,6 +199,45 @@ clf = ClassifierModel("lr")
 
 ```python
 clf = ClassifierModel("nn")
+```
+
+#### 5. **For Best Accuracy: VotingClassifier Ensemble (`voting`)**
+Now available in the package:
+- Combines RF, GB, LR, and SVM into a soft-voting ensemble
+- Leverages strengths of multiple models
+- More robust predictions through model diversity
+
+```python
+clf = ClassifierModel("voting", random_state=42)
+model, grid = clf.model_and_grid
+```
+
+### Cross-Validation Strategies
+
+The package now supports two cross-validation strategies:
+
+#### StratifiedKFold (Default)
+- Preserves class distribution in each fold
+- Best for general classification tasks
+- Shuffles data for randomization
+
+```python
+clf = ClassifierModel("rf", cv_strategy="stratified", n_splits=5)
+cv = clf.get_cv_splitter()
+```
+
+#### TimeSeriesSplit (Temporal Data)
+- Ensures training data always precedes test data
+- Prevents data leakage in time-series forecasting
+- **Recommended for eruption prediction**
+
+```python
+clf = ClassifierModel("rf", cv_strategy="timeseries", n_splits=5)
+cv = clf.get_cv_splitter()
+
+# Use with GridSearchCV
+from sklearn.model_selection import GridSearchCV
+grid_search = GridSearchCV(clf.model, clf.grid, cv=cv, scoring="balanced_accuracy")
 ```
 
 ### Model Selection Workflow
@@ -372,17 +414,21 @@ pipeline = Pipeline([
 
 ## Code Quality Summary
 
-### Recent Improvements (2026-02-04)
+### Recent Improvements (2026-02-09)
 
 | Category | Changes |
 |----------|---------|
-| **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature" |
+| **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature", "calulation" → "calculation", "filenmae" → "filename" |
 | **Docstrings** | Added comprehensive examples to ForecastModel, ClassifierModel, TrainModel, FeaturesBuilder |
+| **Docstrings (2026-02-09)** | Enhanced docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, TrainModel with detailed descriptions, complete Args/Returns/Raises sections, and examples for all public methods |
 | **Type Annotations** | Fixed `dict[str, any]` → `dict[str, Any]` |
 | **Deprecated Parameters** | Removed `max_features="auto"` (deprecated in sklearn 1.4) |
 | **Documentation** | Enhanced method descriptions with usage examples |
 | **New Classifier** | Added GradientBoostingClassifier (`"gb"`) with 216-combination hyperparameter grid |
 | **Random State** | Added configurable `random_state` parameter to ClassifierModel for reproducibility |
+| **TimeSeriesSplit** | Added `cv_strategy` parameter and `get_cv_splitter()` method for temporal cross-validation |
+| **VotingClassifier** | Added `"voting"` ensemble classifier combining RF, GB, LR, and SVM with soft voting |
+| **ModelEvaluator** | New class for comprehensive model evaluation with metrics, export, and plotting capabilities |
 
 ### Code Quality Metrics
 
@@ -403,32 +449,41 @@ pipeline = Pipeline([
    - Added `GradientBoostingClassifier` as `"gb"` classifier
    - Includes optimized hyperparameter grid (216 combinations)
 
-2. **Implement TimeSeriesSplit**
+2. **~~Implement TimeSeriesSplit~~** ✓ COMPLETED
+   - Added `cv_strategy` parameter to ClassifierModel ("stratified" or "timeseries")
+   - Added `get_cv_splitter()` method returning appropriate CV splitter
+   - Prevents data leakage in temporal eruption forecasting
    ```python
-   from sklearn.model_selection import TimeSeriesSplit
-   cv = TimeSeriesSplit(n_splits=5)
+   clf = ClassifierModel("rf", cv_strategy="timeseries", n_splits=5)
+   cv = clf.get_cv_splitter()  # Returns TimeSeriesSplit
    ```
 
-3. **Add Ensemble Voting**
+3. **~~Add Ensemble Voting~~** ✓ COMPLETED
+   - Added `"voting"` classifier type to ClassifierModel
+   - Combines RF, GB, LR, and SVM with soft voting
+   - Includes hyperparameter grid for ensemble tuning
    ```python
-   from sklearn.ensemble import VotingClassifier
+   clf = ClassifierModel("voting", random_state=42)
+   model, grid = clf.model_and_grid
+   ```
 
-   ensemble = VotingClassifier(
-       estimators=[
-           ("rf", RandomForestClassifier()),
-           ("lr", LogisticRegression()),
-           ("svm", SVC(probability=True)),
-       ],
-       voting="soft"
-   )
+4. **~~Add Model Evaluation & Export~~** ✓ COMPLETED
+   - Added `ModelEvaluator` class with comprehensive evaluation capabilities
+   - Metrics: accuracy, precision, recall, F1, ROC-AUC, PR-AUC, balanced accuracy
+   - Export: model (joblib), metrics (CSV/JSON), reports, confusion matrix
+   - Plots: ROC curve, PR curve, confusion matrix, feature importance, learning curve
+   ```python
+   from eruption_forecast.model.model_evaluator import ModelEvaluator
+   evaluator = ModelEvaluator(model, X_test, y_test, X_train, y_train)
+   metrics = evaluator.get_metrics()
+   evaluator.plot_all()
+   evaluator.export_all()
    ```
 
 ### Medium-term Improvements
 
 1. **Probability Calibration**: Use CalibratedClassifierCV for reliable probability estimates
 2. **Feature Pipeline**: Add StandardScaler for SVM/KNN/NN in pipeline
-3. **Model Persistence**: Save trained models with joblib
-4. **Evaluation Metrics**: Add precision-recall curves, ROC-AUC, confusion matrices
 
 ### Long-term Improvements
 
@@ -494,8 +549,15 @@ clf = ClassifierModel("rf")
 # Gradient Boosting (imbalanced data)
 clf = ClassifierModel("gb")
 
+# VotingClassifier Ensemble (best accuracy)
+clf = ClassifierModel("voting", random_state=42)
+
 # With reproducible random state
 clf = ClassifierModel("rf", random_state=42)
+
+# With TimeSeriesSplit for temporal data (prevents data leakage)
+clf = ClassifierModel("rf", cv_strategy="timeseries", n_splits=5)
+cv = clf.get_cv_splitter()
 
 # Logistic Regression (interpretable)
 clf = ClassifierModel("lr")
@@ -510,8 +572,55 @@ clf = ClassifierModel("nn")
 clf.grid = {"n_estimators": [100, 200], "max_depth": [5, 10]}
 ```
 
+### Model Evaluation Quick Reference
+
+```python
+from eruption_forecast.model.model_evaluator import ModelEvaluator
+
+# Initialize evaluator with fitted model
+evaluator = ModelEvaluator(
+    model=fitted_model,
+    X_test=X_test,
+    y_test=y_test,
+    X_train=X_train,  # Optional, for learning curves
+    y_train=y_train,  # Optional, for learning curves
+    model_name="rf_eruption",
+    output_dir="output/evaluation"
+)
+
+# Get comprehensive metrics
+metrics = evaluator.get_metrics()
+print(f"ROC-AUC: {metrics['roc_auc']:.3f}")
+print(f"Balanced Accuracy: {metrics['balanced_accuracy']:.3f}")
+
+# Print summary
+print(evaluator.summary())
+
+# Generate all plots
+evaluator.plot_all(feature_names=feature_names, top_n_features=20)
+
+# Individual plots
+evaluator.plot_roc_curve()
+evaluator.plot_precision_recall_curve()
+evaluator.plot_confusion_matrix(normalize="true")
+evaluator.plot_feature_importances(top_n=15)
+evaluator.plot_learning_curve()
+evaluator.plot_metrics_summary()
+
+# Export all results
+paths = evaluator.export_all()
+# Returns: model.joblib, metrics.csv, metrics.json, report.txt, etc.
+
+# Export individually
+evaluator.export_model()  # Save with joblib
+evaluator.export_metrics(format="csv")
+evaluator.export_classification_report()
+evaluator.export_confusion_matrix()
+evaluator.export_feature_importances()
+```
+
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2026-02-04
-**Author:** Claude Code (Opus 4.5)
+**Document Version:** 2.2
+**Last Updated:** 2026-02-09
+**Author:** Claude Code (Sonnet 4.5)

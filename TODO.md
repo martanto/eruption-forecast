@@ -7,20 +7,22 @@
 - [x] Add examples to class docstrings (ForecastModel, ClassifierModel, TrainModel, FeaturesBuilder)
 - [x] Fix deprecated `max_features="auto"` parameter (sklearn 1.4+)
 - [x] Update SUMMARY.md with ML analysis and recommendations
+- [x] Fix and improve docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, and TrainModel
 
 ## High Priority
 
 - [x] Add Gradient Boosting classifier (GradientBoostingClassifier or XGBoost)
-- [ ] Implement TimeSeriesSplit for proper temporal cross-validation
-- [ ] Add model persistence with joblib (save/load trained models)
+- [x] Implement TimeSeriesSplit for proper temporal cross-validation
+- [x] Add model persistence with joblib (save/load trained models) - via ModelEvaluator
 - [ ] Expand grid parameters for neural network (hidden_layer_sizes too limited)
 
 ## Medium Priority
 
-- [ ] Add VotingClassifier ensemble combining top models
+- [x] Add VotingClassifier ensemble combining top models
+- [x] Add precision-recall curves and ROC-AUC evaluation metrics (via ModelEvaluator)
+- [x] Add detailed evaluation metrics with export and plotting (ModelEvaluator class)
 - [ ] Implement probability calibration (CalibratedClassifierCV)
 - [ ] Add StandardScaler to pipeline for SVM/KNN/NN
-- [ ] Add precision-recall curves and ROC-AUC evaluation metrics
 - [ ] Implement Recursive Feature Elimination (RFE) as alternative to tsfresh selection
 
 ## Low Priority
