@@ -15,16 +15,15 @@ from tsfresh.utilities.dataframe_functions import impute
 # Project imports
 from eruption_forecast.features.constants import (
     DATETIME_COLUMN,
-    ERUPTED_COLUMN,
     ID_COLUMN,
 )
 from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.model.train_model import TrainModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.tremor.tremor_data import TremorData
-from eruption_forecast.utils import concat_features as utils_concat_features
 from eruption_forecast.utils import (
     construct_windows,
     normalize_dates,
@@ -75,7 +74,7 @@ class ForecastModel:
         ...     day_to_forecast=2,
         ...     eruption_dates=["2024-03-15", "2024-05-20"],
         ... )
-        >>> model.build_features().extract_features().train()
+        >>> model.extract_features().train()
     """
 
     def __init__(
@@ -148,19 +147,14 @@ class ForecastModel:
         self.total_eruption_class: int | None = None
         self.total_non_eruption_class: int | None = None
 
-        # Will be set after build_features() called
-        self.FeaturesBuilder: FeaturesBuilder | None = None
-        self.features_data: pd.DataFrame = pd.DataFrame()
-        self.features_csv: str | None = None
-
         # Will be set after extract_features() called
+        self.TremorMatrixBuilder: TremorMatrixBuilder | None = None
+        self.tremor_matrix_df: pd.DataFrame = pd.DataFrame()
+        self.tremor_matrix_csv: str | None = None
+        self.FeaturesBuilder: FeaturesBuilder | None = None
+        self.features_df: pd.DataFrame = pd.DataFrame()
+        self.features_csv: str | None = None
         self.use_relevant_features: bool = False
-        self.extract_features_csvs: set[str] = set()
-        self.relevant_features_csvs: set[str] = set()
-
-        # Will be set after concat_features() called
-        self.extracted_features_csv: str | None = None
-        self.extracted_relevant_csv: str | None = None
 
         # Will be set after predict() called
         self.prediction_features_csvs: set[str] = set()
@@ -386,66 +380,6 @@ class ForecastModel:
                     f"end_date parameter: {self.end_date} updated to "
                     f"tremor end date: {tremor_data.end_date}"
                 )
-
-    def _prepare_features_data(
-        self,
-        tremor_columns: list[str] | None,
-    ) -> pd.DataFrame:
-        """Prepare features data by filtering columns if specified.
-
-        Validates that specified columns exist and returns a filtered dataframe
-        containing only id, datetime, and the specified tremor columns.
-
-        Args:
-            tremor_columns: Specific columns to extract, or None for all
-
-        Returns:
-            Filtered features dataframe
-
-        Raises:
-            ValueError: If specified columns don't exist in features_data
-        """
-        features_data = self.features_data
-
-        if tremor_columns is not None:
-            validate_columns(self.features_data, tremor_columns)
-            features_data = features_data[[ID_COLUMN, DATETIME_COLUMN, *tremor_columns]]
-
-        return features_data
-
-    def _prepare_extraction_parameters(
-        self,
-        exclude_features: list[str] | bool | None,
-        n_jobs: int | None = None,
-    ) -> dict[str, Any]:
-        """Prepare parameters for tsfresh feature extraction.
-
-        Handles feature exclusion logic and builds the parameter dictionary
-        for tsfresh feature extraction functions.
-
-        Args:
-            exclude_features: Features to exclude from calculation
-            n_jobs: Number of parallel jobs. Default to None.
-
-        Returns:
-            Dictionary of extraction parameters for tsfresh
-        """
-        # Handle feature exclusion
-        default_fc_parameters = self.default_fc_parameters
-
-        if exclude_features is not None:
-            if isinstance(exclude_features, list):
-                default_fc_parameters = self.drop_features(exclude_features)
-            elif isinstance(exclude_features, bool) and not exclude_features:
-                self.excludes_features = set()
-
-        # Build extraction parameters
-        return {
-            "column_id": ID_COLUMN,
-            "column_sort": DATETIME_COLUMN,
-            "n_jobs": n_jobs or self.n_jobs,
-            "default_fc_parameters": default_fc_parameters,
-        }
 
     def _extract_features_for_column(
         self,
@@ -750,65 +684,16 @@ class ForecastModel:
 
         return self
 
-    def drop_features(self, excludes_features: list[str]) -> ComprehensiveFCParameters:
-        """Drop features from calculation.
-
-        Args:
-            excludes_features (list[str]): List of features to exclude from calculation.
-
-        Returns:
-            ComprehensiveFCParameters: tsfresh ComprehensiveFCParameters
-        """
-        default_fc_parameters = self.default_fc_parameters
-        self.excludes_features.update(excludes_features)
-
-        if len(self.excludes_features) > 0:
-            default_fc_parameters_data = default_fc_parameters.data
-            for feature in self.excludes_features:
-                if feature in list(default_fc_parameters_data.keys()):
-                    default_fc_parameters.pop(feature)
-
-        self.default_fc_parameters = default_fc_parameters
-        return default_fc_parameters
-
-    def concat_features(self) -> Self:
-        """Concatenate features from calculation."""
-        if len(self.extract_features_csvs) > 0:
-            csv_list = list(self.extract_features_csvs)
-            if self.verbose:
-                logger.info("Concatenating extracted features from calculation.")
-            filepath = os.path.join(
-                self.features_dir,
-                f"extracted_features_{self.start_date_str}-{self.end_date_str}.csv",
-            )
-            self.extracted_features_csv = utils_concat_features(
-                csv_list, filepath, return_as_filepath=True
-            )
-
-        if len(self.relevant_features_csvs) > 0:
-            csv_list = list(self.relevant_features_csvs)
-            if self.verbose:
-                logger.info(
-                    "Concatenating relevant extracted features from calculation."
-                )
-            filepath = os.path.join(
-                self.features_dir,
-                f"extracted_relevant_{self.start_date_str}-{self.end_date_str}.csv",
-            )
-            self.extracted_relevant_csv = utils_concat_features(
-                csv_list, filepath, return_as_filepath=True
-            )
-
-        return self
-
     def extract_features(
         self,
-        exclude_features: list[str] | bool | None = None,
-        tremor_columns: list[str] | None = None,
+        select_tremor_columns: list[str] | None = None,
+        save_tremor_matrix_per_method: bool = True,
+        save_tremor_matrix_per_id: bool = False,
+        exclude_features: list[str] | None = None,
         use_relevant_features: bool = False,
         overwrite: bool = False,
-        concat_features: bool = True,
         n_jobs: int | None = None,
+        verbose: bool | None = None,
     ) -> Self:
         """Extract features from tremor data using tsfresh.
 
@@ -817,134 +702,58 @@ class ForecastModel:
         features based on correlation with eruption labels.
 
         Args:
+            select_tremor_columns (list[str]): List of tremor columns to extract.
+            save_tremor_matrix_per_method (bool, optional): Save separate CSV per tremor
+                column. Defaults to True.
+            save_tremor_matrix_per_id (bool, optional): BE CAREFULL, IT WILL GENERATE A LOT OF FILES.
+                Save individual windowed tremor CSVs for debugging. Defaults to False.
             exclude_features (Optional[list[str]]): List features calculator to be excluded.
-            tremor_columns (list[str]): List of tremor columns to extract.
             use_relevant_features (bool): If True, extract features using relevant features.
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
-            concat_features (bool): If True, concat all features
             n_jobs (int): Number of parallel jobs. Defaults to None.
+            verbose (bool): If True, enables verbose mode. Defaults to False.
 
         Returns:
             self (Self): ForecastModel object
         """
-        # Prepare data
-        features_data = self._prepare_features_data(tremor_columns)
-
-        # Setup parameters
-        overwrite = overwrite or self.overwrite
-        label_data = self.label_data
-        prefix_filename = (
-            "extracted_relevant" if use_relevant_features else "extracted_features"
-        )
-
-        if use_relevant_features and self.verbose:
-            logger.info("Extracting features using relevant features")
-
-        # Prepare target labels
-        y = label_data[ERUPTED_COLUMN]
-        y.index = label_data[ID_COLUMN]
-
-        # Setup extraction directory
-        extract_features_dir = os.path.join(self.features_dir, "extract_features")
-        os.makedirs(extract_features_dir, exist_ok=True)
-
-        # Prepare extraction parameters
-        extract_params = self._prepare_extraction_parameters(exclude_features, n_jobs)
-
-        # Extract features for each column
-        extracted_csvs = set()
-        for column in features_data.columns.tolist():
-            if column in [ID_COLUMN, DATETIME_COLUMN]:
-                continue
-
-            csv_path = self._extract_features_for_column(
-                features_data=features_data,
-                column=column,
-                y=y,
-                extract_params=extract_params,
-                use_relevant_features=use_relevant_features,
-                prefix_filename=prefix_filename,
-                extract_features_dir=extract_features_dir,
-                overwrite=overwrite,
-            )
-
-            if csv_path:
-                extracted_csvs.add(csv_path)
-
-        # Update tracked CSVs
-        if use_relevant_features:
-            self.relevant_features_csvs.update(extracted_csvs)
-        else:
-            self.extract_features_csvs.update(extracted_csvs)
-
-        # Concatenate if requested
-        if concat_features:
-            self.concat_features()
-
-        self.use_relevant_features = use_relevant_features
-
-        return self
-
-    def build_features(
-        self,
-        output_dir: str | None = None,
-        tremor_columns: list[str] | None = None,
-        save_per_method: bool = True,
-        save_tmp_feature: bool = False,
-        overwrite: bool = False,
-        verbose: bool = False,
-    ) -> Self:
-        """Build features from tremor data.
-
-        Args:
-            output_dir (Optional[str]): Directory to save features to. Defaults to None.
-            tremor_columns (list[str]): List of tremor columns to extract. Defaults to None.
-            save_tmp_feature (bool): If True, save features temporarily. Defaults to False.
-            save_per_method (bool): If True, save features per method. Defaults to True.
-            overwrite (bool): If True, overwrite existing feature files. Defaults to False.
-            verbose (bool): If True, show progress. Defaults to False.
-
-        Returns:
-            self (Self): ForecastModel object
-        """
-        label_data = self.label_data
-        output_dir = output_dir or self.features_dir
-        verbose = verbose or self.verbose
-
-        features_builder = FeaturesBuilder(
-            df_tremor=self.tremor_data,
-            df_label=label_data,
-            output_dir=output_dir,
+        tremor_matrix_builder = TremorMatrixBuilder(
+            tremor_df=self.tremor_data,
+            label_df=self.label_data,
+            output_dir=self.features_dir,
             window_size=self.window_size,
-            tremor_columns=tremor_columns,
             overwrite=overwrite or self.overwrite,
             verbose=verbose or self.verbose,
+        ).build(
+            select_tremor_columns=select_tremor_columns,
+            save_tremor_matrix_per_method=save_tremor_matrix_per_method,
+            save_tremor_matrix_per_id=save_tremor_matrix_per_id,
         )
+
+        tremor_matrix_df = tremor_matrix_builder.df
+
+        features_builder = FeaturesBuilder(
+            tremor_matrix_df=tremor_matrix_df,
+            label_df=self.label_data,
+            output_dir=self.features_dir,
+            overwrite=overwrite or self.overwrite,
+            n_jobs=n_jobs or self.n_jobs,
+        )
+
+        extracted_features_df = features_builder.extract_features(
+            use_relevant_features=use_relevant_features,
+            select_tremor_columns=select_tremor_columns,
+            exclude_features=exclude_features,
+        )
+
+        self.TremorMatrixBuilder = tremor_matrix_builder
+        self.tremor_matrix_df = tremor_matrix_df
+        self.tremor_matrix_csv = tremor_matrix_builder.csv
 
         self.FeaturesBuilder = features_builder
-        features_filename = f"tremor_features_{self.start_date_str}-{self.end_date_str}_ws-{self.window_size}.csv"
-        features_data = features_builder.build(
-            save_tmp_feature=save_tmp_feature,
-            save_per_method=save_per_method,
-            filename=features_filename,
-        )
-
-        # Sync label with features matrix
-        if len(features_builder.unique_ids) == 0:
-            raise ValueError("Features builder does not have unique ids.")
-
-        label_data = label_data[label_data[ID_COLUMN].isin(features_builder.unique_ids)]
-
-        label_csv = os.path.join(
-            self.features_dir,
-            f"label_features_{self.start_date_str}-{self.end_date_str}.csv",
-        )
-        label_data.to_csv(label_csv, index=True)
-
-        self.features_data = features_data
+        self.features_df = extracted_features_df
         self.features_csv = features_builder.csv
-        self.label_data = label_data
-        self.label_csv = label_csv
+        self.label_csv = features_builder.label_features_csv
+        self.use_relevant_features = use_relevant_features
 
         return self
 
@@ -1036,17 +845,15 @@ class ForecastModel:
 
     def train(
         self,
-        extracted_features_csv: str | None = None,
-        label_csv: str | None = None,
-        use_relevant_features: bool = False,
-        output_dir: str | None = None,
         random_state: int = 0,
         total_seed: int = 500,
         number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
-        n_jobs: int = 1,
+        extracted_features_csv: str | None = None,
+        output_dir: str | None = None,
+        n_jobs: int | None = None,
         overwrite: bool = False,
         verbose: bool = False,
     ) -> Self:
@@ -1054,8 +861,6 @@ class ForecastModel:
 
         Args:
             extracted_features_csv (str | None): Path to extracted features.
-            label_csv (str | None): Path to label.csv
-            use_relevant_features (bool, optional): Whether to use relevant features. Defaults to False.
             output_dir (str, optional): Path to output directory. Defaults to None.
             random_state (int, optional): Initiate random seed. Defaults to 0.
             total_seed (int, optional): Total random seed. Defaults to 500.
@@ -1072,18 +877,19 @@ class ForecastModel:
         """
         if verbose or self.verbose:
             print("=" * 50)
-            print("|| Training model")
+            print("| Training model")
+            if self.use_relevant_features:
+                print("|- Using Relevant features")
             print("=" * 50)
 
-        features_csv = extracted_features_csv or self.extracted_features_csv
-        if use_relevant_features or self.use_relevant_features:
-            features_csv = self.extracted_relevant_csv
+        features_csv = extracted_features_csv or self.features_csv
+
         if features_csv is None or not os.path.exists(features_csv):
             error_msg = f"Features CSV not found: {features_csv}"
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
-        label_csv = label_csv or self.label_csv
+        label_csv = self.label_csv
         if label_csv is None or not os.path.exists(label_csv):
             error_msg = f"Label CSV not found: {label_csv}"
             logger.error(error_msg)
@@ -1097,7 +903,7 @@ class ForecastModel:
             label_csv=label_csv,
             output_dir=output_dir,
             verbose=verbose or self.verbose,
-            n_jobs=n_jobs,
+            n_jobs=n_jobs or self.n_jobs,
         )
 
         train_model.train(

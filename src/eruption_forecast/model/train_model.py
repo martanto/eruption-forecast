@@ -66,6 +66,7 @@ class TrainModel:
         label_csv: str,
         output_dir: str | None = None,
         n_jobs: int = 1,
+        prefix_filename: str | None = None,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -80,9 +81,6 @@ class TrainModel:
 
         df_labels = df_labels[ERUPTED_COLUMN]
         output_dir = output_dir or os.path.join(os.getcwd(), "output", "trainings")
-        training_dir = output_dir or os.path.join(
-            os.getcwd(), "output", "models", "trainings"
-        )
 
         significant_features_dir = os.path.join(output_dir, "significant_features")
         all_features_dir = os.path.join(output_dir, "all_features")
@@ -93,14 +91,14 @@ class TrainModel:
         # Set DEFAULT properties
         self.df_features = df_features
         self.df_labels = df_labels
-        self.n_jobs = int(n_jobs)
         self.output_dir = output_dir
+        self.n_jobs = n_jobs
+        self.prefix_filename = prefix_filename
         self.verbose = verbose
         self.debug = debug
 
         # Set ADDITIONAL properties
         self.significant_features_dir = significant_features_dir
-        self.training_dir = training_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
         self.significant_figures_dir = significant_figures_dir
@@ -110,6 +108,9 @@ class TrainModel:
         # Validate and create directories
         self.validate()
         self.create_directories()
+
+        if verbose:
+            logger.info(f"Train model using {n_jobs} jobs")
 
     def validate(self) -> None:
         """Validate that features and labels are non-empty and aligned.
@@ -140,16 +141,16 @@ class TrainModel:
     def create_directories(self) -> None:
         """Create required output directories."""
         os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.training_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
 
     def concat_significant_features(
-        self, number_of_significant_features: int | None = None
+        self, number_of_significant_features: int | None = None, plot: bool = False
     ) -> pd.DataFrame:
         """Concatenate significant features.
 
         Args:
             number_of_significant_features (int, optional): Number of significant features.
+            plot (bool, optional): Whether to plot the significant features.
 
         Returns:
             pd.DataFrame: Significant features.
@@ -164,15 +165,42 @@ class TrainModel:
         if df.empty:
             raise ValueError("No data found inside csv files.")
 
-        df.to_csv(
-            os.path.join(self.output_dir, SIGNIFICANT_FEATURES_FILENAME), index=False
+        filename = (
+            f"{self.prefix_filename}_{SIGNIFICANT_FEATURES_FILENAME}"
+            if self.prefix_filename
+            else SIGNIFICANT_FEATURES_FILENAME
         )
+        df.to_csv(os.path.join(self.output_dir, f"{filename}.csv"), index=False)
 
+        # Save number_of_significant_features
         if (
             number_of_significant_features is not None
             and number_of_significant_features > 0
         ):
-            pass
+            filename = (
+                f"{self.prefix_filename}_top_{SIGNIFICANT_FEATURES_FILENAME}"
+                if self.prefix_filename
+                else f"top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
+            )
+
+            df = (
+                df.groupby(by="features")
+                .count()
+                .sort_values(by="p_values", ascending=False)
+            )
+            df.index.name = "features"
+            df.to_csv(
+                os.path.join(self.output_dir, filename),
+                index=True,
+            )
+
+            if plot:
+                plot_significant(
+                    df=df.reset_index(),
+                    filepath=os.path.join(self.output_dir, filename),
+                    overwrite=True,
+                    dpi=72,
+                )
 
         return df
 
@@ -189,12 +217,18 @@ class TrainModel:
         state = random_state + seed
         logger.debug(f"_train: seed={seed}, random_state={random_state}, state={state}")
 
-        significant_filepath = os.path.join(
-            self.significant_features_dir, f"{state:05d}.csv"
+        # Create filename and filepath
+        filename = (
+            f"{self.prefix_filename}_{state:05d}"
+            if self.prefix_filename
+            else f"{state:05d}"
         )
-        all_features_filepath = os.path.join(self.all_features_dir, f"{state:05d}.csv")
+        significant_filepath = os.path.join(
+            self.significant_features_dir, f"{filename}.csv"
+        )
+        all_features_filepath = os.path.join(self.all_features_dir, f"{filename}.csv")
         all_figures_filepath = os.path.join(
-            self.significant_figures_dir, f"{state:05d}.jpg"
+            self.significant_figures_dir, f"{filename}.jpg"
         )
 
         # Skip if files already exist
@@ -224,10 +258,7 @@ class TrainModel:
             labels=labels,
         )
 
-        significant_features.head(number_of_significant_features).to_csv(
-            significant_filepath, index=True
-        )
-
+        # Save all features sort by the lowest p_values
         if save_features:
             significant_features.to_csv(all_features_filepath, index=True)
             if plot_features:
@@ -237,6 +268,11 @@ class TrainModel:
                     overwrite=overwrite,
                     dpi=72,
                 )
+
+        # Save number_of_significant_features
+        significant_features.head(number_of_significant_features).to_csv(
+            significant_filepath, index=True
+        )
 
         if self.verbose:
             logger.info(f"Features {state:05d} saved to: {significant_filepath}")
@@ -311,6 +347,9 @@ class TrainModel:
                 csvs = pool.starmap(self._train, jobs)
                 self.csvs.extend(csvs)
 
-        self.df_significant_features = self.concat_significant_features()
+        self.df_significant_features = self.concat_significant_features(
+            number_of_significant_features=number_of_significant_features,
+            plot=plot_significant_features,
+        )
 
         return None
