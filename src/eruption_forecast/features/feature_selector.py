@@ -174,24 +174,25 @@ class FeatureSelector:
             n_jobs=self.n_jobs,
         )
 
-        rf.fit(X, y)
+        rf.fit(X, y)  # type: ignore
 
         # Use permutation importance (more reliable than Gini importance)
         perm_importance = permutation_importance(
             rf,
-            X,
-            y,
+            X,  # type: ignore
+            y,  # type: ignore
             n_repeats=n_repeats,
             random_state=self.random_state,
             n_jobs=self.n_jobs,
         )
 
         # Create importance DataFrame
+        # Note: permutation_importance returns a Bunch object with attributes
         importance_df = pd.DataFrame(
             {
                 "feature": X.columns,
-                "importance_mean": perm_importance.importances_mean,
-                "importance_std": perm_importance.importances_std,
+                "importance_mean": perm_importance.importances_mean,  # type: ignore[attr-defined]
+                "importance_std": perm_importance.importances_std,  # type: ignore[attr-defined]
             }
         ).sort_values("importance_mean", ascending=False)
 
