@@ -1,3 +1,5 @@
+import os
+
 from eruption_forecast import ForecastModel
 from eruption_forecast.decorators import timer
 
@@ -27,7 +29,12 @@ def main(use_relevant_features: bool = False):
         "2025-08-17",
     ]
 
-    fm = ForecastModel(overwrite=False, n_jobs=4, **params)
+    fm = ForecastModel(
+        overwrite=False,
+        n_jobs=4,
+        output_dir=os.path.join(os.getcwd(), "output_12h"),
+        **params,
+    )
 
     fm.calculate(
         source="sds",
@@ -39,7 +46,7 @@ def main(use_relevant_features: bool = False):
         start_date="2025-01-01",
         end_date="2025-07-24",
         day_to_forecast=2,
-        window_step=6,
+        window_step=12,
         window_step_unit="hours",
         eruption_dates=eruptions,
         verbose=True,
@@ -65,10 +72,11 @@ def main(use_relevant_features: bool = False):
         sampling_strategy=0.75,
         save_all_features=True,
         plot_significant_features=True,
+        output_dir=r"D:\Projects\eruption-forecast\output_12h\VG.OJN.00.EHZ\trainings_relevant_features",
         overwrite=False,
         verbose=True,
     )
 
 
 if __name__ == "__main__":
-    main(use_relevant_features=False)
+    main(use_relevant_features=True)

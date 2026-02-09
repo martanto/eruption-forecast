@@ -573,12 +573,13 @@ pipeline = Pipeline([
 | **ModelEvaluator** | New class for comprehensive model evaluation with metrics, export, and plotting capabilities |
 | **Data Leakage Fix** | Completely rewrote `TrainModel._train()` to eliminate data leakage: (1) train/test split first, (2) resample only training data, (3) feature selection only on training data, (4) RandomForest training with GridSearchCV + StratifiedShuffleSplit, (5) proper test set evaluation. Now saves trained models, per-seed metrics, and aggregated statistics. |
 | **Dynamic Classifier** | TrainModel now supports all classifier types through ClassifierModel integration: RF, GB, SVM, LR, NN, DT, KNN, NB, Voting. Users can select classifier type and CV strategy (shuffle, stratified, timeseries) during initialization. |
+| **Type Safety Fix (2026-02-09)** | Fixed bad-argument-type errors in ModelEvaluator: (1) Added Protocol types (SupportsPredict, SupportsPredictProba, SupportsDecisionFunction) for type safety, (2) Added explicit type annotations for all model method calls with `type: ignore[attr-defined]` where needed, (3) Added runtime validation with hasattr() checks, (4) Improved type annotations for cross_validate(), export_model(), plot_learning_curve(), and get_feature_importances() methods. All pyrefly errors resolved. |
 
 ### Code Quality Metrics
 
 | Metric | Status |
 |--------|--------|
-| Type Checking (pyrefly) | 0 errors |
+| Type Checking (pyrefly) | 0 errors (2 suppressed) |
 | Import Sorting (isort) | Applied |
 | Test Coverage | 81 tests passing |
 | Docstring Coverage | All public methods documented |

@@ -10,6 +10,7 @@
 - [x] Fix and improve docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, and TrainModel
 - [x] **Fix critical data leakage in TrainModel._train()** - Completely rewrote workflow to: (1) split data first, (2) resample only training data, (3) select features only on training data, (4) train classifier with GridSearchCV, (5) evaluate on held-out test set. Now saves trained models, per-seed metrics (JSON), and aggregated statistics (CSV).
 - [x] **Make TrainModel classifier dynamic** - Integrated ClassifierModel to support all classifier types (RF, GB, SVM, LR, NN, DT, KNN, NB, Voting) with configurable CV strategies (shuffle, stratified, timeseries). Users can now select classifier and CV strategy during TrainModel initialization.
+- [x] **Fix pyrefly type errors in ModelEvaluator** - Added Protocol types for type safety, explicit type annotations with proper ignore comments, runtime validation checks, and improved type annotations across all methods.
 
 ## High Priority
 
