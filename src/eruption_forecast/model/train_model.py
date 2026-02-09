@@ -2,11 +2,11 @@
 import json
 import os
 from multiprocessing import Pool
+from typing import Literal
 
 # Third party imports
 import joblib
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -15,11 +15,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from sklearn.model_selection import (
-    GridSearchCV,
-    StratifiedShuffleSplit,
-    train_test_split,
-)
+from sklearn.model_selection import GridSearchCV, train_test_split
 
 # Project imports
 from eruption_forecast.features.constants import (
@@ -29,6 +25,7 @@ from eruption_forecast.features.constants import (
     SIGNIFICANT_FEATURES_FILENAME,
 )
 from eruption_forecast.logger import logger
+from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.plot import plot_significant_features as plot_significant
 from eruption_forecast.utils import (
     get_significant_features,
@@ -37,13 +34,13 @@ from eruption_forecast.utils import (
 
 
 class TrainModel:
-    """Train feature-selection and RandomForest models over multiple random seeds.
+    """Train feature-selection and classifier models over multiple random seeds.
 
     Loads pre-extracted features and labels, and for each seed performs:
     1. Train/test split (80/20, stratified) to prevent data leakage
     2. Random under-sampling on training set only
     3. Feature selection on training set only using tsfresh
-    4. RandomForestClassifier training with GridSearchCV
+    4. Classifier training with GridSearchCV (supports RF, GB, SVM, LR, NN, etc.)
     5. Evaluation on held-out test set
 
     This multi-seed approach provides robust feature selection and model
@@ -57,6 +54,11 @@ class TrainModel:
             ``<cwd>/output/trainings``.
         n_jobs (int, optional): Number of parallel workers. Defaults to 1.
         prefix_filename (str, optional): Prefix for output filenames. Defaults to None.
+        classifier (str, optional): Classifier type ("rf", "gb", "svm", "lr", "nn",
+            "dt", "knn", "nb", "voting"). Defaults to "rf".
+        cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
+            "timeseries"). Defaults to "shuffle".
+        cv_splits (int, optional): Number of CV splits. Defaults to 5.
         verbose (bool, optional): Verbose logging. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
 
@@ -65,6 +67,7 @@ class TrainModel:
             do not match.
 
     Example:
+        >>> # Train with Random Forest (default)
         >>> trainer = TrainModel(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_csv="output/features/label_features.csv",
@@ -77,6 +80,27 @@ class TrainModel:
         ...     number_of_significant_features=20,
         ...     sampling_strategy=0.75,
         ... )
+
+        >>> # Train with Gradient Boosting
+        >>> trainer = TrainModel(
+        ...     features_csv="output/features/extracted_features.csv",
+        ...     label_csv="output/features/label_features.csv",
+        ...     output_dir="output/trainings",
+        ...     classifier="gb",
+        ...     n_jobs=4,
+        ... )
+
+        >>> # Train with VotingClassifier ensemble and TimeSeriesSplit
+        >>> trainer = TrainModel(
+        ...     features_csv="output/features/extracted_features.csv",
+        ...     label_csv="output/features/label_features.csv",
+        ...     output_dir="output/trainings",
+        ...     classifier="voting",
+        ...     cv_strategy="timeseries",
+        ...     cv_splits=5,
+        ...     n_jobs=4,
+        ... )
+
         >>> # Results saved to:
         >>> # - output/trainings/significant_features.csv (aggregated features)
         >>> # - output/trainings/models/ (trained models)
@@ -92,6 +116,11 @@ class TrainModel:
         output_dir: str | None = None,
         n_jobs: int = 1,
         prefix_filename: str | None = None,
+        classifier: Literal[
+            "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
+        ] = "rf",
+        cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
+        cv_splits: int = 5,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -122,6 +151,9 @@ class TrainModel:
         self.output_dir = output_dir
         self.n_jobs = n_jobs
         self.prefix_filename = prefix_filename
+        self.classifier = classifier
+        self.cv_strategy = cv_strategy
+        self.cv_splits = cv_splits
         self.verbose = verbose
         self.debug = debug
 
@@ -140,7 +172,10 @@ class TrainModel:
         self.create_directories()
 
         if verbose:
-            logger.info(f"Train model using {n_jobs} jobs")
+            logger.info(
+                f"Train model using {n_jobs} jobs with {classifier} classifier "
+                f"and {cv_strategy} CV strategy ({cv_splits} splits)"
+            )
 
     def validate(self) -> None:
         """Validate that features and labels are non-empty and aligned.
@@ -291,13 +326,13 @@ class TrainModel:
         save_features: bool = False,
         plot_features: bool = False,
     ) -> tuple[str, dict]:
-        """Train feature selection and RandomForest model for a single random seed.
+        """Train feature selection and classifier model for a single random seed.
 
         Performs:
         1. Train/test split (80/20, stratified)
         2. Random under-sampling on training set only
         3. Feature selection on training set only
-        4. RandomForestClassifier training with GridSearchCV
+        4. Classifier training with GridSearchCV (using configured classifier type)
         5. Evaluation on held-out test set
 
         Args:
@@ -357,7 +392,7 @@ class TrainModel:
 
         if can_skip:
             logger.info(f"Seed {seed:05d} already trained.")
-            with open(metrics_filepath, "r") as f:
+            with open(metrics_filepath) as f:
                 metrics = json.load(f)
             return significant_filepath, metrics
 
@@ -369,7 +404,7 @@ class TrainModel:
             self.df_labels,
             test_size=0.2,
             random_state=state,
-            stratify=self.df_labels,
+            stratify=self.df_labels,  # type: ignore
         )
 
         # ========== STEP 2: Resample ONLY Training Data ==========
@@ -398,9 +433,9 @@ class TrainModel:
                 )
 
         # Select top-N features
-        top_features = (
-            significant_features.head(number_of_significant_features).index.tolist()
-        )
+        top_features = significant_features.head(
+            number_of_significant_features
+        ).index.tolist()
         features_train_selected = features_train_resampled[top_features]
         features_test_selected = features_test[top_features]
 
@@ -409,19 +444,22 @@ class TrainModel:
             significant_filepath, index=True
         )
 
-        # ========== STEP 4: Cross-Validation with StratifiedShuffleSplit ==========
-        cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=state)
+        # ========== STEP 4: Cross-Validation with Dynamic Classifier ==========
+        # Create classifier model with appropriate CV strategy
+        clf_model = ClassifierModel(
+            classifier=self.classifier,
+            random_state=state,
+            cv_strategy=self.cv_strategy,
+            n_splits=self.cv_splits,
+        )
 
-        param_grid = {
-            "n_estimators": [100, 200, 300],
-            "max_depth": [10, 20, 30, None],
-            "min_samples_split": [2, 5, 10],
-            "min_samples_leaf": [1, 2, 4],
-        }
+        # Get model and grid from ClassifierModel
+        model = clf_model.model
+        param_grid = clf_model.grid
+        cv = clf_model.get_cv_splitter()
 
-        rf_classifier = RandomForestClassifier(random_state=state)
         grid_search = GridSearchCV(
-            estimator=rf_classifier,
+            estimator=model,
             param_grid=param_grid,
             cv=cv,
             scoring="balanced_accuracy",
@@ -429,7 +467,7 @@ class TrainModel:
             verbose=0,
         )
 
-        grid_search.fit(features_train_selected, labels_train_resampled) # type: ignore
+        grid_search.fit(features_train_selected, labels_train_resampled)  # type: ignore
         best_model = grid_search.best_estimator_
 
         # ========== STEP 5: Evaluate on Test Set ==========
@@ -438,6 +476,9 @@ class TrainModel:
         metrics = {
             "seed": seed,
             "random_state": state,
+            "classifier": self.classifier,
+            "cv_strategy": self.cv_strategy,
+            "cv_splits": self.cv_splits,
             "n_train": len(labels_train_resampled),
             "n_test": len(labels_test),
             "n_features": number_of_significant_features,
@@ -475,13 +516,13 @@ class TrainModel:
         plot_significant_features: bool = False,
         overwrite: bool = False,
     ) -> None:
-        """Train feature selection and RandomForest models across multiple random seeds.
+        """Train feature selection and classifier models across multiple random seeds.
 
         For each seed, performs:
         1. Train/test split (80/20, stratified)
         2. Random under-sampling on training set only
         3. Feature selection on training set only
-        4. RandomForestClassifier training with GridSearchCV
+        4. Classifier training with GridSearchCV (using configured classifier type)
         5. Evaluation on held-out test set
 
         Args:
@@ -572,9 +613,7 @@ class TrainModel:
         summary.to_csv(os.path.join(self.output_dir, "metrics_summary.csv"))
 
         # Save all individual metrics
-        df_metrics.to_csv(
-            os.path.join(self.output_dir, "all_metrics.csv"), index=False
-        )
+        df_metrics.to_csv(os.path.join(self.output_dir, "all_metrics.csv"), index=False)
 
         logger.info("=" * 60)
         logger.info("Metrics Summary (mean ± std across seeds)")

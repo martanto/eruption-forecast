@@ -572,6 +572,7 @@ pipeline = Pipeline([
 | **VotingClassifier** | Added `"voting"` ensemble classifier combining RF, GB, LR, and SVM with soft voting |
 | **ModelEvaluator** | New class for comprehensive model evaluation with metrics, export, and plotting capabilities |
 | **Data Leakage Fix** | Completely rewrote `TrainModel._train()` to eliminate data leakage: (1) train/test split first, (2) resample only training data, (3) feature selection only on training data, (4) RandomForest training with GridSearchCV + StratifiedShuffleSplit, (5) proper test set evaluation. Now saves trained models, per-seed metrics, and aggregated statistics. |
+| **Dynamic Classifier** | TrainModel now supports all classifier types through ClassifierModel integration: RF, GB, SVM, LR, NN, DT, KNN, NB, Voting. Users can select classifier type and CV strategy (shuffle, stratified, timeseries) during initialization. |
 
 ### Code Quality Metrics
 
