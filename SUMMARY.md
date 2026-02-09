@@ -106,6 +106,147 @@ Raw Seismic Data (SDS/FDSN)
 
 ---
 
+## Critical Fix: Data Leakage in Model Training (2026-02-09)
+
+### Problem Identified
+
+The original `TrainModel._train()` implementation contained **critical data leakage** that violated fundamental machine learning best practices:
+
+1. **Resampling applied to entire dataset** before train/test split
+2. **Feature selection seeing test data** through p-value calculations on full dataset
+3. **No held-out test set** for generalization validation
+4. **Overly optimistic metrics** due to information leakage
+
+### Original (Incorrect) Workflow
+
+```python
+# ❌ WRONG: This was the old implementation
+def _train(self, seed, random_state, ...):
+    # Resample entire dataset (LEAKAGE!)
+    features, labels = random_under_sampler(
+        features=self.df_features,      # ENTIRE dataset
+        labels=self.df_labels,          # ENTIRE dataset
+        sampling_strategy=sampling_strategy,
+        random_state=state,
+    )
+
+    # Feature selection on entire dataset (LEAKAGE!)
+    significant_features = get_significant_features(
+        features=features,
+        labels=labels,
+    )
+
+    # Save features but NO model training!
+    significant_features.head(number_of_significant_features).to_csv(...)
+```
+
+### Corrected Workflow
+
+```python
+# ✅ CORRECT: New implementation
+def _train(self, seed, random_state, ...):
+    # 1. Split FIRST (80/20, stratified)
+    features_train, features_test, labels_train, labels_test = train_test_split(
+        self.df_features, self.df_labels,
+        test_size=0.2, random_state=state, stratify=self.df_labels,
+    )
+
+    # 2. Resample ONLY training data
+    features_train_resampled, labels_train_resampled = random_under_sampler(
+        features=features_train,  # ONLY training data
+        labels=labels_train,
+        sampling_strategy=sampling_strategy,
+        random_state=state,
+    )
+
+    # 3. Feature selection ONLY on training data
+    significant_features = get_significant_features(
+        features=features_train_resampled,  # ONLY training data
+        labels=labels_train_resampled,
+    )
+
+    # 4. Apply selected features to both sets
+    top_features = significant_features.head(number_of_significant_features).index.tolist()
+    features_train_selected = features_train_resampled[top_features]
+    features_test_selected = features_test[top_features]
+
+    # 5. Cross-validation with StratifiedShuffleSplit
+    cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=state)
+    grid_search = GridSearchCV(
+        estimator=RandomForestClassifier(random_state=state),
+        param_grid=param_grid,
+        cv=cv,
+        scoring="balanced_accuracy",
+    )
+    grid_search.fit(features_train_selected, labels_train_resampled)
+
+    # 6. Evaluate on held-out test set
+    y_pred = grid_search.best_estimator_.predict(features_test_selected)
+    metrics = {
+        'accuracy': accuracy_score(labels_test, y_pred),
+        'balanced_accuracy': balanced_accuracy_score(labels_test, y_pred),
+        'f1_score': f1_score(labels_test, y_pred),
+        'precision': precision_score(labels_test, y_pred),
+        'recall': recall_score(labels_test, y_pred),
+        'best_params': grid_search.best_params_,
+        'best_cv_score': grid_search.best_score_,
+    }
+
+    # 7. Save model, metrics, and features
+    joblib.dump(grid_search.best_estimator_, model_filepath)
+    with open(metrics_filepath, 'w') as f:
+        json.dump(metrics, f, indent=2)
+```
+
+### Key Changes
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| Train/Test Split | ❌ None | ✅ 80/20 stratified split FIRST |
+| Resampling | ❌ Applied to entire dataset | ✅ Applied only to training set |
+| Feature Selection | ❌ Saw entire dataset | ✅ Only sees training data |
+| Model Training | ❌ Not implemented | ✅ RandomForest + GridSearchCV |
+| Evaluation | ❌ No test set | ✅ Held-out test set evaluation |
+| Outputs | Features only | Features + trained models + metrics |
+
+### New Output Structure
+
+```
+output/trainings/
+├── significant_features/    # Top-N features per seed (existing)
+│   ├── 00000.csv
+│   └── ...
+├── models/                  # NEW: Trained RandomForest models
+│   ├── 00000.pkl
+│   └── ...
+├── metrics/                 # NEW: Per-seed evaluation metrics
+│   ├── 00000.json
+│   └── ...
+├── significant_features.csv           # Aggregated features
+├── all_metrics.csv                    # NEW: All seed metrics
+└── metrics_summary.csv                # NEW: Mean/std statistics
+```
+
+### Impact on Results
+
+The corrected implementation now provides:
+
+1. **Realistic performance estimates** through proper train/test isolation
+2. **Unbiased feature selection** that doesn't see test data
+3. **Trained models** ready for deployment
+4. **Comprehensive metrics** across multiple seeds for robustness
+5. **True generalization performance** on held-out data
+
+### Testing
+
+Created integration test (`tests/test_train_model_fixed.py`) that verifies:
+- Train + test samples < total (confirming undersampling)
+- All outputs created (models, metrics, features)
+- Metrics computed correctly
+- Models can be loaded and used for prediction
+
+---
+
 ## Machine Learning Workflow Analysis
 
 ### Current Workflow
@@ -136,6 +277,7 @@ The current workflow follows a well-structured approach for binary classificatio
 | No probability calibration | Pending | Add CalibratedClassifierCV for better probability estimates |
 | ~~No model persistence~~ | ✅ RESOLVED | ModelEvaluator.export_model() with joblib |
 | ~~No evaluation metrics~~ | ✅ RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
+| ~~Data leakage in TrainModel~~ | ✅ RESOLVED | Fixed workflow: split → resample → select features → train → evaluate |
 
 ---
 
@@ -429,6 +571,7 @@ pipeline = Pipeline([
 | **TimeSeriesSplit** | Added `cv_strategy` parameter and `get_cv_splitter()` method for temporal cross-validation |
 | **VotingClassifier** | Added `"voting"` ensemble classifier combining RF, GB, LR, and SVM with soft voting |
 | **ModelEvaluator** | New class for comprehensive model evaluation with metrics, export, and plotting capabilities |
+| **Data Leakage Fix** | Completely rewrote `TrainModel._train()` to eliminate data leakage: (1) train/test split first, (2) resample only training data, (3) feature selection only on training data, (4) RandomForest training with GridSearchCV + StratifiedShuffleSplit, (5) proper test set evaluation. Now saves trained models, per-seed metrics, and aggregated statistics. |
 
 ### Code Quality Metrics
 
