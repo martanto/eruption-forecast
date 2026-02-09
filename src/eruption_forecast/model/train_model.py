@@ -336,7 +336,7 @@ class TrainModel:
             and number_of_significant_features > 0
         ):
             filename = (
-                f"{self.prefix_filename}_top_{SIGNIFICANT_FEATURES_FILENAME}"
+                f"{self.prefix_filename}_top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
                 if self.prefix_filename
                 else f"top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
             )
@@ -348,7 +348,7 @@ class TrainModel:
             )
             df.index.name = "features"
             df.to_csv(
-                os.path.join(self.output_dir, filename),
+                os.path.join(self.output_dir, f"{filename}.csv"),
                 index=True,
             )
 
