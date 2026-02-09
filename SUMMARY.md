@@ -272,7 +272,7 @@ The current workflow follows a well-structured approach for binary classificatio
 | Limitation | Status | Recommendation |
 |------------|--------|----------------|
 | ~~No ensemble methods~~ | ✅ RESOLVED | VotingClassifier now available (`"voting"`) |
-| Fixed feature selection | Pending | Consider Recursive Feature Elimination (RFE) |
+| ~~Fixed feature selection~~ | ✅ RESOLVED | Enhanced FeatureSelector with three methods: tsfresh, RandomForest, combined two-stage |
 | ~~No temporal validation~~ | ✅ RESOLVED | TimeSeriesSplit now available (`cv_strategy="timeseries"`) |
 | No probability calibration | Pending | Add CalibratedClassifierCV for better probability estimates |
 | ~~No model persistence~~ | ✅ RESOLVED | ModelEvaluator.export_model() with joblib |
@@ -583,6 +583,138 @@ pipeline = Pipeline([
 | Import Sorting (isort) | Applied |
 | Test Coverage | 81 tests passing |
 | Docstring Coverage | All public methods documented |
+
+---
+
+## Enhanced Feature Selection (2026-02-09)
+
+### New FeatureSelector Class
+
+Added a comprehensive `FeatureSelector` class implementing three feature selection strategies:
+
+#### 1. **tsfresh Statistical Selection** (`method="tsfresh"`)
+- Uses hypothesis testing with FDR (False Discovery Rate) control
+- Fast filtering based on univariate statistical tests
+- Model-agnostic approach
+- Provides p-values for interpretability
+- **Best for:** Initial dimensionality reduction (1000s → 100s features)
+
+```python
+from eruption_forecast.features import FeatureSelector
+
+selector = FeatureSelector(method="tsfresh", n_jobs=4, verbose=True)
+X_selected = selector.fit_transform(X_train, y_train, fdr_level=0.05)
+print(f"Selected {X_selected.shape[1]} features with p < 0.05")
+```
+
+#### 2. **RandomForest Permutation Importance** (`method="random_forest"`)
+- Uses permutation importance (more reliable than Gini)
+- Captures feature interactions and non-linear relationships
+- Model-specific optimization
+- Provides importance scores with standard deviations
+- **Best for:** Feature refinement with interaction capture
+
+```python
+selector = FeatureSelector(method="random_forest", n_jobs=4, verbose=True)
+X_selected = selector.fit_transform(
+    X_train, y_train,
+    top_n=30,
+    n_estimators=200,
+    max_depth=10,
+    min_samples_leaf=20,
+    n_repeats=10
+)
+```
+
+#### 3. **Combined Two-Stage** (`method="combined"`) **[RECOMMENDED]**
+- **Stage 1:** tsfresh statistical filtering (statistical rigor)
+- **Stage 2:** RandomForest permutation importance (interaction capture)
+- Combines speed, statistical grounding, and model optimization
+- Lower overfitting risk through statistical pre-filtering
+- Provides both p-values AND importance scores
+- **Best for:** Production-ready feature selection
+
+```python
+selector = FeatureSelector(method="combined", n_jobs=4, verbose=True)
+X_selected = selector.fit_transform(
+    X_train, y_train,
+    fdr_level=0.05,      # Stage 1: tsfresh FDR level
+    top_n=30,            # Stage 2: final feature count
+    n_estimators=200,    # Stage 2: RandomForest params
+    max_depth=10,
+    n_repeats=10
+)
+
+# Get comprehensive feature scores
+feature_scores = selector.get_feature_scores()
+print(feature_scores.head(10))
+```
+
+### Comparison Results
+
+Empirical comparison shows the combined method balances:
+- ✅ **Speed:** Faster than pure RF (tsfresh pre-filtering)
+- ✅ **Statistical rigor:** P-values for scientific interpretation
+- ✅ **Model optimization:** Captures feature interactions
+- ✅ **Lower overfitting:** Statistical pre-filtering reduces noise
+- ✅ **Interpretability:** Both p-values and importance scores
+
+### Feature Selection Workflow Comparison
+
+| Method | Dimensionality Reduction | Captures Interactions | Overfitting Risk | Interpretability | Speed |
+|--------|--------------------------|----------------------|------------------|------------------|-------|
+| **tsfresh** | 1000s → 100s | ❌ No | ✅ Low | ✅ High (p-values) | ✅ Fast |
+| **RandomForest** | Direct → N | ✅ Yes | ⚠️ Medium | ⚠️ Medium (relative scores) | ⚠️ Slow |
+| **Combined** | 1000s → 100s → N | ✅ Yes | ✅ Low | ✅ High (both metrics) | ✅ Fast |
+
+### Testing Script
+
+A comprehensive comparison script is available: `test_feature_selection_comparison.py`
+
+```bash
+python test_feature_selection_comparison.py
+```
+
+This script:
+- Compares all three methods on the same dataset
+- Trains RandomForest classifiers on each feature set
+- Evaluates performance (accuracy, balanced accuracy, F1-score)
+- Analyzes feature overlap between methods
+- Provides detailed classification reports
+- Saves results for comparison
+
+### Integration with Existing Workflow
+
+The `FeatureSelector` can be used standalone or integrated into the `ForecastModel` pipeline:
+
+```python
+from eruption_forecast.features import FeatureSelector
+import pandas as pd
+
+# Load extracted features
+X = pd.read_csv("output/features/all_features.csv", index_col=0)
+y = pd.read_csv("output/features/label_features.csv")["is_erupted"]
+
+# Two-stage feature selection
+selector = FeatureSelector(method="combined", n_jobs=4, verbose=True)
+X_selected = selector.fit_transform(X, y, fdr_level=0.05, top_n=30)
+
+# Now use with any classifier
+from sklearn.ensemble import RandomForestClassifier
+rf = RandomForestClassifier(n_estimators=200, random_state=42)
+rf.fit(X_selected, y)
+```
+
+### Key Advantages Over Previous Approach
+
+| Aspect | Previous | Enhanced |
+|--------|----------|----------|
+| **Methods** | tsfresh only | tsfresh + RandomForest + combined |
+| **Interaction capture** | ❌ No | ✅ Yes (RF stage) |
+| **Interpretability** | p-values only | p-values + importance scores |
+| **Flexibility** | Fixed approach | Three configurable methods |
+| **Overfitting control** | Statistical only | Statistical + regularization |
+| **Comparison** | Not available | Built-in comparison script |
 
 ---
 
