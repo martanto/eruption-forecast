@@ -1,6 +1,6 @@
 # Standard library imports
 import os
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, Union
 
 # Third party imports
 import joblib
@@ -9,17 +9,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.base import BaseEstimator
-from sklearn.calibration import CalibrationDisplay
 from sklearn.ensemble import (
-    GradientBoostingClassifier,
-    RandomForestClassifier,
     VotingClassifier,
 )
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    ConfusionMatrixDisplay,
-    PrecisionRecallDisplay,
-    RocCurveDisplay,
     accuracy_score,
     average_precision_score,
     balanced_accuracy_score,
@@ -33,10 +26,27 @@ from sklearn.metrics import (
     roc_curve,
 )
 from sklearn.model_selection import GridSearchCV, cross_val_score, learning_curve
-from sklearn.tree import DecisionTreeClassifier
 
 # Project imports
 from eruption_forecast.logger import logger
+
+
+class SupportsPredict(Protocol):
+    """Protocol for models that support predict method."""
+
+    def predict(self, X: np.ndarray | pd.DataFrame) -> np.ndarray: ...
+
+
+class SupportsPredictProba(Protocol):
+    """Protocol for models that support predict_proba method."""
+
+    def predict_proba(self, X: np.ndarray | pd.DataFrame) -> np.ndarray: ...
+
+
+class SupportsDecisionFunction(Protocol):
+    """Protocol for models that support decision_function method."""
+
+    def decision_function(self, X: np.ndarray | pd.DataFrame) -> np.ndarray: ...
 
 
 class ModelEvaluator:
@@ -78,8 +88,8 @@ class ModelEvaluator:
     ) -> None:
         # Handle GridSearchCV objects
         if isinstance(model, GridSearchCV):
-            self._fitted_model = model.best_estimator_
-            self._grid_search = model
+            self._fitted_model: BaseEstimator = model.best_estimator_
+            self._grid_search: GridSearchCV | None = model
         else:
             self._fitted_model = model
             self._grid_search = None
@@ -99,7 +109,11 @@ class ModelEvaluator:
         os.makedirs(self.figures_dir, exist_ok=True)
 
         # Generate predictions
-        self._y_pred = self._fitted_model.predict(X_test)  # type: ignore[union-attr]
+        if not hasattr(self._fitted_model, "predict"):
+            raise TypeError(
+                f"Model {type(self._fitted_model).__name__} does not support predict method"
+            )
+        self._y_pred: np.ndarray = self._fitted_model.predict(X_test)  # type: ignore[attr-defined]
         self._y_proba = self._get_probabilities()
 
         # Cache for metrics
@@ -123,11 +137,12 @@ class ModelEvaluator:
     def _get_probabilities(self) -> np.ndarray | None:
         """Extract prediction probabilities if available."""
         if hasattr(self._fitted_model, "predict_proba"):
-            proba = self._fitted_model.predict_proba(self.X_test)
+            proba: np.ndarray = self._fitted_model.predict_proba(self.X_test)  # type: ignore[attr-defined]
             # Return probability for positive class (class 1)
             return proba[:, 1] if proba.ndim > 1 else proba
         elif hasattr(self._fitted_model, "decision_function"):
-            return self._fitted_model.decision_function(self.X_test)
+            decision: np.ndarray = self._fitted_model.decision_function(self.X_test)  # type: ignore[attr-defined]
+            return decision
         return None
 
     # =========================================================================
@@ -166,7 +181,7 @@ class ModelEvaluator:
         metrics: dict[str, Any] = {
             "model_name": self.model_name,
             "accuracy": accuracy_score(y_true, y_pred),
-            "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
+            "balanced_accuracy": balanced_accuracy_score(ly_true, y_pred),
             "precision": precision_score(y_true, y_pred, zero_division=0),
             "recall": recall_score(y_true, y_pred, zero_division=0),
             "f1_score": f1_score(y_true, y_pred, zero_division=0),
@@ -265,7 +280,7 @@ class ModelEvaluator:
             >>> importances = evaluator.get_feature_importances(top_n=20)
             >>> print(importances.head(10))
         """
-        model = self._fitted_model
+        model: BaseEstimator = self._fitted_model
 
         # Handle VotingClassifier - get importances from first tree-based estimator
         if isinstance(model, VotingClassifier):
@@ -282,7 +297,7 @@ class ModelEvaluator:
             )
             return None
 
-        importances = model.feature_importances_
+        importances: np.ndarray = model.feature_importances_  # type: ignore[attr-defined]
 
         # Determine feature names
         if feature_names is None:
@@ -308,7 +323,7 @@ class ModelEvaluator:
         self,
         cv: int = 5,
         scoring: str | list[str] = "balanced_accuracy",
-    ) -> dict[str, np.ndarray]:
+    ) -> dict[str, Any]:
         """Perform cross-validation on training data.
 
         Requires X_train and y_train to be provided during initialization.
@@ -327,8 +342,8 @@ class ModelEvaluator:
         if self.X_train is None or self.y_train is None:
             raise ValueError("X_train and y_train required for cross-validation")
 
-        scores = cross_val_score(
-            self._fitted_model,
+        scores: np.ndarray = cross_val_score(
+            self._fitted_model,  # type: ignore[arg-type]
             self.X_train,
             self.y_train,
             cv=cv,
@@ -337,8 +352,8 @@ class ModelEvaluator:
 
         return {
             "test_score": scores,
-            "mean_score": scores.mean(),
-            "std_score": scores.std(),
+            "mean_score": float(scores.mean()),
+            "std_score": float(scores.std()),
         }
 
     # =========================================================================
@@ -362,7 +377,7 @@ class ModelEvaluator:
         filename = filename or f"{self.model_name}.joblib"
         filepath = os.path.join(self.output_dir, filename)
 
-        joblib.dump(self._fitted_model, filepath, compress=compress)
+        joblib.dump(self._fitted_model, filepath, compress=compress)  # type: ignore[arg-type]
         logger.info(f"Model exported to: {filepath}")
 
         return filepath
@@ -820,7 +835,7 @@ class ModelEvaluator:
         )
 
         result = learning_curve(
-            self._fitted_model,
+            self._fitted_model,  # type: ignore[arg-type]
             self.X_train,
             self.y_train,
             train_sizes=train_sizes,
