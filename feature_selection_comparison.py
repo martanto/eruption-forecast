@@ -32,7 +32,7 @@ from eruption_forecast.logger import logger
 @timer("Feature Selection Comparison")
 def main(
     use_existing_features: bool = True,
-    output_base_dir: str = "tests/output_feature_selection",
+    output_base_dir: str = r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\features",
 ):
     """
     Compare three feature selection approaches for eruption forecasting.
@@ -76,7 +76,9 @@ def main(
         logger.info("=" * 80)
 
         # Look for existing features in the default output directory
-        default_output = f"output/AM.{params['station']}.00.{params['channel']}/features"
+        default_output = (
+            f"output/AM.{params['station']}.00.{params['channel']}/features"
+        )
 
         # Find the most recent all_features file
         if os.path.exists(default_output):
@@ -148,8 +150,8 @@ def main(
             overwrite=False,
         )
 
-        features_csv = fm.features_builder.all_features_csv
-        label_csv = fm.features_builder.label_features_csv
+        features_csv = fm.FeaturesBuilder.all_features_csv
+        label_csv = fm.FeaturesBuilder.label_features_csv
 
     # ========== STEP 2: Load Features and Labels ==========
     logger.info("=" * 80)
@@ -192,9 +194,7 @@ def main(
         verbose=True,
     )
 
-    X_train_tsfresh = selector_tsfresh.fit_transform(
-        X_train, y_train, fdr_level=0.05
-    )
+    X_train_tsfresh = selector_tsfresh.fit_transform(X_train, y_train, fdr_level=0.05)
     X_test_tsfresh = selector_tsfresh.transform(X_test)
 
     # Train RandomForest on tsfresh-selected features
@@ -219,7 +219,9 @@ def main(
 
     logger.info(f"Selected features: {results['tsfresh']['n_features']}")
     logger.info(f"Test Accuracy: {results['tsfresh']['accuracy']:.4f}")
-    logger.info(f"Test Balanced Accuracy: {results['tsfresh']['balanced_accuracy']:.4f}")
+    logger.info(
+        f"Test Balanced Accuracy: {results['tsfresh']['balanced_accuracy']:.4f}"
+    )
     logger.info(f"Test F1-Score: {results['tsfresh']['f1_score']:.4f}")
 
     # Save feature list
@@ -262,8 +264,8 @@ def main(
         random_state=42,
         n_jobs=4,
     )
-    rf_rf.fit(X_train_rf, y_train)
-    y_pred_rf = rf_rf.predict(X_test_rf)
+    rf_rf.fit(X_train_rf, y_train)  # type: ignore
+    y_pred_rf = rf_rf.predict(X_test_rf)  # type: ignore
 
     # Evaluate
     results["random_forest"] = {
@@ -336,7 +338,9 @@ def main(
 
     logger.info(f"Selected features: {results['combined']['n_features']}")
     logger.info(f"Test Accuracy: {results['combined']['accuracy']:.4f}")
-    logger.info(f"Test Balanced Accuracy: {results['combined']['balanced_accuracy']:.4f}")
+    logger.info(
+        f"Test Balanced Accuracy: {results['combined']['balanced_accuracy']:.4f}"
+    )
     logger.info(f"Test F1-Score: {results['combined']['f1_score']:.4f}")
 
     # Save feature list and scores
@@ -394,9 +398,7 @@ def main(
     rf_set = set(results["random_forest"]["features"])
     combined_set = set(results["combined"]["features"])
 
-    logger.info(
-        f"Features in tsfresh only: {len(tsfresh_set - rf_set - combined_set)}"
-    )
+    logger.info(f"Features in tsfresh only: {len(tsfresh_set - rf_set - combined_set)}")
     logger.info(f"Features in RF only: {len(rf_set - tsfresh_set - combined_set)}")
     logger.info(
         f"Features in combined only: {len(combined_set - tsfresh_set - rf_set)}"
@@ -415,10 +417,7 @@ def main(
     overlap_file = os.path.join(output_base_dir, f"feature_overlap_{timestamp}.csv")
     max_len = max(len(v) for v in overlap_analysis.values())
     overlap_df = pd.DataFrame(
-        {
-            k: v + [""] * (max_len - len(v))
-            for k, v in overlap_analysis.items()
-        }
+        {k: v + [""] * (max_len - len(v)) for k, v in overlap_analysis.items()}
     )
     overlap_df.to_csv(overlap_file, index=False)
     logger.info(f"Saved feature overlap analysis: {overlap_file}")
@@ -429,13 +428,25 @@ def main(
     logger.info("=" * 80)
 
     logger.info("\n--- tsfresh Method ---")
-    print(classification_report(y_test, y_pred_tsfresh, target_names=["No Eruption", "Eruption"]))
+    print(
+        classification_report(
+            y_test, y_pred_tsfresh, target_names=["No Eruption", "Eruption"]
+        )
+    )
 
     logger.info("\n--- RandomForest Method ---")
-    print(classification_report(y_test, y_pred_rf, target_names=["No Eruption", "Eruption"]))
+    print(
+        classification_report(
+            y_test, y_pred_rf, target_names=["No Eruption", "Eruption"]
+        )
+    )
 
     logger.info("\n--- Combined Method ---")
-    print(classification_report(y_test, y_pred_combined, target_names=["No Eruption", "Eruption"]))
+    print(
+        classification_report(
+            y_test, y_pred_combined, target_names=["No Eruption", "Eruption"]
+        )
+    )
 
     # ========== STEP 8: Recommendations ==========
     logger.info("\n" + "=" * 80)
@@ -453,26 +464,26 @@ def main(
     )
 
     if best_method == "combined":
+        logger.info("\n✓ The COMBINED two-stage method is recommended because it:")
         logger.info(
-            "\n✓ The COMBINED two-stage method is recommended because it:"
+            "  - Combines statistical rigor (tsfresh) with model optimization (RF)"
         )
-        logger.info("  - Combines statistical rigor (tsfresh) with model optimization (RF)")
         logger.info("  - Reduces overfitting through statistical pre-filtering")
         logger.info("  - Captures feature interactions with RandomForest")
-        logger.info("  - Provides both p-values and importance scores for interpretability")
-    elif best_method == "tsfresh":
         logger.info(
-            "\n✓ The TSFRESH method performed best. Consider:"
+            "  - Provides both p-values and importance scores for interpretability"
         )
+    elif best_method == "tsfresh":
+        logger.info("\n✓ The TSFRESH method performed best. Consider:")
         logger.info("  - Your features may have strong univariate relationships")
         logger.info("  - Feature interactions may not be critical for this dataset")
         logger.info("  - This is the fastest and most interpretable approach")
     else:
-        logger.info(
-            "\n✓ The RANDOM FOREST method performed best. Consider:"
-        )
+        logger.info("\n✓ The RANDOM FOREST method performed best. Consider:")
         logger.info("  - Feature interactions are likely important")
-        logger.info("  - You may want to try the combined method for better generalization")
+        logger.info(
+            "  - You may want to try the combined method for better generalization"
+        )
 
     logger.info(f"\n✓ All results saved to: {output_base_dir}")
 
@@ -482,6 +493,6 @@ def main(
 if __name__ == "__main__":
     # Set to True if you already have extracted features
     # Set to False to run the full pipeline from raw data
-    USE_EXISTING_FEATURES = True
+    USE_EXISTING_FEATURES = False
 
     results, comparison = main(use_existing_features=USE_EXISTING_FEATURES)
