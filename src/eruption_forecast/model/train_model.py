@@ -2,7 +2,7 @@
 import json
 import os
 from multiprocessing import Pool
-from typing import Literal
+from typing import Any, Literal, Self
 
 # Third party imports
 import joblib
@@ -59,6 +59,7 @@ class TrainModel:
         cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
             "timeseries"). Defaults to "shuffle".
         cv_splits (int, optional): Number of CV splits. Defaults to 5.
+        grid_params (dict[str, any], optional): Grid-search parameters. Defaults to None
         verbose (bool, optional): Verbose logging. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
 
@@ -114,13 +115,16 @@ class TrainModel:
         features_csv: str,
         label_csv: str,
         output_dir: str | None = None,
-        n_jobs: int = 1,
         prefix_filename: str | None = None,
         classifier: Literal[
             "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         cv_splits: int = 5,
+        grid_params: dict[str, Any] | None = None,
+        number_of_significant_features: int = 20,
+        overwrite: bool = False,
+        n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -133,6 +137,13 @@ class TrainModel:
         if DATETIME_COLUMN in df_labels.columns:
             df_labels = df_labels.drop(DATETIME_COLUMN, axis=1)
 
+        classifier_model: ClassifierModel = ClassifierModel(
+            classifier=classifier,
+            cv_strategy=cv_strategy,
+            n_splits=cv_splits,
+        )
+        cliassifier_name = classifier_model.name
+
         df_labels = df_labels[ERUPTED_COLUMN]
         output_dir = output_dir or os.path.join(os.getcwd(), "output", "trainings")
 
@@ -142,8 +153,8 @@ class TrainModel:
         figures_dir = os.path.join(output_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
 
-        models_dir = os.path.join(output_dir, "models")
-        metrics_dir = os.path.join(output_dir, "metrics")
+        models_dir = os.path.join(output_dir, "models", cliassifier_name)
+        metrics_dir = os.path.join(output_dir, "metrics", cliassifier_name)
 
         # Set DEFAULT properties
         self.df_features = df_features
@@ -154,10 +165,14 @@ class TrainModel:
         self.classifier = classifier
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
+        self.number_of_significant_features = number_of_significant_features
+        self.overwrite = overwrite
         self.verbose = verbose
         self.debug = debug
 
         # Set ADDITIONAL properties
+        self.ClassifierModel = classifier_model
+        self.classifier_name = cliassifier_name
         self.significant_features_dir = significant_features_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
@@ -167,13 +182,19 @@ class TrainModel:
         self.csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
 
+        if grid_params:
+            self.update_grid_params(grid_params)
+
+        # WIll be set after _train() method called
+        self.grid_jobs: list = []
+
         # Validate and create directories
         self.validate()
         self.create_directories()
 
         if verbose:
             logger.info(
-                f"Train model using {n_jobs} jobs with {classifier} classifier "
+                f"Train model using {n_jobs} jobs with {cliassifier_name} classifier "
                 f"and {cv_strategy} CV strategy ({cv_splits} splits)"
             )
 
@@ -214,6 +235,27 @@ class TrainModel:
                 f"with filename starting with extracted_features_(start_date)_(end_date).csv or "
                 f"extracted_relevant_(start_date)_(end_date).csv"
             )
+
+    def update_grid_params(self, grid_params: dict[str, Any]) -> Self:
+        """Updates grid parameters with new grid parameters.
+
+        Update self.ClassifierModel.grid value.
+
+        Args:
+            grid_params: Grid search parameters.
+
+        Returns:
+            self (Self): TrainModel class
+        """
+        current_grid = self.ClassifierModel.grid
+        self.ClassifierModel.grid = grid_params
+        if self.verbose:
+            logger.info(
+                f"Your current grid parameters {current_grid} has been updated to"
+                f"{grid_params}."
+            )
+
+        return self
 
     def create_directories(self) -> None:
         """Create required output directories for training results.
@@ -260,13 +302,17 @@ class TrainModel:
         Example:
             >>> trainer = TrainModel(...)
             >>> trainer.train(total_seed=100)
-            >>> df = trainer.concat_significant_features(
+            >>> _df = trainer.concat_significant_features(
             ...     number_of_significant_features=20,
             ...     plot=True
             ... )
-            >>> print(df.head())
+            >>> print(_df.head())
             # Shows features and their occurrence counts across seeds
         """
+        number_of_significant_features = (
+            number_of_significant_features or self.number_of_significant_features
+        )
+
         if len(self.csvs) == 0:
             raise ValueError(
                 f"No significant features CSV file inside directory {self.significant_features_dir}"
@@ -320,9 +366,7 @@ class TrainModel:
         self,
         seed: int,
         random_state: int,
-        number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
-        overwrite: bool = False,
         save_features: bool = False,
         plot_features: bool = False,
     ) -> tuple[str, dict]:
@@ -338,11 +382,8 @@ class TrainModel:
         Args:
             seed (int): Seed number (0 to total_seed-1).
             random_state (int): Base random state value.
-            number_of_significant_features (int, optional): Number of top
-                features to select. Defaults to 20.
             sampling_strategy (str | float, optional): Under-sampling ratio.
                 Defaults to 0.75.
-            overwrite (bool, optional): Overwrite existing files. Defaults to False.
             save_features (bool, optional): Save all ranked features. Defaults to False.
             plot_features (bool, optional): Generate feature plots. Defaults to False.
 
@@ -351,7 +392,7 @@ class TrainModel:
 
         Example:
             >>> trainer = TrainModel(...)
-            >>> csv_path, metrics = trainer._train(
+            >>> csv_path, evaluation_metrics = trainer._train(
             ...     seed=0,
             ...     random_state=42,
             ...     number_of_significant_features=20
@@ -362,8 +403,14 @@ class TrainModel:
             0.8234
         """
         state = random_state + seed
-        logger.debug(f"_train: seed={seed}, random_state={random_state}, state={state}")
+        if self.debug:
+            logger.debug(
+                f"_train: seed={seed}, random_state={random_state}, state={state}"
+            )
 
+        number_of_significant_features = self.number_of_significant_features
+
+        # ========== STEP 0: Preparation ==========
         # Create filename and filepath
         filename = (
             f"{self.prefix_filename}_{state:05d}"
@@ -382,7 +429,7 @@ class TrainModel:
 
         # Skip if files already exist
         can_skip = (
-            not overwrite
+            not self.overwrite
             and os.path.isfile(significant_filepath)
             and os.path.isfile(model_filepath)
             and os.path.isfile(metrics_filepath)
@@ -399,6 +446,7 @@ class TrainModel:
         logger.info(f"Training Seed: {seed:05d}")
 
         # ========== STEP 1: Train/Test Split ==========
+        # X_train, X_test, y_train, y_test
         features_train, features_test, labels_train, labels_test = train_test_split(
             self.df_features,
             self.df_labels,
@@ -428,7 +476,7 @@ class TrainModel:
                 plot_significant(
                     df=pd.DataFrame(significant_features).reset_index(),
                     filepath=all_figures_filepath,
-                    overwrite=overwrite,
+                    overwrite=self.overwrite,
                     dpi=72,
                 )
 
@@ -436,7 +484,7 @@ class TrainModel:
         top_features = significant_features.head(
             number_of_significant_features
         ).index.tolist()
-        features_train_selected = features_train_resampled[top_features]
+        features_train_resampled_selected = features_train_resampled[top_features]
         features_test_selected = features_test[top_features]
 
         # Save top-N significant features
@@ -446,17 +494,13 @@ class TrainModel:
 
         # ========== STEP 4: Cross-Validation with Dynamic Classifier ==========
         # Create classifier model with appropriate CV strategy
-        clf_model = ClassifierModel(
-            classifier=self.classifier,
-            random_state=state,
-            cv_strategy=self.cv_strategy,
-            n_splits=self.cv_splits,
-        )
+
+        clf = self.ClassifierModel.set_random_state(random_state=state)
 
         # Get model and grid from ClassifierModel
-        model = clf_model.model
-        param_grid = clf_model.grid
-        cv = clf_model.get_cv_splitter()
+        model = clf.model
+        param_grid = clf.grid
+        cv = clf.get_cv_splitter()
 
         grid_search = GridSearchCV(
             estimator=model,
@@ -467,21 +511,29 @@ class TrainModel:
             verbose=0,
         )
 
-        grid_search.fit(features_train_selected, labels_train_resampled)  # type: ignore
+        grid_search.fit(features_train_resampled_selected, labels_train_resampled)  # type: ignore
         best_model = grid_search.best_estimator_
 
         # ========== STEP 5: Evaluate on Test Set ==========
         y_pred = best_model.predict(features_test_selected)
 
+        # Confusion matrix for Binary Classification
+        # Read more: https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#binary-classification
+        tn, fp, fn, tp = confusion_matrix(labels_test, y_pred).ravel().tolist()
+
         metrics = {
             "seed": seed,
             "random_state": state,
-            "classifier": self.classifier,
+            "classifier": self.classifier_name,
             "cv_strategy": self.cv_strategy,
             "cv_splits": self.cv_splits,
             "n_train": len(labels_train_resampled),
             "n_test": len(labels_test),
-            "n_features": number_of_significant_features,
+            "n_features": self.number_of_significant_features,
+            "true_negatives": tn,
+            "false_positives": fp,
+            "false_negatives": fn,
+            "true_positives": tp,
             "accuracy": accuracy_score(labels_test, y_pred),
             "balanced_accuracy": balanced_accuracy_score(labels_test, y_pred),
             "f1_score": f1_score(labels_test, y_pred),
@@ -497,7 +549,7 @@ class TrainModel:
 
         # Save metrics
         with open(metrics_filepath, "w") as f:
-            json.dump(metrics, f, indent=2)
+            json.dump(metrics, f, indent=4)
 
         if self.verbose:
             logger.info(
@@ -510,11 +562,10 @@ class TrainModel:
         self,
         random_state: int = 0,
         total_seed: int = 500,
-        number_of_significant_features: int = 20,
+        number_of_significant_features: int | None = None,
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
-        overwrite: bool = False,
     ) -> None:
         """Train feature selection and classifier models across multiple random seeds.
 
@@ -536,11 +587,9 @@ class TrainModel:
                 not just top-N. Defaults to False.
             plot_significant_features (bool, optional): Generate feature importance
                 plots. Defaults to False.
-            overwrite (bool, optional): Overwrite existing output files.
-                Defaults to False.
 
         Example:
-            >>> trainer.train(
+            >>> TrainModel(...).train(
             ...     random_state=42,
             ...     total_seed=100,
             ...     number_of_significant_features=20,
@@ -552,13 +601,15 @@ class TrainModel:
         if plot_significant_features:
             os.makedirs(self.significant_figures_dir, exist_ok=True)
 
+        self.number_of_significant_features = (
+            number_of_significant_features or self.number_of_significant_features
+        )
+
         jobs = [
             (
                 seed,
                 random_state,
-                number_of_significant_features,
                 sampling_strategy,
-                overwrite,
                 save_all_features,
                 plot_significant_features,
             )
@@ -568,12 +619,14 @@ class TrainModel:
         all_metrics = []
 
         if self.n_jobs == 1:
+            # Run test split, resampler, features selection
             for job in jobs:
                 csv, metrics = self._train(*job)
                 self.csvs.append(csv)
                 all_metrics.append(metrics)
 
         if self.n_jobs > 1:
+            # Run test split, resampler, features selection
             logger.info(f"Running on {self.n_jobs} job(s)")
             with Pool(self.n_jobs) as pool:
                 results = pool.starmap(self._train, jobs)
@@ -583,7 +636,6 @@ class TrainModel:
 
         # Aggregate feature selection results
         self.df_significant_features = self.concat_significant_features(
-            number_of_significant_features=number_of_significant_features,
             plot=plot_significant_features,
         )
 

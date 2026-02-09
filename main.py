@@ -58,6 +58,7 @@ def main(use_relevant_features: bool = False):
         use_relevant_features=use_relevant_features,
         overwrite=False,
     ).train(
+        classifier="rf",
         random_state=0,
         total_seed=500,
         number_of_significant_features=20,
@@ -70,4 +71,4 @@ def main(use_relevant_features: bool = False):
 
 
 if __name__ == "__main__":
-    main(use_relevant_features=True)
+    main(use_relevant_features=False)

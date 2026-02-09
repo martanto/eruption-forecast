@@ -105,6 +105,20 @@ class ClassifierModel:
         ) = None
         self._grid: dict[str, Any] | None = None
 
+    def set_random_state(self, random_state: int) -> Self:
+        """Change random state value.
+
+        Args:
+            random_state: Random seed for reproducibility. Applies to classifiers
+
+        Returns:
+            self (Self): ClassifierModel
+        """
+        if random_state < 0:
+            raise ValueError(f"random_state must be >= 0. Your value is {random_state}")
+        self.random_state = random_state
+        return self
+
     def get_cv_splitter(self) -> BaseCrossValidator:
         """Get the cross-validation splitter based on cv_strategy.
 
@@ -365,6 +379,11 @@ class ClassifierModel:
     ):
         """Set model classifier"""
         self._model = model
+
+    @property
+    def name(self) -> str:
+        """Get the classifier name."""
+        return type(self.model).__name__
 
     @property
     def model_and_grid(self):

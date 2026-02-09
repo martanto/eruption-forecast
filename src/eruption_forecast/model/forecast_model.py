@@ -879,6 +879,11 @@ class ForecastModel:
 
     def train(
         self,
+        classifier: Literal[
+            "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
+        ] = "rf",
+        cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
+        grid_params: dict[str, Any] | None = None,
         random_state: int = 0,
         total_seed: int = 500,
         number_of_significant_features: int = 20,
@@ -894,14 +899,19 @@ class ForecastModel:
         """Training model using extracted features and labels.
 
         Args:
-            extracted_features_csv (str | None): Path to extracted features.
-            output_dir (str, optional): Path to output directory. Defaults to None.
+            classifier (str, optional): Classifier type ("rf", "gb", "svm", "lr", "nn",
+                "dt", "knn", "nb", "voting"). Defaults to "rf".
+            cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
+                "timeseries"). Defaults to "shuffle".
+            grid_params (dict[str, any], optional): Grid-search parameters. Defaults to None.
             random_state (int, optional): Initiate random seed. Defaults to 0.
             total_seed (int, optional): Total random seed. Defaults to 500.
             number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
             sampling_strategy (str, optional): Sampling strategy. Defaults to 0.75.
             save_all_features (bool, optional): Whether to save ALL features. Defaults to False.
             plot_significant_features (bool, optional): Whether to plot each significant feature. Defaults to False.
+            extracted_features_csv (str | None): Path to extracted features.
+            output_dir (str, optional): Path to output directory. Defaults to None.
             n_jobs (int, optional): Number of jobs. Defaults to 1.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
@@ -936,18 +946,21 @@ class ForecastModel:
             features_csv=features_csv,
             label_csv=label_csv,
             output_dir=output_dir,
-            verbose=verbose or self.verbose,
+            classifier=classifier,
+            cv_strategy=cv_strategy,
+            grid_params=grid_params,
+            number_of_significant_features=number_of_significant_features,
+            overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs or self.n_jobs,
+            verbose=verbose or self.verbose,
         )
 
         train_model.train(
             random_state=random_state,
             total_seed=total_seed,
-            number_of_significant_features=number_of_significant_features,
             sampling_strategy=sampling_strategy,
             save_all_features=save_all_features,
             plot_significant_features=plot_significant_features,
-            overwrite=overwrite or self.overwrite,
         )
 
         self.TrainModel = train_model
@@ -1004,7 +1017,7 @@ class ForecastModel:
             window_step_unit=window_step_unit,
         )
 
-        logger.debug(f"Generated {len(df_predict_window)} prediction windows")
+        logger.debug(f"Total preditcted windows generated: {len(df_predict_window)}")
 
         df_predict_window.to_csv(predict_window_csv, index=True)
 
