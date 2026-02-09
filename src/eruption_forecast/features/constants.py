@@ -25,5 +25,5 @@ SECONDS_PER_DAY = 86400
 """Number of seconds in one day (24 * 60 * 60)."""
 
 # Output filenames
-SIGNIFICANT_FEATURES_FILENAME = "significant_features.csv"
+SIGNIFICANT_FEATURES_FILENAME = "significant_features"
 """Default filename for concatenated significant features output."""

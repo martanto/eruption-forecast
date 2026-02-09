@@ -7,20 +7,25 @@
 - [x] Add examples to class docstrings (ForecastModel, ClassifierModel, TrainModel, FeaturesBuilder)
 - [x] Fix deprecated `max_features="auto"` parameter (sklearn 1.4+)
 - [x] Update SUMMARY.md with ML analysis and recommendations
+- [x] Fix and improve docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, and TrainModel
+- [x] **Fix critical data leakage in TrainModel._train()** - Completely rewrote workflow to: (1) split data first, (2) resample only training data, (3) select features only on training data, (4) train classifier with GridSearchCV, (5) evaluate on held-out test set. Now saves trained models, per-seed metrics (JSON), and aggregated statistics (CSV).
+- [x] **Make TrainModel classifier dynamic** - Integrated ClassifierModel to support all classifier types (RF, GB, SVM, LR, NN, DT, KNN, NB, Voting) with configurable CV strategies (shuffle, stratified, timeseries). Users can now select classifier and CV strategy during TrainModel initialization.
+- [x] **Fix pyrefly type errors in ModelEvaluator** - Added Protocol types for type safety, explicit type annotations with proper ignore comments, runtime validation checks, and improved type annotations across all methods.
 
 ## High Priority
 
 - [x] Add Gradient Boosting classifier (GradientBoostingClassifier or XGBoost)
-- [ ] Implement TimeSeriesSplit for proper temporal cross-validation
-- [ ] Add model persistence with joblib (save/load trained models)
+- [x] Implement TimeSeriesSplit for proper temporal cross-validation
+- [x] Add model persistence with joblib (save/load trained models) - via ModelEvaluator
 - [ ] Expand grid parameters for neural network (hidden_layer_sizes too limited)
 
 ## Medium Priority
 
-- [ ] Add VotingClassifier ensemble combining top models
+- [x] Add VotingClassifier ensemble combining top models
+- [x] Add precision-recall curves and ROC-AUC evaluation metrics (via ModelEvaluator)
+- [x] Add detailed evaluation metrics with export and plotting (ModelEvaluator class)
 - [ ] Implement probability calibration (CalibratedClassifierCV)
 - [ ] Add StandardScaler to pipeline for SVM/KNN/NN
-- [ ] Add precision-recall curves and ROC-AUC evaluation metrics
 - [ ] Implement Recursive Feature Elimination (RFE) as alternative to tsfresh selection
 
 ## Low Priority

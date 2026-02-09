@@ -1,9 +1,11 @@
+import os
+
 from eruption_forecast import ForecastModel
-from eruption_forecast.utils import timer
+from eruption_forecast.decorators import timer
 
 
-@timer("Calculate Tremor")
-def main():
+@timer("Forecast Model")
+def main(use_relevant_features: bool = False):
     sds_dir = r"D:\Data\OJN"
 
     params = {
@@ -15,7 +17,6 @@ def main():
         "volcano_id": "Lewotobi Laki-laki",
         "verbose": True,
         "debug": False,
-        "n_jobs": 1,
     }
 
     eruptions = [
@@ -28,24 +29,31 @@ def main():
         "2025-08-17",
     ]
 
-    fm = ForecastModel(overwrite=False, **params)
+    fm = ForecastModel(
+        overwrite=False,
+        n_jobs=4,
+        output_dir=os.path.join(os.getcwd(), "output_12h"),
+        **params,
+    )
 
     fm.calculate(
-        source="sds", sds_dir=sds_dir, remove_outlier_method="maximum"
+        source="sds",
+        sds_dir=sds_dir,
+        plot_tmp=True,
+        save_plot=True,
+        remove_outlier_method="maximum",
     ).build_label(
         start_date="2025-01-01",
         end_date="2025-07-24",
         day_to_forecast=2,
-        window_step=6,
+        window_step=12,
         window_step_unit="hours",
         eruption_dates=eruptions,
         verbose=True,
-    ).build_features(
-        save_per_method=True, overwrite=False, verbose=True
     ).extract_features(
-        use_relevant_features=False,
-        overwrite=False,
-        tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+        select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+        save_tremor_matrix_per_method=True,
+        save_tremor_matrix_per_id=False,
         exclude_features=[
             "agg_linear_trend",
             "linear_trend_timewise",
@@ -54,19 +62,21 @@ def main():
             "has_duplicate_min",
             "has_duplicate",
         ],
-        concat_features=True,
-        n_jobs=4,
+        use_relevant_features=use_relevant_features,
+        overwrite=False,
     ).train(
-        sampling_strategy=0.75,
+        classifier="rf",
         random_state=0,
         total_seed=500,
         number_of_significant_features=20,
+        sampling_strategy=0.75,
         save_all_features=True,
         plot_significant_features=True,
+        output_dir=r"D:\Projects\eruption-forecast\output_12h\VG.OJN.00.EHZ\trainings_relevant_features",
         overwrite=False,
         verbose=True,
     )
 
 
 if __name__ == "__main__":
-    main()
+    main(use_relevant_features=True)

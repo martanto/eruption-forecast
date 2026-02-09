@@ -650,8 +650,6 @@ class LabelBuilder:
                 f"Please change your start_date and end_date parameters."
             )
 
-        self.df_eruption = df_eruption
-
         if self.verbose:
             erupted_count = len(df_eruption)
             total_count = len(df)
@@ -659,6 +657,8 @@ class LabelBuilder:
                 f"Label building complete: {erupted_count} erupted windows out of {total_count} total "
                 f"({erupted_count / total_count * 100:.2f}%)"
             )
+
+        self.df_eruption = df_eruption
 
         if not file_exists:
             self.validate_eruption_dates()

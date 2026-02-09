@@ -17,6 +17,7 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 4. **Type checker is pyrefly, not mypy.** Use `uv run pyrefly check src/` for type checking. mypy has been removed from the project.
 5. **All `uv` commands are permitted.** `uv sync`, `uv run`, `uv pip install/uninstall`, `uv lock`, etc. — no need to ask.
 6. **Create a new branch before commits or modifications.** Always create a new branch with `claude/` prefix before making any commits or code modifications (e.g., `claude/fix-docstrings`, `claude/add-feature-x`).
+7. **Alwasy use `tests` directory when running testing.** Create the tests output inside `tests` directory.
 
 ## Testing
 
