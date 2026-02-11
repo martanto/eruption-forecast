@@ -4,14 +4,17 @@ Tests for LabelBuilder and LabelData classes to ensure proper functionality
 after Phase 2 refactoring.
 """
 
+# Standard library imports
 import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
+# Third party imports
 import pandas as pd
 import pytest
 
+# Project imports
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.label.label_data import LabelData
 

@@ -4,12 +4,15 @@ Tests for FeaturesBuilder and TrainModel classes to verify correctness
 after Phase 3 refactoring. All tests use synthetic in-memory data.
 """
 
+# Standard library imports
 import os
 import tempfile
 
+# Third party imports
 import pandas as pd
 import pytest
 
+# Project imports
 from eruption_forecast.features.constants import (
     DATETIME_COLUMN,
     ERUPTED_COLUMN,
@@ -342,6 +345,7 @@ def _write_synthetic_csvs(
 
     Returns (features_csv, label_csv) paths.
     """
+    # Third party imports
     import numpy as np
 
     rng = np.random.default_rng(42)
@@ -370,6 +374,7 @@ class TestTrainModelValidation:
 
     def test_valid_initialization(self) -> None:
         """TrainModel initialises without error on valid data."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -383,6 +388,7 @@ class TestTrainModelValidation:
 
     def test_empty_features_raises_value_error(self) -> None:
         """ValueError when features CSV has zero rows."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -402,6 +408,7 @@ class TestTrainModelValidation:
 
     def test_empty_labels_raises_value_error(self) -> None:
         """ValueError when label CSV has zero rows."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -421,6 +428,7 @@ class TestTrainModelValidation:
 
     def test_mismatched_lengths_raises_value_error(self) -> None:
         """ValueError when features and labels row counts differ."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -440,6 +448,7 @@ class TestTrainModelValidation:
 
     def test_output_directories_created(self) -> None:
         """create_directories() produces expected subdirectories."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -455,6 +464,7 @@ class TestTrainModelValidation:
 
     def test_errors_are_value_error_not_assertion_error(self) -> None:
         """Confirm validation raises ValueError, not AssertionError."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -482,6 +492,7 @@ class TestIntegration:
 
     def test_features_builder_output_loads_in_train_model(self) -> None:
         """CSV produced by FeaturesBuilder can be consumed by TrainModel."""
+        # Project imports
         from eruption_forecast.model.train_model import TrainModel
 
         with tempfile.TemporaryDirectory() as tmp:

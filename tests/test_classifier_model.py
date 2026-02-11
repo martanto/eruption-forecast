@@ -5,15 +5,18 @@ separation, and the train() pipeline.  All tests use synthetic data and
 temporary directories — no real seismic data required.
 """
 
+# Standard library imports
 import os
 import tempfile
 
+# Third party imports
 import joblib
 import numpy as np
 import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
+# Project imports
 from eruption_forecast.features.constants import ERUPTED_COLUMN, ID_COLUMN
 from eruption_forecast.model.classifier_model import ClassifierModel
 

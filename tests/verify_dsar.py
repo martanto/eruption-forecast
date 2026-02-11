@@ -1,13 +1,16 @@
+# Standard library imports
 import os
 import sys
 from datetime import datetime
 
+# Third party imports
 import numpy as np
 from obspy import Stream, Trace, UTCDateTime
 
 # Add src to path to import modules
 sys.path.append(os.path.join(os.getcwd(), 'src'))
 
+# Project imports
 from eruption_forecast.dsar import DSAR
 
 

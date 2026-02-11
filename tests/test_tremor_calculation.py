@@ -13,6 +13,7 @@ Author: Refactoring Phase 1
 Date: 2026-02-03
 """
 
+# Standard library imports
 import os
 import sys
 from datetime import datetime, timedelta
@@ -22,10 +23,13 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+# Standard library imports
 import shutil
 
+# Third party imports
 import pandas as pd
 
+# Project imports
 from eruption_forecast.plot import plot_tremor
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 
@@ -369,6 +373,7 @@ def test_tremor_calculation():
         print(f"Message: {e}")
         print()
 
+        # Standard library imports
         import traceback
         print("Traceback:")
         traceback.print_exc()
