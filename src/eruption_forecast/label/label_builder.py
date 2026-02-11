@@ -80,7 +80,7 @@ class LabelBuilder:
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
         day_to_forecast (int): Day to forecast in days.
         eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
-        volcano_id (str): Volcano ID. To set and forecast ID.
+        volcano_id (str): Volcano identifier used in output filenames and labeling.
         output_dir (Optional[str], optional): Output directory. Defaults to None.
         verbose (bool, optional): Verbose mode. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.

@@ -531,15 +531,16 @@ def construct_windows(
 def to_series(
     df: pd.DataFrame, column_value: str, column_index: str = "id"
 ) -> pd.Series:
-    """Return DataFrame into Series.
+    """Convert a DataFrame column into a Series with a custom index.
 
     Args:
         df (pd.DataFrame): DataFrame with datetime index representing time windows.
-        column_value (str): Column name to be used as value in series.
-        column_index (str, optional): Column name to be used as value in series. Defaults to "id".
+        column_value (str): Column name whose values become the Series values.
+        column_index (str, optional): Column name whose values become the Series index.
+            Defaults to "id".
 
     Returns:
-        pd.Series: Series.
+        pd.Series: Series with values from column_value and index from column_index.
     """
     if column_value not in df.columns:
         raise ValueError(

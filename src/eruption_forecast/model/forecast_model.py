@@ -766,8 +766,9 @@ class ForecastModel:
             select_tremor_columns (list[str]): List of tremor columns to extract.
             save_tremor_matrix_per_method (bool, optional): Save separate CSV per tremor
                 column. Defaults to True.
-            save_tremor_matrix_per_id (bool, optional): BE CAREFULL, IT WILL GENERATE A LOT OF FILES.
-                Save individual windowed tremor CSVs for debugging. Defaults to False.
+            save_tremor_matrix_per_id (bool, optional): **WARNING: This will generate a
+                large number of files** (one per label window). Use only for debugging.
+                Defaults to False.
             exclude_features (Optional[list[str]]): List features calculator to be excluded.
             use_relevant_features (bool): If True, extract features using relevant features.
             output_dir (Optional[str], optional): Output directory. Defaults to None.
@@ -1065,7 +1066,7 @@ class ForecastModel:
             window_step_unit=window_step_unit,
         )
 
-        logger.debug(f"Total preditcted windows generated: {len(df_predict_window)}")
+        logger.debug(f"Total predicted windows generated: {len(df_predict_window)}")
 
         df_predict_window.to_csv(predict_window_csv, index=True)
 

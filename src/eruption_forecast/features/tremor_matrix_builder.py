@@ -30,7 +30,7 @@ class TremorMatrixBuilder:
     Args:
         tremor_df (pd.DataFrame): Tremor dataframe with DatetimeIndex.
             Index type of df_tremor is pd.DatetimeIndex.
-            Can be build by running CalculateTremor or laad it from calculated tremor CSV.
+            Can be built by running CalculateTremor or loaded from a calculated tremor CSV.
             Example calculated tremor CSV location:
                 output/tremor/tremor_VG.OJN.00.EHZ_2025-01-01-2025-09-28.csv
         label_df (pd.DataFrame): Label dataframe with DatetimeIndex and
@@ -113,7 +113,7 @@ class TremorMatrixBuilder:
         self.tremor_end_date_str = tremor_end_date_str
 
         # =========================
-        # WIll be set after build() method called
+        # Will be set after build() method called
         # =========================
         self.df: pd.DataFrame = pd.DataFrame()
         self.csv: str | None = None
@@ -164,12 +164,12 @@ class TremorMatrixBuilder:
     def create_directories(self) -> None:
         """Create required output directories.
 
-        Creates the main output directory for storing tremor matrix files.
-        Called automatically during initialization.
+        Creates the main output directory and any required subdirectories
+        for storing tremor matrix files. Called automatically during initialization.
 
         Example:
             >>> builder = TremorMatrixBuilder(...)
-            >>> builder.create_directories()  # Called in __init__
+            >>> builder.create_directories()  # Called automatically in __init__
         """
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -197,7 +197,7 @@ class TremorMatrixBuilder:
         )
         os.makedirs(tremor_matrix_per_method_dir, exist_ok=True)
 
-        # SKipp ID and datetime columns
+        # Skip ID and datetime columns
         for column in tremor_df.columns.tolist():
             if column in [ID_COLUMN, DATETIME_COLUMN]:
                 continue

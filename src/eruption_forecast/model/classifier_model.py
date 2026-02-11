@@ -118,13 +118,22 @@ class ClassifierModel:
         self._grid: dict[str, Any] | None = None
 
     def set_random_state(self, random_state: int) -> Self:
-        """Change random state value.
+        """Set the random seed for reproducibility.
 
         Args:
-            random_state: Random seed for reproducibility. Applies to classifiers
+            random_state (int): Random seed value (must be >= 0). Applies to all
+                classifiers that support random state (rf, gb, dt, nn, lr, svm).
 
         Returns:
-            self (Self): ClassifierModel
+            Self: The ClassifierModel instance for method chaining.
+
+        Raises:
+            ValueError: If random_state is negative.
+
+        Example:
+            >>> clf = ClassifierModel("rf")
+            >>> clf.set_random_state(42)
+            >>> model, grid = clf.model_and_grid
         """
         if random_state < 0:
             raise ValueError(f"random_state must be >= 0. Your value is {random_state}")

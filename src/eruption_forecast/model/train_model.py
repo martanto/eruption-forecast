@@ -189,7 +189,7 @@ class TrainModel:
         self.metrics_dir = metrics_dir
 
         # =========================
-        # WIll be set after train() method called
+        # Will be set after train() method called
         # =========================
         self.significant_features_csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
@@ -199,7 +199,7 @@ class TrainModel:
         self.csv: str | None = None
 
         # =========================
-        # WIll be updated after _generate_filepath() method called
+        # Will be updated after _generate_filepath() method called
         # =========================
         self.can_skip: bool = False
 
@@ -701,7 +701,7 @@ class TrainModel:
         if plot_significant_features:
             os.makedirs(self.significant_figures_dir, exist_ok=True)
 
-        # Set job paramaters
+        # Set job parameters
         random_states = [random_state + seed for seed in range(total_seed)]
         jobs = [
             (

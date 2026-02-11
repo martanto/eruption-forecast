@@ -478,7 +478,7 @@ class FeaturesBuilder:
         )
         label_df.to_csv(label_csv, index=True)
 
-        # Set variable that will be use for TrainingLabel
+        # Set variables that will be used for model training
         self.label_features_csv = label_csv
         self.unique_ids = unique_ids
 
