@@ -151,9 +151,65 @@ print(f"Negative labels: {(labels.df['is_erupted'] == 0).sum()}")
 ```
 
 **Label logic:**
-- Windows within `day_to_forecast` days before an eruption: `is_erupted = 1`
+- Windows whose **end time** falls within the range `[eruption_date − day_to_forecast, eruption_date]` are labeled `is_erupted = 1`
 - All other windows: `is_erupted = 0`
-- Example: `day_to_forecast=2` with an eruption on 2020-03-15 labels windows from 2020-03-13 to 2020-03-15 as positive
+- Each window's datetime index is its **end time** (tremor data for the preceding `window_size` days)
+
+#### Labeling Strategy Visualization
+
+Example with `window_size=1d`, `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
+
+**How parameters work:**
+
+```
+Timeline (each tick = 12 hours):
+
+──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15 ☄
+ 00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00
+     │      │      │      │      │      │      │      │      │      │      │      │
+     ← window_step: 12h →         │      │      │      │      │
+                                  │      ◄──────────── day_to_forecast=2d ───────────►│
+                                  │                       label = 1 zone              │
+```
+
+**Sliding windows — each row spans exactly `window_size=1d` of tremor data:**
+
+```
+ ID  Window data span                     End time (index)    Label
+ ──  ──────────────────────────────────── ──────────────────  ──────
+  1  Jan09·12:00 ══════════ Jan10·12:00   Jan10 12:00           0
+  2  Jan10·00:00 ══════════ Jan11·00:00   Jan11 00:00           0
+  3  Jan10·12:00 ══════════ Jan11·12:00   Jan11 12:00           0
+  4  Jan11·00:00 ══════════ Jan12·00:00   Jan12 00:00           0
+  5  Jan11·12:00 ══════════ Jan12·12:00   Jan12 12:00           0
+  6  Jan12·00:00 ══════════ Jan13·00:00   Jan13 00:00           1  ← label zone starts
+  7  Jan12·12:00 ══════════ Jan13·12:00   Jan13 12:00           1
+  8  Jan13·00:00 ══════════ Jan14·00:00   Jan14 00:00           1
+  9  Jan13·12:00 ══════════ Jan14·12:00   Jan14 12:00           1
+ 10  Jan14·00:00 ══════════ Jan15·00:00   Jan15 00:00           1  ← eruption day
+```
+
+> **Key:** The window's datetime index = its **end time**. A window gets `label=1` when its
+> end time falls within `[eruption_date − day_to_forecast, eruption_date]`.
+
+**Parameter reference:**
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `window_size` | `int` (days) | Length of each tremor data window fed into tsfresh | `1` day |
+| `window_step` | `int` | How far to shift the window between consecutive labels | `12` |
+| `window_step_unit` | `"minutes"` \| `"hours"` | Unit for `window_step` | `"hours"` |
+| `day_to_forecast` | `int` (days) | How many days before the eruption to start labeling as positive (`is_erupted=1`) | `2` |
+| `eruption_dates` | `list[str]` | Known eruption dates in `YYYY-MM-DD` format | `["2025-03-20"]` |
+| `start_date` / `end_date` | `str` | Date range for generating all label windows | `"2025-01-01"` |
+| `volcano_id` | `str` | Identifier used in output filenames | `"LEWOTOBI"` |
+
+**Output filename convention:**
+
+```
+label_{start_date}_{end_date}_ws-{window_size}_step-{window_step}-{unit}_dtf-{day_to_forecast}.csv
+# Example: label_2025-01-01_2025-07-24_ws-1_step-12-hours_dtf-2.csv
+```
 
 ### 3. Build Tremor Matrix
 
