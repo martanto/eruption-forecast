@@ -105,7 +105,7 @@ class TremorMatrixBuilder:
         self.debug = debug
 
         # =========================
-        # Set ADDITIONAL properties
+        # Set ADDITIONAL properties (derived values)
         # =========================
         self.start_date = label_df.index[0] - timedelta(days=self.window_size)
         self.end_date = tremor_df.index[-1]

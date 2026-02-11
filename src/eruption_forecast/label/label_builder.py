@@ -100,14 +100,18 @@ class LabelBuilder:
         verbose: bool = False,
         debug: bool = False,
     ):
+        # =========================
         # Set DEFAULT parameter
+        # =========================
         start_date, end_date, start_date_str, end_date_str = normalize_dates(
             start_date, end_date
         )
         output_dir = output_dir or os.path.join(os.getcwd(), "output")
         label_dir = os.path.join(output_dir, "labels")
 
+        # =========================
         # Set DEFAULT properties
+        # =========================
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
         self.window_size: int = int(window_size)
@@ -119,7 +123,9 @@ class LabelBuilder:
         self.verbose: bool = bool(verbose)
         self.debug: bool = bool(debug)
 
-        # Set ADDITIONAL properties
+        # =========================
+        # Set ADDITIONAL properties (derived values)
+        # =========================
         self._df: pd.DataFrame = pd.DataFrame()
         self._df_eruption: pd.DataFrame = pd.DataFrame()
         self._df_eruptions: dict[str, pd.DataFrame] = {}
@@ -136,13 +142,15 @@ class LabelBuilder:
         )
         self.csv = os.path.join(label_dir, self.filename)
 
-        # Validate
+        # =========================
+        # Validate and create directories
+        # =========================
         self.validate()
-
-        # Create directories
         self.create_directories()
 
-        # Verbose and debugging
+        # =========================
+        # Verbose and logging
+        # =========================
         if debug:
             logger.info("⚠️ Label Builder :: Debug mode is ON")
 

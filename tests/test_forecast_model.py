@@ -5,11 +5,14 @@ separation, and the predict() pipeline method.  All tests use synthetic
 in-memory data and temporary directories — no real seismic data required.
 """
 
+# Standard library imports
 import os
 import tempfile
 
+# Third party imports
 import pytest
 
+# Project imports
 from eruption_forecast.model.forecast_model import ForecastModel
 
 # ---------------------------------------------------------------------------

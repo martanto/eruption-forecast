@@ -15,7 +15,12 @@
       "Bash(git pull:*)",
       "Bash(gh pr create:*)",
       "Bash(gh auth:*)",
-      "Bash(gh repo list:*)"
+      "Bash(gh repo list:*)",
+      "Bash(git status:*)",
+      "Bash(ls:*)",
+      "Bash(git reset:*)",
+      "Bash(git rm:*)",
+      "Bash(test:*)"
     ],
     "deny": [
       "Read(*.log)",

@@ -75,23 +75,32 @@ class FeaturesBuilder:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        # =========================
         # Set DEFAULT parameter
+        # =========================
+        output_dir = output_dir or os.path.join(os.getcwd(), "output", "features")
 
+        # =========================
         # Set DEFAULT properties
+        # =========================
         self.tremor_matrix_df = tremor_matrix_df
         self.label_df = label_df
-        self.output_dir = output_dir or os.path.join(os.getcwd(), "output", "features")
+        self.output_dir = output_dir
         self.overwrite = overwrite
         self.n_jobs = n_jobs
         self.verbose = verbose
 
-        # Set ADDITIONAL properties
+        # =========================
+        # Set ADDITIONAL properties (derived values)
+        # =========================
         # Initialize feature parameters
         self.default_fc_parameters, self.excludes_features = (
             self._initialize_feature_parameters()
         )
 
+        # =========================
         # Will be set after extract_features() called
+        # =========================
         self.use_relevant_features: bool = False
         self.all_features_csvs: set[str] = set()
         self.relevant_features_csvs: set[str] = set()
@@ -100,16 +109,22 @@ class FeaturesBuilder:
         self.label_features_csv: str | None = None
         self.unique_ids: list[int] = []
 
+        # =========================
         # Will be set after concat_features() called
+        # =========================
         self.all_features_csv: str | None = None
         self.relevant_features_csv: str | None = None
         self.df_all_features: pd.DataFrame = pd.DataFrame()
         self.df_relevant_features: pd.DataFrame = pd.DataFrame()
 
-        # Validate
+        # =========================
+        # Validate and create directories
+        # =========================
         self.validate()
 
-        # Verbose and debugging
+        # =========================
+        # Verbose and logging
+        # =========================
         if debug:
             logger.info("⚠️ Debug mode is ON")
 
@@ -119,6 +134,9 @@ class FeaturesBuilder:
         Raises:
             ValueError: If required label columns are missing or requested
                 tremor columns do not exist in the tremor dataframe.
+
+        Returns:
+            None
         """
         if not isinstance(self.tremor_matrix_df, pd.DataFrame):
             raise ValueError(
@@ -133,6 +151,8 @@ class FeaturesBuilder:
         validate_columns(self.tremor_matrix_df, [ID_COLUMN, DATETIME_COLUMN])
         validate_columns(self.label_df, [ID_COLUMN, ERUPTED_COLUMN])
 
+        return None
+
     @staticmethod
     def _initialize_feature_parameters() -> tuple[ComprehensiveFCParameters, set[str]]:
         """Initialize tsfresh feature extraction parameters with defaults.
@@ -146,11 +166,14 @@ class FeaturesBuilder:
         default_fc_parameters = ComprehensiveFCParameters()
         excludes_features: set[str] = {
             "agg_linear_trend",
-            "linear_trend_timewise",
-            "length",
             "has_duplicate_max",
             "has_duplicate_min",
             "has_duplicate",
+            "linear_trend_timewise",
+            "length",
+            "sum_of_reoccurring_data_points",
+            "sum_of_reoccurring_values",
+            "value_count",
         }
 
         return default_fc_parameters, excludes_features

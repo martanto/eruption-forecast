@@ -4,13 +4,16 @@ Tests that TrainModel can use different classifiers (RF, GB, LR, etc.)
 through the ClassifierModel integration.
 """
 
+# Standard library imports
 import json
 import os
 import shutil
 
+# Third party imports
 import joblib
 import pandas as pd
 
+# Project imports
 from eruption_forecast.model.train_model import TrainModel
 
 

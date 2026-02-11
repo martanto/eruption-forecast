@@ -20,6 +20,9 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
+# Project imports
+from eruption_forecast.logger import logger
+
 
 class ClassifierModel:
     """Manages machine learning classifiers and their hyperparameter grids.
@@ -85,12 +88,21 @@ class ClassifierModel:
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         n_splits: int = 5,
         test_size: float = 0.2,
+        verbose: bool = False,
     ):
+        # =========================
+        # Set DEFAULT properties
+        # =========================
         self.classifier = classifier
         self.random_state = random_state
         self.cv_strategy = cv_strategy
         self.n_splits = n_splits
         self.test_size = test_size
+        self.verbose = verbose
+
+        # =========================
+        # Set ADDITIONAL properties (derived values)
+        # =========================
         self._model: (
             SVC
             | KNeighborsClassifier
@@ -119,12 +131,20 @@ class ClassifierModel:
         self.random_state = random_state
         return self
 
-    def get_cv_splitter(self) -> BaseCrossValidator:
+    def get_cv_splitter(
+        self,
+        strategy: Literal["shuffle", "stratified", "timeseries"] | None = None,
+    ) -> BaseCrossValidator:
         """Get the cross-validation splitter based on cv_strategy.
 
         Returns the appropriate cross-validator for the configured strategy:
         - "stratified": StratifiedKFold (preserves class distribution)
         - "timeseries": TimeSeriesSplit (for temporal data)
+
+        Args:
+            strategy: Cross-validation strategy. Options:
+                - "stratified": StratifiedKFold (default, preserves class distribution)
+                - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
 
         Returns:
             BaseCrossValidator: sklearn cross-validation splitter instance.
@@ -147,10 +167,12 @@ class ClassifierModel:
             >>> clf = ClassifierModel("rf", cv_strategy="timeseries")
             >>> grid_search = GridSearchCV(clf.model, clf.grid, cv=clf.get_cv_splitter())
         """
-        if self.cv_strategy == "timeseries":
+        strategy = strategy or self.cv_strategy
+
+        if strategy == "timeseries":
             return TimeSeriesSplit(n_splits=self.n_splits)
 
-        if self.cv_strategy == "stratified":
+        if strategy == "stratified":
             return StratifiedKFold(
                 n_splits=self.n_splits, shuffle=True, random_state=self.random_state
             )
@@ -252,6 +274,8 @@ class ClassifierModel:
     def grid(self, grid: dict[str, Any]):
         """Set grid parameters"""
         self._grid = grid
+        if self.verbose:
+            logger.info(f"Your grid parameters updated to: {grid}")
 
     @property
     def model(
@@ -379,6 +403,8 @@ class ClassifierModel:
     ):
         """Set model classifier"""
         self._model = model
+        if self.verbose:
+            logger.info(f"Your model to: {model.__class__.__name__}")
 
     @property
     def name(self) -> str:
@@ -425,4 +451,7 @@ class ClassifierModel:
         """
         self._model = model
         self._grid = grid
+        if self.verbose:
+            logger.info(f"Your model updated to: {model.__class__.__name__}")
+            logger.info(f"Your grid parameters updated to: {grid}")
         return self

@@ -70,7 +70,9 @@ class CalculateTremor:
         verbose: bool = False,
         debug: bool = False,
     ):
+        # =========================
         # Set DEFAULT parameter
+        # =========================
         start_date = to_datetime(start_date)
         end_date = to_datetime(end_date)
         network = network or "VG"
@@ -82,7 +84,9 @@ class CalculateTremor:
         tremor_dir = os.path.join(station_dir, "tremor")
         figures_dir = os.path.join(tremor_dir, "figures")
 
+        # =========================
         # Set DEFAULT properties
+        # =========================
         self.station = station.upper()
         self.channel = channel.upper()
         self.start_date: datetime = start_date
@@ -111,7 +115,9 @@ class CalculateTremor:
         self.verbose = verbose
         self.debug = debug
 
-        # Set ADDITIONAL properties
+        # =========================
+        # Set ADDITIONAL properties (derived values)
+        # =========================
         self.df: pd.DataFrame = pd.DataFrame()
         self.start_date_str: str = start_date.strftime("%Y-%m-%d")
         self.end_date_str: str = end_date.strftime("%Y-%m-%d")
@@ -124,7 +130,7 @@ class CalculateTremor:
             (4.5, 8),
             (8, 16),
         ]
-
+        self.figures_dir = figures_dir
         self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
             start=self.start_date, end=self.end_date
@@ -132,23 +138,38 @@ class CalculateTremor:
         self.n_days: int = len(self.dates)
         self.nslc = nslc
         self.tmp_dir: str = os.path.join(tremor_dir, "tmp")
-        self.sds: SDS | None = None
-        self.tmp_files: list[str] = []
-        self.figures_dir = figures_dir
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
-        self._source: str | None = None
-        self._sds_dir: str | None = None
         self._client_url = "https://service.iris.edu"
         self.csv = os.path.join(tremor_dir, self.filename)
 
-        # Validate
+        # =========================
+        # Will be set after from_sds() called
+        # =========================
+        self.sds: SDS | None = None
+        self._sds_dir: str | None = None
+
+        # =========================
+        # Will be set after from_sds() or from_fdsn() called
+        # =========================
+        self._source: str | None = None
+
+        # =========================
+        # Will be set after run() called
+        # =========================
+        self.tmp_files: list[str] = []
+
+        # =========================
+        # Validate and create directories
+        # =========================
         self.validate()
 
-        # Verbose and debugging
+        # =========================
+        # Verbose and logging
+        # =========================
         if debug:
             logger.info("⚠️ Calculate Tremor :: Debug mode is ON")
 
-        if self.verbose:
+        if verbose:
             logger.info(f"Version: {eruption_forecast.__version__}")
             logger.info(f"Running on {self.n_jobs} job(s)")
             logger.info(f"NSLC: {self.nslc}")

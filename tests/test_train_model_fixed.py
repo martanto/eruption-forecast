@@ -9,13 +9,16 @@ Tests that the corrected workflow:
 6. Saves models and metrics
 """
 
+# Standard library imports
 import json
 import os
 import shutil
 
+# Third party imports
 import joblib
 import pandas as pd
 
+# Project imports
 from eruption_forecast.model.train_model import TrainModel
 
 

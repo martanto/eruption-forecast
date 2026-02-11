@@ -113,6 +113,9 @@ class SDS:
             self.sds_dir, str(year), self.network, self.station, f"{self.channel}.D"
         )
 
+        if self.debug:
+            logger.debug(f"SDS Data Directory: {data_dir}")
+
         # Construct filename
         filename = f"{self.nslc}.D.{year}.{julian_day}"
         filepath = os.path.join(data_dir, filename)
