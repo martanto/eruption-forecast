@@ -50,7 +50,7 @@ class TrainModel:
             Can be found in:
                 ``<cwd>output/{nslc}/features/all_extracted_features_{dates}.csv``, or
                 ``<cwd>output/{nslc}/features/relevant_features_{dates}.csv``
-        label_csv (str): Path to the label CSV file. Built by using LabelBuilder.
+        label_features_csv (str): Path to the label CSV file. Built by using LabelBuilder.
             Can be found in: ``<cwd>output/{nslc}/features/label_features_{dates}.csv``
         output_dir (str, optional): Directory for output files. Defaults to
             ``<cwd>/output/trainings``.
@@ -75,7 +75,7 @@ class TrainModel:
         >>> # Train with Random Forest (default)
         >>> trainer = TrainModel(
         ...     features_csv="output/features/extracted_features.csv",
-        ...     label_csv="output/features/label_features.csv",
+        ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     n_jobs=4,
         ... )
@@ -89,7 +89,7 @@ class TrainModel:
         >>> # Train with Gradient Boosting
         >>> trainer = TrainModel(
         ...     features_csv="output/features/extracted_features.csv",
-        ...     label_csv="output/features/label_features.csv",
+        ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     classifier="gb",
         ...     n_jobs=4,
@@ -98,7 +98,7 @@ class TrainModel:
         >>> # Train with VotingClassifier ensemble and TimeSeriesSplit
         >>> trainer = TrainModel(
         ...     features_csv="output/features/extracted_features.csv",
-        ...     label_csv="output/features/label_features.csv",
+        ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     classifier="voting",
         ...     cv_strategy="shuffle",
@@ -134,7 +134,9 @@ class TrainModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        # =========================
         # Set DEFAULT parameter
+        # =========================
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
         df_labels = pd.read_csv(label_features_csv)
         if ID_COLUMN in df_labels.columns:
@@ -162,7 +164,9 @@ class TrainModel:
         models_dir = os.path.join(output_dir, "models", cliassifier_name)
         metrics_dir = os.path.join(output_dir, "metrics", cliassifier_name)
 
+        # =========================
         # Set DEFAULT properties
+        # =========================
         self.df_features = df_features
         self.df_labels = df_labels
         self.output_dir = output_dir
@@ -177,7 +181,9 @@ class TrainModel:
         self.verbose = verbose
         self.debug = debug
 
+        # =========================
         # Set ADDITIONAL properties (derived values)
+        # =========================
         self.FeatureSelector = FeatureSelector(
             method=feature_selection_method, verbose=verbose
         )
@@ -192,13 +198,20 @@ class TrainModel:
         self.csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
 
+        # =========================
         # WIll be set after _train() method called
+        # =========================
         self.grid_jobs: list = []
 
+        # =========================
         # Validate and create directories
+        # =========================
         self.validate()
         self.create_directories()
 
+        # =========================
+        # Verbose and logging
+        # =========================
         if verbose:
             logger.info(
                 f"Train model using {n_jobs} jobs with {cliassifier_name} classifier "
@@ -220,7 +233,7 @@ class TrainModel:
         Example:
             >>> trainer = TrainModel(
             ...     features_csv="features.csv",
-            ...     label_csv="labels.csv"
+            ...     label_features_csv="labels.csv"
             ... )
             >>> trainer.validate()  # Called automatically in __init__
         """

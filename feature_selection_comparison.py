@@ -23,7 +23,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 
-from eruption_forecast import ForecastModel
+from eruption_forecast import FeaturesBuilder, ForecastModel
 from eruption_forecast.decorators import timer
 from eruption_forecast.features import FeatureSelector
 from eruption_forecast.logger import logger
@@ -68,6 +68,9 @@ def main(
 
     # Create output directories
     os.makedirs(output_base_dir, exist_ok=True)
+
+    features_csv = None
+    label_csv = None
 
     # ========== STEP 1: Extract Features (or Load Existing) ==========
     if use_existing_features:
@@ -150,17 +153,24 @@ def main(
             overwrite=False,
         )
 
-        features_csv = fm.FeaturesBuilder.all_features_csv
-        label_csv = fm.FeaturesBuilder.label_features_csv
+        if isinstance(fm.FeaturesBuilder, FeaturesBuilder):
+            features_csv = fm.FeaturesBuilder.all_features_csv
+            label_csv = fm.FeaturesBuilder.label_features_csv
 
     # ========== STEP 2: Load Features and Labels ==========
     logger.info("=" * 80)
     logger.info("Loading features and labels...")
     logger.info("=" * 80)
 
+    if features_csv is None or label_csv is None:
+        raise FileNotFoundError("CSV files not found")
+
     X = pd.read_csv(features_csv, index_col=0)
-    y_df = pd.read_csv(label_csv)
+    y_df = pd.read_csv(label_csv, index_col=0)
     y = y_df["is_erupted"]
+
+    # Ensure X and y have matching indices (required by tsfresh)
+    y.index = X.index
 
     logger.info(f"Total features: {X.shape[1]}")
     logger.info(f"Total samples: {X.shape[0]}")
@@ -172,7 +182,7 @@ def main(
     logger.info("=" * 80)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+        X, y, test_size=0.2, random_state=42, stratify=y  # type: ignore
     )
 
     logger.info(f"Train samples: {X_train.shape[0]}")
@@ -206,7 +216,7 @@ def main(
         n_jobs=4,
     )
     rf_tsfresh.fit(X_train_tsfresh, y_train)
-    y_pred_tsfresh = rf_tsfresh.predict(X_test_tsfresh)
+    y_pred_tsfresh = rf_tsfresh.predict(X_test_tsfresh)  # type: ignore
 
     # Evaluate
     results["tsfresh"] = {
@@ -324,8 +334,8 @@ def main(
         random_state=42,
         n_jobs=4,
     )
-    rf_combined.fit(X_train_combined, y_train)
-    y_pred_combined = rf_combined.predict(X_test_combined)
+    rf_combined.fit(X_train_combined, y_train)  # type: ignore
+    y_pred_combined = rf_combined.predict(X_test_combined)  # type: ignore
 
     # Evaluate
     results["combined"] = {
@@ -459,7 +469,7 @@ def main(
     best_score = comparison_df["Balanced_Accuracy"].max()
 
     logger.info(
-        f"✓ Best performing method: {best_method.upper()} "
+        f"✓ Best performing method: {best_method.upper()} "  # type: ignore
         f"(Balanced Accuracy: {best_score:.4f})"
     )
 

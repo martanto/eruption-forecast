@@ -1,5 +1,6 @@
 # Standard library imports
-from typing import Literal
+import os
+from typing import Literal, Self
 
 # Third party imports
 import pandas as pd
@@ -9,6 +10,7 @@ from tsfresh.feature_selection import select_features
 
 # Project imports
 from eruption_forecast.logger import logger
+from eruption_forecast.utils import get_significant_features
 
 
 class FeatureSelector:
@@ -33,19 +35,20 @@ class FeatureSelector:
 
     Args:
         method (str): Feature selection method:
-            - "tsfresh": Statistical significance only (Stage 1)
+            - "tsfresh": Statistical significance only. Default. (Stage 1)
             - "random_forest": Permutation importance only
             - "combined": Two-stage (tsfresh → RandomForest) [RECOMMENDED]
-        n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
         random_state (int, optional): Random seed for reproducibility. Defaults to 42.
+        output_dir (str, optional): Save extracted features after selection.
+        n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
         verbose (bool, optional): Verbose logging. Defaults to False.
 
     Attributes:
         selected_features_ (pd.Series): Selected features with their scores
         p_values_ (pd.Series): P-values from tsfresh (if applicable)
         importance_scores_ (pd.Series): Permutation importance scores (if applicable)
-        n_features_stage1_ (int): Number of features after stage 1
-        n_features_stage2_ (int): Number of features after stage 2
+        n_features_tsfresh (int): Number of features after tsfresh selection
+        n_features_rf (int): Number of features after random forest features importance
 
     Example:
         >>> # Two-stage selection (recommended)
@@ -66,23 +69,62 @@ class FeatureSelector:
 
     def __init__(
         self,
-        method: Literal["tsfresh", "random_forest", "combined"] = "combined",
-        n_jobs: int = 1,
+        method: Literal["tsfresh", "random_forest", "combined"] = "tsfresh",
         random_state: int = 42,
+        output_dir: str | None = None,
+        n_jobs: int = 1,
         verbose: bool = False,
     ) -> None:
+        # =========================
+        # Set DEFAULT parameter
+        # =========================
+        output_dir = output_dir or os.path.join(
+            os.getcwd(), "output", "features", "selected"
+        )
+
+        # =========================
+        # Set DEFAULT properties
+        # =========================
         self.method = method
         self.n_jobs = n_jobs
         self.random_state = random_state
+        self.output_dir = output_dir
         self.verbose = verbose
 
-        # Will be set after fit()
+        # =========================
+        # Will be set after fit() method called
+        # =========================
         self.selected_features_: pd.Series = pd.Series(dtype=float)
         self.p_values_: pd.Series = pd.Series(dtype=float)
         self.importance_scores_: pd.Series = pd.Series(dtype=float)
-        self.n_features_stage1_: int = 0
-        self.n_features_stage2_: int = 0
+        self.n_features_tsfresh: int = 0
+        self.n_features_rf: int = 0
         self.feature_names_: list[str] = []
+
+        # =========================
+        # Validate and create directories
+        # =========================
+        self.validate()
+
+    def validate(self) -> None:
+        """Validate the selected features selection parameters."""
+        if self.n_jobs < 1:
+            raise ValueError(f"n_jobs must be >= 1. Your value is {self.n_jobs}")
+        return None
+
+    def set_random_state(self, random_state: int) -> Self:
+        """Change random state value.
+
+        Args:
+            random_state: Random seed for reproducibility. Applies to classifiers
+
+        Returns:
+            self: FeatureSelector instance
+        """
+        if random_state < 0:
+            raise ValueError(f"random_state must be >= 0. Your value is {random_state}")
+        self.random_state = random_state
+        return self
 
     def _select_tsfresh(
         self,
@@ -96,15 +138,17 @@ class FeatureSelector:
         significance with FDR (False Discovery Rate) control.
 
         Args:
-            X: Features DataFrame
-            y: Target labels
+            X (pd.DataFrame): Extacted features DataFrame
+            y (pd.Series): Target labels
             fdr_level: False discovery rate level (default: 0.05)
 
         Returns:
             Tuple of (filtered_features, p_values)
         """
         if self.verbose:
-            logger.info("Stage 1: tsfresh statistical feature selection...")
+            logger.info(
+                f"{self.random_state:05d}: tsfresh statistical feature selection..."
+            )
 
         # Use tsfresh's select_features function
         X_filtered = select_features(
@@ -116,20 +160,17 @@ class FeatureSelector:
         )
 
         # Get p-values using get_significant_features utility
-        # Project imports
-        from eruption_forecast.utils import get_significant_features
-
         p_values = get_significant_features(X, y, n_jobs=self.n_jobs)
 
         # Filter p_values to only include selected features
         p_values = p_values[p_values.index.isin(X_filtered.columns)]
 
-        self.n_features_stage1_ = X_filtered.shape[1]
+        self.n_features_tsfresh = X_filtered.shape[1]
         self.p_values_ = p_values
 
         if self.verbose:
             logger.info(
-                f"tsfresh: {X.shape[1]} → {X_filtered.shape[1]} features "
+                f"{self.random_state:05d} tsfresh: {X.shape[1]} → {p_values.shape[0]} features "
                 f"(FDR={fdr_level})"
             )
 
@@ -139,7 +180,7 @@ class FeatureSelector:
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        top_n: int = 30,
+        top_n: int = 20,
         n_estimators: int = 200,
         max_depth: int | None = 10,
         min_samples_leaf: int = 20,
@@ -151,19 +192,21 @@ class FeatureSelector:
         This captures feature interactions and model-specific importance.
 
         Args:
-            X: Features DataFrame
-            y: Target labels
-            top_n: Number of top features to select
-            n_estimators: Number of trees in RandomForest
-            max_depth: Maximum tree depth (None for unlimited)
-            min_samples_leaf: Minimum samples per leaf (regularization)
-            n_repeats: Number of permutation repeats
+            X (pd.DataFrame): Extacted features DataFrame
+            y (pd.Series): Target labels
+            top_n (int, optional): Number of top features to select. Default to 20
+            n_estimators (int, optional): Number of trees in RandomForest. Default to 200
+            max_depth (int, optional): Maximum tree depth (None for unlimited). Default to 10
+            min_samples_leaf (int, optional): Minimum samples per leaf (regularization). Default to 20
+            n_repeats (int, optional): Number of permutation repeats. Default to 10
 
         Returns:
             Tuple of (selected_features, importance_scores)
         """
         if self.verbose:
-            logger.info("Stage 2: RandomForest permutation importance...")
+            logger.info(
+                f"{self.random_state:05d}: RandomForest permutation importance..."
+            )
 
         # Train RandomForest with regularization to prevent overfitting
         rf = RandomForestClassifier(
@@ -208,11 +251,13 @@ class FeatureSelector:
         importance_scores.name = "importance"
         importance_scores.index.name = "features"
 
-        self.n_features_stage2_ = X_selected.shape[1]
+        self.n_features_rf = X_selected.shape[1]
         self.importance_scores_ = importance_scores
 
         if self.verbose:
-            logger.info(f"RandomForest: {X.shape[1]} → {X_selected.shape[1]} features")
+            logger.info(
+                f"{self.random_state:05d} RandomForest: {X.shape[1]} → {X_selected.shape[1]} features"
+            )
 
         return X_selected, importance_scores
 
@@ -221,14 +266,14 @@ class FeatureSelector:
         X: pd.DataFrame,
         y: pd.Series,
         fdr_level: float = 0.05,
-        top_n: int = 30,
+        top_n: int = 20,
         **rf_kwargs,
-    ) -> "FeatureSelector":
+    ) -> Self:
         """Fit the feature selector on training data.
 
         Args:
-            X: Training features DataFrame
-            y: Training labels Series
+            X (pd.DataFrame): Extacted features DataFrame
+            y (pd.Series): Target labels
             fdr_level: FDR level for tsfresh (default: 0.05)
             top_n: Number of top features for final selection (default: 30)
             **rf_kwargs: Additional keyword arguments for RandomForest
@@ -288,7 +333,7 @@ class FeatureSelector:
             if self.verbose:
                 logger.info(
                     f"Two-stage selection: {n_features_initial} → "
-                    f"{self.n_features_stage1_} → {self.n_features_stage2_} features"
+                    f"{self.n_features_tsfresh} → {self.n_features_rf} features"
                 )
 
         else:
@@ -303,7 +348,7 @@ class FeatureSelector:
         """Transform features by selecting only fitted features.
 
         Args:
-            X: Features DataFrame to transform
+            X (pd.DataFrame): Extacted features DataFrame
 
         Returns:
             Transformed DataFrame with selected features only
@@ -337,16 +382,16 @@ class FeatureSelector:
         X: pd.DataFrame,
         y: pd.Series,
         fdr_level: float = 0.05,
-        top_n: int = 30,
+        top_n: int = 20,
         **rf_kwargs,
     ) -> pd.DataFrame:
         """Fit the selector and transform X in one step.
 
         Args:
-            X: Training features DataFrame
-            y: Training labels Series
-            fdr_level: FDR level for tsfresh (default: 0.05)
-            top_n: Number of top features (default: 30)
+            X (pd.DataFrame): Extacted features DataFrame
+            y (pd.Series): Target labels
+            fdr_level (float, optional): FDR level for tsfresh (default: 0.05)
+            top_n (int, optional): Number of top features (default: 30)
             **rf_kwargs: Additional kwargs for RandomForest
 
         Returns:

@@ -25,14 +25,19 @@ class DSAR:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        # =========================
+        # Set DEFAULT properties
+        # =========================
         self.remove_outlier_method = remove_outlier_method
+        self.verbose = verbose
+        self.debug = debug
 
+        # =========================
+        # Will be set after calculate() method called
+        # =========================
         self.first_dsar: pd.Series | None = None
         self.second_dsar: pd.Series | None = None
         self.series: pd.Series | None = None
-
-        self.verbose = verbose
-        self.debug = debug
 
     def calculate(
         self,

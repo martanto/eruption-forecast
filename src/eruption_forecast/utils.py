@@ -811,6 +811,7 @@ def random_under_sampler(
 def get_significant_features(
     features: pd.DataFrame,
     labels: pd.Series | pd.DataFrame,
+    fdr_level: float = 0.05,
     n_jobs: int = 1,
 ) -> pd.Series:
     """Get significant features ranked by p-value.
@@ -821,6 +822,7 @@ def get_significant_features(
     Args:
         features (pd.DataFrame): Extracted features dataframe from tsfresh.
         labels (pd.Series | pd.DataFrame): Binary eruption labels.
+        fdr_level (float, optional): False discovery rate level. Defaults to 0.05.
         n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
     Returns:
@@ -834,7 +836,9 @@ def get_significant_features(
     if isinstance(labels, pd.DataFrame):
         labels = to_series(labels, column_value="is_erupted")
 
-    selector = FeatureSelector(n_jobs=n_jobs, ml_task="classification")
+    selector = FeatureSelector(
+        n_jobs=n_jobs, fdr_level=fdr_level, ml_task="classification"
+    )
     selector.fit_transform(X=features, y=labels)  # type: ignore
 
     _significant_features = pd.Series(selector.p_values, index=selector.features)

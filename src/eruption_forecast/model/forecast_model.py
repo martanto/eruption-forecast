@@ -93,19 +93,21 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        # Normalize dates
+        # =========================
+        # Set DEFAULT parameter
+        # =========================
         start_date, end_date, start_date_str, end_date_str = normalize_dates(
             start_date, end_date
         )
-
-        # Setup directories
         network = network or "VG"
         location = location or "00"
         nslc, output_dir, station_dir, features_dir = self._setup_directories(
             network, station, location, channel, output_dir
         )
 
-        # Set DEFAULT properties (core parameters)
+        # =========================
+        # Set DEFAULT properties
+        # =========================
         self.station = station
         self.channel = channel
         self.start_date: datetime = start_date
@@ -120,34 +122,44 @@ class ForecastModel:
         self.verbose = verbose
         self.debug = debug
 
+        # =========================
         # Set ADDITIONAL properties (derived values)
+        # =========================
         self.start_date_minus_window_size = start_date - timedelta(days=window_size)
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
         self.nslc = nslc
         self.station_dir = station_dir
         self.features_dir = features_dir
+        self.basename: str | None = None
 
         # Initialize feature parameters
         self.default_fc_parameters, self.excludes_features = (
             self._initialize_feature_parameters()
         )
 
+        # =========================
         # Initialize state properties (set during lifecycle)
+        # =========================
         # Will be set after calculate() method called
+        # =========================
         self.CalculateTremor: CalculateTremor | None = None
         self.TremorData: TremorData | None = None
         self.tremor_data: pd.DataFrame = pd.DataFrame()
         self.tremor_csv: str | None = None
 
+        # =========================
         # Will be set after build_label() method called
+        # =========================
         self.LabelBuilder: LabelBuilder | None = None
         self.label_data: pd.DataFrame = pd.DataFrame()
         self.label_csv: str | None = None
         self.total_eruption_class: int | None = None
         self.total_non_eruption_class: int | None = None
 
+        # =========================
         # Will be set after extract_features() called
+        # =========================
         self.TremorMatrixBuilder: TremorMatrixBuilder | None = None
         self.tremor_matrix_df: pd.DataFrame = pd.DataFrame()
         self.tremor_matrix_csv: str | None = None
@@ -156,20 +168,32 @@ class ForecastModel:
         self.features_csv: str | None = None
         self.use_relevant_features: bool = False
 
+        # =========================
         # Will be set after predict() called
+        # =========================
         self.prediction_features_csvs: set[str] = set()
 
+        # =========================
+        # Will be updated after set_feature_selection_method() called
+        # =========================
+        self.feature_selection_method: Literal[
+            "tsfresh", "random_forest", "combined"
+        ] = "tsfresh"
+
+        # =========================
         # Will be set after train() called
+        # =========================
         self.TrainModel: TrainModel | None = None
 
-        # Base filename without extension
-        self.basename: str | None = None
-
+        # =========================
         # Validate and create directories
+        # =========================
         self.validate()
         self.create_directories()
 
-        # Verbose and debugging
+        # =========================
+        # Verbose and logging
+        # =========================
         if debug:
             logger.info("⚠️ Forecast Model :: Debug mode is ON")
 
@@ -877,6 +901,21 @@ class ForecastModel:
 
         return self
 
+    def set_feature_selection_method(
+        self,
+        using: Literal["tsfresh", "random_forest", "combined"],
+    ) -> Self:
+        """Change feature selection method.
+
+        Args:
+            using (str): Feature selection method:
+                - "tsfresh": Statistical significance only
+                - "random_forest": Permutation importance only
+                - "combined": Two-stage (tsfresh → RandomForest)
+        """
+        self.feature_selection_method = using
+        return self
+
     def train(
         self,
         classifier: Literal[
@@ -943,13 +982,13 @@ class ForecastModel:
         os.makedirs(output_dir, exist_ok=True)
 
         train_model = TrainModel(
-            features_csv=features_csv,
-            label_csv=label_csv,
+            extracted_features_csv=features_csv,
+            label_features_csv=label_csv,
             output_dir=output_dir,
             classifier=classifier,
             cv_strategy=cv_strategy,
-            grid_params=grid_params,
             number_of_significant_features=number_of_significant_features,
+            feature_selection_method=self.feature_selection_method,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs or self.n_jobs,
             verbose=verbose or self.verbose,
