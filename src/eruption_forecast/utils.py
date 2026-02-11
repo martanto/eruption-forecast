@@ -1,4 +1,5 @@
 # Standard library imports
+import json
 import os
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -10,6 +11,14 @@ import pandas as pd
 from imblearn.pipeline import Pipeline
 from imblearn.under_sampling import RandomUnderSampler
 from obspy import Trace
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 from sklearn.model_selection import (
     GridSearchCV,
     StratifiedShuffleSplit,
@@ -813,7 +822,7 @@ def get_significant_features(
     labels: pd.Series | pd.DataFrame,
     fdr_level: float = 0.05,
     n_jobs: int = 1,
-) -> pd.Series:
+) -> tuple[pd.DataFrame, pd.Series]:
     """Get significant features ranked by p-value.
 
     Uses tsfresh's FeatureSelector to identify features with statistically
@@ -826,6 +835,7 @@ def get_significant_features(
         n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
     Returns:
+        pd.DataFRame: Extracted features dataframe filtered.
         pd.Series: Features sorted by p-value (ascending), with feature
             names as index and p-values as values.
 
@@ -839,14 +849,16 @@ def get_significant_features(
     selector = FeatureSelector(
         n_jobs=n_jobs, fdr_level=fdr_level, ml_task="classification"
     )
-    selector.fit_transform(X=features, y=labels)  # type: ignore
+
+    # Extracted features with potentially reduced column
+    features_filtered: pd.DataFrame = selector.fit_transform(X=features, y=labels)  # type: ignore
 
     _significant_features = pd.Series(selector.p_values, index=selector.features)
     _significant_features = _significant_features.sort_values()
     _significant_features.name = "p_values"
     _significant_features.index.name = "features"
 
-    return _significant_features
+    return features_filtered, _significant_features
 
 
 def normalize_dates(
@@ -871,3 +883,50 @@ def normalize_dates(
     end_date_str = end_date.strftime("%Y-%m-%d")
 
     return start_date, end_date, start_date_str, end_date_str
+
+
+def get_metrics(
+    classifier: ClassifierModel,
+    labels_test,
+    labels_pred,
+    labels_train: pd.Series,
+    top_n: int,
+    grid_search: GridSearchCV,
+    random_state: int,
+    metrics_filepath: str | None = None,
+) -> dict[str | Any, int | str | Any]:
+    """Get features matrix"""
+
+    # Confusion matrix for Binary Classification
+    # Read more: https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#binary-classification
+    true_negative, false_positive, false_negative, true_positive = (
+        confusion_matrix(labels_test, labels_pred).ravel().tolist()
+    )
+
+    metrics = {
+        "random_state": random_state,
+        "classifier": classifier.name,
+        "cv_strategy": classifier.cv_strategy,
+        "cv_splits": classifier.n_splits,
+        "n_train": len(labels_train),
+        "n_test": len(labels_test),
+        "n_features": top_n,
+        "true_negatives": true_negative,
+        "false_positives": false_positive,
+        "false_negatives": false_negative,
+        "true_positives": true_positive,
+        "accuracy": accuracy_score(labels_test, labels_pred),
+        "balanced_accuracy": balanced_accuracy_score(labels_test, labels_pred),
+        "f1_score": f1_score(labels_test, labels_pred),
+        "precision": precision_score(labels_test, labels_pred),
+        "recall": recall_score(labels_test, labels_pred),
+        "best_params": grid_search.best_params_,
+        "best_cv_score": grid_search.best_score_,
+    }
+
+    # Save metrics
+    if metrics_filepath is not None:
+        with open(metrics_filepath, "w") as f:
+            json.dump(metrics, f, indent=4)
+
+    return metrics

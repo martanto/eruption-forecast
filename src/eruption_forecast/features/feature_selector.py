@@ -150,27 +150,17 @@ class FeatureSelector:
                 f"{self.random_state:05d}: tsfresh statistical feature selection..."
             )
 
-        # Use tsfresh's select_features function
-        X_filtered = select_features(
-            X,
-            y,
-            fdr_level=fdr_level,
-            n_jobs=self.n_jobs,
-            ml_task="classification",
-        )
-
         # Get p-values using get_significant_features utility
-        p_values = get_significant_features(X, y, n_jobs=self.n_jobs)
-
-        # Filter p_values to only include selected features
-        p_values = p_values[p_values.index.isin(X_filtered.columns)]
+        X_filtered, p_values = get_significant_features(
+            X, y, fdr_level=fdr_level, n_jobs=self.n_jobs
+        )
 
         self.n_features_tsfresh = X_filtered.shape[1]
         self.p_values_ = p_values
 
         if self.verbose:
             logger.info(
-                f"{self.random_state:05d} tsfresh: {X.shape[1]} → {p_values.shape[0]} features "
+                f"{self.random_state:05d} Features reduced: {X.shape[1]} → {self.n_features_tsfresh} "
                 f"(FDR={fdr_level})"
             )
 
@@ -204,9 +194,7 @@ class FeatureSelector:
             Tuple of (selected_features, importance_scores)
         """
         if self.verbose:
-            logger.info(
-                f"{self.random_state:05d}: RandomForest permutation importance..."
-            )
+            logger.info(f"{self.random_state:05d}: RandomForest features importance...")
 
         # Train RandomForest with regularization to prevent overfitting
         rf = RandomForestClassifier(
@@ -256,7 +244,7 @@ class FeatureSelector:
 
         if self.verbose:
             logger.info(
-                f"{self.random_state:05d} RandomForest: {X.shape[1]} → {X_selected.shape[1]} features"
+                f"{self.random_state:05d} Features reduced: {X.shape[1]} → {X_selected.shape[1]} features"
             )
 
         return X_selected, importance_scores

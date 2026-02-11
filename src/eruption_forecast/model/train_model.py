@@ -7,14 +7,6 @@ from typing import Any, Literal
 # Third party imports
 import joblib
 import pandas as pd
-from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 # Project imports
@@ -28,7 +20,7 @@ from eruption_forecast.features.feature_selector import FeatureSelector
 from eruption_forecast.logger import logger
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.plot import plot_significant_features as plot_significant
-from eruption_forecast.utils import random_under_sampler
+from eruption_forecast.utils import get_metrics, random_under_sampler
 
 
 class TrainModel:
@@ -150,7 +142,7 @@ class TrainModel:
             cv_strategy=cv_strategy,
             n_splits=cv_splits,
         )
-        cliassifier_name = classifier_model.name
+        classifier_name = classifier_model.name
 
         df_labels = df_labels[ERUPTED_COLUMN]
         output_dir = output_dir or os.path.join(os.getcwd(), "output", "trainings")
@@ -161,8 +153,8 @@ class TrainModel:
         figures_dir = os.path.join(output_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
 
-        models_dir = os.path.join(output_dir, "models", cliassifier_name)
-        metrics_dir = os.path.join(output_dir, "metrics", cliassifier_name)
+        models_dir = os.path.join(output_dir, "models", classifier_name)
+        metrics_dir = os.path.join(output_dir, "metrics", classifier_name)
 
         # =========================
         # Set DEFAULT properties
@@ -188,20 +180,28 @@ class TrainModel:
             method=feature_selection_method, verbose=verbose
         )
         self.ClassifierModel = classifier_model
-        self.classifier_name = cliassifier_name
+        self.classifier_name = classifier_name
         self.significant_features_dir = significant_features_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
         self.significant_figures_dir = significant_figures_dir
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir
-        self.csvs: list[str] = []
-        self.df_significant_features: pd.DataFrame = pd.DataFrame()
 
         # =========================
-        # WIll be set after _train() method called
+        # WIll be set after train() method called
         # =========================
-        self.grid_jobs: list = []
+        self.significant_features_csvs: list[str] = []
+        self.df_significant_features: pd.DataFrame = pd.DataFrame()
+
+        # Will contain pair of significant features csv and trained model filepath
+        self.df: pd.DataFrame = pd.DataFrame()
+        self.csv: str | None = None
+
+        # =========================
+        # WIll be updated after _generate_filepath() method called
+        # =========================
+        self.can_skip: bool = False
 
         # =========================
         # Validate and create directories
@@ -214,7 +214,7 @@ class TrainModel:
         # =========================
         if verbose:
             logger.info(
-                f"Train model using {n_jobs} jobs with {cliassifier_name} classifier "
+                f"Train model using {n_jobs} jobs with {classifier_name} classifier "
                 f"and {cv_strategy} CV strategy ({cv_splits} splits)"
             )
 
@@ -254,6 +254,10 @@ class TrainModel:
                 f"Features CSV should be located under output/_nslc_/features, "
                 f"with filename starting with extracted_features_(start_date)_(end_date).csv or "
                 f"extracted_relevant_(start_date)_(end_date).csv"
+            )
+        if self.n_jobs <= 0:
+            raise ValueError(
+                "n_jobs cannot be negative or equals to 0. Check your n_jobs parameter."
             )
 
     def update_grid_params(
@@ -297,9 +301,7 @@ class TrainModel:
         os.makedirs(self.models_dir, exist_ok=True)
         os.makedirs(self.metrics_dir, exist_ok=True)
 
-    def concat_significant_features(
-        self, number_of_significant_features: int | None = None, plot: bool = False
-    ) -> pd.DataFrame:
+    def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
 
         Merges significant feature CSVs from all random seeds, aggregates
@@ -307,10 +309,6 @@ class TrainModel:
         top-N most frequently selected features.
 
         Args:
-            number_of_significant_features (int, optional): Number of top
-                features to save separately. If provided, creates a separate
-                CSV with the most frequently occurring features across seeds.
-                Defaults to None.
             plot (bool, optional): If True, generates a plot of the top
                 features. Defaults to False.
 
@@ -319,29 +317,29 @@ class TrainModel:
                 how many times each feature appeared across all seeds.
 
         Raises:
-            ValueError: If no CSV files are found in self.csvs.
+            ValueError: If no CSV files are found in self.significant_features_csvs.
             ValueError: If concatenated DataFrame is empty.
 
         Example:
             >>> trainer = TrainModel(...)
             >>> trainer.train(total_seed=100)
             >>> _df = trainer.concat_significant_features(
-            ...     number_of_significant_features=20,
             ...     plot=True
             ... )
             >>> print(_df.head())
             # Shows features and their occurrence counts across seeds
         """
-        number_of_significant_features = (
-            number_of_significant_features or self.number_of_significant_features
-        )
+        number_of_significant_features = self.number_of_significant_features
 
-        if len(self.csvs) == 0:
+        if len(self.significant_features_csvs) == 0:
             raise ValueError(
                 f"No significant features CSV file inside directory {self.significant_features_dir}"
             )
 
-        df = pd.concat([pd.read_csv(file) for file in self.csvs], ignore_index=True)
+        df = pd.concat(
+            [pd.read_csv(file) for file in self.significant_features_csvs],
+            ignore_index=True,
+        )
 
         if df.empty:
             raise ValueError("No data found inside csv files.")
@@ -390,6 +388,9 @@ class TrainModel:
         features: pd.DataFrame,
         labels: pd.Series,
         random_state: int = 42,
+        significant_filepath: str | None = None,
+        all_features_filepath: str | None = None,
+        all_figures_filepath: str | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
         """Feature selection.
 
@@ -400,6 +401,9 @@ class TrainModel:
             features (pd.DataFrame): Resampled features to select.
             labels (pd.Series): Target labels.
             random_state (int, optional): Random seed for feature selection. Defaults to 42.
+            significant_filepath (str, optional): Save path for significant features.
+            all_features_filepath (str, optional): Save path for all features.
+            all_figures_filepath (str, optional): Save path for all features figures.
 
         Returns:
             tuple[pd.DataFrame, pd.Series, pd.Series]: Selected features dataframe,
@@ -422,12 +426,91 @@ class TrainModel:
         # | feature A       | 0.02      |
         # | feature B       | 0.03      |
         # | feature C       | 0.04      |
-        selected_features = selector.selected_features_
-        top_selected_features = selected_features.head(
+        all_selected_features = selector.selected_features_
+
+        top_selected_features = all_selected_features.head(
             self.number_of_significant_features
         )
 
-        return df_selected_features, selected_features, top_selected_features
+        # Save TOP-N significant features
+        top_selected_features.to_csv(significant_filepath, index=True)
+
+        # Save all SELECTED features if requested
+        if all_features_filepath:
+            all_selected_features.to_csv(all_features_filepath, index=True)
+            if all_figures_filepath:
+                self._plot_significant_features(
+                    all_selected_features=pd.DataFrame(
+                        all_selected_features
+                    ).reset_index(),
+                    all_figures_filepath=all_figures_filepath,
+                )
+
+        return df_selected_features, all_selected_features, top_selected_features
+
+    def _plot_significant_features(
+        self,
+        all_selected_features: pd.DataFrame,
+        all_figures_filepath: str,
+    ):
+        plot_significant(
+            df=all_selected_features,
+            filepath=all_figures_filepath,
+            overwrite=self.overwrite,
+            dpi=150,
+        )
+
+        return None
+
+    def _generate_filepaths(
+        self,
+        random_state: int,
+    ) -> tuple[str, str, str, str, str, str]:
+        """Generate filepaths based on random seed.
+
+        Args:
+            random_state (int): Random seed for feature selection.
+
+        Returns:
+            str: Base filename
+            str: Signficant filepath
+            str: All features filepath
+            str: All figures filepath
+            str: Model filepath
+            str: Metrics filepath
+        """
+        filename = (
+            f"{self.prefix_filename}_{random_state:05d}"
+            if self.prefix_filename
+            else f"{random_state:05d}"
+        )
+        significant_filepath = os.path.join(
+            self.significant_features_dir, f"{filename}.csv"
+        )
+        all_features_filepath = os.path.join(self.all_features_dir, f"{filename}.csv")
+        all_figures_filepath = os.path.join(
+            self.significant_figures_dir, f"{filename}.jpg"
+        )
+        model_filepath = os.path.join(self.models_dir, f"{filename}.pkl")
+        metrics_filepath = os.path.join(self.metrics_dir, f"{filename}.json")
+
+        self.can_skip = (
+            not self.overwrite
+            and os.path.isfile(significant_filepath)
+            and os.path.isfile(model_filepath)
+            and os.path.isfile(metrics_filepath)
+            and os.path.isfile(all_features_filepath)
+            and os.path.isfile(all_figures_filepath)
+        )
+
+        return (
+            filename,
+            significant_filepath,
+            all_features_filepath,
+            all_figures_filepath,
+            model_filepath,
+            metrics_filepath,
+        )
 
     def _train(
         self,
@@ -435,7 +518,7 @@ class TrainModel:
         sampling_strategy: str | float = 0.75,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[str, dict]:
+    ) -> tuple[int, str, str, dict]:
         """Train feature selection and classifier model for a single random seed.
 
         Performs:
@@ -453,14 +536,14 @@ class TrainModel:
             plot_features (bool, optional): Generate feature plots. Defaults to False.
 
         Returns:
-            tuple[str, dict]: Path to significant features CSV and metrics dictionary.
+            tuple[int, str, str, dict]: Random state value, path to significant features CSV,
+                trained model filepath, and metrics dictionary.
 
         Example:
             >>> trainer = TrainModel(...)
             >>> csv_path, evaluation_metrics = trainer._train(
             ...     seed=0,
             ...     random_state=42,
-            ...     number_of_significant_features=20
             ... )
             >>> print(csv_path)
             "output/trainings/significant_features/00042.csv"
@@ -473,37 +556,21 @@ class TrainModel:
             )
 
         # ========== STEP 0: Preparation ==========
-        # Create filename and filepath
-        filename = (
-            f"{self.prefix_filename}_{random_state:05d}"
-            if self.prefix_filename
-            else f"{random_state:05d}"
-        )
-        significant_filepath = os.path.join(
-            self.significant_features_dir, f"{filename}.csv"
-        )
-        all_features_filepath = os.path.join(self.all_features_dir, f"{filename}.csv")
-        all_figures_filepath = os.path.join(
-            self.significant_figures_dir, f"{filename}.jpg"
-        )
-        model_filepath = os.path.join(self.models_dir, f"{filename}.pkl")
-        metrics_filepath = os.path.join(self.metrics_dir, f"{filename}.json")
+        (
+            _,
+            significant_filepath,
+            all_features_filepath,
+            all_figures_filepath,
+            model_filepath,
+            metrics_filepath,
+        ) = self._generate_filepaths(random_state=random_state)
 
         # Skip if files already exist
-        can_skip = (
-            not self.overwrite
-            and os.path.isfile(significant_filepath)
-            and os.path.isfile(model_filepath)
-            and os.path.isfile(metrics_filepath)
-            and (not save_features or os.path.isfile(all_features_filepath))
-            and (not plot_features or os.path.isfile(all_figures_filepath))
-        )
-
-        if can_skip:
+        if self.can_skip or not save_features or not plot_features:
             logger.info(f"Seed {random_state:05d} already trained.")
             with open(metrics_filepath) as f:
                 metrics = json.load(f)
-            return significant_filepath, metrics
+            return random_state, significant_filepath, model_filepath, metrics
 
         logger.info(f"Training Seed: {random_state:05d}")
 
@@ -534,30 +601,12 @@ class TrainModel:
             features=features_train_resampled,
             labels=labels_train_resampled,
             random_state=random_state,
+            significant_filepath=significant_filepath,
+            all_features_filepath=all_features_filepath if save_features else None,
+            all_figures_filepath=all_figures_filepath if plot_features else None,
         )
 
-        # Save TOP-N significant features
-        top_selected_features.to_csv(significant_filepath, index=True)
-
-        # Save all SELECTED features if requested
-        if save_features:
-            selected_features.to_csv(all_features_filepath, index=True)
-            if plot_features:
-                plot_significant(
-                    df=pd.DataFrame(selected_features).reset_index(),
-                    filepath=all_figures_filepath,
-                    overwrite=self.overwrite,
-                    dpi=150,
-                )
-
         # ========== STEP 4: Cross-Validation with Dynamic Classifier ==========
-        # Select top-N features
-        top_n_features = top_selected_features.index.tolist()
-        features_train_resampled_selected = features_train_resampled_selected[
-            top_n_features
-        ]
-        features_test_selected = features_test[top_n_features]
-
         # Update random state value to classifier
         clf = self.ClassifierModel.set_random_state(random_state=random_state)
 
@@ -575,44 +624,34 @@ class TrainModel:
             verbose=0,
         )
 
+        # Select top-N features
+        top_n_features = top_selected_features.index.tolist()
+        features_train_resampled_selected = features_train_resampled_selected[
+            top_n_features
+        ]
+        features_test_selected = features_test[top_n_features]
+
         grid_search.fit(features_train_resampled_selected, labels_train_resampled)  # type: ignore
         best_model = grid_search.best_estimator_
 
         # ========== STEP 5: Evaluate on Test Set ==========
-        y_pred = best_model.predict(features_test_selected)
+        labels_pred = best_model.predict(features_test_selected)
 
-        # Confusion matrix for Binary Classification
-        # Read more: https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#binary-classification
-        tn, fp, fn, tp = confusion_matrix(labels_test, y_pred).ravel().tolist()
-
-        metrics = {
-            "random_state": random_state,
-            "classifier": self.classifier_name,
-            "cv_strategy": self.cv_strategy,
-            "cv_splits": self.cv_splits,
-            "n_train": len(labels_train_resampled),
-            "n_test": len(labels_test),
-            "n_features": self.number_of_significant_features,
-            "true_negatives": tn,
-            "false_positives": fp,
-            "false_negatives": fn,
-            "true_positives": tp,
-            "accuracy": accuracy_score(labels_test, y_pred),
-            "balanced_accuracy": balanced_accuracy_score(labels_test, y_pred),
-            "f1_score": f1_score(labels_test, y_pred),
-            "precision": precision_score(labels_test, y_pred),
-            "recall": recall_score(labels_test, y_pred),
-            "best_params": grid_search.best_params_,
-            "best_cv_score": grid_search.best_score_,
-        }
+        # Get and save metrics
+        metrics = get_metrics(
+            classifier=clf,
+            labels_test=labels_test,
+            labels_pred=labels_pred,
+            labels_train=labels_train_resampled,
+            top_n=len(top_n_features),
+            grid_search=grid_search,
+            random_state=random_state,
+            metrics_filepath=metrics_filepath,
+        )
 
         # ========== STEP 6: Save Outputs ==========
         # Save model
         joblib.dump(best_model, model_filepath)
-
-        # Save metrics
-        with open(metrics_filepath, "w") as f:
-            json.dump(metrics, f, indent=4)
 
         if self.verbose:
             logger.info(f"Model {random_state:05d}: {model_filepath}")
@@ -621,17 +660,15 @@ class TrainModel:
                 f"Seed {random_state:05d} - Test Balanced Accuracy: {metrics['balanced_accuracy']:.4f}"
             )
 
-        return significant_filepath, metrics
+        return random_state, significant_filepath, model_filepath, metrics
 
     def train(
         self,
         random_state: int = 0,
         total_seed: int = 500,
-        number_of_significant_features: int | None = None,
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
-        legacy: bool = False,
     ) -> None:
         """Train feature selection and classifier models across multiple random seeds.
 
@@ -645,22 +682,17 @@ class TrainModel:
         Args:
             random_state (int, optional): Initial random state seed. Defaults to 0.
             total_seed (int, optional): Total number of seeds to run. Defaults to 500.
-            number_of_significant_features (int, optional): Number of top features
-                to save per seed. Defaults to 20.
             sampling_strategy (str | float, optional): Under-sampling ratio for
                 balancing classes. Defaults to 0.75.
             save_all_features (bool, optional): Save all features per seed,
                 not just top-N. Defaults to False.
             plot_significant_features (bool, optional): Generate feature importance
                 plots. Defaults to False.
-            legacy (bool, optional): Train using legacy workflow. Defaults to False.
-                See: https://github.com/ddempsey/whakaari
 
         Example:
             >>> TrainModel(...).train(
             ...     random_state=42,
             ...     total_seed=100,
-            ...     number_of_significant_features=20,
             ... )
         """
         if save_all_features:
@@ -668,10 +700,6 @@ class TrainModel:
 
         if plot_significant_features:
             os.makedirs(self.significant_figures_dir, exist_ok=True)
-
-        self.number_of_significant_features = (
-            number_of_significant_features or self.number_of_significant_features
-        )
 
         # Set job paramaters
         random_states = [random_state + seed for seed in range(total_seed)]
@@ -687,12 +715,26 @@ class TrainModel:
 
         # Inittiate all metric values to save calculation metric
         all_metrics = []
+        significant_features_and_trained_models = []
 
         if self.n_jobs == 1:
             # Run test split, resampler, features selection
             for job in jobs:
-                csv, metrics = self._train(*job)
-                self.csvs.append(csv)
+                (
+                    _random_state,
+                    significant_features_csv,
+                    trained_model_filepath,
+                    metrics,
+                ) = self._train(*job)
+
+                self.significant_features_csvs.append(significant_features_csv)
+                significant_features_and_trained_models.append(
+                    {
+                        "random_state": _random_state,
+                        "significant_features_csv": significant_features_csv,
+                        "trained_model_filepath": trained_model_filepath,
+                    }
+                )
                 all_metrics.append(metrics)
 
         if self.n_jobs > 1:
@@ -700,8 +742,21 @@ class TrainModel:
             logger.info(f"Running on {self.n_jobs} job(s)")
             with Pool(self.n_jobs) as pool:
                 results = pool.starmap(self._train, jobs)
-                for csv, metrics in results:
-                    self.csvs.append(csv)
+
+                for (
+                    _random_state,
+                    significant_features_csv,
+                    trained_model_filepath,
+                    metrics,
+                ) in results:
+                    self.significant_features_csvs.append(significant_features_csv)
+                    significant_features_and_trained_models.append(
+                        {
+                            "random_state": _random_state,
+                            "significant_features_csv": significant_features_csv,
+                            "trained_model_filepath": trained_model_filepath,
+                        }
+                    )
                     all_metrics.append(metrics)
 
         # Aggregate feature selection results
@@ -709,12 +764,44 @@ class TrainModel:
             plot=plot_significant_features,
         )
 
+        # Aggregate significant features and models
+
+        # Example suffix filename: RandomForestClassifier_rs-0_ts-500_top-20
+        # Where:
+        #   - RandomForestClassifier the name of the classifier model
+        #   - rs-0 is random state with 0 value
+        #   - top-20 is number of significant features
+        suffix_filename = (
+            f"{self.classifier_name}_rs-{random_state}_ts-{total_seed}"
+            f"_top-{self.number_of_significant_features}"
+        )
+        df_models = pd.DataFrame(significant_features_and_trained_models)
+        df_models.set_index("random_state", inplace=True)
+
+        if df_models.empty:
+            raise ValueError("No significant features or trained models found.")
+
+        models_filename = f"model_{suffix_filename}.csv"
+        csv = os.path.join(self.models_dir, models_filename)
+
+        # Save features and model
+        df_models.to_csv(csv, index=True)
+
         # Aggregate and save metrics
-        self._aggregate_metrics(all_metrics)
+        self._aggregate_metrics(all_metrics, suffix_filename=suffix_filename)
+
+        # set values
+        self.df = df_models
+        self.csv = csv
+
+        if self.verbose:
+            logger.info(f"Models saved to: {csv}")
 
         return None
 
-    def _aggregate_metrics(self, all_metrics: list[dict]) -> None:
+    def _aggregate_metrics(
+        self, all_metrics: list[dict], suffix_filename: str = ""
+    ) -> None:
         """Aggregate metrics across all seeds.
 
         Computes mean and std for each metric and saves to CSV.
@@ -732,10 +819,19 @@ class TrainModel:
 
         # Calculate summary statistics
         summary = df_metrics.describe().T
-        summary.to_csv(os.path.join(self.output_dir, "metrics_summary.csv"))
+        summary_filepath = os.path.join(
+            self.metrics_dir, f"metrics_summary_{suffix_filename}.csv"
+        )
+        summary.to_csv(summary_filepath)
 
         # Save all individual metrics
-        df_metrics.to_csv(os.path.join(self.output_dir, "all_metrics.csv"), index=False)
+        all_metrics_filepath = os.path.join(
+            self.metrics_dir, f"all_metrics_{suffix_filename}.csv"
+        )
+        df_metrics.to_csv(
+            all_metrics_filepath,
+            index=False,
+        )
 
         logger.info("=" * 60)
         logger.info("Metrics Summary (mean ± std across seeds)")
@@ -751,3 +847,7 @@ class TrainModel:
             std = df_metrics[metric].std()
             logger.info(f"{metric:20s}: {mean:.4f} ± {std:.4f}")
         logger.info("=" * 60)
+
+        if self.verbose:
+            logger.info(f"Summary metrics saved to: {summary_filepath}")
+            logger.info(f"All metrics saved to: {all_metrics_filepath}")

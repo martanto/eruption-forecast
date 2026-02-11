@@ -169,11 +169,6 @@ class ForecastModel:
         self.use_relevant_features: bool = False
 
         # =========================
-        # Will be set after predict() called
-        # =========================
-        self.prediction_features_csvs: set[str] = set()
-
-        # =========================
         # Will be updated after set_feature_selection_method() called
         # =========================
         self.feature_selection_method: Literal[
@@ -184,6 +179,13 @@ class ForecastModel:
         # Will be set after train() called
         # =========================
         self.TrainModel: TrainModel | None = None
+        self.trained_model_df: pd.DataFrame = pd.DataFrame()
+        self.trained_model_csv: str | None = None
+
+        # =========================
+        # Will be set after predict() called
+        # =========================
+        self.prediction_features_csvs: set[str] = set()
 
         # =========================
         # Validate and create directories
@@ -749,6 +751,7 @@ class ForecastModel:
         save_tremor_matrix_per_id: bool = False,
         exclude_features: list[str] | None = None,
         use_relevant_features: bool = False,
+        output_dir: str | None = None,
         overwrite: bool = False,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -767,6 +770,7 @@ class ForecastModel:
                 Save individual windowed tremor CSVs for debugging. Defaults to False.
             exclude_features (Optional[list[str]]): List features calculator to be excluded.
             use_relevant_features (bool): If True, extract features using relevant features.
+            output_dir (Optional[str], optional): Output directory. Defaults to None.
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
             n_jobs (int): Number of parallel jobs. Defaults to None.
             verbose (bool): If True, enables verbose mode. Defaults to False.
@@ -774,10 +778,13 @@ class ForecastModel:
         Returns:
             self (Self): ForecastModel object
         """
+        output_dir = output_dir or self.features_dir
+        os.makedirs(output_dir, exist_ok=True)
+
         tremor_matrix_builder = TremorMatrixBuilder(
             tremor_df=self.tremor_data,
             label_df=self.label_data,
-            output_dir=self.features_dir,
+            output_dir=output_dir,
             window_size=self.window_size,
             overwrite=overwrite or self.overwrite,
             verbose=verbose or self.verbose,
@@ -855,7 +862,9 @@ class ForecastModel:
         train_end_date = end_date or self.end_date
         verbose = verbose or self.verbose
         debug = debug or self.debug
+
         output_dir = output_dir or self.station_dir
+        os.makedirs(output_dir, exist_ok=True)
 
         # Validate inputs
         validate_date_ranges(train_start_date, train_end_date)
@@ -922,7 +931,6 @@ class ForecastModel:
             "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
-        grid_params: dict[str, Any] | None = None,
         random_state: int = 0,
         total_seed: int = 500,
         number_of_significant_features: int = 20,
@@ -942,7 +950,6 @@ class ForecastModel:
                 "dt", "knn", "nb", "voting"). Defaults to "rf".
             cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
                 "timeseries"). Defaults to "shuffle".
-            grid_params (dict[str, any], optional): Grid-search parameters. Defaults to None.
             random_state (int, optional): Initiate random seed. Defaults to 0.
             total_seed (int, optional): Total random seed. Defaults to 500.
             number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
@@ -1003,6 +1010,8 @@ class ForecastModel:
         )
 
         self.TrainModel = train_model
+        self.trained_model_df = train_model.df
+        self.trained_model_csv = train_model.csv
 
         return self
 
