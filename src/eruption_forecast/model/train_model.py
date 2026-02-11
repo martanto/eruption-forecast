@@ -2,7 +2,7 @@
 import json
 import os
 from multiprocessing import Pool
-from typing import Any, Literal, Self
+from typing import Any, Literal
 
 # Third party imports
 import joblib
@@ -24,13 +24,11 @@ from eruption_forecast.features.constants import (
     ID_COLUMN,
     SIGNIFICANT_FEATURES_FILENAME,
 )
+from eruption_forecast.features.feature_selector import FeatureSelector
 from eruption_forecast.logger import logger
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.plot import plot_significant_features as plot_significant
-from eruption_forecast.utils import (
-    get_significant_features,
-    random_under_sampler,
-)
+from eruption_forecast.utils import random_under_sampler
 
 
 class TrainModel:
@@ -48,8 +46,12 @@ class TrainModel:
     the risk of overfitting to a particular train/test split.
 
     Args:
-        features_csv (str): Path to the extracted features CSV file.
-        label_csv (str): Path to the label CSV file.
+        extracted_features_csv (str): Path to the extracted features CSV file.
+            Can be found in:
+                ``<cwd>output/{nslc}/features/all_extracted_features_{dates}.csv``, or
+                ``<cwd>output/{nslc}/features/relevant_features_{dates}.csv``
+        label_csv (str): Path to the label CSV file. Built by using LabelBuilder.
+            Can be found in: ``<cwd>output/{nslc}/features/label_features_{dates}.csv``
         output_dir (str, optional): Directory for output files. Defaults to
             ``<cwd>/output/trainings``.
         n_jobs (int, optional): Number of parallel workers. Defaults to 1.
@@ -59,7 +61,9 @@ class TrainModel:
         cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
             "timeseries"). Defaults to "shuffle".
         cv_splits (int, optional): Number of CV splits. Defaults to 5.
-        grid_params (dict[str, any], optional): Grid-search parameters. Defaults to None
+        number_of_significant_features (int, optional): Number of top features
+            to save separately. If provided, creates a separate CSV with
+            the most frequently occurring features across seeds. Defaults to 20.
         verbose (bool, optional): Verbose logging. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
 
@@ -97,7 +101,7 @@ class TrainModel:
         ...     label_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     classifier="voting",
-        ...     cv_strategy="timeseries",
+        ...     cv_strategy="shuffle",
         ...     cv_splits=5,
         ...     n_jobs=4,
         ... )
@@ -112,8 +116,8 @@ class TrainModel:
 
     def __init__(
         self,
-        features_csv: str,
-        label_csv: str,
+        extracted_features_csv: str,
+        label_features_csv: str,
         output_dir: str | None = None,
         prefix_filename: str | None = None,
         classifier: Literal[
@@ -121,16 +125,18 @@ class TrainModel:
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         cv_splits: int = 5,
-        grid_params: dict[str, Any] | None = None,
         number_of_significant_features: int = 20,
+        feature_selection_method: Literal[
+            "tsfresh", "random_forest", "combined"
+        ] = "tsfresh",
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
         # Set DEFAULT parameter
-        df_features = pd.read_csv(features_csv, index_col=0)
-        df_labels = pd.read_csv(label_csv)
+        df_features = pd.read_csv(extracted_features_csv, index_col=0)
+        df_labels = pd.read_csv(label_features_csv)
         if ID_COLUMN in df_labels.columns:
             df_labels = df_labels.set_index(ID_COLUMN)
 
@@ -166,11 +172,15 @@ class TrainModel:
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
         self.number_of_significant_features = number_of_significant_features
+        self.feature_selection_method = feature_selection_method
         self.overwrite = overwrite
         self.verbose = verbose
         self.debug = debug
 
-        # Set ADDITIONAL properties
+        # Set ADDITIONAL properties (derived values)
+        self.FeatureSelector = FeatureSelector(
+            method=feature_selection_method, verbose=verbose
+        )
         self.ClassifierModel = classifier_model
         self.classifier_name = cliassifier_name
         self.significant_features_dir = significant_features_dir
@@ -181,9 +191,6 @@ class TrainModel:
         self.metrics_dir = metrics_dir
         self.csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
-
-        if grid_params:
-            self.update_grid_params(grid_params)
 
         # WIll be set after _train() method called
         self.grid_jobs: list = []
@@ -236,26 +243,29 @@ class TrainModel:
                 f"extracted_relevant_(start_date)_(end_date).csv"
             )
 
-    def update_grid_params(self, grid_params: dict[str, Any]) -> Self:
+    def update_grid_params(
+        self, classifier: ClassifierModel, grid_params: dict[str, Any]
+    ) -> ClassifierModel:
         """Updates grid parameters with new grid parameters.
 
         Update self.ClassifierModel.grid value.
 
         Args:
-            grid_params: Grid search parameters.
+            classifier (ClassifierModel): Classifier model to be updated.
+            grid_params (dict): Grid search parameters.
 
         Returns:
             self (Self): TrainModel class
         """
-        current_grid = self.ClassifierModel.grid
-        self.ClassifierModel.grid = grid_params
+        current_grid = classifier.grid
+        classifier.grid = grid_params
         if self.verbose:
             logger.info(
                 f"Your current grid parameters {current_grid} has been updated to"
                 f"{grid_params}."
             )
 
-        return self
+        return classifier
 
     def create_directories(self) -> None:
         """Create required output directories for training results.
@@ -362,9 +372,52 @@ class TrainModel:
 
         return df
 
+    def select_features(
+        self,
+        features: pd.DataFrame,
+        labels: pd.Series,
+        random_state: int = 42,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+        """Feature selection.
+
+        Based on tsfresh statistical significance testing with FDR control
+        or permutation importance analysis
+
+        Args:
+            features (pd.DataFrame): Resampled features to select.
+            labels (pd.Series): Target labels.
+            random_state (int, optional): Random seed for feature selection. Defaults to 42.
+
+        Returns:
+            tuple[pd.DataFrame, pd.Series, pd.Series]: Selected features dataframe,
+                all selected features, top (n) features
+        """
+        selector = self.FeatureSelector.set_random_state(random_state)
+
+        # Reduced features/columns
+        df_selected_features = selector.fit_transform(
+            features, labels, top_n=self.number_of_significant_features
+        )
+
+        # Return pd.Series indexed by features name. Value column is p_value
+        #
+        # Example:
+        #
+        # ===============================
+        # | feature (idx)   | p_value   |
+        # ===============================
+        # | feature A       | 0.02      |
+        # | feature B       | 0.03      |
+        # | feature C       | 0.04      |
+        selected_features = selector.selected_features_
+        top_selected_features = selected_features.head(
+            self.number_of_significant_features
+        )
+
+        return df_selected_features, selected_features, top_selected_features
+
     def _train(
         self,
-        seed: int,
         random_state: int,
         sampling_strategy: str | float = 0.75,
         save_features: bool = False,
@@ -380,7 +433,6 @@ class TrainModel:
         5. Evaluation on held-out test set
 
         Args:
-            seed (int): Seed number (0 to total_seed-1).
             random_state (int): Base random state value.
             sampling_strategy (str | float, optional): Under-sampling ratio.
                 Defaults to 0.75.
@@ -402,20 +454,17 @@ class TrainModel:
             >>> print(metrics['balanced_accuracy'])
             0.8234
         """
-        state = random_state + seed
         if self.debug:
             logger.debug(
-                f"_train: seed={seed}, random_state={random_state}, state={state}"
+                f"_train: seed={random_state}, random_state={random_state}, state={random_state}"
             )
-
-        number_of_significant_features = self.number_of_significant_features
 
         # ========== STEP 0: Preparation ==========
         # Create filename and filepath
         filename = (
-            f"{self.prefix_filename}_{state:05d}"
+            f"{self.prefix_filename}_{random_state:05d}"
             if self.prefix_filename
-            else f"{state:05d}"
+            else f"{random_state:05d}"
         )
         significant_filepath = os.path.join(
             self.significant_features_dir, f"{filename}.csv"
@@ -438,12 +487,12 @@ class TrainModel:
         )
 
         if can_skip:
-            logger.info(f"Seed {seed:05d} already trained.")
+            logger.info(f"Seed {random_state:05d} already trained.")
             with open(metrics_filepath) as f:
                 metrics = json.load(f)
             return significant_filepath, metrics
 
-        logger.info(f"Training Seed: {seed:05d}")
+        logger.info(f"Training Seed: {random_state:05d}")
 
         # ========== STEP 1: Train/Test Split ==========
         # X_train, X_test, y_train, y_test
@@ -451,7 +500,7 @@ class TrainModel:
             self.df_features,
             self.df_labels,
             test_size=0.2,
-            random_state=state,
+            random_state=random_state,
             stratify=self.df_labels,  # type: ignore
         )
 
@@ -460,42 +509,44 @@ class TrainModel:
             features=features_train,
             labels=labels_train,
             sampling_strategy=sampling_strategy,
-            random_state=state,
+            random_state=random_state,
         )
 
         # ========== STEP 3: Feature Selection ONLY on Training Data ==========
-        significant_features = get_significant_features(
+        (
+            features_train_resampled_selected,
+            selected_features,
+            top_selected_features,
+        ) = self.select_features(
             features=features_train_resampled,
             labels=labels_train_resampled,
+            random_state=random_state,
         )
 
-        # Save all features if requested
+        # Save TOP-N significant features
+        top_selected_features.to_csv(significant_filepath, index=True)
+
+        # Save all SELECTED features if requested
         if save_features:
-            significant_features.to_csv(all_features_filepath, index=True)
+            selected_features.to_csv(all_features_filepath, index=True)
             if plot_features:
                 plot_significant(
-                    df=pd.DataFrame(significant_features).reset_index(),
+                    df=pd.DataFrame(selected_features).reset_index(),
                     filepath=all_figures_filepath,
                     overwrite=self.overwrite,
-                    dpi=72,
+                    dpi=150,
                 )
 
-        # Select top-N features
-        top_features = significant_features.head(
-            number_of_significant_features
-        ).index.tolist()
-        features_train_resampled_selected = features_train_resampled[top_features]
-        features_test_selected = features_test[top_features]
-
-        # Save top-N significant features
-        significant_features.head(number_of_significant_features).to_csv(
-            significant_filepath, index=True
-        )
-
         # ========== STEP 4: Cross-Validation with Dynamic Classifier ==========
-        # Create classifier model with appropriate CV strategy
+        # Select top-N features
+        top_n_features = top_selected_features.index.tolist()
+        features_train_resampled_selected = features_train_resampled_selected[
+            top_n_features
+        ]
+        features_test_selected = features_test[top_n_features]
 
-        clf = self.ClassifierModel.set_random_state(random_state=state)
+        # Update random state value to classifier
+        clf = self.ClassifierModel.set_random_state(random_state=random_state)
 
         # Get model and grid from ClassifierModel
         model = clf.model
@@ -507,7 +558,7 @@ class TrainModel:
             param_grid=param_grid,
             cv=cv,
             scoring="balanced_accuracy",
-            n_jobs=1,
+            n_jobs=1,  # prevent creating multiprocessing inside multiprocessing
             verbose=0,
         )
 
@@ -522,8 +573,7 @@ class TrainModel:
         tn, fp, fn, tp = confusion_matrix(labels_test, y_pred).ravel().tolist()
 
         metrics = {
-            "seed": seed,
-            "random_state": state,
+            "random_state": random_state,
             "classifier": self.classifier_name,
             "cv_strategy": self.cv_strategy,
             "cv_splits": self.cv_splits,
@@ -552,8 +602,10 @@ class TrainModel:
             json.dump(metrics, f, indent=4)
 
         if self.verbose:
+            logger.info(f"Model {random_state:05d}: {model_filepath}")
+            logger.info(f"Metrics {random_state:05d}: {metrics_filepath}")
             logger.info(
-                f"Seed {state:05d} - Test Balanced Accuracy: {metrics['balanced_accuracy']:.4f}"
+                f"Seed {random_state:05d} - Test Balanced Accuracy: {metrics['balanced_accuracy']:.4f}"
             )
 
         return significant_filepath, metrics
@@ -566,6 +618,7 @@ class TrainModel:
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
+        legacy: bool = False,
     ) -> None:
         """Train feature selection and classifier models across multiple random seeds.
 
@@ -587,6 +640,8 @@ class TrainModel:
                 not just top-N. Defaults to False.
             plot_significant_features (bool, optional): Generate feature importance
                 plots. Defaults to False.
+            legacy (bool, optional): Train using legacy workflow. Defaults to False.
+                See: https://github.com/ddempsey/whakaari
 
         Example:
             >>> TrainModel(...).train(
@@ -605,17 +660,19 @@ class TrainModel:
             number_of_significant_features or self.number_of_significant_features
         )
 
+        # Set job paramaters
+        random_states = [random_state + seed for seed in range(total_seed)]
         jobs = [
             (
-                seed,
-                random_state,
+                _random_state,
                 sampling_strategy,
                 save_all_features,
                 plot_significant_features,
             )
-            for seed in range(total_seed)
+            for _random_state in random_states
         ]
 
+        # Inittiate all metric values to save calculation metric
         all_metrics = []
 
         if self.n_jobs == 1:
