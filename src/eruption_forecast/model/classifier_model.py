@@ -1,7 +1,6 @@
 from typing import Any, Self, Literal
 
 from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import (
@@ -38,7 +37,8 @@ class ClassifierModel:
         - nn: Multi-Layer Perceptron Neural Network
         - nb: Gaussian Naive Bayes
         - lr: Logistic Regression (with balanced class weights)
-        - voting: Ensemble VotingClassifier combining rf, gb, lr, and svm
+        - xgb: XGBoost classifier (excellent for imbalanced data)
+        - voting: Ensemble VotingClassifier combining rf and xgb
 
     Args:
         classifier: Classifier type identifier.
@@ -81,7 +81,7 @@ class ClassifierModel:
 
     def __init__(
         self,
-        classifier: Literal["svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"],
+        classifier: Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"],
         random_state: int | None = None,
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         n_splits: int = 5,
@@ -107,6 +107,7 @@ class ClassifierModel:
             | DecisionTreeClassifier
             | RandomForestClassifier
             | GradientBoostingClassifier
+            | XGBClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -251,6 +252,16 @@ class ClassifierModel:
                 "min_samples_leaf": [1, 2],
             }
 
+        if self.classifier == "xgb" or isinstance(self._model, XGBClassifier):
+            return {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [3, 5, 7],
+                "learning_rate": [0.01, 0.1, 0.2],
+                "subsample": [0.8, 1.0],
+                "colsample_bytree": [0.8, 1.0],
+                "min_child_weight": [1, 3],
+            }
+
         if self.classifier == "nn" or isinstance(self._model, MLPClassifier):
             return {
                 "activation": ["identity", "logistic", "tanh", "relu"],
@@ -272,7 +283,7 @@ class ClassifierModel:
             return {
                 "rf__n_estimators": [100, 200],
                 "rf__max_depth": [10, None],
-                "xgb__n_estimators": [100, 200],
+                "xgb__n_estimators": [50, 100],
                 "xgb__learning_rate": [0.05, 0.1],
                 "xgb__max_depth": [5, 7],
             }
@@ -295,6 +306,7 @@ class ClassifierModel:
         | DecisionTreeClassifier
         | RandomForestClassifier
         | GradientBoostingClassifier
+        | XGBClassifier
         | MLPClassifier
         | GaussianNB
         | LogisticRegression
@@ -348,6 +360,14 @@ class ClassifierModel:
         if self.classifier == "gb":
             return GradientBoostingClassifier(random_state=self.random_state)
 
+        if self.classifier == "xgb":
+            return XGBClassifier(
+                scale_pos_weight=1,
+                eval_metric="logloss",
+                random_state=self.random_state,
+                n_jobs=1,
+            )
+
         if self.classifier == "nn":
             return MLPClassifier(alpha=1, max_iter=1000, random_state=self.random_state)
 
@@ -398,6 +418,7 @@ class ClassifierModel:
             | DecisionTreeClassifier
             | RandomForestClassifier
             | GradientBoostingClassifier
+            | XGBClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -426,6 +447,7 @@ class ClassifierModel:
             | DecisionTreeClassifier
             | RandomForestClassifier
             | GradientBoostingClassifier
+            | XGBClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
