@@ -12,6 +12,7 @@
 - [x] **Make TrainModel classifier dynamic** - Integrated ClassifierModel to support all classifier types (RF, GB, SVM, LR, NN, DT, KNN, NB, Voting) with configurable CV strategies (shuffle, stratified, timeseries). Users can now select classifier and CV strategy during TrainModel initialization.
 - [x] **Fix pyrefly type errors in ModelEvaluator** - Added Protocol types for type safety, explicit type annotations with proper ignore comments, runtime validation checks, and improved type annotations across all methods.
 - [x] **Enhanced Feature Selection** - Created new FeatureSelector class with three methods: (1) tsfresh statistical selection, (2) RandomForest permutation importance, (3) combined two-stage (tsfresh → RandomForest). Provides comprehensive feature selection with both p-values and importance scores. Includes comparison script for empirical evaluation.
+- [x] **Fix docstrings (2026-02-11)** - Fixed spelling errors (`Extacted`, `SKipp`, `WIll`, `laad`, `preditcted`, `defaut`, `shanon`, `paramaters`, `BE CAREFULL`). Improved class-level docstrings for `CalculateTremor`, `ClassifierModel.set_random_state`, `FeatureSelector` methods, `TremorMatrixBuilder`, and `utils.to_series`. Rewrote README.md and updated SUMMARY.md.
 
 ## High Priority
 

@@ -1,16 +1,12 @@
-# Standard library imports
 import os
-from typing import Literal, Self
+from typing import Self, Literal
 
-# Third party imports
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
-from tsfresh.feature_selection import select_features
 
-# Project imports
-from eruption_forecast.logger import logger
 from eruption_forecast.utils import get_significant_features
+from eruption_forecast.logger import logger
 
 
 class FeatureSelector:
@@ -107,7 +103,11 @@ class FeatureSelector:
         self.validate()
 
     def validate(self) -> None:
-        """Validate the selected features selection parameters."""
+        """Validate the feature selector parameters.
+
+        Raises:
+            ValueError: If n_jobs is less than 1.
+        """
         if self.n_jobs < 1:
             raise ValueError(f"n_jobs must be >= 1. Your value is {self.n_jobs}")
         return None
@@ -138,12 +138,14 @@ class FeatureSelector:
         significance with FDR (False Discovery Rate) control.
 
         Args:
-            X (pd.DataFrame): Extacted features DataFrame
-            y (pd.Series): Target labels
-            fdr_level: False discovery rate level (default: 0.05)
+            X (pd.DataFrame): Extracted features DataFrame.
+            y (pd.Series): Target labels.
+            fdr_level (float, optional): False discovery rate level. Defaults to 0.05.
 
         Returns:
-            Tuple of (filtered_features, p_values)
+            tuple[pd.DataFrame, pd.Series]: A tuple of (filtered_features, p_values)
+                where filtered_features contains only statistically significant
+                features and p_values contains the corresponding p-values.
         """
         if self.verbose:
             logger.info(
@@ -176,22 +178,29 @@ class FeatureSelector:
         min_samples_leaf: int = 20,
         n_repeats: int = 10,
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Stage 2: RandomForest permutation importance.
+        """Stage 2: RandomForest permutation importance selection.
 
-        Trains a RandomForest and uses permutation importance to rank features.
-        This captures feature interactions and model-specific importance.
+        Trains a RandomForest classifier and uses permutation importance to rank
+        features. This approach captures feature interactions and provides
+        model-specific importance scores, which are more reliable than Gini impurity.
 
         Args:
-            X (pd.DataFrame): Extacted features DataFrame
-            y (pd.Series): Target labels
-            top_n (int, optional): Number of top features to select. Default to 20
-            n_estimators (int, optional): Number of trees in RandomForest. Default to 200
-            max_depth (int, optional): Maximum tree depth (None for unlimited). Default to 10
-            min_samples_leaf (int, optional): Minimum samples per leaf (regularization). Default to 20
-            n_repeats (int, optional): Number of permutation repeats. Default to 10
+            X (pd.DataFrame): Extracted features DataFrame.
+            y (pd.Series): Target labels.
+            top_n (int, optional): Number of top features to select. Defaults to 20.
+            n_estimators (int, optional): Number of trees in the RandomForest.
+                Defaults to 200.
+            max_depth (int | None, optional): Maximum tree depth. None means unlimited.
+                Defaults to 10.
+            min_samples_leaf (int, optional): Minimum number of samples required at a
+                leaf node (acts as regularization). Defaults to 20.
+            n_repeats (int, optional): Number of permutation repeats for importance
+                estimation. Higher values give more stable results. Defaults to 10.
 
         Returns:
-            Tuple of (selected_features, importance_scores)
+            tuple[pd.DataFrame, pd.Series]: A tuple of (selected_features, importance_scores)
+                where selected_features contains the top-N features and importance_scores
+                contains the mean permutation importance for all features.
         """
         if self.verbose:
             logger.info(f"{self.random_state:05d}: RandomForest features importance...")
@@ -205,13 +214,13 @@ class FeatureSelector:
             n_jobs=self.n_jobs,
         )
 
-        rf.fit(X, y)  # type: ignore
+        rf.fit(X, y)
 
         # Use permutation importance (more reliable than Gini importance)
         perm_importance = permutation_importance(
             rf,
-            X,  # type: ignore
-            y,  # type: ignore
+            X,
+            y,
             n_repeats=n_repeats,
             random_state=self.random_state,
             n_jobs=self.n_jobs,
@@ -222,8 +231,8 @@ class FeatureSelector:
         importance_df = pd.DataFrame(
             {
                 "feature": X.columns,
-                "importance_mean": perm_importance.importances_mean,  # type: ignore[attr-defined]
-                "importance_std": perm_importance.importances_std,  # type: ignore[attr-defined]
+                "importance_mean": perm_importance.importances_mean,
+                "importance_std": perm_importance.importances_std,
             }
         ).sort_values("importance_mean", ascending=False)
 
@@ -260,12 +269,12 @@ class FeatureSelector:
         """Fit the feature selector on training data.
 
         Args:
-            X (pd.DataFrame): Extacted features DataFrame
-            y (pd.Series): Target labels
-            fdr_level: FDR level for tsfresh (default: 0.05)
-            top_n: Number of top features for final selection (default: 30)
-            **rf_kwargs: Additional keyword arguments for RandomForest
-                (n_estimators, max_depth, min_samples_leaf, n_repeats)
+            X (pd.DataFrame): Extracted features DataFrame.
+            y (pd.Series): Target labels.
+            fdr_level (float, optional): FDR level for tsfresh selection. Defaults to 0.05.
+            top_n (int, optional): Number of top features for final selection. Defaults to 20.
+            **rf_kwargs: Additional keyword arguments for RandomForest permutation importance
+                (n_estimators, max_depth, min_samples_leaf, n_repeats).
 
         Returns:
             self: Fitted FeatureSelector instance
@@ -326,8 +335,7 @@ class FeatureSelector:
 
         else:
             raise ValueError(
-                f"Invalid method: {self.method}. "
-                "Must be 'tsfresh', 'random_forest', or 'combined'"
+                f"Invalid method: {self.method}. Must be 'tsfresh', 'random_forest', or 'combined'"
             )
 
         return self
@@ -336,10 +344,10 @@ class FeatureSelector:
         """Transform features by selecting only fitted features.
 
         Args:
-            X (pd.DataFrame): Extacted features DataFrame
+            X (pd.DataFrame): Extracted features DataFrame to transform.
 
         Returns:
-            Transformed DataFrame with selected features only
+            pd.DataFrame: Transformed DataFrame containing only the selected features.
 
         Raises:
             ValueError: If selector hasn't been fitted yet
@@ -376,14 +384,14 @@ class FeatureSelector:
         """Fit the selector and transform X in one step.
 
         Args:
-            X (pd.DataFrame): Extacted features DataFrame
-            y (pd.Series): Target labels
-            fdr_level (float, optional): FDR level for tsfresh (default: 0.05)
-            top_n (int, optional): Number of top features (default: 30)
-            **rf_kwargs: Additional kwargs for RandomForest
+            X (pd.DataFrame): Extracted features DataFrame.
+            y (pd.Series): Target labels.
+            fdr_level (float, optional): FDR level for tsfresh selection. Defaults to 0.05.
+            top_n (int, optional): Number of top features to select. Defaults to 20.
+            **rf_kwargs: Additional keyword arguments for RandomForest permutation importance.
 
         Returns:
-            Transformed DataFrame with selected features
+            pd.DataFrame: Transformed DataFrame containing only the selected features.
 
         Example:
             >>> selector = FeatureSelector(method="combined")

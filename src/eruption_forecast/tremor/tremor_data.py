@@ -1,12 +1,9 @@
-# Standard library imports
 import os
 from datetime import datetime
 from functools import cached_property
 
-# Third party imports
 import pandas as pd
 
-# Project imports
 from eruption_forecast.utils import check_sampling_consistency
 
 
@@ -44,7 +41,7 @@ class TremorData:
             raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
 
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
-        df.sort_index(inplace=True)
+        df = df.sort_index()
         self._df = df
         self.csv = tremor_csv
         return df

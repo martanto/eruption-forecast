@@ -7,16 +7,17 @@ after Phase 2 refactoring.
 # Standard library imports
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 
 # Third party imports
 import pandas as pd
 import pytest
 
+from eruption_forecast.label.label_data import LabelData
+
 # Project imports
 from eruption_forecast.label.label_builder import LabelBuilder
-from eruption_forecast.label.label_data import LabelData
 
 
 class TestLabelBuilder:
@@ -191,7 +192,10 @@ class TestLabelBuilder:
             assert os.path.exists(eruption_dates_file)
 
             # Check filename format
-            assert "label_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.csv" in builder.csv
+            assert (
+                "label_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.csv"
+                in builder.csv
+            )
 
     def test_df_property_raises_before_build(self) -> None:
         """Test that accessing df property before build() raises ValueError."""
@@ -245,13 +249,17 @@ class TestLabelData:
     def test_validation_file_not_found(self) -> None:
         """Test that ValueError is raised when file doesn't exist."""
         with pytest.raises(ValueError, match="Label file not found"):
-            LabelData("/nonexistent/path/label_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.csv")
+            LabelData(
+                "/nonexistent/path/label_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.csv"
+            )
 
     def test_validation_invalid_prefix(self) -> None:
         """Test that ValueError is raised for invalid filename prefix."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create file with invalid name
-            invalid_file = os.path.join(tmpdir, "invalid_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.csv")
+            invalid_file = os.path.join(
+                tmpdir, "invalid_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.csv"
+            )
             Path(invalid_file).touch()
 
             with pytest.raises(ValueError, match="Filename should start with"):
@@ -261,7 +269,9 @@ class TestLabelData:
         """Test that ValueError is raised for invalid file extension."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create file with invalid extension
-            invalid_file = os.path.join(tmpdir, "label_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.txt")
+            invalid_file = os.path.join(
+                tmpdir, "label_2020-01-01_2020-01-15_ws-1_step-12-hours_dtf-2.txt"
+            )
             Path(invalid_file).touch()
 
             with pytest.raises(ValueError, match="Label file extension is invalid"):

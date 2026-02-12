@@ -1,50 +1,76 @@
-# Standard library imports
-import glob
 import os
+import glob
 import shutil
+from typing import Self, Literal
 from datetime import datetime, timedelta
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Literal, Self
 
-# Third party imports
 import numpy as np
 import pandas as pd
-from obspy import Stream, Trace, UTCDateTime
+from obspy import Trace, Stream, UTCDateTime
 
-# Project imports
 import eruption_forecast
-from eruption_forecast.logger import logger
-from eruption_forecast.plot import plot_tremor
 from eruption_forecast.sds import SDS
+from eruption_forecast.plot import plot_tremor
+from eruption_forecast.utils import to_datetime, calculate_window_metrics
+from eruption_forecast.logger import logger
 from eruption_forecast.tremor.rsam import RSAM
-from eruption_forecast.utils import calculate_window_metrics, to_datetime
 
 
 class CalculateTremor:
-    """Calculate Tremor Data from seismic data.
+    """Calculate tremor metrics (RSAM and DSAR) from raw seismic data.
+
+    Processes seismic waveform data from SDS archives or FDSN web services,
+    computing Real-time Seismic Amplitude Measurement (RSAM) and Displacement
+    Seismic Amplitude Ratio (DSAR) across configurable frequency bands at
+    10-minute sampling intervals.
+
+    Supports multiprocessing for parallel daily calculations and produces
+    time-series CSV files suitable for downstream feature extraction and
+    eruption forecasting.
+
+    Default frequency bands: (0.01-0.1), (0.1-2), (2-5), (4.5-8), (8-16) Hz
 
     Args:
-        station (str): Seismic station code.
-        channel (str): Seismic channel code.
-        start_date (str): Start date for data processing (YYYY-MM-DD).
-        end_date (Optional[str]): End date for data processing (YYYY-MM-DD).
-        network (str): Seismic network code. Defaults to "VG".
-        location (str): Seismic location code. Defaults to "00".
-        methods (Optional[str]): Calculation methods to apply.
-        output_dir (str): Directory for output files. Defaults to "output".
-        overwrite (bool): Whether to overwrite existing files. Defaults to False.
-        n_jobs (int): Number of parallel jobs to use. Defaults to 1.
-        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
-        interpolate (bool): If True, interpolates the data. Defaults to True.
-        value_multiplier (Optional[float]): Scaling factor for seismic values.
-        cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
-        plot_tmp (bool): If True, plot temporary results for quick view.
-        save_plot (bool): If True, save tremor results for quick view.
-        overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
-        filename_prefix (Optional[str]): Prefix for generated filenames.
-        verbose (bool): If True, enables verbose logging. Defaults to False.
-        debug (bool): If True, enables debug mode. Defaults to False.
+        start_date (str | datetime): Start date for data processing (YYYY-MM-DD).
+        end_date (str | datetime): End date for data processing (YYYY-MM-DD).
+        station (str): Seismic station code (e.g., "OJN").
+        channel (str): Seismic channel code (e.g., "EHZ").
+        network (str, optional): Seismic network code. Defaults to "VG".
+        location (str, optional): Seismic location code. Defaults to "00".
+        methods (str | None, optional): Calculation methods to apply.
+            Currently unused; reserved for future extension. Defaults to None.
+        output_dir (str, optional): Directory for output files. Defaults to "output".
+        overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
+        n_jobs (int, optional): Number of parallel jobs for daily processing. Defaults to 1.
+        remove_outlier_method (Literal["maximum", "all"], optional): Outlier removal strategy.
+            "maximum" removes only the single maximum outlier; "all" removes all outliers.
+            Defaults to "maximum".
+        interpolate (bool, optional): If True, interpolates gaps in the data. Defaults to True.
+        value_multiplier (float | None, optional): Scaling factor applied to seismic values.
+            Defaults to None (no scaling).
+        cleanup_tmp_dir (bool, optional): If True, deletes the temporary directory after
+            merging daily results. Defaults to False.
+        plot_tmp (bool, optional): If True, plots intermediate daily results for inspection.
+            Defaults to False.
+        save_plot (bool, optional): If True, saves the final tremor plot to disk. Defaults to False.
+        overwrite_plot (bool, optional): If True, overwrites existing plot files. Defaults to False.
+        filename_prefix (str | None, optional): Custom prefix for output filenames.
+            Defaults to None (auto-generated).
+        verbose (bool, optional): If True, enables verbose logging. Defaults to False.
+        debug (bool, optional): If True, enables debug-level logging. Defaults to False.
+
+    Example:
+        >>> tremor = CalculateTremor(
+        ...     start_date="2025-01-01",
+        ...     end_date="2025-01-31",
+        ...     station="OJN",
+        ...     channel="EHZ",
+        ...     n_jobs=4,
+        ... ).from_sds(sds_dir="/data/sds").run()
+        >>> print(tremor.df.head())
+        >>> print(f"Saved to: {tremor.csv}")
     """
 
     def __init__(
@@ -94,7 +120,7 @@ class CalculateTremor:
         self.network = network or "VG"
         self.location = location or "00"
 
-        # TODO: Add shanon entropy, and kurtosis
+        # TODO: Add Shannon entropy and kurtosis
         self.methods: list[str] = (
             [methods] if isinstance(methods, str) else list(methods or ["rsam", "dsar"])
         )
@@ -244,8 +270,7 @@ class CalculateTremor:
                 )
             if freq_min >= freq_max:
                 raise ValueError(
-                    f"Freq minimum must be less than freq maximum. "
-                    f"Got: {freq_min} >= {freq_max}"
+                    f"Freq minimum must be less than freq maximum. Got: {freq_min} >= {freq_max}"
                 )
 
         self.freq_bands = freq_bands
@@ -274,7 +299,7 @@ class CalculateTremor:
 
     @property
     def filename(self) -> str:
-        """Return defaut filename"""
+        """Return the default filename for the tremor CSV output."""
         # Example: tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31
         return (
             f"tremor_{self._filename}"
@@ -427,8 +452,11 @@ class CalculateTremor:
 
         if not self.overwrite and os.path.isfile(csv):
             logger.info(f"Load tremor from file: {csv}")
-            self.df = pd.read_csv(csv, index_col=0, parse_dates=True)
-            return self
+            try:
+                self.df = pd.read_csv(csv, index_col=0, parse_dates=True)
+                return self
+            except ValueError:
+                raise ValueError(f"Could not load tremor from file: {csv}")
 
         self.create_temporary_dir()
 
@@ -682,7 +710,7 @@ class CalculateTremor:
                     dsar_series = dsar_series * self.value_multiplier
 
                 # Store in dataframe
-                df[column_name] = dsar_series.values
+                df[column_name] = dsar_series.to_numpy()
 
                 if self.verbose:
                     logger.debug(
@@ -739,7 +767,7 @@ class CalculateTremor:
                     remove_outlier_method=self.remove_outlier_method,
                     interpolate=True,
                 )
-                .values
+                .to_numpy()
             )
 
             del stream_copy

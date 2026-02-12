@@ -9,16 +9,18 @@ temporary directories — no real seismic data required.
 import os
 import tempfile
 
+import numpy as np
+
 # Third party imports
 import joblib
-import numpy as np
 import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
 # Project imports
-from eruption_forecast.features.constants import ERUPTED_COLUMN, ID_COLUMN
+from eruption_forecast.features.constants import ID_COLUMN, ERUPTED_COLUMN
 from eruption_forecast.model.classifier_model import ClassifierModel
+
 
 # ---------------------------------------------------------------------------
 # Helpers — synthetic data factories
@@ -85,12 +87,10 @@ class TestClassifierModelInit:
     def test_empty_features_raises(self) -> None:
         """ValueError when features CSV has zero rows."""
         with tempfile.TemporaryDirectory() as tmp:
-            pd.DataFrame(columns=["feat_0"]).to_csv(
-                os.path.join(tmp, "features.csv")
+            pd.DataFrame(columns=["feat_0"]).to_csv(os.path.join(tmp, "features.csv"))
+            pd.DataFrame({ID_COLUMN: [0], ERUPTED_COLUMN: [0]}).to_csv(
+                os.path.join(tmp, "labels.csv"), index=False
             )
-            pd.DataFrame(
-                {ID_COLUMN: [0], ERUPTED_COLUMN: [0]}
-            ).to_csv(os.path.join(tmp, "labels.csv"), index=False)
 
             with pytest.raises(ValueError, match="Features cannot be empty"):
                 ClassifierModel(
@@ -102,9 +102,7 @@ class TestClassifierModelInit:
     def test_empty_labels_raises(self) -> None:
         """ValueError when label CSV has zero rows."""
         with tempfile.TemporaryDirectory() as tmp:
-            pd.DataFrame({"feat_0": range(5)}).to_csv(
-                os.path.join(tmp, "features.csv")
-            )
+            pd.DataFrame({"feat_0": range(5)}).to_csv(os.path.join(tmp, "features.csv"))
             pd.DataFrame(columns=[ID_COLUMN, ERUPTED_COLUMN]).to_csv(
                 os.path.join(tmp, "labels.csv"), index=False
             )
@@ -122,9 +120,9 @@ class TestClassifierModelInit:
             pd.DataFrame({"feat_0": range(10)}).to_csv(
                 os.path.join(tmp, "features.csv")
             )
-            pd.DataFrame(
-                {ID_COLUMN: range(5), ERUPTED_COLUMN: [0] * 5}
-            ).to_csv(os.path.join(tmp, "labels.csv"), index=False)
+            pd.DataFrame({ID_COLUMN: range(5), ERUPTED_COLUMN: [0] * 5}).to_csv(
+                os.path.join(tmp, "labels.csv"), index=False
+            )
 
             with pytest.raises(ValueError, match="do not match"):
                 ClassifierModel(

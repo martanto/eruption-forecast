@@ -1,26 +1,24 @@
-# Standard library imports
-from typing import Any, Literal, Self
+from typing import Any, Self, Literal
 
-# Third party imports
-from sklearn.ensemble import (
-    GradientBoostingClassifier,
-    RandomForestClassifier,
-    VotingClassifier,
-)
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import (
-    BaseCrossValidator,
-    StratifiedKFold,
-    StratifiedShuffleSplit,
-    TimeSeriesSplit,
-)
-from sklearn.naive_bayes import GaussianNB
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import (
+    VotingClassifier,
+    RandomForestClassifier,
+    GradientBoostingClassifier,
+)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import (
+    StratifiedKFold,
+    TimeSeriesSplit,
+    StratifiedShuffleSplit,
+)
 
-# Project imports
 from eruption_forecast.logger import logger
 
 
@@ -116,15 +114,25 @@ class ClassifierModel:
             | None
         ) = None
         self._grid: dict[str, Any] | None = None
+        self.cv_name = type(self.get_cv_splitter()).__name__
 
     def set_random_state(self, random_state: int) -> Self:
-        """Change random state value.
+        """Set the random seed for reproducibility.
 
         Args:
-            random_state: Random seed for reproducibility. Applies to classifiers
+            random_state (int): Random seed value (must be >= 0). Applies to all
+                classifiers that support random state (rf, gb, dt, nn, lr, svm).
 
         Returns:
-            self (Self): ClassifierModel
+            Self: The ClassifierModel instance for method chaining.
+
+        Raises:
+            ValueError: If random_state is negative.
+
+        Example:
+            >>> clf = ClassifierModel("rf")
+            >>> clf.set_random_state(42)
+            >>> model, grid = clf.model_and_grid
         """
         if random_state < 0:
             raise ValueError(f"random_state must be >= 0. Your value is {random_state}")
@@ -134,7 +142,7 @@ class ClassifierModel:
     def get_cv_splitter(
         self,
         strategy: Literal["shuffle", "stratified", "timeseries"] | None = None,
-    ) -> BaseCrossValidator:
+    ) -> TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
         """Get the cross-validation splitter based on cv_strategy.
 
         Returns the appropriate cross-validator for the configured strategy:
@@ -147,7 +155,8 @@ class ClassifierModel:
                 - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
 
         Returns:
-            BaseCrossValidator: sklearn cross-validation splitter instance.
+            TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
+                sklearn cross-validation splitter instance.
 
         Example:
             >>> # Use StratifiedKFold (default)
@@ -181,7 +190,7 @@ class ClassifierModel:
             n_splits=self.n_splits,
             test_size=self.test_size,
             random_state=self.random_state,
-        )
+        )  # ty:ignore[invalid-return-type]
 
     @property
     def grid(self) -> dict[str, Any]:
@@ -261,11 +270,11 @@ class ClassifierModel:
             # Grid for VotingClassifier ensemble
             # Parameters are prefixed with estimator name (e.g., rf__, gb__, etc.)
             return {
-                "rf__n_estimators": [50, 100],
-                "rf__max_depth": [5, 7],
-                "gb__n_estimators": [50, 100],
-                "gb__learning_rate": [0.1, 0.2],
-                "lr__C": [0.1, 1, 10],
+                "rf__n_estimators": [100, 200],
+                "rf__max_depth": [10, None],
+                "xgb__n_estimators": [100, 200],
+                "xgb__learning_rate": [0.05, 0.1],
+                "xgb__max_depth": [5, 7],
             }
 
         raise ValueError(f"Unknown classifier: {self.classifier}")
@@ -360,24 +369,18 @@ class ClassifierModel:
                     (
                         "rf",
                         RandomForestClassifier(
-                            class_weight="balanced", random_state=self.random_state
-                        ),
-                    ),
-                    ("gb", GradientBoostingClassifier(random_state=self.random_state)),
-                    (
-                        "lr",
-                        LogisticRegression(
                             class_weight="balanced",
                             random_state=self.random_state,
-                            max_iter=1000,
+                            n_jobs=1,
                         ),
                     ),
                     (
-                        "svm",
-                        SVC(
-                            class_weight="balanced",
+                        "xgb",
+                        XGBClassifier(
+                            scale_pos_weight=12,  # adjust to your actual ratio
                             random_state=self.random_state,
-                            probability=True,
+                            eval_metric="logloss",
+                            n_jobs=1,
                         ),
                     ),
                 ],
@@ -433,7 +436,7 @@ class ClassifierModel:
         """Update model classifier and grid parameters.
 
         Args:
-            model (Union[
+            model ([
                 SVC,
                 KNeighborsClassifier,
                 DecisionTreeClassifier,

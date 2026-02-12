@@ -1,9 +1,9 @@
-# Eruption Forecast Package - Technical Summary
+# Eruption Forecast Package — Technical Summary
 
-**Project:** eruption-forecast - Volcanic Eruption Forecasting using Seismic Data Analysis
+**Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
-**Branch:** `claude/add-timeseries-ensemble`
-**Last Updated:** 2026-02-09
+**Branch:** `dev/predictions`
+**Last Updated:** 2026-02-11
 
 ---
 
@@ -33,6 +33,7 @@
 | **Tremor Calculation** | RSAM (amplitude) and DSAR (ratios) across 5 frequency bands |
 | **Label Generation** | Binary classification labels with configurable forecast horizon |
 | **Feature Engineering** | tsfresh time-series feature extraction (700+ features) |
+| **Enhanced Feature Selection** | Three-method: tsfresh statistical, RandomForest permutation, combined two-stage |
 | **Model Training** | Multi-seed feature selection with class balancing |
 | **Prediction** | GridSearchCV-optimized classifiers for eruption prediction |
 
@@ -49,8 +50,10 @@ eruption_forecast/
 │   ├── label_builder.py
 │   ├── label_data.py
 │   └── constants.py
-├── features/            # Feature extraction
+├── features/            # Feature extraction and selection
 │   ├── features_builder.py
+│   ├── tremor_matrix_builder.py
+│   ├── feature_selector.py
 │   └── constants.py
 ├── model/               # ML models and training
 │   ├── forecast_model.py    # Pipeline orchestrator
@@ -80,17 +83,21 @@ Raw Seismic Data (SDS/FDSN)
          ↓
    Label CSV (binary erupted/not labels per time window)
          ↓
-   [FeaturesBuilder]
+   [TremorMatrixBuilder]
          ↓
-   Feature Matrix (id, datetime, tremor columns)
+   Tremor Matrix (id, datetime, tremor columns aligned to label windows)
          ↓
-   [tsfresh extract_features]
+   [FeaturesBuilder + tsfresh]
          ↓
    Extracted Features (700+ time-series features)
          ↓
+   [FeatureSelector (optional)]
+         ↓
+   Selected Features (tsfresh, RandomForest, or combined)
+         ↓
    [TrainModel]
          ↓
-   Significant Features (top-N per seed across 500 seeds)
+   Significant Features (top-N per seed across N seeds)
          ↓
    [ClassifierModel + GridSearchCV]
          ↓
@@ -99,10 +106,11 @@ Raw Seismic Data (SDS/FDSN)
 
 ### Key Design Patterns
 
-1. **Method Chaining**: Fluent API for pipeline configuration
-2. **Multi-seed Training**: Robust feature selection across 500 random seeds
+1. **Method Chaining**: Fluent API for pipeline configuration (`ForecastModel`)
+2. **Multi-seed Training**: Robust feature selection across many random seeds
 3. **Class Balancing**: RandomUnderSampler for imbalanced eruption data
 4. **Separation of Concerns**: Clear module boundaries
+5. **Data Leakage Prevention**: Strict train/test split before any resampling or feature selection
 
 ---
 
@@ -117,33 +125,10 @@ The original `TrainModel._train()` implementation contained **critical data leak
 3. **No held-out test set** for generalization validation
 4. **Overly optimistic metrics** due to information leakage
 
-### Original (Incorrect) Workflow
-
-```python
-# ❌ WRONG: This was the old implementation
-def _train(self, seed, random_state, ...):
-    # Resample entire dataset (LEAKAGE!)
-    features, labels = random_under_sampler(
-        features=self.df_features,      # ENTIRE dataset
-        labels=self.df_labels,          # ENTIRE dataset
-        sampling_strategy=sampling_strategy,
-        random_state=state,
-    )
-
-    # Feature selection on entire dataset (LEAKAGE!)
-    significant_features = get_significant_features(
-        features=features,
-        labels=labels,
-    )
-
-    # Save features but NO model training!
-    significant_features.head(number_of_significant_features).to_csv(...)
-```
-
 ### Corrected Workflow
 
 ```python
-# ✅ CORRECT: New implementation
+# Correct implementation
 def _train(self, seed, random_state, ...):
     # 1. Split FIRST (80/20, stratified)
     features_train, features_test, labels_train, labels_test = train_test_split(
@@ -153,7 +138,7 @@ def _train(self, seed, random_state, ...):
 
     # 2. Resample ONLY training data
     features_train_resampled, labels_train_resampled = random_under_sampler(
-        features=features_train,  # ONLY training data
+        features=features_train,
         labels=labels_train,
         sampling_strategy=sampling_strategy,
         random_state=state,
@@ -161,7 +146,7 @@ def _train(self, seed, random_state, ...):
 
     # 3. Feature selection ONLY on training data
     significant_features = get_significant_features(
-        features=features_train_resampled,  # ONLY training data
+        features=features_train_resampled,
         labels=labels_train_resampled,
     )
 
@@ -170,14 +155,8 @@ def _train(self, seed, random_state, ...):
     features_train_selected = features_train_resampled[top_features]
     features_test_selected = features_test[top_features]
 
-    # 5. Cross-validation with StratifiedShuffleSplit
-    cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=state)
-    grid_search = GridSearchCV(
-        estimator=RandomForestClassifier(random_state=state),
-        param_grid=param_grid,
-        cv=cv,
-        scoring="balanced_accuracy",
-    )
+    # 5. Cross-validation + GridSearchCV
+    grid_search = GridSearchCV(...)
     grid_search.fit(features_train_selected, labels_train_resampled)
 
     # 6. Evaluate on held-out test set
@@ -186,64 +165,20 @@ def _train(self, seed, random_state, ...):
         'accuracy': accuracy_score(labels_test, y_pred),
         'balanced_accuracy': balanced_accuracy_score(labels_test, y_pred),
         'f1_score': f1_score(labels_test, y_pred),
-        'precision': precision_score(labels_test, y_pred),
-        'recall': recall_score(labels_test, y_pred),
-        'best_params': grid_search.best_params_,
-        'best_cv_score': grid_search.best_score_,
+        ...
     }
-
-    # 7. Save model, metrics, and features
-    joblib.dump(grid_search.best_estimator_, model_filepath)
-    with open(metrics_filepath, 'w') as f:
-        json.dump(metrics, f, indent=2)
 ```
 
 ### Key Changes
 
 | Aspect | Before | After |
 |--------|--------|-------|
-| Train/Test Split | ❌ None | ✅ 80/20 stratified split FIRST |
-| Resampling | ❌ Applied to entire dataset | ✅ Applied only to training set |
-| Feature Selection | ❌ Saw entire dataset | ✅ Only sees training data |
-| Model Training | ❌ Not implemented | ✅ RandomForest + GridSearchCV |
-| Evaluation | ❌ No test set | ✅ Held-out test set evaluation |
+| Train/Test Split | No | 80/20 stratified split first |
+| Resampling | Applied to entire dataset | Applied only to training set |
+| Feature Selection | Saw entire dataset | Only sees training data |
+| Model Training | Not implemented | Classifier + GridSearchCV |
+| Evaluation | No test set | Held-out test set evaluation |
 | Outputs | Features only | Features + trained models + metrics |
-
-### New Output Structure
-
-```
-output/trainings/
-├── significant_features/    # Top-N features per seed (existing)
-│   ├── 00000.csv
-│   └── ...
-├── models/                  # NEW: Trained RandomForest models
-│   ├── 00000.pkl
-│   └── ...
-├── metrics/                 # NEW: Per-seed evaluation metrics
-│   ├── 00000.json
-│   └── ...
-├── significant_features.csv           # Aggregated features
-├── all_metrics.csv                    # NEW: All seed metrics
-└── metrics_summary.csv                # NEW: Mean/std statistics
-```
-
-### Impact on Results
-
-The corrected implementation now provides:
-
-1. **Realistic performance estimates** through proper train/test isolation
-2. **Unbiased feature selection** that doesn't see test data
-3. **Trained models** ready for deployment
-4. **Comprehensive metrics** across multiple seeds for robustness
-5. **True generalization performance** on held-out data
-
-### Testing
-
-Created integration test (`tests/test_train_model_fixed.py`) that verifies:
-- Train + test samples < total (confirming undersampling)
-- All outputs created (models, metrics, features)
-- Metrics computed correctly
-- Models can be loaded and used for prediction
 
 ---
 
@@ -251,41 +186,40 @@ Created integration test (`tests/test_train_model_fixed.py`) that verifies:
 
 ### Current Workflow
 
-The current workflow follows a well-structured approach for binary classification:
+The workflow follows a well-structured approach for binary classification:
 
-1. **Feature Extraction**: Uses tsfresh's ComprehensiveFCParameters (700+ features per tremor column)
+1. **Feature Extraction**: tsfresh's ComprehensiveFCParameters (700+ features per tremor column)
 2. **Feature Selection**: Multi-seed approach with under-sampling for stability
-3. **Model Training**: GridSearchCV with StratifiedShuffleSplit cross-validation
+3. **Model Training**: GridSearchCV with configurable cross-validation strategy
 4. **Class Handling**: Balanced class weights + RandomUnderSampler
 
 ### Strengths
 
 | Aspect | Implementation | Benefit |
 |--------|----------------|---------|
-| Feature Robustness | 500-seed feature selection | Reduces overfitting to single split |
+| Feature Robustness | Multi-seed feature selection | Reduces overfitting to single split |
 | Class Imbalance | Under-sampling + balanced weights | Handles rare eruption events |
-| Hyperparameter Tuning | GridSearchCV with stratified CV | Optimal parameter selection |
+| Hyperparameter Tuning | GridSearchCV with CV | Optimal parameter selection |
 | Multi-model Support | 9 classifiers available | Flexibility for different data characteristics |
+| Feature Selection | Three-method FeatureSelector | Statistical rigor + interaction capture |
 
 ### Current Limitations & Recommendations
 
 | Limitation | Status | Recommendation |
 |------------|--------|----------------|
-| ~~No ensemble methods~~ | ✅ RESOLVED | VotingClassifier now available (`"voting"`) |
-| ~~Fixed feature selection~~ | ✅ RESOLVED | Enhanced FeatureSelector with three methods: tsfresh, RandomForest, combined two-stage |
-| ~~No temporal validation~~ | ✅ RESOLVED | TimeSeriesSplit now available (`cv_strategy="timeseries"`) |
-| No probability calibration | Pending | Add CalibratedClassifierCV for better probability estimates |
-| ~~No model persistence~~ | ✅ RESOLVED | ModelEvaluator.export_model() with joblib |
-| ~~No evaluation metrics~~ | ✅ RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
-| ~~Data leakage in TrainModel~~ | ✅ RESOLVED | Fixed workflow: split → resample → select features → train → evaluate |
+| ~~No ensemble methods~~ | RESOLVED | VotingClassifier available (`"voting"`) |
+| ~~Fixed feature selection~~ | RESOLVED | FeatureSelector with tsfresh, RandomForest, combined |
+| ~~No temporal validation~~ | RESOLVED | TimeSeriesSplit available (`cv_strategy="timeseries"`) |
+| ~~Data leakage in TrainModel~~ | RESOLVED | Fixed: split → resample → select features → train → evaluate |
+| ~~No model persistence~~ | RESOLVED | `ModelEvaluator.export_model()` with joblib |
+| ~~No evaluation metrics~~ | RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
+| No probability calibration | Pending | Add CalibratedClassifierCV |
 
 ---
 
 ## Model Comparison & Recommendations
 
 ### Available Classifiers
-
-The package supports 9 classifiers through `ClassifierModel`:
 
 | ID | Classifier | Best For | Pros | Cons |
 |----|------------|----------|------|------|
@@ -297,109 +231,15 @@ The package supports 9 classifiers through `ClassifierModel`:
 | `dt` | Decision Tree | Interpretability | Easy to visualize, fast | Prone to overfitting |
 | `knn` | K-Nearest Neighbors | Small datasets | Simple, no training | Slow prediction, needs scaling |
 | `nb` | Gaussian Naive Bayes | Quick baseline | Very fast, works with small data | Strong independence assumption |
-| `voting` | VotingClassifier Ensemble | **Best accuracy** | Combines multiple models, robust predictions | Slower training, more complex |
-
-### Recommended Model Selection Strategy
-
-For volcanic eruption prediction with imbalanced time-series data:
-
-#### 1. **Primary Choice: Random Forest (`rf`)**
-- Handles class imbalance well with `class_weight="balanced"`
-- Provides feature importance for scientific interpretation
-- Robust to outliers common in seismic data
-- No feature scaling required
-
-```python
-clf = ClassifierModel("rf")
-model, grid = clf.model_and_grid
-```
-
-#### 2. **Alternative: Gradient Boosting (`gb`)**
-Now available in the package:
-- Better handling of imbalanced data
-- Often outperforms RF on tabular data
-- Built-in feature importance
-
-```python
-clf = ClassifierModel("gb")
-model, grid = clf.model_and_grid
-```
-
-#### 3. **For Interpretability: Logistic Regression (`lr`)**
-- Provides probability scores
-- Coefficients show feature importance direction
-- Good baseline for comparison
-
-```python
-clf = ClassifierModel("lr")
-```
-
-#### 4. **For Complex Patterns: Neural Network (`nn`)**
-- Can learn complex temporal patterns
-- Use when linear models underperform
-- Requires more data and tuning
-
-```python
-clf = ClassifierModel("nn")
-```
-
-#### 5. **For Best Accuracy: VotingClassifier Ensemble (`voting`)**
-Now available in the package:
-- Combines RF, GB, LR, and SVM into a soft-voting ensemble
-- Leverages strengths of multiple models
-- More robust predictions through model diversity
-
-```python
-clf = ClassifierModel("voting", random_state=42)
-model, grid = clf.model_and_grid
-```
+| `voting` | VotingClassifier Ensemble | **Best accuracy** | Combines multiple models, robust | Slower training, more complex |
 
 ### Cross-Validation Strategies
 
-The package now supports two cross-validation strategies:
-
-#### StratifiedKFold (Default)
-- Preserves class distribution in each fold
-- Best for general classification tasks
-- Shuffles data for randomization
-
-```python
-clf = ClassifierModel("rf", cv_strategy="stratified", n_splits=5)
-cv = clf.get_cv_splitter()
-```
-
-#### TimeSeriesSplit (Temporal Data)
-- Ensures training data always precedes test data
-- Prevents data leakage in time-series forecasting
-- **Recommended for eruption prediction**
-
-```python
-clf = ClassifierModel("rf", cv_strategy="timeseries", n_splits=5)
-cv = clf.get_cv_splitter()
-
-# Use with GridSearchCV
-from sklearn.model_selection import GridSearchCV
-grid_search = GridSearchCV(clf.model, clf.grid, cv=cv, scoring="balanced_accuracy")
-```
-
-### Model Selection Workflow
-
-```python
-from sklearn.model_selection import cross_val_score
-
-# Compare multiple models
-models = ["rf", "lr", "svm", "nn"]
-results = {}
-
-for model_name in models:
-    clf = ClassifierModel(model_name)
-    model = clf.model
-    scores = cross_val_score(model, X, y, cv=5, scoring="balanced_accuracy")
-    results[model_name] = scores.mean()
-
-# Select best performer
-best_model = max(results, key=results.get)
-```
+| Strategy | Class | Best For |
+|----------|-------|----------|
+| `shuffle` | StratifiedShuffleSplit | General classification |
+| `stratified` | StratifiedKFold | Preserves class distribution |
+| `timeseries` | TimeSeriesSplit | **Temporal data — prevents leakage** |
 
 ---
 
@@ -409,495 +249,140 @@ best_model = max(results, key=results.get)
 
 **Grid Size:** 54 combinations (3 × 3 × 2 × 3)
 
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `n_estimators` | [10, 30, 100] | Increase to [50, 100, 200] for better performance |
-| `max_depth` | [3, 5, 7] | Add [10, None] for complex patterns |
-| `criterion` | ["gini", "entropy"] | Both viable; gini often faster |
-| `max_features` | ["sqrt", "log2", None] | "sqrt" usually optimal |
-
-**Recommended Grid Expansion:**
-```python
-{
-    "n_estimators": [50, 100, 200, 300],
-    "max_depth": [5, 7, 10, 15, None],
-    "criterion": ["gini", "entropy"],
-    "max_features": ["sqrt", "log2"],
-    "min_samples_split": [2, 5, 10],
-    "min_samples_leaf": [1, 2, 4],
-}
-```
+| Parameter | Values |
+|-----------|--------|
+| `n_estimators` | [10, 30, 100] |
+| `max_depth` | [3, 5, 7] |
+| `criterion` | ["gini", "entropy"] |
+| `max_features` | ["sqrt", "log2", None] |
 
 ### 2. Gradient Boosting (`gb`)
 
 **Grid Size:** 216 combinations (3 × 3 × 3 × 2 × 2 × 2)
 
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `n_estimators` | [50, 100, 200] | Good range for most datasets |
-| `max_depth` | [3, 5, 7] | Shallow trees prevent overfitting |
-| `learning_rate` | [0.01, 0.1, 0.2] | Lower rates need more estimators |
-| `subsample` | [0.8, 1.0] | 0.8 adds stochasticity, reduces overfit |
-| `min_samples_split` | [2, 5] | Higher values prevent overfitting |
-| `min_samples_leaf` | [1, 2] | Higher values create more generalized trees |
-
-**Usage:**
-```python
-clf = ClassifierModel("gb")
-model, grid = clf.model_and_grid
-```
+| Parameter | Values |
+|-----------|--------|
+| `n_estimators` | [50, 100, 200] |
+| `max_depth` | [3, 5, 7] |
+| `learning_rate` | [0.01, 0.1, 0.2] |
+| `subsample` | [0.8, 1.0] |
+| `min_samples_split` | [2, 5] |
+| `min_samples_leaf` | [1, 2] |
 
 ### 3. Support Vector Machine (`svm`)
 
 **Grid Size:** 120 combinations (5 × 3 × 4 × 2)
 
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `C` | [0.001, 0.01, 0.1, 1, 10] | Good range; add 100 for hard margins |
-| `kernel` | ["poly", "rbf", "sigmoid"] | Add "linear" for high-dimensional data |
-| `degree` | [2, 3, 4, 5] | Only affects poly kernel |
-| `decision_function_shape` | ["ovo", "ovr"] | "ovr" faster for binary |
-
-**Note:** SVM requires feature scaling (StandardScaler). Add to pipeline:
-```python
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-
-pipeline = Pipeline([
-    ("scaler", StandardScaler()),
-    ("svm", SVC(class_weight="balanced"))
-])
-```
+> **Note:** SVM requires feature scaling (StandardScaler). Add to pipeline before use.
 
 ### 4. Logistic Regression (`lr`)
 
 **Grid Size:** 15 combinations (3 × 5)
 
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `penalty` | ["l2", "l1", "elasticnet"] | l1 for feature selection, l2 for stability |
-| `C` | [0.001, 0.01, 0.1, 1, 10] | Good range |
-
-**Recommended Grid Expansion:**
-```python
-{
-    "penalty": ["l1", "l2", "elasticnet"],
-    "C": [0.001, 0.01, 0.1, 1, 10, 100],
-    "solver": ["saga"],  # Required for l1/elasticnet
-    "l1_ratio": [0.25, 0.5, 0.75],  # Only for elasticnet
-    "max_iter": [1000],
-}
-```
+| Parameter | Values |
+|-----------|--------|
+| `penalty` | ["l2", "l1", "elasticnet"] |
+| `C` | [0.001, 0.01, 0.1, 1, 10] |
 
 ### 5. Neural Network / MLP (`nn`)
 
 **Grid Size:** 8 combinations (4 × 2)
 
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `activation` | ["identity", "logistic", "tanh", "relu"] | relu usually best |
-| `hidden_layer_sizes` | [10, 100] | Too limited; expand significantly |
+| Parameter | Values |
+|-----------|--------|
+| `activation` | ["identity", "logistic", "tanh", "relu"] |
+| `hidden_layer_sizes` | [10, 100] |
 
-**Recommended Grid Expansion:**
-```python
-{
-    "hidden_layer_sizes": [(50,), (100,), (100, 50), (100, 100), (200, 100)],
-    "activation": ["relu", "tanh"],
-    "alpha": [0.0001, 0.001, 0.01],
-    "learning_rate": ["constant", "adaptive"],
-    "max_iter": [500, 1000],
-    "early_stopping": [True],
-    "validation_fraction": [0.1],
-}
-```
-
-### 6. Decision Tree (`dt`)
-
-**Grid Size:** 18 combinations (3 × 2 × 3)
-
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `max_depth` | [3, 5, 7] | Shallow to prevent overfitting |
-| `criterion` | ["gini", "entropy"] | Both viable |
-| `max_features` | ["sqrt", "log2", None] | "sqrt" for high-dimensional |
-
-**Recommended Grid Expansion:**
-```python
-{
-    "max_depth": [3, 5, 7, 10],
-    "criterion": ["gini", "entropy"],
-    "max_features": ["sqrt", "log2"],
-    "min_samples_split": [2, 5, 10, 20],
-    "min_samples_leaf": [1, 2, 5, 10],
-}
-```
-
-### 7. K-Nearest Neighbors (`knn`)
-
-**Grid Size:** 24 combinations (4 × 2 × 3)
-
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `n_neighbors` | [3, 6, 12, 24] | Odd numbers preferred |
-| `weights` | ["uniform", "distance"] | distance often better |
-| `p` | [1, 2, 3] | 2 (Euclidean) most common |
-
-**Note:** KNN requires feature scaling and is slow on large datasets.
-
-### 8. Gaussian Naive Bayes (`nb`)
-
-**Grid Size:** 1 combination
-
-| Parameter | Values | Recommendation |
-|-----------|--------|----------------|
-| `var_smoothing` | [1.0] | Expand to [1e-9, 1e-8, 1e-7, 1e-6] |
-
----
-
-## Code Quality Summary
-
-### Recent Improvements (2026-02-09)
-
-| Category | Changes |
-|----------|---------|
-| **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature", "calulation" → "calculation", "filenmae" → "filename" |
-| **Docstrings** | Added comprehensive examples to ForecastModel, ClassifierModel, TrainModel, FeaturesBuilder |
-| **Docstrings (2026-02-09)** | Enhanced docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, TrainModel with detailed descriptions, complete Args/Returns/Raises sections, and examples for all public methods |
-| **Type Annotations** | Fixed `dict[str, any]` → `dict[str, Any]` |
-| **Deprecated Parameters** | Removed `max_features="auto"` (deprecated in sklearn 1.4) |
-| **Documentation** | Enhanced method descriptions with usage examples |
-| **New Classifier** | Added GradientBoostingClassifier (`"gb"`) with 216-combination hyperparameter grid |
-| **Random State** | Added configurable `random_state` parameter to ClassifierModel for reproducibility |
-| **TimeSeriesSplit** | Added `cv_strategy` parameter and `get_cv_splitter()` method for temporal cross-validation |
-| **VotingClassifier** | Added `"voting"` ensemble classifier combining RF, GB, LR, and SVM with soft voting |
-| **ModelEvaluator** | New class for comprehensive model evaluation with metrics, export, and plotting capabilities |
-| **Data Leakage Fix** | Completely rewrote `TrainModel._train()` to eliminate data leakage: (1) train/test split first, (2) resample only training data, (3) feature selection only on training data, (4) RandomForest training with GridSearchCV + StratifiedShuffleSplit, (5) proper test set evaluation. Now saves trained models, per-seed metrics, and aggregated statistics. |
-| **Dynamic Classifier** | TrainModel now supports all classifier types through ClassifierModel integration: RF, GB, SVM, LR, NN, DT, KNN, NB, Voting. Users can select classifier type and CV strategy (shuffle, stratified, timeseries) during initialization. |
-| **Type Safety Fix (2026-02-09)** | Fixed bad-argument-type errors in ModelEvaluator: (1) Added Protocol types (SupportsPredict, SupportsPredictProba, SupportsDecisionFunction) for type safety, (2) Added explicit type annotations for all model method calls with `type: ignore[attr-defined]` where needed, (3) Added runtime validation with hasattr() checks, (4) Improved type annotations for cross_validate(), export_model(), plot_learning_curve(), and get_feature_importances() methods. All pyrefly errors resolved. |
-
-### Code Quality Metrics
-
-| Metric | Status |
-|--------|--------|
-| Type Checking (pyrefly) | 0 errors (2 suppressed) |
-| Import Sorting (isort) | Applied |
-| Test Coverage | 81 tests passing |
-| Docstring Coverage | All public methods documented |
+> **Note:** `hidden_layer_sizes` grid is too limited. Expanding to multi-layer architectures is recommended (see TODO.md).
 
 ---
 
 ## Enhanced Feature Selection (2026-02-09)
 
-### New FeatureSelector Class
+### FeatureSelector Class
 
-Added a comprehensive `FeatureSelector` class implementing three feature selection strategies:
+Three selection strategies available in `eruption_forecast.features.FeatureSelector`:
 
-#### 1. **tsfresh Statistical Selection** (`method="tsfresh"`)
-- Uses hypothesis testing with FDR (False Discovery Rate) control
+#### 1. tsfresh Statistical Selection (`method="tsfresh"`)
+- Hypothesis testing with FDR (False Discovery Rate) control
 - Fast filtering based on univariate statistical tests
-- Model-agnostic approach
 - Provides p-values for interpretability
-- **Best for:** Initial dimensionality reduction (1000s → 100s features)
+- Best for initial dimensionality reduction (1000s → 100s features)
 
-```python
-from eruption_forecast.features import FeatureSelector
-
-selector = FeatureSelector(method="tsfresh", n_jobs=4, verbose=True)
-X_selected = selector.fit_transform(X_train, y_train, fdr_level=0.05)
-print(f"Selected {X_selected.shape[1]} features with p < 0.05")
-```
-
-#### 2. **RandomForest Permutation Importance** (`method="random_forest"`)
-- Uses permutation importance (more reliable than Gini)
+#### 2. RandomForest Permutation Importance (`method="random_forest"`)
+- Uses permutation importance (more reliable than Gini impurity)
 - Captures feature interactions and non-linear relationships
-- Model-specific optimization
 - Provides importance scores with standard deviations
-- **Best for:** Feature refinement with interaction capture
+- Best for feature refinement after pre-filtering
 
-```python
-selector = FeatureSelector(method="random_forest", n_jobs=4, verbose=True)
-X_selected = selector.fit_transform(
-    X_train, y_train,
-    top_n=30,
-    n_estimators=200,
-    max_depth=10,
-    min_samples_leaf=20,
-    n_repeats=10
-)
-```
-
-#### 3. **Combined Two-Stage** (`method="combined"`) **[RECOMMENDED]**
+#### 3. Combined Two-Stage (`method="combined"`) — Recommended
 - **Stage 1:** tsfresh statistical filtering (statistical rigor)
 - **Stage 2:** RandomForest permutation importance (interaction capture)
-- Combines speed, statistical grounding, and model optimization
-- Lower overfitting risk through statistical pre-filtering
-- Provides both p-values AND importance scores
-- **Best for:** Production-ready feature selection
+- Balances speed, statistical grounding, and model optimization
+- Provides both p-values and importance scores
 
-```python
-selector = FeatureSelector(method="combined", n_jobs=4, verbose=True)
-X_selected = selector.fit_transform(
-    X_train, y_train,
-    fdr_level=0.05,      # Stage 1: tsfresh FDR level
-    top_n=30,            # Stage 2: final feature count
-    n_estimators=200,    # Stage 2: RandomForest params
-    max_depth=10,
-    n_repeats=10
-)
+### Feature Selection Comparison
 
-# Get comprehensive feature scores
-feature_scores = selector.get_feature_scores()
-print(feature_scores.head(10))
-```
+| Method | Dimensionality Reduction | Captures Interactions | Overfitting Risk | Speed |
+|--------|--------------------------|----------------------|------------------|-------|
+| `tsfresh` | 1000s → 100s | No | Low | Fast |
+| `random_forest` | Direct → N | Yes | Medium | Slow |
+| `combined` | 1000s → N | Yes | Low | Fast |
 
-### Comparison Results
+---
 
-Empirical comparison shows the combined method balances:
-- ✅ **Speed:** Faster than pure RF (tsfresh pre-filtering)
-- ✅ **Statistical rigor:** P-values for scientific interpretation
-- ✅ **Model optimization:** Captures feature interactions
-- ✅ **Lower overfitting:** Statistical pre-filtering reduces noise
-- ✅ **Interpretability:** Both p-values and importance scores
+## Code Quality Summary
 
-### Feature Selection Workflow Comparison
+### Changes History
 
-| Method | Dimensionality Reduction | Captures Interactions | Overfitting Risk | Interpretability | Speed |
-|--------|--------------------------|----------------------|------------------|------------------|-------|
-| **tsfresh** | 1000s → 100s | ❌ No | ✅ Low | ✅ High (p-values) | ✅ Fast |
-| **RandomForest** | Direct → N | ✅ Yes | ⚠️ Medium | ⚠️ Medium (relative scores) | ⚠️ Slow |
-| **Combined** | 1000s → 100s → N | ✅ Yes | ✅ Low | ✅ High (both metrics) | ✅ Fast |
+| Date | Category | Changes |
+|------|----------|---------|
+| 2026-02-11 | **Docstrings** | Fixed spelling errors: `Extacted` → `Extracted`, `SKipp` → `Skip`, `WIll` → `Will`, `laad` → `load`, `preditcted` → `predicted`, `defaut` → `default`, `shanon` → `Shannon`, `paramaters` → `parameters`, `BE CAREFULL` → `WARNING`. Improved `CalculateTremor` class docstring with full Args/Returns/Example. Enhanced `set_random_state` in ClassifierModel with Raises section. Clarified `to_series` docstring. Fixed `volcano_id` description in LabelBuilder. |
+| 2026-02-09 | **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature", "calulation" → "calculation", "filenmae" → "filename" |
+| 2026-02-09 | **Feature Selection** | Added `FeatureSelector` class with tsfresh, RandomForest, and combined methods |
+| 2026-02-09 | **Data Leakage Fix** | Rewrote `TrainModel._train()`: split → resample → select features → train → evaluate |
+| 2026-02-09 | **Dynamic Classifier** | TrainModel supports all 9 classifier types and 3 CV strategies |
+| 2026-02-09 | **ModelEvaluator** | New class for evaluation, plotting, and export |
+| 2026-02-09 | **Type Safety** | Fixed pyrefly errors in ModelEvaluator with Protocol types |
+| 2026-02-09 | **Docstrings** | Enhanced docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, TrainModel |
+| Pre-2026-02-09 | **New Classifier** | Added GradientBoostingClassifier (`"gb"`) |
+| Pre-2026-02-09 | **TimeSeriesSplit** | Added `cv_strategy` parameter and `get_cv_splitter()` method |
+| Pre-2026-02-09 | **VotingClassifier** | Added `"voting"` ensemble combining RF, GB, LR, SVM |
 
-### Testing Script
+### Code Quality Metrics
 
-A comprehensive comparison script is available: `test_feature_selection_comparison.py`
-
-```bash
-python test_feature_selection_comparison.py
-```
-
-This script:
-- Compares all three methods on the same dataset
-- Trains RandomForest classifiers on each feature set
-- Evaluates performance (accuracy, balanced accuracy, F1-score)
-- Analyzes feature overlap between methods
-- Provides detailed classification reports
-- Saves results for comparison
-
-### Integration with Existing Workflow
-
-The `FeatureSelector` can be used standalone or integrated into the `ForecastModel` pipeline:
-
-```python
-from eruption_forecast.features import FeatureSelector
-import pandas as pd
-
-# Load extracted features
-X = pd.read_csv("output/features/all_features.csv", index_col=0)
-y = pd.read_csv("output/features/label_features.csv")["is_erupted"]
-
-# Two-stage feature selection
-selector = FeatureSelector(method="combined", n_jobs=4, verbose=True)
-X_selected = selector.fit_transform(X, y, fdr_level=0.05, top_n=30)
-
-# Now use with any classifier
-from sklearn.ensemble import RandomForestClassifier
-rf = RandomForestClassifier(n_estimators=200, random_state=42)
-rf.fit(X_selected, y)
-```
-
-### Key Advantages Over Previous Approach
-
-| Aspect | Previous | Enhanced |
-|--------|----------|----------|
-| **Methods** | tsfresh only | tsfresh + RandomForest + combined |
-| **Interaction capture** | ❌ No | ✅ Yes (RF stage) |
-| **Interpretability** | p-values only | p-values + importance scores |
-| **Flexibility** | Fixed approach | Three configurable methods |
-| **Overfitting control** | Statistical only | Statistical + regularization |
-| **Comparison** | Not available | Built-in comparison script |
+| Metric | Status |
+|--------|--------|
+| Type Checking (pyrefly) | 0 errors |
+| Import Sorting (isort) | Applied |
+| Test Coverage | 81+ tests passing |
+| Docstring Coverage | All public methods documented |
 
 ---
 
 ## Future Recommendations
 
-### Short-term Improvements
+### Short-term
 
-1. **~~Add Gradient Boosting Models~~** ✓ COMPLETED
-   - Added `GradientBoostingClassifier` as `"gb"` classifier
-   - Includes optimized hyperparameter grid (216 combinations)
+1. **Expand Neural Network grid** — `hidden_layer_sizes` is too limited; expand to multi-layer architectures
+2. **Probability calibration** — Add `CalibratedClassifierCV` for reliable probability estimates
+3. **Feature scaling pipeline** — Add `StandardScaler` for SVM/KNN/NN in sklearn `Pipeline`
 
-2. **~~Implement TimeSeriesSplit~~** ✓ COMPLETED
-   - Added `cv_strategy` parameter to ClassifierModel ("stratified" or "timeseries")
-   - Added `get_cv_splitter()` method returning appropriate CV splitter
-   - Prevents data leakage in temporal eruption forecasting
-   ```python
-   clf = ClassifierModel("rf", cv_strategy="timeseries", n_splits=5)
-   cv = clf.get_cv_splitter()  # Returns TimeSeriesSplit
-   ```
+### Medium-term
 
-3. **~~Add Ensemble Voting~~** ✓ COMPLETED
-   - Added `"voting"` classifier type to ClassifierModel
-   - Combines RF, GB, LR, and SVM with soft voting
-   - Includes hyperparameter grid for ensemble tuning
-   ```python
-   clf = ClassifierModel("voting", random_state=42)
-   model, grid = clf.model_and_grid
-   ```
+1. **Grid expansion** — Expand RF and Decision Tree grids with more depth/estimator options
+2. **Naive Bayes grid** — Expand `var_smoothing` to `[1e-9, 1e-8, 1e-7, 1e-6]`
+3. **Integration tests** — End-to-end workflow tests
 
-4. **~~Add Model Evaluation & Export~~** ✓ COMPLETED
-   - Added `ModelEvaluator` class with comprehensive evaluation capabilities
-   - Metrics: accuracy, precision, recall, F1, ROC-AUC, PR-AUC, balanced accuracy
-   - Export: model (joblib), metrics (CSV/JSON), reports, confusion matrix
-   - Plots: ROC curve, PR curve, confusion matrix, feature importance, learning curve
-   ```python
-   from eruption_forecast.model.model_evaluator import ModelEvaluator
-   evaluator = ModelEvaluator(model, X_test, y_test, X_train, y_train)
-   metrics = evaluator.get_metrics()
-   evaluator.plot_all()
-   evaluator.export_all()
-   ```
+### Long-term
 
-### Medium-term Improvements
-
-1. **Probability Calibration**: Use CalibratedClassifierCV for reliable probability estimates
-2. **Feature Pipeline**: Add StandardScaler for SVM/KNN/NN in pipeline
-
-### Long-term Improvements
-
-1. **Deep Learning**: Implement LSTM/Transformer for sequential patterns
-2. **AutoML Integration**: Consider TPOT or auto-sklearn for automated model selection
-3. **Real-time Inference**: Streaming prediction pipeline
-4. **Explainability**: SHAP values for model interpretation
+1. **Deep Learning** — LSTM/Transformer for sequential temporal patterns
+2. **SHAP values** — Model explainability for scientific interpretation
+3. **Real-time inference** — Streaming prediction pipeline
+4. **AutoML** — TPOT or auto-sklearn for automated model selection
 
 ---
 
-## Quick Reference
-
-### Complete Pipeline Example
-
-```python
-from eruption_forecast.model.forecast_model import ForecastModel
-from eruption_forecast.model.classifier_model import ClassifierModel
-
-# 1. Setup and calculate tremor
-model = ForecastModel(
-    station="OJN",
-    channel="EHZ",
-    start_date="2024-01-01",
-    end_date="2024-06-30",
-    window_size=1,
-    volcano_id="LEWOTOBI",
-    n_jobs=4,
-)
-
-# 2. Process seismic data
-model.calculate(source="sds", sds_dir="data/sds")
-
-# 3. Build labels
-model.build_label(
-    window_step=12,
-    window_step_unit="hours",
-    day_to_forecast=2,
-    eruption_dates=["2024-03-15", "2024-05-20"],
-)
-
-# 4. Extract features
-model.build_features()
-model.extract_features()
-
-# 5. Train models
-model.train(
-    random_state=0,
-    total_seed=100,
-    number_of_significant_features=20,
-)
-
-# 6. Use classifier for prediction
-clf = ClassifierModel("rf")
-model, grid = clf.model_and_grid
-```
-
-### Classifier Quick Reference
-
-```python
-# Random Forest (recommended)
-clf = ClassifierModel("rf")
-
-# Gradient Boosting (imbalanced data)
-clf = ClassifierModel("gb")
-
-# VotingClassifier Ensemble (best accuracy)
-clf = ClassifierModel("voting", random_state=42)
-
-# With reproducible random state
-clf = ClassifierModel("rf", random_state=42)
-
-# With TimeSeriesSplit for temporal data (prevents data leakage)
-clf = ClassifierModel("rf", cv_strategy="timeseries", n_splits=5)
-cv = clf.get_cv_splitter()
-
-# Logistic Regression (interpretable)
-clf = ClassifierModel("lr")
-
-# SVM (high-dimensional)
-clf = ClassifierModel("svm")
-
-# Neural Network (complex patterns)
-clf = ClassifierModel("nn")
-
-# Custom grid
-clf.grid = {"n_estimators": [100, 200], "max_depth": [5, 10]}
-```
-
-### Model Evaluation Quick Reference
-
-```python
-from eruption_forecast.model.model_evaluator import ModelEvaluator
-
-# Initialize evaluator with fitted model
-evaluator = ModelEvaluator(
-    model=fitted_model,
-    X_test=X_test,
-    y_test=y_test,
-    X_train=X_train,  # Optional, for learning curves
-    y_train=y_train,  # Optional, for learning curves
-    model_name="rf_eruption",
-    output_dir="output/evaluation"
-)
-
-# Get comprehensive metrics
-metrics = evaluator.get_metrics()
-print(f"ROC-AUC: {metrics['roc_auc']:.3f}")
-print(f"Balanced Accuracy: {metrics['balanced_accuracy']:.3f}")
-
-# Print summary
-print(evaluator.summary())
-
-# Generate all plots
-evaluator.plot_all(feature_names=feature_names, top_n_features=20)
-
-# Individual plots
-evaluator.plot_roc_curve()
-evaluator.plot_precision_recall_curve()
-evaluator.plot_confusion_matrix(normalize="true")
-evaluator.plot_feature_importances(top_n=15)
-evaluator.plot_learning_curve()
-evaluator.plot_metrics_summary()
-
-# Export all results
-paths = evaluator.export_all()
-# Returns: model.joblib, metrics.csv, metrics.json, report.txt, etc.
-
-# Export individually
-evaluator.export_model()  # Save with joblib
-evaluator.export_metrics(format="csv")
-evaluator.export_classification_report()
-evaluator.export_confusion_matrix()
-evaluator.export_feature_importances()
-```
-
----
-
-**Document Version:** 2.2
-**Last Updated:** 2026-02-09
+**Document Version:** 2.3
+**Last Updated:** 2026-02-11
 **Author:** Claude Code (Sonnet 4.5)

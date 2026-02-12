@@ -1,27 +1,30 @@
 [build-system]
-requires = ["uv_build>=0.9.29,<0.10.0"]
+requires = ["uv_build"]
 build-backend = "uv_build"
 
 [project]
 name = "eruption-forecast"
 version = "0.1.0"
-description = "Forecast eruption modelling"
+authors = [
+    {name = "Martanto", email = "martanto@live.com"},
+]
+description = "Eruptipn forecast modelling"
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["eruption", "forecast", "volcano", "volcanology", "seismic"]
 requires-python = ">=3.11"
 dependencies = [
-    "loguru",
-    "notebook>=7.5.3",
     "obspy>=1.4.2",
-    "pandas>=3.0.0",
-    "numpy>=2.3.5",
-    "pip>=26.0",
     "tsfresh",
-    "uv-build>=0.9.0",
+    "numba>=0.63.1",
+    "loguru",
+    "pandas>=3.0.0",
+    "pip>=26.0",
     "imbalanced-learn>=0.14.1",
     "scikit-learn>=1.4",
     "seaborn>=0.13.2",
+    "xgboost>=3.2.0",
+    "lightgbm>=4.6.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -34,83 +37,17 @@ classifiers = [
 
 [dependency-groups]
 dev = [
-    "black>=25.12.0",
-    "ruff>=0.15.0",
-    "isort>=5.12.0",
-    "pandas-stubs>=2.3.3.260113",
-    "ipykernel>=7.1.0",
-    "pyrefly>=0.51.0",
-    "scipy-stubs>=1.17.0.2",
+    "uv-build",
+    "ruff",
+    "ty",
+    "ipykernel",
+    "notebook",
 ]
-
-[tool.pydocstyle]
-convention = "google"
-add-ignore = ["D100", "D104"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-dir]
-eruption_forecast = "src/eruption_forecast"
 
 [tool.uv]
-cache-dir = "./.uv_cache"
+cache-dir = "./.cache/uv"
+build-constraint-dependencies = ["setuptools==80.8.0"]
 
-[tool.black]
-line-length = 88
-target-version = ['py311','py312']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | \.claude
-  | \.uv_cache
-  | examples
-  | output
-  | _build
-  | build
-  | dist
-  | venv
-  | \.env
-  | \.flake8
-)/
-'''
-
-[tool.ruff]
-target-version = "py311"
-line-length = 88
-lint.select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-]
-lint.ignore = [
-    "E402",
-    "E501",  # line too long, handled by black
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
-    "B904",
-]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-
-[tool.isort]
-profile = "black"
-src_paths = ["src"]
-import_heading_stdlib = "Standard library imports"
-import_heading_thirdparty = "Third party imports"
-import_heading_firstparty = "Project imports"
-known_first_party = []
-
-[tool.pyrefly]
-python-version = "3.11.0"
-ignore-missing-imports = ["obspy.*"]
-
-[tool.pyrefly.errors]
-bad-assignment = false
+[project.urls]
+Homepage = "https://github.com/martanto/eruption-forecast"
+Issues = "https://github.com/martanto/eruption-forecast/issues"

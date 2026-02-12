@@ -94,7 +94,9 @@ def test_combined_selection(synthetic_data):
     """Test combined two-stage feature selection."""
     X, y = synthetic_data
 
-    selector = FeatureSelector(method="combined", n_jobs=2, random_state=42, verbose=False)
+    selector = FeatureSelector(
+        method="combined", n_jobs=2, random_state=42, verbose=False
+    )
     X_selected = selector.fit_transform(
         X,
         y,
@@ -118,9 +120,9 @@ def test_combined_selection(synthetic_data):
     # Check stage tracking
     assert selector.n_features_stage1_ > 0, "Stage 1 should reduce features"
     assert selector.n_features_stage2_ > 0, "Stage 2 should select features"
-    assert (
-        selector.n_features_stage1_ >= selector.n_features_stage2_
-    ), "Stage 1 should produce more/equal features than stage 2"
+    assert selector.n_features_stage1_ >= selector.n_features_stage2_, (
+        "Stage 1 should produce more/equal features than stage 2"
+    )
 
 
 def test_fit_transform_separate(synthetic_data):

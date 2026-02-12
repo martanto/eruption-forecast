@@ -1,13 +1,10 @@
-# Standard library imports
 import os
-from datetime import datetime
-from pathlib import Path
 from typing import Any
+from pathlib import Path
+from datetime import datetime
 
-# Third party imports
-from obspy import ObsPyReadingError, Stream, Trace, read
+from obspy import Trace, Stream, ObsPyReadingError, read
 
-# Project imports
 from eruption_forecast.logger import logger
 
 

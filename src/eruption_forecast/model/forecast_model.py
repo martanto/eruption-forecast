@@ -1,36 +1,34 @@
-# Standard library imports
 import os
+from typing import Any, Self, Literal
 from datetime import datetime, timedelta
-from typing import Any, Literal, Self
 
-# Third party imports
 import pandas as pd
-from tsfresh import extract_features as tsfresh_extract_features
 from tsfresh import (
+    extract_features as tsfresh_extract_features,
     extract_relevant_features,
 )
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import impute
 
-# Project imports
-from eruption_forecast.features.constants import (
-    DATETIME_COLUMN,
-    ID_COLUMN,
-)
-from eruption_forecast.features.features_builder import FeaturesBuilder
-from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
-from eruption_forecast.label.label_builder import LabelBuilder
-from eruption_forecast.logger import logger
-from eruption_forecast.model.train_model import TrainModel
-from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.utils import (
-    construct_windows,
-    normalize_dates,
     to_datetime,
+    normalize_dates,
     validate_columns,
+    construct_windows,
     validate_date_ranges,
 )
+from eruption_forecast.logger import logger
+from eruption_forecast.model.train_model import TrainModel
+from eruption_forecast.features.constants import (
+    ID_COLUMN,
+    DATETIME_COLUMN,
+)
+from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.tremor.calculate_tremor import CalculateTremor
+from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 class ForecastModel:
@@ -156,6 +154,7 @@ class ForecastModel:
         self.label_csv: str | None = None
         self.total_eruption_class: int | None = None
         self.total_non_eruption_class: int | None = None
+        self.class_ratio: float | None = None
 
         # =========================
         # Will be set after extract_features() called
@@ -181,6 +180,8 @@ class ForecastModel:
         self.TrainModel: TrainModel | None = None
         self.trained_model_df: pd.DataFrame = pd.DataFrame()
         self.trained_model_csv: str | None = None
+        self.ClassifierModel: ClassifierModel | None = None
+        self.classifier_name: str | None = None
 
         # =========================
         # Will be set after predict() called
@@ -517,7 +518,7 @@ class ForecastModel:
         if tremor_columns is not None:
             df_tremor = df_tremor[tremor_columns]
 
-        df_tremor.sort_index(ascending=True, inplace=True)
+        df_tremor = df_tremor.sort_index(ascending=True)
 
         return df_tremor
 
@@ -573,13 +574,15 @@ class ForecastModel:
         self.total_non_eruption_class = (
             len(label_builder.df) - self.total_eruption_class
         )
-        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
+        self.class_ratio: float = (
+            self.total_eruption_class / self.total_non_eruption_class
+        )
 
         if self.verbose:
             logger.info(
                 f"Total number of eruptions: {self.total_eruption_class}. "
                 f"Total number of non-eruptions: {self.total_non_eruption_class}. "
-                f"Class ratio (eruption vs non-eruptions): {class_ratio}"
+                f"Class ratio (eruption vs non-eruptions): {self.class_ratio}"
             )
 
     def validate(self) -> None:
@@ -766,8 +769,9 @@ class ForecastModel:
             select_tremor_columns (list[str]): List of tremor columns to extract.
             save_tremor_matrix_per_method (bool, optional): Save separate CSV per tremor
                 column. Defaults to True.
-            save_tremor_matrix_per_id (bool, optional): BE CAREFULL, IT WILL GENERATE A LOT OF FILES.
-                Save individual windowed tremor CSVs for debugging. Defaults to False.
+            save_tremor_matrix_per_id (bool, optional): **WARNING: This will generate a
+                large number of files** (one per label window). Use only for debugging.
+                Defaults to False.
             exclude_features (Optional[list[str]]): List features calculator to be excluded.
             use_relevant_features (bool): If True, extract features using relevant features.
             output_dir (Optional[str], optional): Output directory. Defaults to None.
@@ -985,7 +989,10 @@ class ForecastModel:
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
-        output_dir = output_dir or os.path.join(self.station_dir, "trainings")
+        output_dir = output_dir or os.path.join(
+            self.station_dir,
+            "trainings",
+        )
         os.makedirs(output_dir, exist_ok=True)
 
         train_model = TrainModel(
@@ -1012,6 +1019,8 @@ class ForecastModel:
         self.TrainModel = train_model
         self.trained_model_df = train_model.df
         self.trained_model_csv = train_model.csv
+        self.ClassifierModel = train_model.ClassifierModel
+        self.classifier_name = train_model.ClassifierModel.name
 
         return self
 
@@ -1065,7 +1074,7 @@ class ForecastModel:
             window_step_unit=window_step_unit,
         )
 
-        logger.debug(f"Total preditcted windows generated: {len(df_predict_window)}")
+        logger.debug(f"Total predicted windows generated: {len(df_predict_window)}")
 
         df_predict_window.to_csv(predict_window_csv, index=True)
 

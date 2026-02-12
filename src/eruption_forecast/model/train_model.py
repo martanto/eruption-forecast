@@ -1,26 +1,23 @@
-# Standard library imports
-import json
 import os
-from multiprocessing import Pool
+import json
 from typing import Any, Literal
+from multiprocessing import Pool
 
-# Third party imports
 import joblib
 import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
-# Project imports
-from eruption_forecast.features.constants import (
-    DATETIME_COLUMN,
-    ERUPTED_COLUMN,
-    ID_COLUMN,
-    SIGNIFICANT_FEATURES_FILENAME,
-)
-from eruption_forecast.features.feature_selector import FeatureSelector
-from eruption_forecast.logger import logger
-from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.plot import plot_significant_features as plot_significant
 from eruption_forecast.utils import get_metrics, random_under_sampler
+from eruption_forecast.logger import logger
+from eruption_forecast.features.constants import (
+    ID_COLUMN,
+    ERUPTED_COLUMN,
+    DATETIME_COLUMN,
+    SIGNIFICANT_FEATURES_FILENAME,
+)
+from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.features.feature_selector import FeatureSelector
 
 
 class TrainModel:
@@ -130,12 +127,13 @@ class TrainModel:
         # Set DEFAULT parameter
         # =========================
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
+
         df_labels = pd.read_csv(label_features_csv)
         if ID_COLUMN in df_labels.columns:
             df_labels = df_labels.set_index(ID_COLUMN)
-
         if DATETIME_COLUMN in df_labels.columns:
             df_labels = df_labels.drop(DATETIME_COLUMN, axis=1)
+        df_labels = df_labels[ERUPTED_COLUMN]
 
         classifier_model: ClassifierModel = ClassifierModel(
             classifier=classifier,
@@ -143,18 +141,34 @@ class TrainModel:
             n_splits=cv_splits,
         )
         classifier_name = classifier_model.name
+        classifier_cv_name = classifier_model.cv_name
 
-        df_labels = df_labels[ERUPTED_COLUMN]
+        # Output training dir: ``<cwd>/output/trainings``
         output_dir = output_dir or os.path.join(os.getcwd(), "output", "trainings")
 
-        significant_features_dir = os.path.join(output_dir, "significant_features")
-        all_features_dir = os.path.join(output_dir, "all_features")
+        # Filtered features dir: ``<output_dir>/features``
+        features_dir = os.path.join(output_dir, "features")
 
-        figures_dir = os.path.join(output_dir, "figures")
+        # All features dir: ``<features_dir>/all_features``
+        all_features_dir = os.path.join(features_dir, "all_features")
+
+        # Significant features dir: ``<features_dir>/significant_features``
+        significant_features_dir = os.path.join(features_dir, "significant_features")
+
+        # Plot significant features dir: ``<features_dir>/figures/significant``
+        figures_dir = os.path.join(features_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
 
-        models_dir = os.path.join(output_dir, "models", classifier_name)
-        metrics_dir = os.path.join(output_dir, "metrics", classifier_name)
+        # Classifier training dir: ``<features_dir>/<classifier_name>/<classifier_cv_name>``
+        classifier_dir = os.path.join(
+            output_dir, "classifier", classifier_name, classifier_cv_name
+        )
+
+        # Classifier training model dir: ``<classifier_dir>/models``
+        models_dir = os.path.join(classifier_dir, "models")
+
+        # Classifier metrics dir: ``<classifier_dir>/metrics``
+        metrics_dir = os.path.join(classifier_dir, "metrics")
 
         # =========================
         # Set DEFAULT properties
@@ -181,15 +195,17 @@ class TrainModel:
         )
         self.ClassifierModel = classifier_model
         self.classifier_name = classifier_name
+        self.features_dir = features_dir
         self.significant_features_dir = significant_features_dir
         self.all_features_dir = all_features_dir
         self.figures_dir = figures_dir
         self.significant_figures_dir = significant_figures_dir
+        self.classifier_dir = classifier_dir
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir
 
         # =========================
-        # WIll be set after train() method called
+        # Will be set after train() method called
         # =========================
         self.significant_features_csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
@@ -199,7 +215,7 @@ class TrainModel:
         self.csv: str | None = None
 
         # =========================
-        # WIll be updated after _generate_filepath() method called
+        # Will be updated after _generate_filepath() method called
         # =========================
         self.can_skip: bool = False
 
@@ -278,8 +294,7 @@ class TrainModel:
         classifier.grid = grid_params
         if self.verbose:
             logger.info(
-                f"Your current grid parameters {current_grid} has been updated to"
-                f"{grid_params}."
+                f"Your current grid parameters {current_grid} has been updated to{grid_params}."
             )
 
         return classifier
@@ -349,7 +364,7 @@ class TrainModel:
             if self.prefix_filename
             else SIGNIFICANT_FEATURES_FILENAME
         )
-        df.to_csv(os.path.join(self.output_dir, f"{filename}.csv"), index=False)
+        df.to_csv(os.path.join(self.features_dir, f"{filename}.csv"), index=False)
 
         # Save number_of_significant_features
         if (
@@ -369,14 +384,14 @@ class TrainModel:
             )
             df.index.name = "features"
             df.to_csv(
-                os.path.join(self.output_dir, f"{filename}.csv"),
+                os.path.join(self.features_dir, f"{filename}.csv"),
                 index=True,
             )
 
             if plot:
                 plot_significant(
                     df=df.reset_index(),
-                    filepath=os.path.join(self.output_dir, filename),
+                    filepath=os.path.join(self.features_dir, filename),
                     overwrite=True,
                     dpi=72,
                 )
@@ -581,7 +596,7 @@ class TrainModel:
             self.df_labels,
             test_size=0.2,
             random_state=random_state,
-            stratify=self.df_labels,  # type: ignore
+            stratify=self.df_labels,
         )
 
         # ========== STEP 2: Resample ONLY Training Data ==========
@@ -631,7 +646,7 @@ class TrainModel:
         ]
         features_test_selected = features_test[top_n_features]
 
-        grid_search.fit(features_train_resampled_selected, labels_train_resampled)  # type: ignore
+        grid_search.fit(features_train_resampled_selected, labels_train_resampled)
         best_model = grid_search.best_estimator_
 
         # ========== STEP 5: Evaluate on Test Set ==========
@@ -701,9 +716,9 @@ class TrainModel:
         if plot_significant_features:
             os.makedirs(self.significant_figures_dir, exist_ok=True)
 
-        # Set job paramaters
-        random_states = [random_state + seed for seed in range(total_seed)]
-        jobs = [
+        # Set job parameters
+        random_states: list[int] = [random_state + seed for seed in range(total_seed)]
+        jobs: list[tuple[int, str | float, bool, bool]] = [
             (
                 _random_state,
                 sampling_strategy,
@@ -776,15 +791,15 @@ class TrainModel:
             f"_top-{self.number_of_significant_features}"
         )
         df_models = pd.DataFrame(significant_features_and_trained_models)
-        df_models.set_index("random_state", inplace=True)
+        df_models = df_models.set_index("random_state")
 
         if df_models.empty:
             raise ValueError("No significant features or trained models found.")
 
-        models_filename = f"model_{suffix_filename}.csv"
-        csv = os.path.join(self.models_dir, models_filename)
+        models_filename = f"trained_model_{suffix_filename}.csv"
+        csv = os.path.join(self.classifier_dir, models_filename)
 
-        # Save features and model
+        # Save features and model to self.classifier_dir
         df_models.to_csv(csv, index=True)
 
         # Aggregate and save metrics
@@ -820,13 +835,13 @@ class TrainModel:
         # Calculate summary statistics
         summary = df_metrics.describe().T
         summary_filepath = os.path.join(
-            self.metrics_dir, f"metrics_summary_{suffix_filename}.csv"
+            self.classifier_dir, f"metrics_summary_{suffix_filename}.csv"
         )
         summary.to_csv(summary_filepath)
 
         # Save all individual metrics
         all_metrics_filepath = os.path.join(
-            self.metrics_dir, f"all_metrics_{suffix_filename}.csv"
+            self.classifier_dir, f"all_metrics_{suffix_filename}.csv"
         )
         df_metrics.to_csv(
             all_metrics_filepath,

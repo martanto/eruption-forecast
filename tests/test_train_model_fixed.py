@@ -10,8 +10,8 @@ Tests that the corrected workflow:
 """
 
 # Standard library imports
-import json
 import os
+import json
 import shutil
 
 # Third party imports
@@ -54,17 +54,17 @@ def test_full_training_pipeline():
     # ========== Verify outputs ==========
 
     # Check aggregated feature files
-    assert os.path.exists(
-        os.path.join(output_dir, "significant_features.csv")
-    ), "Aggregated features CSV not found"
+    assert os.path.exists(os.path.join(output_dir, "significant_features.csv")), (
+        "Aggregated features CSV not found"
+    )
 
     # Check aggregated metrics files
-    assert os.path.exists(
-        os.path.join(output_dir, "all_metrics.csv")
-    ), "All metrics CSV not found"
-    assert os.path.exists(
-        os.path.join(output_dir, "metrics_summary.csv")
-    ), "Metrics summary CSV not found"
+    assert os.path.exists(os.path.join(output_dir, "all_metrics.csv")), (
+        "All metrics CSV not found"
+    )
+    assert os.path.exists(os.path.join(output_dir, "metrics_summary.csv")), (
+        "Metrics summary CSV not found"
+    )
 
     # Verify models and metrics for each seed
     for seed in range(3):
@@ -77,16 +77,14 @@ def test_full_training_pipeline():
 
         assert os.path.exists(model_file), f"Model file for seed {seed} not found"
         assert os.path.exists(metrics_file), f"Metrics file for seed {seed} not found"
-        assert os.path.exists(
-            features_file
-        ), f"Features file for seed {seed} not found"
+        assert os.path.exists(features_file), f"Features file for seed {seed} not found"
 
         # Verify model can be loaded
         model = joblib.load(model_file)
         assert hasattr(model, "predict"), "Loaded model doesn't have predict method"
 
         # Verify metrics have expected keys
-        with open(metrics_file, "r") as f:
+        with open(metrics_file) as f:
             metrics = json.load(f)
 
         expected_keys = [
@@ -108,9 +106,9 @@ def test_full_training_pipeline():
 
         # Verify train + test < total (because of undersampling)
         total = trainer.df_features.shape[0]
-        assert (
-            metrics["n_train"] + metrics["n_test"] < total
-        ), "Train + test should be less than total due to undersampling"
+        assert metrics["n_train"] + metrics["n_test"] < total, (
+            "Train + test should be less than total due to undersampling"
+        )
 
         print(f"\nSeed {seed} metrics:")
         print(f"  Train samples: {metrics['n_train']}")

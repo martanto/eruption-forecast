@@ -1,33 +1,30 @@
-# Standard library imports
 import os
-from typing import Any, Literal, Protocol, Union
+from typing import Any, Literal, Protocol
 
-# Third party imports
-import joblib
-import matplotlib.pyplot as plt
 import numpy as np
+import joblib
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
+from sklearn.metrics import (
+    f1_score,
+    roc_curve,
+    recall_score,
+    roc_auc_score,
+    accuracy_score,
+    precision_score,
+    confusion_matrix,
+    classification_report,
+    precision_recall_curve,
+    average_precision_score,
+    balanced_accuracy_score,
+)
 from sklearn.ensemble import (
     VotingClassifier,
 )
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    balanced_accuracy_score,
-    classification_report,
-    confusion_matrix,
-    f1_score,
-    precision_recall_curve,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-    roc_curve,
-)
-from sklearn.model_selection import GridSearchCV, cross_val_score, learning_curve
+from sklearn.model_selection import GridSearchCV, learning_curve, cross_val_score
 
-# Project imports
 from eruption_forecast.logger import logger
 
 
@@ -113,7 +110,7 @@ class ModelEvaluator:
             raise TypeError(
                 f"Model {type(self._fitted_model).__name__} does not support predict method"
             )
-        self._y_pred: np.ndarray = self._fitted_model.predict(X_test)  # type: ignore[attr-defined]
+        self._y_pred: np.ndarray = self._fitted_model.predict(X_test)  # ty:ignore[call-non-callable]
         self._y_proba = self._get_probabilities()
 
         # Cache for metrics
@@ -137,11 +134,11 @@ class ModelEvaluator:
     def _get_probabilities(self) -> np.ndarray | None:
         """Extract prediction probabilities if available."""
         if hasattr(self._fitted_model, "predict_proba"):
-            proba: np.ndarray = self._fitted_model.predict_proba(self.X_test)  # type: ignore[attr-defined]
+            proba: np.ndarray = self._fitted_model.predict_proba(self.X_test)
             # Return probability for positive class (class 1)
             return proba[:, 1] if proba.ndim > 1 else proba
         elif hasattr(self._fitted_model, "decision_function"):
-            decision: np.ndarray = self._fitted_model.decision_function(self.X_test)  # type: ignore[attr-defined]
+            decision: np.ndarray = self._fitted_model.decision_function(self.X_test)
             return decision
         return None
 
@@ -181,7 +178,7 @@ class ModelEvaluator:
         metrics: dict[str, Any] = {
             "model_name": self.model_name,
             "accuracy": accuracy_score(y_true, y_pred),
-            "balanced_accuracy": balanced_accuracy_score(ly_true, y_pred),
+            "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
             "precision": precision_score(y_true, y_pred, zero_division=0),
             "recall": recall_score(y_true, y_pred, zero_division=0),
             "f1_score": f1_score(y_true, y_pred, zero_division=0),
@@ -297,7 +294,7 @@ class ModelEvaluator:
             )
             return None
 
-        importances: np.ndarray = model.feature_importances_  # type: ignore[attr-defined]
+        importances: np.ndarray = model.feature_importances_
 
         # Determine feature names
         if feature_names is None:
@@ -343,7 +340,7 @@ class ModelEvaluator:
             raise ValueError("X_train and y_train required for cross-validation")
 
         scores: np.ndarray = cross_val_score(
-            self._fitted_model,  # type: ignore[arg-type]
+            self._fitted_model,
             self.X_train,
             self.y_train,
             cv=cv,
@@ -377,7 +374,7 @@ class ModelEvaluator:
         filename = filename or f"{self.model_name}.joblib"
         filepath = os.path.join(self.output_dir, filename)
 
-        joblib.dump(self._fitted_model, filepath, compress=compress)  # type: ignore[arg-type]
+        joblib.dump(self._fitted_model, filepath, compress=compress)
         logger.info(f"Model exported to: {filepath}")
 
         return filepath
@@ -835,7 +832,7 @@ class ModelEvaluator:
         )
 
         result = learning_curve(
-            self._fitted_model,  # type: ignore[arg-type]
+            self._fitted_model,
             self.X_train,
             self.y_train,
             train_sizes=train_sizes,

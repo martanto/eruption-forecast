@@ -16,8 +16,9 @@ Date: 2026-02-03
 # Standard library imports
 import os
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
+from datetime import datetime, timedelta
+
 
 # Add src to path for imports
 project_root = Path(__file__).parent.parent
@@ -302,7 +303,7 @@ def test_tremor_calculation():
         if os.path.exists(result.csv):
             file_size = os.path.getsize(result.csv)
             print(f"[OK] Output CSV exists: {result.csv}")
-            print(f"   File size: {file_size:,} bytes ({file_size/1024:.2f} KB)")
+            print(f"   File size: {file_size:,} bytes ({file_size / 1024:.2f} KB)")
         else:
             print(f"[FAIL] Output CSV not found: {result.csv}")
             return False
@@ -314,7 +315,7 @@ def test_tremor_calculation():
             figures_dir = result.figures_dir
             print(f"Figures Directory: {figures_dir}")
             if os.path.exists(figures_dir):
-                figures = [f for f in os.listdir(figures_dir) if f.endswith('.png')]
+                figures = [f for f in os.listdir(figures_dir) if f.endswith(".png")]
                 print(f"  Plot files ({len(figures)}):")
                 for f in figures:
                     print(f"    - {f}")
@@ -330,7 +331,7 @@ def test_tremor_calculation():
             figures_dir=figures_dir,
             start_date=start_date,
             end_date=end_date,
-            station=tremor_calc.nslc
+            station=tremor_calc.nslc,
         )
 
         print(f"[OK] Created {daily_plots_created} daily tremor plots")
@@ -375,6 +376,7 @@ def test_tremor_calculation():
 
         # Standard library imports
         import traceback
+
         print("Traceback:")
         traceback.print_exc()
 

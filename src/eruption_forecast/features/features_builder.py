@@ -1,25 +1,24 @@
-# Standard library imports
 import os
 from typing import Any
 
-# Third party imports
 import pandas as pd
-from tsfresh import extract_features as tsfresh_extract_features
 from tsfresh import (
+    extract_features as tsfresh_extract_features,
     extract_relevant_features,
 )
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import impute
 
-# Project imports
-from eruption_forecast.features.constants import (
-    DATETIME_COLUMN,
-    ERUPTED_COLUMN,
-    ID_COLUMN,
+from eruption_forecast.utils import (
+    concat_features as utils_concat_features,
+    validate_columns,
 )
 from eruption_forecast.logger import logger
-from eruption_forecast.utils import concat_features as utils_concat_features
-from eruption_forecast.utils import validate_columns
+from eruption_forecast.features.constants import (
+    ID_COLUMN,
+    ERUPTED_COLUMN,
+    DATETIME_COLUMN,
+)
 
 
 class FeaturesBuilder:
@@ -478,7 +477,7 @@ class FeaturesBuilder:
         )
         label_df.to_csv(label_csv, index=True)
 
-        # Set variable that will be use for TrainingLabel
+        # Set variables that will be used for model training
         self.label_features_csv = label_csv
         self.unique_ids = unique_ids
 
