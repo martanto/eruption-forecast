@@ -37,7 +37,11 @@ class ClassifierModel:
         - nn: Multi-Layer Perceptron Neural Network
         - nb: Gaussian Naive Bayes
         - lr: Logistic Regression (with balanced class weights)
-        - xgb: XGBoost classifier (excellent for imbalanced data)
+        - xgb: XGBoost classifier (excellent for imbalanced data). Uses
+            ``scale_pos_weight=1`` by default because ``TrainModel`` already
+            applies ``RandomUnderSampler`` before training, so the data fed to
+            the classifier is balanced. If you bypass under-sampling, set
+            ``scale_pos_weight = count(negative) / count(positive)``.
         - voting: Ensemble VotingClassifier combining rf and xgb
 
     Args:
