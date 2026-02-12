@@ -1,4 +1,5 @@
-import os
+from __future__ import annotations
+
 import json
 from typing import TYPE_CHECKING, Any, Literal
 from datetime import datetime, timedelta
@@ -15,13 +16,10 @@ from sklearn.metrics import (
     confusion_matrix,
     balanced_accuracy_score,
 )
-from imblearn.pipeline import Pipeline
 from tsfresh.transformers import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import (
     GridSearchCV,
-    StratifiedShuffleSplit,
-    train_test_split,
 )
 
 from eruption_forecast.logger import logger
@@ -29,106 +27,6 @@ from eruption_forecast.logger import logger
 
 if TYPE_CHECKING:
     from eruption_forecast.model.classifier_model import ClassifierModel
-
-
-def create_model_predictions(
-    features: pd.DataFrame,
-    labels: pd.Series,
-    classifier: "ClassifierModel",
-    model_dir: str,
-    sampling_strategy: str | float = 0.75,
-    scoring: str = "balanced_accuracy",
-    random_state: int = 42,
-    cv: Any = None,
-    overwrite: bool = False,
-    verbose: bool = False,
-) -> None:
-    """Create model predictions based on specific classifier.
-
-    Args:
-        features (pd.DataFrame): Extracted features DataFrame.
-        labels (pd.Series): Labels DataFrame.
-        classifier (ClassifierModel): Classifier model.
-        model_dir (str): Output directory for model predictions.
-        sampling_strategy (str, float, optional): Sampling strategy for feature selection. Defaults to 75.
-        random_state (int, optional): Random state for feature selection. Defaults to 42.
-        scoring (str, optional): Cross validation scoring strategy. Defaults to "balanced_accuracy".
-        cv (Any, optional): Cross-validation strategy. Defaults to StratifiedShuffleSplit.
-        overwrite (bool, optional): Whether to overwrite existing predictions. Defaults to False.
-        verbose (bool, optional): Verbosity strategy. Defaults to False.
-
-    Returns:
-        None
-    """
-    classifier_model, param_grid = classifier.model_and_grid
-
-    classifier_name = type(classifier_model).__name__
-    classifier_dir = os.path.join(model_dir, classifier_name)
-    filename = f"{classifier_name}_{random_state:05d}.pkl"
-    filepath = os.path.join(classifier_dir, filename)
-
-    if not overwrite and os.path.isfile(filepath):
-        if verbose:
-            logger.debug(f"Model prediction exists at: {filepath}")
-        return None
-
-    features, _ = get_significant_features(features=features, labels=labels)
-    features_train, features_test, labels_train, labels_test = train_test_split(
-        features,
-        labels,
-        test_size=0.2,
-        random_state=random_state,
-        stratify=labels,
-    )
-
-    if cv is None:
-        cv = StratifiedShuffleSplit(
-            n_splits=5, test_size=0.2, random_state=random_state
-        )
-
-    pipeline = Pipeline(
-        [
-            (
-                "undersampler",
-                RandomUnderSampler(
-                    sampling_strategy=sampling_strategy, random_state=random_state
-                ),
-            ),
-            ("classifier", classifier_model),
-        ]
-    )
-
-    grid_search = GridSearchCV(
-        estimator=pipeline,
-        param_grid=param_grid,
-        cv=cv,
-        scoring=scoring,
-        n_jobs=-1,
-        error_score=np.nan,
-        verbose=verbose,
-    )
-
-    grid_search.fit(features_train, labels_train)
-    best_model = grid_search.best_estimator_
-
-    # TODO: Saved prediction result
-    labels_pred = best_model.predict(features_test)
-    labels_pred_proba = grid_search.predict_proba(features_test)
-
-    results = {
-        "model": classifier_model,
-        "predictions": labels_pred,
-        "probabilities": labels_pred_proba,
-        "best_params": grid_search.best_params_,
-        # "feature_names": feature_names,  # if relevant
-    }
-
-    if verbose:
-        logger.debug(f"Best parameters {random_state:05d}: {grid_search.best_params_}")
-        logger.debug(f"Best score {random_state:05d}: {grid_search.best_score_:.4f}")
-
-    # TODO: Save model
-    return None
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -889,7 +787,7 @@ def normalize_dates(
 
 
 def get_metrics(
-    classifier: "ClassifierModel",
+    classifier: ClassifierModel,
     labels_test,
     labels_pred,
     labels_train: pd.Series,
