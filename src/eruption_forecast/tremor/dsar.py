@@ -1,12 +1,9 @@
-# Standard library imports
 from typing import Literal
 
-# Third party imports
 import numpy as np
 import pandas as pd
-from obspy import Stream, Trace
+from obspy import Trace, Stream
 
-# Project imports
 from eruption_forecast.utils import calculate_window_metrics
 
 

@@ -1,16 +1,12 @@
-# Standard library imports
 import os
-from typing import Literal, Self
+from typing import Self, Literal
 
-# Third party imports
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
-from tsfresh.feature_selection import select_features
 
-# Project imports
-from eruption_forecast.logger import logger
 from eruption_forecast.utils import get_significant_features
+from eruption_forecast.logger import logger
 
 
 class FeatureSelector:
@@ -218,13 +214,13 @@ class FeatureSelector:
             n_jobs=self.n_jobs,
         )
 
-        rf.fit(X, y)  # type: ignore
+        rf.fit(X, y)
 
         # Use permutation importance (more reliable than Gini importance)
         perm_importance = permutation_importance(
             rf,
-            X,  # type: ignore
-            y,  # type: ignore
+            X,
+            y,
             n_repeats=n_repeats,
             random_state=self.random_state,
             n_jobs=self.n_jobs,
@@ -235,8 +231,8 @@ class FeatureSelector:
         importance_df = pd.DataFrame(
             {
                 "feature": X.columns,
-                "importance_mean": perm_importance.importances_mean,  # type: ignore[attr-defined]
-                "importance_std": perm_importance.importances_std,  # type: ignore[attr-defined]
+                "importance_mean": perm_importance.importances_mean,
+                "importance_std": perm_importance.importances_std,
             }
         ).sort_values("importance_mean", ascending=False)
 
@@ -339,8 +335,7 @@ class FeatureSelector:
 
         else:
             raise ValueError(
-                f"Invalid method: {self.method}. "
-                "Must be 'tsfresh', 'random_forest', or 'combined'"
+                f"Invalid method: {self.method}. Must be 'tsfresh', 'random_forest', or 'combined'"
             )
 
         return self

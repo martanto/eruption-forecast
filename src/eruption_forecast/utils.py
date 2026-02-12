@@ -1,32 +1,29 @@
-# Standard library imports
-import json
 import os
-from collections.abc import Callable
-from datetime import datetime, timedelta
+import json
 from typing import Any, Literal
+from datetime import datetime, timedelta
+from collections.abc import Callable
 
-# Third party imports
 import numpy as np
 import pandas as pd
-from imblearn.pipeline import Pipeline
-from imblearn.under_sampling import RandomUnderSampler
 from obspy import Trace
 from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-    confusion_matrix,
     f1_score,
-    precision_score,
     recall_score,
+    accuracy_score,
+    precision_score,
+    confusion_matrix,
+    balanced_accuracy_score,
 )
+from imblearn.pipeline import Pipeline
+from tsfresh.transformers import FeatureSelector
+from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import (
     GridSearchCV,
     StratifiedShuffleSplit,
     train_test_split,
 )
-from tsfresh.transformers import FeatureSelector
 
-# Project imports
 from eruption_forecast.logger import logger
 from eruption_forecast.model.classifier_model import ClassifierModel
 
@@ -72,13 +69,13 @@ def create_model_predictions(
             logger.debug(f"Model prediction exists at: {filepath}")
         return None
 
-    features = get_significant_features(features=features, labels=labels)
+    features, _ = get_significant_features(features=features, labels=labels)
     features_train, features_test, labels_train, labels_test = train_test_split(
         features,
         labels,
         test_size=0.2,
         random_state=random_state,
-        stratify=labels,  # type: ignore
+        stratify=labels,
     )
 
     if cv is None:
@@ -700,7 +697,9 @@ def check_sampling_consistency(
     upper_bound = expected_diff + tolerance_diff
 
     # First row will be NaT (no previous timestamp), so we skip it
-    inconsistent_mask = ~((time_diffs >= lower_bound) & (time_diffs <= upper_bound))
+    inconsistent_mask: pd.Series = ~(
+        (time_diffs >= lower_bound) & (time_diffs <= upper_bound)
+    )
     inconsistent_mask.iloc[0] = False
 
     # Get inconsistent data
@@ -852,7 +851,7 @@ def get_significant_features(
     )
 
     # Extracted features with potentially reduced column
-    features_filtered: pd.DataFrame = selector.fit_transform(X=features, y=labels)  # type: ignore
+    features_filtered: pd.DataFrame = selector.fit_transform(X=features, y=labels)
 
     _significant_features = pd.Series(selector.p_values, index=selector.features)
     _significant_features = _significant_features.sort_values()

@@ -1,15 +1,12 @@
-# Standard library imports
-from collections.abc import Callable
+from typing import Self, Literal
 from datetime import datetime
-from typing import Literal, Self
+from collections.abc import Callable
 
-# Third party imports
 import numpy as np
 import pandas as pd
+from obspy import Trace, Stream
 from loguru import logger
-from obspy import Stream, Trace
 
-# Project imports
 from eruption_forecast.utils import calculate_window_metrics
 
 

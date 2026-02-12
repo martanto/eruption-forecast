@@ -1,14 +1,11 @@
-# Standard library imports
 import os
-from pathlib import Path
 from typing import Literal
+from pathlib import Path
 
-# Third party imports
-import matplotlib.dates as mdates
 import pandas as pd
+import matplotlib.dates as mdates
 from matplotlib import pyplot as plt
 
-# Project imports
 from eruption_forecast.logger import logger
 
 
@@ -163,7 +160,7 @@ def plot_significant_features(
                 f"Features column: {features_column} does not exist"
             )  # noqa: B904
 
-    df.dropna(inplace=True)
+    df = df.dropna()
     df = df.head(number_of_features)
     df = df.iloc[::-1]
 

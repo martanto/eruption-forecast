@@ -1,24 +1,21 @@
-# Standard library imports
 import os
 from datetime import datetime
 from functools import cached_property
 
-# Third party imports
 import pandas as pd
 
-# Project imports
+from eruption_forecast.utils import to_datetime
+from eruption_forecast.logger import logger
 from eruption_forecast.label.constants import (
     DATE_FORMAT,
-    DAY_TO_FORECAST_PREFIX,
-    EXAMPLE_LABEL_FILENAME,
-    LABEL_EXTENSION,
     LABEL_PREFIX,
-    VALID_WINDOW_STEP_UNITS,
+    LABEL_EXTENSION,
     WINDOW_SIZE_PREFIX,
     WINDOW_STEP_PREFIX,
+    DAY_TO_FORECAST_PREFIX,
+    EXAMPLE_LABEL_FILENAME,
+    VALID_WINDOW_STEP_UNITS,
 )
-from eruption_forecast.logger import logger  # type: ignore[attr-defined]
-from eruption_forecast.utils import to_datetime
 
 
 class LabelData:

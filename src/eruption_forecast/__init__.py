@@ -1,15 +1,13 @@
 #!/usr/bin/env python
-
-# Standard library imports
 from importlib.metadata import version
 
-# Project imports
-from eruption_forecast.features.features_builder import FeaturesBuilder
-from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.label.label_data import LabelData
+from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.forecast_model import ForecastModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.features.features_builder import FeaturesBuilder
+
 
 __version__ = version("eruption-forecast")
 __author__ = "Martanto"

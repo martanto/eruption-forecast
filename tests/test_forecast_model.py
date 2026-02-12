@@ -15,6 +15,7 @@ import pytest
 # Project imports
 from eruption_forecast.model.forecast_model import ForecastModel
 
+
 # ---------------------------------------------------------------------------
 # Helpers — default constructor kwargs
 # ---------------------------------------------------------------------------

@@ -14,14 +14,15 @@ import pytest
 
 # Project imports
 from eruption_forecast.features.constants import (
-    DATETIME_COLUMN,
-    ERUPTED_COLUMN,
     ID_COLUMN,
-    REQUIRED_LABEL_COLUMNS,
+    ERUPTED_COLUMN,
+    DATETIME_COLUMN,
     SECONDS_PER_DAY,
+    REQUIRED_LABEL_COLUMNS,
     SIGNIFICANT_FEATURES_FILENAME,
 )
 from eruption_forecast.features.features_builder import FeaturesBuilder
+
 
 # ---------------------------------------------------------------------------
 # Helpers — synthetic data factories

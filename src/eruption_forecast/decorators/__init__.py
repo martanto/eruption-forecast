@@ -1,13 +1,11 @@
-# Standard library imports
-import functools
-import inspect
 import time
-from collections.abc import Callable
-from datetime import datetime, timedelta
-from pathlib import Path
+import inspect
+import functools
 from typing import Any, Literal
+from pathlib import Path
+from datetime import datetime, timedelta
+from collections.abc import Callable
 
-# Project imports
 from eruption_forecast.decorators.decorator_class import (
     AutoSaveDict,
     SerializationWrapper,
@@ -52,7 +50,7 @@ def save_parameters(
                 params_dict.pop("cls", None)
 
             data = {
-                "function": func.__name__,
+                "function": func.__name__,  # ty:ignore[unresolved-attribute]
                 "timestamp": datetime.now().isoformat(),
                 "parameters": params_dict,
             }
@@ -61,7 +59,7 @@ def save_parameters(
             if filepath:
                 output_path = filepath
             else:
-                output_path = f"{func.__name__}_params.{format}"
+                output_path = f"{func.__name__}_params.{format}"  # ty:ignore[unresolved-attribute]
 
             if append_timestamp:
                 path = Path(output_path)
@@ -158,7 +156,7 @@ def save_properties(
                 return getattr(self, f"_{attr_name}_internal", original_value)
 
             setattr(self, f"_{attr_name}_internal", original_value)
-            setattr(cls, attr_name, property(getter, setter))  # type: ignore
+            setattr(cls, attr_name, property(getter, setter))  # ty:ignore[invalid-argument-type]
 
         # Add methods to class
         cls.__init__ = new_init
@@ -196,13 +194,13 @@ def snapshot(filepath: str | None = None, save_as: Literal["json", "yaml"] = "js
 
             # Save snapshot
             data = {
-                "function": func.__name__,
+                "function": func.__name__,  # ty:ignore[unresolved-attribute]
                 "timestamp": datetime.now().isoformat(),
                 "parameters": params_dict,
                 "return_value": result,
             }
 
-            output_path = filepath or f"{func.__name__}_snapshot.{save_as}"
+            output_path = filepath or f"{func.__name__}_snapshot.{save_as}"  # ty:ignore[unresolved-attribute]
             SerializationWrapper.save_to_file(data, output_path, save_as)
 
             return result
@@ -230,7 +228,7 @@ def timer(name: str | None = None, verbose: bool = True):
     """
 
     def decorator(func: Callable) -> Callable:
-        operation_name = name if name else func.__name__
+        operation_name = name if name else func.__name__  # ty:ignore[unresolved-attribute]
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:

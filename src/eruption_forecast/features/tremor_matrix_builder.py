@@ -1,20 +1,17 @@
-# Standard library imports
 import os
-from datetime import timedelta
 from typing import Self
+from datetime import timedelta
 
-# Third party imports
 import pandas as pd
 
-# Project imports
-from eruption_forecast.features.constants import (
-    DATETIME_COLUMN,
-    ID_COLUMN,
-    REQUIRED_LABEL_COLUMNS,
-    SECONDS_PER_DAY,
-)
-from eruption_forecast.logger import logger
 from eruption_forecast.utils import validate_columns
+from eruption_forecast.logger import logger
+from eruption_forecast.features.constants import (
+    ID_COLUMN,
+    DATETIME_COLUMN,
+    SECONDS_PER_DAY,
+    REQUIRED_LABEL_COLUMNS,
+)
 
 
 class TremorMatrixBuilder:
@@ -85,7 +82,7 @@ class TremorMatrixBuilder:
         if not isinstance(label_df.index, pd.DatetimeIndex):
             raise TypeError("label_df.index is not a DatetimeIndex")
         tremor_df = tremor_df.sort_index()
-        label_df.sort_index(inplace=True)
+        label_df = label_df.sort_index()
         matrix_tmp_dir = os.path.join(output_dir, "tmp")
         tremor_start_date_str = tremor_df.index[0].strftime("%Y-%m-%d")
         tremor_end_date_str = tremor_df.index[-1].strftime("%Y-%m-%d")
@@ -285,7 +282,7 @@ class TremorMatrixBuilder:
                 logger.debug(f"Label id={column_id}: accepted ({total_window} samples)")
 
                 tremor_df_sliced = tremor_df_sliced.sort_index(ascending=True)
-                tremor_df_sliced.reset_index(inplace=True)
+                tremor_df_sliced = tremor_df_sliced.reset_index()
                 tremor_df_sliced[ID_COLUMN] = column_id
 
                 # Rearrange column to: id, datetime, .. columns
@@ -401,7 +398,7 @@ class TremorMatrixBuilder:
         if not self.overwrite and (os.path.isfile(tremor_matrix_csv)):
             if verbose:
                 logger.info(f"Tremor matrix {tremor_matrix_csv} already exists.")
-            self.df = pd.read_csv(tremor_matrix_csv)
+            self.df = pd.read_csv(filepath_or_buffer=tremor_matrix_csv)
             return self
 
         if verbose:

@@ -3,12 +3,11 @@ Centralized logger module using loguru for the package.
 This provides a single logger instance that all modules can import and use.
 """
 
-# Standard library imports
 import os
 import sys
 
-# Third party imports
 from loguru import logger
+
 
 # Init default handler
 logger.remove()

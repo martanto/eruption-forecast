@@ -1,25 +1,22 @@
-# Standard library imports
 import os
+from typing import Self, Literal
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Literal, Self
 
-# Third party imports
 import pandas as pd
 
-# Project imports
+from eruption_forecast.utils import (
+    sort_dates,
+    to_datetime,
+    normalize_dates,
+    construct_windows,
+)
+from eruption_forecast.logger import logger
 from eruption_forecast.label.constants import (
     MIN_DATE_RANGE_DAYS,
     VALID_WINDOW_STEP_UNITS,
 )
 from eruption_forecast.label.label_data import LabelData
-from eruption_forecast.logger import logger  # type: ignore[attr-defined]
-from eruption_forecast.utils import (
-    construct_windows,
-    normalize_dates,
-    sort_dates,
-    to_datetime,
-)
 
 
 class LabelBuilder:
@@ -387,12 +384,11 @@ class LabelBuilder:
 
             except ValueError:
                 raise ValueError(  # noqa: B904
-                    f"Eruption date is {eruption}. "
-                    f"Date of eruption must be in YYYY-MM-DD format."
+                    f"Eruption date is {eruption}. Date of eruption must be in YYYY-MM-DD format."
                 )
 
             # Set eruption value with 1 for range of eruption date (vectorized operation)
-            df.loc[start_eruption:end_eruption, "is_erupted"] = 1  # type: ignore[misc, index]
+            df.loc[start_eruption:end_eruption, "is_erupted"] = 1
 
             if self.debug:
                 logger.debug(
@@ -402,7 +398,7 @@ class LabelBuilder:
                 )
 
             # Append eruption date as dict key with df_eruptions
-            self.df_eruptions = {eruption: df.loc[start_eruption:end_eruption]}  # type: ignore[misc]
+            self.df_eruptions = {eruption: df.loc[start_eruption:end_eruption]}
 
         return self
 
@@ -468,8 +464,7 @@ class LabelBuilder:
 
         if self.window_size >= self.n_days:
             raise ValueError(
-                f"window_size must be less than {self.n_days} days, "
-                f"got {self.window_size} days"
+                f"window_size must be less than {self.n_days} days, got {self.window_size} days"
             )
 
         if self.window_step_unit not in VALID_WINDOW_STEP_UNITS:

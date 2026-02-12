@@ -1,26 +1,24 @@
-# Standard library imports
-from typing import Any, Literal, Self
+from typing import Any, Self, Literal
 
-# Third party imports
-from sklearn.ensemble import (
-    GradientBoostingClassifier,
-    RandomForestClassifier,
-    VotingClassifier,
-)
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import (
-    BaseCrossValidator,
-    StratifiedKFold,
-    StratifiedShuffleSplit,
-    TimeSeriesSplit,
-)
-from sklearn.naive_bayes import GaussianNB
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import (
+    VotingClassifier,
+    RandomForestClassifier,
+    GradientBoostingClassifier,
+)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import (
+    StratifiedKFold,
+    TimeSeriesSplit,
+    StratifiedShuffleSplit,
+)
 
-# Project imports
 from eruption_forecast.logger import logger
 
 
@@ -116,6 +114,7 @@ class ClassifierModel:
             | None
         ) = None
         self._grid: dict[str, Any] | None = None
+        self.cv_name = type(self.get_cv_splitter()).__name__
 
     def set_random_state(self, random_state: int) -> Self:
         """Set the random seed for reproducibility.
@@ -143,7 +142,7 @@ class ClassifierModel:
     def get_cv_splitter(
         self,
         strategy: Literal["shuffle", "stratified", "timeseries"] | None = None,
-    ) -> BaseCrossValidator:
+    ) -> TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
         """Get the cross-validation splitter based on cv_strategy.
 
         Returns the appropriate cross-validator for the configured strategy:
@@ -156,7 +155,8 @@ class ClassifierModel:
                 - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
 
         Returns:
-            BaseCrossValidator: sklearn cross-validation splitter instance.
+            TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
+                sklearn cross-validation splitter instance.
 
         Example:
             >>> # Use StratifiedKFold (default)
@@ -190,7 +190,7 @@ class ClassifierModel:
             n_splits=self.n_splits,
             test_size=self.test_size,
             random_state=self.random_state,
-        )
+        )  # ty:ignore[invalid-return-type]
 
     @property
     def grid(self) -> dict[str, Any]:
@@ -270,11 +270,12 @@ class ClassifierModel:
             # Grid for VotingClassifier ensemble
             # Parameters are prefixed with estimator name (e.g., rf__, gb__, etc.)
             return {
-                "rf__n_estimators": [50, 100],
-                "rf__max_depth": [5, 7],
-                "gb__n_estimators": [50, 100],
-                "gb__learning_rate": [0.1, 0.2],
-                "lr__C": [0.1, 1, 10],
+                "rf__n_estimators": [100, 200],
+                "rf__max_depth": [7, 10, None],
+                "rf__min_samples_split": [2, 5],  # Helps with overfitting
+                "gb__n_estimators": [100, 200],
+                "gb__learning_rate": [0.05, 0.1],
+                "gb__max_depth": [3, 5],  # GB typically wants shallower trees
             }
 
         raise ValueError(f"Unknown classifier: {self.classifier}")
@@ -372,21 +373,20 @@ class ClassifierModel:
                             class_weight="balanced", random_state=self.random_state
                         ),
                     ),
-                    ("gb", GradientBoostingClassifier(random_state=self.random_state)),
                     (
-                        "lr",
-                        LogisticRegression(
-                            class_weight="balanced",
+                        "xgb",
+                        XGBClassifier(
+                            scale_pos_weight=13.3,  # adjust to your actual ratio
                             random_state=self.random_state,
-                            max_iter=1000,
+                            eval_metric="logloss",
                         ),
                     ),
                     (
-                        "svm",
-                        SVC(
+                        "lgbm",
+                        LGBMClassifier(
                             class_weight="balanced",
                             random_state=self.random_state,
-                            probability=True,
+                            verbose=-1,
                         ),
                     ),
                 ],
@@ -442,7 +442,7 @@ class ClassifierModel:
         """Update model classifier and grid parameters.
 
         Args:
-            model (Union[
+            model ([
                 SVC,
                 KNeighborsClassifier,
                 DecisionTreeClassifier,

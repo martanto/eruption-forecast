@@ -1,24 +1,21 @@
-# Standard library imports
-import glob
 import os
+import glob
 import shutil
+from typing import Self, Literal
 from datetime import datetime, timedelta
 from functools import cached_property
 from multiprocessing import Pool
-from typing import Literal, Self
 
-# Third party imports
 import numpy as np
 import pandas as pd
-from obspy import Stream, Trace, UTCDateTime
+from obspy import Trace, Stream, UTCDateTime
 
-# Project imports
 import eruption_forecast
-from eruption_forecast.logger import logger
-from eruption_forecast.plot import plot_tremor
 from eruption_forecast.sds import SDS
+from eruption_forecast.plot import plot_tremor
+from eruption_forecast.utils import to_datetime, calculate_window_metrics
+from eruption_forecast.logger import logger
 from eruption_forecast.tremor.rsam import RSAM
-from eruption_forecast.utils import calculate_window_metrics, to_datetime
 
 
 class CalculateTremor:
@@ -273,8 +270,7 @@ class CalculateTremor:
                 )
             if freq_min >= freq_max:
                 raise ValueError(
-                    f"Freq minimum must be less than freq maximum. "
-                    f"Got: {freq_min} >= {freq_max}"
+                    f"Freq minimum must be less than freq maximum. Got: {freq_min} >= {freq_max}"
                 )
 
         self.freq_bands = freq_bands
@@ -456,8 +452,11 @@ class CalculateTremor:
 
         if not self.overwrite and os.path.isfile(csv):
             logger.info(f"Load tremor from file: {csv}")
-            self.df = pd.read_csv(csv, index_col=0, parse_dates=True)
-            return self
+            try:
+                self.df = pd.read_csv(csv, index_col=0, parse_dates=True)
+                return self
+            except ValueError:
+                raise ValueError(f"Could not load tremor from file: {csv}")
 
         self.create_temporary_dir()
 
@@ -711,7 +710,7 @@ class CalculateTremor:
                     dsar_series = dsar_series * self.value_multiplier
 
                 # Store in dataframe
-                df[column_name] = dsar_series.values
+                df[column_name] = dsar_series.to_numpy()
 
                 if self.verbose:
                     logger.debug(
@@ -768,7 +767,7 @@ class CalculateTremor:
                     remove_outlier_method=self.remove_outlier_method,
                     interpolate=True,
                 )
-                .values
+                .to_numpy()
             )
 
             del stream_copy

@@ -1,36 +1,34 @@
-# Standard library imports
 import os
+from typing import Any, Self, Literal
 from datetime import datetime, timedelta
-from typing import Any, Literal, Self
 
-# Third party imports
 import pandas as pd
-from tsfresh import extract_features as tsfresh_extract_features
 from tsfresh import (
+    extract_features as tsfresh_extract_features,
     extract_relevant_features,
 )
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import impute
 
-# Project imports
-from eruption_forecast.features.constants import (
-    DATETIME_COLUMN,
-    ID_COLUMN,
-)
-from eruption_forecast.features.features_builder import FeaturesBuilder
-from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
-from eruption_forecast.label.label_builder import LabelBuilder
-from eruption_forecast.logger import logger
-from eruption_forecast.model.train_model import TrainModel
-from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.utils import (
-    construct_windows,
-    normalize_dates,
     to_datetime,
+    normalize_dates,
     validate_columns,
+    construct_windows,
     validate_date_ranges,
 )
+from eruption_forecast.logger import logger
+from eruption_forecast.model.train_model import TrainModel
+from eruption_forecast.features.constants import (
+    ID_COLUMN,
+    DATETIME_COLUMN,
+)
+from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.tremor.calculate_tremor import CalculateTremor
+from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 class ForecastModel:
@@ -181,6 +179,8 @@ class ForecastModel:
         self.TrainModel: TrainModel | None = None
         self.trained_model_df: pd.DataFrame = pd.DataFrame()
         self.trained_model_csv: str | None = None
+        self.ClassifierModel: ClassifierModel | None = None
+        self.classifier_name: str | None = None
 
         # =========================
         # Will be set after predict() called
@@ -517,7 +517,7 @@ class ForecastModel:
         if tremor_columns is not None:
             df_tremor = df_tremor[tremor_columns]
 
-        df_tremor.sort_index(ascending=True, inplace=True)
+        df_tremor = df_tremor.sort_index(ascending=True)
 
         return df_tremor
 
@@ -986,7 +986,10 @@ class ForecastModel:
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
-        output_dir = output_dir or os.path.join(self.station_dir, "trainings")
+        output_dir = output_dir or os.path.join(
+            self.station_dir,
+            "trainings",
+        )
         os.makedirs(output_dir, exist_ok=True)
 
         train_model = TrainModel(
@@ -1013,6 +1016,8 @@ class ForecastModel:
         self.TrainModel = train_model
         self.trained_model_df = train_model.df
         self.trained_model_csv = train_model.csv
+        self.ClassifierModel = train_model.ClassifierModel
+        self.classifier_name = train_model.ClassifierModel.name
 
         return self
 

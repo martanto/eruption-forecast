@@ -1,5 +1,3 @@
-import os
-
 from eruption_forecast import ForecastModel
 from eruption_forecast.decorators import timer
 
@@ -63,18 +61,27 @@ def main(use_relevant_features: bool = False):
         ],
         use_relevant_features=use_relevant_features,
         overwrite=False,
-    ).train(
-        classifier="rf",
-        random_state=0,
-        total_seed=500,
-        number_of_significant_features=20,
-        sampling_strategy=0.75,
-        save_all_features=True,
-        plot_significant_features=True,
-        output_dir=r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\trainings",
-        overwrite=False,
-        verbose=True,
     )
+
+    classifiers = ("voting", "rf")
+
+    for classifier in classifiers:
+        print("=" * 50)
+        print(f"| Classifier: {classifier}:")
+        print("=" * 50)
+        fm.train(
+            classifier=classifier,
+            cv_strategy="stratified",
+            random_state=0,
+            total_seed=500,
+            number_of_significant_features=20,
+            sampling_strategy=0.75,
+            save_all_features=True,
+            plot_significant_features=True,
+            # output_dir=r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\trainings",
+            overwrite=False,
+            verbose=True,
+        )
 
 
 if __name__ == "__main__":
