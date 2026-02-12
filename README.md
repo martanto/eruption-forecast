@@ -300,51 +300,51 @@ print(scores.head(10))
 
 ### 6. Train Models with Multiple Classifiers
 
-Train machine learning models with automatic feature selection across multiple random seeds.
+Two training workflows are available depending on your evaluation strategy.
+
+#### `train()` — with held-out test set (80/20 split)
+
+Splits data before resampling and feature selection to prevent data leakage.
+Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
 
 ```python
 from eruption_forecast import TrainModel
 
-# Random Forest (default)
 trainer = TrainModel(
     extracted_features_csv="output/features/all_features.csv",
     label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings_rf",
+    output_dir="output/trainings",
     classifier="rf",
-    cv_strategy="timeseries",  # Prevents data leakage in temporal data
-    cv_splits=5,
+    cv_strategy="timeseries",
     n_jobs=4,
-    verbose=True,
 )
 
 trainer.train(
     random_state=0,
     total_seed=100,
-    number_of_significant_features=20,
-    sampling_strategy=0.75,  # Under-sample majority class
-    overwrite=False,
+    sampling_strategy=0.75,
 )
+```
 
-# Gradient Boosting (recommended for imbalanced data)
+#### `fit()` — full dataset training (no split)
+
+Trains on the **entire** dataset across multiple seeds. No metrics are computed
+here — evaluation is deferred to `ModelPredictor` using a separate future dataset.
+
+```python
 trainer = TrainModel(
     extracted_features_csv="output/features/all_features.csv",
     label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings_gb",
-    classifier="gb",
-    cv_strategy="stratified",
+    output_dir="output/trainings",
+    classifier="rf",
     n_jobs=4,
 )
-trainer.train(random_state=0, total_seed=100, number_of_significant_features=20)
 
-# VotingClassifier ensemble (best accuracy)
-trainer = TrainModel(
-    extracted_features_csv="output/features/all_features.csv",
-    label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings_voting",
-    classifier="voting",
-    n_jobs=4,
+trainer.fit(
+    random_state=0,
+    total_seed=100,
+    sampling_strategy=0.75,
 )
-trainer.train(random_state=0, total_seed=50, number_of_significant_features=20)
 ```
 
 **Supported classifiers:**
@@ -363,7 +363,32 @@ trainer.train(random_state=0, total_seed=50, number_of_significant_features=20)
 - `stratified`: StratifiedKFold (preserves class distribution)
 - `timeseries`: TimeSeriesSplit (for temporal data, prevents data leakage)
 
-### 7. Analyze Training Results
+### 7. Predict on Future Data with ModelPredictor
+
+After `fit()`, use `ModelPredictor` to evaluate the trained models against a
+separate "future" feature set (e.g. from a different time period or volcano).
+
+```python
+from eruption_forecast.model.model_predictor import ModelPredictor
+
+predictor = ModelPredictor(
+    trained_models_csv=trainer.csv,
+    future_features_csv="output/features/future_features.csv",
+    future_labels_csv="output/features/future_labels.csv",
+    output_dir="output/predictions",
+)
+
+# Evaluate all seeds — returns a DataFrame of per-seed metrics
+df_metrics = predictor.predict()
+print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
+
+# Get the best-performing seed's evaluator
+evaluator = predictor.predict_best(criterion="balanced_accuracy")
+print(evaluator.summary())
+evaluator.plot_all()
+```
+
+### 9. Analyze Training Results
 
 ```python
 import pandas as pd
@@ -385,7 +410,7 @@ sig_features = pd.read_csv("output/trainings/significant_features.csv")
 print(sig_features.head(10))
 ```
 
-### 8. Model Evaluation and Visualization
+### 10. Model Evaluation and Visualization
 
 ```python
 from eruption_forecast.model.model_evaluator import ModelEvaluator
@@ -580,10 +605,8 @@ output/
 - loguru
 
 ### Development Dependencies
-- black (code formatting)
 - ruff (linting)
-- pyrefly (type checking)
-- isort (import sorting)
+- ty (type checking)
 - pytest (testing)
 
 ## Development
@@ -591,17 +614,11 @@ output/
 ### Code Quality Tools
 
 ```bash
-# Format code
-uv run black src/
-
-# Lint code
-uv run ruff check src/
+# Lint and auto-fix
+uv run ruff check --fix src/
 
 # Type checking
-uv run pyrefly check src/
-
-# Sort imports
-uv run isort src/
+uvx ty check src/
 ```
 
 ### Running Tests
@@ -681,4 +698,4 @@ This project uses:
 
 **Version:** 0.2.0
 **Status:** Active Development
-**Last Updated:** 2026-02-11
+**Last Updated:** 2026-02-12
