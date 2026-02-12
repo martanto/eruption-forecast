@@ -46,6 +46,7 @@ dev = [
 
 [tool.uv]
 cache-dir = "./.cache/uv"
+build-constraint-dependencies = ["setuptools==80.8.0"]
 
 [project.urls]
 Homepage = "https://github.com/martanto/eruption-forecast"
