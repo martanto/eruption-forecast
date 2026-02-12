@@ -214,6 +214,7 @@ The workflow follows a well-structured approach for binary classification:
 | ~~No model persistence~~ | RESOLVED | `ModelEvaluator.export_model()` with joblib |
 | ~~No evaluation metrics~~ | RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
 | No probability calibration | Pending | Add CalibratedClassifierCV |
+| No full-dataset training | RESOLVED | `TrainModel.fit()` trains on full dataset; `ModelPredictor` evaluates on future data |
 
 ---
 
@@ -337,6 +338,7 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 | Date | Category | Changes |
 |------|----------|---------|
+| 2026-02-12 | **Full-dataset training + ModelPredictor** | Added `TrainModel._fit()` / `fit()` for full-dataset training (no train/test split, no metrics). Extended `ModelEvaluator` with `selected_features` parameter and `from_files()` classmethod. Created new `ModelPredictor` class that loads trained models from `fit()`, evaluates each against future features/labels, and aggregates metrics (mean ± std). Exported `ModelPredictor` from `model/__init__.py`. |
 | 2026-02-11 | **Docstrings** | Fixed spelling errors: `Extacted` → `Extracted`, `SKipp` → `Skip`, `WIll` → `Will`, `laad` → `load`, `preditcted` → `predicted`, `defaut` → `default`, `shanon` → `Shannon`, `paramaters` → `parameters`, `BE CAREFULL` → `WARNING`. Improved `CalculateTremor` class docstring with full Args/Returns/Example. Enhanced `set_random_state` in ClassifierModel with Raises section. Clarified `to_series` docstring. Fixed `volcano_id` description in LabelBuilder. |
 | 2026-02-09 | **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature", "calulation" → "calculation", "filenmae" → "filename" |
 | 2026-02-09 | **Feature Selection** | Added `FeatureSelector` class with tsfresh, RandomForest, and combined methods |
@@ -383,6 +385,6 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 ---
 
-**Document Version:** 2.3
-**Last Updated:** 2026-02-11
+**Document Version:** 2.4
+**Last Updated:** 2026-02-12
 **Author:** Claude Code (Sonnet 4.5)

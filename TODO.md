@@ -13,6 +13,7 @@
 - [x] **Fix pyrefly type errors in ModelEvaluator** - Added Protocol types for type safety, explicit type annotations with proper ignore comments, runtime validation checks, and improved type annotations across all methods.
 - [x] **Enhanced Feature Selection** - Created new FeatureSelector class with three methods: (1) tsfresh statistical selection, (2) RandomForest permutation importance, (3) combined two-stage (tsfresh → RandomForest). Provides comprehensive feature selection with both p-values and importance scores. Includes comparison script for empirical evaluation.
 - [x] **Fix docstrings (2026-02-11)** - Fixed spelling errors (`Extacted`, `SKipp`, `WIll`, `laad`, `preditcted`, `defaut`, `shanon`, `paramaters`, `BE CAREFULL`). Improved class-level docstrings for `CalculateTremor`, `ClassifierModel.set_random_state`, `FeatureSelector` methods, `TremorMatrixBuilder`, and `utils.to_series`. Rewrote README.md and updated SUMMARY.md.
+- [x] **Full-dataset training + ModelPredictor (2026-02-12)** - Added `TrainModel._fit()` and `fit()` for training on the full dataset without train/test split. Extended `ModelEvaluator` with `selected_features` param and `from_files()` classmethod. Created `ModelPredictor` class for evaluating trained models against future feature sets with multi-seed aggregation.
 
 ## High Priority
 

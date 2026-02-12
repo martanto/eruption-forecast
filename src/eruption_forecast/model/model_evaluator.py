@@ -82,6 +82,7 @@ class ModelEvaluator:
         y_train: np.ndarray | pd.Series | None = None,
         model_name: str = "model",
         output_dir: str | None = None,
+        selected_features: list[str] | None = None,
     ) -> None:
         # Handle GridSearchCV objects
         if isinstance(model, GridSearchCV):
@@ -91,6 +92,13 @@ class ModelEvaluator:
             self._fitted_model = model
             self._grid_search = None
 
+        # Filter to selected features if provided
+        if selected_features is not None:
+            if isinstance(X_test, pd.DataFrame):
+                X_test = X_test[selected_features]
+            if X_train is not None and isinstance(X_train, pd.DataFrame):
+                X_train = X_train[selected_features]
+
         self.X_test = X_test
         self.y_test = y_test
         self.X_train = X_train
@@ -99,6 +107,7 @@ class ModelEvaluator:
         self.output_dir = output_dir or os.path.join(
             os.getcwd(), "output", "evaluation"
         )
+        self.selected_features = selected_features
 
         # Create output directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -115,6 +124,78 @@ class ModelEvaluator:
 
         # Cache for metrics
         self._metrics: dict[str, Any] | None = None
+
+    @classmethod
+    def from_files(
+        cls,
+        model_path: str,
+        X_test: pd.DataFrame | str,
+        y_test: pd.Series | str,
+        selected_features: list[str] | None = None,
+        X_train: pd.DataFrame | str | None = None,
+        y_train: pd.Series | str | None = None,
+        model_name: str = "model",
+        output_dir: str | None = None,
+    ) -> "ModelEvaluator":
+        """Load model and data from files and create a ModelEvaluator.
+
+        Args:
+            model_path (str): Path to a joblib-saved model file.
+            X_test (pd.DataFrame | str): Test features DataFrame or path to CSV.
+            y_test (pd.Series | str): True test labels Series or path to CSV.
+            selected_features (list[str] | None, optional): If provided, filter
+                X_test (and X_train) to these columns before evaluation.
+            X_train (pd.DataFrame | str | None, optional): Training features
+                DataFrame or path to CSV. Used for learning curves. Defaults to None.
+            y_train (pd.Series | str | None, optional): Training labels Series
+                or path to CSV. Defaults to None.
+            model_name (str, optional): Name identifier for the model. Defaults to "model".
+            output_dir (str | None, optional): Directory for saving outputs. Defaults to None.
+
+        Returns:
+            ModelEvaluator: Configured evaluator instance ready for metrics and plots.
+
+        Example:
+            >>> evaluator = ModelEvaluator.from_files(
+            ...     model_path="output/models/00042.pkl",
+            ...     X_test="output/features/X_future.csv",
+            ...     y_test="output/features/y_future.csv",
+            ...     selected_features=["feature_a", "feature_b"],
+            ... )
+            >>> metrics = evaluator.get_metrics()
+        """
+        model = joblib.load(model_path)
+
+        if isinstance(X_test, str):
+            X_test = pd.read_csv(X_test, index_col=0)
+        if isinstance(y_test, str):
+            _y_df = pd.read_csv(y_test, index_col=0)
+            y_test = _y_df.iloc[:, 0]
+
+        _X_train: pd.DataFrame | None = None
+        _y_train: pd.Series | None = None
+        if X_train is not None:
+            if isinstance(X_train, str):
+                _X_train = pd.read_csv(X_train, index_col=0)
+            else:
+                _X_train = X_train
+        if y_train is not None:
+            if isinstance(y_train, str):
+                _y_df2 = pd.read_csv(y_train, index_col=0)
+                _y_train = _y_df2.iloc[:, 0]
+            else:
+                _y_train = y_train
+
+        return cls(
+            model=model,
+            X_test=X_test,
+            y_test=y_test,
+            X_train=_X_train,
+            y_train=_y_train,
+            model_name=model_name,
+            output_dir=output_dir,
+            selected_features=selected_features,
+        )
 
     @property
     def fitted_model(self) -> BaseEstimator:
@@ -281,7 +362,7 @@ class ModelEvaluator:
 
         # Handle VotingClassifier - get importances from first tree-based estimator
         if isinstance(model, VotingClassifier):
-            for name, estimator in model.named_estimators_.items():
+            for _name, estimator in model.named_estimators_.items():
                 if hasattr(estimator, "feature_importances_"):
                     model = estimator
                     break
@@ -949,7 +1030,7 @@ class ModelEvaluator:
         bars = ax.bar(names, values, color=colors, edgecolor="black", linewidth=1)
 
         # Add value labels on bars
-        for bar, value in zip(bars, values):
+        for bar, value in zip(bars, values, strict=False):
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
                 bar.get_height() + 0.01,
