@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable
 
@@ -25,13 +25,16 @@ from sklearn.model_selection import (
 )
 
 from eruption_forecast.logger import logger
-from eruption_forecast.model.classifier_model import ClassifierModel
+
+
+if TYPE_CHECKING:
+    from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 def create_model_predictions(
     features: pd.DataFrame,
     labels: pd.Series,
-    classifier: ClassifierModel,
+    classifier: "ClassifierModel",
     model_dir: str,
     sampling_strategy: str | float = 0.75,
     scoring: str = "balanced_accuracy",
@@ -886,7 +889,7 @@ def normalize_dates(
 
 
 def get_metrics(
-    classifier: ClassifierModel,
+    classifier: "ClassifierModel",
     labels_test,
     labels_pred,
     labels_train: pd.Series,
