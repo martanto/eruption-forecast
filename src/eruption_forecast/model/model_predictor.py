@@ -75,36 +75,14 @@ class ModelPredictor:
         self._all_metrics: list[dict] | None = None
         self._evaluators: list[ModelEvaluator] | None = None
 
-    def predict(
-        self,
-        plot: bool = False,
-        save_reports: bool = False,
-    ) -> pd.DataFrame:
+    def predict(self, plot: bool = False) -> pd.DataFrame:
         """Evaluate every trained model on the future dataset.
 
-        For each row in the trained-models CSV:
-        1. Load significant features to get the selected feature names.
-        2. Build a ``ModelEvaluator`` via ``from_files()``, filtering
-           ``X_future`` to those features.
-        3. Collect metrics.
-
-        Optionally saves per-seed plots and reports.
-
-        After all seeds are processed, aggregates and prints a summary
-        (mean ± std) and saves ``all_metrics.csv`` / ``metrics_summary.csv``
-        to ``self.output_dir``.
-
         Args:
-            plot (bool, optional): Save per-seed plots to ``figures/``. Defaults to False.
-            save_reports (bool, optional): Export per-seed metrics JSON and
-                classification report. Defaults to False.
+            plot (bool, optional): Save per-seed plots to the output directory. Defaults to False.
 
         Returns:
             pd.DataFrame: One row per seed with all evaluation metrics.
-
-        Example:
-            >>> df = predictor.predict()
-            >>> print(df[["balanced_accuracy", "f1_score"]].describe())
         """
         all_metrics = []
         evaluators = []
@@ -127,7 +105,7 @@ class ModelPredictor:
                 y_test=self.df_labels,
                 selected_features=feature_names,
                 model_name=model_name,
-                output_dir=seed_output_dir if (plot or save_reports) else self.output_dir,
+                output_dir=seed_output_dir if plot else self.output_dir,
             )
 
             metrics = evaluator.get_metrics()
@@ -136,15 +114,8 @@ class ModelPredictor:
             all_metrics.append(metrics)
             evaluators.append(evaluator)
 
-            if save_reports:
-                evaluator.export_metrics(format="json")
-                evaluator.export_classification_report()
-
             if plot:
-                evaluator.plot_confusion_matrix()
-                evaluator.plot_roc_curve()
-                evaluator.plot_precision_recall_curve()
-                evaluator.plot_metrics_summary()
+                evaluator.plot_all()
 
             logger.info(
                 f"Seed {random_state:05d} — balanced_accuracy: "
@@ -162,7 +133,6 @@ class ModelPredictor:
         self,
         criterion: str = "balanced_accuracy",
         plot: bool = False,
-        save_reports: bool = False,
     ) -> ModelEvaluator:
         """Return the ``ModelEvaluator`` for the best-performing seed.
 
@@ -183,7 +153,7 @@ class ModelPredictor:
             >>> print(best.summary())
         """
         if self._all_metrics is None or self._evaluators is None:
-            self.predict(plot=plot, save_reports=save_reports)
+            self.predict(plot=plot)
 
         assert self._all_metrics is not None
         assert self._evaluators is not None

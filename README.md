@@ -414,42 +414,23 @@ print(sig_features.head(10))
 
 ```python
 from eruption_forecast.model.model_evaluator import ModelEvaluator
-import joblib
-import pandas as pd
 
-# Load trained model and test data
-model = joblib.load("output/trainings/models/00042.pkl")
-X_test = pd.read_csv("output/features/all_features.csv", index_col=0)
-y_test = pd.read_csv("output/features/label_features.csv")["is_erupted"]
+# From objects
+evaluator = ModelEvaluator(model, X_test, y_test, model_name="rf_42", output_dir="output/eval")
 
-# Initialize evaluator
-evaluator = ModelEvaluator(
-    model=model,
-    X_test=X_test,
-    y_test=y_test,
-    model_name="gradient_boosting_eruption",
-    output_dir="output/evaluation",
+# Or load directly from files
+evaluator = ModelEvaluator.from_files(
+    model_path="output/trainings/models/00042.pkl",
+    X_test="output/features/all_features.csv",
+    y_test="output/features/label_features.csv",
+    selected_features=["feat_a", "feat_b"],  # optional
+    model_name="rf_42",
 )
 
-# Get metrics
-metrics = evaluator.get_metrics()
-print(f"ROC-AUC: {metrics['roc_auc']:.3f}")
-print(f"Balanced Accuracy: {metrics['balanced_accuracy']:.3f}")
-print(f"F1 Score: {metrics['f1']:.3f}")
 print(evaluator.summary())
-
-# Generate all plots
-evaluator.plot_all(feature_names=X_test.columns.tolist(), top_n_features=15)
-
-# Export everything
-paths = evaluator.export_all()
+metrics = evaluator.get_metrics()  # returns dict
+evaluator.plot_all()               # saves confusion matrix, ROC, PR curves
 ```
-
-**ModelEvaluator outputs:**
-
-Plots: `roc_curve.png`, `precision_recall_curve.png`, `confusion_matrix.png`, `feature_importances.png`, `learning_curve.png`, `metrics_summary.png`
-
-Files: `{model_name}.joblib`, `metrics.csv`, `metrics.json`, `classification_report.txt`, `confusion_matrix.csv`, `feature_importances.csv`
 
 ## Advanced Features
 
