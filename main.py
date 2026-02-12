@@ -1,3 +1,5 @@
+from typing import Any
+
 from eruption_forecast import ForecastModel
 from eruption_forecast.decorators import timer
 
@@ -6,7 +8,7 @@ from eruption_forecast.decorators import timer
 def main(use_relevant_features: bool = False):
     sds_dir = r"D:\Data\OJN"
 
-    params = {
+    params: dict[str, Any] = {
         "station": "OJN",
         "channel": "EHZ",
         "start_date": "2025-01-01",

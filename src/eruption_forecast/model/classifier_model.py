@@ -271,11 +271,10 @@ class ClassifierModel:
             # Parameters are prefixed with estimator name (e.g., rf__, gb__, etc.)
             return {
                 "rf__n_estimators": [100, 200],
-                "rf__max_depth": [7, 10, None],
-                "rf__min_samples_split": [2, 5],  # Helps with overfitting
-                "gb__n_estimators": [100, 200],
-                "gb__learning_rate": [0.05, 0.1],
-                "gb__max_depth": [3, 5],  # GB typically wants shallower trees
+                "rf__max_depth": [10, None],
+                "xgb__n_estimators": [100, 200],
+                "xgb__learning_rate": [0.05, 0.1],
+                "xgb__max_depth": [5, 7],
             }
 
         raise ValueError(f"Unknown classifier: {self.classifier}")
@@ -370,23 +369,18 @@ class ClassifierModel:
                     (
                         "rf",
                         RandomForestClassifier(
-                            class_weight="balanced", random_state=self.random_state
+                            class_weight="balanced",
+                            random_state=self.random_state,
+                            n_jobs=1,
                         ),
                     ),
                     (
                         "xgb",
                         XGBClassifier(
-                            scale_pos_weight=13.3,  # adjust to your actual ratio
+                            scale_pos_weight=12,  # adjust to your actual ratio
                             random_state=self.random_state,
                             eval_metric="logloss",
-                        ),
-                    ),
-                    (
-                        "lgbm",
-                        LGBMClassifier(
-                            class_weight="balanced",
-                            random_state=self.random_state,
-                            verbose=-1,
+                            n_jobs=1,
                         ),
                     ),
                 ],

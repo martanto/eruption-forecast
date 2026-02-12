@@ -154,6 +154,7 @@ class ForecastModel:
         self.label_csv: str | None = None
         self.total_eruption_class: int | None = None
         self.total_non_eruption_class: int | None = None
+        self.class_ratio: float | None = None
 
         # =========================
         # Will be set after extract_features() called
@@ -573,13 +574,15 @@ class ForecastModel:
         self.total_non_eruption_class = (
             len(label_builder.df) - self.total_eruption_class
         )
-        class_ratio: float = self.total_eruption_class / self.total_non_eruption_class
+        self.class_ratio: float = (
+            self.total_eruption_class / self.total_non_eruption_class
+        )
 
         if self.verbose:
             logger.info(
                 f"Total number of eruptions: {self.total_eruption_class}. "
                 f"Total number of non-eruptions: {self.total_non_eruption_class}. "
-                f"Class ratio (eruption vs non-eruptions): {class_ratio}"
+                f"Class ratio (eruption vs non-eruptions): {self.class_ratio}"
             )
 
     def validate(self) -> None:
