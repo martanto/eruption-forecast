@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import json
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable
 
@@ -23,10 +21,6 @@ from sklearn.model_selection import (
 )
 
 from eruption_forecast.logger import logger
-
-
-if TYPE_CHECKING:
-    from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -787,7 +781,7 @@ def normalize_dates(
 
 
 def get_metrics(
-    classifier: ClassifierModel,
+    classifier: Any,
     labels_test,
     labels_pred,
     labels_train: pd.Series,
