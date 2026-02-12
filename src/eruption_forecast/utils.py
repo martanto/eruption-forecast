@@ -21,6 +21,7 @@ from sklearn.model_selection import (
 )
 
 from eruption_forecast.logger import logger
+from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -781,7 +782,7 @@ def normalize_dates(
 
 
 def get_metrics(
-    classifier: Any,
+    classifier: ClassifierModel,
     labels_test,
     labels_pred,
     labels_train: pd.Series,
