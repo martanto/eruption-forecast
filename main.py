@@ -65,14 +65,14 @@ def main(use_relevant_features: bool = False):
         overwrite=False,
     )
 
-    classifiers = ("voting", "rf")
+    classifiers = ("xgb", "rf")
 
     for classifier in classifiers:
         print("=" * 50)
         print(f"| Classifier: {classifier}:")
         print("=" * 50)
         fm.train(
-            classifier=classifier,
+            classifier=classifier,  # ty:ignore[invalid-argument-type]
             cv_strategy="stratified",
             random_state=0,
             total_seed=500,
@@ -80,7 +80,6 @@ def main(use_relevant_features: bool = False):
             sampling_strategy=0.75,
             save_all_features=True,
             plot_significant_features=True,
-            # output_dir=r"D:\Projects\eruption-forecast\output\VG.OJN.00.EHZ\trainings",
             overwrite=False,
             verbose=True,
         )
