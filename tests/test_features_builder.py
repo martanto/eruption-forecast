@@ -1,6 +1,6 @@
 """Unit tests for the feature extraction and model training modules.
 
-Tests for FeaturesBuilder and TrainModel classes to verify correctness
+Tests for FeaturesBuilder and ModelTrainer classes to verify correctness
 after Phase 3 refactoring. All tests use synthetic in-memory data.
 """
 
@@ -335,14 +335,14 @@ class TestFeaturesBuilderSavePerMethod:
 
 
 # ---------------------------------------------------------------------------
-# TrainModel — validation (uses CSV round-trip via synthetic data)
+# ModelTrainer — validation (uses CSV round-trip via synthetic data)
 # ---------------------------------------------------------------------------
 
 
 def _write_synthetic_csvs(
     tmp: str, n_features: int = 10, n_samples: int = 20
 ) -> tuple[str, str]:
-    """Write synthetic features and label CSVs for TrainModel tests.
+    """Write synthetic features and label CSVs for ModelTrainer tests.
 
     Returns (features_csv, label_csv) paths.
     """
@@ -370,17 +370,17 @@ def _write_synthetic_csvs(
     return features_csv, label_csv
 
 
-class TestTrainModelValidation:
-    """Test TrainModel validation logic."""
+class TestModelTrainerValidation:
+    """Test ModelTrainer validation logic."""
 
     def test_valid_initialization(self) -> None:
-        """TrainModel initialises without error on valid data."""
+        """ModelTrainer initialises without error on valid data."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             features_csv, label_csv = _write_synthetic_csvs(tmp)
-            model = TrainModel(
+            model = ModelTrainer(
                 features_csv=features_csv,
                 label_csv=label_csv,
                 output_dir=os.path.join(tmp, "out"),
@@ -390,7 +390,7 @@ class TestTrainModelValidation:
     def test_empty_features_raises_value_error(self) -> None:
         """ValueError when features CSV has zero rows."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             # Empty features
@@ -401,7 +401,7 @@ class TestTrainModelValidation:
             )
 
             with pytest.raises(ValueError, match="Features cannot be empty"):
-                TrainModel(
+                ModelTrainer(
                     features_csv=os.path.join(tmp, "features.csv"),
                     label_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
@@ -410,7 +410,7 @@ class TestTrainModelValidation:
     def test_empty_labels_raises_value_error(self) -> None:
         """ValueError when label CSV has zero rows."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             # 5-row features
@@ -421,7 +421,7 @@ class TestTrainModelValidation:
             )
 
             with pytest.raises(ValueError, match="Labels cannot be empty"):
-                TrainModel(
+                ModelTrainer(
                     features_csv=os.path.join(tmp, "features.csv"),
                     label_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
@@ -430,7 +430,7 @@ class TestTrainModelValidation:
     def test_mismatched_lengths_raises_value_error(self) -> None:
         """ValueError when features and labels row counts differ."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             pd.DataFrame({"feat_0": range(10)}).to_csv(
@@ -441,7 +441,7 @@ class TestTrainModelValidation:
             )
 
             with pytest.raises(ValueError, match="do not match"):
-                TrainModel(
+                ModelTrainer(
                     features_csv=os.path.join(tmp, "features.csv"),
                     label_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
@@ -450,12 +450,12 @@ class TestTrainModelValidation:
     def test_output_directories_created(self) -> None:
         """create_directories() produces expected subdirectories."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             features_csv, label_csv = _write_synthetic_csvs(tmp)
             out = os.path.join(tmp, "predictions")
-            model = TrainModel(
+            model = ModelTrainer(
                 features_csv=features_csv,
                 label_csv=label_csv,
                 output_dir=out,
@@ -466,7 +466,7 @@ class TestTrainModelValidation:
     def test_errors_are_value_error_not_assertion_error(self) -> None:
         """Confirm validation raises ValueError, not AssertionError."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             pd.DataFrame({"feat_0": range(3)}).to_csv(os.path.join(tmp, "features.csv"))
@@ -476,7 +476,7 @@ class TestTrainModelValidation:
 
             # Must be ValueError — never AssertionError
             with pytest.raises(ValueError):
-                TrainModel(
+                ModelTrainer(
                     features_csv=os.path.join(tmp, "features.csv"),
                     label_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
@@ -484,17 +484,17 @@ class TestTrainModelValidation:
 
 
 # ---------------------------------------------------------------------------
-# Integration — FeaturesBuilder → TrainModel round-trip
+# Integration — FeaturesBuilder → ModelTrainer round-trip
 # ---------------------------------------------------------------------------
 
 
 class TestIntegration:
-    """End-to-end: build features then hand off to TrainModel init."""
+    """End-to-end: build features then hand off to ModelTrainer init."""
 
     def test_features_builder_output_loads_in_train_model(self) -> None:
-        """CSV produced by FeaturesBuilder can be consumed by TrainModel."""
+        """CSV produced by FeaturesBuilder can be consumed by ModelTrainer."""
         # Project imports
-        from eruption_forecast.model.train_model import TrainModel
+        from eruption_forecast.model.model_trainer import ModelTrainer
 
         with tempfile.TemporaryDirectory() as tmp:
             # 1. Build features
@@ -521,8 +521,8 @@ class TestIntegration:
             label_csv = os.path.join(tmp, "labels.csv")
             labels.to_csv(label_csv, index=False)
 
-            # 3. TrainModel should initialise successfully
-            model = TrainModel(
+            # 3. ModelTrainer should initialise successfully
+            model = ModelTrainer(
                 features_csv=features_csv,
                 label_csv=label_csv,
                 output_dir=os.path.join(tmp, "predictions"),
