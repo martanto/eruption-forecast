@@ -18,6 +18,7 @@ from eruption_forecast.features.constants import (
     ID_COLUMN,
     ERUPTED_COLUMN,
     DATETIME_COLUMN,
+    DEFAULT_EXCLUDE_FEATURES,
 )
 
 
@@ -57,8 +58,10 @@ class FeaturesBuilder:
 
     Raises:
         ValueError: If ``tremor_matrix_df`` or ``label_df`` is not a
-            ``pd.DataFrame``, or if required columns (``id``, ``datetime``,
-            ``is_erupted``) are missing.
+            ``pd.DataFrame``, or if required columns are missing (``id`` and
+            ``datetime`` are always required on the tremor matrix; ``id`` and
+            ``is_erupted`` are required on ``label_df`` only when it is
+            non-empty).
 
     Example:
         >>> tremor_matrix_df = TremorMatrixBuilder(...).build().df
@@ -183,17 +186,7 @@ class FeaturesBuilder:
             Tuple of (default_fc_parameters, excludes_features)
         """
         default_fc_parameters = ComprehensiveFCParameters()
-        excludes_features: set[str] = {
-            "agg_linear_trend",
-            "has_duplicate_max",
-            "has_duplicate_min",
-            "has_duplicate",
-            "linear_trend_timewise",
-            "length",
-            "sum_of_reoccurring_data_points",
-            "sum_of_reoccurring_values",
-            "value_count",
-        }
+        excludes_features: set[str] = set(DEFAULT_EXCLUDE_FEATURES)
 
         return default_fc_parameters, excludes_features
 
@@ -240,10 +233,16 @@ class FeaturesBuilder:
         for tsfresh feature extraction functions.
 
         Args:
-            exclude_features: Features to exclude from calculation
+            exclude_features (list[str] | bool | None): Controls feature
+                exclusion.  Pass a ``list[str]`` of tsfresh calculator names
+                to add them to the exclusion set.  Pass ``False`` (bool) to
+                **clear** all previously excluded features.  Pass ``None`` to
+                leave the exclusion set unchanged.
 
         Returns:
-            Dictionary of extraction parameters for tsfresh
+            dict[str, Any]: Parameter dictionary ready to be unpacked into
+                tsfresh extraction calls (keys: ``column_id``,
+                ``column_sort``, ``n_jobs``, ``default_fc_parameters``).
         """
         # Handle feature exclusion
         default_fc_parameters = self.default_fc_parameters
@@ -287,7 +286,9 @@ class FeaturesBuilder:
             extract_features_dir: Directory to save extracted features
 
         Returns:
-            Path to extracted features CSV, or None if skipped
+            str: Path to the extracted features CSV.  Returns the existing
+                path immediately (without re-extracting) when the file
+                already exists and ``overwrite`` is ``False``.
         """
         extracted_csv = os.path.join(
             extract_features_dir, f"{prefix_filename}_{column_method}.csv"
@@ -332,7 +333,10 @@ class FeaturesBuilder:
         return extracted_csv
 
     def concat_features(
-        self, csv_list: list[str], filename: str
+        self,
+        csv_list: list[str],
+        filename: str,
+        use_relevant_features: bool = False,
     ) -> tuple[str, pd.DataFrame]:
         """Concatenate extracted features from multiple CSV files.
 
@@ -340,12 +344,17 @@ class FeaturesBuilder:
         :meth:`_extract_features_for_column` into a single unified features
         DataFrame and saves it to disk.  Also updates the relevant
         ``self.all_features_csv`` / ``self.relevant_features_csv`` attributes
-        depending on the current :attr:`use_relevant_features` flag.
+        depending on *use_relevant_features*.
 
         Args:
             csv_list (list[str]): Paths to per-column extracted feature CSVs.
                 Must contain at least 2 files.
             filename (str): Output filename stem (without ``.csv`` extension).
+            use_relevant_features (bool, optional): When ``True``, stores the
+                result in :attr:`relevant_features_csv` /
+                :attr:`df_relevant_features`; otherwise in
+                :attr:`all_features_csv` / :attr:`df_all_features`.
+                Defaults to ``False``.
 
         Returns:
             tuple[str, pd.DataFrame]: ``(filepath, features_df)`` where
@@ -373,7 +382,7 @@ class FeaturesBuilder:
         filepath = os.path.join(self.output_dir, f"{filename}.csv")
         features_csv, features_df = utils_concat_features(list(csv_list), filepath)
 
-        if self.use_relevant_features:
+        if use_relevant_features:
             self.relevant_features_csv = features_csv
             self.df_relevant_features = features_df
         else:
@@ -384,6 +393,58 @@ class FeaturesBuilder:
         self.df = features_df
 
         return features_csv, features_df
+
+    def _prepare_training_mode(self) -> tuple[str, pd.DataFrame]:
+        """Filter labels to tremor window IDs, save aligned label CSV.
+
+        Reads ``self.unique_ids`` (populated by :meth:`extract_features` before
+        this helper is called) to restrict the label DataFrame to only those
+        windows that are present in the tremor matrix.
+
+        Returns:
+            tuple[str, pd.DataFrame]: ``(dates_str, filtered_label_df)`` where
+                *dates_str* is ``"YYYY-MM-DD-YYYY-MM-DD"`` and
+                *filtered_label_df* contains only the rows whose ``id`` is in
+                :attr:`unique_ids`.  Also sets :attr:`label_features_csv` as a
+                side-effect.
+        """
+        label_df = self.label_df[self.label_df[ID_COLUMN].isin(self.unique_ids)]
+        start_date_str = label_df.index[0].strftime("%Y-%m-%d")
+        end_date_str = label_df.index[-1].strftime("%Y-%m-%d")
+        dates_str = f"{start_date_str}-{end_date_str}"
+
+        label_csv = os.path.join(
+            self.output_dir,
+            f"label_features_{dates_str}.csv",
+        )
+        label_df.to_csv(label_csv, index=True)
+        self.label_features_csv = label_csv
+
+        return dates_str, label_df
+
+    def _prepare_prediction_mode(
+        self, tremor_matrix_df: pd.DataFrame
+    ) -> tuple[str, pd.DataFrame]:
+        """Compute date range from tremor datetimes for prediction (no labels).
+
+        Args:
+            tremor_matrix_df: Tremor matrix whose ``datetime`` column is used
+                to derive the date range.
+
+        Returns:
+            tuple[str, pd.DataFrame]: ``(dates_str, empty_df)`` where
+                *dates_str* is ``"YYYY-MM-DD-YYYY-MM-DD"`` and *empty_df* is
+                an empty :class:`pd.DataFrame`.
+        """
+        logger.info(
+            "No labels provided. Using relevant features will be disabled. "
+            "All features will be extracted."
+        )
+        tremor_dates = tremor_matrix_df[DATETIME_COLUMN].sort_values().unique().tolist()
+        start_date_str = tremor_dates[0].strftime("%Y-%m-%d")
+        end_date_str = tremor_dates[-1].strftime("%Y-%m-%d")
+        dates_str = f"{start_date_str}-{end_date_str}"
+        return dates_str, pd.DataFrame()
 
     def extract_features(
         self,
@@ -446,8 +507,6 @@ class FeaturesBuilder:
             >>> print(features_df.shape)
             (100, 1500)  # 100 windows × ~750 features per column
         """
-        label_df = self.label_df
-
         # Select column matrix
         tremor_matrix_df = self.tremor_matrix_df
         if select_tremor_columns is not None:
@@ -459,35 +518,13 @@ class FeaturesBuilder:
         # Get labels based on unique IDs from tremor matrix
         self.unique_ids: list[int] = tremor_matrix_df[ID_COLUMN].unique().tolist()
 
-        # Override use_relevant_features value to False if label not provided.
-        # Calculate relevant features need label to process.
-        if label_df.empty:
-            logger.info(
-                "No labels provided. Using relevant features will be disabled. "
-                "All features will be extracted."
-            )
+        # Dispatch to the appropriate mode helper.
+        # Prediction mode forces use_relevant_features=False (requires labels).
+        if self.label_df.empty:
             use_relevant_features = False
-            tremor_matrix_dates = (
-                tremor_matrix_df[DATETIME_COLUMN].sort_values().unique().tolist()
-            )
-            start_date_str = tremor_matrix_dates[0].strftime("%Y-%m-%d")
-            end_date_str = tremor_matrix_dates[-1].strftime("%Y-%m-%d")
-            dates_str = f"{start_date_str}-{end_date_str}"
+            dates_str, label_df = self._prepare_prediction_mode(tremor_matrix_df)
         else:
-            label_df = label_df[label_df[ID_COLUMN].isin(self.unique_ids)]
-            start_date_str = label_df.index[0].strftime("%Y-%m-%d")
-            end_date_str = label_df.index[-1].strftime("%Y-%m-%d")
-            dates_str = f"{start_date_str}-{end_date_str}"
-
-            # Save label CSV after success extraction
-            label_csv = os.path.join(
-                self.output_dir,
-                f"label_features_{start_date_str}-{end_date_str}.csv",
-            )
-            label_df.to_csv(label_csv, index=True)
-
-            # Set variables that will be used for model training
-            self.label_features_csv = label_csv
+            dates_str, label_df = self._prepare_training_mode()
 
         # Get params for features extraction
         extract_params = self._prepare_extraction_parameters(exclude_features)
@@ -534,11 +571,11 @@ class FeaturesBuilder:
         else:
             self.all_features_csvs.update(extracted_csvs)
 
-        self.csv, self.df = self.concat_features(
-            csv_list=list(extracted_csvs), filename=prefix_filename
-        )
-
-        # Update value for self.use_relevant_features
         self.use_relevant_features = use_relevant_features
+        self.csv, self.df = self.concat_features(
+            csv_list=list(extracted_csvs),
+            filename=prefix_filename,
+            use_relevant_features=use_relevant_features,
+        )
 
         return self.df
