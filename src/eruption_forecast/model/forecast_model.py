@@ -71,7 +71,7 @@ class ForecastModel:
         ...     day_to_forecast=2,
         ...     eruption_dates=["2024-03-15", "2024-05-20"],
         ... )
-        >>> model.extract_features().train()
+        >>> model.extract_features().train_and_evaluate()
     """
 
     def __init__(
@@ -918,7 +918,7 @@ class ForecastModel:
             verbose=verbose or self.verbose,
         )
 
-        train_model.train(
+        train_model.train_and_evaluate(
             random_state=random_state,
             total_seed=total_seed,
             sampling_strategy=sampling_strategy,
