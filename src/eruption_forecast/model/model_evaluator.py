@@ -105,6 +105,16 @@ class ModelEvaluator:
         return cls(model, X_test, y_test, model_name, output_dir, selected_features)
 
     def _get_proba(self) -> np.ndarray | None:
+        """Retrieve predicted probabilities or decision scores for the test set.
+
+        Tries ``predict_proba`` first (returns the positive-class column),
+        then falls back to ``decision_function``. Returns None when neither
+        method is available on the model.
+
+        Returns:
+            np.ndarray | None: 1-D array of probability estimates or
+            decision scores, or None if the model does not support either.
+        """
         if hasattr(self.model, "predict_proba"):
             proba: np.ndarray = self.model.predict_proba(self.X_test)  # type: ignore[union-attr]
             return proba[:, 1] if proba.ndim > 1 else proba
@@ -115,9 +125,41 @@ class ModelEvaluator:
     def get_metrics(self) -> dict[str, Any]:
         """Compute and return evaluation metrics (cached after first call).
 
+        Calculates classification performance metrics from the cached
+        predictions. Results are memoised — subsequent calls return the
+        same dict without recomputing.
+
         Returns:
-            dict with accuracy, balanced_accuracy, precision, recall, f1_score,
-            roc_auc, pr_auc, and confusion matrix components.
+            dict[str, Any]: Metrics dictionary with keys:
+
+            - ``model_name`` (str): Name of the model.
+            - ``accuracy`` (float): Overall accuracy.
+            - ``balanced_accuracy`` (float): Accuracy adjusted for class
+              imbalance.
+            - ``precision`` (float): Positive predictive value.
+            - ``recall`` (float): True positive rate (sensitivity).
+            - ``f1_score`` (float): Harmonic mean of precision and recall.
+            - ``roc_auc`` (float): Area under the ROC curve (nan if not
+              available).
+            - ``pr_auc`` (float): Area under the precision-recall curve
+              (nan if not available).
+            - ``true_positives`` (int): TP count (binary labels only).
+            - ``true_negatives`` (int): TN count (binary labels only).
+            - ``false_positives`` (int): FP count (binary labels only).
+            - ``false_negatives`` (int): FN count (binary labels only).
+            - ``sensitivity`` (float): Same as recall (binary labels only).
+            - ``specificity`` (float): True negative rate (binary labels
+              only).
+            - ``optimal_threshold`` (float): Decision threshold that
+              maximises F1 (nan if probabilities unavailable).
+            - ``f1_at_optimal`` (float): F1 at the optimal threshold.
+            - ``recall_at_optimal`` (float): Recall at the optimal threshold.
+            - ``precision_at_optimal`` (float): Precision at the optimal
+              threshold.
+
+        Examples:
+            >>> m = evaluator.get_metrics()
+            >>> print(f"F1: {m['f1_score']:.3f}, AUC: {m['roc_auc']:.3f}")
         """
         if self._metrics is not None:
             return self._metrics
@@ -173,7 +215,21 @@ class ModelEvaluator:
         return metrics
 
     def summary(self) -> str:
-        """Return a formatted text summary of evaluation metrics."""
+        """Return a formatted text summary of evaluation metrics.
+
+        Returns:
+            str: Multi-line string with accuracy, balanced accuracy, precision,
+            recall, F1, ROC-AUC, PR-AUC, sensitivity/specificity, and
+            confusion matrix counts (where available).
+
+        Examples:
+            >>> print(evaluator.summary())
+            ==================================================
+            Model: rf_seed_42
+            ==================================================
+              Accuracy:          0.9200
+              ...
+        """
         m = self.get_metrics()
         lines = [
             "=" * 50,
@@ -212,7 +268,22 @@ class ModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure:
-        """Plot confusion matrix heatmap."""
+        """Plot a confusion matrix heatmap.
+
+        Args:
+            normalize (str | None, optional): Normalisation mode passed to
+                ``sklearn.metrics.confusion_matrix``. Use ``"true"`` to
+                normalise by row. Defaults to None (raw counts).
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_confusion_matrix.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure object.
+        """
         cm = confusion_matrix(self.y_test, self._y_pred, normalize=normalize)
         labels = ["Not Erupted", "Erupted"]
         fmt = ".2f" if normalize else "d"
@@ -238,7 +309,20 @@ class ModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
-        """Plot ROC curve. Returns None if probabilities are unavailable."""
+        """Plot the ROC curve with AUC annotation.
+
+        Args:
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_roc_curve.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
+        """
         if self._y_proba is None:
             logger.warning("ROC curve requires probability predictions")
             return None
@@ -269,7 +353,20 @@ class ModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
-        """Plot Precision-Recall curve. Returns None if probabilities are unavailable."""
+        """Plot the Precision-Recall curve with average precision annotation.
+
+        Args:
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_pr_curve.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
+        """
         if self._y_proba is None:
             logger.warning("PR curve requires probability predictions")
             return None
@@ -350,8 +447,19 @@ class ModelEvaluator:
     ) -> plt.Figure | None:
         """Plot precision, recall, F1, and balanced accuracy vs decision threshold.
 
-        Marks the default 0.5 threshold and the optimal F1 threshold. Returns
-        None if probabilities are unavailable.
+        Marks the default 0.5 threshold and the optimal F1 threshold.
+
+        Args:
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_threshold_analysis.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
         """
         if self._y_proba is None:
             logger.warning("plot_threshold_analysis requires probability predictions")
@@ -407,7 +515,18 @@ class ModelEvaluator:
         a warning for models that do not support this attribute.
 
         Args:
-            top_n: Number of top features to display. Defaults to 20.
+            top_n (int, optional): Number of top features to display.
+                Defaults to 20.
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_feature_importance.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if the model does
+            not expose ``feature_importances_``.
         """
         model = self.model
         importances: np.ndarray | None = None
@@ -463,10 +582,21 @@ class ModelEvaluator:
         """Plot a reliability diagram (calibration curve).
 
         Compares predicted probabilities against the empirical fraction of
-        positives. Returns None if probabilities are unavailable.
+        positives to assess how well-calibrated the model is.
 
         Args:
-            n_bins: Number of bins for calibration curve. Defaults to 10.
+            n_bins (int, optional): Number of bins for the calibration
+                curve. Defaults to 10.
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_calibration.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
         """
         if self._y_proba is None:
             logger.warning("plot_calibration requires probability predictions")
@@ -503,8 +633,20 @@ class ModelEvaluator:
     ) -> plt.Figure | None:
         """Plot histograms of predicted probabilities split by true class.
 
-        Class 0 (not erupted) is shown in blue and class 1 (erupted) in orange.
-        Returns None if probabilities are unavailable.
+        Class 0 (not erupted) is shown in blue and class 1 (erupted) in
+        orange. A dashed line marks the default 0.5 decision threshold.
+
+        Args:
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_prediction_distribution.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
         """
         if self._y_proba is None:
             logger.warning("plot_prediction_distribution requires probability predictions")
@@ -536,7 +678,27 @@ class ModelEvaluator:
         return fig
 
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
-        """Generate and save all plots. Returns a dict of figure objects."""
+        """Generate and save all evaluation plots.
+
+        Runs every individual plot method and collects the resulting figures.
+        Each figure is also saved to ``output_dir`` automatically.
+
+        Args:
+            dpi (int, optional): Figure resolution applied to all plots.
+                Defaults to 150.
+
+        Returns:
+            dict[str, plt.Figure | None]: Mapping of plot name to figure
+            object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
+            ``"pr_curve"``, ``"threshold_analysis"``,
+            ``"feature_importance"``, ``"calibration"``,
+            ``"prediction_distribution"``. Values are None when a plot
+            could not be generated (e.g. probabilities unavailable).
+
+        Examples:
+            >>> figs = evaluator.plot_all(dpi=200)
+            >>> figs["roc_curve"].savefig("custom_roc.png")
+        """
         return {
             "confusion_matrix": self.plot_confusion_matrix(dpi=dpi),
             "roc_curve": self.plot_roc_curve(dpi=dpi),

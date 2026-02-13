@@ -798,7 +798,60 @@ def get_metrics(
     random_state: int,
     metrics_filepath: str | None = None,
 ) -> dict[str | Any, int | str | Any]:
-    """Get features matrix"""
+    """Compute classification metrics from model predictions.
+
+    Calculates confusion matrix components, accuracy, balanced accuracy,
+    F1 score, precision, recall, and best cross-validation parameters.
+    Optionally saves the metrics to a JSON file.
+
+    Args:
+        classifier (ClassifierModel): Fitted classifier model with name,
+            cv_strategy, and n_splits attributes.
+        labels_test: True test labels (array-like).
+        labels_pred: Predicted labels from the model (array-like).
+        labels_train (pd.Series): Training labels used for training.
+        top_n (int): Number of features used in training.
+        grid_search (GridSearchCV): Fitted GridSearchCV object with
+            best_params_ and best_score_ attributes.
+        random_state (int): Random state seed used for reproducibility.
+        metrics_filepath (str | None, optional): Path to save metrics as
+            a JSON file. Defaults to None.
+
+    Returns:
+        dict: Metrics dictionary with keys:
+            - ``random_state`` (int): Random seed used.
+            - ``classifier`` (str): Classifier name.
+            - ``cv_strategy`` (str): Cross-validation strategy.
+            - ``cv_splits`` (int): Number of CV splits.
+            - ``n_train`` (int): Number of training samples.
+            - ``n_test`` (int): Number of test samples.
+            - ``n_features`` (int): Number of features used.
+            - ``true_negatives`` (int): TN count.
+            - ``false_positives`` (int): FP count.
+            - ``false_negatives`` (int): FN count.
+            - ``true_positives`` (int): TP count.
+            - ``accuracy`` (float): Accuracy score.
+            - ``balanced_accuracy`` (float): Balanced accuracy score.
+            - ``f1_score`` (float): F1 score.
+            - ``precision`` (float): Precision score.
+            - ``recall`` (float): Recall score.
+            - ``best_params`` (dict): Best hyperparameters from GridSearchCV.
+            - ``best_cv_score`` (float): Best CV score from GridSearchCV.
+
+    Examples:
+        >>> metrics = get_metrics(
+        ...     classifier=clf_model,
+        ...     labels_test=y_test,
+        ...     labels_pred=y_pred,
+        ...     labels_train=y_train,
+        ...     top_n=20,
+        ...     grid_search=gs,
+        ...     random_state=42,
+        ...     metrics_filepath="output/metrics.json",
+        ... )
+        >>> print(metrics["f1_score"])
+        0.85
+    """
 
     # Confusion matrix for Binary Classification
     # Read more: https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#binary-classification
