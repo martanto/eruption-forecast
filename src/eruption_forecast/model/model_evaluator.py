@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import joblib
@@ -19,6 +19,7 @@ from sklearn.metrics import (
     average_precision_score,
     balanced_accuracy_score,
 )
+from sklearn.calibration import calibration_curve
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
@@ -155,6 +156,19 @@ class ModelEvaluator:
                 "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0.0,
             })
 
+        # Optimal threshold analysis
+        if y_proba is not None:
+            opt_thresh, opt_metrics = self.optimize_threshold(criterion="f1")
+            metrics["optimal_threshold"] = opt_thresh
+            metrics["f1_at_optimal"] = opt_metrics["f1"]
+            metrics["recall_at_optimal"] = opt_metrics["recall"]
+            metrics["precision_at_optimal"] = opt_metrics["precision"]
+        else:
+            metrics["optimal_threshold"] = np.nan
+            metrics["f1_at_optimal"] = np.nan
+            metrics["recall_at_optimal"] = np.nan
+            metrics["precision_at_optimal"] = np.nan
+
         self._metrics = metrics
         return metrics
 
@@ -279,10 +293,256 @@ class ModelEvaluator:
 
         return fig
 
+    def optimize_threshold(
+        self,
+        criterion: Literal["f1", "balanced_accuracy", "recall", "precision"] = "f1",
+    ) -> tuple[float, dict[str, float]]:
+        """Sweep thresholds and return the one maximising the given criterion.
+
+        Args:
+            criterion: Metric to optimise. One of ``"f1"``, ``"balanced_accuracy"``,
+                ``"recall"``, or ``"precision"``.
+
+        Returns:
+            Tuple of ``(threshold, metrics_at_threshold)`` where
+            ``metrics_at_threshold`` contains f1, balanced_accuracy, recall, and
+            precision at the optimal threshold.
+
+        Raises:
+            ValueError: If probabilities are not available.
+        """
+        if self._y_proba is None:
+            raise ValueError("optimize_threshold requires probability predictions")
+
+        thresholds = np.linspace(0.0, 1.0, 101)
+        best_thresh = 0.5
+        best_score = -1.0
+
+        for t in thresholds:
+            y_pred_t = (self._y_proba >= t).astype(int)
+            if criterion == "f1":
+                score = f1_score(self.y_test, y_pred_t, zero_division=0)
+            elif criterion == "balanced_accuracy":
+                score = balanced_accuracy_score(self.y_test, y_pred_t)
+            elif criterion == "recall":
+                score = recall_score(self.y_test, y_pred_t, zero_division=0)
+            else:  # precision
+                score = precision_score(self.y_test, y_pred_t, zero_division=0)
+
+            if score > best_score:
+                best_score = score
+                best_thresh = float(t)
+
+        y_pred_best = (self._y_proba >= best_thresh).astype(int)
+        metrics_at = {
+            "f1": f1_score(self.y_test, y_pred_best, zero_division=0),
+            "balanced_accuracy": balanced_accuracy_score(self.y_test, y_pred_best),
+            "recall": recall_score(self.y_test, y_pred_best, zero_division=0),
+            "precision": precision_score(self.y_test, y_pred_best, zero_division=0),
+        }
+        return best_thresh, metrics_at
+
+    def plot_threshold_analysis(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot precision, recall, F1, and balanced accuracy vs decision threshold.
+
+        Marks the default 0.5 threshold and the optimal F1 threshold. Returns
+        None if probabilities are unavailable.
+        """
+        if self._y_proba is None:
+            logger.warning("plot_threshold_analysis requires probability predictions")
+            return None
+
+        thresholds = np.linspace(0.0, 1.0, 101)
+        precisions, recalls, f1s, bal_accs = [], [], [], []
+
+        for t in thresholds:
+            y_pred_t = (self._y_proba >= t).astype(int)
+            precisions.append(precision_score(self.y_test, y_pred_t, zero_division=0))
+            recalls.append(recall_score(self.y_test, y_pred_t, zero_division=0))
+            f1s.append(f1_score(self.y_test, y_pred_t, zero_division=0))
+            bal_accs.append(balanced_accuracy_score(self.y_test, y_pred_t))
+
+        opt_thresh, _ = self.optimize_threshold(criterion="f1")
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(thresholds, precisions, label="Precision")
+        ax.plot(thresholds, recalls, label="Recall")
+        ax.plot(thresholds, f1s, label="F1", linewidth=2)
+        ax.plot(thresholds, bal_accs, label="Balanced Accuracy", linestyle="--")
+        ax.axvline(0.5, color="gray", linestyle=":", linewidth=1, label="Default (0.5)")
+        ax.axvline(opt_thresh, color="red", linestyle="--", linewidth=1.5,
+                   label=f"Optimal F1 ({opt_thresh:.2f})")
+        ax.set_xlabel("Threshold")
+        ax.set_ylabel("Score")
+        ax.set_title(f"Threshold Analysis — {self.model_name}")
+        ax.legend(loc="best")
+        ax.grid(alpha=0.3)
+        plt.tight_layout()
+
+        if save:
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_threshold_analysis.png"
+            )
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved: {path}")
+
+        return fig
+
+    def plot_feature_importance(
+        self,
+        top_n: int = 20,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot a horizontal bar chart of the top-N feature importances.
+
+        Works for tree-based models (RF, GB, XGB, DT) and VotingClassifier
+        when sub-estimators expose ``feature_importances_``. Returns None with
+        a warning for models that do not support this attribute.
+
+        Args:
+            top_n: Number of top features to display. Defaults to 20.
+        """
+        model = self.model
+        importances: np.ndarray | None = None
+
+        if hasattr(model, "feature_importances_"):
+            importances = model.feature_importances_  # type: ignore[union-attr]
+        elif hasattr(model, "estimators_"):
+            # VotingClassifier: average importances from tree-based sub-estimators
+            sub_importances = []
+            for est in model.estimators_:  # type: ignore[union-attr]
+                if hasattr(est, "feature_importances_"):
+                    sub_importances.append(est.feature_importances_)
+            if sub_importances:
+                importances = np.mean(sub_importances, axis=0)
+
+        if importances is None:
+            logger.warning(
+                f"{type(model).__name__} does not expose feature_importances_; "
+                "skipping plot_feature_importance"
+            )
+            return None
+
+        feature_names = list(self.X_test.columns)
+        indices = np.argsort(importances)[::-1][:top_n]
+        top_names = [feature_names[i] for i in indices]
+        top_values = importances[indices]
+
+        fig, ax = plt.subplots(figsize=(8, max(4, top_n * 0.35)))
+        ax.barh(range(len(top_names)), top_values[::-1], align="center")
+        ax.set_yticks(range(len(top_names)))
+        ax.set_yticklabels(top_names[::-1])
+        ax.set_xlabel("Importance")
+        ax.set_title(f"Top-{top_n} Feature Importances — {self.model_name}")
+        ax.grid(axis="x", alpha=0.3)
+        plt.tight_layout()
+
+        if save:
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_feature_importance.png"
+            )
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved: {path}")
+
+        return fig
+
+    def plot_calibration(
+        self,
+        n_bins: int = 10,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot a reliability diagram (calibration curve).
+
+        Compares predicted probabilities against the empirical fraction of
+        positives. Returns None if probabilities are unavailable.
+
+        Args:
+            n_bins: Number of bins for calibration curve. Defaults to 10.
+        """
+        if self._y_proba is None:
+            logger.warning("plot_calibration requires probability predictions")
+            return None
+
+        fraction_of_positives, mean_predicted = calibration_curve(
+            self.y_test, self._y_proba, n_bins=n_bins
+        )
+
+        fig, ax = plt.subplots(figsize=(6, 5))
+        ax.plot(mean_predicted, fraction_of_positives, "s-", label=self.model_name)
+        ax.plot([0, 1], [0, 1], "k--", label="Perfectly calibrated")
+        ax.set_xlabel("Mean predicted probability")
+        ax.set_ylabel("Fraction of positives")
+        ax.set_title(f"Calibration Curve — {self.model_name}")
+        ax.legend()
+        ax.grid(alpha=0.3)
+        plt.tight_layout()
+
+        if save:
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_calibration.png"
+            )
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved: {path}")
+
+        return fig
+
+    def plot_prediction_distribution(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot histograms of predicted probabilities split by true class.
+
+        Class 0 (not erupted) is shown in blue and class 1 (erupted) in orange.
+        Returns None if probabilities are unavailable.
+        """
+        if self._y_proba is None:
+            logger.warning("plot_prediction_distribution requires probability predictions")
+            return None
+
+        y_true = np.asarray(self.y_test)
+        proba_0 = self._y_proba[y_true == 0]
+        proba_1 = self._y_proba[y_true == 1]
+
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.hist(proba_0, bins=20, alpha=0.6, color="steelblue", label="Not Erupted (0)")
+        ax.hist(proba_1, bins=20, alpha=0.6, color="darkorange", label="Erupted (1)")
+        ax.axvline(0.5, color="gray", linestyle="--", linewidth=1, label="Threshold 0.5")
+        ax.set_xlabel("Predicted probability")
+        ax.set_ylabel("Count")
+        ax.set_title(f"Prediction Distribution — {self.model_name}")
+        ax.legend()
+        ax.grid(alpha=0.3)
+        plt.tight_layout()
+
+        if save:
+            path = os.path.join(
+                self.output_dir,
+                filename or f"{self.model_name}_prediction_distribution.png",
+            )
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved: {path}")
+
+        return fig
+
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
         """Generate and save all plots. Returns a dict of figure objects."""
         return {
             "confusion_matrix": self.plot_confusion_matrix(dpi=dpi),
             "roc_curve": self.plot_roc_curve(dpi=dpi),
             "pr_curve": self.plot_precision_recall_curve(dpi=dpi),
+            "threshold_analysis": self.plot_threshold_analysis(dpi=dpi),
+            "feature_importance": self.plot_feature_importance(dpi=dpi),
+            "calibration": self.plot_calibration(dpi=dpi),
+            "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
         }
