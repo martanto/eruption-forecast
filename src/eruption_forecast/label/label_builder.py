@@ -10,6 +10,7 @@ from eruption_forecast.utils import (
     to_datetime,
     normalize_dates,
     construct_windows,
+    resolve_output_dir,
 )
 from eruption_forecast.logger import logger
 from eruption_forecast.label.constants import (
@@ -78,7 +79,12 @@ class LabelBuilder:
         day_to_forecast (int): Day to forecast in days.
         eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
         volcano_id (str): Volcano identifier used in output filenames and labeling.
-        output_dir (Optional[str], optional): Output directory. Defaults to None.
+        output_dir (str | None, optional): Output directory. If None, defaults to
+            ``root_dir/output``. Relative paths are resolved against ``root_dir``
+            (or ``os.getcwd()`` when ``root_dir`` is None). Absolute paths are used
+            as-is. Defaults to None.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         verbose (bool, optional): Verbose mode. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
     """
@@ -94,6 +100,7 @@ class LabelBuilder:
         eruption_dates: list[str],
         volcano_id: str,
         output_dir: str | None = None,
+        root_dir: str | None = None,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -103,7 +110,7 @@ class LabelBuilder:
         start_date, end_date, start_date_str, end_date_str = normalize_dates(
             start_date, end_date
         )
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
+        output_dir = resolve_output_dir(output_dir, root_dir, "output")
         label_dir = os.path.join(output_dir, "labels")
 
         # =========================

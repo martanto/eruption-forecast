@@ -8,7 +8,11 @@ import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.plot import plot_significant_features as plot_significant
-from eruption_forecast.utils import get_metrics, random_under_sampler
+from eruption_forecast.utils import (
+    get_metrics,
+    resolve_output_dir,
+    random_under_sampler,
+)
 from eruption_forecast.logger import logger
 from eruption_forecast.features.constants import (
     ID_COLUMN,
@@ -41,8 +45,12 @@ class ModelTrainer:
                 ``<cwd>output/{nslc}/features/relevant_features_{dates}.csv``
         label_features_csv (str): Path to the label CSV file. Built by using LabelBuilder.
             Can be found in: ``<cwd>output/{nslc}/features/label_features_{dates}.csv``
-        output_dir (str, optional): Directory for output files. Defaults to
-            ``<cwd>/output/trainings``.
+        output_dir (str | None, optional): Directory for output files. If None,
+            defaults to ``root_dir/output/trainings``. Relative paths are resolved
+            against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
+            Absolute paths are used as-is. Defaults to None.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         n_jobs (int, optional): Number of parallel workers. Defaults to 1.
         prefix_filename (str, optional): Prefix for output filenames. Defaults to None.
         classifier (str, optional): Classifier type ("rf", "gb", "svm", "lr", "nn",
@@ -108,6 +116,7 @@ class ModelTrainer:
         extracted_features_csv: str,
         label_features_csv: str,
         output_dir: str | None = None,
+        root_dir: str | None = None,
         prefix_filename: str | None = None,
         classifier: Literal[
             "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
@@ -143,8 +152,8 @@ class ModelTrainer:
         classifier_name = classifier_model.name
         classifier_cv_name = classifier_model.cv_name
 
-        # Output training dir: ``<cwd>/output/trainings``
-        output_dir = output_dir or os.path.join(os.getcwd(), "output", "trainings")
+        # Output training dir: ``<root_dir>/output/trainings``
+        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "trainings"))
 
         # Filtered features dir: ``<output_dir>/features``
         features_dir = os.path.join(output_dir, "features")

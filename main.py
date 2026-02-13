@@ -30,6 +30,7 @@ def main(use_relevant_features: bool = False):
     ]
 
     fm = ForecastModel(
+        root_dir=r"D:\Projects\eruption-forecast",
         overwrite=False,
         n_jobs=4,
         **params,

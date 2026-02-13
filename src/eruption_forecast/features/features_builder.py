@@ -12,6 +12,7 @@ from tsfresh.utilities.dataframe_functions import impute
 from eruption_forecast.utils import (
     concat_features as utils_concat_features,
     validate_columns,
+    resolve_output_dir,
 )
 from eruption_forecast.logger import logger
 from eruption_forecast.features.constants import (
@@ -46,10 +47,16 @@ class FeaturesBuilder:
             ``datetime`` columns plus one or more tremor metric columns
             (``rsam_*``, ``dsar_*``).
         output_dir (str | None, optional): Directory for saved CSVs.
-            Defaults to ``<cwd>/output/features``.
+            If None, defaults to ``root_dir/output/features``. Relative paths
+            are resolved against ``root_dir`` (or ``os.getcwd()`` when
+            ``root_dir`` is None). Absolute paths are used as-is.
+            Defaults to None.
         label_df (pd.DataFrame | None, optional): Label DataFrame with a
             ``DatetimeIndex`` and columns ``id`` and ``is_erupted``.
             Pass ``None`` (default) for prediction mode.
+        root_dir (str | None, optional): Anchor directory for resolving
+            relative ``output_dir`` values. Defaults to None (uses
+            ``os.getcwd()``).
         overwrite (bool, optional): If ``True``, re-extract even when output
             files already exist. Defaults to ``False``.
         n_jobs (int, optional): Parallel jobs passed to tsfresh. Defaults to 1.
@@ -83,6 +90,7 @@ class FeaturesBuilder:
         tremor_matrix_df: pd.DataFrame,
         output_dir: str | None = None,
         label_df: pd.DataFrame | None = None,
+        root_dir: str | None = None,
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
@@ -91,7 +99,7 @@ class FeaturesBuilder:
         # =========================
         # Set DEFAULT parameter
         # =========================
-        output_dir = output_dir or os.path.join(os.getcwd(), "output", "features")
+        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "features"))
         label_df = pd.DataFrame() if label_df is None else label_df
 
         # =========================
