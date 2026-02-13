@@ -17,9 +17,6 @@ ERUPTED_COLUMN = "is_erupted"
 FEATURES_COLUMN = "features"
 """Column name for feature names in significant features output."""
 
-REQUIRED_LABEL_COLUMNS = [ID_COLUMN, ERUPTED_COLUMN]
-"""Required columns in label DataFrames."""
-
 # Time conversion
 SECONDS_PER_DAY = 86400
 """Number of seconds in one day (24 * 60 * 60)."""

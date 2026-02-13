@@ -375,6 +375,7 @@ def construct_windows(
     end_date: str | datetime,
     window_step: int,
     window_step_unit: Literal["minutes", "hours"],
+    reset_index: bool = False,
 ) -> pd.DataFrame:
     """Construct time windows for label and tremor data.
 
@@ -557,7 +558,7 @@ def check_sampling_consistency(
     expected_freq: str = "10min",
     tolerance: str = "1min",
     verbose: bool = False,
-) -> tuple[bool, pd.DataFrame, pd.DataFrame]:
+) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
     """
     Check 10-minute sampling rate consistency, identify inconsistencies, and remove them.
 
@@ -571,6 +572,7 @@ def check_sampling_consistency(
         bool: True if consistent. False otherwise.
         pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
         pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
+        int | None: Sampling rate in seconds or None if inconsistencies.
     """
     if len(df) <= 2:
         raise ValueError(
@@ -580,6 +582,7 @@ def check_sampling_consistency(
         raise TypeError("DataFrame index must be DatetimeIndex")
 
     df = df.sort_index()
+    sampling_rate = None
 
     # Calculate time differences between consecutive timestamps
     time_diffs = df.index.to_series().diff()
@@ -606,6 +609,10 @@ def check_sampling_consistency(
 
     is_consistent = True if inconsistent_data.empty else False
 
+    # Get sampling rate if consistent
+    if is_consistent:
+        sampling_rate = (df.index[1] - df.index[0]).seconds
+
     if verbose:
         print(f"Total rows: {len(df)}")
         print(f"Inconsistent rows found: {len(inconsistent_data)}")
@@ -615,7 +622,7 @@ def check_sampling_consistency(
             print("\nInconsistent time differences:")
             print(time_diffs[inconsistent_mask].describe())
 
-    return is_consistent, consistent_data, inconsistent_data
+    return is_consistent, consistent_data, inconsistent_data, sampling_rate
 
 
 def validate_columns(

@@ -1,14 +1,8 @@
 import os
-from typing import Any, Self, Literal
+from typing import Self, Literal
 from datetime import datetime, timedelta
 
 import pandas as pd
-from tsfresh import (
-    extract_features as tsfresh_extract_features,
-    extract_relevant_features,
-)
-from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
-from tsfresh.utilities.dataframe_functions import impute
 
 from eruption_forecast.utils import (
     to_datetime,
@@ -18,13 +12,9 @@ from eruption_forecast.utils import (
     validate_date_ranges,
 )
 from eruption_forecast.logger import logger
-from eruption_forecast.model.train_model import TrainModel
-from eruption_forecast.features.constants import (
-    ID_COLUMN,
-    DATETIME_COLUMN,
-)
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.model.model_trainer import ModelTrainer
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
@@ -131,11 +121,6 @@ class ForecastModel:
         self.features_dir = features_dir
         self.basename: str | None = None
 
-        # Initialize feature parameters
-        self.default_fc_parameters, self.excludes_features = (
-            self._initialize_feature_parameters()
-        )
-
         # =========================
         # Initialize state properties (set during lifecycle)
         # =========================
@@ -177,7 +162,7 @@ class ForecastModel:
         # =========================
         # Will be set after train() called
         # =========================
-        self.TrainModel: TrainModel | None = None
+        self.ModelTrainer: ModelTrainer | None = None
         self.trained_model_df: pd.DataFrame = pd.DataFrame()
         self.trained_model_csv: str | None = None
         self.ClassifierModel: ClassifierModel | None = None
@@ -201,13 +186,10 @@ class ForecastModel:
             logger.info("⚠️ Forecast Model :: Debug mode is ON")
 
         if verbose:
-            logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
-            logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
+            logger.info(f"Start Date: {start_date_str}")
+            logger.info(f"End Date: {end_date_str}")
             logger.info(f"Volcano ID: {self.volcano_id}")
-            logger.info(f"Network: {self.network}")
-            logger.info(f"Station: {self.station}")
-            logger.info(f"Location: {self.location}")
-            logger.info(f"Channel: {self.channel}")
+            logger.info(f"NSLC: {self.nslc}")
             logger.info(f"Output Dir: {self.output_dir}")
 
     @staticmethod
@@ -239,28 +221,6 @@ class ForecastModel:
         features_dir = os.path.join(station_dir, "features")
 
         return nslc, output_dir, station_dir, features_dir
-
-    @staticmethod
-    def _initialize_feature_parameters() -> tuple[ComprehensiveFCParameters, set[str]]:
-        """Initialize tsfresh feature extraction parameters with defaults.
-
-        Sets up default feature calculators from tsfresh's ComprehensiveFCParameters
-        and defines a set of features to exclude from calculation.
-
-        Returns:
-            Tuple of (default_fc_parameters, excludes_features)
-        """
-        default_fc_parameters = ComprehensiveFCParameters()
-        excludes_features: set[str] = {
-            "agg_linear_trend",
-            "linear_trend_timewise",
-            "length",
-            "has_duplicate_max",
-            "has_duplicate_min",
-            "has_duplicate",
-        }
-
-        return default_fc_parameters, excludes_features
 
     def _setup_calculate_tremor(
         self,
@@ -407,71 +367,6 @@ class ForecastModel:
                     f"end_date parameter: {self.end_date} updated to "
                     f"tremor end date: {tremor_data.end_date}"
                 )
-
-    def _extract_features_for_column(
-        self,
-        features_data: pd.DataFrame,
-        column: str,
-        y: pd.Series,
-        extract_params: dict[str, Any],
-        use_relevant_features: bool,
-        prefix_filename: str,
-        extract_features_dir: str,
-        overwrite: bool,
-    ) -> str | None:
-        """Extract features for a single tremor column.
-
-        Performs tsfresh feature extraction for one column, either using
-        all features or only relevant features based on correlation with labels.
-
-        Args:
-            features_data: Features dataframe with id, datetime, and tremor columns
-            column: Column name to extract features from
-            y: Target labels
-            extract_params: Parameters for tsfresh extraction
-            use_relevant_features: Whether to use relevant features only
-            prefix_filename: Prefix for output filename
-            extract_features_dir: Directory to save extracted features
-            overwrite: Whether to overwrite existing files
-
-        Returns:
-            Path to extracted features CSV, or None if skipped
-        """
-        extracted_csv = os.path.join(
-            extract_features_dir, f"{prefix_filename}_{column}.csv"
-        )
-
-        # Skip if already exists and not overwriting
-        if not overwrite and os.path.isfile(extracted_csv):
-            if self.verbose:
-                logger.info(
-                    f"Extracted features for {column} already exist: {extracted_csv}"
-                )
-            return extracted_csv
-
-        # Prepare data for extraction
-        df = features_data[[ID_COLUMN, DATETIME_COLUMN, column]]
-
-        if self.verbose:
-            logger.info(f"Extracting features for {column}")
-
-        # Extract features
-        if use_relevant_features:
-            extracted_features = extract_relevant_features(df, y, **extract_params)
-        else:
-            extracted_features = tsfresh_extract_features(
-                df,
-                impute_function=impute,
-                **extract_params,
-            )
-
-        # Save to CSV
-        extracted_features.index.name = ID_COLUMN
-        extracted_features.to_csv(extracted_csv, index=True)
-
-        logger.info(f"Extracted features for {column} saved: {extracted_csv}")
-
-        return extracted_csv
 
     @staticmethod
     def _validate_tremor_for_labeling(
@@ -995,7 +890,7 @@ class ForecastModel:
         )
         os.makedirs(output_dir, exist_ok=True)
 
-        train_model = TrainModel(
+        train_model = ModelTrainer(
             extracted_features_csv=features_csv,
             label_features_csv=label_csv,
             output_dir=output_dir,
@@ -1016,7 +911,7 @@ class ForecastModel:
             plot_significant_features=plot_significant_features,
         )
 
-        self.TrainModel = train_model
+        self.ModelTrainer = train_model
         self.trained_model_df = train_model.df
         self.trained_model_csv = train_model.csv
         self.ClassifierModel = train_model.ClassifierModel

@@ -20,7 +20,7 @@ from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
 
 
-class TrainModel:
+class ModelTrainer:
     """Train feature-selection and classifier models over multiple random seeds.
 
     Loads pre-extracted features and labels, and for each seed performs:
@@ -62,7 +62,7 @@ class TrainModel:
 
     Example:
         >>> # Train with Random Forest (default)
-        >>> trainer = TrainModel(
+        >>> trainer = ModelTrainer(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
@@ -76,7 +76,7 @@ class TrainModel:
         ... )
 
         >>> # Train with Gradient Boosting
-        >>> trainer = TrainModel(
+        >>> trainer = ModelTrainer(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
@@ -85,7 +85,7 @@ class TrainModel:
         ... )
 
         >>> # Train with VotingClassifier ensemble and TimeSeriesSplit
-        >>> trainer = TrainModel(
+        >>> trainer = ModelTrainer(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
@@ -247,7 +247,7 @@ class TrainModel:
                 do not match.
 
         Example:
-            >>> trainer = TrainModel(
+            >>> trainer = ModelTrainer(
             ...     features_csv="features.csv",
             ...     label_features_csv="labels.csv"
             ... )
@@ -288,7 +288,7 @@ class TrainModel:
             grid_params (dict): Grid search parameters.
 
         Returns:
-            self (Self): TrainModel class
+            self (Self): ModelTrainer class
         """
         current_grid = classifier.grid
         classifier.grid = grid_params
@@ -307,7 +307,7 @@ class TrainModel:
         automatically during initialization.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> trainer.create_directories()  # Called in __init__
             >>> # Creates: output_dir/, significant_features/, models/, metrics/
         """
@@ -336,7 +336,7 @@ class TrainModel:
             ValueError: If concatenated DataFrame is empty.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> trainer.train(total_seed=100)
             >>> _df = trainer.concat_significant_features(
             ...     plot=True
@@ -555,7 +555,7 @@ class TrainModel:
                 trained model filepath, and metrics dictionary.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> csv_path, evaluation_metrics = trainer._train(
             ...     seed=0,
             ...     random_state=42,
@@ -705,7 +705,7 @@ class TrainModel:
                 plots. Defaults to False.
 
         Example:
-            >>> TrainModel(...).train(
+            >>> ModelTrainer(...).train(
             ...     random_state=42,
             ...     total_seed=100,
             ... )
@@ -841,7 +841,7 @@ class TrainModel:
                 and trained model filepath.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> random_state, sig_csv, model_path = trainer._fit(random_state=42)
         """
         if self.debug:
@@ -954,7 +954,7 @@ class TrainModel:
                 plots. Defaults to False.
 
         Example:
-            >>> trainer = TrainModel(
+            >>> trainer = ModelTrainer(
             ...     features_csv="output/features/extracted_features.csv",
             ...     label_features_csv="output/features/label_features.csv",
             ... )
@@ -1055,7 +1055,7 @@ class TrainModel:
             all_metrics (list[dict]): List of metric dictionaries from each seed.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> trainer.train(total_seed=100)
             >>> # Creates: all_metrics.csv and metrics_summary.csv
         """

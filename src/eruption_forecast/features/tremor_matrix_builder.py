@@ -8,9 +8,9 @@ from eruption_forecast.utils import validate_columns
 from eruption_forecast.logger import logger
 from eruption_forecast.features.constants import (
     ID_COLUMN,
+    ERUPTED_COLUMN,
     DATETIME_COLUMN,
     SECONDS_PER_DAY,
-    REQUIRED_LABEL_COLUMNS,
 )
 
 
@@ -31,7 +31,7 @@ class TremorMatrixBuilder:
             Example calculated tremor CSV location:
                 output/tremor/tremor_VG.OJN.00.EHZ_2025-01-01-2025-09-28.csv
         label_df (pd.DataFrame): Label dataframe with DatetimeIndex and
-            columns 'id' and 'is_erupted'. Index type of df_label is pd.DatetimeIndex.
+            columns 'id' and/or 'is_erupted'. Index type of df_label is pd.DatetimeIndex.
             Can be build using LabelBuilder or load from label CSV.
             Example label CSV location:
                 output/labels/label_2025-01-01_2025-07-24_ws-2_step-6-hours_dtf-2.csv
@@ -128,8 +128,7 @@ class TremorMatrixBuilder:
         to fit within the available tremor data range.
 
         Raises:
-            ValueError: If required label columns ('id', 'is_erupted') are
-                missing from the label DataFrame.
+            ValueError: If 'id' column missing from the label DataFrame.
 
         Example:
             >>> builder = TremorMatrixBuilder(...)
@@ -137,12 +136,11 @@ class TremorMatrixBuilder:
         """
         label_columns = self.label_df.columns.tolist()
 
-        for col in REQUIRED_LABEL_COLUMNS:
-            if col not in label_columns:
-                raise ValueError(
-                    f"Column '{col}' not found in Label dataframe. "
-                    f"Columns available: {label_columns}"
-                )
+        if ID_COLUMN not in label_columns:
+            raise ValueError(
+                f"Column '{ID_COLUMN}' not found in Label dataframe. "
+                f"Columns available: {label_columns}"
+            )
 
         # Ensuring label date within range of tremor date
         tremor_start_date = self.tremor_df.index[0]
@@ -235,7 +233,7 @@ class TremorMatrixBuilder:
         Args:
             tremor_df (pd.DataFrame): Full tremor DataFrame with DatetimeIndex.
             filtered_label_df (pd.DataFrame): Filtered label DataFrame with
-                DatetimeIndex and columns 'id' and 'is_erupted'.
+                DatetimeIndex and columns 'id' and/or 'is_erupted'.
             tremor_sampling_period (int): Sampling period in seconds (e.g., 600
                 for 10-minute intervals).
             tremor_columns (list[str]): List of tremor column names to include.
@@ -265,6 +263,13 @@ class TremorMatrixBuilder:
         if save_tremor_matrix_per_id:
             os.makedirs(self.matrix_tmp_dir, exist_ok=True)
 
+        # Check if filtered_label_df have "is_erupted" column
+        # Added with None value if not exists.
+        # This means the eruption is not happened yet.
+        # Use in building tremor matrix for prediction
+        if ERUPTED_COLUMN not in filtered_label_df.columns:
+            filtered_label_df[ERUPTED_COLUMN] = None
+
         for (
             datetime_index,
             column_id,
@@ -276,6 +281,8 @@ class TremorMatrixBuilder:
                 self.window_size * SECONDS_PER_DAY / tremor_sampling_period
             )
 
+            suffix_filename = f"_eruption-{column_eruption}" if column_eruption else ""
+
             tremor_df_sliced = tremor_df.loc[start_datetime:end_datetime]
 
             if len(tremor_df_sliced) == total_window:
@@ -285,7 +292,7 @@ class TremorMatrixBuilder:
                 tremor_df_sliced = tremor_df_sliced.reset_index()
                 tremor_df_sliced[ID_COLUMN] = column_id
 
-                # Rearrange column to: id, datetime, .. columns
+                # Rearrange column to: id, datetime, ...columns
                 tremor_df_sliced = tremor_df_sliced[
                     [ID_COLUMN, DATETIME_COLUMN, *tremor_columns]
                 ]
@@ -298,7 +305,7 @@ class TremorMatrixBuilder:
                 if save_tremor_matrix_per_id:
                     start_date_str = start_datetime.strftime("%Y-%m-%d--%H-%M-%S")
                     end_date_str = end_datetime.strftime("%Y-%m-%d__%H-%M-%S")
-                    matrix_tmp_filename = f"{column_id:05}_{start_date_str}_{end_date_str}_eruption-{column_eruption}.csv"
+                    matrix_tmp_filename = f"{column_id:05}_{start_date_str}_{end_date_str}{suffix_filename}.csv"
                     feature_tmp_filepath = os.path.join(
                         self.matrix_tmp_dir, matrix_tmp_filename
                     )
@@ -398,7 +405,7 @@ class TremorMatrixBuilder:
         if not self.overwrite and (os.path.isfile(tremor_matrix_csv)):
             if verbose:
                 logger.info(f"Tremor matrix {tremor_matrix_csv} already exists.")
-            self.df = pd.read_csv(filepath_or_buffer=tremor_matrix_csv)
+            self.df = pd.read_csv(tremor_matrix_csv)
             return self
 
         if verbose:

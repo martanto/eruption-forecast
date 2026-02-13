@@ -21,7 +21,7 @@ class TremorData:
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}(csv={self.csv}, df={self.df}, "
+            f"{self.__class__.__name__}(csv={self.csv}, df={self.df.shape}, "
             f"verbose={self.verbose}, debug={self.debug})"
         )
 
@@ -99,15 +99,17 @@ class TremorData:
         """Get number of days in tremor data"""
         return int((self.end_date - self.start_date).days)
 
-    def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame]:
+    def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
         """Check consistency of tremor data.
 
         Returns:
             bool: True if consistent. False otherwise.
             pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
             pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
+            int | None: Sampling rate in seconds or None if inconsistencies.
         """
         return check_sampling_consistency(
             df=self.df,
+            expected_freq="10min",
             verbose=self.verbose,
         )
