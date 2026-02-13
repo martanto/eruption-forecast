@@ -2,7 +2,7 @@
 
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
-**Branch:** `claude/fit-method-and-model-predictor`
+**Branch:** `dev/predictions`
 **Last Updated:** 2026-02-13
 
 ---
@@ -375,6 +375,13 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 ---
 
+## Recent Changes
+
+### Add root_dir Parameter (2026-02-13)
+Added `resolve_output_dir()` helper function to `utils.py` and a `root_dir: str | None = None` parameter to all standalone classes and `ForecastModel`. All relative `output_dir` values are now resolved against `root_dir` (falling back to `os.getcwd()` when `None`). Absolute `output_dir` values bypass `root_dir` entirely. `ForecastModel` normalises relative `root_dir` to an absolute path immediately in `__init__` for multiprocessing safety. Backward compatible: existing code without `root_dir` behaves identically to before.
+
+---
+
 ## Future Recommendations
 
 ### Short-term
@@ -523,6 +530,12 @@ No public API changes. No attribute renames. Downstream callers (`ForecastModel`
 
 ---
 
-**Document Version:** 3.0
+## Add root_dir Parameter (2026-02-13)
+
+Added `resolve_output_dir()` helper function to `utils.py` and a `root_dir: str | None = None` parameter to all standalone classes and `ForecastModel`. All relative `output_dir` values are now resolved against `root_dir` (falling back to `os.getcwd()` when `None`). Absolute `output_dir` values bypass `root_dir` entirely. `ForecastModel` normalises relative `root_dir` to an absolute path immediately in `__init__` for multiprocessing safety. Backward compatible: existing code without `root_dir` behaves identically to before.
+
+---
+
+**Document Version:** 3.1
 **Last Updated:** 2026-02-13
 **Author:** Claude Code (Sonnet 4.5)
