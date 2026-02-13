@@ -2,8 +2,8 @@
 
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
-**Branch:** `dev/predictions`
-**Last Updated:** 2026-02-11
+**Branch:** `claude/fit-method-and-model-predictor`
+**Last Updated:** 2026-02-13
 
 ---
 
@@ -11,11 +11,14 @@
 
 1. [Package Overview](#package-overview)
 2. [Architecture](#architecture)
-3. [Machine Learning Workflow Analysis](#machine-learning-workflow-analysis)
-4. [Model Comparison & Recommendations](#model-comparison--recommendations)
-5. [Grid Parameter Analysis](#grid-parameter-analysis)
-6. [Code Quality Summary](#code-quality-summary)
-7. [Future Recommendations](#future-recommendations)
+3. [Critical Fix: Data Leakage in Model Training](#critical-fix-data-leakage-in-model-training-2026-02-09)
+4. [Machine Learning Workflow Analysis](#machine-learning-workflow-analysis)
+5. [Model Comparison & Recommendations](#model-comparison--recommendations)
+6. [Grid Parameter Analysis](#grid-parameter-analysis)
+7. [Enhanced Feature Selection](#enhanced-feature-selection-2026-02-09)
+8. [Code Quality Summary](#code-quality-summary)
+9. [Future Recommendations](#future-recommendations)
+10. [ModelPredictor Multi-Model Consensus](#modelpredictor-multi-model-consensus-2026-02-13)
 
 ---
 
@@ -200,7 +203,7 @@ The workflow follows a well-structured approach for binary classification:
 | Feature Robustness | Multi-seed feature selection | Reduces overfitting to single split |
 | Class Imbalance | Under-sampling + balanced weights | Handles rare eruption events |
 | Hyperparameter Tuning | GridSearchCV with CV | Optimal parameter selection |
-| Multi-model Support | 9 classifiers available | Flexibility for different data characteristics |
+| Multi-model Support | 10 classifiers available | Flexibility for different data characteristics |
 | Feature Selection | Three-method FeatureSelector | Statistical rigor + interaction capture |
 
 ### Current Limitations & Recommendations
@@ -232,7 +235,8 @@ The workflow follows a well-structured approach for binary classification:
 | `dt` | Decision Tree | Interpretability | Easy to visualize, fast | Prone to overfitting |
 | `knn` | K-Nearest Neighbors | Small datasets | Simple, no training | Slow prediction, needs scaling |
 | `nb` | Gaussian Naive Bayes | Quick baseline | Very fast, works with small data | Strong independence assumption |
-| `voting` | VotingClassifier Ensemble | **Best accuracy** | Combines multiple models, robust | Slower training, more complex |
+| `xgb` | XGBoost | **Imbalanced data** | `scale_pos_weight` grid search, fast, accurate | Requires xgboost package |
+| `voting` | VotingClassifier Ensemble (RF + XGBoost) | **Best accuracy** | Combines RF and XGBoost with soft voting | Slower training, more complex |
 
 ### Cross-Validation Strategies
 
@@ -248,14 +252,16 @@ The workflow follows a well-structured approach for binary classification:
 
 ### 1. Random Forest (`rf`)
 
-**Grid Size:** 54 combinations (3 × 3 × 2 × 3)
+**Grid Size:** 162 combinations (3 × 3 × 2 × 3 × 3 × 3)
 
 | Parameter | Values |
 |-----------|--------|
-| `n_estimators` | [10, 30, 100] |
+| `n_estimators` | [50, 100, 200] |
 | `max_depth` | [3, 5, 7] |
 | `criterion` | ["gini", "entropy"] |
 | `max_features` | ["sqrt", "log2", None] |
+| `min_samples_split` | [2, 5, 10] |
+| `min_samples_leaf` | [1, 2, 4] |
 
 ### 2. Gradient Boosting (`gb`)
 
@@ -278,23 +284,24 @@ The workflow follows a well-structured approach for binary classification:
 
 ### 4. Logistic Regression (`lr`)
 
-**Grid Size:** 15 combinations (3 × 5)
+**Grid Size:** 90 combinations (3 × 5 × 2 × 3)
 
 | Parameter | Values |
 |-----------|--------|
 | `penalty` | ["l2", "l1", "elasticnet"] |
 | `C` | [0.001, 0.01, 0.1, 1, 10] |
+| `solver` | ["lbfgs", "saga"] |
+| `l1_ratio` | [0.15, 0.5, 0.85] |
 
 ### 5. Neural Network / MLP (`nn`)
 
-**Grid Size:** 8 combinations (4 × 2)
+**Grid Size:** 32 combinations (4 × 4 × 2)
 
 | Parameter | Values |
 |-----------|--------|
 | `activation` | ["identity", "logistic", "tanh", "relu"] |
-| `hidden_layer_sizes` | [10, 100] |
-
-> **Note:** `hidden_layer_sizes` grid is too limited. Expanding to multi-layer architectures is recommended (see TODO.md).
+| `hidden_layer_sizes` | [(50,), (100,), (100, 50), (100, 100)] |
+| `learning_rate_init` | [0.001, 0.01] |
 
 ---
 
@@ -338,6 +345,9 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 | Date | Category | Changes |
 |------|----------|---------|
+| 2026-02-13 | **README overhaul** | Rewrote README from scratch: added XGBoost classifier section, detailed hyperparameter grids with collapsible blocks, corrected output directory structure (classifier/{ClassName}/{cv_strategy}/models\|metrics), added `fit()` + `ModelPredictor` workflow, `optimize_threshold()` usage, and comprehensive A-to-Z step-by-step guide. Updated SUMMARY.md classifier count (9 → 10) and VotingClassifier composition (now RF + XGBoost). |
+| 2026-02-13 | **Imbalance-aware improvements** | Fixed `_train()` skip-logic bug (spurious `or not save_features` check). Expanded RF/NN/LR grids; added `scale_pos_weight=[1,5,10,15]` to XGB grid; removed hardcoded `scale_pos_weight=1`. Added `class_weight`/`n_jobs` params to `ClassifierModel`. Added `optimize_threshold()`, `plot_threshold_analysis()`, `plot_feature_importance()`, `plot_calibration()`, `plot_prediction_distribution()` to `ModelEvaluator`; `get_metrics()` now includes optimal-threshold fields. |
+| 2026-02-12 | **Simplify ModelEvaluator** | Rewrote from scratch: removed Protocol classes, X_train/y_train, all export_* methods, cross_validate, learning curve, feature importances, and as_dataframe flag. Kept core: `__init__`, `from_files()`, `get_metrics()`, `summary()`, three plot methods, `plot_all()`. ModelPredictor: dropped `save_reports` param. |
 | 2026-02-12 | **Full-dataset training + ModelPredictor** | Added `TrainModel._fit()` / `fit()` for full-dataset training (no train/test split, no metrics). Extended `ModelEvaluator` with `selected_features` parameter and `from_files()` classmethod. Created new `ModelPredictor` class that loads trained models from `fit()`, evaluates each against future features/labels, and aggregates metrics (mean ± std). Exported `ModelPredictor` from `model/__init__.py`. |
 | 2026-02-11 | **Docstrings** | Fixed spelling errors: `Extacted` → `Extracted`, `SKipp` → `Skip`, `WIll` → `Will`, `laad` → `load`, `preditcted` → `predicted`, `defaut` → `default`, `shanon` → `Shannon`, `paramaters` → `parameters`, `BE CAREFULL` → `WARNING`. Improved `CalculateTremor` class docstring with full Args/Returns/Example. Enhanced `set_random_state` in ClassifierModel with Raises section. Clarified `to_series` docstring. Fixed `volcano_id` description in LabelBuilder. |
 | 2026-02-09 | **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature", "calulation" → "calculation", "filenmae" → "filename" |
@@ -349,7 +359,7 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 | 2026-02-09 | **Docstrings** | Enhanced docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, TrainModel |
 | Pre-2026-02-09 | **New Classifier** | Added GradientBoostingClassifier (`"gb"`) |
 | Pre-2026-02-09 | **TimeSeriesSplit** | Added `cv_strategy` parameter and `get_cv_splitter()` method |
-| Pre-2026-02-09 | **VotingClassifier** | Added `"voting"` ensemble combining RF, GB, LR, SVM |
+| Pre-2026-02-09 | **VotingClassifier** | Added `"voting"` ensemble combining RF and XGBoost with soft voting |
 
 ### Code Quality Metrics
 
@@ -385,6 +395,40 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 ---
 
-**Document Version:** 2.4
-**Last Updated:** 2026-02-12
+---
+
+## ModelPredictor Multi-Model Consensus (2026-02-13)
+
+Refactored `ModelPredictor` to support multi-model consensus and unlabelled forecast mode.
+
+### Changes
+- `trained_models_csv: str` → `trained_models: str | dict[str, str]`
+  - `str`: single classifier (backward compat)
+  - `dict`: multiple classifiers (e.g. `{"rf": "...", "xgb": "...", "voting": "..."}`)
+- `future_labels_csv` remains optional
+- `predict()` includes a `classifier` column in the returned DataFrame; consensus metrics logged across classifiers
+- `predict_proba()` outputs per-classifier columns (`{name}_eruption_probability`, `{name}_uncertainty`, `{name}_confidence`, `{name}_prediction`) + `consensus_*` columns
+- New private `_compute_model_proba()` helper — per-classifier seed aggregation
+- Plot: each classifier as dashed line + consensus as solid black line with shaded uncertainty band
+
+### Usage
+
+```python
+predictor = ModelPredictor(
+    trained_models={
+        "rf":     "output/trainings/rf/trained_model_rf.csv",
+        "xgb":    "output/trainings/xgb/trained_model_xgb.csv",
+        "voting": "output/trainings/voting/trained_model_voting.csv",
+    },
+    future_features_csv="output/features/future_features.csv",
+)
+df = predictor.predict_proba()
+# Columns: rf_eruption_probability, xgb_eruption_probability, ...,
+#          consensus_eruption_probability, consensus_confidence, ...
+```
+
+---
+
+**Document Version:** 2.6
+**Last Updated:** 2026-02-13
 **Author:** Claude Code (Sonnet 4.5)

@@ -2,14 +2,47 @@
 
 A comprehensive Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions based on seismic patterns.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
+- [Step-by-Step Usage Guide](#step-by-step-usage-guide)
+  - [1. Calculate Tremor Metrics](#1-calculate-tremor-metrics)
+  - [2. Build Training Labels](#2-build-training-labels)
+  - [3. Build Tremor Matrix](#3-build-tremor-matrix)
+  - [4. Extract Time-Series Features](#4-extract-time-series-features)
+  - [5. Feature Selection](#5-feature-selection)
+  - [6. Train Models with Multiple Seeds](#6-train-models-with-multiple-seeds)
+  - [7. Supported Classifiers](#7-supported-classifiers)
+  - [8. Hyperparameter Grids](#8-hyperparameter-grids)
+  - [9. Cross-Validation Strategies](#9-cross-validation-strategies)
+  - [10. Predict on Future Data with ModelPredictor](#10-predict-on-future-data-with-modelpredictor)
+  - [11. Model Evaluation](#11-model-evaluation)
+  - [12. Analyze Training Results](#12-analyze-training-results)
+- [Advanced Usage](#advanced-usage)
+  - [ForecastModel — Orchestrated Pipeline](#forecastmodel--orchestrated-pipeline)
+  - [Comparing Multiple Classifiers](#comparing-multiple-classifiers)
+  - [fit() + ModelPredictor Workflow](#fit--modelpredictor-workflow-recommended-for-operational-use)
+  - [Custom Frequency Bands](#custom-frequency-bands)
+- [Output Directory Structure](#output-directory-structure)
+- [Configuration](#configuration)
+- [Requirements](#requirements)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
 ## Features
 
 - **Tremor Calculation**: Process raw seismic data (SDS/FDSN) to calculate RSAM and DSAR metrics across multiple frequency bands
 - **Label Building**: Generate training labels from eruption dates with configurable forecast horizons
 - **Feature Extraction**: Extract 700+ time-series features using tsfresh for machine learning
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
-- **Model Training**: Train multiple classifier types (Random Forest, Gradient Boosting, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
-- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, and feature importance
+- **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
+- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, and feature importance
+- **Two Training Workflows**: `train()` for in-sample evaluation (80/20 split), `fit()` for full-dataset training with future-data evaluation via `ModelPredictor`
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Logging**: Built-in logging with loguru for debugging and monitoring
 
@@ -31,15 +64,11 @@ uv sync --group dev
 
 ## Quick Start: Complete Pipeline
 
-Here's a complete example from raw seismic data to eruption predictions:
+Here's a minimal end-to-end example from raw seismic data to trained models:
 
 ```python
 from eruption_forecast import ForecastModel
-from eruption_forecast.model.model_evaluator import ModelEvaluator
-import joblib
-import pandas as pd
 
-# ========== Complete Pipeline via ForecastModel ==========
 fm = ForecastModel(
     station="OJN",
     channel="EHZ",
@@ -66,14 +95,16 @@ fm.calculate(
 ).extract_features(
     select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
 ).train(
-    classifier="rf",
+    classifier="xgb",
+    cv_strategy="stratified",
     random_state=0,
-    total_seed=100,
+    total_seed=500,
     number_of_significant_features=20,
     sampling_strategy=0.75,
-    verbose=True,
 )
 ```
+
+---
 
 ## Step-by-Step Usage Guide
 
@@ -117,7 +148,7 @@ print(f"Saved to: {tremor.csv}")
 - DateTime index with 10-minute intervals
 - RSAM columns: `rsam_f0`, `rsam_f1`, `rsam_f2`, `rsam_f3`, `rsam_f4`
 - DSAR columns: `dsar_f0-f1`, `dsar_f1-f2`, `dsar_f2-f3`, `dsar_f3-f4`
-- Default bands: (0.01-0.1), (0.1-2), (2-5), (4.5-8), (8-16) Hz
+- Default bands: (0.01–0.1), (0.1–2), (2–5), (4.5–8), (8–16) Hz
 
 ### 2. Build Training Labels
 
@@ -151,15 +182,13 @@ print(f"Negative labels: {(labels.df['is_erupted'] == 0).sum()}")
 ```
 
 **Label logic:**
-- Windows whose **end time** falls within the range `[eruption_date − day_to_forecast, eruption_date]` are labeled `is_erupted = 1`
+- Windows whose **end time** falls within `[eruption_date − day_to_forecast, eruption_date]` are labeled `is_erupted = 1`
 - All other windows: `is_erupted = 0`
 - Each window's datetime index is its **end time** (tremor data for the preceding `window_size` days)
 
 #### Labeling Strategy Visualization
 
 Example with `window_size=1d`, `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
-
-**How parameters work:**
 
 ```
 Timeline (each tick = 12 hours):
@@ -171,8 +200,6 @@ Timeline (each tick = 12 hours):
                                   │      ◄──────────── day_to_forecast=2d ───────────►│
                                   │                       label = 1 zone              │
 ```
-
-**Sliding windows — each row spans exactly `window_size=1d` of tremor data:**
 
 ```
  ID  Window data span                     End time (index)    Label
@@ -203,13 +230,6 @@ Timeline (each tick = 12 hours):
 | `eruption_dates` | `list[str]` | Known eruption dates in `YYYY-MM-DD` format | `["2025-03-20"]` |
 | `start_date` / `end_date` | `str` | Date range for generating all label windows | `"2025-01-01"` |
 | `volcano_id` | `str` | Identifier used in output filenames | `"LEWOTOBI"` |
-
-**Output filename convention:**
-
-```
-label_{start_date}_{end_date}_ws-{window_size}_step-{window_step}-{unit}_dtf-{day_to_forecast}.csv
-# Example: label_2025-01-01_2025-07-24_ws-1_step-12-hours_dtf-2.csv
-```
 
 ### 3. Build Tremor Matrix
 
@@ -255,7 +275,7 @@ print(f"Features shape: {features.shape}")
 # Example: (5000 windows, 1500 features)
 ```
 
-**Feature types:**
+**Feature types extracted:**
 - Statistical: mean, median, std, variance, min, max, quantiles
 - Time-domain: autocorrelation, partial autocorrelation
 - Frequency-domain: FFT coefficients, spectral entropy
@@ -292,19 +312,20 @@ print(scores.head(10))
 ```
 
 **Selection methods:**
+
 | Method | Reduces | Captures Interactions | Speed |
 |--------|---------|-----------------------|-------|
 | `tsfresh` | 1000s → 100s | No | Fast |
 | `random_forest` | Direct → N | Yes | Slow |
 | `combined` | 1000s → 100s → N | Yes | Fast |
 
-### 6. Train Models with Multiple Classifiers
+### 6. Train Models with Multiple Seeds
 
 Two training workflows are available depending on your evaluation strategy.
 
 #### `train()` — with held-out test set (80/20 split)
 
-Splits data before resampling and feature selection to prevent data leakage.
+Splits data **before** resampling and feature selection to prevent data leakage.
 Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
 
 ```python
@@ -314,22 +335,24 @@ trainer = TrainModel(
     extracted_features_csv="output/features/all_features.csv",
     label_features_csv="output/features/label_features.csv",
     output_dir="output/trainings",
-    classifier="rf",
-    cv_strategy="timeseries",
+    classifier="xgb",
+    cv_strategy="stratified",
+    number_of_significant_features=20,
+    feature_selection_method="combined",
     n_jobs=4,
 )
 
 trainer.train(
     random_state=0,
-    total_seed=100,
+    total_seed=500,
     sampling_strategy=0.75,
 )
 ```
 
 #### `fit()` — full dataset training (no split)
 
-Trains on the **entire** dataset across multiple seeds. No metrics are computed
-here — evaluation is deferred to `ModelPredictor` using a separate future dataset.
+Trains on the **entire** dataset across multiple seeds. No metrics are computed here —
+evaluation is deferred to `ModelPredictor` using a separate future dataset.
 
 ```python
 trainer = TrainModel(
@@ -342,101 +365,297 @@ trainer = TrainModel(
 
 trainer.fit(
     random_state=0,
-    total_seed=100,
+    total_seed=500,
     sampling_strategy=0.75,
 )
 ```
 
-**Supported classifiers:**
-- `rf`: Random Forest (balanced, robust, default)
-- `gb`: Gradient Boosting (excellent for imbalanced data)
-- `svm`: Support Vector Machine (high-dimensional data)
-- `lr`: Logistic Regression (interpretable, fast)
-- `nn`: Neural Network (MLP, complex patterns)
-- `dt`: Decision Tree (interpretable)
-- `knn`: K-Nearest Neighbors (simple baseline)
-- `nb`: Gaussian Naive Bayes (fast baseline)
-- `voting`: VotingClassifier ensemble (best accuracy)
+#### TrainModel constructor parameters
 
-**Cross-validation strategies:**
-- `shuffle`: StratifiedShuffleSplit (random splits with stratification)
-- `stratified`: StratifiedKFold (preserves class distribution)
-- `timeseries`: TimeSeriesSplit (for temporal data, prevents data leakage)
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `extracted_features_csv` | `str` | — | Path to all-features CSV |
+| `label_features_csv` | `str` | — | Path to aligned labels CSV |
+| `output_dir` | `str \| None` | `None` | Output directory (auto-generated if None) |
+| `classifier` | `str` | `"rf"` | Classifier type (see table below) |
+| `cv_strategy` | `str` | `"shuffle"` | Cross-validation strategy |
+| `cv_splits` | `int` | `5` | Number of CV folds |
+| `number_of_significant_features` | `int` | `20` | Top-N features to keep |
+| `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm |
+| `overwrite` | `bool` | `False` | Re-run even if output exists |
+| `n_jobs` | `int` | `1` | Parallel workers |
+| `verbose` | `bool` | `False` | Print progress |
 
-### 7. Predict on Future Data with ModelPredictor
+### 7. Supported Classifiers
 
-After `fit()`, use `ModelPredictor` to evaluate the trained models against a
-separate "future" feature set (e.g. from a different time period or volcano).
+| Classifier | Description | Imbalance Handling |
+|------------|-------------|---------------------|
+| `rf` | Random Forest (balanced, robust, default) | `class_weight="balanced"` |
+| `gb` | Gradient Boosting (handles imbalance natively) | None (natural) |
+| `xgb` | XGBoost (excellent for imbalanced data) | `scale_pos_weight` grid search |
+| `svm` | Support Vector Machine (high-dimensional) | `class_weight="balanced"` |
+| `lr` | Logistic Regression (interpretable, fast) | `class_weight="balanced"` |
+| `nn` | Neural Network MLP (complex patterns) | None |
+| `dt` | Decision Tree (interpretable baseline) | `class_weight="balanced"` |
+| `knn` | K-Nearest Neighbors (simple baseline) | None |
+| `nb` | Gaussian Naive Bayes (fast baseline) | None |
+| `voting` | Soft VotingClassifier (RF + XGBoost ensemble) | Combined |
+
+### 8. Hyperparameter Grids
+
+Each classifier comes with a built-in hyperparameter grid for `GridSearchCV`. You can override the grid via `ClassifierModel`:
+
+```python
+from eruption_forecast.model.classifier_model import ClassifierModel
+
+clf = ClassifierModel("xgb", random_state=42)
+
+# Override default grid
+clf.grid = {
+    "n_estimators": [200, 300, 500],
+    "max_depth": [3, 5, 7, 9],
+    "learning_rate": [0.01, 0.05, 0.1],
+    "scale_pos_weight": [1, 5, 10, 20],
+}
+```
+
+**Default grids by classifier:**
+
+<details>
+<summary>Random Forest (<code>rf</code>)</summary>
+
+```python
+{
+    "n_estimators": [50, 100, 200],
+    "max_depth": [3, 5, 7],
+    "criterion": ["gini", "entropy"],
+    "max_features": ["sqrt", "log2", None],
+    "min_samples_split": [2, 5, 10],
+    "min_samples_leaf": [1, 2, 4],
+}
+```
+</details>
+
+<details>
+<summary>Gradient Boosting (<code>gb</code>)</summary>
+
+```python
+{
+    "n_estimators": [50, 100, 200],
+    "max_depth": [3, 5, 7],
+    "learning_rate": [0.01, 0.1, 0.2],
+    "subsample": [0.8, 1.0],
+    "min_samples_split": [2, 5],
+    "min_samples_leaf": [1, 2],
+}
+```
+</details>
+
+<details>
+<summary>XGBoost (<code>xgb</code>)</summary>
+
+```python
+{
+    "n_estimators": [100, 200, 300],
+    "max_depth": [3, 5, 7],
+    "learning_rate": [0.01, 0.1, 0.2],
+    "subsample": [0.8, 1.0],
+    "colsample_bytree": [0.8, 1.0],
+    "min_child_weight": [1, 3],
+    "scale_pos_weight": [1, 5, 10, 15],  # Tunes positive-class weighting
+}
+```
+
+> `scale_pos_weight` controls how much extra weight positive (eruption) samples receive. Higher values increase sensitivity at the cost of more false positives.
+</details>
+
+<details>
+<summary>Voting Ensemble (<code>voting</code>)</summary>
+
+```python
+{
+    "rf__n_estimators": [100, 200],
+    "rf__max_depth": [10, None],
+    "xgb__n_estimators": [50, 100],
+    "xgb__learning_rate": [0.05, 0.1],
+    "xgb__max_depth": [5, 7],
+}
+```
+
+> Combines Random Forest and XGBoost with soft voting (probability averaging).
+</details>
+
+### 9. Cross-Validation Strategies
+
+| Strategy | Class | Best For |
+|----------|-------|----------|
+| `shuffle` | `StratifiedShuffleSplit` | Random splits with stratification (default) |
+| `stratified` | `StratifiedKFold` | Preserves class distribution across folds |
+| `timeseries` | `TimeSeriesSplit` | Temporal data, strict no-future-leakage |
+
+### 10. Predict on Future Data with ModelPredictor
+
+`ModelPredictor` supports two modes after `fit()`:
+
+#### Single model — evaluation mode (labelled data)
+
+Evaluates each seed model against known eruption labels and aggregates metrics across seeds.
 
 ```python
 from eruption_forecast.model.model_predictor import ModelPredictor
 
 predictor = ModelPredictor(
-    trained_models_csv=trainer.csv,
-    future_features_csv="output/features/future_features.csv",
-    future_labels_csv="output/features/future_labels.csv",
+    trained_models=trainer.csv,                 # trained_model_*.csv from fit()
+    future_features_csv="output/features/future_all_features.csv",
+    future_labels_csv="output/features/future_label_features.csv",  # required
     output_dir="output/predictions",
 )
 
-# Evaluate all seeds — returns a DataFrame of per-seed metrics
+# One row per (classifier, seed)
 df_metrics = predictor.predict()
 print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
 
-# Get the best-performing seed's evaluator
+# Best (classifier, seed) overall
 evaluator = predictor.predict_best(criterion="balanced_accuracy")
 print(evaluator.summary())
 evaluator.plot_all()
 ```
 
-### 9. Analyze Training Results
+`predict_best()` accepts any metric column as `criterion`:
+`"accuracy"`, `"balanced_accuracy"`, `"f1_score"`, `"precision"`, `"recall"`, `"roc_auc"`, `"pr_auc"`.
+
+#### Single model — forecast mode (unlabelled data)
+
+When no ground-truth labels are available, use `predict_proba()`.
 
 ```python
-import pandas as pd
+predictor = ModelPredictor(
+    trained_models=trainer.csv,
+    future_features_csv="output/features/future_all_features.csv",
+    output_dir="output/predictions",
+)
 
-# Load aggregated metrics
-metrics = pd.read_csv("output/trainings/all_metrics.csv")
-
-# View summary statistics
-summary = pd.read_csv("output/trainings/metrics_summary.csv", index_col=0)
-print(summary[["balanced_accuracy", "f1_score", "precision", "recall"]])
-
-# Find best performing seed
-best_seed = metrics.loc[metrics["balanced_accuracy"].idxmax()]
-print(f"Best seed: {best_seed['random_state']}")
-print(f"Balanced Accuracy: {best_seed['balanced_accuracy']:.4f}")
-
-# Load significant features
-sig_features = pd.read_csv("output/trainings/significant_features.csv")
-print(sig_features.head(10))
+df_forecast = predictor.predict_proba(plot=True)
 ```
 
-### 10. Model Evaluation and Visualization
+#### Multi-model consensus
+
+Pass a dict of classifier registries.  `predict_proba()` aggregates within
+each classifier (across seeds) and then across classifiers (consensus).
+
+```python
+predictor = ModelPredictor(
+    trained_models={
+        "rf":     "output/trainings/rf/trained_model_rf_stratified.csv",
+        "xgb":    "output/trainings/xgb/trained_model_xgb_stratified.csv",
+        "voting": "output/trainings/voting/trained_model_voting_stratified.csv",
+    },
+    future_features_csv="output/features/future_all_features.csv",
+    output_dir="output/predictions",
+)
+
+df_forecast = predictor.predict_proba(plot=True)
+```
+
+**Output columns (multi-model):**
+
+| Column | Description |
+|--------|-------------|
+| `{name}_eruption_probability` | Mean P(eruption) across seeds of that classifier |
+| `{name}_uncertainty` | Std across seeds of that classifier |
+| `{name}_confidence` | Seed-level agreement fraction (0.5–1.0) |
+| `{name}_prediction` | Hard label for that classifier |
+| `consensus_eruption_probability` | Mean P(eruption) averaged across all classifiers |
+| `consensus_uncertainty` | Std of per-classifier means (inter-model disagreement) |
+| `consensus_confidence` | Fraction of classifiers voting with consensus majority |
+| `consensus_prediction` | Hard label — `1` if `consensus_eruption_probability ≥ 0.5` |
+
+Results are saved to `predictions.csv`.  The plot shows each classifier as a
+dashed line and the consensus as a solid black line with a shaded uncertainty
+band (`eruption_forecast.png` in `figures/`).
+
+### 11. Model Evaluation
 
 ```python
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 
-# From objects
-evaluator = ModelEvaluator(model, X_test, y_test, model_name="rf_42", output_dir="output/eval")
+# From in-memory objects
+evaluator = ModelEvaluator(
+    model=trained_model,
+    X_test=X_test,
+    y_test=y_test,
+    model_name="xgb_42",
+    output_dir="output/eval",
+)
 
 # Or load directly from files
 evaluator = ModelEvaluator.from_files(
-    model_path="output/trainings/models/00042.pkl",
+    model_path="output/trainings/classifier/XGBClassifier/stratified/models/00042.pkl",
     X_test="output/features/all_features.csv",
     y_test="output/features/label_features.csv",
     selected_features=["feat_a", "feat_b"],  # optional
-    model_name="rf_42",
+    model_name="xgb_42",
+    output_dir="output/eval",
 )
 
+# Print a formatted summary
 print(evaluator.summary())
-metrics = evaluator.get_metrics()  # returns dict
-evaluator.plot_all()               # saves confusion matrix, ROC, PR curves
+
+# Get metrics as a dict
+metrics = evaluator.get_metrics()
+# Keys: accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc, pr_auc,
+#       true_positives, true_negatives, false_positives, false_negatives,
+#       sensitivity, specificity, optimal_threshold, f1_at_optimal,
+#       recall_at_optimal, precision_at_optimal
+
+# Generate all plots (saved to output_dir)
+evaluator.plot_all()
+# Produces: confusion_matrix, roc_curve, pr_curve, threshold_analysis,
+#            feature_importance, calibration, prediction_distribution
+
+# Find optimal decision threshold
+threshold, threshold_metrics = evaluator.optimize_threshold(criterion="f1")
+print(f"Optimal threshold: {threshold:.3f}")
+print(f"F1 at threshold:   {threshold_metrics['f1']:.4f}")
 ```
 
-## Advanced Features
+### 12. Analyze Training Results
 
-### Using ForecastModel (Complete Pipeline)
+```python
+import pandas as pd
 
-The `ForecastModel` class orchestrates the entire pipeline in one go:
+# All per-seed metrics
+metrics = pd.read_csv(
+    "output/trainings/classifier/XGBClassifier/stratified/all_metrics_xgb_stratified.csv"
+)
+
+# Summary statistics (mean ± std)
+summary = pd.read_csv(
+    "output/trainings/classifier/XGBClassifier/stratified/metrics_summary_xgb_stratified.csv",
+    index_col=0,
+)
+print(summary[["balanced_accuracy", "f1_score", "precision", "recall"]])
+
+# Best seed
+best_seed = metrics.loc[metrics["balanced_accuracy"].idxmax()]
+print(f"Best seed:          {best_seed['random_state']}")
+print(f"Balanced Accuracy:  {best_seed['balanced_accuracy']:.4f}")
+print(f"F1 Score:           {best_seed['f1_score']:.4f}")
+
+# Aggregated significant features
+sig_features = pd.read_csv(
+    "output/trainings/features/significant_features.csv"
+)
+print(sig_features.head(10))
+```
+
+---
+
+## Advanced Usage
+
+### ForecastModel — Orchestrated Pipeline
+
+`ForecastModel` chains the entire pipeline in a single fluent API:
 
 ```python
 from eruption_forecast.model.forecast_model import ForecastModel
@@ -446,25 +665,52 @@ model = ForecastModel(
     channel="EHZ",
     start_date="2025-01-01",
     end_date="2025-12-31",
-    window_size=1,
+    window_size=2,
     volcano_id="LEWOTOBI",
+    network="VG",
+    location="00",
     n_jobs=4,
+    verbose=True,
 )
 
-model.calculate(source="sds", sds_dir="/data/sds")
-model.build_label(
-    window_step=12,
+model.calculate(
+    source="sds",
+    sds_dir="/data/sds",
+    plot_tmp=True,
+    save_plot=True,
+).build_label(
+    window_step=6,
     window_step_unit="hours",
     day_to_forecast=2,
     eruption_dates=["2025-03-20", "2025-06-15"],
-)
-model.extract_features()
-model.train(
+).extract_features(
+    select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+    use_relevant_features=True,
+).train(
+    classifier="xgb",
+    cv_strategy="stratified",
     random_state=0,
-    total_seed=100,
+    total_seed=500,
     number_of_significant_features=20,
-    classifier="gb",
+    sampling_strategy=0.75,
+)
+```
+
+If you already have pre-calculated tremor data, skip the `calculate()` step:
+
+```python
+model.load_tremor_data(
+    tremor_csv="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv"
+).build_label(...).extract_features(...).train(...)
+```
+
+Change feature selection method before training:
+
+```python
+model.set_feature_selection_method("combined").train(
+    classifier="rf",
     cv_strategy="timeseries",
+    total_seed=200,
 )
 ```
 
@@ -473,11 +719,12 @@ model.train(
 ```python
 import pandas as pd
 
+base = "output/trainings/classifier"
 classifiers = {
-    "rf": "output/trainings_rf/all_metrics.csv",
-    "gb": "output/trainings_gb/all_metrics.csv",
-    "lr": "output/trainings_lr/all_metrics.csv",
-    "voting": "output/trainings_voting/all_metrics.csv",
+    "rf":     f"{base}/RandomForestClassifier/stratified/all_metrics_rf_stratified.csv",
+    "gb":     f"{base}/GradientBoostingClassifier/stratified/all_metrics_gb_stratified.csv",
+    "xgb":    f"{base}/XGBClassifier/stratified/all_metrics_xgb_stratified.csv",
+    "voting": f"{base}/VotingClassifier/stratified/all_metrics_voting_stratified.csv",
 }
 
 results = []
@@ -486,39 +733,79 @@ for name, path in classifiers.items():
     results.append({
         "classifier": name,
         "mean_balanced_acc": df["balanced_accuracy"].mean(),
-        "std_balanced_acc": df["balanced_accuracy"].std(),
-        "mean_f1": df["f1_score"].mean(),
+        "std_balanced_acc":  df["balanced_accuracy"].std(),
+        "mean_f1":           df["f1_score"].mean(),
+        "mean_roc_auc":      df["roc_auc"].mean(),
     })
 
 comparison = pd.DataFrame(results).sort_values("mean_balanced_acc", ascending=False)
-print(comparison)
+print(comparison.to_string(index=False))
 ```
 
-### Custom Hyperparameter Grids
+### fit() + ModelPredictor Workflow (Recommended for Operational Use)
+
+Use `fit()` to train on all available historical data, then evaluate on future events
+or forecast on unlabelled data.
 
 ```python
-from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast import TrainModel
+from eruption_forecast.model.model_predictor import ModelPredictor
 
-clf = ClassifierModel("rf", random_state=42)
+# --- Stage 1: Train on historical data ---
+trainer = TrainModel(
+    extracted_features_csv="data/historical/all_features.csv",
+    label_features_csv="data/historical/label_features.csv",
+    output_dir="output/trainings",
+    classifier="xgb",
+    cv_strategy="stratified",
+    number_of_significant_features=20,
+    n_jobs=4,
+)
 
-# Override default grid
-clf.grid = {
-    "n_estimators": [200, 300, 500],
-    "max_depth": [15, 20, 30, None],
-    "min_samples_split": [2, 5, 10],
-    "max_features": ["sqrt", "log2"],
-}
-```
+trainer.fit(
+    random_state=0,
+    total_seed=500,
+    sampling_strategy=0.75,
+)
 
-## Configuration
+# --- Stage 2a: Evaluate on future/held-out labelled data ---
+predictor = ModelPredictor(
+    trained_models=trainer.csv,
+    future_features_csv="data/future/all_features.csv",
+    future_labels_csv="data/future/label_features.csv",   # known labels
+    output_dir="output/predictions",
+)
 
-### Logging
+df_metrics = predictor.predict(plot=True)
+print(df_metrics[["classifier", "balanced_accuracy", "f1_score", "roc_auc"]])
 
-```python
-from eruption_forecast.logger import set_log_level, set_log_directory
+best_evaluator = predictor.predict_best(criterion="balanced_accuracy")
+print(best_evaluator.summary())
+best_evaluator.plot_all()
 
-set_log_level("DEBUG")  # Options: DEBUG, INFO, WARNING, ERROR
-set_log_directory("/custom/logs")
+# --- Stage 2b: Forecast on unlabelled data (single model) ---
+predictor = ModelPredictor(
+    trained_models=trainer.csv,
+    future_features_csv="data/realtime/all_features.csv",
+    output_dir="output/forecast",
+)
+df_forecast = predictor.predict_proba(plot=True)
+print(df_forecast[df_forecast["model_prediction"] == 1])
+
+# --- Stage 2c: Multi-model consensus forecast ---
+predictor = ModelPredictor(
+    trained_models={
+        "rf":     "output/trainings/rf/trained_model_rf_stratified.csv",
+        "xgb":    "output/trainings/xgb/trained_model_xgb_stratified.csv",
+        "voting": "output/trainings/voting/trained_model_voting_stratified.csv",
+    },
+    future_features_csv="data/realtime/all_features.csv",
+    output_dir="output/consensus",
+)
+df_consensus = predictor.predict_proba(plot=True)
+# Inspect windows where all 3 classifiers agree on eruption
+eruption_windows = df_consensus[df_consensus["consensus_confidence"] == 1.0]
+print(eruption_windows[["consensus_eruption_probability", "consensus_confidence"]])
 ```
 
 ### Custom Frequency Bands
@@ -538,40 +825,98 @@ tremor = CalculateTremor(
 ]).from_sds(sds_dir="/data/sds").run()
 ```
 
+---
+
 ## Output Directory Structure
+
+All outputs are organized under `{output_dir}/{network}.{station}.{location}.{channel}/`
+(e.g., `output/VG.OJN.00.EHZ/`).
 
 ```
 output/
-└── {network}.{station}.{location}.{channel}/
+└── VG.OJN.00.EHZ/
     ├── tremor/
-    │   ├── tmp/                           # Temporary daily files
-    │   └── tremor_*.csv                   # Final tremor data
+    │   ├── tmp/                              # Temporary daily files
+    │   └── tremor_*.csv                      # Final merged tremor data
+    │
     ├── features/
-    │   ├── extracted/
-    │   │   ├── all_features_*.csv         # All tsfresh features per column
-    │   │   └── relevant_features_*.csv    # Relevant features per column
-    │   ├── tremor_matrix_unified_*.csv    # Aligned tremor matrix
-    │   ├── tremor_matrix_per_method/      # Per-column tremor matrices
-    │   ├── all_features_*.csv             # Concatenated all features
-    │   └── label_features_*.csv           # Labels aligned with features
+    │   ├── tremor_matrix_*.csv               # Aligned tremor matrix (all columns)
+    │   ├── tremor_matrix_per_method/         # Per-column tremor matrices (optional)
+    │   ├── all_extracted_features_*.csv      # tsfresh output per tremor column
+    │   └── label_features_*.csv             # Labels aligned with features
+    │
     └── trainings/
-        ├── significant_features/          # Top-N features per seed
-        │   ├── 00000.csv
-        │   └── ...
-        ├── models/                        # Trained models
-        │   ├── 00000.pkl
-        │   └── ...
-        ├── metrics/                       # Per-seed metrics
-        │   ├── 00000.json
-        │   └── ...
-        ├── significant_features.csv       # Aggregated features
-        ├── all_metrics.csv                # All seed metrics
-        └── metrics_summary.csv            # Mean/std statistics
+        ├── features/
+        │   ├── significant_features.csv      # Aggregated top-N features (all seeds)
+        │   ├── top_20_significant_features.csv
+        │   ├── all_features/                 # Per-seed ranked features (optional)
+        │   │   ├── 00000.csv
+        │   │   └── ...
+        │   └── figures/significant/          # Feature importance plots (optional)
+        │       └── 00000.jpg
+        │
+        └── classifier/
+            └── {ClassifierName}/             # e.g., XGBClassifier
+                └── {cv_strategy}/            # e.g., stratified
+                    ├── models/
+                    │   ├── 00000.pkl         # Trained model (seed 0)
+                    │   ├── 00001.pkl
+                    │   └── ...
+                    ├── metrics/
+                    │   ├── 00000.json        # Per-seed metrics (train() only)
+                    │   └── ...
+                    ├── trained_model_{suffix}.csv    # Registry of all trained models
+                    ├── all_metrics_{suffix}.csv      # All seed metrics (train() only)
+                    └── metrics_summary_{suffix}.csv  # Mean ± std summary (train() only)
 ```
+
+**ModelPredictor output** (`output_dir/predictions/`):
+
+*Evaluation mode (`predict()` / `predict_best()`):*
+
+```
+predictions/
+├── metrics/
+│   ├── all_metrics.csv
+│   └── metrics_summary.csv
+└── seed_00000/                    # Only created when plot=True
+    ├── seed_00000_confusion_matrix.png
+    ├── seed_00000_roc_curve.png
+    ├── seed_00000_pr_curve.png
+    ├── seed_00000_threshold_analysis.png
+    ├── seed_00000_feature_importance.png
+    ├── seed_00000_calibration.png
+    └── seed_00000_prediction_distribution.png
+```
+
+*Forecast mode (`predict_proba()`):*
+
+```
+predictions/
+├── predictions.csv                # eruption_probability, uncertainty, confidence, prediction
+└── figures/
+    └── eruption_forecast.png      # Probability + confidence time-series plot
+```
+
+---
+
+## Configuration
+
+### Logging
+
+```python
+from eruption_forecast.logger import set_log_level, set_log_directory
+
+set_log_level("DEBUG")  # Options: DEBUG, INFO, WARNING, ERROR
+set_log_directory("/custom/logs")
+```
+
+---
 
 ## Requirements
 
 ### Core Dependencies
+
 - Python >= 3.11
 - pandas >= 3.0.0
 - numpy
@@ -580,15 +925,19 @@ output/
 - tsfresh (time-series feature extraction)
 - scikit-learn
 - imbalanced-learn
+- xgboost
 - joblib
 - matplotlib
 - seaborn
 - loguru
 
 ### Development Dependencies
+
 - ruff (linting)
 - ty (type checking)
 - pytest (testing)
+
+---
 
 ## Development
 
@@ -606,14 +955,16 @@ uvx ty check src/
 
 ```bash
 # Run all tests
-pytest
+pytest tests/
 
 # Run with coverage
-pytest --cov=src/eruption_forecast
+pytest --cov=src/eruption_forecast tests/
 
 # Run specific test
-pytest tests/test_train_model_fixed.py
+pytest tests/test_train_model.py
 ```
+
+---
 
 ## Documentation
 
@@ -634,15 +985,18 @@ See the `examples/` directory for Jupyter notebooks demonstrating:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b claude/my-feature`)
 3. Make changes with tests
-4. Ensure code passes linting and type checks
+4. Ensure code passes linting and type checks (`uv run ruff check --fix src/`)
 5. Update documentation
 6. Submit a pull request
 
 ### Code Style
+
 - Follow PEP 8 guidelines
 - Use Google-style docstrings
 - Include type hints for all functions
 - Write unit tests for new features
+
+---
 
 ## License
 
@@ -673,10 +1027,11 @@ This project uses:
 - [ObsPy](https://github.com/obspy/obspy) for seismic data processing
 - [tsfresh](https://github.com/blue-yonder/tsfresh) for feature extraction
 - [scikit-learn](https://scikit-learn.org/) for machine learning
+- [XGBoost](https://xgboost.readthedocs.io/) for gradient boosting
 - [uv](https://docs.astral.sh/uv/) for package management
 
 ---
 
 **Version:** 0.2.0
 **Status:** Active Development
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-02-13
