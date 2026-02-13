@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `dev/predictions`
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-02-13 (model_trainer.py refactor)
 
 ---
 
@@ -22,6 +22,7 @@
 11. [Rename TrainModel → ModelTrainer](#rename-trainmodel--modeltrainer-2026-02-13)
 12. [Docstring Improvements](#docstring-improvements-2026-02-13)
 13. [FeaturesBuilder Readability Improvements](#featuresbuilder-readability-improvements-2026-02-13)
+14. [ModelTrainer Refactor](#modeltrainer-refactor-2026-02-13)
 
 ---
 
@@ -536,6 +537,29 @@ Added `resolve_output_dir()` helper function to `utils.py` and a `root_dir: str 
 
 ---
 
-**Document Version:** 3.1
+---
+
+## ModelTrainer Refactor (2026-02-13)
+
+Refactored `model_trainer.py` for readability and maintainability without changing any behaviour:
+
+- **Bug fix:** Missing space in `update_grid_params` log message (`"has been updated to{grid_params}"` → `"Grid parameters updated from … to …"`).
+- **Comment fix:** Typo and misleading comment in `train_and_evaluate()` replaced with `# Accumulate results across all seeds before aggregating`.
+- **Docstring fix:** Removed incorrect `_run_train_and_evaluate()` example that used a non-existent `seed=0` parameter.
+- **Skip logic unified:** `_generate_filepaths()` now returns `can_skip` as its 7th value instead of setting `self.can_skip` as a hidden side effect. `self.can_skip` attribute removed from the class.
+- **`_setup_grid_search()` extracted:** Both `_run_train_and_evaluate()` and `_run_train()` shared an identical GridSearchCV setup block; extracted to a private helper.
+- **`_run_jobs()` extracted:** Sequential/parallel dispatch logic duplicated across `train_and_evaluate()` and `train()`; extracted to a private helper.
+- **`_save_models_registry()` extracted:** Post-processing (building and saving the models CSV) was duplicated; extracted to a private helper.
+- **Comment style fixed:** Inline comments follow the project convention (explain *why*, not *what*; 2 spaces before `#`; proper grammar).
+- **Method renames:**
+  - `train()` → `train_and_evaluate()` (clarifies train/test split + evaluation)
+  - `_train()` → `_run_train_and_evaluate()` (consistent internal naming)
+  - `fit()` → `train()` (aligns with domain term; trains on full dataset)
+  - `_fit()` → `_run_train()` (consistent internal naming)
+- **Call sites updated:** `forecast_model.py`, `model_predictor.py`, `tests/test_train_model_fixed.py`, `tests/test_train_model_dynamic_classifier.py`.
+
+---
+
+**Document Version:** 3.2
 **Last Updated:** 2026-02-13
 **Author:** Claude Code (Sonnet 4.5)

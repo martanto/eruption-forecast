@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+_Last updated: 2026-02-13_
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Python Package Manager
@@ -13,11 +15,11 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 
 1. **SUMMARY.md must be updated after every completed task.** Any finished task — bug fix, refactor, new feature, test, documentation change — must have its outcome recorded in SUMMARY.md before moving on.
 2. **TODO.md tracks pending work.** Use TODO.md for next things to do. Check off items when complete and add new items as they arise.
-3. **Run `uv run isort src/` before every commit.** Imports must be sorted before staging and committing.
-4. **Type checker is pyrefly, not mypy.** Use `uv run pyrefly check src/` for type checking. mypy has been removed from the project.
+3. **Type checker is `ty`.** Use `uvx ty check src/` for type checking.
+4. **Lint with ruff.** Use `uv run ruff check --fix src/` for linting.
 5. **All `uv` commands are permitted.** `uv sync`, `uv run`, `uv pip install/uninstall`, `uv lock`, etc. — no need to ask.
 6. **Create a new branch before commits or modifications.** Always create a new branch with `claude/` prefix before making any commits or code modifications (e.g., `claude/fix-docstrings`, `claude/add-feature-x`).
-7. **Alwasy use `tests` directory when running testing.** Create the tests output inside `tests` directory.
+7. **Always use `tests` directory when running testing.** Create the tests output inside `tests` directory.
 
 ## Testing
 
@@ -47,17 +49,16 @@ uv sync --group dev
 
 ### Code Quality
 ```bash
-# Format code with black
-uv run black src/
+# Lint with ruff (--fix auto-corrects fixable issues)
+uv run ruff check --fix src/
 
-# Lint with ruff
-uv run ruff check src/
+# Type checking with ty
+uvx ty check src/
+```
 
-# Type checking with pyrefly
-uv run pyrefly check src/
-
-# Sort imports with isort
-uv run isort src/
+### Running Tests
+```bash
+uv run pytest tests/
 ```
 
 ### Running the Application
@@ -69,130 +70,138 @@ python main.py
 uv run python main.py
 ```
 
-### Jupyter Notebooks
-The `examples/` directory contains Jupyter notebooks demonstrating various workflows. Run notebooks using:
-```bash
-jupyter notebook examples/
-```
 
 ## Architecture Overview
 
-### Core Pipeline (Three-Stage Process)
+### Pipeline
 
-The package follows a sequential three-stage pipeline for eruption forecasting:
+`ForecastModel` orchestrates the full pipeline with method chaining:
 
-1. **Tremor Calculation** (`CalculateTremor`): Process raw seismic data from SDS format to calculate tremor metrics (RSAM and DSAR)
-2. **Feature Engineering** (`FeaturesBuilder`): Extract time-series features from tremor data and build labeled training datasets
-3. **Forecasting** (`ForecastModel`): Train models and predict eruptions (work in progress)
+```
+CalculateTremor → LabelBuilder → TremorMatrixBuilder → FeaturesBuilder → ModelTrainer → ModelPredictor
+```
 
 ### Key Components
 
 #### 1. Tremor Calculation (`src/eruption_forecast/tremor/`)
 
-**`CalculateTremor`** is the entry point for processing raw seismic data:
+**`CalculateTremor`** processes raw seismic data into tremor metrics:
 - Reads seismic data from SDS (SeisComP Data Structure) format or FDSN web services
-- Calculates two types of tremor metrics in parallel across multiple frequency bands:
-  - **RSAM** (Real Seismic Amplitude Measurement): Mean amplitude in frequency bands
-  - **DSAR** (Displacement Seismic Amplitude Ratio): Ratio between consecutive frequency bands
+- Calculates two metrics across multiple frequency bands in parallel:
+  - **RSAM** (Real Seismic Amplitude Measurement): Mean amplitude per band
+  - **DSAR** (Displacement Seismic Amplitude Ratio): Ratio between consecutive bands
 - Default frequency bands: `(0.01-0.1), (0.1-2), (2-5), (4.5-8), (8-16) Hz`
-- Supports multiprocessing for parallel daily calculations
-- Outputs time-series CSV files with 10-minute sampling intervals
+- Supports multiprocessing via `n_jobs`; outputs 10-minute interval CSVs
 
 **Key classes:**
-- `CalculateTremor`: Main orchestrator (in `calculate_tremor.py`)
-- `RSAM`: Calculates mean amplitude metrics (in `rsam.py`)
-- `DSAR`: Calculates amplitude ratios between bands (in `dsar.py`)
-- `TremorData`: Wrapper for loading and validating tremor CSV files (in `tremor_data.py`)
-- `SDS`: Handles SeisComP Data Structure file reading (in `sds.py`)
+- `CalculateTremor`: Main orchestrator (`calculate_tremor.py`)
+- `RSAM`: Mean amplitude metrics (`rsam.py`)
+- `DSAR`: Amplitude ratios between bands (`dsar.py`)
+- `TremorData`: Loads and validates tremor CSV files (`tremor_data.py`)
+- `SDS`: Reads SeisComP Data Structure files (`sds.py`)
 
 **Workflow:**
 ```python
-# Configure and run tremor calculation
 calculate = CalculateTremor(
     station="OJN",
     channel="EHZ",
     start_date="2025-01-01",
     end_date="2025-01-03",
-    n_jobs=4  # Parallel processing
+    n_jobs=4
 ).from_sds(sds_dir="/path/to/sds").run()
-
-# Output: CSV with columns like rsam_f0, rsam_f1, dsar_f0-f1, etc.
+# Output CSV columns: rsam_f0, rsam_f1, dsar_f0-f1, etc.
 ```
 
 #### 2. Label Building (`src/eruption_forecast/label/`)
 
 **`LabelBuilder`** generates binary labels for supervised learning:
-- Creates sliding time windows from tremor data based on configurable parameters
-- Labels windows as erupted (1) or not erupted (0) based on known eruption dates
-- Uses a "day_to_forecast" parameter to look ahead N days before eruptions
-- Validates label filenames follow the pattern: `label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv`
+- Creates sliding time windows and labels them erupted (1) or not (0)
+- Uses `day_to_forecast` to look ahead N days before eruptions
+- Label filenames follow: `label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv`
 
 **Key classes:**
-- `LabelBuilder`: Creates labeled windows (in `label_builder.py`)
-- `LabelData`: Loads and parses label CSV files, extracting parameters from filename (in `label_data.py`)
+- `LabelBuilder`: Creates labeled windows (`label_builder.py`)
+- `LabelData`: Loads label CSV and parses parameters from filename (`label_data.py`)
 
 **Window configuration:**
-- `window_size`: Size of each training window in days
-- `window_step` + `window_step_unit`: Step size between windows (minutes or hours)
-- `day_to_forecast`: Number of days before eruption to start labeling as positive
+- `window_size`: Window size in days
+- `window_step` + `window_step_unit`: Step between windows (minutes or hours)
+- `day_to_forecast`: Days before eruption to start labeling positive
 
 **Workflow:**
 ```python
 label_builder = LabelBuilder(
     start_date="2020-01-01",
     end_date="2020-12-31",
-    window_size=1,  # 1-day windows
+    window_size=1,
     window_step=12,
     window_step_unit="hours",
-    day_to_forecast=2,  # Label 2 days before eruption
+    day_to_forecast=2,
     eruption_dates=["2020-06-15", "2020-09-20"],
     volcano_id="VOLCANO_ID"
 ).build()
 ```
 
-#### 3. Feature Extraction (`src/eruption_forecast/features/`)
+#### 3. Tremor Matrix Building (`src/eruption_forecast/features/`)
 
-**`FeaturesBuilder`** combines tremor data with labels:
-- Loads tremor CSV (from `TremorData`) and label CSV (from `LabelData`)
-- Synchronizes time windows between tremor metrics and labels
-- Prepares feature matrix for machine learning (uses tsfresh for time-series features)
+**`TremorMatrixBuilder`** slices tremor time-series into windows aligned with labels:
+- Takes tremor DataFrame and label DataFrame as input
+- Validates sample counts per window
+- Concatenates all windows into a unified matrix with `id`, `datetime`, and tremor columns
 
 **Key classes:**
-- `FeaturesBuilder`: Orchestrates feature extraction (in `features_builder.py`)
+- `TremorMatrixBuilder`: Builds the windowed tremor matrix (`tremor_matrix_builder.py`)
 
-**Workflow:**
-```python
-features = FeaturesBuilder(
-    tremor_csv="path/to/tremor.csv",
-    label_csv="path/to/label.csv",
-    output_dir="output/"
-)
-```
+#### 4. Feature Extraction (`src/eruption_forecast/features/`)
 
-#### 4. Forecast Model (`src/eruption_forecast/model/`)
+**`FeaturesBuilder`** extracts tsfresh features from the tremor matrix:
+- Operates in two modes:
+  - **Training mode** (labels provided): Filters windows to match labels, saves aligned label CSV
+  - **Prediction mode** (no labels): Extracts all features, disables relevance filtering
+- Runs tsfresh extraction per tremor column independently
 
-**`ForecastModel`** (work in progress) will handle:
-- Model training on extracted features
-- Eruption prediction
-- Model evaluation
+**Key classes:**
+- `FeaturesBuilder`: Orchestrates tsfresh feature extraction (`features_builder.py`)
+- `FeatureSelector`: Two-stage selection — tsfresh (statistical FDR) → RandomForest (importance) (`feature_selector.py`)
+  - Methods: `"tsfresh"`, `"random_forest"`, `"combined"`
+
+#### 5. Model Training (`src/eruption_forecast/model/`)
+
+**`ModelTrainer`** trains classifiers across multiple random seeds:
+- Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
+- CV strategies: `shuffle`, `stratified`, `timeseries`
+- Uses `RandomUnderSampler` to handle class imbalance
+- Two training modes:
+  - `train_and_evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
+  - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
+
+**Key classes:**
+- `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
+- `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
+- `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
+  - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
+- `ModelPredictor`: Runs inference in evaluation or forecast mode (`model_predictor.py`)
+  - `predict()` / `predict_best()`: Requires labels (evaluation mode)
+  - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
 
 ### Data Classes
 
-The package uses dataclasses to wrap CSV files with metadata:
-- **`TremorData`**: Wraps tremor CSV, provides start/end dates, validates sampling rate
-- **`LabelData`**: Wraps label CSV, parses parameters from filename (window_size, window_step, day_to_forecast)
+- **`TremorData`**: Wraps tremor CSV; provides start/end dates, validates sampling rate
+- **`LabelData`**: Wraps label CSV; parses parameters from filename
 
-These data classes use `@cached_property` for efficient access to derived attributes.
+Both use `@cached_property` for efficient attribute access.
 
 ### Utility Functions (`src/eruption_forecast/utils.py`)
 
-Core utilities used throughout the package:
-- `calculate_window_metrics()`: Calculates metrics over time windows with outlier removal
-- `construct_windows()`: Creates time window DataFrames for labeling
-- `detect_maximum_outlier()` / `delete_outliers()`: Z-score based outlier detection
+- `construct_windows()`: Creates sliding time windows
+- `calculate_window_metrics()`: Metrics over windows with outlier removal
+- `detect_maximum_outlier()` / `remove_outliers()`: Z-score based outlier detection
 - `to_datetime()`: Date string validation and conversion
 - `validate_date_ranges()`: Ensures start_date < end_date
 - `validate_window_step()`: Validates window step parameters
+- `random_under_sampler()`: Balances classes via random undersampling
+- `get_significant_features()`: Retrieves statistically significant tsfresh features
+- `resolve_output_dir()`: Resolves paths relative to `root_dir`
 
 ## Important Patterns
 
@@ -244,47 +253,49 @@ output/
 - **SDS (SeisComP Data Structure)**: Primary seismic data format
 - **FDSN**: Alternative data source via web services
 
-## Type Checking Configuration
-
-The project uses pyrefly for type checking (mypy has been removed):
-- Run with: `uv run pyrefly check src/`
-- All functions must have complete type annotations
 
 ## Common Workflows
 
 ### Complete Pipeline Example
+
+`ForecastModel` orchestrates the full pipeline via method chaining. `root_dir` anchors all output paths.
+
 ```python
-# 1. Calculate tremor from seismic data
-tremor = CalculateTremor(
+from eruption_forecast import ForecastModel
+
+fm = ForecastModel(
+    root_dir="/path/to/project",
     station="OJN",
     channel="EHZ",
     start_date="2020-01-01",
     end_date="2020-12-31",
-    n_jobs=4
-).from_sds(sds_dir="/data/sds").run()
-
-# 2. Build labels
-labels = LabelBuilder(
-    start_date="2020-01-01",
-    end_date="2020-12-31",
-    window_size=1,
-    window_step=12,
-    window_step_unit="hours",
-    day_to_forecast=2,
-    eruption_dates=["2020-06-15"],
-    volcano_id="VOLCANO_001"
-).build()
-
-# 3. Extract features
-features = FeaturesBuilder(
-    tremor_csv=tremor.filepath,
-    label_csv=labels.filepath,
-    output_dir="output/"
+    window_size=2,
+    volcano_id="VOLCANO_001",
+    n_jobs=4,
 )
 
-# 4. Train model (work in progress)
-# model = ForecastModel(...).train()
+fm.calculate(
+    source="sds",
+    sds_dir="/path/to/sds",
+).build_label(
+    start_date="2020-01-01",
+    end_date="2020-12-31",
+    day_to_forecast=2,
+    window_step=6,
+    window_step_unit="hours",
+    eruption_dates=["2020-06-15"],
+).extract_features(
+    select_tremor_columns=["rsam_f2", "rsam_f3", "dsar_f3-f4"],
+).train(
+    classifier="xgb",
+    cv_strategy="stratified",
+    random_state=0,
+    total_seed=500,
+    number_of_significant_features=20,
+)
 ```
+
+See `main.py` for a full working example.
 
 ### Working with Existing Data
 ```python
