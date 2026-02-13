@@ -19,6 +19,9 @@
 8. [Code Quality Summary](#code-quality-summary)
 9. [Future Recommendations](#future-recommendations)
 10. [ModelPredictor Multi-Model Consensus](#modelpredictor-multi-model-consensus-2026-02-13)
+11. [Rename TrainModel → ModelTrainer](#rename-trainmodel--modeltrainer-2026-02-13)
+12. [Docstring Improvements](#docstring-improvements-2026-02-13)
+13. [FeaturesBuilder Readability Improvements](#featuresbuilder-readability-improvements-2026-02-13)
 
 ---
 
@@ -429,6 +432,97 @@ df = predictor.predict_proba()
 
 ---
 
-**Document Version:** 2.6
+## Rename TrainModel → ModelTrainer (2026-02-13)
+
+Renamed `train_model.py` → `model_trainer.py` and class `TrainModel` → `ModelTrainer` throughout the codebase.
+
+**Files updated:**
+- `src/eruption_forecast/model/model_trainer.py` — all docstring references updated
+- `src/eruption_forecast/model/model_predictor.py` — docstring references updated
+- `src/eruption_forecast/model/forecast_model.py` — attribute `self.TrainModel` → `self.ModelTrainer`
+- `tests/test_features_builder.py` — imports and class references updated
+- `tests/test_train_model_dynamic_classifier.py` — imports and class references updated
+- `tests/test_train_model_fixed.py` — imports and class references updated
+
+---
+
+## Docstring Improvements (2026-02-13)
+
+Audited all 27 Python source files and fixed docstrings across 6 files.
+
+**Changes made:**
+
+- `utils.py::get_metrics()` — replaced placeholder `"Get features matrix"` with full
+  docstring listing all parameters and the 17-key return dict.
+- `plot.py::plot_tremor()` — corrected `overwrite` default from `False` → `True`,
+  expanded all arg descriptions with units and behaviour notes, added example.
+- `plot.py::plot_significant_features()` — added full arg descriptions, return type,
+  and example.
+- `tremor/tremor_data.py::TremorData` — added class-level docstring with args and
+  examples; expanded `from_csv`, `df`, all cached_property methods, and
+  `check_consistency` with complete return-tuple documentation.
+- `model/model_evaluator.py` — added docstring to `_get_proba`; expanded `get_metrics`
+  with all 17 return-dict keys; expanded `summary`, `plot_confusion_matrix`,
+  `plot_roc_curve`, `plot_precision_recall_curve`, `plot_threshold_analysis`,
+  `plot_feature_importance`, `plot_calibration`, `plot_prediction_distribution`, and
+  `plot_all` with full args/returns.
+- `decorators/decorator_class.py` — expanded `SerializationWrapper` class docstring;
+  added full docstrings to `_prepare_value` and `save_to_file`; rewrote
+  `AutoSaveDict` class docstring with args; added one-line docstrings to `_save`,
+  `__setitem__`, `__delitem__`, `update`; fixed duplicate `print` statement.
+- `logger.py` — added return types and full arg/example sections to `set_log_level`
+  and `set_log_directory`.
+
+---
+
+## Multi-file Consistency Update (2026-02-13)
+
+Reviewed and updated consistency across 8 changed files.
+
+**Bug fixed:**
+- `src/eruption_forecast/features/features_builder.py:299` — `y.index = y[ID_COLUMN]` was operating on a Series after `y` was already reassigned; fixed by capturing `y_index = y[ID_COLUMN]` before the reassignment.
+
+**Dead code removed from `forecast_model.py`:**
+- Removed `tsfresh` / `ComprehensiveFCParameters` / `impute` imports (feature extraction is now fully delegated to `FeaturesBuilder`)
+- Removed `_initialize_feature_parameters()` static method and the `self.default_fc_parameters` / `self.excludes_features` attributes it populated
+- Removed `_extract_features_for_column()` instance method (superseded by `FeaturesBuilder`)
+- `features.constants` import auto-removed by ruff (no longer needed after dead-code removal)
+
+**Public API updated (`__init__.py`):**
+- Added `TremorMatrixBuilder` and `ModelTrainer` exports (both are now first-class pipeline components)
+
+---
+
+## FeaturesBuilder Docstring Update (2026-02-13)
+
+Rewrote and corrected docstrings throughout `features_builder.py`.
+
+**Changes:**
+- Class docstring: replaced wrong example (used `tremor_df`, `window_size`, `select_tremor_columns` constructor params and `save_per_method` — none of which exist) with a correct two-mode (training / prediction) description and accurate example
+- `validate()`: removed false mention of "date ranges"; clarified it checks DataFrame types and column presence only
+- `concat_features()`: documented the `ValueError` raised by the underlying utility for < 2 files; clarified the attribute side-effects
+- `extract_features()`: fixed signature (`prefix_filename: str = None` → `str | None = None`); rewrote docstring to describe per-column extraction flow, label CSV output, and the auto-fallback when no labels are provided
+
+---
+
+## FeaturesBuilder Readability Improvements (2026-02-13)
+
+### Problem
+`extract_features()` mixed training and prediction logic inline, and `concat_features()` read `self.use_relevant_features` which was only assigned *after* the call — a state-mutation ordering bug.
+
+### Changes (`features_builder.py`)
+
+| # | Change | Detail |
+|---|--------|--------|
+| 1 | **Bug fix** | `concat_features()` now accepts `use_relevant_features: bool = False` parameter instead of reading stale `self.use_relevant_features`; call site updated to pass the value explicitly |
+| 2 | **`_prepare_training_mode()`** | New private helper: filters labels to window IDs present in tremor matrix, saves `label_features_<dates>.csv`, sets `self.label_features_csv`, returns `(dates_str, label_df)` |
+| 3 | **`_prepare_prediction_mode()`** | New private helper: computes date range from tremor `datetime` column for unlabelled prediction; returns `(dates_str, empty_df)` |
+| 4 | **`extract_features()` simplified** | Replaced 25-line inline dual-mode block with a 4-line dispatch to the two helpers; `self.use_relevant_features` is now assigned *before* `concat_features()` is called |
+
+No public API changes. No attribute renames. Downstream callers (`ForecastModel`, `ModelTrainer`, tests) unaffected.
+
+---
+
+**Document Version:** 3.0
 **Last Updated:** 2026-02-13
 **Author:** Claude Code (Sonnet 4.5)
