@@ -1,6 +1,6 @@
-"""Test dynamic classifier functionality in TrainModel.
+"""Test dynamic classifier functionality in ModelTrainer.
 
-Tests that TrainModel can use different classifiers (RF, GB, LR, etc.)
+Tests that ModelTrainer can use different classifiers (RF, GB, LR, etc.)
 through the ClassifierModel integration.
 """
 
@@ -11,7 +11,7 @@ import shutil
 
 # Third party imports
 # Project imports
-from eruption_forecast.model.train_model import TrainModel
+from eruption_forecast.model.model_trainer import ModelTrainer
 
 
 def test_random_forest_classifier():
@@ -23,7 +23,7 @@ def test_random_forest_classifier():
         shutil.rmtree(output_dir)
 
     # Create trainer with Random Forest
-    trainer = TrainModel(
+    trainer = ModelTrainer(
         features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
         label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,
@@ -70,7 +70,7 @@ def test_gradient_boosting_classifier():
         shutil.rmtree(output_dir)
 
     # Create trainer with Gradient Boosting
-    trainer = TrainModel(
+    trainer = ModelTrainer(
         features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
         label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,
@@ -116,7 +116,7 @@ def test_logistic_regression_classifier():
         shutil.rmtree(output_dir)
 
     # Create trainer with Logistic Regression
-    trainer = TrainModel(
+    trainer = ModelTrainer(
         features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
         label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,

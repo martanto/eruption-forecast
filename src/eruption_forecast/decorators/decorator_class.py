@@ -8,11 +8,31 @@ import yaml
 
 
 class SerializationWrapper:
-    """Utility class for serializing Python objects to JSON or YAML"""
+    """Utility class for serializing Python objects to JSON or YAML.
+
+    Provides static methods to recursively convert arbitrary Python objects
+    into JSON/YAML-compatible types and write them to disk.
+
+    Examples:
+        >>> SerializationWrapper.save_to_file(
+        ...     {"key": "value"}, "output/config.json"
+        ... )
+    """
 
     @staticmethod
     def _prepare_value(value: Any) -> Any:
-        """Convert value to JSON/YAML serializable format"""
+        """Recursively convert a value to a JSON/YAML-serializable type.
+
+        Handles dataclasses (via ``asdict``), objects with ``__dict__``,
+        lists/tuples, dicts, and primitive types. Falls back to ``str()``
+        for anything else.
+
+        Args:
+            value (Any): The value to convert.
+
+        Returns:
+            Any: A JSON/YAML-serializable representation of ``value``.
+        """
         if is_dataclass(value):
             return asdict(value)
         elif hasattr(value, "__dict__"):
@@ -29,14 +49,31 @@ class SerializationWrapper:
     @staticmethod
     def save_to_file(
         data: dict, filepath: str | Path, save_as: Literal["json", "yaml"] | None = None
-    ):
-        """
-        Save data to JSON or YAML file
+    ) -> None:
+        """Save a dictionary to a JSON or YAML file.
+
+        Creates parent directories automatically. Values are passed through
+        :meth:`_prepare_value` before serialisation to ensure compatibility.
 
         Args:
-            data (dict): Dictionary to save
-            filepath (str | Path): Path to output file
-            save_as (Literal["json","yaml"]: Save as 'json' or 'yaml'
+            data (dict): Dictionary to serialise and write to disk.
+            filepath (str | Path): Destination file path. Parent directories
+                are created if they do not exist.
+            save_as (Literal["json", "yaml"] | None, optional): Output
+                format. If None, defaults to ``"json"``. Defaults to None.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If ``save_as`` is not ``"json"`` or ``"yaml"``.
+
+        Examples:
+            >>> SerializationWrapper.save_to_file(
+            ...     {"model": "rf", "score": 0.92},
+            ...     "output/results.yaml",
+            ...     save_as="yaml",
+            ... )
         """
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -55,20 +92,29 @@ class SerializationWrapper:
             raise ValueError(f"Unsupported format: {save_as}. Use 'json' or 'yaml'")
 
         print(f"Saved to: {filepath}")
-        print(f"Saved to: {filepath}")
 
 
 class AutoSaveDict(dict):
-    """Dictionary that automatically saves to file on updates
+    """Dictionary that automatically persists itself to disk on every update.
+
+    Wraps the built-in ``dict`` and overrides mutating methods
+    (``__setitem__``, ``__delitem__``, ``update``) so the file is rewritten
+    after each change. The saved file includes a ``timestamp`` and a
+    ``data`` key containing the dictionary contents.
+
+    Args:
+        filepath (str): Destination file path for persistence. The file is
+            written immediately on construction.
+        save_as (Literal["json", "yaml"], optional): Serialisation format.
+            Defaults to ``"json"``.
+        *args: Positional arguments forwarded to ``dict.__init__``.
+        **kwargs: Keyword arguments forwarded to ``dict.__init__``.
 
     Examples:
-        >>> config = AutoSaveDict('outputs/app_config.json', format='json')
-        >>> config['app_name'] = 'My Application'
-        >>> config['version'] = '1.0.0'
-        >>> config['settings'] = {
-        >>>     'debug': False,
-        >>>     'port': 8080
-        >>> }
+        >>> config = AutoSaveDict("outputs/app_config.json", save_as="json")
+        >>> config["app_name"] = "My Application"
+        >>> config["version"] = "1.0.0"
+        >>> config["settings"] = {"debug": False, "port": 8080}
     """
 
     def __init__(
@@ -79,19 +125,22 @@ class AutoSaveDict(dict):
         self.save_as = save_as
         self._save()
 
-    def _save(self):
-        """Save current state to file"""
+    def _save(self) -> None:
+        """Persist the current dictionary state to the configured file."""
         data = {"timestamp": datetime.now().isoformat(), "data": dict(self)}
         SerializationWrapper.save_to_file(data, self.filepath, self.save_as)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any) -> None:
+        """Set an item and immediately save the dictionary to disk."""
         super().__setitem__(key, value)
         self._save()
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: Any) -> None:
+        """Delete an item and immediately save the dictionary to disk."""
         super().__delitem__(key)
         self._save()
 
-    def update(self, *args, **kwargs):
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        """Update the dictionary and immediately save to disk."""
         super().update(*args, **kwargs)
         self._save()

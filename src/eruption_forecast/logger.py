@@ -57,12 +57,24 @@ def get_logger():
     return logger
 
 
-def set_log_level(level: str):
-    """
-    Change the console log level dynamically.
+def set_log_level(level: str) -> None:
+    """Change the console log level dynamically.
+
+    Removes all existing handlers and re-adds them with the new console
+    level. File handlers retain their original levels (DEBUG for the
+    general log, ERROR for the error log).
 
     Args:
-        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        level (str): Desired log level for the console handler. One of
+            ``"DEBUG"``, ``"INFO"``, ``"WARNING"``, ``"ERROR"``, or
+            ``"CRITICAL"``. Case-insensitive.
+
+    Returns:
+        None
+
+    Examples:
+        >>> set_log_level("DEBUG")
+        >>> set_log_level("WARNING")
     """
     logger.remove()  # Remove all handlers
 
@@ -96,12 +108,22 @@ def set_log_level(level: str):
     )
 
 
-def set_log_directory(log_dir: str):
-    """
-    Change the log directory dynamically.
+def set_log_directory(log_dir: str) -> None:
+    """Change the log file directory dynamically.
+
+    Updates ``DEFAULT_LOG_DIR``, creates the directory if needed, then
+    reconfigures all handlers to write log files to the new location.
 
     Args:
-        log_dir: New directory path for log files
+        log_dir (str): Absolute or relative path to the new log directory.
+            The directory is created automatically if it does not exist.
+
+    Returns:
+        None
+
+    Examples:
+        >>> set_log_directory("output/logs")
+        >>> set_log_directory("/var/log/eruption_forecast")
     """
     global DEFAULT_LOG_DIR
     DEFAULT_LOG_DIR = os.path.abspath(log_dir)

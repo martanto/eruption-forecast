@@ -20,7 +20,7 @@ from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
 
 
-class TrainModel:
+class ModelTrainer:
     """Train feature-selection and classifier models over multiple random seeds.
 
     Loads pre-extracted features and labels, and for each seed performs:
@@ -62,7 +62,7 @@ class TrainModel:
 
     Example:
         >>> # Train with Random Forest (default)
-        >>> trainer = TrainModel(
+        >>> trainer = ModelTrainer(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
@@ -76,7 +76,7 @@ class TrainModel:
         ... )
 
         >>> # Train with Gradient Boosting
-        >>> trainer = TrainModel(
+        >>> trainer = ModelTrainer(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
@@ -85,7 +85,7 @@ class TrainModel:
         ... )
 
         >>> # Train with VotingClassifier ensemble and TimeSeriesSplit
-        >>> trainer = TrainModel(
+        >>> trainer = ModelTrainer(
         ...     features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
@@ -247,7 +247,7 @@ class TrainModel:
                 do not match.
 
         Example:
-            >>> trainer = TrainModel(
+            >>> trainer = ModelTrainer(
             ...     features_csv="features.csv",
             ...     label_features_csv="labels.csv"
             ... )
@@ -288,7 +288,7 @@ class TrainModel:
             grid_params (dict): Grid search parameters.
 
         Returns:
-            self (Self): TrainModel class
+            self (Self): ModelTrainer class
         """
         current_grid = classifier.grid
         classifier.grid = grid_params
@@ -307,7 +307,7 @@ class TrainModel:
         automatically during initialization.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> trainer.create_directories()  # Called in __init__
             >>> # Creates: output_dir/, significant_features/, models/, metrics/
         """
@@ -336,7 +336,7 @@ class TrainModel:
             ValueError: If concatenated DataFrame is empty.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> trainer.train(total_seed=100)
             >>> _df = trainer.concat_significant_features(
             ...     plot=True
@@ -555,7 +555,7 @@ class TrainModel:
                 trained model filepath, and metrics dictionary.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> csv_path, evaluation_metrics = trainer._train(
             ...     seed=0,
             ...     random_state=42,
@@ -581,7 +581,7 @@ class TrainModel:
         ) = self._generate_filepaths(random_state=random_state)
 
         # Skip if files already exist
-        if self.can_skip or not save_features or not plot_features:
+        if self.can_skip:
             logger.info(f"Seed {random_state:05d} already trained.")
             with open(metrics_filepath) as f:
                 metrics = json.load(f)
@@ -705,7 +705,7 @@ class TrainModel:
                 plots. Defaults to False.
 
         Example:
-            >>> TrainModel(...).train(
+            >>> ModelTrainer(...).train(
             ...     random_state=42,
             ...     total_seed=100,
             ... )
@@ -814,6 +814,235 @@ class TrainModel:
 
         return None
 
+    def _fit(
+        self,
+        random_state: int,
+        sampling_strategy: str | float = 0.75,
+        save_features: bool = False,
+        plot_features: bool = False,
+    ) -> tuple[int, str, str]:
+        """Train on the full dataset (no train/test split) for a single random seed.
+
+        Performs:
+        1. Random under-sampling on full dataset
+        2. Feature selection on resampled data
+        3. Classifier training with GridSearchCV (using configured classifier type)
+        4. Save trained model
+
+        Args:
+            random_state (int): Random seed for reproducibility.
+            sampling_strategy (str | float, optional): Under-sampling ratio.
+                Defaults to 0.75.
+            save_features (bool, optional): Save all ranked features. Defaults to False.
+            plot_features (bool, optional): Generate feature plots. Defaults to False.
+
+        Returns:
+            tuple[int, str, str]: Random state value, path to significant features CSV,
+                and trained model filepath.
+
+        Example:
+            >>> trainer = ModelTrainer(...)
+            >>> random_state, sig_csv, model_path = trainer._fit(random_state=42)
+        """
+        if self.debug:
+            logger.debug(f"_fit: seed={random_state}")
+
+        # ========== STEP 0: Preparation ==========
+        (
+            _,
+            significant_filepath,
+            all_features_filepath,
+            all_figures_filepath,
+            model_filepath,
+            _metrics_filepath,
+        ) = self._generate_filepaths(random_state=random_state)
+
+        # For fit(), skip only based on significant + model files (no metrics)
+        can_skip = (
+            not self.overwrite
+            and os.path.isfile(significant_filepath)
+            and os.path.isfile(model_filepath)
+        )
+
+        if can_skip:
+            logger.info(f"Seed {random_state:05d} already fitted.")
+            return random_state, significant_filepath, model_filepath
+
+        logger.info(f"Fitting Seed: {random_state:05d}")
+
+        # ========== STEP 1: Resample Full Dataset ==========
+        features_resampled, labels_resampled = random_under_sampler(
+            features=self.df_features,
+            labels=self.df_labels,
+            sampling_strategy=sampling_strategy,
+            random_state=random_state,
+        )
+
+        # ========== STEP 2: Feature Selection on Resampled Data ==========
+        (
+            features_resampled_selected,
+            _selected_features,
+            top_selected_features,
+        ) = self.select_features(
+            features=features_resampled,
+            labels=labels_resampled,
+            random_state=random_state,
+            significant_filepath=significant_filepath,
+            all_features_filepath=all_features_filepath if save_features else None,
+            all_figures_filepath=all_figures_filepath if plot_features else None,
+        )
+
+        # ========== STEP 3: Cross-Validation with Dynamic Classifier ==========
+        clf = self.ClassifierModel.set_random_state(random_state=random_state)
+
+        model = clf.model
+        param_grid = clf.grid
+        cv = clf.get_cv_splitter()
+
+        grid_search = GridSearchCV(
+            estimator=model,
+            param_grid=param_grid,
+            cv=cv,
+            scoring="balanced_accuracy",
+            n_jobs=1,
+            verbose=0,
+        )
+
+        top_n_features = top_selected_features.index.tolist()
+        features_resampled_selected = features_resampled_selected[top_n_features]
+
+        grid_search.fit(features_resampled_selected, labels_resampled)
+        best_model = grid_search.best_estimator_
+
+        # ========== STEP 4: Save Model ==========
+        joblib.dump(best_model, model_filepath)
+
+        if self.verbose:
+            logger.info(f"Model {random_state:05d}: {model_filepath}")
+
+        return random_state, significant_filepath, model_filepath
+
+    def fit(
+        self,
+        random_state: int = 0,
+        total_seed: int = 500,
+        sampling_strategy: str | float = 0.75,
+        save_all_features: bool = False,
+        plot_significant_features: bool = False,
+    ) -> None:
+        """Train on the full dataset across multiple seeds (no train/test split).
+
+        For each seed, performs:
+        1. Random under-sampling on full dataset
+        2. Feature selection on resampled data
+        3. Classifier training with GridSearchCV
+        4. Save trained model
+
+        Unlike ``train()``, this method does NOT perform a train/test split and
+        does NOT compute evaluation metrics. It is intended for final model
+        training when a separate "future" dataset will be used for evaluation
+        via ``ModelPredictor``.
+
+        Args:
+            random_state (int, optional): Initial random state seed. Defaults to 0.
+            total_seed (int, optional): Total number of seeds to run. Defaults to 500.
+            sampling_strategy (str | float, optional): Under-sampling ratio for
+                balancing classes. Defaults to 0.75.
+            save_all_features (bool, optional): Save all features per seed,
+                not just top-N. Defaults to False.
+            plot_significant_features (bool, optional): Generate feature importance
+                plots. Defaults to False.
+
+        Example:
+            >>> trainer = ModelTrainer(
+            ...     features_csv="output/features/extracted_features.csv",
+            ...     label_features_csv="output/features/label_features.csv",
+            ... )
+            >>> trainer.fit(random_state=0, total_seed=5)
+        """
+        if save_all_features:
+            os.makedirs(self.all_features_dir, exist_ok=True)
+
+        if plot_significant_features:
+            os.makedirs(self.significant_figures_dir, exist_ok=True)
+
+        random_states: list[int] = [random_state + seed for seed in range(total_seed)]
+        jobs: list[tuple[int, str | float, bool, bool]] = [
+            (
+                _random_state,
+                sampling_strategy,
+                save_all_features,
+                plot_significant_features,
+            )
+            for _random_state in random_states
+        ]
+
+        significant_features_and_trained_models = []
+
+        if self.n_jobs == 1:
+            for job in jobs:
+                (
+                    _random_state,
+                    significant_features_csv,
+                    trained_model_filepath,
+                ) = self._fit(*job)
+
+                self.significant_features_csvs.append(significant_features_csv)
+                significant_features_and_trained_models.append(
+                    {
+                        "random_state": _random_state,
+                        "significant_features_csv": significant_features_csv,
+                        "trained_model_filepath": trained_model_filepath,
+                    }
+                )
+
+        if self.n_jobs > 1:
+            logger.info(f"Running on {self.n_jobs} job(s)")
+            with Pool(self.n_jobs) as pool:
+                results = pool.starmap(self._fit, jobs)
+
+                for (
+                    _random_state,
+                    significant_features_csv,
+                    trained_model_filepath,
+                ) in results:
+                    self.significant_features_csvs.append(significant_features_csv)
+                    significant_features_and_trained_models.append(
+                        {
+                            "random_state": _random_state,
+                            "significant_features_csv": significant_features_csv,
+                            "trained_model_filepath": trained_model_filepath,
+                        }
+                    )
+
+        # Aggregate feature selection results
+        self.df_significant_features = self.concat_significant_features(
+            plot=plot_significant_features,
+        )
+
+        suffix_filename = (
+            f"{self.classifier_name}_rs-{random_state}_ts-{total_seed}"
+            f"_top-{self.number_of_significant_features}"
+        )
+        df_models = pd.DataFrame(significant_features_and_trained_models)
+        df_models = df_models.set_index("random_state")
+
+        if df_models.empty:
+            raise ValueError("No significant features or trained models found.")
+
+        models_filename = f"trained_model_{suffix_filename}.csv"
+        csv = os.path.join(self.classifier_dir, models_filename)
+
+        df_models.to_csv(csv, index=True)
+
+        self.df = df_models
+        self.csv = csv
+
+        if self.verbose:
+            logger.info(f"Models saved to: {csv}")
+
+        return None
+
     def _aggregate_metrics(
         self, all_metrics: list[dict], suffix_filename: str = ""
     ) -> None:
@@ -826,7 +1055,7 @@ class TrainModel:
             all_metrics (list[dict]): List of metric dictionaries from each seed.
 
         Example:
-            >>> trainer = TrainModel(...)
+            >>> trainer = ModelTrainer(...)
             >>> trainer.train(total_seed=100)
             >>> # Creates: all_metrics.csv and metrics_summary.csv
         """

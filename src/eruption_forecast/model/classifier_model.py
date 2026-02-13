@@ -1,7 +1,6 @@
 from typing import Any, Self, Literal
 
 from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import (
@@ -38,7 +37,8 @@ class ClassifierModel:
         - nn: Multi-Layer Perceptron Neural Network
         - nb: Gaussian Naive Bayes
         - lr: Logistic Regression (with balanced class weights)
-        - voting: Ensemble VotingClassifier combining rf, gb, lr, and svm
+        - xgb: XGBoost classifier (excellent for imbalanced data)
+        - voting: Ensemble VotingClassifier combining rf and xgb
 
     Args:
         classifier: Classifier type identifier.
@@ -54,7 +54,7 @@ class ClassifierModel:
         >>> clf = ClassifierModel("rf")
         >>> model, grid = clf.model_and_grid
         >>> print(grid)
-        {'n_estimators': [10, 30, 100], 'max_depth': [3, 5, 7], ...}
+        {'n_estimators': [50, 100, 200], 'max_depth': [3, 5, 7], ...}
 
         >>> # Create a Gradient Boosting classifier with random state
         >>> clf = ClassifierModel("gb", random_state=42)
@@ -81,12 +81,16 @@ class ClassifierModel:
 
     def __init__(
         self,
-        classifier: Literal["svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"],
+        classifier: Literal[
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
+        ],
         random_state: int | None = None,
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         n_splits: int = 5,
         test_size: float = 0.2,
         verbose: bool = False,
+        class_weight: str | dict[int, float] | None = None,
+        n_jobs: int = 1,
     ):
         # =========================
         # Set DEFAULT properties
@@ -97,6 +101,8 @@ class ClassifierModel:
         self.n_splits = n_splits
         self.test_size = test_size
         self.verbose = verbose
+        self.class_weight = class_weight
+        self.n_jobs = n_jobs
 
         # =========================
         # Set ADDITIONAL properties (derived values)
@@ -107,6 +113,7 @@ class ClassifierModel:
             | DecisionTreeClassifier
             | RandomForestClassifier
             | GradientBoostingClassifier
+            | XGBClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -190,7 +197,7 @@ class ClassifierModel:
             n_splits=self.n_splits,
             test_size=self.test_size,
             random_state=self.random_state,
-        )  # ty:ignore[invalid-return-type]
+        )
 
     @property
     def grid(self) -> dict[str, Any]:
@@ -233,10 +240,12 @@ class ClassifierModel:
 
         if self.classifier == "rf" or isinstance(self._model, RandomForestClassifier):
             return {
-                "n_estimators": [10, 30, 100],
+                "n_estimators": [50, 100, 200],
                 "max_depth": [3, 5, 7],
                 "criterion": ["gini", "entropy"],
                 "max_features": ["sqrt", "log2", None],
+                "min_samples_split": [2, 5, 10],
+                "min_samples_leaf": [1, 2, 4],
             }
 
         if self.classifier == "gb" or isinstance(
@@ -251,10 +260,22 @@ class ClassifierModel:
                 "min_samples_leaf": [1, 2],
             }
 
+        if self.classifier == "xgb" or isinstance(self._model, XGBClassifier):
+            return {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [3, 5, 7],
+                "learning_rate": [0.01, 0.1, 0.2],
+                "subsample": [0.8, 1.0],
+                "colsample_bytree": [0.8, 1.0],
+                "min_child_weight": [1, 3],
+                "scale_pos_weight": [1, 5, 10, 15],
+            }
+
         if self.classifier == "nn" or isinstance(self._model, MLPClassifier):
             return {
                 "activation": ["identity", "logistic", "tanh", "relu"],
-                "hidden_layer_sizes": [10, 100],
+                "hidden_layer_sizes": [(50,), (100,), (100, 50), (100, 100)],
+                "learning_rate_init": [0.001, 0.01],
             }
 
         if self.classifier == "nb" or isinstance(self._model, GaussianNB):
@@ -264,6 +285,8 @@ class ClassifierModel:
             return {
                 "penalty": ["l2", "l1", "elasticnet"],
                 "C": [0.001, 0.01, 0.1, 1, 10],
+                "solver": ["lbfgs", "saga"],
+                "l1_ratio": [0.15, 0.5, 0.85],
             }
 
         if self.classifier == "voting" or isinstance(self._model, VotingClassifier):
@@ -272,7 +295,7 @@ class ClassifierModel:
             return {
                 "rf__n_estimators": [100, 200],
                 "rf__max_depth": [10, None],
-                "xgb__n_estimators": [100, 200],
+                "xgb__n_estimators": [50, 100],
                 "xgb__learning_rate": [0.05, 0.1],
                 "xgb__max_depth": [5, 7],
             }
@@ -295,6 +318,7 @@ class ClassifierModel:
         | DecisionTreeClassifier
         | RandomForestClassifier
         | GradientBoostingClassifier
+        | XGBClassifier
         | MLPClassifier
         | GaussianNB
         | LogisticRegression
@@ -325,9 +349,11 @@ class ClassifierModel:
         if self._model is not None:
             return self._model
 
+        _cw = self.class_weight if self.class_weight is not None else "balanced"
+
         if self.classifier == "svm":
             return SVC(
-                class_weight="balanced",
+                class_weight=_cw,
                 random_state=self.random_state,
                 probability=True,
             )
@@ -337,16 +363,25 @@ class ClassifierModel:
 
         if self.classifier == "dt":
             return DecisionTreeClassifier(
-                class_weight="balanced", random_state=self.random_state
+                class_weight=_cw, random_state=self.random_state
             )
 
         if self.classifier == "rf":
             return RandomForestClassifier(
-                class_weight="balanced", random_state=self.random_state
+                class_weight=_cw,
+                random_state=self.random_state,
+                n_jobs=self.n_jobs,
             )
 
         if self.classifier == "gb":
             return GradientBoostingClassifier(random_state=self.random_state)
+
+        if self.classifier == "xgb":
+            return XGBClassifier(
+                eval_metric="logloss",
+                random_state=self.random_state,
+                n_jobs=self.n_jobs,
+            )
 
         if self.classifier == "nn":
             return MLPClassifier(alpha=1, max_iter=1000, random_state=self.random_state)
@@ -356,7 +391,7 @@ class ClassifierModel:
 
         if self.classifier == "lr":
             return LogisticRegression(
-                class_weight="balanced",
+                class_weight=_cw,
                 random_state=self.random_state,
                 max_iter=1000,
             )
@@ -369,18 +404,17 @@ class ClassifierModel:
                     (
                         "rf",
                         RandomForestClassifier(
-                            class_weight="balanced",
+                            class_weight=_cw,
                             random_state=self.random_state,
-                            n_jobs=1,
+                            n_jobs=self.n_jobs,
                         ),
                     ),
                     (
                         "xgb",
                         XGBClassifier(
-                            scale_pos_weight=12,  # adjust to your actual ratio
                             random_state=self.random_state,
                             eval_metric="logloss",
-                            n_jobs=1,
+                            n_jobs=self.n_jobs,
                         ),
                     ),
                 ],
@@ -398,6 +432,7 @@ class ClassifierModel:
             | DecisionTreeClassifier
             | RandomForestClassifier
             | GradientBoostingClassifier
+            | XGBClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression
@@ -426,6 +461,7 @@ class ClassifierModel:
             | DecisionTreeClassifier
             | RandomForestClassifier
             | GradientBoostingClassifier
+            | XGBClassifier
             | MLPClassifier
             | GaussianNB
             | LogisticRegression

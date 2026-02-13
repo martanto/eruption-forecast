@@ -1,4 +1,4 @@
-"""Integration test for the fixed TrainModel implementation.
+"""Integration test for the fixed ModelTrainer implementation.
 
 Tests that the corrected workflow:
 1. Splits data before any resampling
@@ -19,7 +19,7 @@ import joblib
 import pandas as pd
 
 # Project imports
-from eruption_forecast.model.train_model import TrainModel
+from eruption_forecast.model.model_trainer import ModelTrainer
 
 
 def test_full_training_pipeline():
@@ -32,7 +32,7 @@ def test_full_training_pipeline():
         shutil.rmtree(output_dir)
 
     # Create trainer
-    trainer = TrainModel(
+    trainer = ModelTrainer(
         features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
         label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,

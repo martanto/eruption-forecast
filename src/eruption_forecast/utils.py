@@ -1,4 +1,3 @@
-import os
 import json
 from typing import Any, Literal
 from datetime import datetime, timedelta
@@ -15,117 +14,14 @@ from sklearn.metrics import (
     confusion_matrix,
     balanced_accuracy_score,
 )
-from imblearn.pipeline import Pipeline
 from tsfresh.transformers import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import (
     GridSearchCV,
-    StratifiedShuffleSplit,
-    train_test_split,
 )
 
 from eruption_forecast.logger import logger
 from eruption_forecast.model.classifier_model import ClassifierModel
-
-
-def create_model_predictions(
-    features: pd.DataFrame,
-    labels: pd.Series,
-    classifier: ClassifierModel,
-    model_dir: str,
-    sampling_strategy: str | float = 0.75,
-    scoring: str = "balanced_accuracy",
-    random_state: int = 42,
-    cv: Any = None,
-    overwrite: bool = False,
-    verbose: bool = False,
-) -> None:
-    """Create model predictions based on specific classifier.
-
-    Args:
-        features (pd.DataFrame): Extracted features DataFrame.
-        labels (pd.Series): Labels DataFrame.
-        classifier (ClassifierModel): Classifier model.
-        model_dir (str): Output directory for model predictions.
-        sampling_strategy (str, float, optional): Sampling strategy for feature selection. Defaults to 75.
-        random_state (int, optional): Random state for feature selection. Defaults to 42.
-        scoring (str, optional): Cross validation scoring strategy. Defaults to "balanced_accuracy".
-        cv (Any, optional): Cross-validation strategy. Defaults to StratifiedShuffleSplit.
-        overwrite (bool, optional): Whether to overwrite existing predictions. Defaults to False.
-        verbose (bool, optional): Verbosity strategy. Defaults to False.
-
-    Returns:
-        None
-    """
-    classifier_model, param_grid = classifier.model_and_grid
-
-    classifier_name = type(classifier_model).__name__
-    classifier_dir = os.path.join(model_dir, classifier_name)
-    filename = f"{classifier_name}_{random_state:05d}.pkl"
-    filepath = os.path.join(classifier_dir, filename)
-
-    if not overwrite and os.path.isfile(filepath):
-        if verbose:
-            logger.debug(f"Model prediction exists at: {filepath}")
-        return None
-
-    features, _ = get_significant_features(features=features, labels=labels)
-    features_train, features_test, labels_train, labels_test = train_test_split(
-        features,
-        labels,
-        test_size=0.2,
-        random_state=random_state,
-        stratify=labels,
-    )
-
-    if cv is None:
-        cv = StratifiedShuffleSplit(
-            n_splits=5, test_size=0.2, random_state=random_state
-        )
-
-    pipeline = Pipeline(
-        [
-            (
-                "undersampler",
-                RandomUnderSampler(
-                    sampling_strategy=sampling_strategy, random_state=random_state
-                ),
-            ),
-            ("classifier", classifier_model),
-        ]
-    )
-
-    grid_search = GridSearchCV(
-        estimator=pipeline,
-        param_grid=param_grid,
-        cv=cv,
-        scoring=scoring,
-        n_jobs=-1,
-        error_score=np.nan,
-        verbose=verbose,
-    )
-
-    grid_search.fit(features_train, labels_train)
-    best_model = grid_search.best_estimator_
-
-    # TODO: Saved prediction result
-    labels_pred = best_model.predict(features_test)
-    labels_pred_proba = grid_search.predict_proba(features_test)
-
-    results = {
-        "model": classifier_model,
-        "predictions": labels_pred,
-        "probabilities": labels_pred_proba,
-        "best_params": grid_search.best_params_,
-        # "feature_names": feature_names,  # if relevant
-    }
-
-    if verbose:
-        logger.debug(f"Best parameters {random_state:05d}: {grid_search.best_params_}")
-        logger.debug(f"Best score {random_state:05d}: {grid_search.best_score_:.4f}")
-
-    # TODO: Save model
-    return None
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -479,6 +375,7 @@ def construct_windows(
     end_date: str | datetime,
     window_step: int,
     window_step_unit: Literal["minutes", "hours"],
+    reset_index: bool = False,
 ) -> pd.DataFrame:
     """Construct time windows for label and tremor data.
 
@@ -661,7 +558,7 @@ def check_sampling_consistency(
     expected_freq: str = "10min",
     tolerance: str = "1min",
     verbose: bool = False,
-) -> tuple[bool, pd.DataFrame, pd.DataFrame]:
+) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
     """
     Check 10-minute sampling rate consistency, identify inconsistencies, and remove them.
 
@@ -675,6 +572,7 @@ def check_sampling_consistency(
         bool: True if consistent. False otherwise.
         pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
         pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
+        int | None: Sampling rate in seconds or None if inconsistencies.
     """
     if len(df) <= 2:
         raise ValueError(
@@ -684,6 +582,7 @@ def check_sampling_consistency(
         raise TypeError("DataFrame index must be DatetimeIndex")
 
     df = df.sort_index()
+    sampling_rate = None
 
     # Calculate time differences between consecutive timestamps
     time_diffs = df.index.to_series().diff()
@@ -710,6 +609,10 @@ def check_sampling_consistency(
 
     is_consistent = True if inconsistent_data.empty else False
 
+    # Get sampling rate if consistent
+    if is_consistent:
+        sampling_rate = (df.index[1] - df.index[0]).seconds
+
     if verbose:
         print(f"Total rows: {len(df)}")
         print(f"Inconsistent rows found: {len(inconsistent_data)}")
@@ -719,7 +622,7 @@ def check_sampling_consistency(
             print("\nInconsistent time differences:")
             print(time_diffs[inconsistent_mask].describe())
 
-    return is_consistent, consistent_data, inconsistent_data
+    return is_consistent, consistent_data, inconsistent_data, sampling_rate
 
 
 def validate_columns(
@@ -895,7 +798,60 @@ def get_metrics(
     random_state: int,
     metrics_filepath: str | None = None,
 ) -> dict[str | Any, int | str | Any]:
-    """Get features matrix"""
+    """Compute classification metrics from model predictions.
+
+    Calculates confusion matrix components, accuracy, balanced accuracy,
+    F1 score, precision, recall, and best cross-validation parameters.
+    Optionally saves the metrics to a JSON file.
+
+    Args:
+        classifier (ClassifierModel): Fitted classifier model with name,
+            cv_strategy, and n_splits attributes.
+        labels_test: True test labels (array-like).
+        labels_pred: Predicted labels from the model (array-like).
+        labels_train (pd.Series): Training labels used for training.
+        top_n (int): Number of features used in training.
+        grid_search (GridSearchCV): Fitted GridSearchCV object with
+            best_params_ and best_score_ attributes.
+        random_state (int): Random state seed used for reproducibility.
+        metrics_filepath (str | None, optional): Path to save metrics as
+            a JSON file. Defaults to None.
+
+    Returns:
+        dict: Metrics dictionary with keys:
+            - ``random_state`` (int): Random seed used.
+            - ``classifier`` (str): Classifier name.
+            - ``cv_strategy`` (str): Cross-validation strategy.
+            - ``cv_splits`` (int): Number of CV splits.
+            - ``n_train`` (int): Number of training samples.
+            - ``n_test`` (int): Number of test samples.
+            - ``n_features`` (int): Number of features used.
+            - ``true_negatives`` (int): TN count.
+            - ``false_positives`` (int): FP count.
+            - ``false_negatives`` (int): FN count.
+            - ``true_positives`` (int): TP count.
+            - ``accuracy`` (float): Accuracy score.
+            - ``balanced_accuracy`` (float): Balanced accuracy score.
+            - ``f1_score`` (float): F1 score.
+            - ``precision`` (float): Precision score.
+            - ``recall`` (float): Recall score.
+            - ``best_params`` (dict): Best hyperparameters from GridSearchCV.
+            - ``best_cv_score`` (float): Best CV score from GridSearchCV.
+
+    Examples:
+        >>> metrics = get_metrics(
+        ...     classifier=clf_model,
+        ...     labels_test=y_test,
+        ...     labels_pred=y_pred,
+        ...     labels_train=y_train,
+        ...     top_n=20,
+        ...     grid_search=gs,
+        ...     random_state=42,
+        ...     metrics_filepath="output/metrics.json",
+        ... )
+        >>> print(metrics["f1_score"])
+        0.85
+    """
 
     # Confusion matrix for Binary Classification
     # Read more: https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#binary-classification

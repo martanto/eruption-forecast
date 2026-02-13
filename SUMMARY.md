@@ -2,8 +2,8 @@
 
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
-**Branch:** `dev/predictions`
-**Last Updated:** 2026-02-11
+**Branch:** `claude/fit-method-and-model-predictor`
+**Last Updated:** 2026-02-13
 
 ---
 
@@ -11,11 +11,17 @@
 
 1. [Package Overview](#package-overview)
 2. [Architecture](#architecture)
-3. [Machine Learning Workflow Analysis](#machine-learning-workflow-analysis)
-4. [Model Comparison & Recommendations](#model-comparison--recommendations)
-5. [Grid Parameter Analysis](#grid-parameter-analysis)
-6. [Code Quality Summary](#code-quality-summary)
-7. [Future Recommendations](#future-recommendations)
+3. [Critical Fix: Data Leakage in Model Training](#critical-fix-data-leakage-in-model-training-2026-02-09)
+4. [Machine Learning Workflow Analysis](#machine-learning-workflow-analysis)
+5. [Model Comparison & Recommendations](#model-comparison--recommendations)
+6. [Grid Parameter Analysis](#grid-parameter-analysis)
+7. [Enhanced Feature Selection](#enhanced-feature-selection-2026-02-09)
+8. [Code Quality Summary](#code-quality-summary)
+9. [Future Recommendations](#future-recommendations)
+10. [ModelPredictor Multi-Model Consensus](#modelpredictor-multi-model-consensus-2026-02-13)
+11. [Rename TrainModel → ModelTrainer](#rename-trainmodel--modeltrainer-2026-02-13)
+12. [Docstring Improvements](#docstring-improvements-2026-02-13)
+13. [FeaturesBuilder Readability Improvements](#featuresbuilder-readability-improvements-2026-02-13)
 
 ---
 
@@ -200,7 +206,7 @@ The workflow follows a well-structured approach for binary classification:
 | Feature Robustness | Multi-seed feature selection | Reduces overfitting to single split |
 | Class Imbalance | Under-sampling + balanced weights | Handles rare eruption events |
 | Hyperparameter Tuning | GridSearchCV with CV | Optimal parameter selection |
-| Multi-model Support | 9 classifiers available | Flexibility for different data characteristics |
+| Multi-model Support | 10 classifiers available | Flexibility for different data characteristics |
 | Feature Selection | Three-method FeatureSelector | Statistical rigor + interaction capture |
 
 ### Current Limitations & Recommendations
@@ -214,6 +220,7 @@ The workflow follows a well-structured approach for binary classification:
 | ~~No model persistence~~ | RESOLVED | `ModelEvaluator.export_model()` with joblib |
 | ~~No evaluation metrics~~ | RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
 | No probability calibration | Pending | Add CalibratedClassifierCV |
+| No full-dataset training | RESOLVED | `TrainModel.fit()` trains on full dataset; `ModelPredictor` evaluates on future data |
 
 ---
 
@@ -231,7 +238,8 @@ The workflow follows a well-structured approach for binary classification:
 | `dt` | Decision Tree | Interpretability | Easy to visualize, fast | Prone to overfitting |
 | `knn` | K-Nearest Neighbors | Small datasets | Simple, no training | Slow prediction, needs scaling |
 | `nb` | Gaussian Naive Bayes | Quick baseline | Very fast, works with small data | Strong independence assumption |
-| `voting` | VotingClassifier Ensemble | **Best accuracy** | Combines multiple models, robust | Slower training, more complex |
+| `xgb` | XGBoost | **Imbalanced data** | `scale_pos_weight` grid search, fast, accurate | Requires xgboost package |
+| `voting` | VotingClassifier Ensemble (RF + XGBoost) | **Best accuracy** | Combines RF and XGBoost with soft voting | Slower training, more complex |
 
 ### Cross-Validation Strategies
 
@@ -247,14 +255,16 @@ The workflow follows a well-structured approach for binary classification:
 
 ### 1. Random Forest (`rf`)
 
-**Grid Size:** 54 combinations (3 × 3 × 2 × 3)
+**Grid Size:** 162 combinations (3 × 3 × 2 × 3 × 3 × 3)
 
 | Parameter | Values |
 |-----------|--------|
-| `n_estimators` | [10, 30, 100] |
+| `n_estimators` | [50, 100, 200] |
 | `max_depth` | [3, 5, 7] |
 | `criterion` | ["gini", "entropy"] |
 | `max_features` | ["sqrt", "log2", None] |
+| `min_samples_split` | [2, 5, 10] |
+| `min_samples_leaf` | [1, 2, 4] |
 
 ### 2. Gradient Boosting (`gb`)
 
@@ -277,23 +287,24 @@ The workflow follows a well-structured approach for binary classification:
 
 ### 4. Logistic Regression (`lr`)
 
-**Grid Size:** 15 combinations (3 × 5)
+**Grid Size:** 90 combinations (3 × 5 × 2 × 3)
 
 | Parameter | Values |
 |-----------|--------|
 | `penalty` | ["l2", "l1", "elasticnet"] |
 | `C` | [0.001, 0.01, 0.1, 1, 10] |
+| `solver` | ["lbfgs", "saga"] |
+| `l1_ratio` | [0.15, 0.5, 0.85] |
 
 ### 5. Neural Network / MLP (`nn`)
 
-**Grid Size:** 8 combinations (4 × 2)
+**Grid Size:** 32 combinations (4 × 4 × 2)
 
 | Parameter | Values |
 |-----------|--------|
 | `activation` | ["identity", "logistic", "tanh", "relu"] |
-| `hidden_layer_sizes` | [10, 100] |
-
-> **Note:** `hidden_layer_sizes` grid is too limited. Expanding to multi-layer architectures is recommended (see TODO.md).
+| `hidden_layer_sizes` | [(50,), (100,), (100, 50), (100, 100)] |
+| `learning_rate_init` | [0.001, 0.01] |
 
 ---
 
@@ -337,6 +348,10 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 | Date | Category | Changes |
 |------|----------|---------|
+| 2026-02-13 | **README overhaul** | Rewrote README from scratch: added XGBoost classifier section, detailed hyperparameter grids with collapsible blocks, corrected output directory structure (classifier/{ClassName}/{cv_strategy}/models\|metrics), added `fit()` + `ModelPredictor` workflow, `optimize_threshold()` usage, and comprehensive A-to-Z step-by-step guide. Updated SUMMARY.md classifier count (9 → 10) and VotingClassifier composition (now RF + XGBoost). |
+| 2026-02-13 | **Imbalance-aware improvements** | Fixed `_train()` skip-logic bug (spurious `or not save_features` check). Expanded RF/NN/LR grids; added `scale_pos_weight=[1,5,10,15]` to XGB grid; removed hardcoded `scale_pos_weight=1`. Added `class_weight`/`n_jobs` params to `ClassifierModel`. Added `optimize_threshold()`, `plot_threshold_analysis()`, `plot_feature_importance()`, `plot_calibration()`, `plot_prediction_distribution()` to `ModelEvaluator`; `get_metrics()` now includes optimal-threshold fields. |
+| 2026-02-12 | **Simplify ModelEvaluator** | Rewrote from scratch: removed Protocol classes, X_train/y_train, all export_* methods, cross_validate, learning curve, feature importances, and as_dataframe flag. Kept core: `__init__`, `from_files()`, `get_metrics()`, `summary()`, three plot methods, `plot_all()`. ModelPredictor: dropped `save_reports` param. |
+| 2026-02-12 | **Full-dataset training + ModelPredictor** | Added `TrainModel._fit()` / `fit()` for full-dataset training (no train/test split, no metrics). Extended `ModelEvaluator` with `selected_features` parameter and `from_files()` classmethod. Created new `ModelPredictor` class that loads trained models from `fit()`, evaluates each against future features/labels, and aggregates metrics (mean ± std). Exported `ModelPredictor` from `model/__init__.py`. |
 | 2026-02-11 | **Docstrings** | Fixed spelling errors: `Extacted` → `Extracted`, `SKipp` → `Skip`, `WIll` → `Will`, `laad` → `load`, `preditcted` → `predicted`, `defaut` → `default`, `shanon` → `Shannon`, `paramaters` → `parameters`, `BE CAREFULL` → `WARNING`. Improved `CalculateTremor` class docstring with full Args/Returns/Example. Enhanced `set_random_state` in ClassifierModel with Raises section. Clarified `to_series` docstring. Fixed `volcano_id` description in LabelBuilder. |
 | 2026-02-09 | **Grammar/Spelling** | Fixed "aftrer" → "after", "each significant features" → "each significant feature", "calulation" → "calculation", "filenmae" → "filename" |
 | 2026-02-09 | **Feature Selection** | Added `FeatureSelector` class with tsfresh, RandomForest, and combined methods |
@@ -347,7 +362,7 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 | 2026-02-09 | **Docstrings** | Enhanced docstrings in FeaturesBuilder, TremorMatrixBuilder, ForecastModel, TrainModel |
 | Pre-2026-02-09 | **New Classifier** | Added GradientBoostingClassifier (`"gb"`) |
 | Pre-2026-02-09 | **TimeSeriesSplit** | Added `cv_strategy` parameter and `get_cv_splitter()` method |
-| Pre-2026-02-09 | **VotingClassifier** | Added `"voting"` ensemble combining RF, GB, LR, SVM |
+| Pre-2026-02-09 | **VotingClassifier** | Added `"voting"` ensemble combining RF and XGBoost with soft voting |
 
 ### Code Quality Metrics
 
@@ -383,6 +398,131 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 ---
 
-**Document Version:** 2.3
-**Last Updated:** 2026-02-11
+---
+
+## ModelPredictor Multi-Model Consensus (2026-02-13)
+
+Refactored `ModelPredictor` to support multi-model consensus and unlabelled forecast mode.
+
+### Changes
+- `trained_models_csv: str` → `trained_models: str | dict[str, str]`
+  - `str`: single classifier (backward compat)
+  - `dict`: multiple classifiers (e.g. `{"rf": "...", "xgb": "...", "voting": "..."}`)
+- `future_labels_csv` remains optional
+- `predict()` includes a `classifier` column in the returned DataFrame; consensus metrics logged across classifiers
+- `predict_proba()` outputs per-classifier columns (`{name}_eruption_probability`, `{name}_uncertainty`, `{name}_confidence`, `{name}_prediction`) + `consensus_*` columns
+- New private `_compute_model_proba()` helper — per-classifier seed aggregation
+- Plot: each classifier as dashed line + consensus as solid black line with shaded uncertainty band
+
+### Usage
+
+```python
+predictor = ModelPredictor(
+    trained_models={
+        "rf":     "output/trainings/rf/trained_model_rf.csv",
+        "xgb":    "output/trainings/xgb/trained_model_xgb.csv",
+        "voting": "output/trainings/voting/trained_model_voting.csv",
+    },
+    future_features_csv="output/features/future_features.csv",
+)
+df = predictor.predict_proba()
+# Columns: rf_eruption_probability, xgb_eruption_probability, ...,
+#          consensus_eruption_probability, consensus_confidence, ...
+```
+
+---
+
+## Rename TrainModel → ModelTrainer (2026-02-13)
+
+Renamed `train_model.py` → `model_trainer.py` and class `TrainModel` → `ModelTrainer` throughout the codebase.
+
+**Files updated:**
+- `src/eruption_forecast/model/model_trainer.py` — all docstring references updated
+- `src/eruption_forecast/model/model_predictor.py` — docstring references updated
+- `src/eruption_forecast/model/forecast_model.py` — attribute `self.TrainModel` → `self.ModelTrainer`
+- `tests/test_features_builder.py` — imports and class references updated
+- `tests/test_train_model_dynamic_classifier.py` — imports and class references updated
+- `tests/test_train_model_fixed.py` — imports and class references updated
+
+---
+
+## Docstring Improvements (2026-02-13)
+
+Audited all 27 Python source files and fixed docstrings across 6 files.
+
+**Changes made:**
+
+- `utils.py::get_metrics()` — replaced placeholder `"Get features matrix"` with full
+  docstring listing all parameters and the 17-key return dict.
+- `plot.py::plot_tremor()` — corrected `overwrite` default from `False` → `True`,
+  expanded all arg descriptions with units and behaviour notes, added example.
+- `plot.py::plot_significant_features()` — added full arg descriptions, return type,
+  and example.
+- `tremor/tremor_data.py::TremorData` — added class-level docstring with args and
+  examples; expanded `from_csv`, `df`, all cached_property methods, and
+  `check_consistency` with complete return-tuple documentation.
+- `model/model_evaluator.py` — added docstring to `_get_proba`; expanded `get_metrics`
+  with all 17 return-dict keys; expanded `summary`, `plot_confusion_matrix`,
+  `plot_roc_curve`, `plot_precision_recall_curve`, `plot_threshold_analysis`,
+  `plot_feature_importance`, `plot_calibration`, `plot_prediction_distribution`, and
+  `plot_all` with full args/returns.
+- `decorators/decorator_class.py` — expanded `SerializationWrapper` class docstring;
+  added full docstrings to `_prepare_value` and `save_to_file`; rewrote
+  `AutoSaveDict` class docstring with args; added one-line docstrings to `_save`,
+  `__setitem__`, `__delitem__`, `update`; fixed duplicate `print` statement.
+- `logger.py` — added return types and full arg/example sections to `set_log_level`
+  and `set_log_directory`.
+
+---
+
+## Multi-file Consistency Update (2026-02-13)
+
+Reviewed and updated consistency across 8 changed files.
+
+**Bug fixed:**
+- `src/eruption_forecast/features/features_builder.py:299` — `y.index = y[ID_COLUMN]` was operating on a Series after `y` was already reassigned; fixed by capturing `y_index = y[ID_COLUMN]` before the reassignment.
+
+**Dead code removed from `forecast_model.py`:**
+- Removed `tsfresh` / `ComprehensiveFCParameters` / `impute` imports (feature extraction is now fully delegated to `FeaturesBuilder`)
+- Removed `_initialize_feature_parameters()` static method and the `self.default_fc_parameters` / `self.excludes_features` attributes it populated
+- Removed `_extract_features_for_column()` instance method (superseded by `FeaturesBuilder`)
+- `features.constants` import auto-removed by ruff (no longer needed after dead-code removal)
+
+**Public API updated (`__init__.py`):**
+- Added `TremorMatrixBuilder` and `ModelTrainer` exports (both are now first-class pipeline components)
+
+---
+
+## FeaturesBuilder Docstring Update (2026-02-13)
+
+Rewrote and corrected docstrings throughout `features_builder.py`.
+
+**Changes:**
+- Class docstring: replaced wrong example (used `tremor_df`, `window_size`, `select_tremor_columns` constructor params and `save_per_method` — none of which exist) with a correct two-mode (training / prediction) description and accurate example
+- `validate()`: removed false mention of "date ranges"; clarified it checks DataFrame types and column presence only
+- `concat_features()`: documented the `ValueError` raised by the underlying utility for < 2 files; clarified the attribute side-effects
+- `extract_features()`: fixed signature (`prefix_filename: str = None` → `str | None = None`); rewrote docstring to describe per-column extraction flow, label CSV output, and the auto-fallback when no labels are provided
+
+---
+
+## FeaturesBuilder Readability Improvements (2026-02-13)
+
+### Problem
+`extract_features()` mixed training and prediction logic inline, and `concat_features()` read `self.use_relevant_features` which was only assigned *after* the call — a state-mutation ordering bug.
+
+### Changes (`features_builder.py`)
+
+| # | Change | Detail |
+|---|--------|--------|
+| 1 | **Bug fix** | `concat_features()` now accepts `use_relevant_features: bool = False` parameter instead of reading stale `self.use_relevant_features`; call site updated to pass the value explicitly |
+| 2 | **`_prepare_training_mode()`** | New private helper: filters labels to window IDs present in tremor matrix, saves `label_features_<dates>.csv`, sets `self.label_features_csv`, returns `(dates_str, label_df)` |
+| 3 | **`_prepare_prediction_mode()`** | New private helper: computes date range from tremor `datetime` column for unlabelled prediction; returns `(dates_str, empty_df)` |
+| 4 | **`extract_features()` simplified** | Replaced 25-line inline dual-mode block with a 4-line dispatch to the two helpers; `self.use_relevant_features` is now assigned *before* `concat_features()` is called |
+
+No public API changes. No attribute renames. Downstream callers (`ForecastModel`, `ModelTrainer`, tests) unaffected.
+
+---
+
+**Document Version:** 3.0
+**Last Updated:** 2026-02-13
 **Author:** Claude Code (Sonnet 4.5)

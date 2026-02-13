@@ -4,9 +4,11 @@ from importlib.metadata import version
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.model.model_trainer import ModelTrainer
 from eruption_forecast.model.forecast_model import ForecastModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 __version__ = version("eruption-forecast")
@@ -25,7 +27,9 @@ __all__ = [
     "CalculateTremor",
     "LabelBuilder",
     "FeaturesBuilder",
+    "TremorMatrixBuilder",
     "ForecastModel",
+    "ModelTrainer",
     "LabelData",
     "TremorData",
 ]

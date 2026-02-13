@@ -8,6 +8,32 @@ from eruption_forecast.utils import check_sampling_consistency
 
 
 class TremorData:
+    """Container for tremor time-series data.
+
+    Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR) and exposes
+    convenience properties for common metadata. Data can be supplied
+    directly as a DataFrame or loaded from a CSV file via :meth:`from_csv`.
+
+    Args:
+        df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame
+            with a DatetimeIndex. If None, an empty DataFrame is used until
+            :meth:`from_csv` is called. Defaults to None.
+        verbose (bool, optional): If True, emit informational log messages.
+            Defaults to False.
+        debug (bool, optional): If True, emit debug-level log messages.
+            Defaults to False.
+
+    Attributes:
+        csv (str | None): Path to the source CSV file, set by
+            :meth:`from_csv`. Defaults to None.
+        verbose (bool): Verbosity flag.
+        debug (bool): Debug flag.
+
+    Examples:
+        >>> tremor = TremorData(df=my_df)
+        >>> tremor = TremorData(verbose=True).from_csv("tremor.csv")
+    """
+
     def __init__(
         self,
         df: pd.DataFrame | None = None,
@@ -21,21 +47,32 @@ class TremorData:
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}(csv={self.csv}, df={self.df}, "
+            f"{self.__class__.__name__}(csv={self.csv}, df={self.df.shape}, "
             f"verbose={self.verbose}, debug={self.debug})"
         )
 
     def from_csv(self, tremor_csv: str) -> pd.DataFrame:
-        """Load tremor data from csv file
+        """Load tremor data from a CSV file.
+
+        Reads the CSV, parses the ``datetime`` column as the index, and
+        sorts the index in ascending order. The CSV path is stored in
+        ``self.csv`` for later reference.
 
         Args:
-            tremor_csv (str): Path to tremor csv file
+            tremor_csv (str): Absolute or relative path to the tremor CSV
+                file. The file must contain a ``datetime`` column that will
+                be used as the DatetimeIndex.
 
         Returns:
-            pd.DataFrame: Tremor dataframe
+            pd.DataFrame: Tremor DataFrame sorted by DatetimeIndex with
+                columns such as ``rsam_f0``, ``dsar_f0-f1``, etc.
 
         Raises:
-            FileNotFoundError: If tremor CSV file does not exist
+            FileNotFoundError: If the file at ``tremor_csv`` does not exist.
+
+        Examples:
+            >>> tremor = TremorData()
+            >>> df = tremor.from_csv("output/OJN/tremor/tremor.csv")
         """
         if not os.path.exists(tremor_csv):
             raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
@@ -48,13 +85,14 @@ class TremorData:
 
     @property
     def df(self) -> pd.DataFrame:
-        """Load tremor dataframe
+        """Get the tremor DataFrame.
 
         Returns:
-            pd.DataFrame: Tremor dataframe
+            pd.DataFrame: Tremor DataFrame with a DatetimeIndex and columns
+                such as ``rsam_f0``, ``dsar_f0-f1``, etc.
 
         Raises:
-            ValueError: If tremor dataframe is empty
+            ValueError: If the DataFrame is empty (no data has been loaded).
         """
         if len(self._df) == 0:
             raise ValueError(
@@ -69,45 +107,86 @@ class TremorData:
 
     @cached_property
     def columns(self) -> list[str]:
-        """Get column names"""
+        """List of DataFrame column names.
+
+        Returns:
+            list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1"]``.
+        """
         return self.df.columns.tolist()
 
     @cached_property
     def start_date(self) -> datetime:
-        """Get start date of tremor data"""
+        """First timestamp in the tremor data.
+
+        Returns:
+            datetime: Start datetime derived from the first index entry.
+        """
         start_date: datetime = self.df.index[0].to_pydatetime()
         return start_date
 
     @cached_property
     def end_date(self) -> datetime:
-        """Get end date of tremor data"""
+        """Last timestamp in the tremor data.
+
+        Returns:
+            datetime: End datetime derived from the last index entry.
+        """
         end_date: datetime = self.df.index[-1].to_pydatetime()
         return end_date
 
     @cached_property
     def start_date_str(self) -> str:
-        """Get start date of tremor data as string"""
+        """Start date as an ISO-format string.
+
+        Returns:
+            str: Start date in ``"YYYY-MM-DD"`` format.
+        """
         return self.start_date.strftime("%Y-%m-%d")
 
     @cached_property
     def end_date_str(self) -> str:
-        """Get end date of tremor data as string"""
+        """End date as an ISO-format string.
+
+        Returns:
+            str: End date in ``"YYYY-MM-DD"`` format.
+        """
         return self.end_date.strftime("%Y-%m-%d")
 
     @property
     def n_days(self) -> int:
-        """Get number of days in tremor data"""
-        return int((self.end_date - self.start_date).days)
-
-    def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame]:
-        """Check consistency of tremor data.
+        """Number of days spanned by the tremor data.
 
         Returns:
-            bool: True if consistent. False otherwise.
-            pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
-            pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
+            int: Integer number of days between start and end date.
+        """
+        return int((self.end_date - self.start_date).days)
+
+    def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
+        """Check temporal sampling consistency of the tremor data.
+
+        Validates that the DataFrame has a uniform 10-minute sampling
+        interval throughout its DatetimeIndex.
+
+        Returns:
+            tuple: A 4-element tuple ``(is_consistent, consistent_df,
+            inconsistent_df, sampling_rate)`` where:
+
+            - ``is_consistent`` (bool): True if all intervals match the
+              expected 10-minute frequency.
+            - ``consistent_df`` (pd.DataFrame): Rows with consistent
+              timestamps.
+            - ``inconsistent_df`` (pd.DataFrame): Rows with unexpected
+              gaps or duplicates.
+            - ``sampling_rate`` (int | None): Sampling rate in seconds
+              (600 for 10-minute data) or None if inconsistencies exist.
+
+        Examples:
+            >>> ok, df_ok, df_bad, rate = tremor.check_consistency()
+            >>> if not ok:
+            ...     print(f"Found {len(df_bad)} inconsistent rows")
         """
         return check_sampling_consistency(
             df=self.df,
+            expected_freq="10min",
             verbose=self.verbose,
         )

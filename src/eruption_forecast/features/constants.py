@@ -17,9 +17,6 @@ ERUPTED_COLUMN = "is_erupted"
 FEATURES_COLUMN = "features"
 """Column name for feature names in significant features output."""
 
-REQUIRED_LABEL_COLUMNS = [ID_COLUMN, ERUPTED_COLUMN]
-"""Required columns in label DataFrames."""
-
 # Time conversion
 SECONDS_PER_DAY = 86400
 """Number of seconds in one day (24 * 60 * 60)."""
@@ -27,3 +24,17 @@ SECONDS_PER_DAY = 86400
 # Output filenames
 SIGNIFICANT_FEATURES_FILENAME = "significant_features"
 """Default filename for concatenated significant features output."""
+
+# tsfresh feature exclusions
+DEFAULT_EXCLUDE_FEATURES: set[str] = {
+    "agg_linear_trend",
+    "has_duplicate_max",
+    "has_duplicate_min",
+    "has_duplicate",
+    "linear_trend_timewise",
+    "length",
+    "sum_of_reoccurring_data_points",
+    "sum_of_reoccurring_values",
+    "value_count",
+}
+"""tsfresh calculator names excluded from feature extraction by default."""

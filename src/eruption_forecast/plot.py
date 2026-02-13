@@ -21,22 +21,38 @@ def plot_tremor(
     selected_columns: list[str] | None = None,
     verbose: bool = False,
 ) -> None:
-    """Plot tremor data
+    """Plot tremor data as a multi-panel time series figure.
+
+    Creates one subplot per column in the DataFrame (or per selected column),
+    with configurable x-axis tick interval and optional file output.
 
     Args:
-        df (pd.DataFrame): Tremor data
-        interval (Optional[int], optional): Interval in day. Defaults to 1.
-        interval_unit (Literal["hours", "days"], optional): Interval unit. Defaults to "hours".
-        filename (Optional[str], optional): Filename. Defaults to None.
-        figure_dir (Optional[str], optional): Output directory. Defaults to None.
-        title (Optional[str], optional): Plot Title. Defaults to None.
-        overwrite (bool, optional): Overwrite. Defaults to False.
-        dpi (Optional[int], optional): Plot resolution. Defaults to 100.
-        selected_columns (Optional[list], optional): Selected columns to plot. Defaults to None.
-        verbose (bool, optional): Verbosity. Defaults to False.
+        df (pd.DataFrame): Tremor data with a DatetimeIndex.
+        interval (int, optional): Tick interval for the x-axis. Defaults to 1.
+        interval_unit (Literal["hours", "days"], optional): Unit for the tick
+            interval — ``"hours"`` or ``"days"``. Defaults to ``"hours"``.
+        filename (str | None, optional): Output filename stem (extension is
+            added automatically). If None, a name is derived from the date
+            range. Defaults to None.
+        figure_dir (str | None, optional): Directory to save the figure. If
+            None, saves to ``<cwd>/figures``. Defaults to None.
+        title (str | None, optional): X-axis label / plot title. If None, the
+            date range is used. Defaults to None.
+        overwrite (bool, optional): If True, overwrite an existing file with
+            the same name. Defaults to True.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 100.
+        selected_columns (list[str] | None, optional): Subset of columns to
+            plot. If None, all columns are plotted. Defaults to None.
+        verbose (bool, optional): If True, log a message when the file is
+            saved or already exists. Defaults to False.
 
     Returns:
         None
+
+    Examples:
+        >>> import pandas as pd
+        >>> plot_tremor(df, interval=6, interval_unit="hours",
+        ...            figure_dir="output/figures", overwrite=False)
     """
     # TODO: Asserting pd.datetime index
     # TODO: Asserting interval_unit
@@ -132,22 +148,45 @@ def plot_significant_features(
     dpi: int = 100,
     overwrite: bool = True,
 ):
-    """Plot significant features
+    """Plot a horizontal bar chart of significant features.
+
+    Displays the top ``number_of_features`` rows of ``df`` as a horizontal
+    bar chart sorted by ``values_column``, with a dashed reference line at
+    ``top_features``.
 
     Args:
-        df (pd.DataFrame): Significant features data
-        filepath (str): Save filepath location.
-        number_of_features (int, optional): Number of features. Defaults to 50.
-        top_features (int, optional): Number of top features. Defaults to 20.
-        title (Optional[str], optional): Plot title. Defaults to None.
-        figsize (tuple, optional): Figure size. Defaults to (3, 12).
-        features_column (str, optional): Features column name. Defaults to "features".
-        values_column (str, optional): Values column name. Defaults to "p_values".
-        dpi (int, optional): DPI. Defaults to 100.
-        overwrite (bool, optional): Overwrite. Defaults to True.
+        df (pd.DataFrame): DataFrame containing feature names and their
+            significance values (e.g. p-values).
+        filepath (str): Full path (including filename) where the figure is
+            saved.
+        number_of_features (int, optional): Total number of features to
+            display in the chart. Defaults to 50.
+        top_features (int, optional): Position at which to draw a reference
+            line marking the top-N cut-off. Defaults to 20.
+        title (str | None, optional): Chart title. If None, defaults to
+            ``"<number_of_features> Significant Features"``. Defaults to None.
+        figsize (tuple, optional): Figure dimensions as ``(width, height)``
+            in inches. Defaults to ``(3, 12)``.
+        features_column (str, optional): Name of the column containing
+            feature names. If missing, the index is used. Defaults to
+            ``"features"``.
+        values_column (str, optional): Name of the column containing
+            significance values. Defaults to ``"p_values"``.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to 100.
+        overwrite (bool, optional): If True, overwrite an existing file.
+            Defaults to True.
 
     Returns:
         None
+
+    Examples:
+        >>> plot_significant_features(
+        ...     df=sig_features_df,
+        ...     filepath="output/figures/significant_features.png",
+        ...     number_of_features=30,
+        ...     top_features=10,
+        ... )
     """
     if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
         return None
