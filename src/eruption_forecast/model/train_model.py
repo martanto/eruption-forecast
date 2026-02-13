@@ -581,7 +581,7 @@ class TrainModel:
         ) = self._generate_filepaths(random_state=random_state)
 
         # Skip if files already exist
-        if self.can_skip or not save_features or not plot_features:
+        if self.can_skip:
             logger.info(f"Seed {random_state:05d} already trained.")
             with open(metrics_filepath) as f:
                 metrics = json.load(f)
