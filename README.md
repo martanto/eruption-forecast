@@ -165,7 +165,6 @@ from eruption_forecast import LabelBuilder
 labels = LabelBuilder(
     start_date="2020-01-01",
     end_date="2020-12-31",
-    window_size=1,           # 1-day windows
     window_step=12,          # Slide by 12 hours
     window_step_unit="hours",
     day_to_forecast=2,       # Label 2 days before eruption as positive
@@ -193,7 +192,7 @@ print(f"Negative labels: {(labels.df['is_erupted'] == 0).sum()}")
 
 #### Labeling Strategy Visualization
 
-Example with `window_size=1d`, `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
+Example with `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
 
 ```
 Timeline (each tick = 12 hours):
@@ -228,7 +227,6 @@ Timeline (each tick = 12 hours):
 
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
-| `window_size` | `int` (days) | Length of each tremor data window fed into tsfresh | `1` day |
 | `window_step` | `int` | How far to shift the window between consecutive labels | `12` |
 | `window_step_unit` | `"minutes"` \| `"hours"` | Unit for `window_step` | `"hours"` |
 | `day_to_forecast` | `int` (days) | How many days before the eruption to start labeling as positive (`is_erupted=1`) | `2` |
@@ -1108,4 +1106,4 @@ This project uses:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-02-14
