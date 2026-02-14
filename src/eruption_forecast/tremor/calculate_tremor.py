@@ -13,7 +13,11 @@ from obspy import Trace, Stream, UTCDateTime
 import eruption_forecast
 from eruption_forecast.sds import SDS
 from eruption_forecast.plot import plot_tremor
-from eruption_forecast.utils import to_datetime, calculate_window_metrics
+from eruption_forecast.utils import (
+    to_datetime,
+    resolve_output_dir,
+    calculate_window_metrics,
+)
 from eruption_forecast.logger import logger
 from eruption_forecast.tremor.rsam import RSAM
 
@@ -41,7 +45,12 @@ class CalculateTremor:
         location (str, optional): Seismic location code. Defaults to "00".
         methods (str | None, optional): Calculation methods to apply.
             Currently unused; reserved for future extension. Defaults to None.
-        output_dir (str, optional): Directory for output files. Defaults to "output".
+        output_dir (str | None, optional): Directory for output files.
+            If None, defaults to ``root_dir/output``. Relative paths are resolved
+            against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
+            Absolute paths are used as-is. Defaults to None.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
         n_jobs (int, optional): Number of parallel jobs for daily processing. Defaults to 1.
         remove_outlier_method (Literal["maximum", "all"], optional): Outlier removal strategy.
@@ -82,7 +91,8 @@ class CalculateTremor:
         network: str = "VG",
         location: str = "00",
         methods: str | None = None,
-        output_dir: str = "output",
+        output_dir: str | None = None,
+        root_dir: str | None = None,
         overwrite: bool = False,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
@@ -104,7 +114,7 @@ class CalculateTremor:
         network = network or "VG"
         location = location or "00"
         nslc = f"{network}.{station}.{location}.{channel}"
-        output_dir = os.path.join(os.getcwd(), output_dir)
+        output_dir = resolve_output_dir(output_dir, root_dir, "output")
         station_dir = os.path.join(output_dir, nslc)
         forecast_dir = os.path.join(station_dir, "forecast")
         tremor_dir = os.path.join(station_dir, "tremor")

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pandas as pd
 
-from eruption_forecast.utils import validate_columns
+from eruption_forecast.utils import validate_columns, resolve_output_dir
 from eruption_forecast.logger import logger
 from eruption_forecast.features.constants import (
     ID_COLUMN,
@@ -35,8 +35,13 @@ class TremorMatrixBuilder:
             Can be build using LabelBuilder or load from label CSV.
             Example label CSV location:
                 output/labels/label_2025-01-01_2025-07-24_ws-2_step-6-hours_dtf-2.csv
-        output_dir (str): Output directory path for saved CSVs.
-        window_size (int): Window size in days.
+        output_dir (str | None, optional): Output directory path for saved CSVs.
+            If None, defaults to ``root_dir/output/features``. Relative paths are
+            resolved against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is
+            None). Absolute paths are used as-is. Defaults to None.
+        window_size (int): Window size in days. Defaults to 1.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         overwrite (bool, optional): Overwrite existing output files.
             Defaults to False.
         verbose (bool, optional): Verbose logging. Defaults to False.
@@ -68,8 +73,9 @@ class TremorMatrixBuilder:
         self,
         tremor_df: pd.DataFrame,
         label_df: pd.DataFrame,
-        output_dir: str,
-        window_size: int,
+        output_dir: str | None = None,
+        window_size: int = 1,
+        root_dir: str | None = None,
         overwrite: bool = False,
         verbose: bool = False,
         debug: bool = False,
@@ -83,6 +89,7 @@ class TremorMatrixBuilder:
             raise TypeError("label_df.index is not a DatetimeIndex")
         tremor_df = tremor_df.sort_index()
         label_df = label_df.sort_index()
+        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "features"))
         matrix_tmp_dir = os.path.join(output_dir, "tmp")
         tremor_start_date_str = tremor_df.index[0].strftime("%Y-%m-%d")
         tremor_end_date_str = tremor_df.index[-1].strftime("%Y-%m-%d")

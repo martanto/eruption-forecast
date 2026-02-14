@@ -26,7 +26,7 @@ _METRIC_KEYS = [
 class ModelPredictor:
     """Evaluate or forecast with one or more sets of trained full-dataset models.
 
-    Loads models produced by ``ModelTrainer.fit()``.  Accepts either a single
+    Loads models produced by ``ModelTrainer.train()``.  Accepts either a single
     registry CSV or a dict of multiple registries (one per classifier type),
     enabling **consensus** aggregation across classifiers.
 
@@ -43,7 +43,7 @@ class ModelPredictor:
     Args:
         trained_models (str | dict[str, str]): Either a single path to a
             ``trained_model_{suffix}.csv`` file produced by
-            ``ModelTrainer.fit()``; or a dict mapping a classifier name to its
+            ``ModelTrainer.train()``; or a dict mapping a classifier name to its
             CSV path (e.g. ``{"rf": "...", "xgb": "...", "voting": "..."}``)
             for multi-model consensus.
         future_features_csv (str): Path to a features CSV whose rows

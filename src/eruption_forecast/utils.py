@@ -1,3 +1,4 @@
+import os
 import json
 from typing import Any, Literal
 from datetime import datetime, timedelta
@@ -538,7 +539,7 @@ def validate_window_step(
 
 
 def sort_dates(dates: list[str]) -> list[str]:
-    """Convert the list of dates into a pandas Series.
+    """Sorting list of dates.
 
     Args:
         dates (list[str]): List of dates.
@@ -762,6 +763,46 @@ def get_significant_features(
     _significant_features.index.name = "features"
 
     return features_filtered, _significant_features
+
+
+def resolve_output_dir(
+    output_dir: str | None,
+    root_dir: str | None,
+    default_subpath: str,
+) -> str:
+    """Resolve an output directory path against an anchor directory.
+
+    Provides a consistent way to resolve output paths relative to a stable
+    root directory instead of relying on the current working directory.
+
+    Rules:
+    1. Absolute ``output_dir`` → used as-is (``root_dir`` is ignored).
+    2. Relative ``output_dir`` → joined with ``root_dir`` (or ``os.getcwd()`` if None).
+    3. ``None`` ``output_dir`` → ``root_dir / default_subpath``.
+
+    Args:
+        output_dir: Caller-supplied output directory (absolute, relative, or None).
+        root_dir: Anchor directory for resolving relative paths.
+            If None, falls back to ``os.getcwd()``.
+        default_subpath: Sub-path appended to the anchor when ``output_dir`` is None.
+
+    Returns:
+        Resolved absolute-or-anchored output directory path.
+
+    Example:
+        >>> resolve_output_dir(None, "/data/project", "output")
+        '/data/project/output'
+        >>> resolve_output_dir("custom", "/data/project", "output")
+        '/data/project/custom'
+        >>> resolve_output_dir("/abs/path", "/data/project", "output")
+        '/abs/path'
+    """
+    anchor = root_dir if root_dir is not None else os.getcwd()
+    if output_dir is None:
+        return os.path.join(anchor, default_subpath)
+    if os.path.isabs(output_dir):
+        return output_dir
+    return os.path.join(anchor, output_dir)
 
 
 def normalize_dates(

@@ -20,7 +20,8 @@
       "Bash(ls:*)",
       "Bash(git reset:*)",
       "Bash(git rm:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(uvx ty check:*)"
     ],
     "deny": [
       "Read(*.log)",

@@ -9,6 +9,7 @@ from eruption_forecast.utils import (
     normalize_dates,
     validate_columns,
     construct_windows,
+    resolve_output_dir,
     validate_date_ranges,
 )
 from eruption_forecast.logger import logger
@@ -40,7 +41,14 @@ class ForecastModel:
         volcano_id (str): Volcano identifier for output naming.
         network (str): Seismic network code. Defaults to "VG".
         location (str): Seismic location code. Defaults to "00".
-        output_dir (str): Directory for output files. Defaults to "output".
+        output_dir (str | None): Directory for output files. If None, defaults to
+            ``root_dir/output``. Relative paths are resolved against ``root_dir``
+            (or ``os.getcwd()`` when ``root_dir`` is None). Absolute paths are
+            used as-is. Defaults to None.
+        root_dir (str | None): Anchor directory for resolving relative ``output_dir``
+            values. Relative ``root_dir`` values are immediately normalised to an
+            absolute path via ``os.path.abspath``. Defaults to None (uses
+            ``os.getcwd()``).
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
         n_jobs (int): Number of parallel jobs to use. Defaults to 1.
         verbose (bool): If True, enables verbose logging. Defaults to False.
@@ -54,6 +62,7 @@ class ForecastModel:
         ...     end_date="2024-06-30",
         ...     window_size=1,
         ...     volcano_id="LEWOTOBI",
+        ...     root_dir=r"D:\\Projects\\eruption-forecast",
         ... )
         >>> model.calculate(source="sds", sds_dir="data/sds")
         >>> model.build_label(
@@ -62,7 +71,7 @@ class ForecastModel:
         ...     day_to_forecast=2,
         ...     eruption_dates=["2024-03-15", "2024-05-20"],
         ... )
-        >>> model.extract_features().train()
+        >>> model.extract_features().train_and_evaluate()
     """
 
     def __init__(
@@ -76,6 +85,7 @@ class ForecastModel:
         network: str = "VG",
         location: str = "00",
         output_dir: str | None = None,
+        root_dir: str | None = None,
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
@@ -89,8 +99,9 @@ class ForecastModel:
         )
         network = network or "VG"
         location = location or "00"
+        root_dir = os.path.abspath(root_dir) if root_dir is not None else None
         nslc, output_dir, station_dir, features_dir = self._setup_directories(
-            network, station, location, channel, output_dir
+            network, station, location, channel, output_dir, root_dir
         )
 
         # =========================
@@ -105,6 +116,7 @@ class ForecastModel:
         self.network = network
         self.location = location
         self.output_dir = output_dir
+        self.root_dir = root_dir
         self.overwrite = overwrite
         self.n_jobs = n_jobs
         self.verbose = verbose
@@ -199,6 +211,7 @@ class ForecastModel:
         location: str,
         channel: str,
         output_dir: str | None,
+        root_dir: str | None = None,
     ) -> tuple[str, str, str, str]:
         """Setup directory structure for forecast model outputs.
 
@@ -210,13 +223,15 @@ class ForecastModel:
             station: Station code
             location: Location code
             channel: Channel code
-            output_dir: Base output directory. Defaults to 'output' in current directory.
+            output_dir: Base output directory. Defaults to 'output' relative to root_dir.
+            root_dir: Anchor directory for resolving relative paths.
+                If None, falls back to ``os.getcwd()``.
 
         Returns:
             Tuple of (nslc, output_dir, station_dir, features_dir)
         """
         nslc = f"{network}.{station}.{location}.{channel}"
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
+        output_dir = resolve_output_dir(output_dir, root_dir, "output")
         station_dir = os.path.join(output_dir, nslc)
         features_dir = os.path.join(station_dir, "features")
 
@@ -903,7 +918,7 @@ class ForecastModel:
             verbose=verbose or self.verbose,
         )
 
-        train_model.train(
+        train_model.train_and_evaluate(
             random_state=random_state,
             total_seed=total_seed,
             sampling_strategy=sampling_strategy,

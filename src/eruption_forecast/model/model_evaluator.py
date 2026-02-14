@@ -22,6 +22,7 @@ from sklearn.metrics import (
 from sklearn.calibration import calibration_curve
 from sklearn.model_selection import GridSearchCV
 
+from eruption_forecast.utils import resolve_output_dir
 from eruption_forecast.logger import logger
 
 
@@ -36,8 +37,13 @@ class ModelEvaluator:
         X_test: Test features.
         y_test: True test labels.
         model_name: Name used in plot titles and filenames. Defaults to "model".
-        output_dir: Directory for saved plots. Defaults to ``<cwd>/output/evaluation``.
+        output_dir: Directory for saved plots. If None, defaults to
+            ``root_dir/output/evaluation``. Relative paths are resolved against
+            ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None). Absolute
+            paths are used as-is. Defaults to None.
         selected_features: If provided, filter X_test to these columns before predicting.
+        root_dir: Anchor directory for resolving relative ``output_dir`` values.
+            Defaults to None (uses ``os.getcwd()``).
 
     Example:
         >>> evaluator = ModelEvaluator(model, X_test, y_test, model_name="rf_seed_42")
@@ -53,6 +59,7 @@ class ModelEvaluator:
         model_name: str = "model",
         output_dir: str | None = None,
         selected_features: list[str] | None = None,
+        root_dir: str | None = None,
     ) -> None:
         if isinstance(model, GridSearchCV):
             model = model.best_estimator_
@@ -64,7 +71,7 @@ class ModelEvaluator:
         self.X_test = X_test
         self.y_test = y_test
         self.model_name = model_name
-        self.output_dir = output_dir or os.path.join(os.getcwd(), "output", "evaluation")
+        self.output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "evaluation"))
 
         os.makedirs(self.output_dir, exist_ok=True)
 

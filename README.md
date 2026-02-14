@@ -1,5 +1,9 @@
 # eruption-forecast
 
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active%20development-orange)
+
 A comprehensive Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions based on seismic patterns.
 
 ## Table of Contents
@@ -23,7 +27,7 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - [Advanced Usage](#advanced-usage)
   - [ForecastModel — Orchestrated Pipeline](#forecastmodel--orchestrated-pipeline)
   - [Comparing Multiple Classifiers](#comparing-multiple-classifiers)
-  - [fit() + ModelPredictor Workflow](#fit--modelpredictor-workflow-recommended-for-operational-use)
+  - [train() + ModelPredictor Workflow](#train--modelpredictor-workflow-recommended-for-operational-use)
   - [Custom Frequency Bands](#custom-frequency-bands)
 - [Output Directory Structure](#output-directory-structure)
 - [Configuration](#configuration)
@@ -42,7 +46,7 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, and feature importance
-- **Two Training Workflows**: `train()` for in-sample evaluation (80/20 split), `fit()` for full-dataset training with future-data evaluation via `ModelPredictor`
+- **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Logging**: Built-in logging with loguru for debugging and monitoring
 
@@ -76,6 +80,7 @@ fm = ForecastModel(
     end_date="2025-12-31",
     window_size=2,
     volcano_id="LEWOTOBI",
+    root_dir="/path/to/project",  # all output paths are anchored here
     n_jobs=4,
     verbose=True,
 )
@@ -323,15 +328,25 @@ print(scores.head(10))
 
 Two training workflows are available depending on your evaluation strategy.
 
-#### `train()` — with held-out test set (80/20 split)
+#### Which workflow should I use?
+
+| Question | `train_and_evaluate()` | `train()` |
+|---|---|---|
+| Do I want to measure in-sample performance? | ✅ Yes — evaluates each seed on held-out 20% | ❌ No metrics computed |
+| Do I have a separate future dataset to evaluate on? | — | ✅ Use with `ModelPredictor` |
+| Am I exploring classifiers and hyperparameters? | ✅ Quick feedback per run | ❌ Not suitable |
+| Am I training the final production model? | ❌ Wastes 20% of data | ✅ Uses 100% of data |
+| Does order of data matter (time-series)? | ✅ Use `cv_strategy="timeseries"` | ✅ Use `cv_strategy="timeseries"` |
+
+#### `train_and_evaluate()` — with held-out test set (80/20 split)
 
 Splits data **before** resampling and feature selection to prevent data leakage.
 Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
 
 ```python
-from eruption_forecast import TrainModel
+from eruption_forecast.model.model_trainer import ModelTrainer
 
-trainer = TrainModel(
+trainer = ModelTrainer(
     extracted_features_csv="output/features/all_features.csv",
     label_features_csv="output/features/label_features.csv",
     output_dir="output/trainings",
@@ -342,20 +357,20 @@ trainer = TrainModel(
     n_jobs=4,
 )
 
-trainer.train(
+trainer.train_and_evaluate(
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
 )
 ```
 
-#### `fit()` — full dataset training (no split)
+#### `train()` — full dataset training (no split)
 
 Trains on the **entire** dataset across multiple seeds. No metrics are computed here —
 evaluation is deferred to `ModelPredictor` using a separate future dataset.
 
 ```python
-trainer = TrainModel(
+trainer = ModelTrainer(
     extracted_features_csv="output/features/all_features.csv",
     label_features_csv="output/features/label_features.csv",
     output_dir="output/trainings",
@@ -363,28 +378,51 @@ trainer = TrainModel(
     n_jobs=4,
 )
 
-trainer.fit(
+trainer.train(
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
 )
 ```
 
-#### TrainModel constructor parameters
+#### ModelTrainer constructor parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `extracted_features_csv` | `str` | — | Path to all-features CSV |
-| `label_features_csv` | `str` | — | Path to aligned labels CSV |
-| `output_dir` | `str \| None` | `None` | Output directory (auto-generated if None) |
-| `classifier` | `str` | `"rf"` | Classifier type (see table below) |
-| `cv_strategy` | `str` | `"shuffle"` | Cross-validation strategy |
+| `extracted_features_csv` | `str` | — | Path to extracted features CSV (output of `FeaturesBuilder`) |
+| `label_features_csv` | `str` | — | Path to aligned labels CSV (output of `FeaturesBuilder`) |
+| `output_dir` | `str \| None` | `None` | Output directory; resolved against `root_dir` when relative. Defaults to `root_dir/output/trainings` |
+| `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Defaults to `os.getcwd()` |
+| `prefix_filename` | `str \| None` | `None` | Optional prefix prepended to every output filename |
+| `classifier` | `str` | `"rf"` | Classifier type — see [Supported Classifiers](#7-supported-classifiers) |
+| `cv_strategy` | `str` | `"shuffle"` | Cross-validation strategy — `"shuffle"`, `"stratified"`, or `"timeseries"` |
 | `cv_splits` | `int` | `5` | Number of CV folds |
-| `number_of_significant_features` | `int` | `20` | Top-N features to keep |
-| `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm |
-| `overwrite` | `bool` | `False` | Re-run even if output exists |
-| `n_jobs` | `int` | `1` | Parallel workers |
-| `verbose` | `bool` | `False` | Print progress |
+| `number_of_significant_features` | `int` | `20` | Top-N features retained per seed and aggregated across seeds |
+| `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |
+| `overwrite` | `bool` | `False` | Re-run even if output files already exist |
+| `n_jobs` | `int` | `1` | Parallel workers for multi-seed dispatch |
+| `verbose` | `bool` | `False` | Print progress messages |
+| `debug` | `bool` | `False` | Enable debug-level logging |
+
+#### `train_and_evaluate()` method parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `random_state` | `int` | `0` | Starting random seed; seeds are `random_state, random_state+1, …, random_state+total_seed−1` |
+| `total_seed` | `int` | `500` | Number of seeds (independent train/test splits) to run |
+| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on training data only |
+| `save_all_features` | `bool` | `False` | Save all ranked features per seed (can produce many files) |
+| `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
+
+#### `train()` method parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `random_state` | `int` | `0` | Starting random seed |
+| `total_seed` | `int` | `500` | Number of seeds to run |
+| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on full dataset |
+| `save_all_features` | `bool` | `False` | Save all ranked features per seed |
+| `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
 
 ### 7. Supported Classifiers
 
@@ -495,7 +533,7 @@ clf.grid = {
 
 ### 10. Predict on Future Data with ModelPredictor
 
-`ModelPredictor` supports two modes after `fit()`:
+`ModelPredictor` supports two modes after `train()`:
 
 #### Single model — evaluation mode (labelled data)
 
@@ -505,7 +543,7 @@ Evaluates each seed model against known eruption labels and aggregates metrics a
 from eruption_forecast.model.model_predictor import ModelPredictor
 
 predictor = ModelPredictor(
-    trained_models=trainer.csv,                 # trained_model_*.csv from fit()
+    trained_models=trainer.csv,                 # trained_model_*.csv from train()
     future_features_csv="output/features/future_all_features.csv",
     future_labels_csv="output/features/future_label_features.csv",  # required
     output_dir="output/predictions",
@@ -523,6 +561,15 @@ evaluator.plot_all()
 
 `predict_best()` accepts any metric column as `criterion`:
 `"accuracy"`, `"balanced_accuracy"`, `"f1_score"`, `"precision"`, `"recall"`, `"roc_auc"`, `"pr_auc"`.
+
+#### ModelPredictor constructor parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path (from `train()`) or a `{name: path}` dict for multi-model consensus |
+| `future_features_csv` | `str` | — | Path to extracted features CSV for the future/unlabelled period |
+| `future_labels_csv` | `str \| None` | `None` | Path to labels CSV. Required for `predict()` / `predict_best()`; omit for `predict_proba()` |
+| `output_dir` | `str \| None` | `None` | Output directory; defaults to `<cwd>/output/predictions` |
 
 #### Single model — forecast mode (unlabelled data)
 
@@ -655,7 +702,28 @@ print(sig_features.head(10))
 
 ### ForecastModel — Orchestrated Pipeline
 
-`ForecastModel` chains the entire pipeline in a single fluent API:
+`ForecastModel` chains the entire pipeline in a single fluent API. It internally delegates to `ModelTrainer.train_and_evaluate()` when you call `.train()`.
+
+#### ForecastModel constructor parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `station` | `str` | — | Seismic station code (e.g. `"OJN"`) |
+| `channel` | `str` | — | Seismic channel code (e.g. `"EHZ"`) |
+| `start_date` | `str \| datetime` | — | Training period start date (`YYYY-MM-DD`) |
+| `end_date` | `str \| datetime` | — | Training period end date (`YYYY-MM-DD`) |
+| `window_size` | `int` | — | Duration (days) of each tremor window fed into tsfresh |
+| `volcano_id` | `str` | — | Identifier used in output filenames (e.g. `"LEWOTOBI"`) |
+| `network` | `str` | `"VG"` | Seismic network code |
+| `location` | `str` | `"00"` | Seismic location code |
+| `output_dir` | `str \| None` | `None` | Base output directory; relative paths are resolved against `root_dir`. Defaults to `root_dir/output` |
+| `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Relative values are normalised to an absolute path immediately. Defaults to `os.getcwd()` |
+| `overwrite` | `bool` | `False` | Re-run and overwrite existing output files |
+| `n_jobs` | `int` | `1` | Parallel workers propagated to all pipeline stages |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+| `debug` | `bool` | `False` | Enable debug-level logging |
+
+
 
 ```python
 from eruption_forecast.model.forecast_model import ForecastModel
@@ -714,6 +782,26 @@ model.set_feature_selection_method("combined").train(
 )
 ```
 
+`ForecastModel.train()` always calls `ModelTrainer.train_and_evaluate()` internally (80/20 split + metrics). If you want to train on the full dataset via `ForecastModel`, use `ModelTrainer.train()` directly after extracting features:
+
+```python
+from eruption_forecast.model.model_trainer import ModelTrainer
+
+# After running fm.extract_features(), features and labels are at:
+#   fm.features_csv  — extracted features
+#   fm.label_csv     — aligned labels
+
+trainer = ModelTrainer(
+    extracted_features_csv=fm.features_csv,
+    label_features_csv=fm.label_csv,
+    output_dir="output/trainings",
+    classifier="xgb",
+    cv_strategy="stratified",
+    n_jobs=4,
+)
+trainer.train(random_state=0, total_seed=500)  # Full-dataset training
+```
+
 ### Comparing Multiple Classifiers
 
 ```python
@@ -742,17 +830,17 @@ comparison = pd.DataFrame(results).sort_values("mean_balanced_acc", ascending=Fa
 print(comparison.to_string(index=False))
 ```
 
-### fit() + ModelPredictor Workflow (Recommended for Operational Use)
+### train() + ModelPredictor Workflow (Recommended for Operational Use)
 
-Use `fit()` to train on all available historical data, then evaluate on future events
+Use `train()` to train on all available historical data, then evaluate on future events
 or forecast on unlabelled data.
 
 ```python
-from eruption_forecast import TrainModel
+from eruption_forecast.model.model_trainer import ModelTrainer
 from eruption_forecast.model.model_predictor import ModelPredictor
 
 # --- Stage 1: Train on historical data ---
-trainer = TrainModel(
+trainer = ModelTrainer(
     extracted_features_csv="data/historical/all_features.csv",
     label_features_csv="data/historical/label_features.csv",
     output_dir="output/trainings",
@@ -762,7 +850,7 @@ trainer = TrainModel(
     n_jobs=4,
 )
 
-trainer.fit(
+trainer.train(
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
@@ -863,11 +951,11 @@ output/
                     │   ├── 00001.pkl
                     │   └── ...
                     ├── metrics/
-                    │   ├── 00000.json        # Per-seed metrics (train() only)
+                    │   ├── 00000.json        # Per-seed metrics (train_and_evaluate() only)
                     │   └── ...
                     ├── trained_model_{suffix}.csv    # Registry of all trained models
-                    ├── all_metrics_{suffix}.csv      # All seed metrics (train() only)
-                    └── metrics_summary_{suffix}.csv  # Mean ± std summary (train() only)
+                    ├── all_metrics_{suffix}.csv      # All seed metrics (train_and_evaluate() only)
+                    └── metrics_summary_{suffix}.csv  # Mean ± std summary (train_and_evaluate() only)
 ```
 
 **ModelPredictor output** (`output_dir/predictions/`):
@@ -966,24 +1054,10 @@ pytest tests/test_train_model.py
 
 ---
 
-## Documentation
-
-- **CLAUDE.md**: Architecture documentation and development guidelines
-- **SUMMARY.md**: Technical summary with ML workflow analysis and model comparison
-
-## Examples
-
-See the `examples/` directory for Jupyter notebooks demonstrating:
-- Complete pipeline workflows
-- Custom frequency band configurations
-- Feature extraction strategies
-- Model training and comparison
-- Evaluation and visualization techniques
-
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b claude/my-feature`)
+2. Create a feature branch (`git checkout -b feature/my-feature`)
 3. Make changes with tests
 4. Ensure code passes linting and type checks (`uv run ruff check --fix src/`)
 5. Update documentation
@@ -1032,6 +1106,6 @@ This project uses:
 
 ---
 
-**Version:** 0.2.0
+**Version:** 0.2.1
 **Status:** Active Development
 **Last Updated:** 2026-02-13
