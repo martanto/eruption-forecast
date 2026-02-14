@@ -46,9 +46,54 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, and feature importance
-- **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`
+- **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Logging**: Built-in logging with loguru for debugging and monitoring
+
+## Pipeline Overview
+
+```
+Raw Seismic Data (SDS / FDSN)
+         │
+         ▼
+┌─────────────────────┐
+│   CalculateTremor   │  RSAM + DSAR metrics (10-min intervals)
+└─────────┬───────────┘
+          │  tremor.csv
+          ▼
+┌─────────────────────┐
+│    LabelBuilder     │  Binary labels (1 = eruption, 0 = normal)
+└─────────┬───────────┘
+          │  label_*.csv
+          ▼
+┌─────────────────────┐
+│ TremorMatrixBuilder │  Windowed tremor matrix aligned to labels
+└─────────┬───────────┘
+          │  tremor_matrix_*.csv
+          ▼
+┌─────────────────────┐
+│   FeaturesBuilder   │  700+ tsfresh features per tremor column
+└─────────┬───────────┘
+          │  all_extracted_features_*.csv
+          ▼
+┌─────────────────────┐
+│   ModelTrainer      │  Multi-seed GridSearchCV training
+│  ┌───────────────┐  │
+│  │FeatureSelector│  │  tsfresh / RandomForest / combined
+│  └───────────────┘  │
+│  ┌───────────────┐  │
+│  │ClassifierModel│  │  10 classifiers, 3 CV strategies
+│  └───────────────┘  │
+└─────────┬───────────┘
+          │  trained_model_*.csv  +  *.pkl models
+          ▼
+┌─────────────────────┐
+│   ModelPredictor    │  Evaluation or forecast on future data
+│  ┌───────────────┐  │
+│  │ModelEvaluator │  │  Metrics, plots, threshold analysis
+│  └───────────────┘  │
+└─────────────────────┘
+```
 
 ## Installation
 
@@ -326,6 +371,30 @@ print(scores.head(10))
 
 Two training workflows are available depending on your evaluation strategy.
 
+```
+train_and_evaluate() workflow:         train() workflow:
+
+Full Dataset                           Full Dataset
+     │                                      │
+     ▼                                      ▼
+ 80/20 Split                          RandomUnderSampler
+     │                                 (full dataset)
+  ┌──┴──┐                                   │
+Train  Test                           Feature Selection
+  │     │                              (full dataset)
+RandomUnder                                 │
+Sampler                               GridSearchCV + CV
+  │                                         │
+Feature                               ┌─────┴──────┐
+Selection                          Save model  Save registry
+  │                                (.pkl)      (.csv)
+GridSearchCV + CV
+  │
+Evaluate on Test
+  │
+Save model + metrics
+```
+
 #### Which workflow should I use?
 
 | Question | `train_and_evaluate()` | `train()` |
@@ -383,6 +452,34 @@ trainer.train(
 )
 ```
 
+#### `fit()` — unified entry point
+
+`fit()` dispatches to `train_and_evaluate()` or `train()` based on the
+`with_evaluation` flag. Use it when the calling code needs a single method
+regardless of which workflow is active.
+
+```python
+# Equivalent to train_and_evaluate()
+trainer.fit(
+    with_evaluation=True,
+    random_state=0,
+    total_seed=500,
+    sampling_strategy=0.75,
+)
+
+# Equivalent to train()
+trainer.fit(
+    with_evaluation=False,
+    random_state=0,
+    total_seed=500,
+    sampling_strategy=0.75,
+)
+```
+
+`ForecastModel.train()` calls `fit()` internally and exposes `with_evaluation`
+as a direct parameter, so you can control the workflow from the high-level API
+without dropping down to `ModelTrainer`.
+
 #### ModelTrainer constructor parameters
 
 | Parameter | Type | Default | Description |
@@ -421,6 +518,13 @@ trainer.train(
 | `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on full dataset |
 | `save_all_features` | `bool` | `False` | Save all ranked features per seed |
 | `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
+
+#### `fit()` method parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
+| `**kwargs` | — | — | Forwarded to `train_and_evaluate()` or `train()` (same parameters as those methods) |
 
 ### 7. Supported Classifiers
 
@@ -591,11 +695,10 @@ each classifier (across seeds) and then across classifiers (consensus).
 ```python
 predictor = ModelPredictor(
     trained_models={
-        "rf":     "output/trainings/rf/trained_model_rf_stratified.csv",
-        "xgb":    "output/trainings/xgb/trained_model_xgb_stratified.csv",
-        "voting": "output/trainings/voting/trained_model_voting_stratified.csv",
+        "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
-    future_features_csv="output/features/future_all_features.csv",
+    future_features_csv="...",
     output_dir="output/predictions",
 )
 
@@ -669,16 +772,16 @@ print(f"F1 at threshold:   {threshold_metrics['f1']:.4f}")
 ```python
 import pandas as pd
 
+# Suffix format: {ClassifierName}-{CVName}_rs-{random_state}_ts-{total_seed}_top-{n}
+# e.g., XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20
+base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+suffix = "XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20"
+
 # All per-seed metrics
-metrics = pd.read_csv(
-    "output/trainings/classifier/XGBClassifier/stratified/all_metrics_xgb_stratified.csv"
-)
+metrics = pd.read_csv(f"{base}/all_metrics_{suffix}.csv")
 
 # Summary statistics (mean ± std)
-summary = pd.read_csv(
-    "output/trainings/classifier/XGBClassifier/stratified/metrics_summary_xgb_stratified.csv",
-    index_col=0,
-)
+summary = pd.read_csv(f"{base}/metrics_summary_{suffix}.csv", index_col=0)
 print(summary[["balanced_accuracy", "f1_score", "precision", "recall"]])
 
 # Best seed
@@ -688,9 +791,7 @@ print(f"Balanced Accuracy:  {best_seed['balanced_accuracy']:.4f}")
 print(f"F1 Score:           {best_seed['f1_score']:.4f}")
 
 # Aggregated significant features
-sig_features = pd.read_csv(
-    "output/trainings/features/significant_features.csv"
-)
+sig_features = pd.read_csv(f"{base}/features/significant_features.csv")
 print(sig_features.head(10))
 ```
 
@@ -700,7 +801,7 @@ print(sig_features.head(10))
 
 ### ForecastModel — Orchestrated Pipeline
 
-`ForecastModel` chains the entire pipeline in a single fluent API. It internally delegates to `ModelTrainer.train_and_evaluate()` when you call `.train()`.
+`ForecastModel` chains the entire pipeline in a single fluent API. It internally delegates to `ModelTrainer.train_and_evaluate()` or `ModelTrainer.train()` (controlled by `with_evaluation`) when you call `.train()`.
 
 #### ForecastModel constructor parameters
 
@@ -780,7 +881,7 @@ model.set_feature_selection_method("combined").train(
 )
 ```
 
-`ForecastModel.train()` always calls `ModelTrainer.train_and_evaluate()` internally (80/20 split + metrics). If you want to train on the full dataset via `ForecastModel`, use `ModelTrainer.train()` directly after extracting features:
+`ForecastModel.train()` passes `with_evaluation` to `ModelTrainer.fit()` internally. Set `with_evaluation=False` to train on the full dataset without an 80/20 split. Alternatively, use `ModelTrainer` directly after calling `fm.extract_features()`:
 
 ```python
 from eruption_forecast.model.model_trainer import ModelTrainer
@@ -805,12 +906,13 @@ trainer.train(random_state=0, total_seed=500)  # Full-dataset training
 ```python
 import pandas as pd
 
-base = "output/trainings/classifier"
+base = "output/trainings/model-with-evaluation"
+suffix = "rs-0_ts-500_top-20"
 classifiers = {
-    "rf":     f"{base}/RandomForestClassifier/stratified/all_metrics_rf_stratified.csv",
-    "gb":     f"{base}/GradientBoostingClassifier/stratified/all_metrics_gb_stratified.csv",
-    "xgb":    f"{base}/XGBClassifier/stratified/all_metrics_xgb_stratified.csv",
-    "voting": f"{base}/VotingClassifier/stratified/all_metrics_voting_stratified.csv",
+    "rf":     f"{base}/random-forest-classifier/stratified-shuffle-split/all_metrics_RandomForestClassifier-StratifiedShuffleSplit_{suffix}.csv",
+    "gb":     f"{base}/gradient-boosting-classifier/stratified-shuffle-split/all_metrics_GradientBoostingClassifier-StratifiedShuffleSplit_{suffix}.csv",
+    "xgb":    f"{base}/xgb-classifier/stratified-shuffle-split/all_metrics_XGBClassifier-StratifiedShuffleSplit_{suffix}.csv",
+    "voting": f"{base}/voting-classifier/stratified-shuffle-split/all_metrics_VotingClassifier-StratifiedShuffleSplit_{suffix}.csv",
 }
 
 results = []
@@ -881,9 +983,8 @@ print(df_forecast[df_forecast["model_prediction"] == 1])
 # --- Stage 2c: Multi-model consensus forecast ---
 predictor = ModelPredictor(
     trained_models={
-        "rf":     "output/trainings/rf/trained_model_rf_stratified.csv",
-        "xgb":    "output/trainings/xgb/trained_model_xgb_stratified.csv",
-        "voting": "output/trainings/voting/trained_model_voting_stratified.csv",
+        "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
     future_features_csv="data/realtime/all_features.csv",
     output_dir="output/consensus",
@@ -932,28 +1033,39 @@ output/
     │   └── label_features_*.csv             # Labels aligned with features
     │
     └── trainings/
-        ├── features/
-        │   ├── significant_features.csv      # Aggregated top-N features (all seeds)
-        │   ├── top_20_significant_features.csv
-        │   ├── all_features/                 # Per-seed ranked features (optional)
-        │   │   ├── 00000.csv
-        │   │   └── ...
-        │   └── figures/significant/          # Feature importance plots (optional)
-        │       └── 00000.jpg
+        ├── model-with-evaluation/        # Output of train_and_evaluate()
+        │   └── {classifier-slug}/        # e.g., random-forest-classifier
+        │       └── {cv-slug}/            # e.g., stratified-shuffle-split
+        │           ├── features/
+        │           │   ├── significant_features/     # Per-seed top-N features
+        │           │   │   ├── 00000.csv
+        │           │   │   └── ...
+        │           │   ├── all_features/             # All ranked features (optional)
+        │           │   │   ├── 00000.csv
+        │           │   │   └── ...
+        │           │   ├── figures/significant/      # Feature plots (optional)
+        │           │   │   └── 00000.jpg
+        │           │   ├── significant_features.csv  # Aggregated features (all seeds)
+        │           │   └── top_20_significant_features.csv
+        │           ├── models/
+        │           │   ├── 00000.pkl     # Trained model (seed 0)
+        │           │   ├── 00001.pkl
+        │           │   └── ...
+        │           ├── metrics/
+        │           │   ├── 00000.json    # Per-seed metrics
+        │           │   └── ...
+        │           ├── trained_model_{suffix}.csv    # Registry of all trained models
+        │           ├── all_metrics_{suffix}.csv      # All seed metrics
+        │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
         │
-        └── classifier/
-            └── {ClassifierName}/             # e.g., XGBClassifier
-                └── {cv_strategy}/            # e.g., stratified
+        └── model-only/                   # Output of train()
+            └── {classifier-slug}/
+                └── {cv-slug}/
+                    ├── features/
+                    │   ├── significant_features/
+                    │   └── ...
                     ├── models/
-                    │   ├── 00000.pkl         # Trained model (seed 0)
-                    │   ├── 00001.pkl
-                    │   └── ...
-                    ├── metrics/
-                    │   ├── 00000.json        # Per-seed metrics (train_and_evaluate() only)
-                    │   └── ...
-                    ├── trained_model_{suffix}.csv    # Registry of all trained models
-                    ├── all_metrics_{suffix}.csv      # All seed metrics (train_and_evaluate() only)
-                    └── metrics_summary_{suffix}.csv  # Mean ± std summary (train_and_evaluate() only)
+                    └── trained_model_{suffix}.csv
 ```
 
 **ModelPredictor output** (`output_dir/predictions/`):
@@ -1106,4 +1218,4 @@ This project uses:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-14
+**Last Updated:** 2026-02-15
