@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `dev/predictions`
-**Last Updated:** 2026-02-13 (model_trainer.py refactor)
+**Last Updated:** 2026-02-15
 
 ---
 
@@ -23,6 +23,7 @@
 12. [Docstring Improvements](#docstring-improvements-2026-02-13)
 13. [FeaturesBuilder Readability Improvements](#featuresbuilder-readability-improvements-2026-02-13)
 14. [ModelTrainer Refactor](#modeltrainer-refactor-2026-02-13)
+15. [Refactor Output Directory Structure](#refactor-output-directory-structure-2026-02-15)
 
 ---
 
@@ -64,9 +65,10 @@ eruption_forecast/
 │   └── constants.py
 ├── model/               # ML models and training
 │   ├── forecast_model.py    # Pipeline orchestrator
-│   ├── train_model.py       # Multi-seed training
+│   ├── model_trainer.py     # Multi-seed training
 │   ├── classifier_model.py  # Classifier management
-│   └── model_evaluator.py   # Evaluation, export, and plotting
+│   ├── model_evaluator.py   # Evaluation, export, and plotting
+│   └── model_predictor.py   # Inference (evaluation + forecast modes)
 ├── utils.py             # Shared utilities
 ├── sds.py               # SDS file handling
 ├── plot.py              # Visualization
@@ -80,35 +82,53 @@ eruption_forecast/
 ### Data Pipeline
 
 ```
-Raw Seismic Data (SDS/FDSN)
-         ↓
-   [CalculateTremor]
-         ↓
-   Tremor CSV (RSAM + DSAR metrics, 10-min intervals)
-         ↓
-   [LabelBuilder]
-         ↓
-   Label CSV (binary erupted/not labels per time window)
-         ↓
-   [TremorMatrixBuilder]
-         ↓
-   Tremor Matrix (id, datetime, tremor columns aligned to label windows)
-         ↓
-   [FeaturesBuilder + tsfresh]
-         ↓
-   Extracted Features (700+ time-series features)
-         ↓
-   [FeatureSelector (optional)]
-         ↓
-   Selected Features (tsfresh, RandomForest, or combined)
-         ↓
-   [TrainModel]
-         ↓
-   Significant Features (top-N per seed across N seeds)
-         ↓
-   [ClassifierModel + GridSearchCV]
-         ↓
-   Trained Model → Eruption Predictions
+Raw Seismic Data (SDS / FDSN)
+         │
+         ▼
+┌─────────────────────┐
+│   CalculateTremor   │  RSAM + DSAR → tremor.csv
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│    LabelBuilder     │  Binary labels → label_*.csv
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ TremorMatrixBuilder │  Windowed matrix → tremor_matrix_*.csv
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│   FeaturesBuilder   │  700+ features → all_extracted_features_*.csv
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────┐
+│                 ModelTrainer                │
+│  ┌─────────────┐   ┌──────────────────────┐ │
+│  │FeatureSelect│   │   ClassifierModel    │ │
+│  │   or        │   │ (10 classifiers,     │ │
+│  │  combined   │   │  3 CV strategies)    │ │
+│  └─────────────┘   └──────────────────────┘ │
+│         ↓  train_and_evaluate()  ↓ train()  │
+│    80/20 split + metrics   Full dataset     │
+└─────────┬───────────────────────────────────┘
+          │  trained_model_*.csv  +  *.pkl
+          ▼
+┌─────────────────────────────────────────────┐
+│               ModelPredictor                │
+│  ┌──────────────────────────────────────┐   │
+│  │ predict() / predict_best()           │   │
+│  │ (evaluation mode — requires labels)  │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │ predict_proba()                      │   │
+│  │ (forecast mode — no labels needed)   │   │
+│  └──────────────────────────────────────┘   │
+│  Single model or multi-model consensus      │
+└─────────────────────────────────────────────┘
 ```
 
 ### Key Design Patterns
@@ -118,6 +138,33 @@ Raw Seismic Data (SDS/FDSN)
 3. **Class Balancing**: RandomUnderSampler for imbalanced eruption data
 4. **Separation of Concerns**: Clear module boundaries
 5. **Data Leakage Prevention**: Strict train/test split before any resampling or feature selection
+
+### Multi-Seeding Training Workflows
+
+```
+  train_and_evaluate()              train()
+  ─────────────────────            ─────────────────────
+  Full Dataset                     Full Dataset
+       │                                │
+       ▼                                ▼
+   80/20 Split                  RandomUnderSampler
+   (stratified)                  (full dataset)
+  ┌────┴────┐                          │
+Train     Test                  Feature Selection
+  │         │                    (full dataset)
+RandomUnder │                          │
+Sampler     │                    GridSearchCV
+  │         │                     + CV folds
+Feature     │                          │
+Selection   │                   ┌──────┴──────┐
+  │         │               model.pkl   registry.csv
+GridSearchCV│
+ + CV folds │
+  │         │
+Evaluate ◄──┘
+  │
+Save model + metrics
+```
 
 ---
 
@@ -221,7 +268,7 @@ The workflow follows a well-structured approach for binary classification:
 | ~~No model persistence~~ | RESOLVED | `ModelEvaluator.export_model()` with joblib |
 | ~~No evaluation metrics~~ | RESOLVED | ModelEvaluator with ROC-AUC, PR-AUC, confusion matrix, plots |
 | No probability calibration | Pending | Add CalibratedClassifierCV |
-| No full-dataset training | RESOLVED | `TrainModel.fit()` trains on full dataset; `ModelPredictor` evaluates on future data |
+| No full-dataset training | RESOLVED | `ModelTrainer.train()` trains on full dataset; `ModelPredictor` evaluates on future data |
 
 ---
 
@@ -349,6 +396,7 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 | Date | Category | Changes |
 |------|----------|---------|
+| 2026-02-15 | **Output directory restructure + docstring fixes** | Restructured ModelTrainer output into model-with-evaluation/ and model-only/ by classifier-slug/cv-slug. Added get_classifier_properties(), update_directories(). Added with_evaluation/grid_params to ForecastModel.train(). Added slugify_class_name() to utils.py. Fixed get_metrics() param rename. Fixed docstring typos. |
 | 2026-02-13 | **README overhaul** | Rewrote README from scratch: added XGBoost classifier section, detailed hyperparameter grids with collapsible blocks, corrected output directory structure (classifier/{ClassName}/{cv_strategy}/models\|metrics), added `fit()` + `ModelPredictor` workflow, `optimize_threshold()` usage, and comprehensive A-to-Z step-by-step guide. Updated SUMMARY.md classifier count (9 → 10) and VotingClassifier composition (now RF + XGBoost). |
 | 2026-02-13 | **Imbalance-aware improvements** | Fixed `_train()` skip-logic bug (spurious `or not save_features` check). Expanded RF/NN/LR grids; added `scale_pos_weight=[1,5,10,15]` to XGB grid; removed hardcoded `scale_pos_weight=1`. Added `class_weight`/`n_jobs` params to `ClassifierModel`. Added `optimize_threshold()`, `plot_threshold_analysis()`, `plot_feature_importance()`, `plot_calibration()`, `plot_prediction_distribution()` to `ModelEvaluator`; `get_metrics()` now includes optimal-threshold fields. |
 | 2026-02-12 | **Simplify ModelEvaluator** | Rewrote from scratch: removed Protocol classes, X_train/y_train, all export_* methods, cross_validate, learning curve, feature importances, and as_dataframe flag. Kept core: `__init__`, `from_files()`, `get_metrics()`, `summary()`, three plot methods, `plot_all()`. ModelPredictor: dropped `save_reports` param. |
@@ -560,6 +608,45 @@ Refactored `model_trainer.py` for readability and maintainability without changi
 
 ---
 
-**Document Version:** 3.2
-**Last Updated:** 2026-02-13
+## Refactor Output Directory Structure (2026-02-15)
+
+Restructured `ModelTrainer` output directories and updated `ForecastModel.train()`.
+
+### Changes
+
+| Component | Change |
+|-----------|--------|
+| `ModelTrainer` output | Reorganised into `model-with-evaluation/` and `model-only/` subdirectories, each further split by `{classifier-slug}/{cv-slug}/` |
+| `ModelTrainer` | Added `get_classifier_properties()` — returns classifier name, slug, and ID; added `update_directories()` — recalculates all output paths after classifier changes |
+| `ForecastModel.train()` | Added `with_evaluation: bool` parameter (dispatches to `train_and_evaluate()` or `train()`); added `grid_params` parameter for custom hyperparameter overrides |
+| `utils.py` | Added `slugify_class_name()` — converts PascalCase class names to kebab-case slugs (e.g. `XGBClassifier` → `xgb-classifier`) |
+| Bug fix | `get_metrics()` parameter renamed from `classifier` → `classifier_model` |
+| Docstring fixes | Fixed `pd.DataFRame`, `SLugify`, `Trainig` typos across `model_trainer.py`, `utils.py` |
+
+### New Output Directory Layout
+
+```
+trainings/
+├── model-with-evaluation/      ← train_and_evaluate()
+│   └── {classifier-slug}/      e.g. xgb-classifier
+│       └── {cv-slug}/          e.g. stratified-shuffle-split
+│           ├── features/
+│           ├── models/
+│           ├── metrics/
+│           ├── trained_model_{suffix}.csv
+│           ├── all_metrics_{suffix}.csv
+│           └── metrics_summary_{suffix}.csv
+│
+└── model-only/                 ← train()
+    └── {classifier-slug}/
+        └── {cv-slug}/
+            ├── features/
+            ├── models/
+            └── trained_model_{suffix}.csv
+```
+
+---
+
+**Document Version:** 3.3
+**Last Updated:** 2026-02-15
 **Author:** Claude Code (Sonnet 4.5)
