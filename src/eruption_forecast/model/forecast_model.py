@@ -788,7 +788,6 @@ class ForecastModel:
         label_builder = LabelBuilder(
             start_date=to_datetime(train_start_date),
             end_date=to_datetime(train_end_date),
-            window_size=self.window_size,
             window_step=window_step,
             window_step_unit=window_step_unit,
             day_to_forecast=day_to_forecast,
