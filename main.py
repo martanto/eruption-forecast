@@ -66,17 +66,24 @@ def main(use_relevant_features: bool = False):
         overwrite=False,
     )
 
-    classifiers = ("xgb", "rf")
+    classifiers = ["rf"]
+    grid_params = {
+        "rf": {
+            "n_estimators": [10, 30, 100],
+            "max_depth": [3, 5, 7],
+            "criterion": ["gini", "entropy"],
+            "max_features": ["sqrt", "log2", None],
+        }
+    }
 
     for classifier in classifiers:
-        print("=" * 50)
-        print(f"| Classifier: {classifier}:")
-        print("=" * 50)
         fm.train(
             classifier=classifier,  # ty:ignore[invalid-argument-type]
             cv_strategy="stratified",
             random_state=0,
             total_seed=500,
+            with_evaluation=False,
+            grid_params=grid_params[classifier],
             number_of_significant_features=20,
             sampling_strategy=0.75,
             save_all_features=True,
