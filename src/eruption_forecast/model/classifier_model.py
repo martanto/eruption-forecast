@@ -18,6 +18,7 @@ from sklearn.model_selection import (
     StratifiedShuffleSplit,
 )
 
+from eruption_forecast.utils import slugify_class_name
 from eruption_forecast.logger import logger
 
 
@@ -44,8 +45,9 @@ class ClassifierModel:
         classifier: Classifier type identifier.
         random_state: Random seed for reproducibility. Applies to classifiers
             that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
-        cv_strategy: Cross-validation strategy. Options:
-            - "stratified": StratifiedKFold (default, preserves class distribution)
+        cv_strategy: Cross-validation strategy. Defaults to ``"shuffle"``.
+            - "shuffle": StratifiedShuffleSplit (randomised stratified folds)
+            - "stratified": StratifiedKFold (preserves class distribution)
             - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
         n_splits: Number of cross-validation splits. Defaults to 5.
 
@@ -157,8 +159,9 @@ class ClassifierModel:
         - "timeseries": TimeSeriesSplit (for temporal data)
 
         Args:
-            strategy: Cross-validation strategy. Options:
-                - "stratified": StratifiedKFold (default, preserves class distribution)
+            strategy: Cross-validation strategy. Defaults to ``self.cv_strategy``.
+                - "shuffle": StratifiedShuffleSplit (randomised stratified folds)
+                - "stratified": StratifiedKFold (preserves class distribution)
                 - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
 
         Returns:
@@ -198,6 +201,16 @@ class ClassifierModel:
             test_size=self.test_size,
             random_state=self.random_state,
         )
+
+    @property
+    def slug_name(self) -> str:
+        """Slug name for this classifier."""
+        return slugify_class_name(self.name)
+
+    @property
+    def slug_cv_name(self) -> str:
+        """Slug name for cross-validation."""
+        return slugify_class_name(self.cv_name)
 
     @property
     def grid(self) -> dict[str, Any]:
@@ -304,7 +317,7 @@ class ClassifierModel:
 
     @grid.setter
     def grid(self, grid: dict[str, Any]):
-        """Set grid parameters"""
+        """Set a custom hyperparameter grid, overriding the default."""
         self._grid = grid
         if self.verbose:
             logger.info(f"Your grid parameters updated to: {grid}")
@@ -439,7 +452,7 @@ class ClassifierModel:
             | VotingClassifier
         ),
     ):
-        """Set model classifier"""
+        """Set a custom classifier instance, overriding the default."""
         self._model = model
         if self.verbose:
             logger.info(f"Your model to: {model.__class__.__name__}")
@@ -450,7 +463,8 @@ class ClassifierModel:
         return type(self.model).__name__
 
     @property
-    def model_and_grid(self):
+    def model_and_grid(self) -> tuple:
+        """Return a ``(model, grid)`` tuple for use with GridSearchCV."""
         return self.model, self.grid
 
     def update_model_and_grid(
@@ -472,21 +486,12 @@ class ClassifierModel:
         """Update model classifier and grid parameters.
 
         Args:
-            model ([
-                SVC,
-                KNeighborsClassifier,
-                DecisionTreeClassifier,
-                RandomForestClassifier,
-                GradientBoostingClassifier,
-                MLPClassifier,
-                GaussianNB,
-                LogisticRegression,
-                VotingClassifier
-            ]): Model classifier
-            grid (dict[str, Any]): Grid parameters
+            model: Classifier instance to use. Accepts any supported sklearn
+                or XGBoost estimator (SVC, RandomForestClassifier, XGBClassifier, etc.).
+            grid (dict[str, Any]): Hyperparameter grid for GridSearchCV.
 
         Returns:
-            Self: ClassifierModel
+            Self for method chaining.
         """
         self._model = model
         self._grid = grid

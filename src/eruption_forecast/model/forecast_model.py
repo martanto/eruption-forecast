@@ -1,5 +1,6 @@
 import os
-from typing import Self, Literal
+from time import sleep
+from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -600,24 +601,30 @@ class ForecastModel:
         """Calculate Tremor Data from seismic data source.
 
         Args:
-            source (optional, Literal["sds", "fdsn"]): Seismic data source
-            methods (Optional[str]): Calculation methods to apply.
-            filename_prefix (Optional[str]): Prefix for generated filenames.
-            remove_outlier_method ("all" or "maximum"): Method for outlier removal. Defaults to "maximum".
-            interpolate (bool): If True, interpolates the data. Defaults to True.
-            value_multiplier (Optional[float]): Scaling factor for seismic values.
-            cleanup_tmp_dir (bool): If True, deletes temporary directory after use. Defaults to False.
-            plot_tmp (bool): If True, plot temporary results for quick view.
-            save_plot (bool): If True, save tremor results for quick view.
-            overwrite_plot (bool): If True, overwrite existing plot files. Defaults to False.
-            sds_dir (str): SDS directory location. Must be provided if source is 'sds'.
-            client_url (str): URL to FDSN service. Default to https://service.iris.edu
-            n_jobs: Number of jobs to run in parallel. Isolated on this method only
+            source (Literal["sds", "fdsn"]): Seismic data source. Defaults to "sds".
+            methods (str | None): Calculation methods to apply. Defaults to None.
+            filename_prefix (str | None): Prefix for generated filenames. Defaults to None.
+            remove_outlier_method (Literal["all", "maximum"]): Outlier removal method.
+                Defaults to "maximum".
+            interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
+            value_multiplier (float | None): Scaling factor for seismic values. Defaults to None.
+            cleanup_tmp_dir (bool): If True, deletes the temporary directory after merging.
+                Defaults to False.
+            plot_tmp (bool): If True, plots each daily result for a quick visual check.
+                Defaults to False.
+            save_plot (bool): If True, saves the final tremor plot. Defaults to False.
+            overwrite_plot (bool): If True, overwrites existing plot files. Defaults to False.
+            sds_dir (str | None): Path to the SDS data directory. Required when
+                ``source="sds"``. Defaults to None.
+            client_url (str): FDSN web-service URL. Defaults to
+                ``"https://service.iris.edu"``.
+            n_jobs (int | None): Parallel workers for this call only. Overrides the
+                instance-level ``n_jobs`` when provided. Defaults to None.
             verbose (bool): If True, enables verbose logging. Defaults to False.
             debug (bool): If True, enables debug mode. Defaults to False.
 
         Returns:
-            self (Self): ForecastModel object
+            Self for method chaining.
         """
         # Setup CalculateTremor instance
         calculate = self._setup_calculate_tremor(
@@ -676,21 +683,25 @@ class ForecastModel:
         features based on correlation with eruption labels.
 
         Args:
-            select_tremor_columns (list[str]): List of tremor columns to extract.
-            save_tremor_matrix_per_method (bool, optional): Save separate CSV per tremor
-                column. Defaults to True.
-            save_tremor_matrix_per_id (bool, optional): **WARNING: This will generate a
-                large number of files** (one per label window). Use only for debugging.
-                Defaults to False.
-            exclude_features (Optional[list[str]]): List features calculator to be excluded.
-            use_relevant_features (bool): If True, extract features using relevant features.
-            output_dir (Optional[str], optional): Output directory. Defaults to None.
+            select_tremor_columns (list[str] | None): Tremor columns to use for feature
+                extraction. Uses all available columns when None. Defaults to None.
+            save_tremor_matrix_per_method (bool): Save a separate tremor-matrix CSV for
+                each tremor column. Defaults to True.
+            save_tremor_matrix_per_id (bool): **WARNING: generates one file per label
+                window** — use only for debugging. Defaults to False.
+            exclude_features (list[str] | None): tsfresh feature calculator names to skip.
+                Defaults to None.
+            use_relevant_features (bool): If True, run tsfresh with relevance filtering
+                (requires labels). Defaults to False.
+            output_dir (str | None): Output directory for feature files. Defaults to
+                ``self.features_dir``.
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
-            n_jobs (int): Number of parallel jobs. Defaults to None.
-            verbose (bool): If True, enables verbose mode. Defaults to False.
+            n_jobs (int | None): Parallel workers for tsfresh extraction. Overrides the
+                instance-level ``n_jobs`` when provided. Defaults to None.
+            verbose (bool | None): If True, enables verbose logging. Defaults to None.
 
         Returns:
-            self (Self): ForecastModel object
+            Self for method chaining.
         """
         output_dir = output_dir or self.features_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -831,9 +842,12 @@ class ForecastModel:
 
         Args:
             using (str): Feature selection method:
-                - "tsfresh": Statistical significance only
-                - "random_forest": Permutation importance only
-                - "combined": Two-stage (tsfresh → RandomForest)
+                - "tsfresh": Statistical significance only.
+                - "random_forest": Permutation importance only.
+                - "combined": Two-stage (tsfresh → RandomForest).
+
+        Returns:
+            Self for method chaining.
         """
         self.feature_selection_method = using
         return self
@@ -841,11 +855,13 @@ class ForecastModel:
     def train(
         self,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         random_state: int = 0,
         total_seed: int = 500,
+        with_evaluation: bool = True,
+        grid_params: dict[str, Any] | None = None,
         number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
@@ -858,15 +874,33 @@ class ForecastModel:
     ) -> Self:
         """Training model using extracted features and labels.
 
+        Supported classifiers:
+            - svm: Support Vector Machine (SVC with balanced class weights)
+            - knn: K-Nearest Neighbors
+            - dt: Decision Tree (with balanced class weights)
+            - rf: Random Forest (with balanced class weights)
+            - gb: Gradient Boosting (handles imbalanced data well)
+            - nn: Multi-Layer Perceptron Neural Network
+            - nb: Gaussian Naive Bayes
+            - lr: Logistic Regression (with balanced class weights)
+            - xgb: XGBoost classifier (excellent for imbalanced data)
+            - voting: Ensemble VotingClassifier combining rf and xgb
+
         Args:
-            classifier (str, optional): Classifier type ("rf", "gb", "svm", "lr", "nn",
-                "dt", "knn", "nb", "voting"). Defaults to "rf".
+            classifier (str, optional): Classifier type ("svm", "knn", "dt", "rf", "gb",
+                "xgb", "nn", "nb", "lr", "voting"). Defaults to "rf".
             cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
                 "timeseries"). Defaults to "shuffle".
-            random_state (int, optional): Initiate random seed. Defaults to 0.
-            total_seed (int, optional): Total random seed. Defaults to 500.
-            number_of_significant_features (int, optional): Number of significant features. Defaults to 20.
-            sampling_strategy (str, optional): Sampling strategy. Defaults to 0.75.
+            random_state (int, optional): Initial random seed. Defaults to 0.
+            total_seed (int, optional): Total number of random seeds. Defaults to 500.
+            with_evaluation (bool, optional): If True, performs 80/20 train/test split and
+                computes evaluation metrics. Requires labels. Defaults to True.
+            grid_params (dict[str, Any], optional): Override default hyperparameter grid
+                for GridSearchCV. Defaults to None.
+            number_of_significant_features (int, optional): Number of top features to retain
+                per seed. Defaults to 20.
+            sampling_strategy (str | float, optional): Under-sampling ratio for balancing
+                classes. Defaults to 0.75.
             save_all_features (bool, optional): Whether to save ALL features. Defaults to False.
             plot_significant_features (bool, optional): Whether to plot each significant feature. Defaults to False.
             extracted_features_csv (str | None): Path to extracted features.
@@ -880,10 +914,21 @@ class ForecastModel:
         """
         if verbose or self.verbose:
             print("=" * 50)
-            print("| Training model")
+            print(f"| Training model using: {classifier}")
             if self.use_relevant_features:
-                print("|- Using Relevant features")
+                print("|- Relevant Features selected.")
+            # Model evaluation only works if self.label_data is not empty
+            if not self.label_data.empty and with_evaluation:
+                print("|- Training model with evaluation.")
+            if self.label_data.empty and with_evaluation:
+                print("|- Label is empty. Model evaluation will be set to False.")
+                with_evaluation = False
+            if not with_evaluation:
+                print("|- Training model only. No evaluation.")
             print("=" * 50)
+
+        # Give a chance to show message
+        sleep(3)
 
         features_csv = extracted_features_csv or self.features_csv
 
@@ -917,13 +962,19 @@ class ForecastModel:
             verbose=verbose or self.verbose,
         )
 
-        train_model.train_and_evaluate(
-            random_state=random_state,
-            total_seed=total_seed,
-            sampling_strategy=sampling_strategy,
-            save_all_features=save_all_features,
-            plot_significant_features=plot_significant_features,
-        )
+        # Override default grid search parameters
+        if grid_params is not None:
+            train_model.ClassifierModel.grid = grid_params
+
+        train_params: dict[str, Any] = {
+            "random_state": random_state,
+            "total_seed": total_seed,
+            "sampling_strategy": sampling_strategy,
+            "save_all_features": save_all_features,
+            "plot_significant_features": plot_significant_features,
+        }
+
+        train_model.fit(with_evaluation=with_evaluation, **train_params)
 
         self.ModelTrainer = train_model
         self.trained_model_df = train_model.df
@@ -961,6 +1012,12 @@ class ForecastModel:
             Self for method chaining.
         """
         verbose = verbose or self.verbose
+
+        if self.trained_model_csv is None:
+            raise ValueError(
+                "Trained model CSV not found. Please run train() first. "
+                "Usually named as: trained_model_{classifier_name}_rs-0_ts-500_top-20.csv"
+            )
 
         if verbose:
             logger.info("predict() started")

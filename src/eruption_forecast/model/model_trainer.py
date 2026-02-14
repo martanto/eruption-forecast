@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Any, Literal
+from typing import Any, Self, Literal
 from collections.abc import Callable
 from multiprocessing import Pool
 
@@ -54,8 +54,8 @@ class ModelTrainer:
             ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         n_jobs (int, optional): Number of parallel workers. Defaults to 1.
         prefix_filename (str, optional): Prefix for output filenames. Defaults to None.
-        classifier (str, optional): Classifier type ("rf", "gb", "svm", "lr", "nn",
-            "dt", "knn", "nb", "voting"). Defaults to "rf".
+        classifier (str, optional): Classifier type ("rf", "gb", "xgb", "svm", "lr",
+            "nn", "dt", "knn", "nb", "voting"). Defaults to "rf".
         cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
             "timeseries"). Defaults to "shuffle".
         cv_splits (int, optional): Number of CV splits. Defaults to 5.
@@ -72,7 +72,7 @@ class ModelTrainer:
     Example:
         >>> # Train with Random Forest (default)
         >>> trainer = ModelTrainer(
-        ...     features_csv="output/features/extracted_features.csv",
+        ...     extracted_features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     n_jobs=4,
@@ -86,16 +86,16 @@ class ModelTrainer:
 
         >>> # Train with Gradient Boosting
         >>> trainer = ModelTrainer(
-        ...     features_csv="output/features/extracted_features.csv",
+        ...     extracted_features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     classifier="gb",
         ...     n_jobs=4,
         ... )
 
-        >>> # Train with VotingClassifier ensemble and TimeSeriesSplit
+        >>> # Train with VotingClassifier ensemble and StratifiedShuffleSplit
         >>> trainer = ModelTrainer(
-        ...     features_csv="output/features/extracted_features.csv",
+        ...     extracted_features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     classifier="voting",
@@ -105,11 +105,11 @@ class ModelTrainer:
         ... )
 
         >>> # Results saved to:
-        >>> # - output/trainings/significant_features.csv (aggregated features)
-        >>> # - output/trainings/models/ (trained models)
-        >>> # - output/trainings/metrics/ (evaluation metrics)
-        >>> # - output/trainings/all_metrics.csv (metrics from all seeds)
-        >>> # - output/trainings/metrics_summary.csv (mean/std statistics)
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/features/significant_features.csv
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/models/  (trained models)
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/metrics/ (per-seed metrics)
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/all_metrics_{suffix}.csv
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/metrics_summary_{suffix}.csv
     """
 
     def __init__(
@@ -120,7 +120,7 @@ class ModelTrainer:
         root_dir: str | None = None,
         prefix_filename: str | None = None,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "nn", "nb", "lr", "voting"
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         cv_splits: int = 5,
@@ -149,17 +149,38 @@ class ModelTrainer:
             classifier=classifier,
             cv_strategy=cv_strategy,
             n_splits=cv_splits,
+            verbose=verbose,
         )
-        classifier_name = classifier_model.name
-        classifier_cv_name = classifier_model.cv_name
+
+        (
+            self.classifier_name,
+            self.classifier_slug_name,
+            self.classifier_slug_cv_name,
+            self.classifier_id,
+        ) = self.get_classifier_properties(classifier_model)
 
         # Output training dir: ``<root_dir>/output/trainings``
         output_dir = resolve_output_dir(
-            output_dir, root_dir, os.path.join("output", "trainings")
+            output_dir,
+            root_dir,
+            os.path.join("output", "trainings"),
         )
 
-        # Filtered features dir: ``<output_dir>/features``
-        features_dir = os.path.join(output_dir, "features")
+        output_dir = os.path.join(output_dir, "model-with-evaluation")
+
+        # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
+        classifier_dir = os.path.join(
+            output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
+        )
+
+        # Classifier training model dir: ``<classifier_dir>/models``
+        models_dir = os.path.join(classifier_dir, "models")
+
+        # Classifier metrics dir: ``<classifier_dir>/metrics``
+        metrics_dir = os.path.join(classifier_dir, "metrics")
+
+        # Filtered features dir: ``<classifier_dir>/features``
+        features_dir = os.path.join(classifier_dir, "features")
 
         # All features dir: ``<features_dir>/all_features``
         all_features_dir = os.path.join(features_dir, "all_features")
@@ -170,17 +191,6 @@ class ModelTrainer:
         # Plot significant features dir: ``<features_dir>/figures/significant``
         figures_dir = os.path.join(features_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
-
-        # Classifier training dir: ``<features_dir>/<classifier_name>/<classifier_cv_name>``
-        classifier_dir = os.path.join(
-            output_dir, "classifier", classifier_name, classifier_cv_name
-        )
-
-        # Classifier training model dir: ``<classifier_dir>/models``
-        models_dir = os.path.join(classifier_dir, "models")
-
-        # Classifier metrics dir: ``<classifier_dir>/metrics``
-        metrics_dir = os.path.join(classifier_dir, "metrics")
 
         # =========================
         # Set DEFAULT properties
@@ -206,7 +216,6 @@ class ModelTrainer:
             method=feature_selection_method, verbose=verbose
         )
         self.ClassifierModel = classifier_model
-        self.classifier_name = classifier_name
         self.features_dir = features_dir
         self.significant_features_dir = significant_features_dir
         self.all_features_dir = all_features_dir
@@ -230,14 +239,13 @@ class ModelTrainer:
         # Validate and create directories
         # =========================
         self.validate()
-        self.create_directories()
 
         # =========================
         # Verbose and logging
         # =========================
         if verbose:
             logger.info(
-                f"Train model using {n_jobs} jobs with {classifier_name} classifier "
+                f"Train model using {n_jobs} jobs with {self.classifier_name} classifier "
                 f"and {cv_strategy} CV strategy ({cv_splits} splits)"
             )
 
@@ -255,8 +263,8 @@ class ModelTrainer:
 
         Example:
             >>> trainer = ModelTrainer(
-            ...     features_csv="features.csv",
-            ...     label_features_csv="labels.csv"
+            ...     extracted_features_csv="features.csv",
+            ...     label_features_csv="labels.csv",
             ... )
             >>> trainer.validate()  # Called automatically in __init__
         """
@@ -283,6 +291,92 @@ class ModelTrainer:
                 "n_jobs cannot be negative or equals to 0. Check your n_jobs parameter."
             )
 
+    def get_classifier_properties(
+        self,
+        classifier_model: ClassifierModel | None = None,
+    ) -> tuple[str, str, str, str]:
+        """Extract name, slug, and identifier strings from a ClassifierModel.
+
+        Args:
+            classifier_model: ClassifierModel instance to inspect.
+                Defaults to ``self.ClassifierModel`` when None.
+
+        Returns:
+            tuple[str, str, str, str]: A four-element tuple of
+                ``(classifier_name, classifier_slug_name,
+                classifier_slug_cv_name, classifier_id)``.
+        """
+        classifier_model = classifier_model or self.ClassifierModel
+
+        classifier_name = classifier_model.name
+        classifier_slug_name = classifier_model.slug_name
+        classifier_cv_name = classifier_model.cv_name
+
+        classifier_slug_cv_name = classifier_model.slug_cv_name
+        classifier_id = f"{classifier_name}-{classifier_cv_name}"
+
+        return (
+            classifier_name,
+            classifier_slug_name,
+            classifier_slug_cv_name,
+            classifier_id,
+        )
+
+    def update_directories(
+        self, output_dir: str | None = None, root_dir: str | None = None
+    ) -> Self:
+        """Recompute and update all subdirectory paths from a new output directory.
+
+        Resolves the new output directory using the same rules as ``__init__``,
+        then rebuilds every derived path (classifier, models, metrics, features,
+        figures). Calls ``create_directories()`` to ensure the paths exist.
+
+        Args:
+            output_dir: New base output directory. Resolved against ``root_dir``
+                (or ``os.getcwd()`` when None). Defaults to None.
+            root_dir: Anchor directory for resolving relative ``output_dir`` values.
+                Defaults to None.
+
+        Returns:
+            Self for method chaining.
+        """
+        # Output training dir: ``<root_dir>/output/trainings``
+        self.output_dir = resolve_output_dir(
+            output_dir,
+            root_dir,
+            os.path.join("output", "trainings", "model-with-evaluation"),
+        )
+
+        # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
+        self.classifier_dir = os.path.join(
+            output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
+        )
+
+        # Classifier training model dir: ``<classifier_dir>/models``
+        self.models_dir = os.path.join(self.classifier_dir, "models")
+
+        # Classifier metrics dir: ``<classifier_dir>/metrics``
+        self.metrics_dir = os.path.join(self.classifier_dir, "metrics")
+
+        # Filtered features dir: ``<classifier_dir>/features``
+        self.features_dir = os.path.join(self.classifier_dir, "features")
+
+        # All features dir: ``<features_dir>/all_features``
+        self.all_features_dir = os.path.join(self.features_dir, "all_features")
+
+        # Significant features dir: ``<features_dir>/significant_features``
+        self.significant_features_dir = os.path.join(
+            self.features_dir, "significant_features"
+        )
+
+        # Plot significant features dir: ``<features_dir>/figures/significant``
+        figures_dir = os.path.join(self.features_dir, "figures")
+        self.significant_figures_dir = os.path.join(figures_dir, "significant")
+
+        self.create_directories()
+
+        return self
+
     def update_grid_params(
         self, classifier: ClassifierModel, grid_params: dict[str, Any]
     ) -> ClassifierModel:
@@ -295,7 +389,7 @@ class ModelTrainer:
             grid_params (dict): Grid search parameters.
 
         Returns:
-            self (Self): ModelTrainer class
+            ClassifierModel: The updated classifier instance.
         """
         current_grid = classifier.grid
         classifier.grid = grid_params
@@ -310,18 +404,17 @@ class ModelTrainer:
         """Create required output directories for training results.
 
         Creates the main output directory and subdirectories for storing
-        significant features CSVs, trained models, and metrics. Called
-        automatically during initialization.
+        significant features CSVs and trained models. Called at the start
+        of ``train_and_evaluate()`` and ``update_directories()``.
 
         Example:
             >>> trainer = ModelTrainer(...)
-            >>> trainer.create_directories()  # Called in __init__
-            >>> # Creates: output_dir/, significant_features/, models/, metrics/
+            >>> trainer.create_directories()
+            >>> # Creates: output_dir/, significant_features/, models/
         """
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
-        os.makedirs(self.metrics_dir, exist_ok=True)
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
@@ -414,10 +507,10 @@ class ModelTrainer:
         all_features_filepath: str | None = None,
         all_figures_filepath: str | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-        """Feature selection.
+        """Select the most predictive features from a resampled training set.
 
-        Based on tsfresh statistical significance testing with FDR control
-        or permutation importance analysis
+        Uses tsfresh statistical significance testing with FDR control
+        or permutation importance analysis, depending on ``self.feature_selection_method``.
 
         Args:
             features (pd.DataFrame): Resampled features to select.
@@ -575,6 +668,12 @@ class ModelTrainer:
     ) -> str:
         """Build and save the trained-models registry CSV.
 
+        Save model registry DataFrame with filename format:
+        trained_model_{classifier_name}_rs-{random_state}_ts-{total_seed}_top-{number_of_significant_features}.csv
+
+        Example Filename:
+            trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv
+
         Args:
             records (list[dict]): One dict per seed with keys
                 ``random_state``, ``significant_features_csv``,
@@ -589,16 +688,19 @@ class ModelTrainer:
             ValueError: If no records were produced (no models trained).
         """
         suffix = (
-            f"{self.classifier_name}_rs-{random_state}_ts-{total_seed}"
+            f"{self.classifier_id}_rs-{random_state}_ts-{total_seed}"
             f"_top-{self.number_of_significant_features}"
         )
+        filename = f"trained_model_{suffix}.csv"
+
         df = pd.DataFrame(records).set_index("random_state")
         if df.empty:
             raise ValueError("No significant features or trained models found.")
-        csv = os.path.join(self.classifier_dir, f"trained_model_{suffix}.csv")
+        csv = os.path.join(self.classifier_dir, filename)
         df.to_csv(csv, index=True)
         self.df = df
         self.csv = csv
+
         return suffix
 
     def _run_train_and_evaluate(
@@ -701,7 +803,7 @@ class ModelTrainer:
 
         # Get and save metrics
         metrics = get_metrics(
-            classifier=clf,
+            classifier_model=clf,
             labels_test=labels_test,
             labels_pred=labels_pred,
             labels_train=labels_train_resampled,
@@ -757,6 +859,8 @@ class ModelTrainer:
             ...     total_seed=100,
             ... )
         """
+        self.create_directories()
+
         if save_all_features:
             os.makedirs(self.all_features_dir, exist_ok=True)
 
@@ -942,11 +1046,19 @@ class ModelTrainer:
 
         Example:
             >>> trainer = ModelTrainer(
-            ...     features_csv="output/features/extracted_features.csv",
+            ...     extracted_features_csv="output/features/extracted_features.csv",
             ...     label_features_csv="output/features/label_features.csv",
             ... )
             >>> trainer.train(random_state=0, total_seed=5)
         """
+
+        # Since we are not using evaluation, we change the folder name from
+        # ``model-with-evaluation`` to ``model-only``
+        output_dir = self.output_dir.replace("model-with-evaluation", "model-only")
+
+        # Update current directories with new output directory
+        self.update_directories(output_dir=output_dir)
+
         if save_all_features:
             os.makedirs(self.all_features_dir, exist_ok=True)
 
@@ -994,6 +1106,19 @@ class ModelTrainer:
 
         return None
 
+    def fit(self, with_evaluation: bool = True, **kwargs) -> None:
+        """Dispatch to ``train_and_evaluate()`` or ``train()`` based on ``with_evaluation``.
+
+        Args:
+            with_evaluation (bool, optional): If True, calls ``train_and_evaluate()``
+                (80/20 split + metrics). If False, calls ``train()`` (full dataset,
+                no metrics). Defaults to True.
+            **kwargs: Additional keyword arguments forwarded to the chosen method.
+        """
+        if with_evaluation:
+            return self.train_and_evaluate(**kwargs)
+        return self.train(**kwargs)
+
     def _aggregate_metrics(
         self, all_metrics: list[dict], suffix_filename: str = ""
     ) -> None:
@@ -1003,13 +1128,17 @@ class ModelTrainer:
         Also saves all individual metrics for detailed analysis.
 
         Args:
-            all_metrics (list[dict]): List of metric dictionaries from each seed.
+            all_metrics (list[dict]): List of metric dictionaries, one per seed.
+            suffix_filename (str, optional): Suffix appended to output filenames.
+                Defaults to ``""``.
 
         Example:
             >>> trainer = ModelTrainer(...)
             >>> trainer.train_and_evaluate(total_seed=100)
-            >>> # Creates: all_metrics.csv and metrics_summary.csv
+            >>> # Creates: all_metrics_{suffix}.csv and metrics_summary_{suffix}.csv
         """
+        os.makedirs(self.metrics_dir, exist_ok=True)
+
         df_metrics = pd.DataFrame(all_metrics)
 
         # Calculate summary statistics

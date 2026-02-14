@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import os
 import json
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable
 
@@ -22,7 +24,10 @@ from sklearn.model_selection import (
 )
 
 from eruption_forecast.logger import logger
-from eruption_forecast.model.classifier_model import ClassifierModel
+
+
+if TYPE_CHECKING:
+    from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -738,7 +743,7 @@ def get_significant_features(
         n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
     Returns:
-        pd.DataFRame: Extracted features dataframe filtered.
+        pd.DataFrame: Extracted features dataframe filtered.
         pd.Series: Features sorted by p-value (ascending), with feature
             names as index and p-values as values.
 
@@ -829,7 +834,7 @@ def normalize_dates(
 
 
 def get_metrics(
-    classifier: ClassifierModel,
+    classifier_model: ClassifierModel,
     labels_test,
     labels_pred,
     labels_train: pd.Series,
@@ -845,7 +850,7 @@ def get_metrics(
     Optionally saves the metrics to a JSON file.
 
     Args:
-        classifier (ClassifierModel): Fitted classifier model with name,
+        classifier_model (ClassifierModel): Fitted classifier model with name,
             cv_strategy, and n_splits attributes.
         labels_test: True test labels (array-like).
         labels_pred: Predicted labels from the model (array-like).
@@ -901,9 +906,9 @@ def get_metrics(
 
     metrics = {
         "random_state": random_state,
-        "classifier": classifier.name,
-        "cv_strategy": classifier.cv_strategy,
-        "cv_splits": classifier.n_splits,
+        "classifier": classifier_model.name,
+        "cv_strategy": classifier_model.cv_strategy,
+        "cv_splits": classifier_model.n_splits,
         "n_train": len(labels_train),
         "n_test": len(labels_test),
         "n_features": top_n,
@@ -926,3 +931,27 @@ def get_metrics(
             json.dump(metrics, f, indent=4)
 
     return metrics
+
+
+def slugify_class_name(class_name: str) -> str:
+    """Convert a class name to a slug.
+
+    Args:
+        class_name (str): Class name.
+
+    Examples:
+        MyClassName -> my-class-name
+        HTTPSConnection -> https-connection
+        XMLParser -> xml-parser
+
+    Returns:
+        str: Slugified class name.
+    """
+    import re
+
+    # Insert hyphens before uppercase letters (except at start)
+    s = re.sub("([a-z0-9])([A-Z])", r"\1-\2", class_name)
+    # Handle consecutive uppercase letters (e.g., HTTP)
+    s = re.sub("([A-Z]+)([A-Z][a-z])", r"\1-\2", s)
+
+    return s.lower()
