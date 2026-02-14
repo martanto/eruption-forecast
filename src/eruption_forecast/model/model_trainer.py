@@ -154,7 +154,9 @@ class ModelTrainer:
         classifier_cv_name = classifier_model.cv_name
 
         # Output training dir: ``<root_dir>/output/trainings``
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "trainings"))
+        output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "trainings")
+        )
 
         # Filtered features dir: ``<output_dir>/features``
         features_dir = os.path.join(output_dir, "features")
@@ -407,8 +409,8 @@ class ModelTrainer:
         self,
         features: pd.DataFrame,
         labels: pd.Series,
+        significant_filepath: str,
         random_state: int = 42,
-        significant_filepath: str | None = None,
         all_features_filepath: str | None = None,
         all_figures_filepath: str | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
@@ -420,8 +422,8 @@ class ModelTrainer:
         Args:
             features (pd.DataFrame): Resampled features to select.
             labels (pd.Series): Target labels.
+            significant_filepath (str): Save path for significant features.
             random_state (int, optional): Random seed for feature selection. Defaults to 42.
-            significant_filepath (str, optional): Save path for significant features.
             all_features_filepath (str, optional): Save path for all features.
             all_figures_filepath (str, optional): Save path for all features figures.
 

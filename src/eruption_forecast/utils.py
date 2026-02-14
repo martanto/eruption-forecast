@@ -539,7 +539,7 @@ def validate_window_step(
 
 
 def sort_dates(dates: list[str]) -> list[str]:
-    """Convert the list of dates into a pandas Series.
+    """Sorting list of dates.
 
     Args:
         dates (list[str]): List of dates.
