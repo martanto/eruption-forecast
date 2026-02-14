@@ -7,7 +7,6 @@ including filename format prefixes, validation thresholds, and default values.
 # Label filename format constants
 LABEL_PREFIX = "label_"
 LABEL_EXTENSION = ".csv"
-WINDOW_SIZE_PREFIX = "ws-"
 WINDOW_STEP_PREFIX = "step-"
 DAY_TO_FORECAST_PREFIX = "dtf-"
 
@@ -16,9 +15,6 @@ MIN_DATE_RANGE_DAYS = 7
 """Minimum number of days required between start_date and end_date."""
 
 # Default parameter values
-DEFAULT_WINDOW_SIZE = 1
-"""Default window size in days."""
-
 DEFAULT_WINDOW_STEP = 12
 """Default window step size."""
 
@@ -41,5 +37,5 @@ DATE_FORMAT = "%Y-%m-%d"
 """Standard date format string (YYYY-MM-DD)."""
 
 # Example filename for error messages
-EXAMPLE_LABEL_FILENAME = "label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv"
+EXAMPLE_LABEL_FILENAME = "label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv"
 """Example of a correctly formatted label filename."""

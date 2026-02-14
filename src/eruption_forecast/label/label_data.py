@@ -10,7 +10,6 @@ from eruption_forecast.label.constants import (
     DATE_FORMAT,
     LABEL_PREFIX,
     LABEL_EXTENSION,
-    WINDOW_SIZE_PREFIX,
     WINDOW_STEP_PREFIX,
     DAY_TO_FORECAST_PREFIX,
     EXAMPLE_LABEL_FILENAME,
@@ -23,10 +22,9 @@ class LabelData:
 
     This class handles loading pre-built label CSV files and extracts metadata
     from the filename. The filename must follow the format:
-    label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv
+    label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X.csv
 
-    Example filename: label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv
-        - ws-1: window_size = 1 day
+    Example filename: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv
         - step-12-hours: window_step = 12 hours
         - dtf-2: day_to_forecast = 2 days
 
@@ -36,7 +34,6 @@ class LabelData:
         end_date (datetime): End date extracted from filename
         start_date_str (str): Start date string in YYYY-MM-DD format
         end_date_str (str): End date string in YYYY-MM-DD format
-        window_size (int): Window size in days
         window_step (int): Window step size
         window_unit (str): Unit of window step ('hours' or 'minutes')
         day_to_forecast (int): Days before eruption to start labeling
@@ -44,8 +41,8 @@ class LabelData:
         df (pd.DataFrame): Cached label dataframe with datetime index
 
     Example:
-        >>> label_data = LabelData("output/labels/label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv")
-        >>> print(label_data.window_size)
+        >>> label_data = LabelData("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
+        >>> print(label_data.window_step)
         1
         >>> print(label_data.parameters)
         {'start_date': datetime(2020, 1, 1), 'end_date': datetime(2020, 12, 31), ...}
@@ -57,7 +54,7 @@ class LabelData:
 
         Args:
             label_csv (str): Path to the label CSV file. Filename must follow
-                the format: label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv
+                the format: label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X.csv
 
         Raises:
             ValueError: If file doesn't exist or filename format is invalid
@@ -70,7 +67,6 @@ class LabelData:
             prefix,
             start_date_str,
             end_date_str,
-            window_size,
             window_step_and_unit,
             day_to_forecast,
         ) = self.basename.split("_")
@@ -83,7 +79,6 @@ class LabelData:
         self.end_date: datetime = end_date
         self.start_date_str: str = start_date_str
         self.end_date_str: str = end_date_str
-        self.window_size: int = int(window_size.split("-")[1])
         self.window_step: int = int(window_step_parts[1])
         self.window_unit: str = window_step_parts[2]
         self.day_to_forecast: int = int(day_to_forecast.split("-")[1])
@@ -92,7 +87,6 @@ class LabelData:
             "end_date": self.end_date,
             "start_date_str": self.start_date_str,
             "end_date_str": self.end_date_str,
-            "window_size": self.window_size,
             "window_step": self.window_step,
             "window_unit": self.window_unit,
             "day_to_forecast": self.day_to_forecast,
@@ -109,7 +103,7 @@ class LabelData:
                 or any component validation fails
 
         Example:
-            Valid filename: label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv
+            Valid filename: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv
         """
         if not os.path.exists(self.label_csv):
             raise ValueError(f"Label file not found at {self.label_csv}")
@@ -126,13 +120,11 @@ class LabelData:
             )
 
         parts = self.basename.split("_")
-        if len(parts) != 6:
+        if len(parts) != 5:
             raise ValueError(
                 f"Label filename is invalid. "
-                f"Expected format: label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv. "
-                f": ws-1 -> window_size = 1 (days)"
-                f": step-12-hours -> window_step = 12, window_step_unit = hours"
-                f": dtf-2 -> day_to_forecast = 2 (days)"
+                f"Expected format: label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X.csv "
+                f"(step-12-hours -> window_step=12, unit=hours; dtf-2 -> day_to_forecast=2). "
                 f"Got: {self.basename}{LABEL_EXTENSION}. Example: {EXAMPLE_LABEL_FILENAME}"
             )
 
@@ -140,7 +132,6 @@ class LabelData:
             _,
             start_date,
             end_date,
-            window_size,
             window_step,
             day_to_forecast,
         ) = parts
@@ -159,18 +150,6 @@ class LabelData:
             raise ValueError(
                 f"End date is invalid. Expected format: {DATE_FORMAT}. Got: {end_date}"
             ) from e
-
-        # Validating window size
-        if not window_size.startswith(WINDOW_SIZE_PREFIX):
-            raise ValueError(
-                f"Window size is invalid. Expected format: {WINDOW_SIZE_PREFIX}X. Got: {window_size}"
-            )
-
-        if not window_size.split("-")[1].isdigit():
-            raise ValueError(
-                f"Window size should be integer in days. "
-                f"Expected format: {WINDOW_SIZE_PREFIX}X where 'X' is an integer. Got: {window_size}"
-            )
 
         # Validating window step.
         # Expected example: step-10-minutes or step-12-hours
@@ -238,7 +217,7 @@ class LabelData:
 
         Example:
             >>> label_data.filename
-            'label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2.csv'
+            'label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv'
         """
         return os.path.basename(self.label_csv)
 
@@ -251,7 +230,7 @@ class LabelData:
 
         Example:
             >>> label_data.basename
-            'label_2020-01-01_2020-12-31_ws-1_step-12-hours_dtf-2'
+            'label_2020-01-01_2020-12-31_step-12-hours_dtf-2'
         """
         return self.filename.split(".")[0]
 
@@ -278,14 +257,13 @@ class LabelData:
                 - end_date (datetime): End date
                 - start_date_str (str): Start date string
                 - end_date_str (str): End date string
-                - window_size (int): Window size in days
                 - window_step (int): Window step value
                 - window_unit (str): Window step unit ('hours' or 'minutes')
                 - day_to_forecast (int): Days before eruption to label
 
         Example:
             >>> params = label_data.parameters
-            >>> params['window_size']
+            >>> params['window_step']
             1
             >>> params['day_to_forecast']
             2
@@ -295,7 +273,6 @@ class LabelData:
             "end_date": self.end_date,
             "start_date_str": self.start_date_str,
             "end_date_str": self.end_date_str,
-            "window_size": self.window_size,
             "window_step": self.window_step,
             "window_unit": self.window_unit,
             "day_to_forecast": self.day_to_forecast,

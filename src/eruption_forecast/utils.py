@@ -376,7 +376,6 @@ def construct_windows(
     end_date: str | datetime,
     window_step: int,
     window_step_unit: Literal["minutes", "hours"],
-    reset_index: bool = False,
 ) -> pd.DataFrame:
     """Construct time windows for label and tremor data.
 

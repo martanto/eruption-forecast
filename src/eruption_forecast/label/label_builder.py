@@ -39,7 +39,6 @@ class LabelBuilder:
     Attributes:
         start_date (datetime): Start date for label generation
         end_date (datetime): End date for label generation
-        window_size (int): Size of each training window in days
         window_step (int): Step size between windows
         window_step_unit (Literal["minutes", "hours"]): Unit of window step
         day_to_forecast (int): Days before eruption to start positive labeling
@@ -57,7 +56,6 @@ class LabelBuilder:
         >>> builder = LabelBuilder(
         ...     start_date="2020-01-01",
         ...     end_date="2020-12-31",
-        ...     window_size=1,
         ...     window_step=12,
         ...     window_step_unit="hours",
         ...     day_to_forecast=2,
@@ -73,7 +71,6 @@ class LabelBuilder:
     Args:
         start_date (str | datetime): Start date in YYYY-MM-DD format.
         end_date (str | datetime): End date in YYYY-MM-DD format.
-        window_size (int): Window size in days.
         window_step (int): Window step size.
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
         day_to_forecast (int): Day to forecast in days.
@@ -93,7 +90,6 @@ class LabelBuilder:
         self,
         start_date: str | datetime,
         end_date: str | datetime,
-        window_size: int,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
@@ -118,8 +114,7 @@ class LabelBuilder:
         # =========================
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
-        self.window_size: int = int(window_size)
-        self.window_step: int = int(window_step)
+        self.window_step = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = sort_dates(eruption_dates)
@@ -140,7 +135,6 @@ class LabelBuilder:
         self.label_dir = label_dir
         self.filename = (
             f"label_{start_date_str}_{end_date_str}"
-            f"_ws-{window_size}"
             f"_step-{window_step}-{window_step_unit}"
             f"_dtf-{day_to_forecast}.csv"
         )
@@ -161,7 +155,6 @@ class LabelBuilder:
         if verbose:
             logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
             logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
-            logger.info(f"Window Size (days): {window_size}")
             logger.info(f"Window Step ({window_step_unit}): {window_step}")
             logger.info(f"Day To Forecast (days): {day_to_forecast}")
             logger.info(f"Volcano ID: {volcano_id}")
@@ -170,7 +163,6 @@ class LabelBuilder:
         return (
             f"LabelBuilder({self.start_date_str}, "
             f"{self.end_date_str}, "
-            f"{self.window_size}, "
             f"{self.window_step}, "
             f"{self.window_step_unit}, "
             f"{self.day_to_forecast}, "
@@ -466,31 +458,10 @@ class LabelBuilder:
                 f"Parameter end_date should be at least {minimal_end_date.strftime('%Y-%m-%d')}"
             )
 
-        if self.window_size <= 0:
-            raise ValueError(f"window_size must be > 0, got {self.window_size}")
-
-        if self.window_size >= self.n_days:
-            raise ValueError(
-                f"window_size must be less than {self.n_days} days, got {self.window_size} days"
-            )
-
         if self.window_step_unit not in VALID_WINDOW_STEP_UNITS:
             raise ValueError(
                 f"window_step_unit must be one of {VALID_WINDOW_STEP_UNITS}, "
                 f"got '{self.window_step_unit}'"
-            )
-
-        # Maximum window overlap is the window size in hours
-        if self.window_step_unit == "minutes":
-            maximum_window_step = self.window_size * 60 * 24
-        else:
-            maximum_window_step = self.window_size * 24
-
-        if not (0 < self.window_step <= maximum_window_step):
-            raise ValueError(
-                f"window_step must be between 1 and {maximum_window_step} "
-                f"{self.window_step_unit}. "
-                f"Got window_step={self.window_step}"
             )
 
         if self.day_to_forecast <= 0:
@@ -624,7 +595,6 @@ class LabelBuilder:
         """
         if self.verbose:
             logger.info(f"Building labels for {self.n_days} days")
-            logger.info(f"Window size: {self.window_size} days")
             logger.info(f"Window step: {self.window_step} {self.window_step_unit}")
             logger.info(f"Day to forecast: {self.day_to_forecast} days")
 
@@ -680,7 +650,7 @@ class LabelBuilder:
         """Save label file to disk.
 
         Saves the built labels DataFrame to a file with filename format:
-        label_{start_date}_{end_date}_ws-{window_size}_step-{window_step}-{unit}_dtf-{day_to_forecast}.{ext}
+        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}.{ext}
 
         Also saves a separate eruption_dates.csv file for reference.
 
