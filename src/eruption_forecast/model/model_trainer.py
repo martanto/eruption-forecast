@@ -971,8 +971,6 @@ class ModelTrainer:
             logger.info(f"Seed {random_state:05d} already fitted.")
             return random_state, significant_filepath, model_filepath
 
-        logger.info(f"Fitting Seed: {random_state:05d}")
-
         # ========== STEP 1: Resample Full Dataset ==========
         features_resampled, labels_resampled = random_under_sampler(
             features=self.df_features,
@@ -996,6 +994,8 @@ class ModelTrainer:
         )
 
         # ========== STEP 3: Cross-Validation with Dynamic Classifier ==========
+        logger.info(f"Fitting Seed: {random_state:05d}")
+
         top_n_features = top_selected_features.index.tolist()
 
         _, _, best_model = self._setup_grid_search(
