@@ -596,7 +596,7 @@ class ModelTrainer:
         )
         all_features_filepath = os.path.join(self.all_features_dir, f"{filename}.csv")
         all_figures_filepath = os.path.join(
-            self.significant_figures_dir, f"{filename}.jpg"
+            self.significant_figures_dir, f"{filename}.png"
         )
         model_filepath = os.path.join(self.models_dir, f"{filename}.pkl")
         metrics_filepath = os.path.join(self.metrics_dir, f"{filename}.json")

@@ -245,8 +245,8 @@ class ForecastModel:
         remove_outlier_method: Literal["all", "maximum"],
         interpolate: bool,
         value_multiplier: float | None,
-        cleanup_tmp_dir: bool,
-        plot_tmp: bool,
+        cleanup_daily_dir: bool,
+        plot_daily: bool,
         save_plot: bool,
         overwrite_plot: bool,
         n_jobs: int | None = None,
@@ -264,8 +264,8 @@ class ForecastModel:
             remove_outlier_method: Method for outlier removal
             interpolate: Whether to interpolate data
             value_multiplier: Scaling factor for values
-            cleanup_tmp_dir: Whether to clean temporary directory
-            plot_tmp: Whether to plot temporary results
+            cleanup_daily_dir: Whether to clean temporary directory
+            plot_daily: Whether to plot temporary results
             save_plot: Whether to save plots
             overwrite_plot: Whether to overwrite existing plots
             n_jobs: Number of jobs to run in parallel. Isolated on this method only
@@ -294,8 +294,8 @@ class ForecastModel:
             remove_outlier_method=remove_outlier_method,
             interpolate=interpolate,
             value_multiplier=value_multiplier,
-            cleanup_tmp_dir=cleanup_tmp_dir,
-            plot_tmp=plot_tmp,
+            cleanup_daily_dir=cleanup_daily_dir,
+            plot_daily=plot_daily,
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
         )
@@ -588,8 +588,8 @@ class ForecastModel:
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
         value_multiplier: float | None = None,
-        cleanup_tmp_dir: bool = False,
-        plot_tmp: bool = False,
+        cleanup_daily_dir: bool = False,
+        plot_daily: bool = False,
         save_plot: bool = False,
         overwrite_plot: bool = False,
         sds_dir: str | None = None,
@@ -608,9 +608,9 @@ class ForecastModel:
                 Defaults to "maximum".
             interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
             value_multiplier (float | None): Scaling factor for seismic values. Defaults to None.
-            cleanup_tmp_dir (bool): If True, deletes the temporary directory after merging.
+            cleanup_daily_dir (bool): If True, deletes the temporary directory after merging.
                 Defaults to False.
-            plot_tmp (bool): If True, plots each daily result for a quick visual check.
+            plot_daily (bool): If True, plots each daily result for a quick visual check.
                 Defaults to False.
             save_plot (bool): If True, saves the final tremor plot. Defaults to False.
             overwrite_plot (bool): If True, overwrites existing plot files. Defaults to False.
@@ -633,8 +633,8 @@ class ForecastModel:
             remove_outlier_method=remove_outlier_method,
             interpolate=interpolate,
             value_multiplier=value_multiplier,
-            cleanup_tmp_dir=cleanup_tmp_dir,
-            plot_tmp=plot_tmp,
+            cleanup_daily_dir=cleanup_daily_dir,
+            plot_daily=plot_daily,
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
             n_jobs=n_jobs or self.n_jobs,
