@@ -1,5 +1,7 @@
 # TODO
 
+> **Note:** The HTTP API layer has been moved to a separate project (`eruption-forecast-api`) and is maintained independently. This file tracks work for the core `eruption-forecast` package only.
+
 ## Table of Contents
 
 - [Completed](#completed)

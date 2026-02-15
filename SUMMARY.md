@@ -24,7 +24,6 @@
 13. [FeaturesBuilder Readability Improvements](#featuresbuilder-readability-improvements-2026-02-13)
 14. [ModelTrainer Refactor](#modeltrainer-refactor-2026-02-13)
 15. [Refactor Output Directory Structure](#refactor-output-directory-structure-2026-02-15)
-
 ---
 
 ## Package Overview
@@ -647,6 +646,10 @@ trainings/
 
 ---
 
-**Document Version:** 3.3
+---
+
+> **Note:** The HTTP API layer has been moved to a separate project (`eruption-forecast-api`) and is maintained independently. This document covers the core `eruption-forecast` package only.
+
+**Document Version:** 3.4
 **Last Updated:** 2026-02-15
 **Author:** Claude Code (Sonnet 4.5)
