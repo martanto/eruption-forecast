@@ -1,10 +1,12 @@
 """Feature importance and selection visualization with Nature/Science styling."""
 
 import os
+from pathlib import Path
 
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import (
     NATURE_COLORS,
     configure_spine,
@@ -162,3 +164,168 @@ def plot_significant_features(
         plt.close()
 
     return None
+
+
+def replot_significant_features(
+    all_features_dir: str | Path,
+    output_dir: str | Path | None = None,
+    overwrite: bool = True,
+    number_of_features: int = 50,
+    top_features: int = 20,
+    dpi: int = 150,
+    **kwargs,
+) -> dict[str, int]:
+    """Batch replot significant features from all CSV files in a directory.
+
+    Reads all CSV files from the specified directory, loads each as a DataFrame,
+    and generates publication-quality feature importance plots using
+    ``plot_significant_features()``. Useful for replotting features across
+    multiple random seeds or cross-validation folds.
+
+    Args:
+        all_features_dir (str | Path): Directory containing CSV files with
+            feature data. Each CSV should have feature names and significance
+            values (e.g., p-values or importance scores). **REQUIRED parameter.**
+        output_dir (str | Path | None, optional): Directory where output plots
+            will be saved. If None, plots are saved in the same directory as
+            the input CSV files. Defaults to None.
+        overwrite (bool, optional): If True, regenerate all plots. If False,
+            skip plotting if the output file already exists. Defaults to True.
+        number_of_features (int, optional): Number of top features to display
+            in each plot. Passed to ``plot_significant_features()``.
+            Defaults to 50.
+        top_features (int, optional): Number of top features to highlight with
+            darker color. Passed to ``plot_significant_features()``.
+            Defaults to 20.
+        dpi (int, optional): Resolution of output plots in dots per inch.
+            Passed to ``plot_significant_features()``. Defaults to 150.
+        **kwargs: Additional keyword arguments passed to
+            ``plot_significant_features()``. Can include ``features_column``,
+            ``values_column``, ``title``, ``figsize``, etc.
+
+    Returns:
+        dict[str, int]: Summary statistics with keys:
+            - ``'created'``: Number of plots successfully created
+            - ``'skipped'``: Number of plots skipped (file exists, overwrite=False)
+            - ``'failed'``: Number of plots that failed due to errors
+
+    Examples:
+        >>> # Replot all features with default settings
+        >>> results = replot_significant_features(
+        ...     all_features_dir="output/.../features/all_features",
+        ...     overwrite=True,
+        ... )
+        >>> print(f"Created: {results['created']}, Failed: {results['failed']}")
+
+        >>> # Custom output directory, skip existing plots
+        >>> results = replot_significant_features(
+        ...     all_features_dir="path/to/features",
+        ...     output_dir="path/to/plots",
+        ...     overwrite=False,
+        ...     number_of_features=30,
+        ... )
+
+    Notes:
+        - CSV files are expected to have either a 'features' column or feature
+          names in the index.
+        - The function attempts to auto-detect the values column (tries
+          'p_values', 'importance', or first numeric column).
+        - Errors are logged but don't stop processing of remaining files.
+        - Output filenames match input CSV filenames with .png extension.
+    """
+    # Convert paths to Path objects
+    all_features_dir = Path(all_features_dir)
+    if output_dir is None:
+        output_dir = all_features_dir
+    else:
+        output_dir = Path(output_dir)
+
+    # Validate input directory
+    if not all_features_dir.exists():
+        msg = f"Directory does not exist: {all_features_dir}"
+        raise FileNotFoundError(msg)
+    if not all_features_dir.is_dir():
+        msg = f"Path is not a directory: {all_features_dir}"
+        raise NotADirectoryError(msg)
+
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Find all CSV files
+    csv_files = sorted(all_features_dir.glob("*.csv"))
+    if not csv_files:
+        logger.warning(f"No CSV files found in {all_features_dir}")
+        return {"created": 0, "skipped": 0, "failed": 0}
+
+    logger.info(f"Found {len(csv_files)} CSV files in {all_features_dir}")
+
+    # Initialize counters
+    results = {"created": 0, "skipped": 0, "failed": 0}
+
+    # Process each CSV file
+    for csv_path in csv_files:
+        # Generate output filename
+        output_filename = csv_path.stem + ".png"
+        output_path = output_dir / output_filename
+
+        # Check if should skip
+        if not overwrite and output_path.exists():
+            logger.debug(f"Skipping {csv_path.name} (already exists)")
+            results["skipped"] += 1
+            continue
+
+        try:
+            # Load CSV
+            df = pd.read_csv(csv_path)
+
+            # Auto-detect features column if not in kwargs
+            features_column = kwargs.get("features_column", "features")
+            if features_column not in df.columns and len(df.columns) > 0:
+                # Assume index contains features
+                df = df.copy()
+                df[features_column] = df.index
+                kwargs["features_column"] = features_column
+
+            # Auto-detect values column if not in kwargs
+            values_column = kwargs.get("values_column", None)
+            if values_column is None:
+                if "p_values" in df.columns:
+                    values_column = "p_values"
+                elif "importance" in df.columns:
+                    values_column = "importance"
+                else:
+                    # Use first numeric column
+                    numeric_cols = df.select_dtypes(include="number").columns
+                    if len(numeric_cols) > 0:
+                        values_column = numeric_cols[0]
+                    else:
+                        msg = f"No numeric columns found in {csv_path.name}"
+                        raise ValueError(msg)
+                kwargs["values_column"] = values_column
+
+            # Plot
+            plot_significant_features(
+                df=df,
+                filepath=str(output_path),
+                number_of_features=number_of_features,
+                top_features=top_features,
+                dpi=dpi,
+                overwrite=overwrite,
+                **kwargs,
+            )
+
+            logger.info(f"Created plot: {output_path.name}")
+            results["created"] += 1
+
+        except Exception as e:
+            logger.error(f"Failed to plot {csv_path.name}: {e}")
+            results["failed"] += 1
+            continue
+
+    # Summary
+    logger.info(
+        f"Batch replot complete: {results['created']} created, "
+        f"{results['skipped']} skipped, {results['failed']} failed"
+    )
+
+    return results

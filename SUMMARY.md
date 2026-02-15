@@ -686,6 +686,7 @@ src/eruption_forecast/plots/
 
 **Feature Plotting** (`feature_plots.py`):
 - `plot_significant_features()`: Horizontal bar charts with top-N features highlighted darker, p-value labels, statistical significance markers
+- `replot_significant_features()`: **NEW** - Batch replot utility that processes all CSV files in a directory, generates plots for each with consistent styling. Returns summary statistics (created/skipped/failed counts). Useful for replotting features across multiple random seeds or CV folds.
 
 **Model Evaluation** (`evaluation_plots.py`):
 - `plot_confusion_matrix()`: Heatmap with Nature/Science styling

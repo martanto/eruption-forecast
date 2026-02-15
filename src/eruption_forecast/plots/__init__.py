@@ -25,7 +25,10 @@ from eruption_forecast.plots.styles import (
 from eruption_forecast.plots.tremor_plots import plot_tremor
 
 # Feature plotting
-from eruption_forecast.plots.feature_plots import plot_significant_features
+from eruption_forecast.plots.feature_plots import (
+    plot_significant_features,
+    replot_significant_features,
+)
 
 # Forecast plotting
 from eruption_forecast.plots.forecast_plots import (
@@ -58,6 +61,7 @@ __all__ = [
     "plot_tremor",
     # Feature plotting
     "plot_significant_features",
+    "replot_significant_features",
     # Evaluation plotting
     "plot_confusion_matrix",
     "plot_roc_curve",
