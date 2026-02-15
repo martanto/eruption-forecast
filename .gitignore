@@ -6,7 +6,6 @@ dist/
 wheels/
 /.idea
 *.egg-info
-#/test
 
 # Virtual environments
 .venv
@@ -23,3 +22,5 @@ wheels/
 # Test outputs (cleaned up automatically)
 tests/output/
 /.cache/
+/.claude/
+
