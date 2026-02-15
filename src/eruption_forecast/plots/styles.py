@@ -31,8 +31,8 @@ Example:
     ...     plt.savefig("output.png")
 """
 
+from typing import Any, Literal
 from contextlib import contextmanager
-from typing import Literal
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -107,7 +107,7 @@ GRID_CONFIG = {
     "color": "gray",
 }
 
-SPINE_CONFIG = {
+SPINE_CONFIG: dict[str, Any] = {
     "linewidth": 1.0,
     "color": "black",
 }
@@ -232,7 +232,7 @@ def get_color(
             index = int(name)
             return OKABE_ITO[index]
         except (ValueError, IndexError) as e:
-            msg = f"Invalid Okabe-Ito index '{name}'. Must be 0-{len(OKABE_ITO)-1}"
+            msg = f"Invalid Okabe-Ito index '{name}'. Must be 0-{len(OKABE_ITO) - 1}"
             raise ValueError(msg) from e
     else:
         msg = f"Unknown palette '{palette}'. Use 'nature' or 'okabe_ito'"

@@ -43,7 +43,11 @@ def plot_significant_features(
         title (str | None, optional): Chart title. If None, defaults to
             ``"<number_of_features> Significant Features"``. Defaults to None.
         figsize (tuple[float, float], optional): Figure dimensions as
-            ``(width, height)`` in inches. Defaults to ``(4, 12)``.
+            ``(width, height)`` in inches. If using the default value of
+            ``(4, 12)``, the height will be automatically calculated based on
+            ``number_of_features`` to prevent layout collapse
+            (formula: ``max(8, number_of_features * 0.3 + 2)``).
+            Custom values are respected as-is. Defaults to ``(4, 12)``.
         features_column (str, optional): Name of the column containing
             feature names. If missing, the index is used. Defaults to
             ``"features"``.
@@ -81,8 +85,19 @@ def plot_significant_features(
     df = df.head(number_of_features)
     df = df.iloc[::-1]  # Reverse for bottom-to-top ordering
 
+    # Calculate dynamic figure height based on number of features
+    # Only apply if user is using default figsize to avoid breaking custom sizes
+    if figsize == (4, 12):  # Default value
+        # Formula: min 8" height, or 0.3" per feature + 2" overhead for labels/title
+        calculated_height = max(8, number_of_features * 0.3 + 2)
+        figsize = (4, calculated_height)
+
     # Apply Nature/Science styling
     with apply_nature_style():
+        # Temporarily disable constrained_layout for horizontal bar charts
+        # Use tight_layout instead which handles many labels better
+        plt.rcParams['figure.constrained_layout.use'] = False
+
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
         # Color bars by position: top features in darker blue
@@ -140,6 +155,8 @@ def plot_significant_features(
                         color=NATURE_COLORS["blue"],
                     )
 
+        # Apply tight layout to prevent label clipping
+        plt.tight_layout()
         plt.savefig(filepath, dpi=dpi)
         plt.close()
 

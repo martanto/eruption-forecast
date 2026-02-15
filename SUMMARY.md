@@ -748,6 +748,27 @@ Both produce identical publication-quality styled output.
 - All plotting functions are pure (no side effects except file I/O)
 - Supports multiprocessing-safe file operations
 
+### Bugfix: Feature Plot Layout Collapse (2026-02-15)
+
+Fixed `UserWarning` about constrained_layout collapsing when plotting many features:
+
+**Problem:** With 50+ features, `plot_significant_features()` triggered matplotlib warning:
+```
+UserWarning: constrained_layout not applied because axes sizes collapsed to zero.
+```
+
+**Solution implemented:**
+- **Dynamic figure height calculation**: Automatically scales height based on `number_of_features` when using default figsize
+  - Formula: `height = max(8, number_of_features * 0.3 + 2)`
+  - Examples: 10 features → 8", 50 features → 17", 100 features → 32"
+- **Switched to tight_layout**: Disabled `constrained_layout` for horizontal bar charts, uses `tight_layout()` instead (more forgiving with many labels)
+- **Fully backward compatible**: User-provided figsize values are respected as-is; only default behavior improved
+
+**Results:**
+- ✅ No more layout warnings for any feature count
+- ✅ Plots render with proper spacing and readable labels
+- ✅ Zero breaking changes - all existing code works unchanged
+
 ---
 
 ---
