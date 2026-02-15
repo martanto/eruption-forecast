@@ -264,8 +264,8 @@ class ForecastModel:
             remove_outlier_method: Method for outlier removal
             interpolate: Whether to interpolate data
             value_multiplier: Scaling factor for values
-            cleanup_daily_dir: Whether to clean temporary directory
-            plot_daily: Whether to plot temporary results
+            cleanup_daily_dir: Whether to clean daily directory
+            plot_daily: Whether to plot daily results
             save_plot: Whether to save plots
             overwrite_plot: Whether to overwrite existing plots
             n_jobs: Number of jobs to run in parallel. Isolated on this method only
@@ -608,7 +608,7 @@ class ForecastModel:
                 Defaults to "maximum".
             interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
             value_multiplier (float | None): Scaling factor for seismic values. Defaults to None.
-            cleanup_daily_dir (bool): If True, deletes the temporary directory after merging.
+            cleanup_daily_dir (bool): If True, deletes the daily directory after merging.
                 Defaults to False.
             plot_daily (bool): If True, plots each daily result for a quick visual check.
                 Defaults to False.
