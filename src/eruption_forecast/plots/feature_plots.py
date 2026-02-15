@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from multiprocessing import Pool
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -166,6 +167,88 @@ def plot_significant_features(
     return None
 
 
+def _process_single_file(
+    csv_path: Path,
+    output_dir: Path,
+    overwrite: bool,
+    number_of_features: int,
+    top_features: int,
+    dpi: int,
+    kwargs: dict,
+) -> str:
+    """Process a single CSV file and generate plot.
+
+    Helper function for multiprocessing support in replot_significant_features().
+
+    Args:
+        csv_path: Path to input CSV file
+        output_dir: Directory for output plot
+        overwrite: Whether to overwrite existing files
+        number_of_features: Number of features to display
+        top_features: Number of top features to highlight
+        dpi: Plot resolution
+        kwargs: Additional keyword arguments for plot_significant_features()
+
+    Returns:
+        str: Status string - "created", "skipped", or "failed"
+    """
+    # Generate output filename
+    output_filename = csv_path.stem + ".png"
+    output_path = output_dir / output_filename
+
+    # Check if should skip
+    if not overwrite and output_path.exists():
+        logger.debug(f"Skipping {csv_path.name} (already exists)")
+        return "skipped"
+
+    try:
+        # Load CSV
+        df = pd.read_csv(csv_path)
+
+        # Auto-detect features column if not in kwargs
+        features_column = kwargs.get("features_column", "features")
+        if features_column not in df.columns and len(df.columns) > 0:
+            # Assume index contains features
+            df = df.copy()
+            df[features_column] = df.index
+            kwargs["features_column"] = features_column
+
+        # Auto-detect values column if not in kwargs
+        values_column = kwargs.get("values_column", None)
+        if values_column is None:
+            if "p_values" in df.columns:
+                values_column = "p_values"
+            elif "importance" in df.columns:
+                values_column = "importance"
+            else:
+                # Use first numeric column
+                numeric_cols = df.select_dtypes(include="number").columns
+                if len(numeric_cols) > 0:
+                    values_column = numeric_cols[0]
+                else:
+                    msg = f"No numeric columns found in {csv_path.name}"
+                    raise ValueError(msg)
+            kwargs["values_column"] = values_column
+
+        # Plot
+        plot_significant_features(
+            df=df,
+            filepath=str(output_path),
+            number_of_features=number_of_features,
+            top_features=top_features,
+            dpi=dpi,
+            overwrite=overwrite,
+            **kwargs,
+        )
+
+        logger.info(f"Created plot: {output_path.name}")
+        return "created"
+
+    except Exception as e:
+        logger.error(f"Failed to plot {csv_path.name}: {e}")
+        return "failed"
+
+
 def replot_significant_features(
     all_features_dir: str | Path,
     output_dir: str | Path | None = None,
@@ -173,6 +256,7 @@ def replot_significant_features(
     number_of_features: int = 50,
     top_features: int = 20,
     dpi: int = 150,
+    n_jobs: int = 1,
     **kwargs,
 ) -> dict[str, int]:
     """Batch replot significant features from all CSV files in a directory.
@@ -202,6 +286,9 @@ def replot_significant_features(
             Defaults to 20.
         dpi (int, optional): Resolution of output plots in dots per inch.
             Passed to ``plot_significant_features()``. Defaults to 150.
+        n_jobs (int, optional): Number of parallel jobs for plotting. If 1,
+            processes files sequentially. If greater than 1, uses multiprocessing
+            to plot multiple files in parallel. Defaults to 1.
         **kwargs: Additional keyword arguments passed to
             ``plot_significant_features()``. Can include ``features_column``,
             ``values_column``, ``title``, ``figsize``, etc.
@@ -266,68 +353,38 @@ def replot_significant_features(
 
     logger.info(f"Found {len(csv_files)} CSV files in {all_features_dir}")
 
-    # Initialize counters
+    # Validate n_jobs
+    if n_jobs <= 0:
+        raise ValueError(f"n_jobs must be greater than 0. Your value: {n_jobs}")
+
+    # Prepare job parameters
+    jobs = [
+        (
+            csv_path,
+            output_dir,
+            overwrite,
+            number_of_features,
+            top_features,
+            dpi,
+            kwargs,
+        )
+        for csv_path in csv_files
+    ]
+
+    # Process files (sequential or parallel)
+    if n_jobs == 1:
+        # Sequential processing
+        job_results = [_process_single_file(*job) for job in jobs]  # type: ignore[arg-type]
+    else:
+        # Parallel processing
+        logger.info(f"Running on {n_jobs} job(s)")
+        with Pool(n_jobs) as pool:
+            job_results = pool.starmap(_process_single_file, jobs)
+
+    # Aggregate results
     results = {"created": 0, "skipped": 0, "failed": 0}
-
-    # Process each CSV file
-    for csv_path in csv_files:
-        # Generate output filename
-        output_filename = csv_path.stem + ".png"
-        output_path = output_dir / output_filename
-
-        # Check if should skip
-        if not overwrite and output_path.exists():
-            logger.debug(f"Skipping {csv_path.name} (already exists)")
-            results["skipped"] += 1
-            continue
-
-        try:
-            # Load CSV
-            df = pd.read_csv(csv_path)
-
-            # Auto-detect features column if not in kwargs
-            features_column = kwargs.get("features_column", "features")
-            if features_column not in df.columns and len(df.columns) > 0:
-                # Assume index contains features
-                df = df.copy()
-                df[features_column] = df.index
-                kwargs["features_column"] = features_column
-
-            # Auto-detect values column if not in kwargs
-            values_column = kwargs.get("values_column", None)
-            if values_column is None:
-                if "p_values" in df.columns:
-                    values_column = "p_values"
-                elif "importance" in df.columns:
-                    values_column = "importance"
-                else:
-                    # Use first numeric column
-                    numeric_cols = df.select_dtypes(include="number").columns
-                    if len(numeric_cols) > 0:
-                        values_column = numeric_cols[0]
-                    else:
-                        msg = f"No numeric columns found in {csv_path.name}"
-                        raise ValueError(msg)
-                kwargs["values_column"] = values_column
-
-            # Plot
-            plot_significant_features(
-                df=df,
-                filepath=str(output_path),
-                number_of_features=number_of_features,
-                top_features=top_features,
-                dpi=dpi,
-                overwrite=overwrite,
-                **kwargs,
-            )
-
-            logger.info(f"Created plot: {output_path.name}")
-            results["created"] += 1
-
-        except Exception as e:
-            logger.error(f"Failed to plot {csv_path.name}: {e}")
-            results["failed"] += 1
-            continue
+    for result in job_results:
+        results[result] += 1
 
     # Summary
     logger.info(
