@@ -187,8 +187,11 @@ def replot_significant_features(
             feature data. Each CSV should have feature names and significance
             values (e.g., p-values or importance scores). **REQUIRED parameter.**
         output_dir (str | Path | None, optional): Directory where output plots
-            will be saved. If None, plots are saved in the same directory as
-            the input CSV files. Defaults to None.
+            will be saved. If None, plots are saved in a sibling directory
+            called ``significant_features`` at the same level as
+            ``all_features_dir``. For example, if input is
+            ``.../features/all_features``, output will be
+            ``.../features/significant_features``. Defaults to None.
         overwrite (bool, optional): If True, regenerate all plots. If False,
             skip plotting if the output file already exists. Defaults to True.
         number_of_features (int, optional): Number of top features to display
@@ -232,11 +235,15 @@ def replot_significant_features(
           'p_values', 'importance', or first numeric column).
         - Errors are logged but don't stop processing of remaining files.
         - Output filenames match input CSV filenames with .png extension.
+        - Default output directory is ``<parent>/significant_features`` where
+          ``<parent>`` is the parent directory of ``all_features_dir``.
     """
     # Convert paths to Path objects
     all_features_dir = Path(all_features_dir)
     if output_dir is None:
-        output_dir = all_features_dir
+        # Default: create sibling directory called 'significant_features'
+        # Example: .../features/all_features -> .../features/significant_features
+        output_dir = all_features_dir.parent / "significant_features"
     else:
         output_dir = Path(output_dir)
 
