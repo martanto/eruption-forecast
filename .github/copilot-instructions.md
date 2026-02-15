@@ -2,6 +2,10 @@
 
 This Python package implements volcanic eruption forecasting using seismic tremor analysis and machine learning.
 
+## Code Guidelines
+
+**Always use available skills whenever possible** when executing commands (e.g., use the scikit-learn skill for ML tasks, matplotlib/seaborn skills for plotting, statistical-analysis skill for tests, etc.)
+
 ## Package Manager and Commands
 
 This project uses **uv** as the package manager.
