@@ -59,9 +59,9 @@ class CalculateTremor:
         interpolate (bool, optional): If True, interpolates gaps in the data. Defaults to True.
         value_multiplier (float | None, optional): Scaling factor applied to seismic values.
             Defaults to None (no scaling).
-        cleanup_tmp_dir (bool, optional): If True, deletes the temporary directory after
+        cleanup_daily_dir (bool, optional): If True, deletes the daily directory after
             merging daily results. Defaults to False.
-        plot_tmp (bool, optional): If True, plots intermediate daily results for inspection.
+        plot_daily (bool, optional): If True, plots intermediate daily results for inspection.
             Defaults to False.
         save_plot (bool, optional): If True, saves the final tremor plot to disk. Defaults to False.
         overwrite_plot (bool, optional): If True, overwrites existing plot files. Defaults to False.
@@ -97,8 +97,8 @@ class CalculateTremor:
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
         value_multiplier: float | None = None,
-        cleanup_tmp_dir: bool = False,
-        plot_tmp: bool = False,
+        cleanup_daily_dir: bool = False,
+        plot_daily: bool = False,
         save_plot: bool = False,
         overwrite_plot: bool = False,
         filename_prefix: str | None = None,
@@ -144,8 +144,8 @@ class CalculateTremor:
         self.remove_outlier_method = remove_outlier_method
         self.interpolate = interpolate
         self.value_multiplier = value_multiplier
-        self.cleanup_tmp_dir = cleanup_tmp_dir
-        self.plot_tmp = plot_tmp
+        self.cleanup_daily_dir = cleanup_daily_dir
+        self.plot_daily = plot_daily
         self.save_plot = save_plot
         self.overwrite_plot = overwrite_plot
         self.verbose = verbose
@@ -173,7 +173,7 @@ class CalculateTremor:
         )
         self.n_days: int = len(self.dates)
         self.nslc = nslc
-        self.tmp_dir: str = os.path.join(tremor_dir, "tmp")
+        self.daily_dir: str = os.path.join(tremor_dir, "daily")
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
         self._client_url = "https://service.iris.edu"
         self.csv = os.path.join(tremor_dir, self.filename)
@@ -192,7 +192,7 @@ class CalculateTremor:
         # =========================
         # Will be set after run() called
         # =========================
-        self.tmp_files: list[str] = []
+        self.daily_files: list[str] = []
 
         # =========================
         # Validate and create directories
@@ -234,8 +234,8 @@ class CalculateTremor:
             f"channel={self.channel}, location={self.location}, methods={self.methods}, "
             f"output_dir={self.output_dir}, overwrite={self.overwrite}, n_jobs={self.n_jobs}, "
             f"remove_outlier_method={self.remove_outlier_method}, interpolate={self.interpolate}, "
-            f"value_multiplier={self.value_multiplier}, cleanup_tmp_dir={self.cleanup_tmp_dir}, "
-            f"plot_tmp={self.plot_tmp}, save_plot={self.save_plot}, overwrite_plot={self.overwrite_plot}, "
+            f"value_multiplier={self.value_multiplier}, cleanup_daily_dir={self.cleanup_daily_dir}, "
+            f"plot_daily={self.plot_daily}, save_plot={self.save_plot}, overwrite_plot={self.overwrite_plot}, "
             f"csv={self.csv}, verbose={self.verbose}, debug={self.debug})"
         )
 
@@ -332,18 +332,18 @@ class CalculateTremor:
         """
         return [(job_index, date) for job_index, date in enumerate(self.dates)]
 
-    def create_temporary_dir(self) -> Self:
-        """Create temporary directory.
+    def create_daily_dir(self) -> Self:
+        """Create daily directory.
 
         Returns:
             None
         """
-        if self.cleanup_tmp_dir:
+        if self.cleanup_daily_dir:
             if self.verbose:
-                logger.info(f"Cleaning up temp dir: {self.tmp_dir}")
-            shutil.rmtree(self.tmp_dir)
+                logger.info(f"Cleaning up temp dir: {self.daily_dir}")
+            shutil.rmtree(self.daily_dir)
 
-        os.makedirs(self.tmp_dir, exist_ok=True)
+        os.makedirs(self.daily_dir, exist_ok=True)
         return self
 
     def create_directories(self) -> None:
@@ -355,9 +355,9 @@ class CalculateTremor:
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.station_dir, exist_ok=True)
         os.makedirs(self.tremor_dir, exist_ok=True)
-        os.makedirs(self.tmp_dir, exist_ok=True)
+        os.makedirs(self.daily_dir, exist_ok=True)
 
-        if self.plot_tmp:
+        if self.plot_daily:
             os.makedirs(self.figures_dir, exist_ok=True)
 
     def validate(self) -> None:
@@ -468,25 +468,27 @@ class CalculateTremor:
             except ValueError:
                 raise ValueError(f"Could not load tremor from file: {csv}")
 
-        self.create_temporary_dir()
+        self.create_daily_dir()
 
         if self.n_jobs == 1:
             for job in self.jobs:
                 temp_file = self.run_job(*job)
                 if temp_file is not None:
-                    self.tmp_files.append(temp_file)
+                    self.daily_files.append(temp_file)
 
         if self.n_jobs > 1:
             if self.verbose:
                 logger.info(f"Running on {self.n_jobs} job(s)")
 
             with Pool(self.n_jobs) as pool:
-                tmp_files = pool.starmap(self.run_job, self.jobs)
-                tmp_files = [tmp_file for tmp_file in tmp_files if tmp_file is not None]
-                self.tmp_files.extend(tmp_files)
+                daily_files = pool.starmap(self.run_job, self.jobs)
+                daily_files = [
+                    daily_file for daily_file in daily_files if daily_file is not None
+                ]
+                self.daily_files.extend(daily_files)
 
-        # Merge calculated tremor CSV files from tmp dir
-        df = self.concat_tremor_data(self.tmp_dir, self.tremor_dir)
+        # Merge calculated tremor CSV files from daily dir
+        df = self.concat_tremor_data(self.daily_dir, self.tremor_dir)
 
         start_date = df.index[0].strftime("%Y-%m-%d")
         end_date = df.index[-1].strftime("%Y-%m-%d")
@@ -530,7 +532,7 @@ class CalculateTremor:
             None: Not saved, if dataframe is empty
         """
         date_str = date.strftime("%Y-%m-%d")
-        temp_file = os.path.join(self.tmp_dir, f"{date_str}.csv")
+        temp_file = os.path.join(self.daily_dir, f"{date_str}.csv")
         temp_plot = os.path.join(self.figures_dir, f"{date_str}.png")
 
         logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
@@ -538,7 +540,7 @@ class CalculateTremor:
         can_skip = (
             not self.overwrite
             and os.path.exists(temp_file)
-            and (not self.plot_tmp or os.path.exists(temp_plot))
+            and (not self.plot_daily or os.path.exists(temp_plot))
         )
 
         if can_skip:
@@ -559,7 +561,7 @@ class CalculateTremor:
         )
 
         # plot tremor data
-        if self.plot_tmp:
+        if self.plot_daily:
             plot_tremor(
                 df=df,
                 interval=2,
@@ -573,7 +575,7 @@ class CalculateTremor:
 
         if self.verbose:
             logger.info(
-                f"{date_str} :: File CSV saved {os.path.join(self.tmp_dir, date_str)}"
+                f"{date_str} :: File CSV saved {os.path.join(self.daily_dir, date_str)}"
             )
 
         return temp_file
@@ -790,27 +792,31 @@ class CalculateTremor:
         return df
 
     @staticmethod
-    def concat_tremor_data(tmp_dir: str, tremor_dir: str | None = None) -> pd.DataFrame:
-        """Concatenate calculated tremor data from tmp dir to tremor dir.
+    def concat_tremor_data(
+        daily_dir: str, tremor_dir: str | None = None
+    ) -> pd.DataFrame:
+        """Concatenate calculated tremor data from daily dir to tremor dir.
 
         Args:
-            tmp_dir (str): Temporary dir where calculated tremor saved
+            daily_dir (str): Daily dir where calculated tremor saved
             tremor_dir (str, optional): Directory where tremor data will be saved. Defaults to None.
 
         Returns:
             pd.DataFrame: Tremor data
 
         Raises:
-            FileNotFoundError: If tmp_dir doesn't exist or no CSV files found
+            FileNotFoundError: If daily_dir doesn't exist or no CSV files found
         """
-        if not os.path.isdir(tmp_dir):
-            raise FileNotFoundError(f"Directory {tmp_dir} does not exist")
+        if not os.path.isdir(daily_dir):
+            raise FileNotFoundError(f"Directory {daily_dir} does not exist")
 
-        files = glob.glob(os.path.join(tmp_dir, "*.csv"))
+        files = glob.glob(os.path.join(daily_dir, "*.csv"))
         if len(files) == 0:
-            raise FileNotFoundError(f"No CSV files found in {tmp_dir}")
+            raise FileNotFoundError(f"No CSV files found in {daily_dir}")
 
-        tremor_dir = tmp_dir.replace("tmp", "") if tremor_dir is None else tremor_dir
+        tremor_dir = (
+            daily_dir.replace("daily", "") if tremor_dir is None else tremor_dir
+        )
         os.makedirs(tremor_dir, exist_ok=True)
 
         df = pd.concat(
