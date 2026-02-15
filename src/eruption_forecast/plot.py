@@ -1,12 +1,19 @@
-import os
+"""Legacy plotting functions - delegates to eruption_forecast.plots module.
+
+This module maintains backward compatibility by wrapping the new Nature/Science
+styled plotting functions. All existing imports continue to work without changes.
+
+For new code, prefer importing directly from eruption_forecast.plots submodules.
+"""
+
 from typing import Literal
-from pathlib import Path
 
 import pandas as pd
-import matplotlib.dates as mdates
-from matplotlib import pyplot as plt
 
-from eruption_forecast.logger import logger
+from eruption_forecast.plots.tremor_plots import plot_tremor as _plot_tremor_new
+from eruption_forecast.plots.feature_plots import (
+    plot_significant_features as _plot_significant_features_new,
+)
 
 
 def plot_tremor(
@@ -22,6 +29,9 @@ def plot_tremor(
     verbose: bool = False,
 ) -> None:
     """Plot tremor data as a multi-panel time series figure.
+
+    **Legacy wrapper**: Delegates to eruption_forecast.plots.tremor_plots.plot_tremor
+    with Nature/Science journal styling.
 
     Creates one subplot per column in the DataFrame (or per selected column),
     with configurable x-axis tick interval and optional file output.
@@ -54,86 +64,22 @@ def plot_tremor(
         >>> plot_tremor(df, interval=6, interval_unit="hours",
         ...            figure_dir="output/figures", overwrite=False)
     """
-    # TODO: Asserting pd.datetime index
-    # TODO: Asserting interval_unit
-    # TODO: Asserting selected_columns
+    # Use enhanced DPI if not explicitly overridden
+    if dpi == 100:
+        dpi = 150
 
-    start_date: pd.Timestamp = df.index[0]
-    end_date: pd.Timestamp = df.index[-1]
-    n_days = int((end_date - start_date).days)
-
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
-
-    if filename is not None:
-        filename = Path(filename).stem
-
-    default_filename = f"tremor_{start_date_str}_{end_date_str}"
-    default_title = (
-        f"{start_date_str}" if n_days == 0 else f"{start_date_str}_{end_date_str}"
+    return _plot_tremor_new(
+        df=df,
+        interval=interval,
+        interval_unit=interval_unit,
+        filename=filename,
+        figure_dir=figure_dir,
+        title=title,
+        overwrite=overwrite,
+        dpi=dpi,
+        selected_columns=selected_columns,
+        verbose=verbose,
     )
-    title = title or default_title
-
-    # Save plot to figure directory
-    figure_dir = figure_dir or os.path.join(os.getcwd(), "figures")
-    os.makedirs(figure_dir, exist_ok=True)
-
-    filename = filename or default_filename
-    filepath = os.path.join(figure_dir, f"{filename}.png")
-
-    if os.path.exists(filepath) and not overwrite:
-        if verbose:
-            logger.info(f"{start_date_str} :: Plot already exists at {filepath}")
-        return None
-
-    # Define date locator and formatter based on plot type
-    date_locator = (
-        mdates.HourLocator(interval=interval)
-        if interval_unit == "hours"
-        else mdates.DayLocator(interval=14)
-    )
-    date_formatter = (
-        mdates.DateFormatter("%H:%M")
-        if interval_unit == "hours"
-        else mdates.DateFormatter("%Y-%m-%d")
-    )
-
-    columns = selected_columns or df.columns.tolist()
-    n_rows = len(columns)
-    fig, axs = plt.subplots(
-        nrows=n_rows, ncols=1, figsize=(10, 1.2 * n_rows), sharex=True
-    )
-
-    for index, column in enumerate(columns):
-        ax = axs[index] if n_rows > 1 else axs
-        ax.grid(True, linestyle="-.", axis="both", alpha=0.5)
-        ax.plot(
-            df.index,
-            df[column],
-            color="black",
-            linewidth=1,
-            label=column,
-            alpha=0.8,
-        )
-        ax.set_xlim(start_date, end_date)
-        ax.legend(loc="upper left", fontsize=8, frameon=False)
-
-        ax.xaxis.set_major_locator(date_locator)
-        ax.xaxis.set_major_formatter(date_formatter)
-        for label in ax.get_xticklabels(which="major"):
-            label.set(rotation=30, horizontalalignment="right", fontsize=8)
-
-        if index == (n_rows - 1):
-            ax.set_xlabel(title, fontsize=10)
-
-    plt.tight_layout()
-    plt.savefig(filepath, dpi=dpi)
-    plt.close()
-
-    if verbose:
-        logger.info(f"{start_date_str} :: Plot saved to {filepath}")
-
-    return None
 
 
 def plot_significant_features(
@@ -149,6 +95,9 @@ def plot_significant_features(
     overwrite: bool = True,
 ):
     """Plot a horizontal bar chart of significant features.
+
+    **Legacy wrapper**: Delegates to eruption_forecast.plots.feature_plots.plot_significant_features
+    with Nature/Science journal styling.
 
     Displays the top ``number_of_features`` rows of ``df`` as a horizontal
     bar chart sorted by ``values_column``, with a dashed reference line at
@@ -188,39 +137,24 @@ def plot_significant_features(
         ...     top_features=10,
         ... )
     """
-    if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
-        return None
+    # Use enhanced DPI if not explicitly overridden
+    if dpi == 100:
+        dpi = 150
 
-    if features_column not in df.columns:
-        try:
-            df[features_column] = df.index
-        except ValueError:
-            raise ValueError(  # noqa: B904
-                f"Features column: {features_column} does not exist"
-            )  # noqa: B904
+    # Convert tuple to explicit tuple type if needed
+    if not isinstance(figsize, tuple):
+        figsize = tuple(figsize)
 
-    df = df.dropna()
-    df = df.head(number_of_features)
-    df = df.iloc[::-1]
-
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
-    ax.grid(True, linestyle="-.", axis="both", alpha=0.3)
-    ax.barh(df[features_column], df[values_column], height=0.5)
-    ax.axhline(
-        df.index[top_features],
-        color="red",
-        linestyle="--",
-        label=f"Top {top_features} Fts",
+    return _plot_significant_features_new(
+        df=df,
+        filepath=filepath,
+        number_of_features=number_of_features,
+        top_features=top_features,
+        title=title,
+        figsize=figsize,
+        features_column=features_column,
+        values_column=values_column,
+        dpi=dpi,
+        overwrite=overwrite,
     )
 
-    ax.title.set_text(title or f"{number_of_features} Significant Features")
-
-    ax.legend(frameon=False)
-
-    plt.ylim(-0.5, number_of_features - 0.5)
-    plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
-    plt.close()
-
-    del df
-
-    return None
