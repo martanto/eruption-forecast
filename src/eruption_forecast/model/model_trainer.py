@@ -963,6 +963,7 @@ class ModelTrainer:
         # For train(), skip only based on significant + model files (no metrics).
         can_skip = (
             not self.overwrite
+            and os.path.exists(all_figures_filepath)
             and os.path.isfile(significant_filepath)
             and os.path.isfile(model_filepath)
         )

@@ -96,13 +96,14 @@ def plot_significant_features(
     with apply_nature_style():
         # Temporarily disable constrained_layout for horizontal bar charts
         # Use tight_layout instead which handles many labels better
-        plt.rcParams['figure.constrained_layout.use'] = False
+        plt.rcParams["figure.constrained_layout.use"] = False
 
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
         # Color bars by position: top features in darker blue
         bar_colors = [
-            NATURE_COLORS["blue"] if i >= (number_of_features - top_features)
+            NATURE_COLORS["blue"]
+            if i >= (number_of_features - top_features)
             else NATURE_COLORS["gray"]
             for i in range(len(df))
         ]
@@ -127,13 +128,11 @@ def plot_significant_features(
                 label=f"Top {top_features} features",
                 alpha=0.7,
             )
-            ax.legend(frameon=False, loc="lower right")
+            ax.legend(frameon=False, loc="upper right")
 
         # Configure axes
         configure_spine(ax)
-        ax.set_xlabel(
-            "P-value" if values_column == "p_values" else "Importance Score"
-        )
+        ax.set_xlabel("P-value" if values_column == "p_values" else "Importance Score")
         ax.set_ylabel("Feature")
         ax.set_title(title or f"{number_of_features} Significant Features")
 
@@ -155,8 +154,10 @@ def plot_significant_features(
                         color=NATURE_COLORS["blue"],
                     )
 
-        # Apply tight layout to prevent label clipping
-        plt.tight_layout()
+        # Note: tight_layout() is not called here because savefig.bbox='tight'
+        # (configured in styles.py) handles layout automatically and is more
+        # robust with long feature labels. Explicit tight_layout() can fail
+        # when labels are too long for the figure width.
         plt.savefig(filepath, dpi=dpi)
         plt.close()
 

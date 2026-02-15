@@ -750,23 +750,35 @@ Both produce identical publication-quality styled output.
 
 ### Bugfix: Feature Plot Layout Collapse (2026-02-15)
 
-Fixed `UserWarning` about constrained_layout collapsing when plotting many features:
+Fixed multiple `UserWarning` issues when plotting many features with long labels:
 
-**Problem:** With 50+ features, `plot_significant_features()` triggered matplotlib warning:
+**Problem 1:** With 50+ features, `plot_significant_features()` triggered matplotlib warning:
 ```
 UserWarning: constrained_layout not applied because axes sizes collapsed to zero.
 ```
 
+**Problem 2:** After initial fix, encountered second warning with long feature names:
+```
+UserWarning: Tight layout not applied. The left and right margins cannot be 
+made large enough to accommodate all Axes decorations.
+```
+
+**Root cause:** Long tsfresh feature names (e.g., `rsam_f2__abs_energy__quantile_0.3`) require significant horizontal space for y-axis labels.
+
 **Solution implemented:**
-- **Dynamic figure height calculation**: Automatically scales height based on `number_of_features` when using default figsize
-  - Formula: `height = max(8, number_of_features * 0.3 + 2)`
-  - Examples: 10 features → 8", 50 features → 17", 100 features → 32"
-- **Switched to tight_layout**: Disabled `constrained_layout` for horizontal bar charts, uses `tight_layout()` instead (more forgiving with many labels)
-- **Fully backward compatible**: User-provided figsize values are respected as-is; only default behavior improved
+1. **Dynamic figure height calculation**: Automatically scales height based on `number_of_features` when using default figsize
+   - Formula: `height = max(8, number_of_features * 0.3 + 2)`
+   - Examples: 10 features → 8", 50 features → 17", 100 features → 32"
+2. **Disabled constrained_layout**: Turned off for horizontal bar charts (incompatible with many labels)
+3. **Removed explicit tight_layout() call**: Relies instead on `bbox_inches='tight'` in `savefig()` (already configured in `styles.py`)
+   - `tight_layout()` tries to fit within fixed figure size → fails with long labels
+   - `bbox_inches='tight'` expands saved figure to fit all elements → more robust
+4. **Fully backward compatible**: User-provided figsize values are respected as-is; only default behavior improved
 
 **Results:**
-- ✅ No more layout warnings for any feature count
+- ✅ No layout warnings regardless of feature count or label length
 - ✅ Plots render with proper spacing and readable labels
+- ✅ Saved figures automatically sized to fit all content
 - ✅ Zero breaking changes - all existing code works unchanged
 
 ---
