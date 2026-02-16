@@ -29,6 +29,14 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
   - [Comparing Multiple Classifiers](#comparing-multiple-classifiers)
   - [train() + ModelPredictor Workflow](#train--modelpredictor-workflow-recommended-for-operational-use)
   - [Custom Frequency Bands](#custom-frequency-bands)
+- [Visualization & Plotting](#visualization--plotting)
+  - [Tremor Time-Series Plots](#tremor-time-series-plots)
+  - [Feature Importance Plots](#feature-importance-plots)
+  - [Model Evaluation Plots](#model-evaluation-plots)
+  - [Forecast Visualization](#forecast-visualization)
+  - [Batch Replot Utilities](#batch-replot-utilities)
+  - [Common Parameters](#common-parameters)
+  - [Import Examples](#import-examples)
 - [Output Directory Structure](#output-directory-structure)
 - [Configuration](#configuration)
 - [Requirements](#requirements)
@@ -1010,6 +1018,265 @@ tremor = CalculateTremor(
     (5.0, 10.0),   # High frequency
     (10.0, 20.0),  # Very high frequency
 ]).from_sds(sds_dir="/data/sds").run()
+```
+
+---
+
+## Visualization & Plotting
+
+The `plots/` module provides publication-quality visualization functions with consistent Nature/Science journal styling. All plots use colorblind-safe palettes, clean typography, and high DPI output suitable for papers and presentations.
+
+### Tremor Time-Series Plots
+
+#### plot_tremor()
+
+Visualize tremor metrics (RSAM/DSAR) as multi-panel time-series plots.
+
+```python
+from eruption_forecast.plots.tremor_plots import plot_tremor
+import pandas as pd
+
+# Load tremor data
+df = pd.read_csv("output/VG.OJN.00.EHZ/tremor/tremor.csv", index_col=0, parse_dates=True)
+
+# Basic tremor plot
+plot_tremor(
+    df=df,
+    figure_dir="output/figures",
+    dpi=150,
+)
+
+# Custom interval and selected columns
+plot_tremor(
+    df=df,
+    interval=6,
+    interval_unit="hours",
+    selected_columns=["rsam_f2", "rsam_f3", "dsar_f2-f3"],
+    figure_dir="output/figures",
+    filename="tremor_selected",
+    dpi=300,
+    verbose=True,
+)
+```
+
+**Key Parameters:**
+- `df` - Tremor DataFrame with datetime index
+- `interval` - X-axis tick interval (default: 1)
+- `interval_unit` - "hours" or "days" (default: "hours")
+- `selected_columns` - Subset of columns to plot (default: all)
+- `dpi` - Resolution (default: 150)
+
+### Feature Importance Plots
+
+#### plot_significant_features()
+
+Visualize feature importance or p-values as horizontal bar charts.
+
+```python
+from eruption_forecast.plots.feature_plots import plot_significant_features
+import pandas as pd
+
+# From DataFrame
+df_features = pd.read_csv("features.csv")
+plot_significant_features(
+    features=df_features,
+    number_of_features=50,
+    top_features=20,
+    output_dir="output/figures",
+    filename="feature_importance",
+    dpi=150,
+)
+
+# From CSV file directly
+plot_significant_features(
+    features="path/to/features.csv",
+    number_of_features=30,
+    top_features=10,
+    values_column="importance",  # or "p_values"
+    output_dir="output/figures",
+)
+```
+
+**Key Parameters:**
+- `features` - DataFrame or CSV path with feature data
+- `number_of_features` - Total features to display (default: 50)
+- `top_features` - Number highlighted with darker color (default: 20)
+- `values_column` - Column name for values (auto-detected if None)
+
+### Model Evaluation Plots
+
+The `ModelEvaluator` class provides 7 evaluation plot types for comprehensive model analysis.
+
+#### Available Plot Types
+
+1. **Confusion Matrix** - Classification performance breakdown
+2. **ROC Curve** - True/false positive rate tradeoff with AUC score
+3. **Precision-Recall Curve** - Precision/recall tradeoff with Average Precision
+4. **Threshold Analysis** - Metrics vs decision threshold
+5. **Feature Importance** - Top contributing features to predictions
+6. **Calibration Curve** - Predicted vs actual probabilities (reliability diagram)
+7. **Prediction Distribution** - Score distributions by class (histogram + KDE)
+
+#### Usage Example
+
+```python
+from eruption_forecast.model.model_evaluator import ModelEvaluator
+
+# Create evaluator from trained model
+evaluator = ModelEvaluator.from_files(
+    model_path="output/trainings/model.pkl",
+    features_csv="output/features.csv",
+    label_csv="output/label.csv",
+    output_dir="output/figures",
+)
+
+# Generate all 7 plots at once
+evaluator.plot_all()
+
+# Or generate individual plots
+evaluator.plot_confusion_matrix()
+evaluator.plot_roc_curve()
+evaluator.plot_precision_recall_curve()
+evaluator.plot_threshold_analysis()
+evaluator.plot_feature_importance()
+evaluator.plot_calibration()
+evaluator.plot_prediction_distribution()
+```
+
+All plots are saved to `output_dir` with publication-quality styling.
+
+### Forecast Visualization
+
+#### Plotting with ModelPredictor
+
+Visualize eruption probability forecasts as time-series plots.
+
+```python
+from eruption_forecast.model.model_predictor import ModelPredictor
+
+predictor = ModelPredictor(
+    model_dir="output/trainings/model-only/random-forest-classifier/stratified-k-fold",
+    features_csv="output/features_forecast.csv",
+    label_csv="output/label_forecast.csv",  # Optional
+    output_dir="output/forecast",
+)
+
+# With labeled data (evaluation mode)
+df_metrics = predictor.predict(plot=True)
+
+# Without labels (forecasting mode)
+df_forecast = predictor.predict_proba(plot=True)
+```
+
+**Plot Features:**
+- Probability time-series for each classifier
+- Consensus probability (mean across classifiers)
+- Confidence bands (standard deviation)
+- Eruption event markers (if labels provided)
+- Saved as `eruption_forecast.png` in `figures/` subdirectory
+
+### Batch Replot Utilities
+
+Regenerate plots for multiple files in parallel — useful for applying style updates or reprocessing after data changes.
+
+#### replot_tremor()
+
+Batch replot daily tremor CSV files.
+
+```python
+from eruption_forecast.plots.tremor_plots import replot_tremor
+
+# Sequential processing
+results = replot_tremor(
+    daily_dir="output/VG.OJN.00.EHZ/tremor/daily",
+    output_dir="output/VG.OJN.00.EHZ/tremor/figures",
+    overwrite=True,
+)
+print(f"Created: {results['created']}, Skipped: {results['skipped']}")
+
+# Parallel processing with custom parameters
+results = replot_tremor(
+    daily_dir="output/VG.OJN.00.EHZ/tremor/daily",
+    n_jobs=4,
+    interval=6,
+    interval_unit="hours",
+    dpi=300,
+    selected_columns=["rsam_f2", "rsam_f3"],
+    overwrite=False,
+)
+```
+
+#### replot_significant_features()
+
+Batch replot feature importance across multiple seeds.
+
+```python
+from eruption_forecast.plots.feature_plots import replot_significant_features
+
+# Sequential processing
+results = replot_significant_features(
+    all_features_dir="output/trainings/features/all_features",
+    output_dir="output/trainings/features/figures/significant",
+    overwrite=True,
+)
+
+# Parallel processing
+results = replot_significant_features(
+    all_features_dir="output/trainings/features/all_features",
+    n_jobs=4,
+    number_of_features=50,
+    top_features=20,
+    dpi=300,
+    overwrite=False,
+)
+print(f"Processed: Created {results['created']}, Skipped {results['skipped']}, Failed {results['failed']}")
+```
+
+**Return Value:**
+Both functions return a dict with counts:
+- `'created'` - Plots successfully generated
+- `'skipped'` - Plots skipped (file exists, overwrite=False)
+- `'failed'` - Plots that encountered errors
+
+### Common Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dpi` | `int` | `150` | Resolution in dots per inch (use 300 for publication) |
+| `overwrite` | `bool` | `True` | Replace existing plots if they exist |
+| `n_jobs` | `int` | `1` | Parallel workers for batch utilities (use >1 for large datasets) |
+| `output_dir` / `figure_dir` | `str` | varies | Directory where plots are saved |
+| `verbose` | `bool` | `False` | Enable logging of plot generation |
+| `filename` | `str` | auto | Custom filename stem (extension added automatically) |
+
+### Import Examples
+
+```python
+# Tremor plots
+from eruption_forecast.plots.tremor_plots import plot_tremor, replot_tremor
+
+# Feature plots
+from eruption_forecast.plots.feature_plots import (
+    plot_significant_features,
+    replot_significant_features,
+)
+
+# Evaluation plots (via ModelEvaluator)
+from eruption_forecast.model.model_evaluator import ModelEvaluator
+
+# Forecast plots (via ModelPredictor)
+from eruption_forecast.model.model_predictor import ModelPredictor
+
+# All evaluation plot functions available individually:
+from eruption_forecast.plots.evaluation_plots import (
+    plot_confusion_matrix,
+    plot_roc_curve,
+    plot_precision_recall_curve,
+    plot_threshold_analysis,
+    plot_feature_importance,
+    plot_calibration,
+    plot_prediction_distribution,
+)
 ```
 
 ---

@@ -4,26 +4,33 @@ from typing import Any, Literal
 import numpy as np
 import joblib
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
 from sklearn.metrics import (
     f1_score,
-    roc_curve,
     recall_score,
     roc_auc_score,
     accuracy_score,
     precision_score,
     confusion_matrix,
-    precision_recall_curve,
     average_precision_score,
     balanced_accuracy_score,
 )
-from sklearn.calibration import calibration_curve
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.utils import resolve_output_dir
 from eruption_forecast.logger import logger
+
+# Import new styled plotting functions
+from eruption_forecast.plots.evaluation_plots import (
+    plot_roc_curve as _plot_roc_styled,
+    plot_calibration as _plot_cal_styled,
+    plot_confusion_matrix as _plot_cm_styled,
+    plot_feature_importance as _plot_fi_styled,
+    plot_threshold_analysis as _plot_threshold_styled,
+    plot_precision_recall_curve as _plot_pr_styled,
+    plot_prediction_distribution as _plot_pred_dist_styled,
+)
 
 
 class ModelEvaluator:
@@ -291,17 +298,15 @@ class ModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure object.
         """
-        cm = confusion_matrix(self.y_test, self._y_pred, normalize=normalize)
-        labels = ["Not Erupted", "Erupted"]
-        fmt = ".2f" if normalize else "d"
-
-        fig, ax = plt.subplots(figsize=(6, 5))
-        sns.heatmap(cm, annot=True, fmt=fmt, cmap="Blues",
-                    xticklabels=labels, yticklabels=labels, ax=ax)
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
-        ax.set_title(f"Confusion Matrix — {self.model_name}")
-        plt.tight_layout()
+        # Delegate to styled plotting function
+        fig = _plot_cm_styled(
+            y_true=self.y_test,
+            y_pred=self._y_pred,
+            normalize=normalize,
+            title=f"Confusion Matrix — {self.model_name}",
+            figsize=(6, 5),
+            dpi=dpi,
+        )
 
         if save:
             path = os.path.join(self.output_dir, filename or f"{self.model_name}_confusion_matrix.png")
@@ -334,18 +339,14 @@ class ModelEvaluator:
             logger.warning("ROC curve requires probability predictions")
             return None
 
-        fpr, tpr, _ = roc_curve(self.y_test, self._y_proba)
-        auc = roc_auc_score(self.y_test, self._y_proba)
-
-        fig, ax = plt.subplots(figsize=(6, 5))
-        ax.plot(fpr, tpr, lw=2, label=f"AUC = {auc:.3f}")
-        ax.plot([0, 1], [0, 1], "k--", lw=1)
-        ax.set_xlabel("False Positive Rate")
-        ax.set_ylabel("True Positive Rate")
-        ax.set_title(f"ROC Curve — {self.model_name}")
-        ax.legend()
-        ax.grid(alpha=0.3)
-        plt.tight_layout()
+        # Delegate to styled plotting function
+        fig = _plot_roc_styled(
+            y_true=self.y_test,
+            y_proba=self._y_proba,
+            title=f"ROC Curve — {self.model_name}",
+            figsize=(6, 5),
+            dpi=dpi,
+        )
 
         if save:
             path = os.path.join(self.output_dir, filename or f"{self.model_name}_roc_curve.png")
@@ -378,17 +379,14 @@ class ModelEvaluator:
             logger.warning("PR curve requires probability predictions")
             return None
 
-        precision, recall, _ = precision_recall_curve(self.y_test, self._y_proba)
-        ap = average_precision_score(self.y_test, self._y_proba)
-
-        fig, ax = plt.subplots(figsize=(6, 5))
-        ax.plot(recall, precision, lw=2, label=f"AP = {ap:.3f}")
-        ax.set_xlabel("Recall")
-        ax.set_ylabel("Precision")
-        ax.set_title(f"Precision-Recall Curve — {self.model_name}")
-        ax.legend()
-        ax.grid(alpha=0.3)
-        plt.tight_layout()
+        # Delegate to styled plotting function
+        fig = _plot_pr_styled(
+            y_true=self.y_test,
+            y_proba=self._y_proba,
+            title=f"Precision-Recall Curve — {self.model_name}",
+            figsize=(6, 5),
+            dpi=dpi,
+        )
 
         if save:
             path = os.path.join(self.output_dir, filename or f"{self.model_name}_pr_curve.png")
@@ -472,32 +470,14 @@ class ModelEvaluator:
             logger.warning("plot_threshold_analysis requires probability predictions")
             return None
 
-        thresholds = np.linspace(0.0, 1.0, 101)
-        precisions, recalls, f1s, bal_accs = [], [], [], []
-
-        for t in thresholds:
-            y_pred_t = (self._y_proba >= t).astype(int)
-            precisions.append(precision_score(self.y_test, y_pred_t, zero_division=0))
-            recalls.append(recall_score(self.y_test, y_pred_t, zero_division=0))
-            f1s.append(f1_score(self.y_test, y_pred_t, zero_division=0))
-            bal_accs.append(balanced_accuracy_score(self.y_test, y_pred_t))
-
-        opt_thresh, _ = self.optimize_threshold(criterion="f1")
-
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.plot(thresholds, precisions, label="Precision")
-        ax.plot(thresholds, recalls, label="Recall")
-        ax.plot(thresholds, f1s, label="F1", linewidth=2)
-        ax.plot(thresholds, bal_accs, label="Balanced Accuracy", linestyle="--")
-        ax.axvline(0.5, color="gray", linestyle=":", linewidth=1, label="Default (0.5)")
-        ax.axvline(opt_thresh, color="red", linestyle="--", linewidth=1.5,
-                   label=f"Optimal F1 ({opt_thresh:.2f})")
-        ax.set_xlabel("Threshold")
-        ax.set_ylabel("Score")
-        ax.set_title(f"Threshold Analysis — {self.model_name}")
-        ax.legend(loc="best")
-        ax.grid(alpha=0.3)
-        plt.tight_layout()
+        # Delegate to styled plotting function
+        fig = _plot_threshold_styled(
+            y_true=self.y_test,
+            y_proba=self._y_proba,
+            title=f"Threshold Analysis — {self.model_name}",
+            figsize=(10, 6),
+            dpi=dpi,
+        )
 
         if save:
             path = os.path.join(
@@ -535,40 +515,21 @@ class ModelEvaluator:
             plt.Figure | None: Matplotlib figure, or None if the model does
             not expose ``feature_importances_``.
         """
-        model = self.model
-        importances: np.ndarray | None = None
+        # Delegate to styled plotting function
+        fig = _plot_fi_styled(
+            model=self.model,
+            feature_names=list(self.X_test.columns),
+            top_n=top_n,
+            title=f"Top-{top_n} Feature Importances — {self.model_name}",
+            dpi=dpi,
+        )
 
-        if hasattr(model, "feature_importances_"):
-            importances = model.feature_importances_  # type: ignore[union-attr]
-        elif hasattr(model, "estimators_"):
-            # VotingClassifier: average importances from tree-based sub-estimators
-            sub_importances = []
-            for est in model.estimators_:  # type: ignore[union-attr]
-                if hasattr(est, "feature_importances_"):
-                    sub_importances.append(est.feature_importances_)
-            if sub_importances:
-                importances = np.mean(sub_importances, axis=0)
-
-        if importances is None:
+        if fig is None:
             logger.warning(
-                f"{type(model).__name__} does not expose feature_importances_; "
+                f"{type(self.model).__name__} does not expose feature_importances_; "
                 "skipping plot_feature_importance"
             )
             return None
-
-        feature_names = list(self.X_test.columns)
-        indices = np.argsort(importances)[::-1][:top_n]
-        top_names = [feature_names[i] for i in indices]
-        top_values = importances[indices]
-
-        fig, ax = plt.subplots(figsize=(8, max(4, top_n * 0.35)))
-        ax.barh(range(len(top_names)), top_values[::-1], align="center")
-        ax.set_yticks(range(len(top_names)))
-        ax.set_yticklabels(top_names[::-1])
-        ax.set_xlabel("Importance")
-        ax.set_title(f"Top-{top_n} Feature Importances — {self.model_name}")
-        ax.grid(axis="x", alpha=0.3)
-        plt.tight_layout()
 
         if save:
             path = os.path.join(
@@ -609,19 +570,15 @@ class ModelEvaluator:
             logger.warning("plot_calibration requires probability predictions")
             return None
 
-        fraction_of_positives, mean_predicted = calibration_curve(
-            self.y_test, self._y_proba, n_bins=n_bins
+        # Delegate to styled plotting function
+        fig = _plot_cal_styled(
+            y_true=self.y_test,
+            y_proba=self._y_proba,
+            n_bins=n_bins,
+            title=f"Calibration Curve — {self.model_name}",
+            figsize=(6, 5),
+            dpi=dpi,
         )
-
-        fig, ax = plt.subplots(figsize=(6, 5))
-        ax.plot(mean_predicted, fraction_of_positives, "s-", label=self.model_name)
-        ax.plot([0, 1], [0, 1], "k--", label="Perfectly calibrated")
-        ax.set_xlabel("Mean predicted probability")
-        ax.set_ylabel("Fraction of positives")
-        ax.set_title(f"Calibration Curve — {self.model_name}")
-        ax.legend()
-        ax.grid(alpha=0.3)
-        plt.tight_layout()
 
         if save:
             path = os.path.join(
@@ -659,20 +616,23 @@ class ModelEvaluator:
             logger.warning("plot_prediction_distribution requires probability predictions")
             return None
 
-        y_true = np.asarray(self.y_test)
-        proba_0 = self._y_proba[y_true == 0]
-        proba_1 = self._y_proba[y_true == 1]
+        # Delegate to styled plotting function
+        fig = _plot_pred_dist_styled(
+            y_true=self.y_test,
+            y_proba=self._y_proba,
+            title=f"Prediction Distribution — {self.model_name}",
+            figsize=(8, 5),
+            dpi=dpi,
+        )
 
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.hist(proba_0, bins=20, alpha=0.6, color="steelblue", label="Not Erupted (0)")
-        ax.hist(proba_1, bins=20, alpha=0.6, color="darkorange", label="Erupted (1)")
-        ax.axvline(0.5, color="gray", linestyle="--", linewidth=1, label="Threshold 0.5")
-        ax.set_xlabel("Predicted probability")
-        ax.set_ylabel("Count")
-        ax.set_title(f"Prediction Distribution — {self.model_name}")
-        ax.legend()
-        ax.grid(alpha=0.3)
-        plt.tight_layout()
+        if save:
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_prediction_distribution.png"
+            )
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved: {path}")
+
+        return fig
 
         if save:
             path = os.path.join(

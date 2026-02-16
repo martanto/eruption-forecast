@@ -596,7 +596,7 @@ class ModelTrainer:
         )
         all_features_filepath = os.path.join(self.all_features_dir, f"{filename}.csv")
         all_figures_filepath = os.path.join(
-            self.significant_figures_dir, f"{filename}.jpg"
+            self.significant_figures_dir, f"{filename}.png"
         )
         model_filepath = os.path.join(self.models_dir, f"{filename}.pkl")
         metrics_filepath = os.path.join(self.metrics_dir, f"{filename}.json")
@@ -963,6 +963,7 @@ class ModelTrainer:
         # For train(), skip only based on significant + model files (no metrics).
         can_skip = (
             not self.overwrite
+            and os.path.exists(all_figures_filepath)
             and os.path.isfile(significant_filepath)
             and os.path.isfile(model_filepath)
         )
