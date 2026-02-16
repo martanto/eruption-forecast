@@ -784,10 +784,135 @@ made large enough to accommodate all Axes decorations.
 
 ---
 
+## Batch Tremor Replot Utility (2026-02-16)
+
+### Overview
+Added `replot_tremor()` function to `plots/tremor_plots.py` for batch regeneration of daily tremor plots with consistent styling.
+
+### Implementation
+
+**Location:** `src/eruption_forecast/plots/tremor_plots.py`
+
+**New Functions:**
+1. **`_process_single_tremor_file()`** - Helper function for processing individual CSV files
+2. **`replot_tremor()`** - Main batch processing function with multiprocessing support
+
+### Function Signature
+
+```python
+def replot_tremor(
+    daily_dir: str | Path,
+    output_dir: str | Path | None = None,
+    overwrite: bool = True,
+    n_jobs: int = 1,
+    **kwargs,
+) -> dict[str, int]:
+```
+
+### Key Features
+
+**Input/Output:**
+- Input: `daily_dir` containing daily tremor CSV files (e.g., `tremor/daily/`)
+- Output: Plots saved to sibling `figures/` directory by default
+- Returns: Summary dict with `created`, `skipped`, `failed` counts
+
+**Multiprocessing:**
+- `n_jobs=1`: Sequential processing (default)
+- `n_jobs>1`: Parallel processing with `multiprocessing.Pool`
+- Follows project pattern (same as `replot_significant_features()`)
+
+**Plot Parameters:**
+- Accepts all `plot_tremor()` parameters via `**kwargs`
+- Supports: `interval`, `interval_unit`, `selected_columns`, `dpi`, `verbose`, etc.
+
+**Error Handling:**
+- Validates directory exists and is not empty
+- Logs errors but continues processing remaining files
+- Returns status for each file: "created" / "skipped" / "failed"
+
+### Usage Examples
+
+```python
+from eruption_forecast.plots.tremor_plots import replot_tremor
+
+# Basic usage - replot all daily files
+results = replot_tremor(
+    daily_dir="output/VG.OJN.00.EHZ/tremor/daily",
+    overwrite=True,
+)
+print(f"Created: {results['created']}, Failed: {results['failed']}")
+
+# Custom output directory, skip existing
+results = replot_tremor(
+    daily_dir="path/to/tremor/daily",
+    output_dir="path/to/custom/figures",
+    overwrite=False,
+)
+
+# Parallel processing with custom parameters
+results = replot_tremor(
+    daily_dir="path/to/tremor/daily",
+    n_jobs=4,
+    interval=6,
+    interval_unit="hours",
+    dpi=300,
+    selected_columns=["rsam_f2", "rsam_f3"],
+)
+```
+
+### Technical Details
+
+**Pattern Consistency:**
+- Mirrors `replot_significant_features()` structure exactly
+- Same validation, processing, and error handling patterns
+- Same multiprocessing implementation (`Pool.starmap()`)
+
+**File Structure:**
+```
+tremor/
+├── daily/              # Input (daily_dir)
+│   ├── 2020-01-01.csv
+│   ├── 2020-01-02.csv
+│   └── 2020-01-03.csv
+└── figures/            # Output (default output_dir)
+    ├── 2020-01-01.png
+    ├── 2020-01-02.png
+    └── 2020-01-03.png
+```
+
+**CSV Format Requirements:**
+- DateTime index (pandas DatetimeIndex)
+- Tremor columns: `rsam_f0`, `rsam_f1`, `dsar_f0-f1`, etc.
+- Standard format from `CalculateTremor.calculate_tremor()`
+
+### Benefits
+
+1. **Batch regeneration** - Replot all daily files with one command
+2. **Consistent styling** - All plots use Nature/Science journal styling
+3. **Performance** - Multiprocessing support for large datasets
+4. **Flexibility** - Pass any plot_tremor() parameter
+5. **Robustness** - Error handling doesn't stop batch processing
+
+### Code Quality
+
+✅ **Linting:** Passed `ruff check --fix`  
+✅ **Type checking:** Passed `uvx ty check`  
+✅ **Pattern consistency:** Matches established patterns  
+✅ **Documentation:** Comprehensive docstrings with examples
+
+### Files Modified
+
+- `src/eruption_forecast/plots/tremor_plots.py` (+212 lines)
+  - Added import: `from multiprocessing import Pool`
+  - Added `_process_single_tremor_file()` helper (55 lines)
+  - Added `replot_tremor()` main function (157 lines)
+
+---
+
 ---
 
 > **Note:** The HTTP API layer has been moved to a separate project (`eruption-forecast-api`) and is maintained independently. This document covers the core `eruption-forecast` package only.
 
-**Document Version:** 3.4
-**Last Updated:** 2026-02-15
+**Document Version:** 3.5
+**Last Updated:** 2026-02-16
 **Author:** Claude Code (Sonnet 4.5)
