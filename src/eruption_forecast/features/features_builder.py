@@ -99,7 +99,9 @@ class FeaturesBuilder:
         # =========================
         # Set DEFAULT parameter
         # =========================
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "features"))
+        output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "features")
+        )
         label_df = pd.DataFrame() if label_df is None else label_df
 
         # =========================
@@ -286,7 +288,7 @@ class FeaturesBuilder:
 
         Args:
             tremor_matrix_df: Features dataframe with id, datetime, and tremor columns
-            column_method: Column method to extract features from. Example: rsam_f0, etc
+            column_method: Tremor column method to extract features from. Example: rsam_f0, etc
             y: Target labels. If empty, extract all features.
             extract_params: Parameters for tsfresh extraction
             use_relevant_features: Whether to use relevant features only
