@@ -1,4 +1,28 @@
 #!/usr/bin/env python
+"""
+Volcanic eruption forecasting using seismic tremor analysis and machine learning.
+
+This package implements a complete pipeline for processing seismic data, extracting features,
+and training predictive models for volcanic eruption forecasting. It includes modules for:
+
+- Tremor calculation (RSAM, DSAR metrics)
+- Label generation for supervised learning
+- Feature extraction using tsfresh
+- Model training and evaluation
+- Eruption forecasting
+
+The pipeline can be orchestrated through the `ForecastModel` class or used as individual components.
+
+Examples:
+    >>> from eruption_forecast import ForecastModel
+    >>> fm = ForecastModel(root_dir="output", station="OJN", channel="EHZ",
+    ...                    start_date="2025-01-01", end_date="2025-12-31",
+    ...                    window_size=2, volcano_id="VOLCANO_001")
+    >>> fm.calculate(source="sds", sds_dir="/data/sds").build_label(
+    ...     eruption_dates=["2025-06-15"], day_to_forecast=2
+    ... ).extract_features().train(classifier="xgb")
+"""
+
 from importlib.metadata import version
 
 from eruption_forecast.label.label_data import LabelData

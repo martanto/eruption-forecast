@@ -4,12 +4,12 @@ from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
 import pandas as pd
+from sqlalchemy.sql.expression import over
 
 from eruption_forecast.utils import (
     to_datetime,
     normalize_dates,
     validate_columns,
-    construct_windows,
     resolve_output_dir,
     validate_date_ranges,
 )
@@ -17,6 +17,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.model_trainer import ModelTrainer
+from eruption_forecast.model.model_predictor import ModelPredictor
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
@@ -164,6 +165,7 @@ class ForecastModel:
         self.features_df: pd.DataFrame = pd.DataFrame()
         self.features_csv: str | None = None
         self.use_relevant_features: bool = False
+        self.select_tremor_columns: list[str] | None = None
 
         # ------------------------------------------------------------------
         # Will be updated after set_feature_selection_method() called
@@ -180,11 +182,13 @@ class ForecastModel:
         self.trained_model_csv: str | None = None
         self.ClassifierModel: ClassifierModel | None = None
         self.classifier_name: str | None = None
+        self.trained_models: dict[str, str] = {}
 
         # ------------------------------------------------------------------
         # Will be set after predict() called
         # ------------------------------------------------------------------
-        self.prediction_features_csvs: set[str] = set()
+        self.ModelPredictor: ModelPredictor | None = None
+        self.prediction_df: pd.DataFrame = pd.DataFrame()
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -512,12 +516,6 @@ class ForecastModel:
             >>> model = ForecastModel(...)
             >>> model.validate()  # Called automatically in __init__
         """
-        # Validate window size
-        if self.window_size <= 0:
-            raise ValueError(
-                f"window_size must be greater than 0. Got: {self.window_size}"
-            )
-
         # Validate date ranges
         validate_date_ranges(self.start_date, self.end_date)
 
@@ -744,6 +742,7 @@ class ForecastModel:
         self.features_csv = features_builder.csv
         self.label_csv = features_builder.label_features_csv
         self.use_relevant_features = use_relevant_features
+        self.select_tremor_columns = select_tremor_columns
 
         return self
 
@@ -943,11 +942,7 @@ class ForecastModel:
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
-        output_dir = output_dir or os.path.join(
-            self.station_dir,
-            "trainings",
-        )
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = output_dir or self.station_dir
 
         train_model = ModelTrainer(
             extracted_features_csv=features_csv,
@@ -978,73 +973,75 @@ class ForecastModel:
 
         self.ModelTrainer = train_model
         self.trained_model_df = train_model.df
-        self.trained_model_csv = train_model.csv
+        self.trained_model_csv: str = train_model.csv
         self.ClassifierModel = train_model.ClassifierModel
-        self.classifier_name = train_model.ClassifierModel.name
+        self.classifier_name: str = train_model.ClassifierModel.name
+
+        self.trained_models[self.classifier_name] = self.trained_model_csv
 
         return self
 
-    def predict(
+    def forecast(
         self,
         start_date: str | datetime,
         end_date: str | datetime,
+        window_size: int,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
+        save_predictions: bool = True,
+        save_plot: bool = True,
         output_dir: str | None = None,
-        verbose: bool | None = None,
+        n_jobs: int | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
     ) -> Self:
-        """Generate prediction windows for eruption forecasting.
-
-        Constructs sliding time windows over the given date range and saves
-        them to a CSV file.  Note: actual model inference is not yet
-        implemented — this method only prepares the prediction window layout.
+        """Eruption forecasting.
 
         Args:
-            start_date: Start date for prediction windows.
-            end_date: End date for prediction windows.
+            start_date: Start date for forecasting windows.
+            end_date: End date for forecasting windows.
+            window_size (int): Window size in days. Defaults to 1.
             window_step: Step size between consecutive windows.
             window_step_unit: Unit of the window step ("minutes" or "hours").
-            output_dir: Directory to write the prediction CSV.
-                Defaults to ``<station_dir>/predictions``.
+            save_predictions (bool): Whether to save the prediction windows. Defaults to True.
+            save_plot (bool): Whether to save the prediction plot. Defaults to True.
+            output_dir: Directory to write the prediction CSV. Defaults to None.
+            n_jobs (int, optional): Number of jobs. Defaults to 1.
+            overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose: Override instance verbose flag.
 
         Returns:
             Self for method chaining.
         """
         verbose = verbose or self.verbose
-
-        if self.trained_model_csv is None:
-            raise ValueError(
-                "Trained model CSV not found. Please run train() first. "
-                "Usually named as: trained_model_{classifier_name}_rs-0_ts-500_top-20.csv"
-            )
+        output_dir = output_dir or self.station_dir
+        overwrite = overwrite or self.overwrite
+        n_jobs = n_jobs or self.n_jobs
 
         if verbose:
-            logger.info("predict() started")
+            logger.info("Starting Prediction...")
 
-        start_date = to_datetime(start_date)
-        end_date = to_datetime(end_date)
-        start_date_str = start_date.strftime("%Y-%m-%d")
-        end_date_str = end_date.strftime("%Y-%m-%d")
-
-        output_dir = output_dir or os.path.join(self.station_dir, "predictions")
-        os.makedirs(output_dir, exist_ok=True)
-
-        filename = f"predict_window_{start_date_str}-{end_date_str}_step-{window_step}{window_step_unit}.csv"
-        predict_window_csv = os.path.join(output_dir, filename)
-
-        df_predict_window = construct_windows(
+        model_predictor = ModelPredictor(
             start_date=start_date,
             end_date=end_date,
-            window_step=window_step,
-            window_step_unit=window_step_unit,
+            trained_models=self.trained_models,
+            output_dir=output_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+            overwrite=overwrite,
         )
 
-        logger.debug(f"Total predicted windows generated: {len(df_predict_window)}")
+        df_prediction = model_predictor.predict_proba(
+            tremor_data=self.tremor_data,
+            window_size=window_size,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            select_tremor_columns=self.select_tremor_columns,
+            save_predictions=save_predictions,
+            plot=save_plot,
+        )
 
-        df_predict_window.to_csv(predict_window_csv, index=True)
-
-        if verbose:
-            logger.info(f"Prediction window saved to: {predict_window_csv}")
+        self.ModelPredictor = model_predictor
+        self.prediction_df = df_prediction
 
         return self

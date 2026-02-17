@@ -165,10 +165,9 @@ class ModelTrainer:
         output_dir = resolve_output_dir(
             output_dir,
             root_dir,
-            os.path.join("output", "trainings"),
+            os.path.join("output"),
         )
-
-        output_dir = os.path.join(output_dir, "model-with-evaluation")
+        output_dir = os.path.join(output_dir, "trainings", "model-with-evaluation")
 
         # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
         classifier_dir = os.path.join(

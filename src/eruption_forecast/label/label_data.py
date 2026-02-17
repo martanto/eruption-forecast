@@ -21,43 +21,77 @@ class LabelData:
     """Wrapper class for loading and parsing label CSV files.
 
     This class handles loading pre-built label CSV files and extracts metadata
-    from the filename. The filename must follow the format:
-    label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X.csv
+    from the standardized filename format. Use this class to load existing labels
+    for model training or evaluation without rebuilding them.
 
-    Example filename: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv
-        - step-12-hours: window_step = 12 hours
-        - dtf-2: day_to_forecast = 2 days
+    The filename must follow the format:
+        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}.csv
 
     Attributes:
-        label_csv (str): Path to the label CSV file
-        start_date (datetime): Start date extracted from filename
-        end_date (datetime): End date extracted from filename
-        start_date_str (str): Start date string in YYYY-MM-DD format
-        end_date_str (str): End date string in YYYY-MM-DD format
-        window_step (int): Window step size
-        window_unit (str): Unit of window step ('hours' or 'minutes')
-        day_to_forecast (int): Days before eruption to start labeling
-        kwargs (dict): Dictionary of all extracted parameters
-        df (pd.DataFrame): Cached label dataframe with datetime index
+        label_csv (str): Path to the label CSV file.
+        start_date (datetime.datetime): Start date extracted from filename.
+        end_date (datetime.datetime): End date extracted from filename.
+        start_date_str (str): Start date string in YYYY-MM-DD format.
+        end_date_str (str): End date string in YYYY-MM-DD format.
+        window_step (int): Window step size (e.g., 12 for 12 hours).
+        window_unit (str): Unit of window step ('hours' or 'minutes').
+        day_to_forecast (int): Days before eruption to start labeling as positive.
+        kwargs (dict): Dictionary of all extracted parameters.
+        df (pd.DataFrame): Cached label DataFrame with datetime index and columns
+            'id' (int) and 'is_erupted' (0 or 1).
+        filename (str): Basename of the label CSV file with extension.
+        basename (str): Filename without extension.
+        filetype (str): File extension without the dot.
+        parameters (dict): Dictionary of all extracted parameters (same as kwargs).
 
-    Example:
+    Examples:
+        >>> # Load existing label file
         >>> label_data = LabelData("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
         >>> print(label_data.window_step)
-        1
-        >>> print(label_data.parameters)
-        {'start_date': datetime(2020, 1, 1), 'end_date': datetime(2020, 12, 31), ...}
-        >>> df = label_data.df  # Load the dataframe
+        12
+        >>> print(label_data.window_unit)
+        'hours'
+        >>> print(label_data.day_to_forecast)
+        2
+
+        >>> # Access the DataFrame
+        >>> df = label_data.df
+        >>> print(df.columns.tolist())
+        ['id', 'is_erupted']
+        >>> print(df.index.name)
+        'datetime'
+
+        >>> # Get all parameters as dict
+        >>> params = label_data.parameters
+        >>> print(params['start_date_str'])
+        '2020-01-01'
     """
 
     def __init__(self, label_csv: str) -> None:
         """Initialize LabelData with a label CSV file path.
 
+        Loads and validates the label CSV file, then parses all metadata from the
+        filename according to the standard format.
+
         Args:
             label_csv (str): Path to the label CSV file. Filename must follow
-                the format: label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X.csv
+                the format: label_{start}_{end}_step-{X}-{unit}_dtf-{X}.csv
+                where start and end are YYYY-MM-DD dates, X are integers,
+                and unit is 'hours' or 'minutes'.
 
         Raises:
-            ValueError: If file doesn't exist or filename format is invalid
+            ValueError: If file doesn't exist, filename format is invalid,
+                date format is incorrect, or any component validation fails.
+
+        Examples:
+            >>> # Valid initialization
+            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
+
+            >>> # Invalid - file not found
+            >>> label_data = LabelData("nonexistent.csv")  # doctest: +SKIP
+            Traceback (most recent call last):
+                ...
+            ValueError: Label file not found at nonexistent.csv
         """
         self.label_csv = label_csv
 
@@ -93,17 +127,38 @@ class LabelData:
         }
 
     def validate(self) -> None:
-        """Validate label filename format and components.
+        """Validate label filename format and all components.
 
-        Checks that the filename follows the expected format and that all
-        components (dates, window size, step, day to forecast) are valid.
+        Performs comprehensive validation of the label CSV file:
+        - File existence
+        - Filename prefix and extension
+        - Number of filename parts
+        - Date format (YYYY-MM-DD)
+        - Window step format (step-X-unit)
+        - Day to forecast format (dtf-X)
 
         Raises:
-            ValueError: If file doesn't exist, filename format is invalid,
-                or any component validation fails
+            ValueError: If any validation check fails. Error messages include:
+                - File not found
+                - Invalid filename prefix (must start with 'label_')
+                - Invalid file extension (must be '.csv')
+                - Wrong number of filename parts (must be 5)
+                - Invalid date format (must be YYYY-MM-DD)
+                - Invalid window step format (must be step-X-unit)
+                - Invalid window step value (must be numeric)
+                - Invalid window unit (must be 'hours' or 'minutes')
+                - Invalid day_to_forecast format (must be dtf-X where X is integer)
 
-        Example:
-            Valid filename: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv
+        Examples:
+            >>> # Valid filename passes validation
+            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
+            >>> label_data.validate()  # No exception raised
+
+            >>> # Invalid filename raises ValueError
+            >>> label_data = LabelData("wrong_format.csv")  # doctest: +SKIP
+            Traceback (most recent call last):
+                ...
+            ValueError: Label filename is invalid. Filename should start with 'label_'...
         """
         if not os.path.exists(self.label_csv):
             raise ValueError(f"Label file not found at {self.label_csv}")
@@ -198,10 +253,24 @@ class LabelData:
 
     @cached_property
     def df(self) -> pd.DataFrame:
-        """Get label dataframe from file
+        """Load and return the label DataFrame from CSV file.
+
+        Reads the CSV file with 'datetime' as the index column, parsed as datetime.
+        The DataFrame is cached after first access for performance.
 
         Returns:
-            pd.DataFrame: Label dataframe with datetime index
+            pd.DataFrame: Label DataFrame with DatetimeIndex and columns 'id' (int)
+                and 'is_erupted' (int, values 0 or 1).
+
+        Examples:
+            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
+            >>> df = label_data.df
+            >>> print(df.index.name)
+            'datetime'
+            >>> print(df.columns.tolist())
+            ['id', 'is_erupted']
+            >>> print(df['is_erupted'].unique())
+            [0 1]
         """
         logger.debug(f"Loading label data from {self.label_csv}")
         df = pd.read_csv(self.label_csv, index_col="datetime", parse_dates=True)
@@ -210,12 +279,13 @@ class LabelData:
 
     @cached_property
     def filename(self) -> str:
-        """Get the filename from the full path.
+        """Extract the filename from the full path.
 
         Returns:
-            str: Basename of the label CSV file
+            str: Basename of the label CSV file including extension.
 
-        Example:
+        Examples:
+            >>> label_data = LabelData("/path/to/label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
             >>> label_data.filename
             'label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv'
         """
@@ -223,12 +293,13 @@ class LabelData:
 
     @cached_property
     def basename(self) -> str:
-        """Get the basename without file extension.
+        """Extract the basename without file extension.
 
         Returns:
-            str: Filename without the .csv extension
+            str: Filename without the .csv extension.
 
-        Example:
+        Examples:
+            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
             >>> label_data.basename
             'label_2020-01-01_2020-12-31_step-12-hours_dtf-2'
         """
@@ -236,12 +307,13 @@ class LabelData:
 
     @cached_property
     def filetype(self) -> str:
-        """Get the file extension.
+        """Extract the file extension.
 
         Returns:
-            str: File extension without the dot
+            str: File extension without the leading dot (e.g., 'csv').
 
-        Example:
+        Examples:
+            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
             >>> label_data.filetype
             'csv'
         """
@@ -249,24 +321,29 @@ class LabelData:
 
     @cached_property
     def parameters(self) -> dict[str, str | datetime | int]:
-        """Get all parameters extracted from the label filename.
+        """Extract all parameters from the label filename.
 
         Returns:
-            dict[str, Union[str, datetime, int]]: Dictionary containing:
-                - start_date (datetime): Start date
-                - end_date (datetime): End date
-                - start_date_str (str): Start date string
-                - end_date_str (str): End date string
-                - window_step (int): Window step value
+            dict[str, str | datetime | int]: Dictionary containing all parsed parameters:
+                - start_date (datetime.datetime): Start date object
+                - end_date (datetime.datetime): End date object
+                - start_date_str (str): Start date in YYYY-MM-DD format
+                - end_date_str (str): End date in YYYY-MM-DD format
+                - window_step (int): Window step size value
                 - window_unit (str): Window step unit ('hours' or 'minutes')
-                - day_to_forecast (int): Days before eruption to label
+                - day_to_forecast (int): Days before eruption to start labeling
 
-        Example:
+        Examples:
+            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
             >>> params = label_data.parameters
             >>> params['window_step']
-            1
+            12
+            >>> params['window_unit']
+            'hours'
             >>> params['day_to_forecast']
             2
+            >>> params['start_date_str']
+            '2020-01-01'
         """
         parameters: dict[str, str | datetime | int] = {
             "start_date": self.start_date,

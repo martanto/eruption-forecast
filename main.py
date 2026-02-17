@@ -39,7 +39,7 @@ def main(use_relevant_features: bool = False):
     fm.calculate(
         source="sds",
         sds_dir=sds_dir,
-        plot_tmp=True,
+        plot_daily=True,
         save_plot=True,
         remove_outlier_method="maximum",
     ).build_label(
@@ -91,6 +91,14 @@ def main(use_relevant_features: bool = False):
             overwrite=False,
             verbose=True,
         )
+
+    fm.forecast(
+        start_date="2025-07-28",
+        end_date="2025-08-04",
+        window_size=2,
+        window_step=10,
+        window_step_unit="minutes",
+    )
 
 
 if __name__ == "__main__":

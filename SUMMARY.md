@@ -1174,3 +1174,133 @@ All 5 files in the tremor module received comprehensive docstring improvements:
 
 ---
 
+
+## Label Module Docstring Standardization (2026-02-16)
+
+**Branch:** `copilot/fix-label-module-docstrings`  
+**Objective:** Fix ALL docstrings in the label module to conform to Google docstring format.
+
+### Files Modified
+
+1. `src/eruption_forecast/label/__init__.py` - Added comprehensive module docstring
+2. `src/eruption_forecast/label/constants.py` - Enhanced module docstring with examples
+3. `src/eruption_forecast/label/label_data.py` - Fixed all class and method docstrings
+4. `src/eruption_forecast/label/label_builder.py` - Fixed all class and method docstrings
+
+### Docstring Standards Applied
+
+**Google Docstring Format Requirements:**
+- One-line summary followed by detailed description
+- Explicit type information in all Args sections
+- Comprehensive Returns sections with types
+- Raises sections documenting all exceptions
+- Examples sections with >>> format
+- Attributes section BEFORE __init__ for all classes
+- Fixed spelling, grammar, and typos
+
+**Key Improvements:**
+
+1. **Class Docstrings:**
+   - Added Attributes sections listing all instance variables with types
+   - Moved Attributes before Args to follow Google style guide
+   - Added comprehensive Examples showing typical usage
+
+2. **Method Docstrings:**
+   - All parameter types explicitly documented
+   - All return types explicitly documented
+   - Added Raises sections where applicable
+   - Added practical Examples for complex methods
+
+3. **Property Docstrings:**
+   - Clear return type documentation
+   - Concise descriptions of what the property represents
+
+4. **Module Docstrings:**
+   - Added comprehensive module-level documentation
+   - Included usage examples
+   - Listed all exported classes/functions
+
+### Examples of Changes
+
+#### label_data.py - Class Attributes Section
+``python
+# Before: Attributes scattered, incomplete types
+# After: Comprehensive Attributes section with full type information
+Attributes:
+    label_csv (str): Path to the label CSV file.
+    start_date (datetime.datetime): Start date extracted from filename.
+    end_date (datetime.datetime): End date extracted from filename.
+    start_date_str (str): Start date string in YYYY-MM-DD format.
+    # ... (all 12 attributes documented)
+``
+
+#### label_builder.py - Enhanced __init__ Docstring
+``python
+# Before: Basic Args list, minimal examples
+# After: Comprehensive Args with detailed descriptions, Raises section, multiple Examples
+Args:
+    start_date (str | datetime.datetime): Start date in YYYY-MM-DD format
+        or datetime object. Must be before end_date.
+    # ... (detailed description for each parameter)
+
+Raises:
+    ValueError: If start_date >= end_date, date range < MIN_DATE_RANGE_DAYS,
+        window_step_unit not in VALID_WINDOW_STEP_UNITS, day_to_forecast <= 0,
+        or day_to_forecast >= total days.
+
+Examples:
+    >>> # Basic initialization
+    >>> builder = LabelBuilder(...)
+    # ... (multiple usage examples)
+``
+
+#### Property Docstrings - Improved Clarity
+``python
+# Before:
+""Labels DataFrame property
+
+Raises:
+    ValueError: If dataframe is empty (build not called yet)
+
+Returns:
+    pd.DataFrame: The labels dataframe
+""
+
+# After:
+""Access the built labels DataFrame.
+
+Returns:
+    pd.DataFrame: Labels DataFrame with DatetimeIndex and columns 'id' (int)
+        and 'is_erupted' (int, values 0 or 1).
+
+Raises:
+    ValueError: If DataFrame is empty because build() has not been called yet.
+
+Examples:
+    >>> builder.build()
+    >>> df = builder.df
+    >>> print(df.columns.tolist())
+    ['id', 'is_erupted']
+""
+``
+
+### Statistics
+
+| Metric | Count |
+|--------|-------|
+| Files Modified | 4 |
+| Total Edits | 30+ |
+| Classes Documented | 2 (LabelData, LabelBuilder) |
+| Methods Documented | 15+ |
+| Properties Documented | 10+ |
+| Examples Added | 20+ |
+
+### Impact
+
+- **Improved Developer Experience:** Clear documentation helps developers understand the labeling API
+- **Better IDE Support:** Type hints in docstrings improve autocomplete and type checking
+- **Easier Maintenance:** Comprehensive examples reduce ambiguity in label generation workflow
+- **Professional Standards:** Google-style docstrings align with Python best practices
+- **Consistency:** Label module now matches tremor module docstring standards
+
+---

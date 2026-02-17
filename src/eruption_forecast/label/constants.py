@@ -1,7 +1,31 @@
 """Constants for the label building module.
 
 This module defines constants used throughout the label building process,
-including filename format prefixes, validation thresholds, and default values.
+including filename format prefixes, validation thresholds, and default parameter
+values for window configuration and labeling logic.
+
+The label filename format is:
+    label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}.csv
+
+Where:
+    - start_date, end_date: YYYY-MM-DD format
+    - window_step: Integer step size
+    - unit: "hours" or "minutes"
+    - day_to_forecast: Integer days before eruption
+
+Examples:
+    >>> # Valid label filename
+    >>> filename = f"{LABEL_PREFIX}2020-01-01_2020-12-31_step-12-hours_dtf-2{LABEL_EXTENSION}"
+    >>> print(filename)
+    'label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv'
+
+    >>> # Validation constants
+    >>> print(f"Minimum date range: {MIN_DATE_RANGE_DAYS} days")
+    Minimum date range: 7 days
+
+    >>> # Check valid units
+    >>> "hours" in VALID_WINDOW_STEP_UNITS
+    True
 """
 
 # Label filename format constants

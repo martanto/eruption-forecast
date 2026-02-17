@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from eruption_forecast import TremorData, FeaturesBuilder, TremorMatrixBuilder
 from eruption_forecast.utils import (
     to_datetime,
     construct_windows,
@@ -19,7 +18,10 @@ from eruption_forecast.features.constants import (
     ERUPTED_COLUMN,
     DATETIME_COLUMN,
 )
+from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 _METRIC_KEYS = [
@@ -130,8 +132,9 @@ class ModelPredictor:
         output_dir = resolve_output_dir(
             output_dir,
             root_dir,
-            os.path.join("output", "predictions"),
+            os.path.join("output"),
         )
+        output_dir = os.path.join(output_dir, "predictions")
 
         output_dir = output_dir
         tremor_dir = os.path.join(output_dir, "tremor")
@@ -303,8 +306,7 @@ class ModelPredictor:
                     evaluator.plot_all()
 
                 logger.info(
-                    f"  Seed {random_state:05d} — balanced_accuracy: "
-                    f"{metrics['balanced_accuracy']:.4f}"
+                    f"  Seed {random_state:05d} — recall: {metrics['recall']:.4f}"
                 )
 
         self.predict_log_metrics_summary(all_metrics)
@@ -322,7 +324,7 @@ class ModelPredictor:
         self,
         future_features_csv: str,
         future_labels_csv: str,
-        criterion: str = "balanced_accuracy",
+        criterion: str = "recall",
         plot: bool = False,
     ) -> ModelEvaluator:
         """Return the ``ModelEvaluator`` for the best (classifier, seed) pair.
@@ -336,7 +338,7 @@ class ModelPredictor:
                 matching ``future_features_csv``.  Required for :meth:`predict` /
                 :meth:`predict_best`.
             criterion (str, optional): Metric name to optimise.
-                Defaults to ``"balanced_accuracy"``.
+                Defaults to ``"recall"``.
             plot (bool, optional): Passed to :meth:`predict` when called
                 internally.
 
@@ -700,11 +702,12 @@ class ModelPredictor:
 
         cols: dict[str, np.ndarray] = {}
         model_mean_probabilities: dict[str, np.ndarray] = {}
+        result_dir = os.path.join(self.output_dir, "results")
 
         for model_name, df_models in self.trained_models.items():
             logger.info(f"Forecasting with classifier: {model_name}")
 
-            model_output_dir = os.path.join(self.output_dir, model_name)
+            model_output_dir = os.path.join(result_dir, model_name)
             os.makedirs(model_output_dir, exist_ok=True)
 
             mean_probability, std_probability, confidence, prediction = (

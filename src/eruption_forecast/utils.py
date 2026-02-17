@@ -34,15 +34,24 @@ if TYPE_CHECKING:
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
     """Remove zero values from an array.
 
+    Filters out all zero values (0.0) from the input numpy array, returning only
+    non-zero elements. This function is commonly used to clean data before outlier
+    detection or statistical calculations.
+
     Args:
         data (np.ndarray): Input array of numerical data.
 
     Returns:
-        np.ndarray: Array with zero values removed.
+        np.ndarray: Array with zero values removed, preserving original order.
+
+    Raises:
+        TypeError: If input is not a numpy array.
 
     Examples:
         >>> mask_zero_values(np.array([1, 0, 2, 0, 3]))
         array([1, 2, 3])
+        >>> mask_zero_values(np.array([0.0, 1.5, 0.0, 2.5]))
+        array([1.5, 2.5])
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Input must be a numpy array")
@@ -56,9 +65,10 @@ def detect_maximum_outlier(
 ) -> tuple[bool, int | float, float]:
     """Detect if maximum value in array is an outlier using z-score method.
 
-    Uses z-score ((X - μ) / σ) to determine if the maximum value in the array
-    is statistically an outlier. A value is considered an outlier if its z-score
-    exceeds the threshold (default 3.0, equivalent to 3 standard deviations).
+    Uses z-score ((X - μ) / σ) to determine if the maximum value (by absolute value)
+    in the array is statistically an outlier. A value is considered an outlier if its
+    z-score exceeds the threshold (default 3.0, equivalent to 3 standard deviations).
+    NaN values are automatically filtered before detection.
 
     Args:
         data (np.ndarray): Array of numerical data.
@@ -66,19 +76,21 @@ def detect_maximum_outlier(
             Defaults to 3.0 (3 standard deviations).
 
     Returns:
-        tuple[bool, Union[int, float], float]:
-            - is_outlier (bool): True if maximum value is an outlier
-            - outlier_index (int | float): Index of the maximum value, or np.nan if no outlier
-            - outlier_value (float): Maximum value, or np.nan if no outlier
+        tuple[bool, int | float, float]:
+            - is_outlier (bool): True if maximum value is an outlier.
+            - outlier_index (int | float): Index of the maximum value, or np.nan if no outlier.
+            - outlier_value (float): Maximum value, or np.nan if no outlier.
 
     Raises:
-        TypeError: If input is not a numpy array
-        ValueError: If array is empty or outlier_threshold is not positive
+        TypeError: If input is not a numpy array.
+        ValueError: If array is empty or outlier_threshold is not positive.
 
     Examples:
         >>> detect_maximum_outlier(np.array([1, 2, 3, 100]))  # 100 is outlier
         (True, 3, 100.0)
         >>> detect_maximum_outlier(np.array([1, 2, 3, 4]))  # No outlier
+        (False, nan, nan)
+        >>> detect_maximum_outlier(np.array([5, 5, 5, 5]))  # Identical values
         (False, nan, nan)
     """
     if not isinstance(data, np.ndarray):
@@ -121,7 +133,8 @@ def remove_maximum_outlier(
     """Remove single maximum outlier from array using z-score method.
 
     Detects if the maximum value (by absolute value) is an outlier and removes it.
-    Optionally masks zero values before outlier detection.
+    This function removes at most one outlier per call. To remove all outliers,
+    use remove_outliers() instead. Optionally masks zero values before detection.
 
     Args:
         data (np.ndarray): Input array of numerical data.
@@ -131,14 +144,17 @@ def remove_maximum_outlier(
             Defaults to 3.0.
 
     Returns:
-        np.ndarray: Array with maximum outlier removed (if detected).
+        np.ndarray: Array with maximum outlier removed (if detected), or original array
+            if no outlier found.
 
     Raises:
-        TypeError: If input is not a numpy array
+        TypeError: If input is not a numpy array.
 
     Examples:
         >>> remove_maximum_outlier(np.array([1, 2, 3, 100]))
         array([1, 2, 3])
+        >>> remove_maximum_outlier(np.array([0, 1, 2, 3]), mask_zero_value=False)
+        array([0, 1, 2, 3])
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Input must be a numpy array")
@@ -177,9 +193,9 @@ def remove_outliers(
 ) -> np.ndarray:
     """Remove all outliers from array based on z-score threshold.
 
-    Iteratively removes all values whose z-score exceeds the threshold.
+    Removes all values whose z-score exceeds the threshold in a single pass.
     Unlike remove_maximum_outlier which removes only one value, this function
-    removes all outliers in a single pass.
+    removes all outliers simultaneously. NaN values are automatically filtered.
 
     Args:
         data (np.ndarray): Input array of numerical data.
@@ -192,16 +208,19 @@ def remove_outliers(
 
     Returns:
         np.ndarray: Array with outliers removed, or array of outliers if return_outliers=True.
+            Returns empty array if all values are identical (std=0).
 
     Raises:
-        TypeError: If input is not a numpy array
-        ValueError: If outlier_threshold is not positive
+        TypeError: If input is not a numpy array.
+        ValueError: If outlier_threshold is not positive.
 
     Examples:
         >>> remove_outliers(np.array([1, 2, 3, 100, 200]))
         array([1, 2, 3])
         >>> remove_outliers(np.array([1, 2, 3, 100, 200]), return_outliers=True)
         array([100, 200])
+        >>> remove_outliers(np.array([1, 2, 3, 4]), outlier_threshold=2.0)
+        array([1, 2, 3, 4])
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Input must be a numpy array")
@@ -256,22 +275,30 @@ def get_windows_information(
 ) -> dict[str, int | float]:
     """Get window and sample information from an ObsPy Trace.
 
+    Calculates the number of samples, windows, and sampling statistics from a seismic
+    trace. This is useful for understanding the temporal resolution and data completeness.
+
     Args:
-        trace (Trace): ObsPy Trace object.
-        window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
+        trace (Trace): ObsPy Trace object containing seismic waveform data.
+        window_duration_minutes (int, optional): Duration of each window in minutes.
+            Defaults to 10.
 
     Returns:
-        dict[str, Union[int, float]]: Window and sample information.
+        dict[str, int | float]: Dictionary containing window and sample information:
+            - number_of_samples (int): Total number of samples in the trace.
+            - samples_per_day (float): Expected samples per 24-hour period.
+            - sample_per_window (float): Expected samples per window.
+            - total_windows (int): Total number of windows per day.
+            - sample_window (int): Actual number of windows in the trace.
 
-    Example:
-        Example return value:
-            {
-                "number_of_samples": number_of_samples,
-                "samples_per_day": samples_per_day,
-                "sample_per_window": sample_per_window,
-                "total_windows": total_windows,
-                "sample_window": sample_window,
-            }
+    Raises:
+        TypeError: If input is not an ObsPy Trace object.
+
+    Examples:
+        >>> trace = obspy.read()[0]  # Load example trace
+        >>> info = get_windows_information(trace, window_duration_minutes=10)
+        >>> print(info["total_windows"])
+        144
     """
     if not isinstance(trace, Trace):
         raise TypeError("Input must be an ObsPy Trace object")
@@ -310,18 +337,41 @@ def calculate_window_metrics(
 ) -> pd.Series:
     """Calculate metrics for defined time windows of an ObsPy Trace.
 
+    Divides a seismic trace into fixed-duration time windows and computes a statistical
+    metric for each window. Supports outlier removal and data quality filtering. This
+    is the core function for computing RSAM and other tremor metrics.
+
     Args:
-        trace (Trace): ObsPy Trace object.
-        window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
-        metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
-        mask_zero_value (bool, optional): Mask zero values. Defaults to False.
-        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
-        minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate the metric. Defaults to 0.3.
-        absolute_value (bool, optional): Whether to use absolute values. Defaults to False.
-        value_multiplier (float, optional): Multiplier for the metric value. Defaults to 1.0.
+        trace (Trace): ObsPy Trace object containing seismic waveform data.
+        window_duration_minutes (int, optional): Duration of each window in minutes.
+            Defaults to 10.
+        metric_function (Callable[[np.ndarray], float], optional): Function to calculate
+            metric (e.g., np.mean, np.max, np.median). Defaults to np.mean.
+        remove_outlier_method (Literal["maximum", "all"] | None, optional): Outlier removal
+            strategy. "maximum" removes single outlier, "all" removes all outliers, None
+            disables removal. Defaults to None.
+        mask_zero_value (bool, optional): If True, mask zero values before processing.
+            Defaults to False.
+        minimum_completion_ratio (float, optional): Minimum ratio of data points required
+            to calculate the metric (0.0-1.0). Windows with fewer samples return NaN.
+            Defaults to 0.3.
+        absolute_value (bool, optional): If True, use absolute values of trace data.
+            Defaults to False.
+        value_multiplier (float, optional): Multiplier applied to the final metric value.
+            Defaults to 1.0.
 
     Returns:
-        pd.Series: Series containing the calculated metrics with datetime index.
+        pd.Series: Series containing the calculated metrics with datetime index and float dtype.
+
+    Raises:
+        TypeError: If input is not an ObsPy Trace object.
+
+    Examples:
+        >>> trace = obspy.read()[0]
+        >>> rsam = calculate_window_metrics(
+        ...     trace, window_duration_minutes=10, metric_function=np.mean
+        ... )
+        >>> print(rsam.head())
     """
     if not isinstance(trace, Trace):
         raise TypeError("Input must be an ObsPy Trace object")
@@ -385,14 +435,26 @@ def construct_windows(
 ) -> pd.DataFrame:
     """Construct time windows for label and tremor data.
 
+    Generates a sliding window time series from start_date to end_date with specified
+    step size. This is used by LabelBuilder to create time windows for labeling.
+
     Args:
-        start_date (Union[str, datetime]): Start date in YYYY-MM-DD format or datetime object.
-        end_date (Union[str, datetime]): End date in YYYY-MM-DD format or datetime object.
-        window_step (int): Step size between windows.
+        start_date (str | datetime): Start date in YYYY-MM-DD format or datetime object.
+        end_date (str | datetime): End date in YYYY-MM-DD format or datetime object.
+        window_step (int): Step size between consecutive windows.
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
 
     Returns:
-        pd.DataFrame: DataFrame with datetime index representing time windows.
+        pd.DataFrame: DataFrame with datetime index representing time windows. The index
+            is named "datetime" and spans from start_date (00:00:00) to end_date (23:59:59).
+
+    Raises:
+        ValueError: If window_step exceeds the date range duration.
+
+    Examples:
+        >>> windows = construct_windows("2025-01-01", "2025-01-02", 6, "hours")
+        >>> print(len(windows))
+        9
     """
     window_step, window_step_unit = validate_window_step(window_step, window_step_unit)
     start_date, end_date, n_days = validate_date_ranges(start_date, end_date)
@@ -433,14 +495,28 @@ def to_series(
 ) -> pd.Series:
     """Convert a DataFrame column into a Series with a custom index.
 
+    Extracts a column from a DataFrame and uses another column as the index.
+    Commonly used to convert label DataFrames into Series for tsfresh processing.
+
     Args:
-        df (pd.DataFrame): DataFrame with datetime index representing time windows.
+        df (pd.DataFrame): Input DataFrame containing both value and index columns.
         column_value (str): Column name whose values become the Series values.
         column_index (str, optional): Column name whose values become the Series index.
             Defaults to "id".
 
     Returns:
         pd.Series: Series with values from column_value and index from column_index.
+
+    Raises:
+        ValueError: If column_value or column_index is not in DataFrame columns.
+
+    Examples:
+        >>> df = pd.DataFrame({"id": [1, 2, 3], "is_erupted": [0, 1, 0]})
+        >>> series = to_series(df, column_value="is_erupted", column_index="id")
+        >>> print(series)
+        1    0
+        2    1
+        3    0
     """
     if column_value not in df.columns:
         raise ValueError(
@@ -460,12 +536,25 @@ def to_series(
 def to_datetime(date: str | datetime, variable_name: str | None = None) -> datetime:
     """Ensure date object is a datetime object.
 
+    Converts date strings in YYYY-MM-DD format to datetime objects. If already a
+    datetime object, returns it unchanged. Used for standardizing date inputs.
+
     Args:
-        date (Union[str, datetime]): Date string in YYYY-MM-DD format or datetime object.
-        variable_name (str, optional): Variable name for error messages. Defaults to None.
+        date (str | datetime): Date string in YYYY-MM-DD format or datetime object.
+        variable_name (str | None, optional): Variable name for error messages.
+            Defaults to None.
 
     Returns:
         datetime: Datetime object.
+
+    Raises:
+        ValueError: If date string is not in YYYY-MM-DD format.
+
+    Examples:
+        >>> to_datetime("2025-03-20")
+        datetime.datetime(2025, 3, 20, 0, 0)
+        >>> to_datetime(datetime(2025, 3, 20))
+        datetime.datetime(2025, 3, 20, 0, 0)
     """
     if isinstance(date, datetime):
         return date
@@ -483,17 +572,28 @@ def to_datetime(date: str | datetime, variable_name: str | None = None) -> datet
 def validate_date_ranges(
     start_date: str | datetime, end_date: str | datetime
 ) -> tuple[datetime, datetime, int]:
-    """Validate date range.
+    """Validate date range and ensure start_date is before end_date.
+
+    Converts date strings to datetime objects and validates that start_date
+    comes before end_date. Returns the validated dates and duration in days.
 
     Args:
-        start_date (Union[str, datetime]): Start date in YYYY-MM-DD format or datetime object.
-        end_date (Union[str, datetime]): End date in YYYY-MM-DD format or datetime object.
-
-    Raises:
-        ValueError: If date range is not valid.
+        start_date (str | datetime): Start date in YYYY-MM-DD format or datetime object.
+        end_date (str | datetime): End date in YYYY-MM-DD format or datetime object.
 
     Returns:
-        tuple[datetime, datetime, int]: Start date, end date, and total number of days.
+        tuple[datetime, datetime, int]: Tuple containing:
+            - start_date (datetime): Validated start date.
+            - end_date (datetime): Validated end date.
+            - n_days (int): Total number of days between start and end (end - start).
+
+    Raises:
+        ValueError: If start_date >= end_date.
+
+    Examples:
+        >>> start, end, days = validate_date_ranges("2025-01-01", "2025-01-10")
+        >>> print(days)
+        9
     """
     if isinstance(start_date, str):
         start_date = to_datetime(start_date)
@@ -519,15 +619,25 @@ def validate_window_step(
 ) -> tuple[int, Literal["minutes", "hours"]]:
     """Validate window step and step unit.
 
+    Ensures window_step is an integer and window_step_unit is either "minutes"
+    or "hours". Used to validate sliding window parameters before construction.
+
     Args:
-        window_step (int): Step size between windows.
+        window_step (int): Step size between consecutive windows (must be positive integer).
         window_step_unit (Literal["minutes", "hours"]): Unit of window step.
 
-    Raises:
-        ValueError: If window step or unit is invalid.
-
     Returns:
-        tuple[int, Literal["minutes", "hours"]]: Window step and unit (minutes or hours).
+        tuple[int, Literal["minutes", "hours"]]: Validated window step and unit.
+
+    Raises:
+        TypeError: If window_step is not an integer or window_step_unit is not a string.
+        ValueError: If window_step_unit is not "minutes" or "hours".
+
+    Examples:
+        >>> validate_window_step(6, "hours")
+        (6, 'hours')
+        >>> validate_window_step(30, "minutes")
+        (30, 'minutes')
     """
     if not isinstance(window_step, int):
         raise TypeError(f"window_step must be an integer. Your value is {window_step}")
@@ -544,13 +654,20 @@ def validate_window_step(
 
 
 def sort_dates(dates: list[str]) -> list[str]:
-    """Sorting list of dates.
+    """Sort a list of date strings chronologically.
+
+    Converts date strings to datetime objects, sorts them chronologically,
+    and returns them as formatted strings. Used for sorting eruption dates.
 
     Args:
-        dates (list[str]): List of dates.
+        dates (list[str]): List of date strings in YYYY-MM-DD format.
 
     Returns:
-        list[str]: List of dates.
+        list[str]: Sorted list of date strings in YYYY-MM-DD format.
+
+    Examples:
+        >>> sort_dates(["2025-03-20", "2025-01-15", "2025-02-10"])
+        ['2025-01-15', '2025-02-10', '2025-03-20']
     """
     date_series = pd.Series(dates)
     date_series = date_series.apply(pd.to_datetime, format="%Y-%m-%d").sort_values()
@@ -565,20 +682,38 @@ def check_sampling_consistency(
     tolerance: str = "1min",
     verbose: bool = False,
 ) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
-    """
-    Check 10-minute sampling rate consistency, identify inconsistencies, and remove them.
+    """Check sampling rate consistency and identify inconsistencies.
+
+    Validates that a DataFrame has consistent time intervals between consecutive rows.
+    Identifies and separates rows with inconsistent sampling rates based on tolerance.
+    This is crucial for ensuring data quality in tremor time series.
 
     Args:
         df (pd.DataFrame): DataFrame with pd.DatetimeIndex.
-        expected_freq (optional, str): Expected sampling frequency. Defaults to "10min".
-        tolerance (optional, str): Tolerance in seconds for considering sampling periods as equal (default: "1min").
-        verbose (optional, bool): Print detailed information. Defaults to False.
+        expected_freq (str, optional): Expected sampling frequency (e.g., "10min", "1H").
+            Defaults to "10min".
+        tolerance (str, optional): Tolerance for considering sampling periods as equal
+            (e.g., "1min", "30s"). Defaults to "1min".
+        verbose (bool, optional): If True, print detailed information about inconsistencies.
+            Defaults to False.
 
     Returns:
-        bool: True if consistent. False otherwise.
-        pd.DataFrame: Consistency DataFrame with pd.DatetimeIndex.
-        pd.DataFrame: Inconsistency DataFrame with pd.DatetimeIndex.
-        int | None: Sampling rate in seconds or None if inconsistencies.
+        tuple[bool, pd.DataFrame, pd.DataFrame, int | None]: Tuple containing:
+            - is_consistent (bool): True if all samples are consistent, False otherwise.
+            - consistent_data (pd.DataFrame): DataFrame with consistent samples only.
+            - inconsistent_data (pd.DataFrame): DataFrame with inconsistent samples.
+            - sampling_rate (int | None): Sampling rate in seconds if consistent, None otherwise.
+
+    Raises:
+        ValueError: If DataFrame has fewer than 2 rows.
+        TypeError: If DataFrame index is not DatetimeIndex.
+
+    Examples:
+        >>> df = pd.DataFrame({"value": [1, 2, 3]},
+        ...                   index=pd.date_range("2025-01-01", periods=3, freq="10min"))
+        >>> is_consistent, consistent, inconsistent, rate = check_sampling_consistency(df)
+        >>> print(is_consistent)
+        True
     """
     if len(df) <= 2:
         raise ValueError(
@@ -634,18 +769,28 @@ def check_sampling_consistency(
 def validate_columns(
     df: pd.DataFrame, columns: list[str], exclude_columns: list[str] | None = None
 ) -> None:
-    """Validate columns in dataframe.
+    """Validate that specified columns exist in DataFrame.
+
+    Checks that all specified columns exist in the DataFrame, except those in
+    the exclude list. Raises ValueError with detailed message if any column is missing.
 
     Args:
-        df (pd.DataFrame): DataFrame with pd.DatetimeIndex.
-        columns (list[str]): List of columns to validate.
-        exclude_columns (list[str] | None): List of columns to exclude. Defaults to None.
-
-    Raises:
-        ValueError: If columns are invalid.
+        df (pd.DataFrame): DataFrame to validate.
+        columns (list[str]): List of column names to validate.
+        exclude_columns (list[str] | None, optional): List of column names to skip
+            validation. Defaults to None.
 
     Returns:
         None
+
+    Raises:
+        ValueError: If any column in columns (except exclude_columns) does not exist
+            in the DataFrame.
+
+    Examples:
+        >>> df = pd.DataFrame({"rsam_f0": [1, 2], "rsam_f1": [3, 4]})
+        >>> validate_columns(df, ["rsam_f0", "rsam_f1"])  # No error
+        >>> validate_columns(df, ["rsam_f2"])  # Raises ValueError
     """
     if exclude_columns is None:
         exclude_columns = []
@@ -663,15 +808,28 @@ def validate_columns(
 
 
 def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFrame]:
-    """Concatenate features from csv_list into one dataframe.
+    """Concatenate feature CSVs into one DataFrame and save.
+
+    Reads multiple feature CSV files, concatenates them column-wise (axis=1),
+    and saves the combined DataFrame to the specified filepath. This is used
+    to merge per-column tsfresh feature extractions.
 
     Args:
-        csv_list (list[str]): List of csv files.
-        filepath (str): Filepath to save csv file.
+        csv_list (list[str]): List of CSV file paths to concatenate.
+        filepath (str): Output filepath to save the concatenated CSV.
 
     Returns:
-        str: Filepath of csv file.
-        (str, pd.DataFrame): Filepath and DataFrame
+        tuple[str, pd.DataFrame]: Tuple containing:
+            - filepath (str): Path where the CSV was saved.
+            - df (pd.DataFrame): Concatenated DataFrame.
+
+    Raises:
+        ValueError: If csv_list has fewer than 2 files or if all CSVs are empty.
+
+    Examples:
+        >>> csv_files = ["features_f0.csv", "features_f1.csv"]
+        >>> path, df = concat_features(csv_files, "all_features.csv")
+        >>> print(df.shape)
     """
     if len(csv_list) <= 1:
         raise ValueError(
@@ -698,24 +856,28 @@ def random_under_sampler(
 
     Handles imbalanced eruption/non-eruption datasets by randomly removing
     samples from the majority class (non-eruption) to match the minority
-    class (eruption) based on the sampling strategy.
+    class (eruption) based on the sampling strategy. This improves classifier
+    performance on imbalanced data.
 
     Args:
-        features (pd.DataFrame): Features dataframe.
-        labels (pd.Series): Binary labels series.
+        features (pd.DataFrame): Features DataFrame with training samples.
+        labels (pd.Series): Binary labels Series (0=non-eruption, 1=eruption).
         sampling_strategy (str | float, optional): Sampling ratio or strategy.
-            Float value represents desired ratio of minority/majority.
-            Defaults to "auto".
+            If "auto", balances to 50/50. If float, represents desired ratio
+            of minority/majority class. Defaults to "auto".
         random_state (int, optional): Random seed for reproducibility.
             Defaults to 42.
 
     Returns:
-        tuple[pd.DataFrame, pd.Series]: Balanced (features, labels).
+        tuple[pd.DataFrame, pd.Series]: Tuple containing:
+            - features (pd.DataFrame): Balanced features DataFrame.
+            - labels (pd.Series): Balanced labels Series.
 
-    Example:
+    Examples:
         >>> balanced_X, balanced_y = random_under_sampler(
         ...     features, labels, sampling_strategy=0.75, random_state=42
         ... )
+        >>> print(balanced_y.value_counts())
     """
     sampler = RandomUnderSampler(
         sampling_strategy=sampling_strategy, random_state=random_state
@@ -732,25 +894,34 @@ def get_significant_features(
     fdr_level: float = 0.05,
     n_jobs: int = 1,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Get significant features ranked by p-value.
+    """Get significant features ranked by p-value using tsfresh FeatureSelector.
 
-    Uses tsfresh's FeatureSelector to identify features with statistically
-    significant correlation to the target labels.
+    Uses tsfresh's FeatureSelector with Benjamini-Hochberg FDR correction to identify
+    features with statistically significant correlation to the target labels. This is
+    the first stage of feature selection in the pipeline.
 
     Args:
-        features (pd.DataFrame): Extracted features dataframe from tsfresh.
-        labels (pd.Series | pd.DataFrame): Binary eruption labels.
-        fdr_level (float, optional): False discovery rate level. Defaults to 0.05.
-        n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+        features (pd.DataFrame): Extracted features DataFrame from tsfresh.
+        labels (pd.Series | pd.DataFrame): Binary eruption labels. If DataFrame,
+            will extract "is_erupted" column.
+        fdr_level (float, optional): False discovery rate threshold (0.0-1.0).
+            Lower values are more conservative. Defaults to 0.05.
+        n_jobs (int, optional): Number of parallel jobs for computation. Defaults to 1.
 
     Returns:
-        pd.DataFrame: Extracted features dataframe filtered.
-        pd.Series: Features sorted by p-value (ascending), with feature
-            names as index and p-values as values.
+        tuple[pd.DataFrame, pd.Series]: Tuple containing:
+            - features_filtered (pd.DataFrame): Filtered features DataFrame with only
+              significant features.
+            - significant_features (pd.Series): Features sorted by p-value (ascending),
+              with feature names as index and p-values as values. Index name is "features",
+              series name is "p_values".
 
-    Example:
-        >>> significant = get_significant_features(features_df, labels_series)
-        >>> top_10_features = significant.head(10).index.tolist()
+    Examples:
+        >>> filtered_features, sig_features = get_significant_features(
+        ...     features_df, labels_series, fdr_level=0.05, n_jobs=4
+        ... )
+        >>> top_10_features = sig_features.head(10).index.tolist()
+        >>> print(f"Selected {len(filtered_features.columns)} significant features")
     """
     if isinstance(labels, pd.DataFrame):
         labels = to_series(labels, column_value="is_erupted")
@@ -778,23 +949,24 @@ def resolve_output_dir(
     """Resolve an output directory path against an anchor directory.
 
     Provides a consistent way to resolve output paths relative to a stable
-    root directory instead of relying on the current working directory.
+    root directory instead of relying on the current working directory. This
+    is critical for the pipeline's output directory structure.
 
-    Rules:
+    Resolution rules:
     1. Absolute ``output_dir`` → used as-is (``root_dir`` is ignored).
     2. Relative ``output_dir`` → joined with ``root_dir`` (or ``os.getcwd()`` if None).
     3. ``None`` ``output_dir`` → ``root_dir / default_subpath``.
 
     Args:
-        output_dir: Caller-supplied output directory (absolute, relative, or None).
-        root_dir: Anchor directory for resolving relative paths.
+        output_dir (str | None): Caller-supplied output directory (absolute, relative, or None).
+        root_dir (str | None): Anchor directory for resolving relative paths.
             If None, falls back to ``os.getcwd()``.
-        default_subpath: Sub-path appended to the anchor when ``output_dir`` is None.
+        default_subpath (str): Sub-path appended to the anchor when ``output_dir`` is None.
 
     Returns:
-        Resolved absolute-or-anchored output directory path.
+        str: Resolved absolute or anchored output directory path.
 
-    Example:
+    Examples:
         >>> resolve_output_dir(None, "/data/project", "output")
         '/data/project/output'
         >>> resolve_output_dir("custom", "/data/project", "output")
@@ -817,14 +989,24 @@ def normalize_dates(
     """Normalize start and end dates to standard format.
 
     Converts date strings to datetime objects and formats them consistently.
-    Start date is set to 00:00:00, end date is set to 23:59:59.
+    Start date is set to 00:00:00, end date is set to 23:59:59. Returns both
+    datetime objects and formatted strings for convenience.
 
     Args:
-        start_date: Start date in YYYY-MM-DD format or datetime object.
-        end_date: End date in YYYY-MM-DD format or datetime object.
+        start_date (str | datetime): Start date in YYYY-MM-DD format or datetime object.
+        end_date (str | datetime): End date in YYYY-MM-DD format or datetime object.
 
     Returns:
-        tuple of (start_date, end_date, start_date_str, end_date_str)
+        tuple[datetime, datetime, str, str]: Tuple containing:
+            - start_date (datetime): Start date at 00:00:00.
+            - end_date (datetime): End date at 23:59:59.
+            - start_date_str (str): Start date formatted as YYYY-MM-DD.
+            - end_date_str (str): End date formatted as YYYY-MM-DD.
+
+    Examples:
+        >>> start, end, start_str, end_str = normalize_dates("2025-01-01", "2025-01-31")
+        >>> print(start_str, end_str)
+        2025-01-01 2025-01-31
     """
     start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
     end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
@@ -848,23 +1030,24 @@ def get_metrics(
 
     Calculates confusion matrix components, accuracy, balanced accuracy,
     F1 score, precision, recall, and best cross-validation parameters.
-    Optionally saves the metrics to a JSON file.
+    Optionally saves the metrics to a JSON file. This is the core metrics
+    function used by ModelTrainer.
 
     Args:
         classifier_model (ClassifierModel): Fitted classifier model with name,
             cv_strategy, and n_splits attributes.
-        labels_test: True test labels (array-like).
-        labels_pred: Predicted labels from the model (array-like).
+        labels_test (array-like): True test labels.
+        labels_pred (array-like): Predicted labels from the model.
         labels_train (pd.Series): Training labels used for training.
         top_n (int): Number of features used in training.
         grid_search (GridSearchCV): Fitted GridSearchCV object with
             best_params_ and best_score_ attributes.
         random_state (int): Random state seed used for reproducibility.
         metrics_filepath (str | None, optional): Path to save metrics as
-            a JSON file. Defaults to None.
+            a JSON file. If None, does not save. Defaults to None.
 
     Returns:
-        dict: Metrics dictionary with keys:
+        dict[str | Any, int | str | Any]: Metrics dictionary with keys:
             - ``random_state`` (int): Random seed used.
             - ``classifier`` (str): Classifier name.
             - ``cv_strategy`` (str): Cross-validation strategy.
@@ -886,7 +1069,7 @@ def get_metrics(
 
     Examples:
         >>> metrics = get_metrics(
-        ...     classifier=clf_model,
+        ...     classifier_model=clf_model,
         ...     labels_test=y_test,
         ...     labels_pred=y_pred,
         ...     labels_train=y_train,
@@ -895,8 +1078,8 @@ def get_metrics(
         ...     random_state=42,
         ...     metrics_filepath="output/metrics.json",
         ... )
-        >>> print(metrics["f1_score"])
-        0.85
+        >>> print(f"F1: {metrics['f1_score']:.3f}")
+        F1: 0.850
     """
 
     # Confusion matrix for Binary Classification
@@ -935,18 +1118,27 @@ def get_metrics(
 
 
 def slugify_class_name(class_name: str) -> str:
-    """Convert a class name to a slug.
+    """Convert a class name to a slug for use in filenames.
+
+    Converts CamelCase class names to lowercase hyphen-separated slugs.
+    Handles consecutive uppercase letters (e.g., HTTP, XML) correctly.
+    Used for creating classifier-specific directory names.
 
     Args:
-        class_name (str): Class name.
-
-    Examples:
-        MyClassName -> my-class-name
-        HTTPSConnection -> https-connection
-        XMLParser -> xml-parser
+        class_name (str): Class name in CamelCase format.
 
     Returns:
-        str: Slugified class name.
+        str: Slugified class name in lowercase with hyphens.
+
+    Examples:
+        >>> slugify_class_name("MyClassName")
+        'my-class-name'
+        >>> slugify_class_name("HTTPSConnection")
+        'https-connection'
+        >>> slugify_class_name("XMLParser")
+        'xml-parser'
+        >>> slugify_class_name("XGBClassifier")
+        'xgb-classifier'
     """
     import re
 
@@ -963,34 +1155,54 @@ def compute_seed_eruption_probability(
     features_df: pd.DataFrame,
     significant_features_csv: str,
     model_filepath: str,
-    classifier_name: str = "model",
     output_dir: str | None = None,
     save: bool = False,
     overwrite: bool = False,
     verbose: bool = False,
     debug: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute eruption probability per seed
+    """Compute eruption probability for a single random seed model.
+
+    Loads a trained model and computes eruption probabilities for the given features.
+    Supports both predict_proba (probabilistic) and decision_function (SVM) methods.
+    Can cache results to disk for faster repeated predictions.
 
     Args:
-        random_state (int): Random seed.
-        features_df (pd.DataFrame): Extracted features DataFrame.
-        significant_features_csv (str): Significant features CSV.
-        model_filepath (str): Model file.
-        classifier_name (str): Classifier name. Defaults to "model".
-        output_dir (str): Output directory. Defaults to "seeds".
-        save (bool, optional): Whether to save probability. Defaults to False.
-        overwrite (bool, optional): Whether to overwrite existing file. Defaults to False.
-        debug (bool, optional): Debug mode. Defaults to False.
+        random_state (int): Random seed identifying the model.
+        features_df (pd.DataFrame): Extracted features DataFrame for prediction.
+        significant_features_csv (str): Path to CSV containing significant feature names.
+        model_filepath (str): Path to the saved model (.pkl file).
+        output_dir (str | None, optional): Directory to save predictions. If None,
+            uses "output/predictions/seeds". Defaults to None.
+        save (bool, optional): If True, save probabilities to CSV. Defaults to False.
+        overwrite (bool, optional): If True, overwrite existing cached predictions.
+            Defaults to False.
+        verbose (bool, optional): If True, log save operations. Defaults to False.
+        debug (bool, optional): If True, log detailed debug information. Defaults to False.
 
     Returns:
-        tuple[np.ndarray, ndarray]: Probabilities of eruptions (1-dimension), and
-            probabilities of eruptiions and non-eruptions (2-dimension).
+        tuple[np.ndarray, np.ndarray]: Tuple containing:
+            - probabilities_eruption (np.ndarray): 1D array of eruption probabilities (P(class=1)).
+            - probabilities_scores (np.ndarray): 2D array of shape (n_windows, 2) with
+              columns [P(non-eruption), P(eruption)].
+
+    Raises:
+        ValueError: If model output is 1-dimensional.
+        RuntimeError: If model supports neither predict_proba nor decision_function.
+
+    Examples:
+        >>> proba_1d, proba_2d = compute_seed_eruption_probability(
+        ...     random_state=42,
+        ...     features_df=features,
+        ...     significant_features_csv="sig_features.csv",
+        ...     model_filepath="model_00042.pkl",
+        ...     save=True
+        ... )
+        >>> print(proba_1d.mean())
+        0.35
     """
-    output_dir = output_dir or os.path.join(
-        os.getcwd(), "output", "predictions", "seeds"
-    )
-    output_dir = os.path.join(output_dir, "seeds", classifier_name)
+    output_dir = output_dir or os.path.join(os.getcwd(), "output", "predictions")
+    output_dir = os.path.join(output_dir, "seeds")
 
     filename = f"p_{random_state:05d}.csv"
     filepath = os.path.join(output_dir, f"{filename}")
@@ -1042,7 +1254,7 @@ def compute_seed_eruption_probability(
 
     else:
         raise RuntimeError(
-            f"[{classifier_name}] Model at {model_filepath} supports neither "
+            f"Model at {model_filepath} supports neither "
             "predict_proba nor decision_function."
         )
 
@@ -1073,25 +1285,51 @@ def compute_model_probabilities(
     save_predictions: bool = False,
     overwrite: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Aggregate probabilities across all seeds of a single classifier.
+    """Aggregate eruption probabilities across all seeds of a single classifier.
 
-    One classifier has many seeds. This function calculate prediction based on all
-    seeds prediction.
+    Computes consensus predictions by averaging probabilities from multiple models
+    trained with different random seeds. This reduces variance and improves prediction
+    reliability. Calculates mean probability, uncertainty (std), confidence, and
+    binary predictions.
 
     Args:
-        df_models: Registry DataFrame for this classifier.
-        features_df: Extracted feature matrix for the prediction windows.
-        features_csv_column (str, optional): CSV column name from extracted feature matrix.
-            Defaults to "significant_features_csv".
-        trained_model_filepath_column (str, optional): Trained model file path column name
-            from extracted feature matrix. Defaults to "trained_model_filepath".
-        classifier_name: Classifier name (used in log messages only). Defaults to "model".
-        threshold (float, optional): Minimum mean theshold value to classify as an eruption.
-        number_of_seeds (int, optional): limit number of seeds to use. Defaults to None.
+        df_models (pd.DataFrame): Model registry DataFrame with random_state as index.
+            Must contain columns specified by features_csv_column and
+            trained_model_filepath_column.
+        features_df (pd.DataFrame): Extracted feature matrix for the prediction windows.
+        features_csv_column (str, optional): Column name containing paths to significant
+            features CSVs. Defaults to "significant_features_csv".
+        trained_model_filepath_column (str, optional): Column name containing paths to
+            trained model files. Defaults to "trained_model_filepath".
+        classifier_name (str, optional): Classifier name for logging. Defaults to "model".
+        threshold (float, optional): Minimum mean probability threshold to classify as
+            eruption (0.0-1.0). Defaults to 0.7.
+        number_of_seeds (int | None, optional): Maximum number of seeds to use. If None,
+            uses all seeds. Defaults to None.
+        output_dir (str | None, optional): Directory to save per-seed predictions.
+            Defaults to None.
+        save_predictions (bool, optional): If True, save per-seed predictions to CSV.
+            Defaults to False.
+        overwrite (bool, optional): If True, overwrite existing cached predictions.
+            Defaults to False.
 
     Returns:
-        Tuple of (mean_probability, std_proba, confidence, prediction) arrays
-        of shape ``(n_windows,)``.
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Tuple containing arrays
+            of shape (n_windows,):
+            - mean_probability (np.ndarray): Mean eruption probability across seeds.
+            - std_proba (np.ndarray): Standard deviation of probabilities (uncertainty).
+            - confidence (np.ndarray): Voting agreement fraction (0.5-1.0).
+            - prediction (np.ndarray): Binary predictions (0 or 1) based on threshold.
+
+    Examples:
+        >>> mean_p, std_p, conf, pred = compute_model_probabilities(
+        ...     df_models=model_registry,
+        ...     features_df=features,
+        ...     threshold=0.6,
+        ...     number_of_seeds=100
+        ... )
+        >>> print(f"Mean eruption probability: {mean_p.mean():.3f}")
+        Mean eruption probability: 0.450
     """
     seed_eruption_probabilities: list[np.ndarray] = []
 
@@ -1140,16 +1378,29 @@ def compute_model_probabilities(
 def label_id_to_datetime(
     label_df: pd.DataFrame | pd.Series, target_df: pd.DataFrame
 ) -> pd.DataFrame:
-    """Add datetime column to target datafram (target_df) based on label_df.
+    """Add datetime column to target DataFrame by merging with label DataFrame.
+
+    Merges the label DataFrame (containing id and datetime) with the target DataFrame
+    to add datetime information. This is useful for adding temporal context to
+    extracted features, tremor matrices, or prediction results.
 
     Args:
-        label_df (pd.DataFrame | pd.Series): Label which has 'id' and 'datetime' columns.
-        target_df (pd.DataFrame): Target dataframe which 'datetime' will be added.
-            Target dataframe can be extracted features, eruption probabilities, or
-            tremor matrix.
+        label_df (pd.DataFrame | pd.Series): Label DataFrame or Series with datetime
+            index containing 'id' and 'datetime' columns. If Series, will be converted
+            to DataFrame.
+        target_df (pd.DataFrame): Target DataFrame to which datetime will be added.
+            Can be extracted features, eruption probabilities, or tremor matrix.
+            Must have matching index with label_df.
 
     Returns:
-        pd.DataFrame: Targe dataframe with datetime column.
+        pd.DataFrame: Target DataFrame with datetime column merged from label_df.
+
+    Examples:
+        >>> label_df = pd.DataFrame({"id": [1, 2], "datetime": ["2025-01-01", "2025-01-02"]})
+        >>> target_df = pd.DataFrame({"feature_1": [0.5, 0.8]}, index=[1, 2])
+        >>> result = label_id_to_datetime(label_df, target_df)
+        >>> print(result.columns)
+        Index(['feature_1', 'id', 'datetime'], dtype='object')
     """
     if isinstance(label_df, pd.Series):
         label_df = pd.DataFrame(label_df)
