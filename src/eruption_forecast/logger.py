@@ -28,10 +28,10 @@ logger.add(
 logger.add(
     os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
     rotation="00:00",  # Rotate at midnight
-    retention="30 days",  # Keep logs for 30 days
+    retention="3 days",  # Keep logs for 30 days
     compression="zip",  # Compress rotated logs
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="DEBUG",  # File logs everything including DEBUG
+    level="INFO",  # File logs everything including DEBUG
     enqueue=True,  # Thread-safe logging
 )
 
@@ -39,7 +39,7 @@ logger.add(
 logger.add(
     os.path.join(DEFAULT_LOG_DIR, "errors_{time:YYYY-MM-DD}.log"),
     rotation="00:00",
-    retention="90 days",  # Keep error logs longer
+    retention="3 days",  # Keep error logs longer
     compression="zip",
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="ERROR",  # Only errors and above
