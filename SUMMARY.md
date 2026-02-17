@@ -26,6 +26,7 @@
 15. [Refactor Output Directory Structure](#refactor-output-directory-structure-2026-02-15)
 16. [ModelPredictor Code Quality and API Update](#modelpredictor-code-quality-and-api-update-2026-02-16)
 17. [Tremor Module Docstring Standardization](#tremor-module-docstring-standardization-2026-02-16)
+18. [Features Module Docstring Standardization](#features-module-docstring-standardization-2026-02-16)
 ---
 
 ## Package Overview
@@ -1302,5 +1303,180 @@ Examples:
 - **Easier Maintenance:** Comprehensive examples reduce ambiguity in label generation workflow
 - **Professional Standards:** Google-style docstrings align with Python best practices
 - **Consistency:** Label module now matches tremor module docstring standards
+
+---
+
+## Features Module Docstring Standardization (2026-02-16)
+
+**Branch:** `copilot/fix-features-docstrings`
+
+### Overview
+
+Comprehensive docstring update for the **features module** following Google docstring format standards. This update completes the docstring standardization effort across all core modules (tremor, label, features).
+
+### Files Updated
+
+1. **`__init__.py`** — Added comprehensive module-level docstring
+2. **`constants.py`** — Enhanced constant documentation with examples
+3. **`tremor_matrix_builder.py`** — TremorMatrixBuilder class and all methods
+4. **`features_builder.py`** — FeaturesBuilder class and all methods
+5. **`feature_selector.py`** — FeatureSelector class and all methods
+
+### Key Improvements
+
+#### 1. Module-Level Documentation (`__init__.py`)
+
+**Before:** Empty file
+**After:** Comprehensive module overview with:
+- Module purpose and capabilities
+- List of exported classes
+- Key constants
+- Usage examples
+
+#### 2. Constants Documentation (`constants.py`)
+
+**Enhanced:**
+- Detailed module-level docstring
+- Comprehensive constant descriptions
+- Usage examples with calculations
+- Cross-references to other modules
+
+#### 3. TremorMatrixBuilder Class
+
+**Added Attributes Section:**
+```python
+Attributes:
+    tremor_df (pd.DataFrame): Tremor DataFrame with DatetimeIndex
+    label_df (pd.DataFrame): Label DataFrame with DatetimeIndex
+    output_dir (str): Output directory path
+    window_size (int): Window size in days
+    tremor_matrix_filename (str): Auto-generated filename
+    matrix_tmp_dir (str): Temporary directory path
+    df (pd.DataFrame): Built tremor matrix (set after build())
+    csv (str | None): Path to saved CSV (set after build())
+    # ... 8 more attributes
+```
+
+**Method Updates:**
+- `validate()`: Added Raises section, improved examples
+- `create_directories()`: Clarified auto-call behavior
+- `save_matrix_per_method()`: Enhanced examples with directory structure
+- `_build_tremor_matrices()`: Detailed Args with type info, comprehensive examples
+- `build()`: Complete workflow documentation, multi-example coverage
+
+#### 4. FeaturesBuilder Class
+
+**Added Attributes Section:**
+```python
+Attributes:
+    tremor_matrix_df (pd.DataFrame): Input tremor matrix
+    output_dir (str): Output directory
+    label_df (pd.DataFrame): Label DataFrame or empty
+    use_relevant_features (bool): Set after extract
+    all_features_csvs (set[str]): Paths to all features
+    relevant_features_csvs (set[str]): Paths to relevant features
+    csv (str | None): Concatenated features path
+    df (pd.DataFrame): Concatenated features
+    label_features_csv (str | None): Aligned labels path
+    # ... 9 more attributes
+```
+
+**Method Updates:**
+- `validate()`: Clarified validation logic
+- `_initialize_feature_parameters()`: Added return type details
+- `exclude_features()`: Enhanced examples with use cases
+- `_prepare_extraction_parameters()`: Documented all parameter behaviors
+- `_extract_features_for_column()`: Comprehensive Args documentation
+- `concat_features()`: Detailed Raises section
+- `_prepare_training_mode()`: Side effects documentation
+- `_prepare_prediction_mode()`: Mode-specific behavior
+- `extract_features()`: Complete two-mode documentation with examples
+
+#### 5. FeatureSelector Class
+
+**Added Attributes Section:**
+```python
+Attributes:
+    method (str): Selection method
+    n_jobs (int): Parallel jobs count
+    random_state (int): Random seed
+    selected_features_ (pd.Series): Selected features with scores
+    p_values_ (pd.Series): P-values from tsfresh
+    importance_scores_ (pd.Series): Permutation importance
+    n_features_tsfresh (int): Features after Stage 1
+    n_features_rf (int): Features after Stage 2
+    feature_names_ (list[str]): Selected feature names
+```
+
+**Enhanced Two-Stage Pipeline Documentation:**
+```python
+**Stage 1 (tsfresh)**: Statistical significance testing with FDR control
+    - Fast filtering based on univariate statistical tests
+    - Model-agnostic approach using hypothesis testing
+    - Reduces features from thousands → hundreds
+    - Controls False Discovery Rate (FDR)
+
+**Stage 2 (RandomForest)**: Permutation importance analysis
+    - Captures feature interactions
+    - Model-specific refinement
+    - Reduces features from hundreds → final set
+    - Uses permutation importance (reliable)
+```
+
+**Method Updates:**
+- `validate()`: Added Returns section
+- `set_random_state()`: Detailed seed behavior
+- `_select_tsfresh()`: FDR control explanation
+- `_select_random_forest()`: Permutation importance details, all hyperparameter docs
+- `fit()`: Comprehensive Args with **rf_kwargs expansion
+- `transform()`: Feature space mismatch handling
+- `fit_transform()`: Convenience method documentation
+- `get_feature_scores()`: Return format specification
+
+### Docstring Standards Applied
+
+All docstrings now include:
+
+1. **Summary**: One-line description
+2. **Description**: Detailed explanation (1-3 paragraphs)
+3. **Attributes**: Complete class attributes with types (before __init__)
+4. **Args**: All parameters with explicit types
+5. **Returns**: Explicit return types with descriptions
+6. **Raises**: All possible exceptions
+7. **Examples**: Multiple usage examples with >>> format
+8. **Side Effects**: Documented where applicable
+
+### Quality Metrics
+
+| Metric | Count |
+|--------|-------|
+| Files Modified | 5 |
+| Total Edits | 40+ |
+| Classes Documented | 3 (TremorMatrixBuilder, FeaturesBuilder, FeatureSelector) |
+| Methods Documented | 25+ |
+| Attributes Documented | 30+ |
+| Examples Added | 35+ |
+
+### Validation
+
+- **Type Checking:** All files passed `uvx ty check src/eruption_forecast/features/`
+- **Consistency:** Follows same standards as tremor and label modules
+- **Completeness:** All public methods and classes fully documented
+
+### Impact
+
+- **Improved Developer Experience:** Clear API documentation for feature extraction pipeline
+- **Better IDE Support:** Enhanced autocomplete and type hints in docstrings
+- **Easier Maintenance:** Comprehensive examples reduce learning curve
+- **Professional Standards:** Google-style docstrings align with Python best practices
+- **Complete Coverage:** All three core modules (tremor, label, features) now standardized
+
+### Cross-Module Consistency
+
+The features module documentation now aligns with:
+- **Tremor module** (standardized 2026-02-16)
+- **Label module** (standardized 2026-02-16)
+
+All three modules now follow identical docstring standards, providing a consistent developer experience across the entire package.
 
 ---
