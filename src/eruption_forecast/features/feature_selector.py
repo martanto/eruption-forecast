@@ -5,8 +5,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 
-from eruption_forecast.utils import get_significant_features
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import get_significant_features
 
 
 class FeatureSelector:

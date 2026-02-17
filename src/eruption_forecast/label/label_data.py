@@ -4,7 +4,6 @@ from functools import cached_property
 
 import pandas as pd
 
-from eruption_forecast.utils import to_datetime
 from eruption_forecast.logger import logger
 from eruption_forecast.label.constants import (
     DATE_FORMAT,
@@ -15,6 +14,7 @@ from eruption_forecast.label.constants import (
     EXAMPLE_LABEL_FILENAME,
     VALID_WINDOW_STEP_UNITS,
 )
+from eruption_forecast.utils.date_utils import to_datetime
 
 
 class LabelData:

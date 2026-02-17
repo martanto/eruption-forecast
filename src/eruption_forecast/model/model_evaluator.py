@@ -18,8 +18,8 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import GridSearchCV
 
-from eruption_forecast.utils import resolve_output_dir
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.pathutils import resolve_output_dir
 
 # Import new styled plotting functions
 from eruption_forecast.plots.evaluation_plots import (

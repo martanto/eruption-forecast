@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from obspy import Trace, Stream
 
-from eruption_forecast.utils import calculate_window_metrics
+from eruption_forecast.utils.window import calculate_window_metrics
 
 
 class DSAR:

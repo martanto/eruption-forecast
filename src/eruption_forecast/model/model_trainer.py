@@ -8,12 +8,12 @@ import joblib
 import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
-from eruption_forecast.utils import (
+from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import (
     get_metrics,
-    resolve_output_dir,
     random_under_sampler,
 )
-from eruption_forecast.logger import logger
+from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.features.constants import (
     ID_COLUMN,
     ERUPTED_COLUMN,

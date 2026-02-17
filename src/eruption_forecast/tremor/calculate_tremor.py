@@ -12,13 +12,11 @@ from obspy import Trace, Stream, UTCDateTime
 
 import eruption_forecast
 from eruption_forecast.sds import SDS
-from eruption_forecast.utils import (
-    to_datetime,
-    resolve_output_dir,
-    calculate_window_metrics,
-)
 from eruption_forecast.logger import logger
 from eruption_forecast.tremor.rsam import RSAM
+from eruption_forecast.utils.window import calculate_window_metrics
+from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
 
 
