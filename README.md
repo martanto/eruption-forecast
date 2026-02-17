@@ -653,18 +653,25 @@ Evaluates each seed model against known eruption labels and aggregates metrics a
 from eruption_forecast.model.model_predictor import ModelPredictor
 
 predictor = ModelPredictor(
-    trained_models=trainer.csv,                 # trained_model_*.csv from train()
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",  # required
+    start_date="2025-03-16",
+    end_date="2025-03-22",
+    trained_models=trainer.csv,  # trained_model_*.csv from train()
     output_dir="output/predictions",
 )
 
 # One row per (classifier, seed)
-df_metrics = predictor.predict()
+df_metrics = predictor.predict(
+    future_features_csv="output/features/future_all_features.csv",
+    future_labels_csv="output/features/future_label_features.csv",
+)
 print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
 
 # Best (classifier, seed) overall
-evaluator = predictor.predict_best(criterion="balanced_accuracy")
+evaluator = predictor.predict_best(
+    future_features_csv="output/features/future_all_features.csv",
+    future_labels_csv="output/features/future_label_features.csv",
+    criterion="balanced_accuracy",
+)
 print(evaluator.summary())
 evaluator.plot_all()
 ```
@@ -676,10 +683,14 @@ evaluator.plot_all()
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `start_date` | `str \| datetime` | — | Start date for prediction period (format: YYYY-MM-DD) |
+| `end_date` | `str \| datetime` | — | End date for prediction period (format: YYYY-MM-DD) |
 | `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path (from `train()`) or a `{name: path}` dict for multi-model consensus |
-| `future_features_csv` | `str` | — | Path to extracted features CSV for the future/unlabelled period |
-| `future_labels_csv` | `str \| None` | `None` | Path to labels CSV. Required for `predict()` / `predict_best()`; omit for `predict_proba()` |
-| `output_dir` | `str \| None` | `None` | Output directory; defaults to `<cwd>/output/predictions` |
+| `overwrite` | `bool` | `False` | Overwrite existing output files |
+| `n_jobs` | `int` | `1` | Number of parallel jobs for feature extraction |
+| `output_dir` | `str \| None` | `None` | Output directory; defaults to `<root_dir>/output/predictions` |
+| `root_dir` | `str \| None` | `None` | Root directory for resolving output paths |
+| `verbose` | `bool` | `False` | Enable verbose logging |
 
 #### Single model — forecast mode (unlabelled data)
 
@@ -687,12 +698,19 @@ When no ground-truth labels are available, use `predict_proba()`.
 
 ```python
 predictor = ModelPredictor(
+    start_date="2025-03-16",
+    end_date="2025-03-22",
     trained_models=trainer.csv,
-    future_features_csv="output/features/future_all_features.csv",
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(plot=True)
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",  # or pd.DataFrame
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
 ```
 
 #### Multi-model consensus
@@ -702,15 +720,22 @@ each classifier (across seeds) and then across classifiers (consensus).
 
 ```python
 predictor = ModelPredictor(
+    start_date="2025-03-16",
+    end_date="2025-03-22",
     trained_models={
         "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
-    future_features_csv="...",
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(plot=True)
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
 ```
 
 **Output columns (multi-model):**
@@ -966,39 +991,61 @@ trainer.train(
 
 # --- Stage 2a: Evaluate on future/held-out labelled data ---
 predictor = ModelPredictor(
+    start_date="2025-03-16",
+    end_date="2025-03-22",
     trained_models=trainer.csv,
-    future_features_csv="data/future/all_features.csv",
-    future_labels_csv="data/future/label_features.csv",   # known labels
     output_dir="output/predictions",
 )
 
-df_metrics = predictor.predict(plot=True)
+df_metrics = predictor.predict(
+    future_features_csv="data/future/all_features.csv",
+    future_labels_csv="data/future/label_features.csv",  # known labels
+    plot=True,
+)
 print(df_metrics[["classifier", "balanced_accuracy", "f1_score", "roc_auc"]])
 
-best_evaluator = predictor.predict_best(criterion="balanced_accuracy")
+best_evaluator = predictor.predict_best(
+    future_features_csv="data/future/all_features.csv",
+    future_labels_csv="data/future/label_features.csv",
+    criterion="balanced_accuracy",
+)
 print(best_evaluator.summary())
 best_evaluator.plot_all()
 
 # --- Stage 2b: Forecast on unlabelled data (single model) ---
 predictor = ModelPredictor(
+    start_date="2025-03-23",
+    end_date="2025-03-30",
     trained_models=trainer.csv,
-    future_features_csv="data/realtime/all_features.csv",
     output_dir="output/forecast",
 )
-df_forecast = predictor.predict_proba(plot=True)
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
 print(df_forecast[df_forecast["model_prediction"] == 1])
 
 # --- Stage 2c: Multi-model consensus forecast ---
 predictor = ModelPredictor(
+    start_date="2025-03-23",
+    end_date="2025-03-30",
     trained_models={
         "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
-    future_features_csv="data/realtime/all_features.csv",
     output_dir="output/consensus",
 )
-df_consensus = predictor.predict_proba(plot=True)
-# Inspect windows where all 3 classifiers agree on eruption
+df_consensus = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
+# Inspect windows where all classifiers agree on eruption
 eruption_windows = df_consensus[df_consensus["consensus_confidence"] == 1.0]
 print(eruption_windows[["consensus_eruption_probability", "consensus_confidence"]])
 ```
@@ -1155,17 +1202,27 @@ Visualize eruption probability forecasts as time-series plots.
 from eruption_forecast.model.model_predictor import ModelPredictor
 
 predictor = ModelPredictor(
-    model_dir="output/trainings/model-only/random-forest-classifier/stratified-k-fold",
-    features_csv="output/features_forecast.csv",
-    label_csv="output/label_forecast.csv",  # Optional
+    start_date="2025-03-23",
+    end_date="2025-03-30",
+    trained_models="output/trainings/model-only/random-forest-classifier/stratified-k-fold/trained_model_*.csv",
     output_dir="output/forecast",
 )
 
 # With labeled data (evaluation mode)
-df_metrics = predictor.predict(plot=True)
+df_metrics = predictor.predict(
+    future_features_csv="output/features_forecast.csv",
+    future_labels_csv="output/label_forecast.csv",
+    plot=True,
+)
 
 # Without labels (forecasting mode)
-df_forecast = predictor.predict_proba(plot=True)
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
 ```
 
 **Plot Features:**

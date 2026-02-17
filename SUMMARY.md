@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/unified-plotting-system`
-**Last Updated:** 2026-02-15
+**Last Updated:** 2026-02-16
 
 ---
 
@@ -24,6 +24,7 @@
 13. [FeaturesBuilder Readability Improvements](#featuresbuilder-readability-improvements-2026-02-13)
 14. [ModelTrainer Refactor](#modeltrainer-refactor-2026-02-13)
 15. [Refactor Output Directory Structure](#refactor-output-directory-structure-2026-02-15)
+16. [ModelPredictor Code Quality and API Update](#modelpredictor-code-quality-and-api-update-2026-02-16)
 ---
 
 ## Package Overview
@@ -909,10 +910,194 @@ tremor/
 
 ---
 
+## ModelPredictor Code Quality and API Update (2026-02-16)
+
+### Overview
+Comprehensive code quality review and API update for `model_predictor.py` including bug fixes, spelling corrections, docstring improvements, and README synchronization.
+
+### Code Quality Fixes
+
+**Typo Corrections:**
+- Line 179: `pedict_all_metrics` → `predict_all_metrics`
+- Line 176: `multi_model` → `_multi_model` (made private for consistency)
+- Line 486: `Paramater` → `Parameter`
+- Line 520: `fututes` → `future`
+
+**Bug Fixes:**
+- Lines 403-406: Removed duplicate validation check for `labels_df`
+- Fixed all references to `pedict_all_metrics` → `predict_all_metrics` (3 instances)
+- Fixed all references to `multi_model` → `_multi_model` (3 instances in logs/title)
+
+**Missing Docstrings Added:**
+1. `build_tremor_matrix()` - Full docstring with Args, Returns, Raises sections
+2. `extract_features()` - Added Args, Returns, Raises documentation
+3. `predict_log_metrics_summary()` - Added Args section
+4. `_log_forecast_summary()` - Added Args section
+5. `_plot_forecast()` - Enhanced docstring with Args section and clarified behavior
+
+**Enhanced Plot Styling:**
+- Updated `_plot_forecast()` with improved aesthetics (already implemented)
+- Set white background for figure and axes
+- Custom color palette with professional colors
+- Enhanced legend styling (shadow, fancybox)
+- Better reference lines and grid styling
+- Higher DPI output (300 DPI)
+
+### API Changes
+
+**ModelPredictor Constructor:**
+
+**OLD Signature:**
+```python
+ModelPredictor(
+    trained_models: str | dict[str, str],
+    future_features_csv: str,
+    future_labels_csv: str | None = None,
+    output_dir: str | None = None,
+)
+```
+
+**NEW Signature:**
+```python
+ModelPredictor(
+    start_date: str | datetime,
+    end_date: str | datetime,
+    trained_models: str | dict[str, str],
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    verbose: bool = False,
+)
+```
+
+**Key Changes:**
+1. Added `start_date` and `end_date` parameters (required)
+2. Removed `future_features_csv` and `future_labels_csv` from constructor
+3. Added `overwrite`, `n_jobs`, `root_dir`, `verbose` parameters
+4. Features/labels now passed to `predict()` and `predict_proba()` methods
+
+**Method Signatures Updated:**
+
+**predict():**
+```python
+# OLD
+predict() -> pd.DataFrame
+
+# NEW
+predict(
+    future_features_csv: str,
+    future_labels_csv: str,
+    plot: bool = False
+) -> pd.DataFrame
+```
+
+**predict_best():**
+```python
+# OLD
+predict_best(criterion: str = "balanced_accuracy") -> ModelEvaluator
+
+# NEW
+predict_best(
+    future_features_csv: str,
+    future_labels_csv: str,
+    criterion: str = "balanced_accuracy",
+    plot: bool = False,
+) -> ModelEvaluator
+```
+
+**predict_proba():**
+```python
+# OLD
+predict_proba(plot: bool = True) -> pd.DataFrame
+
+# NEW
+predict_proba(
+    tremor_data: str | pd.DataFrame,
+    window_size: int,
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+    use_relevant_features: bool = True,
+    select_tremor_columns: list[str] | None = None,
+    plot: bool = True,
+) -> pd.DataFrame
+```
+
+### New Workflow
+
+**Unified Predictor Workflow:**
+
+```python
+from eruption_forecast.model.model_predictor import ModelPredictor
+
+# 1. Initialize predictor
+predictor = ModelPredictor(
+    start_date="2025-03-16",
+    end_date="2025-03-22",
+    trained_models=trainer.csv,
+    output_dir="output/predictions",
+)
+
+# 2a. Evaluation mode (with labels)
+df_metrics = predictor.predict(
+    future_features_csv="output/features/future_features.csv",
+    future_labels_csv="output/features/future_labels.csv",
+    plot=True,
+)
+
+# 2b. Forecast mode (no labels, builds features from tremor)
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
+```
+
+### README Updates
+
+Updated all ModelPredictor examples in README.md:
+- Section 10: "Predict on Future Data with ModelPredictor"
+- Advanced Usage: "train() + ModelPredictor Workflow"
+- Visualization section: "Plotting with ModelPredictor"
+
+**Changes:**
+1. Updated constructor parameters table with new signature
+2. Updated all code examples to use new API
+3. Added `start_date` and `end_date` to all examples
+4. Moved `future_features_csv` and `future_labels_csv` to method calls
+5. Added `tremor_data` parameter examples for `predict_proba()`
+
+### Code Quality Results
+
+✅ **Linting:** `ruff check --fix` - All checks passed  
+✅ **Type Checking:** `uvx ty check` - All checks passed  
+✅ **Docstrings:** All public methods documented  
+✅ **README:** All examples updated and synchronized
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/eruption_forecast/model/model_predictor.py` | 14 edits: typos, bugs, docstrings, API changes |
+| `README.md` | 4 edits: updated examples, parameter table, workflow code |
+| `SUMMARY.md` | Added this section with complete documentation |
+
+### Benefits
+
+1. **Cleaner API**: Date range in constructor, features/data in methods
+2. **More flexible**: Can reuse predictor for different feature sets
+3. **Better separation**: Predictor setup vs. actual prediction separated
+4. **Consistent naming**: All private attributes use `_` prefix
+5. **Complete documentation**: All methods have comprehensive docstrings
+
+---
+
 ---
 
 > **Note:** The HTTP API layer has been moved to a separate project (`eruption-forecast-api`) and is maintained independently. This document covers the core `eruption-forecast` package only.
 
-**Document Version:** 3.5
+**Document Version:** 3.6
 **Last Updated:** 2026-02-16
 **Author:** Claude Code (Sonnet 4.5)
