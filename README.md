@@ -1514,7 +1514,7 @@ pytest tests/test_train_model.py
 
 **Documentation Standards:**
 
-All code follows enterprise-grade documentation standards:
+All code follows research-grade documentation standards:
 - 30 Python files with 100% Google-style docstrings
 - 200+ attributes documented with types
 - 200+ usage examples with `>>>` format
