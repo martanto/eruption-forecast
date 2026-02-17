@@ -25,6 +25,7 @@
 14. [ModelTrainer Refactor](#modeltrainer-refactor-2026-02-13)
 15. [Refactor Output Directory Structure](#refactor-output-directory-structure-2026-02-15)
 16. [ModelPredictor Code Quality and API Update](#modelpredictor-code-quality-and-api-update-2026-02-16)
+17. [Tremor Module Docstring Standardization](#tremor-module-docstring-standardization-2026-02-16)
 ---
 
 ## Package Overview
@@ -1101,3 +1102,75 @@ Updated all ModelPredictor examples in README.md:
 **Document Version:** 3.6
 **Last Updated:** 2026-02-16
 **Author:** Claude Code (Sonnet 4.5)
+
+
+## Tremor Module Docstring Standardization (2026-02-16)
+
+### Overview
+
+Standardized all docstrings in the tremor module according to Google docstring format guidelines.
+
+### Files Updated
+
+All 5 files in the tremor module received comprehensive docstring improvements:
+
+1. **`__init__.py`** - Added module-level docstring
+2. **`tremor_data.py`** - Fixed class and property docstrings
+3. **`rsam.py`** - Complete RSAM class documentation
+4. **`dsar.py`** - Complete DSAR class documentation
+5. **`calculate_tremor.py`** - Fixed all 16 method docstrings
+
+### Changes Applied
+
+**Format Requirements Enforced:**
+
+- One-line summary followed by detailed description
+- Explicit type information in all Args sections
+- Comprehensive Returns sections with types
+- Raises sections documenting all exceptions
+- Examples sections with >>> format
+- Attributes section BEFORE __init__ for all classes
+- Fixed spelling, grammar, and typos
+
+**Key Improvements:**
+
+1. **Class Docstrings:**
+   - Added Attributes sections listing all instance variables with types
+   - Moved Attributes before Args to follow Google style guide
+   - Added comprehensive Examples showing typical usage
+
+2. **Method Docstrings:**
+   - All parameter types explicitly documented
+   - All return types explicitly documented
+   - Added Raises sections where applicable
+   - Added practical Examples for complex methods
+
+3. **Property Docstrings:**
+   - Clear return type documentation
+   - Concise descriptions of what the property represents
+
+### Verification
+
+- **Linting:** `uv run ruff check --fix src/eruption_forecast/tremor` - All checks passed
+- **Type Checking:** `uvx ty check src/eruption_forecast/tremor` - All checks passed
+
+### Impact
+
+- **Improved Developer Experience:** Clear documentation helps developers understand the API
+- **Better IDE Support:** Type hints in docstrings improve autocomplete
+- **Easier Maintenance:** Comprehensive examples reduce ambiguity
+- **Professional Standards:** Google-style docstrings align with Python best practices
+
+### Statistics
+
+| Metric | Count |
+|--------|-------|
+| Files Modified | 5 |
+| Total Edits | 20+ |
+| Classes Documented | 4 (TremorData, RSAM, DSAR, CalculateTremor) |
+| Methods Documented | 20+ |
+| Properties Documented | 10+ |
+| Examples Added | 15+ |
+
+---
+
