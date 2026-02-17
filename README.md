@@ -28,6 +28,8 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 
 - [Important Disclaimers](#️-important-disclaimers)
 - [Features](#features)
+- [Package Architecture](#package-architecture)
+- [Pipeline Overview](#pipeline-overview)
 - [Installation](#installation)
 - [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
 - [Step-by-Step Usage Guide](#step-by-step-usage-guide)
@@ -77,6 +79,52 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Logging**: Built-in logging with loguru for debugging and monitoring
 - **Professional Documentation**: 100% Google-style docstrings with explicit types, comprehensive examples, and detailed API documentation
+- **Modular Architecture**: Clean separation of concerns with focused utility modules (array operations, time windows, date validation, DataFrame ops, ML utilities, path resolution, text formatting)
+
+## Package Architecture
+
+The package is organized into focused modules with clear responsibilities:
+
+```
+eruption-forecast/
+├── src/eruption_forecast/
+│   ├── tremor/              # Seismic tremor processing
+│   │   ├── calculate_tremor.py
+│   │   ├── rsam.py          # Real Seismic Amplitude Measurement
+│   │   ├── dsar.py          # Displacement Seismic Amplitude Ratio
+│   │   └── tremor_data.py
+│   ├── label/               # Training label generation
+│   │   ├── label_builder.py
+│   │   └── label_data.py
+│   ├── features/            # Feature extraction & selection
+│   │   ├── features_builder.py
+│   │   ├── feature_selector.py
+│   │   └── tremor_matrix_builder.py
+│   ├── model/               # ML model training & prediction
+│   │   ├── forecast_model.py
+│   │   ├── model_trainer.py
+│   │   ├── model_predictor.py
+│   │   ├── model_evaluator.py
+│   │   └── classifier_model.py
+│   ├── plots/               # Visualization utilities
+│   │   └── ...
+│   ├── utils/               # Focused utility modules
+│   │   ├── array.py         # Array operations, outlier detection
+│   │   ├── window.py        # Time window operations
+│   │   ├── date_utils.py    # Date/time validation & conversion
+│   │   ├── dataframe.py     # DataFrame validation & ops
+│   │   ├── ml.py            # ML utilities (sampling, metrics)
+│   │   ├── pathutils.py     # Path resolution
+│   │   └── formatting.py    # Text formatting
+│   └── decorators/          # Function decorators
+└── tests/                   # Unit tests
+```
+
+**Key Design Principles:**
+- **Single Responsibility**: Each module has one clear purpose
+- **Explicit Imports**: No hidden re-exports (e.g., `from eruption_forecast.utils.date_utils import to_datetime`)
+- **Minimal Dependencies**: Each utils module imports only what it needs
+- **Clean Architecture**: Reduced coupling, easier testing and maintenance
 
 ## Pipeline Overview
 
@@ -1613,6 +1661,7 @@ All code follows research-grade documentation standards:
 - 200+ usage examples with `>>>` format
 - 150+ methods/functions with comprehensive documentation
 - Consistent terminology and formatting across all modules
+- Modular architecture with 7 focused utility modules for improved maintainability
 
 ---
 
@@ -1657,4 +1706,7 @@ This project uses:
 **Status:** Active Development
 **Last Updated:** 2026-02-17
 
-**Documentation:** All 30 Python files standardized to Google docstring format (2026-02-17)
+**Recent Updates:**
+- **2026-02-17**: Refactored utils.py into 7 focused modules for improved maintainability
+- **2026-02-17**: All 30 Python files standardized to Google docstring format
+- **2026-02-17**: Added comprehensive safety disclaimers for volcanic forecasting

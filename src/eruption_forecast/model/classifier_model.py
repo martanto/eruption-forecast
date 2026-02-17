@@ -18,8 +18,8 @@ from sklearn.model_selection import (
     StratifiedShuffleSplit,
 )
 
-from eruption_forecast.utils import slugify_class_name
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.formatting import slugify_class_name
 
 
 class ClassifierModel:

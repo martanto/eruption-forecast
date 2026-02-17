@@ -4,7 +4,7 @@ from functools import cached_property
 
 import pandas as pd
 
-from eruption_forecast.utils import check_sampling_consistency
+from eruption_forecast.utils.dataframe import check_sampling_consistency
 
 
 class TremorData:

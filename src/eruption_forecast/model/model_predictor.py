@@ -6,13 +6,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from eruption_forecast.utils import (
-    to_datetime,
-    construct_windows,
-    resolve_output_dir,
-    compute_model_probabilities,
-)
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import compute_model_probabilities
+from eruption_forecast.utils.window import construct_windows
+from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.features.constants import (
     ID_COLUMN,
     ERUPTED_COLUMN,
