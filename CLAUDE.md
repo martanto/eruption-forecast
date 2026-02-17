@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-13_
+_Last updated: 2026-02-17_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -17,8 +17,8 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 2. **TODO.md tracks pending work.** Use TODO.md for next things to do. Check off items when complete and add new items as they arise.
 3. **Type checker is `ty`.** Use `uvx ty check src/` for type checking.
 4. **Lint with ruff.** Use `uv run ruff check --fix src/` for linting.
-5. **All `uv` commands are permitted.** `uv sync`, `uv run`, `uv pip install/uninstall`, `uv lock`, etc. — no need to ask.
-6. **Create a new branch before commits or modifications.** Always create a new branch with `claude/` prefix before making any commits or code modifications (e.g., `claude/fix-docstrings`, `claude/add-feature-x`).
+5. **All `uv`, `uvx`, and `python` commands are permitted.** `uv sync`, `uv run`, `uv pip install/uninstall`, `uv lock`, `uvx ty check`, `python main.py`, etc. — no need to ask. User has granted permission to run these commands without approval.
+6. **ALWAYS create a new branch before any commits or modifications.** Use `git checkout -b copilot/<branch-name>` to create a new branch with `copilot/` prefix before making ANY commits or code modifications (e.g., `copilot/fix-docstrings`, `copilot/add-feature-x`). Never work directly on main or dev branches.
 7. **Always use `tests` directory when running testing.** Create the tests output inside `tests` directory.
 8. **Do not commit temporary test files.** Files starting with `test` in the root directory (e.g., `test_*.py`, `test.py`) should not be committed. These are temporary test scripts and are excluded via `.gitignore`.
 
