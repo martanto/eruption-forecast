@@ -1,4 +1,4 @@
-"""Configuration constants for eruption-forecast package."""
+"""Configuration constants and pipeline configuration for eruption-forecast package."""
 
 from eruption_forecast.config.constants import (
     PLOT_DPI,
@@ -9,6 +9,15 @@ from eruption_forecast.config.constants import (
     DEFAULT_SAMPLING_STRATEGY,
     DEFAULT_N_SIGNIFICANT_FEATURES,
     ERUPTION_PROBABILITY_THRESHOLD,
+)
+from eruption_forecast.config.pipeline_config import (
+    ModelConfig,
+    TrainConfig,
+    ForecastConfig,
+    PipelineConfig,
+    CalculateConfig,
+    BuildLabelConfig,
+    ExtractFeaturesConfig,
 )
 
 
@@ -21,4 +30,11 @@ __all__ = [
     "THRESHOLD_RESOLUTION",
     "PLOT_DPI",
     "PLOT_SEPARATOR_LENGTH",
+    "ModelConfig",
+    "CalculateConfig",
+    "BuildLabelConfig",
+    "ExtractFeaturesConfig",
+    "TrainConfig",
+    "ForecastConfig",
+    "PipelineConfig",
 ]

@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-17 (config persistence + unit tests)
 
 ## ⚠️ Important Notice
 
@@ -35,6 +35,8 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 20. [Complete Codebase Docstring Audit and Standardization](#complete-codebase-docstring-audit-and-standardization-2026-02-17)
 21. [Important Disclaimers for Volcanic Eruption Forecasting](#important-disclaimers-for-volcanic-eruption-forecasting-2026-02-17)
 22. [Utils Module Refactoring: Decoupling into Focused Modules](#utils-module-refactoring-decoupling-into-focused-modules-2026-02-17)
+23. [Codebase Review and Bug Fixes](#codebase-review-and-bug-fixes-2026-02-17)
+24. [Pipeline Configuration Saving and Loading](#pipeline-configuration-saving-and-loading-2026-02-17)
 ---
 
 ## Package Overview
@@ -2282,3 +2284,118 @@ Completed comprehensive architecture improvements focused on eliminating code du
 
 ---
 
+
+## Codebase Review and Bug Fixes (2026-02-17)
+
+Full codebase review after recent architecture improvements. Three bugs identified and fixed.
+
+### Bugs Fixed
+
+| File | Line | Issue | Fix |
+|------|------|-------|-----|
+| `features/features_builder.py` | 204 | Error message used `type(self.tremor_matrix_df)` instead of `type(self.label_df)` in the label validation branch | Changed to `type(self.label_df)` |
+| `model/model_trainer.py` | 1025–1030 | `_run_train()` skip check included `all_figures_filepath` (using `os.path.exists`) despite the comment stating "skip only based on significant + model files"; figures are optional and only generated when `plot_significant_features=True`, so including them caused seeds to always be retrained when figures were absent | Removed `all_figures_filepath` from check; changed `os.path.exists` to `os.path.isfile` for consistency |
+| `model/model_predictor.py` | 158 | No-op assignment `output_dir = output_dir` | Removed the redundant line |
+
+### Architecture Review
+
+The architecture is sound. Key components reviewed:
+
+- `ForecastModel` (orchestrator, ~1138 lines) — method chaining pipeline
+- `ModelTrainer` — multi-seed training with two modes (`train_and_evaluate` / `train`)
+- `ModelPredictor` — evaluation + forecast modes with consensus
+- `ModelEvaluator` — metrics, plots, threshold optimization
+- `ClassifierModel` — 10 classifiers + CV strategies
+- `FeaturesBuilder` — tsfresh extraction with training/prediction modes
+- Utils refactored into focused modules: `array`, `dataframe`, `date_utils`, `formatting`, `ml`, `pathutils`, `window`
+
+---
+
+## Pipeline Configuration Saving and Loading (2026-02-17)
+
+### Objective
+
+Persist the complete set of pipeline parameters so that any run can be replayed identically, and a trained model can be resumed without re-running earlier stages.
+
+### New File: `src/eruption_forecast/config/pipeline_config.py`
+
+Seven dataclasses covering every pipeline stage:
+
+| Class | Stage |
+|---|---|
+| `ModelConfig` | `ForecastModel.__init__` |
+| `CalculateConfig` | `.calculate()` |
+| `BuildLabelConfig` | `.build_label()` |
+| `ExtractFeaturesConfig` | `.extract_features()` |
+| `TrainConfig` | `.train()` |
+| `ForecastConfig` | `.forecast()` |
+| `PipelineConfig` | Top-level container with `save()` / `load()` |
+
+`PipelineConfig.save(path, fmt="yaml")` writes a human-readable YAML (or JSON). `PipelineConfig.load(path)` reconstructs the object from either format, detecting format by file extension.
+
+### ForecastModel changes
+
+- **`__init__`**: Creates `self._config = PipelineConfig(model=ModelConfig(...))` and `self._loaded_config = None`.
+- **Each stage method** stores a frozen config snapshot to `self._config.<section>` after execution.
+- **`train(save_model=True)`**: New `save_model` parameter (default `True`) auto-serialises the full instance to `{station_dir}/forecast_model.pkl` via `joblib`.
+- **`forecast()`**: Auto-saves `config.yaml` to `{station_dir}/config.yaml` at the end.
+- **`save_config(path, fmt)`**: Explicit config save; returns the path.
+- **`save_model(path)`**: Serialises the full instance via `joblib.dump`; returns the path.
+- **`from_config(path)`** *(classmethod)*: Loads config, constructs a fresh `ForecastModel`, attaches `_loaded_config`.
+- **`load_model(path)`** *(classmethod)*: Restores a pickled instance via `joblib.load`.
+- **`run()`**: Replays all stages from `_loaded_config` in order; raises `RuntimeError` if not loaded via `from_config`.
+
+### Exports
+
+- `PipelineConfig` added to `eruption_forecast.__init__.__all__`.
+- All six section classes exported from `eruption_forecast.config.__init__`.
+
+### Usage examples
+
+```python
+# Save config after a run
+fm.train(classifier="xgb")   # auto-saves forecast_model.pkl
+fm.forecast(...)              # auto-saves config.yaml
+
+# Replay from config
+fm2 = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
+fm2.run()
+
+# Resume from saved model (skip re-training)
+fm3 = ForecastModel.load_model("output/VG.OJN.00.EHZ/forecast_model.pkl")
+fm3.forecast(start_date="2025-04-01", end_date="2025-04-07", ...)
+```
+
+---
+
+## Unit Tests: PipelineConfig (2026-02-17)
+
+**File:** `tests/test_pipeline_config.py`
+
+58 tests covering all aspects of the config persistence feature, requiring no real seismic data.
+
+### Test classes
+
+| Class | Count | What is tested |
+|---|---|---|
+| `TestModelConfig` | 5 | defaults, `to_dict`, `from_dict` round-trip, unknown keys, partial dict |
+| `TestCalculateConfig` | 3 | defaults, round-trip, unknown keys |
+| `TestBuildLabelConfig` | 4 | defaults, mutable default isolation, list round-trip, unknown keys |
+| `TestExtractFeaturesConfig` | 3 | defaults, column list round-trip, unknown keys |
+| `TestTrainConfig` | 3 | defaults, full round-trip, unknown keys (`grid_params` ignored) |
+| `TestForecastConfig` | 3 | defaults, round-trip, unknown keys |
+| `TestPipelineConfigToDict` | 3 | omits `None` sections, all sections when set, nested values |
+| `TestPipelineConfigYaml` | 7 | file creation, comment header, full round-trip, partial config, `saved_at` refresh, parent dir creation, missing file error |
+| `TestPipelineConfigJson` | 3 | file creation + valid JSON, full round-trip, extension auto-detection |
+| `TestForecastModelConfigInit` | 3 | `_config.model` mirrors `__init__` params, stage sections are `None` at init, `_loaded_config` is `None` at init |
+| `TestForecastModelSaveConfig` | 6 | default path, custom path, JSON format, default JSON path, return value, YAML readable by `PipelineConfig.load` |
+| `TestForecastModelFromConfig` | 5 | restores params, sets `_loaded_config`, model section content, missing file error, JSON format |
+| `TestForecastModelSaveLoadModel` | 6 | default path, custom path, return value, attribute restoration, config preservation, missing file error |
+| `TestForecastModelRun` | 3 | raises without `from_config`, raises after `load_model`, no-op when all sections absent |
+| `TestTopLevelExport` | 1 | `from eruption_forecast import PipelineConfig` is same class |
+
+### Result
+
+```
+58 passed in 2.86s
+```

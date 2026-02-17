@@ -3,6 +3,7 @@ from time import sleep
 from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
+import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
@@ -17,6 +18,15 @@ from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.model_trainer import ModelTrainer
 from eruption_forecast.model.model_predictor import ModelPredictor
+from eruption_forecast.config.pipeline_config import (
+    ModelConfig,
+    TrainConfig,
+    ForecastConfig,
+    PipelineConfig,
+    CalculateConfig,
+    BuildLabelConfig,
+    ExtractFeaturesConfig,
+)
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
@@ -252,6 +262,30 @@ class ForecastModel:
         # ------------------------------------------------------------------
         self.ModelPredictor: ModelPredictor | None = None
         self.prediction_df: pd.DataFrame = pd.DataFrame()
+
+        # ------------------------------------------------------------------
+        # Pipeline configuration (accumulates params as each stage is called)
+        # ------------------------------------------------------------------
+        self._config = PipelineConfig(
+            model=ModelConfig(
+                station=station,
+                channel=channel,
+                start_date=start_date_str,
+                end_date=end_date_str,
+                window_size=window_size,
+                volcano_id=volcano_id,
+                network=network,
+                location=location,
+                output_dir=self.output_dir,
+                root_dir=self.root_dir,
+                overwrite=overwrite,
+                n_jobs=n_jobs,
+                verbose=verbose,
+                debug=debug,
+            )
+        )
+        # Set when the instance is restored via from_config()
+        self._loaded_config: PipelineConfig | None = None
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -750,6 +784,24 @@ class ForecastModel:
         # Slice tremor data to adjusted date range
         self.tremor_data = tremor_data.df.loc[self.start_date : self.end_date]
 
+        self._config.calculate = CalculateConfig(
+            source=source,
+            sds_dir=sds_dir,
+            methods=methods,
+            filename_prefix=filename_prefix,
+            remove_outlier_method=remove_outlier_method,
+            interpolate=interpolate,
+            value_multiplier=value_multiplier,
+            cleanup_daily_dir=cleanup_daily_dir,
+            plot_daily=plot_daily,
+            save_plot=save_plot,
+            overwrite_plot=overwrite_plot,
+            client_url=client_url,
+            n_jobs=n_jobs,
+            verbose=verbose,
+            debug=debug,
+        )
+
         return self
 
     def extract_features(
@@ -833,6 +885,17 @@ class ForecastModel:
         self.label_csv = features_builder.label_features_csv
         self.use_relevant_features = use_relevant_features
         self.select_tremor_columns = select_tremor_columns
+
+        self._config.extract_features = ExtractFeaturesConfig(
+            select_tremor_columns=select_tremor_columns,
+            save_tremor_matrix_per_method=save_tremor_matrix_per_method,
+            save_tremor_matrix_per_id=save_tremor_matrix_per_id,
+            exclude_features=exclude_features,
+            use_relevant_features=use_relevant_features,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
 
         return self
 
@@ -921,6 +984,18 @@ class ForecastModel:
         # Calculate and log statistics
         self._calculate_eruption_statistics(label_builder)
 
+        self._config.build_label = BuildLabelConfig(
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            day_to_forecast=day_to_forecast,
+            eruption_dates=eruption_dates,
+            start_date=str(train_start_date) if start_date is not None else None,
+            end_date=str(train_end_date) if end_date is not None else None,
+            tremor_columns=tremor_columns,
+            verbose=bool(verbose),
+            debug=bool(debug),
+        )
+
         return self
 
     def set_feature_selection_method(
@@ -960,6 +1035,7 @@ class ForecastModel:
         n_jobs: int | None = None,
         overwrite: bool = False,
         verbose: bool = False,
+        save_model: bool = True,
     ) -> Self:
         """Training model using extracted features and labels.
 
@@ -997,6 +1073,9 @@ class ForecastModel:
             n_jobs (int, optional): Number of jobs. Defaults to 1.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
+            save_model (bool, optional): If True, serialises the full ``ForecastModel``
+                instance to ``{station_dir}/forecast_model.pkl`` via ``save_model()``.
+                Defaults to True.
 
         Returns:
             self (Self): ForecastModel object
@@ -1069,6 +1148,26 @@ class ForecastModel:
 
         self.trained_models[self.classifier_name] = self.trained_model_csv
 
+        self._config.train = TrainConfig(
+            classifier=classifier,
+            cv_strategy=cv_strategy,
+            random_state=random_state,
+            total_seed=total_seed,
+            with_evaluation=with_evaluation,
+            number_of_significant_features=number_of_significant_features,
+            sampling_strategy=float(sampling_strategy)
+            if isinstance(sampling_strategy, (int, float))
+            else 0.75,
+            save_all_features=save_all_features,
+            plot_significant_features=plot_significant_features,
+            n_jobs=n_jobs,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
+
+        if save_model:
+            self.save_model()
+
         return self
 
     def forecast(
@@ -1133,5 +1232,149 @@ class ForecastModel:
 
         self.ModelPredictor = model_predictor
         self.prediction_df = df_prediction
+
+        self._config.forecast = ForecastConfig(
+            start_date=str(to_datetime(start_date).date()),
+            end_date=str(to_datetime(end_date).date()),
+            window_size=window_size,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            save_predictions=save_predictions,
+            save_plot=save_plot,
+            n_jobs=n_jobs,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
+
+        self.save_config()
+
+        return self
+
+    # ------------------------------------------------------------------
+    # Configuration persistence helpers
+    # ------------------------------------------------------------------
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Save the accumulated pipeline configuration to disk.
+
+        Writes all parameters that have been set so far (model init plus any
+        stage that has been called) to a YAML or JSON file.
+
+        Args:
+            path (str | None): Destination file path. Defaults to
+                ``{station_dir}/config.yaml`` (or ``config.json`` when
+                ``fmt="json"``).
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The path where the file was written.
+        """
+        if path is None:
+            ext = "json" if fmt == "json" else "yaml"
+            path = os.path.join(self.station_dir, f"config.{ext}")
+        return self._config.save(path, fmt=fmt)
+
+    @classmethod
+    def from_config(cls, path: str) -> Self:
+        """Construct a ``ForecastModel`` from a previously saved config file.
+
+        Loads the YAML or JSON config, creates a new ``ForecastModel`` from
+        the ``model`` section, and attaches the full config so that
+        ``run()`` can replay all stages.
+
+        Args:
+            path (str): Path to the config file produced by ``save_config()``.
+
+        Returns:
+            Self: A new instance initialised from the saved config.
+                Call ``run()`` on the result to replay the full pipeline.
+
+        Raises:
+            FileNotFoundError: If *path* does not exist.
+        """
+        config = PipelineConfig.load(path)
+        fm = cls(**config.model.to_dict())
+        fm._loaded_config = config
+        return fm
+
+    def save_model(self, path: str | None = None) -> str:
+        """Serialise the full ``ForecastModel`` instance to disk via joblib.
+
+        Saving the entire object allows resuming from any pipeline stage
+        without re-running earlier steps. The default destination is
+        ``{station_dir}/forecast_model.pkl``.
+
+        Args:
+            path (str | None): Destination file path. Defaults to
+                ``{station_dir}/forecast_model.pkl``.
+
+        Returns:
+            str: The path where the file was written.
+        """
+        path = path or os.path.join(self.station_dir, "forecast_model.pkl")
+        joblib.dump(self, path)
+        return path
+
+    @classmethod
+    def load_model(cls, path: str) -> Self:
+        """Restore a ``ForecastModel`` instance from a joblib pickle file.
+
+        All pipeline state (tremor data, labels, features, trained models)
+        is restored from the saved object, so you can call further pipeline
+        methods (e.g. ``forecast()``) without re-running prior stages.
+
+        Args:
+            path (str): Path to a ``forecast_model.pkl`` file produced by
+                ``save_model()``.
+
+        Returns:
+            Self: The restored instance.
+
+        Raises:
+            FileNotFoundError: If *path* does not exist.
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Model file not found: {path}")
+        return joblib.load(path)
+
+    def run(self) -> Self:
+        """Replay the full pipeline from a loaded configuration.
+
+        Calls each pipeline stage in order (``calculate`` →
+        ``build_label`` → ``extract_features`` → ``train`` →
+        ``forecast``) using the parameters stored in the loaded config.
+        Stages whose config section is absent are skipped.
+
+        This method is only meaningful when the instance was created via
+        ``from_config()``.
+
+        Returns:
+            Self: This instance after all stages have been executed.
+
+        Raises:
+            RuntimeError: If the instance was not created via ``from_config()``.
+        """
+        config = self._loaded_config
+        if config is None:
+            raise RuntimeError(
+                "run() is only available when the instance was created via "
+                "ForecastModel.from_config(path)."
+            )
+
+        if config.calculate is not None:
+            self.calculate(**config.calculate.to_dict())
+        if config.build_label is not None:
+            self.build_label(**config.build_label.to_dict())
+        if config.extract_features is not None:
+            self.extract_features(**config.extract_features.to_dict())
+        if config.train is not None:
+            self.train(**config.train.to_dict())
+        if config.forecast is not None:
+            self.forecast(**config.forecast.to_dict())
 
         return self
