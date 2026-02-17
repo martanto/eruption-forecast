@@ -27,6 +27,7 @@
 16. [ModelPredictor Code Quality and API Update](#modelpredictor-code-quality-and-api-update-2026-02-16)
 17. [Tremor Module Docstring Standardization](#tremor-module-docstring-standardization-2026-02-16)
 18. [Features Module Docstring Standardization](#features-module-docstring-standardization-2026-02-16)
+19. [Plots Module Docstring Standardization](#plots-module-docstring-standardization-2026-02-16)
 ---
 
 ## Package Overview
@@ -1480,9 +1481,116 @@ The features module documentation now aligns with:
 All three modules now follow identical docstring standards, providing a consistent developer experience across the entire package.
 
 ---
-## 2026-02-17 - Model Module Docstrings Standardization
+## 2026-02-17 - Plots Module Docstrings Standardization
 
-Fixed ALL docstrings in model module (6 files) following Google Docstring format.
-Files: __init__.py, classifier_model.py, model_evaluator.py, model_trainer.py, model_predictor.py, forecast_model.py
-Added Attributes sections, enhanced Args/Returns/Examples for 5 classes and 30+ methods.
+### Branch
+`copilot/fix-plots-docstrings`
 
+### Overview
+Fixed ALL docstrings in the plots module (6 files) to conform to Google Docstring format. Enhanced documentation with detailed parameter descriptions, comprehensive examples, and explicit type information for all plotting functions.
+
+### Files Modified
+
+1. **`__init__.py`** - Module-level docstring (already good, no changes needed)
+2. **`styles.py`** - Style configuration and helper functions (5 functions)
+3. **`tremor_plots.py`** - Tremor time-series visualization (3 functions)
+4. **`feature_plots.py`** - Feature importance plotting (3 functions)
+5. **`evaluation_plots.py`** - Model evaluation plots (7 functions)
+6. **`forecast_plots.py`** - Forecast probability visualization (2 functions)
+
+### Key Improvements
+
+#### styles.py Enhancements
+- **`setup_nature_style()`**: Added detailed description of rcParams configuration
+- **`apply_nature_style()`**: Clarified context manager behavior and state restoration
+- **`get_color()`**: Expanded Args with palette examples and specific color names/indices
+- **`configure_spine()`**: Detailed spine visibility and styling explanation
+- **`get_figure_size()`**: Listed all 6 size options with dimensions in docstring
+
+#### tremor_plots.py Enhancements
+- **`plot_tremor()`**: Detailed all parameters including interval behavior, color scheme (RSAM=blue, DSAR=orange), and auto-naming logic
+- **`_process_single_tremor_file()`**: Added comprehensive helper function docs with multiprocessing context
+- **`replot_tremor()`**: Enhanced with extensive examples showing parallel processing, custom parameters, and output directory behavior
+
+#### feature_plots.py Enhancements
+- **`plot_significant_features()`**: Detailed explanation of auto-scaling logic for figsize, color coding (top features=blue, others=gray), and value label behavior
+- **`_process_single_file()`**: Documented auto-detection logic for features_column and values_column
+- **`replot_significant_features()`**: Added examples with parallel processing and custom feature counts
+
+#### evaluation_plots.py Enhancements
+All 7 evaluation plotting functions enhanced:
+- **`plot_confusion_matrix()`**: Normalization modes explained, label scheme documented
+- **`plot_roc_curve()`**: AUC annotation and reference line behavior detailed
+- **`plot_precision_recall_curve()`**: Baseline calculation explained
+- **`plot_threshold_analysis()`**: Detailed metric calculations and optimal threshold logic
+- **`plot_feature_importance()`**: VotingClassifier averaging logic, model compatibility documented
+- **`plot_calibration()`**: Calibration strategy and binning explained
+- **`plot_prediction_distribution()`**: Class separation visualization purpose clarified
+
+#### forecast_plots.py Enhancements
+- **`plot_forecast()`**: Dual-panel layout detailed, multi-model vs single-model mode explained, column naming conventions documented
+- **`plot_forecast_with_events()`**: Event marker behavior, date range filtering, and visual styling explained
+
+### Type Safety Fix
+Added type annotation for `importances` variable in `plot_feature_importance()` with `# type: ignore[assignment]` comment to resolve sklearn's untyped `feature_importances_` attribute.
+
+### Documentation Standards Applied
+
+All docstrings now include:
+
+1. **Summary**: One-line description of function purpose
+2. **Description**: Detailed explanation with usage context (1-2 sentences)
+3. **Args**: All parameters with explicit types and comprehensive descriptions
+   - Parameter ranges, units, and defaults clearly stated
+   - Color schemes, styling options, and plot parameters documented
+4. **Returns**: Explicit return types (plt.Figure, None, dict, etc.) with descriptions
+5. **Raises**: All exceptions documented (FileNotFoundError, NotADirectoryError, ValueError)
+6. **Examples**: Multiple usage examples in >>> format
+   - Basic usage examples
+   - Advanced usage with custom parameters
+   - Multi-model and parallel processing examples
+
+### Plot Parameter Documentation
+
+Special attention given to documenting:
+- **Color palettes**: Okabe-Ito colorblind-safe colors, NATURE_COLORS mapping
+- **Figure sizes**: Journal column widths (Nature/Science standards)
+- **DPI settings**: Screen (100), print (150), publication (300)
+- **Styling elements**: Spine configuration, grid settings, font sizes
+- **Layout behavior**: Auto-scaling logic, tight_layout vs constrained_layout
+
+### Quality Metrics
+
+| Metric | Count |
+|--------|-------|
+| Files Modified | 5 (excluding __init__.py) |
+| Total Edits | 15 |
+| Functions Documented | 20 |
+| Examples Added | 30+ |
+| Type Hints Enhanced | All parameters |
+
+### Validation
+
+- **Linting:** ✓ All files passed `uv run ruff check --fix src/eruption_forecast/plots/`
+- **Type Checking:** ✓ All files passed `uvx ty check src/eruption_forecast/plots/`
+- **Consistency:** ✓ Follows same standards as tremor, label, features, and model modules
+
+### Impact
+
+- **Improved Developer Experience:** Clear API documentation for all plotting functions
+- **Better IDE Support:** Enhanced autocomplete with detailed parameter descriptions
+- **Easier Customization:** Examples show how to modify colors, sizes, titles, and styling
+- **Professional Standards:** Google-style docstrings align with Python best practices
+- **Complete Coverage:** All 5 core modules (tremor, label, features, model, plots) now standardized
+
+### Cross-Module Consistency
+
+The plots module documentation now aligns with:
+- **Tremor module** (standardized 2026-02-16)
+- **Label module** (standardized 2026-02-16)
+- **Features module** (standardized 2026-02-16)
+- **Model module** (standardized 2026-02-17)
+
+All five modules now follow identical docstring standards, providing a consistent developer experience across the entire package.
+
+---
