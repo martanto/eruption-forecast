@@ -6,7 +6,7 @@ computation, and eruption probability prediction.
 
 import os
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import numpy as np
 import joblib
@@ -25,10 +25,7 @@ from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
-
-
-if TYPE_CHECKING:
-    from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 def random_under_sampler(
