@@ -141,46 +141,90 @@ uv sync --group dev
 
 ## Quick Start: Complete Pipeline
 
-Here's a minimal end-to-end example from raw seismic data to trained models:
+Here's a complete end-to-end example from raw seismic data to trained models and eruption forecasting (adapted from `main.py`):
 
 ```python
 from eruption_forecast import ForecastModel
 
+# Initialize the forecast model with station and time range
 fm = ForecastModel(
+    root_dir="output",              # All outputs anchored to this directory
     station="OJN",
     channel="EHZ",
     start_date="2025-01-01",
     end_date="2025-12-31",
-    window_size=2,
-    volcano_id="LEWOTOBI",
-    root_dir="/path/to/project",  # all output paths are anchored here
-    n_jobs=4,
+    window_size=2,                   # 2-day windows for feature extraction
+    volcano_id="Lewotobi Laki-laki",
+    n_jobs=4,                        # Parallel processing
     verbose=True,
 )
 
+# Complete pipeline with method chaining
 fm.calculate(
     source="sds",
     sds_dir="/path/to/sds/data",
+    plot_daily=True,                 # Generate daily tremor plots
+    save_plot=True,
+    remove_outlier_method="maximum", # Remove outliers from tremor data
 ).build_label(
-    day_to_forecast=2,
+    start_date="2025-01-01",
+    end_date="2025-07-24",           # Training period ends before last eruption
+    day_to_forecast=2,               # Label windows 2 days before eruptions
     window_step=6,
     window_step_unit="hours",
     eruption_dates=[
         "2025-03-20",
-        "2025-06-15",
-        "2025-09-10",
+        "2025-04-22",
+        "2025-05-18",
+        "2025-06-17",
+        "2025-07-07",
     ],
 ).extract_features(
     select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+    save_tremor_matrix_per_method=True,
+    exclude_features=[               # Exclude problematic features
+        "agg_linear_trend",
+        "linear_trend_timewise",
+        "length",
+    ],
+    use_relevant_features=True,      # Apply tsfresh relevance filtering
 ).train(
-    classifier="xgb",
+    classifier="rf",                 # Random Forest classifier
     cv_strategy="stratified",
     random_state=0,
-    total_seed=500,
+    total_seed=500,                  # Train 500 models with different seeds
+    with_evaluation=False,           # Train on full dataset (use for production)
     number_of_significant_features=20,
-    sampling_strategy=0.75,
+    sampling_strategy=0.75,          # Balance classes (75% of majority class)
+    save_all_features=True,
+    plot_significant_features=True,
+).forecast(
+    start_date="2025-07-28",         # Forecast period (future data)
+    end_date="2025-08-04",
+    window_size=2,
+    window_step=10,                  # 10-minute windows for real-time forecasting
+    window_step_unit="minutes",
 )
 ```
+
+**What this pipeline does:**
+
+1. **Calculate tremor** (RSAM/DSAR) from raw seismic data with outlier removal
+2. **Build labels** from known eruption dates (training period: Jan 1 - Jul 24)
+3. **Extract features** using tsfresh (700+ features) and select top 20
+4. **Train models** using Random Forest with 500 random seeds for robust predictions
+5. **Forecast** future eruptions (Jul 28 - Aug 4) using the trained ensemble
+
+**Output includes:**
+- Tremor CSV files with daily plots
+- Label CSV with eruption windows
+- Extracted features and selected top 20
+- 500 trained models (.pkl files)
+- Model registry CSV
+- Forecast predictions with probabilities, uncertainty, and confidence
+- Eruption forecast plot
+
+See `main.py` in the repository for the complete working example.
 
 ---
 
@@ -854,7 +898,7 @@ print(sig_features.head(10))
 
 ### ForecastModel — Orchestrated Pipeline
 
-`ForecastModel` chains the entire pipeline in a single fluent API. It internally delegates to `ModelTrainer.train_and_evaluate()` or `ModelTrainer.train()` (controlled by `with_evaluation`) when you call `.train()`.
+`ForecastModel` chains the entire pipeline in a single fluent API, from raw seismic data to eruption forecasting. It internally delegates to `ModelTrainer.train_and_evaluate()` or `ModelTrainer.train()` (controlled by `with_evaluation`) when you call `.train()`, and uses `ModelPredictor` internally for `.forecast()`.
 
 #### ForecastModel constructor parameters
 
@@ -865,7 +909,7 @@ print(sig_features.head(10))
 | `start_date` | `str \| datetime` | — | Training period start date (`YYYY-MM-DD`) |
 | `end_date` | `str \| datetime` | — | Training period end date (`YYYY-MM-DD`) |
 | `window_size` | `int` | — | Duration (days) of each tremor window fed into tsfresh |
-| `volcano_id` | `str` | — | Identifier used in output filenames (e.g. `"LEWOTOBI"`) |
+| `volcano_id` | `str` | — | Identifier used in output filenames (e.g. `"Lewotobi Laki-laki"`) |
 | `network` | `str` | `"VG"` | Seismic network code |
 | `location` | `str` | `"00"` | Seismic location code |
 | `output_dir` | `str \| None` | `None` | Base output directory; relative paths are resolved against `root_dir`. Defaults to `root_dir/output` |
@@ -875,56 +919,96 @@ print(sig_features.head(10))
 | `verbose` | `bool` | `False` | Enable verbose logging |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
-
+#### Complete Pipeline Example (from `main.py`)
 
 ```python
-from eruption_forecast.model.forecast_model import ForecastModel
+from eruption_forecast import ForecastModel
 
+# Initialize with station and time parameters
 model = ForecastModel(
+    root_dir="output",
     station="OJN",
     channel="EHZ",
     start_date="2025-01-01",
     end_date="2025-12-31",
     window_size=2,
-    volcano_id="LEWOTOBI",
-    network="VG",
-    location="00",
+    volcano_id="Lewotobi Laki-laki",
     n_jobs=4,
     verbose=True,
 )
 
+# Chain all pipeline stages
 model.calculate(
     source="sds",
-    sds_dir="/data/sds",
-    plot_tmp=True,
+    sds_dir="/path/to/sds/data",
+    plot_daily=True,
     save_plot=True,
+    remove_outlier_method="maximum",
 ).build_label(
+    start_date="2025-01-01",
+    end_date="2025-07-24",           # Training period
+    day_to_forecast=2,
     window_step=6,
     window_step_unit="hours",
-    day_to_forecast=2,
-    eruption_dates=["2025-03-20", "2025-06-15"],
+    eruption_dates=[
+        "2025-03-20",
+        "2025-04-22",
+        "2025-05-18",
+        "2025-06-17",
+        "2025-07-07",
+    ],
 ).extract_features(
     select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+    save_tremor_matrix_per_method=True,
+    exclude_features=[
+        "agg_linear_trend",
+        "linear_trend_timewise",
+        "length",
+    ],
     use_relevant_features=True,
 ).train(
-    classifier="xgb",
+    classifier="rf",
     cv_strategy="stratified",
     random_state=0,
     total_seed=500,
+    with_evaluation=False,           # Train on full dataset for forecasting
     number_of_significant_features=20,
     sampling_strategy=0.75,
+    save_all_features=True,
+    plot_significant_features=True,
+).forecast(
+    start_date="2025-07-28",         # Future forecast period
+    end_date="2025-08-04",
+    window_size=2,
+    window_step=10,
+    window_step_unit="minutes",
 )
+
+# Access results
+print(f"Trained models: {model.trained_model_csv}")
+print(f"Forecast predictions: {model.predictions_csv}")
+print(f"Forecast plot: {model.forecast_plot_path}")
 ```
 
-If you already have pre-calculated tremor data, skip the `calculate()` step:
+**Pipeline stages:**
+
+1. **calculate()** — Process raw seismic data into RSAM/DSAR tremor metrics
+2. **build_label()** — Create binary labels from eruption dates
+3. **extract_features()** — Extract 700+ tsfresh features from tremor windows
+4. **train()** — Train classifier ensemble with feature selection
+5. **forecast()** — Generate probabilistic eruption predictions for future period
+
+#### Alternative Workflows
+
+**Skip tremor calculation if data already exists:**
 
 ```python
 model.load_tremor_data(
     tremor_csv="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv"
-).build_label(...).extract_features(...).train(...)
+).build_label(...).extract_features(...).train(...).forecast(...)
 ```
 
-Change feature selection method before training:
+**Change feature selection method:**
 
 ```python
 model.set_feature_selection_method("combined").train(
@@ -934,24 +1018,14 @@ model.set_feature_selection_method("combined").train(
 )
 ```
 
-`ForecastModel.train()` passes `with_evaluation` to `ModelTrainer.fit()` internally. Set `with_evaluation=False` to train on the full dataset without an 80/20 split. Alternatively, use `ModelTrainer` directly after calling `fm.extract_features()`:
+**Train with evaluation (80/20 split) for in-sample testing:**
 
 ```python
-from eruption_forecast.model.model_trainer import ModelTrainer
-
-# After running fm.extract_features(), features and labels are at:
-#   fm.features_csv  — extracted features
-#   fm.label_csv     — aligned labels
-
-trainer = ModelTrainer(
-    extracted_features_csv=fm.features_csv,
-    label_features_csv=fm.label_csv,
-    output_dir="output/trainings",
+model.train(
     classifier="xgb",
-    cv_strategy="stratified",
-    n_jobs=4,
+    with_evaluation=True,  # Split data for evaluation
+    total_seed=100,
 )
-trainer.train(random_state=0, total_seed=500)  # Full-dataset training
 ```
 
 ### Comparing Multiple Classifiers
