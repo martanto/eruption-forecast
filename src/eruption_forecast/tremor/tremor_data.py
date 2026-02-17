@@ -12,26 +12,27 @@ class TremorData:
 
     Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR) and exposes
     convenience properties for common metadata. Data can be supplied
-    directly as a DataFrame or loaded from a CSV file via :meth:`from_csv`.
-
-    Args:
-        df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame
-            with a DatetimeIndex. If None, an empty DataFrame is used until
-            :meth:`from_csv` is called. Defaults to None.
-        verbose (bool, optional): If True, emit informational log messages.
-            Defaults to False.
-        debug (bool, optional): If True, emit debug-level log messages.
-            Defaults to False.
+    directly as a DataFrame or loaded from a CSV file.
 
     Attributes:
         csv (str | None): Path to the source CSV file, set by
             :meth:`from_csv`. Defaults to None.
-        verbose (bool): Verbosity flag.
-        debug (bool): Debug flag.
+        verbose (bool): If True, emit informational log messages.
+        debug (bool): If True, emit debug-level log messages.
+
+    Args:
+        df (pd.DataFrame | None): Pre-loaded tremor DataFrame
+            with a DatetimeIndex. If None, an empty DataFrame is used until
+            :meth:`from_csv` is called. Defaults to None.
+        verbose (bool): If True, emit informational log messages.
+            Defaults to False.
+        debug (bool): If True, emit debug-level log messages.
+            Defaults to False.
 
     Examples:
         >>> tremor = TremorData(df=my_df)
         >>> tremor = TremorData(verbose=True).from_csv("tremor.csv")
+        >>> print(tremor.start_date_str, tremor.end_date_str)
     """
 
     def __init__(
@@ -102,7 +103,11 @@ class TremorData:
 
     @df.setter
     def df(self, df: pd.DataFrame) -> None:
-        """Set tremor dataframe"""
+        """Set the tremor DataFrame.
+
+        Args:
+            df (pd.DataFrame): Tremor DataFrame to set.
+        """
         self._df = df
 
     @cached_property

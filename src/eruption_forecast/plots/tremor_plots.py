@@ -32,36 +32,44 @@ def plot_tremor(
     """Plot tremor data as a multi-panel time series with publication-quality styling.
 
     Creates one subplot per column in the DataFrame (or per selected column),
-    with Nature/Science journal formatting, colorblind-safe colors, and
-    configurable x-axis tick interval.
+    with Nature/Science journal formatting, colorblind-safe colors (Okabe-Ito palette),
+    and configurable x-axis tick interval. RSAM columns use blue tones, DSAR uses orange.
 
     Args:
-        df (pd.DataFrame): Tremor data with a DatetimeIndex.
-        interval (int, optional): Tick interval for the x-axis. Defaults to 1.
+        df (pd.DataFrame): Tremor data with a DatetimeIndex and columns like
+            "rsam_f0", "rsam_f1", "dsar_f0-f1", etc.
+        interval (int, optional): Tick interval for the x-axis. Works with
+            interval_unit to set tick spacing. Defaults to 1.
         interval_unit (Literal["hours", "days"], optional): Unit for the tick
-            interval — ``"hours"`` or ``"days"``. Defaults to ``"hours"``.
+            interval. Must be either "hours" or "days". Defaults to "hours".
         filename (str | None, optional): Output filename stem (extension is
-            added automatically). If None, a name is derived from the date
-            range. Defaults to None.
+            added automatically as .png). If None, a name is auto-generated from
+            the date range as "tremor_YYYY-MM-DD_YYYY-MM-DD". Defaults to None.
         figure_dir (str | None, optional): Directory to save the figure. If
-            None, saves to ``<cwd>/figures``. Defaults to None.
-        title (str | None, optional): X-axis label / plot title. If None, the
-            date range is used. Defaults to None.
+            None, saves to "<cwd>/figures". Directory is created if it doesn't
+            exist. Defaults to None.
+        title (str | None, optional): X-axis label / plot subtitle. If None, the
+            date range is used (e.g., "2025-03-16 to 2025-03-22"). Defaults to None.
         overwrite (bool, optional): If True, overwrite an existing file with
-            the same name. Defaults to True.
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
-        selected_columns (list[str] | None, optional): Subset of columns to
+            the same name. If False, skip plotting if file exists. Defaults to True.
+        dpi (int, optional): Figure resolution in dots per inch for saved PNG.
+            Defaults to 150.
+        selected_columns (list[str] | None, optional): Subset of column names to
             plot. If None, all columns are plotted. Defaults to None.
-        verbose (bool, optional): If True, log a message when the file is
+        verbose (bool, optional): If True, log informational messages when the file is
             saved or already exists. Defaults to False.
 
     Returns:
-        None
+        None: Saves figure to disk, does not return matplotlib objects.
 
     Examples:
         >>> import pandas as pd
+        >>> # Plot with 6-hour ticks
         >>> plot_tremor(df, interval=6, interval_unit="hours",
         ...            figure_dir="output/figures", overwrite=False)
+        >>> # Plot only RSAM columns with daily ticks
+        >>> plot_tremor(df, interval=1, interval_unit="days",
+        ...            selected_columns=["rsam_f0", "rsam_f1", "rsam_f2"])
     """
     start_date: pd.Timestamp = df.index[0]
     end_date: pd.Timestamp = df.index[-1]
@@ -180,23 +188,29 @@ def _process_single_tremor_file(
 
     Helper function for batch processing in replot_tremor(). Loads a tremor
     CSV file, generates a plot using plot_tremor(), and returns the processing
-    status.
+    status. Designed for use with multiprocessing.Pool.starmap().
 
     Args:
-        csv_path (Path): Path to the CSV file containing tremor data.
-        output_dir (Path): Directory where the plot will be saved.
+        csv_path (Path): Path to the CSV file containing tremor data. Must have
+            a datetime index and tremor columns (e.g., rsam_f0, dsar_f0-f1).
+        output_dir (Path): Directory where the plot PNG will be saved.
         overwrite (bool): If True, overwrite existing plots. If False, skip
-            if plot already exists.
+            plotting if output file already exists.
         plot_tremor_kwargs (dict): Additional keyword arguments to pass to
-            plot_tremor().
+            plot_tremor(). Can include "interval", "interval_unit",
+            "selected_columns", "dpi", etc.
 
     Returns:
-        str: Processing status - "created", "skipped", or "failed".
+        str: Processing status - one of "created", "skipped", or "failed".
+
+    Raises:
+        Does not raise exceptions. Errors are logged via logger.error() and
+        "failed" status is returned.
 
     Notes:
         - CSV file is expected to have a datetime index and tremor columns
         - Filename stem is used as the plot filename
-        - Errors are logged but don't raise exceptions
+        - Errors are logged but don't raise exceptions for robustness
     """
     try:
         # Load CSV with datetime index
@@ -292,6 +306,7 @@ def replot_tremor(
         ...     interval=6,
         ...     interval_unit="hours",
         ...     dpi=300,
+        ...     selected_columns=["rsam_f0", "rsam_f1"],
         ... )
 
     Notes:

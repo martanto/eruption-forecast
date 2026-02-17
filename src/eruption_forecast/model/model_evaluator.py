@@ -36,26 +36,53 @@ from eruption_forecast.plots.evaluation_plots import (
 class ModelEvaluator:
     """Evaluate a fitted classifier on a test set.
 
-    Wraps a trained model and test data to provide metrics, a text summary,
-    and plots. Predictions are computed once on construction and cached.
+    Wraps a trained model and test data to provide comprehensive evaluation
+    metrics, text summaries, and visualization plots. Predictions are computed
+    once on construction and cached for efficiency.
+
+    Attributes:
+        model (BaseEstimator): Fitted sklearn estimator (unwrapped from GridSearchCV if needed).
+        X_test (pd.DataFrame): Test features DataFrame.
+        y_test (pd.Series): True test labels Series.
+        model_name (str): Model identifier used in plot titles and filenames.
+        output_dir (str): Directory path for saved plots.
+        _y_pred (np.ndarray): Cached predictions on test set.
+        _y_proba (np.ndarray | None): Cached probability estimates (None if unavailable).
+        _metrics (dict[str, Any] | None): Cached evaluation metrics dictionary.
 
     Args:
-        model: Fitted sklearn estimator or GridSearchCV (best_estimator_ is used).
-        X_test: Test features.
-        y_test: True test labels.
-        model_name: Name used in plot titles and filenames. Defaults to "model".
-        output_dir: Directory for saved plots. If None, defaults to
-            ``root_dir/output/evaluation``. Relative paths are resolved against
-            ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None). Absolute
-            paths are used as-is. Defaults to None.
-        selected_features: If provided, filter X_test to these columns before predicting.
-        root_dir: Anchor directory for resolving relative ``output_dir`` values.
-            Defaults to None (uses ``os.getcwd()``).
+        model (BaseEstimator | GridSearchCV): Fitted sklearn estimator or GridSearchCV
+            (best_estimator_ is extracted automatically).
+        X_test (pd.DataFrame): Test features DataFrame.
+        y_test (pd.Series): True test labels Series.
+        model_name (str, optional): Name used in plot titles and filenames.
+            Defaults to "model".
+        output_dir (str | None, optional): Directory for saved plots. If None,
+            defaults to ``root_dir/output/evaluation``. Relative paths are resolved
+            against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
+            Absolute paths are used as-is. Defaults to None.
+        selected_features (list[str] | None, optional): If provided, filter X_test
+            to these columns before predicting. Defaults to None.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
 
-    Example:
+    Raises:
+        ValueError: If model is not fitted or X_test/y_test shapes are incompatible.
+
+    Examples:
+        >>> # Evaluate a fitted model
         >>> evaluator = ModelEvaluator(model, X_test, y_test, model_name="rf_seed_42")
         >>> print(evaluator.summary())
         >>> evaluator.plot_all()
+
+        >>> # Load model from file
+        >>> evaluator = ModelEvaluator.from_files(
+        ...     model_path="models/rf_00000.pkl",
+        ...     X_test="features/X_test.csv",
+        ...     y_test="features/y_test.csv",
+        ... )
+        >>> metrics = evaluator.get_metrics()
+        >>> print(f"F1: {metrics['f1_score']:.3f}")
     """
 
     def __init__(
@@ -100,16 +127,34 @@ class ModelEvaluator:
     ) -> "ModelEvaluator":
         """Load model and data from files and construct a ModelEvaluator.
 
+        Convenience factory method to load a saved model and test data from
+        disk and create an evaluator instance.
+
         Args:
-            model_path: Path to a joblib-saved model file.
-            X_test: Test features DataFrame or path to CSV.
-            y_test: True test labels Series or path to CSV.
-            selected_features: If provided, filter X_test to these columns.
-            model_name: Name identifier for the model. Defaults to "model".
-            output_dir: Directory for saved plots. Defaults to None.
+            model_path (str): Path to a joblib-saved model file (.pkl).
+            X_test (pd.DataFrame | str): Test features DataFrame or path to CSV file.
+            y_test (pd.Series | str): True test labels Series or path to CSV file.
+            selected_features (list[str] | None, optional): If provided, filter
+                X_test to these columns. Defaults to None.
+            model_name (str, optional): Name identifier for the model.
+                Defaults to "model".
+            output_dir (str | None, optional): Directory for saved plots.
+                Defaults to None.
 
         Returns:
-            ModelEvaluator ready for metrics and plots.
+            ModelEvaluator: Configured evaluator instance ready for metrics and plots.
+
+        Raises:
+            FileNotFoundError: If model_path, X_test path, or y_test path does not exist.
+
+        Examples:
+            >>> evaluator = ModelEvaluator.from_files(
+            ...     model_path="models/xgb_00042.pkl",
+            ...     X_test="data/X_test.csv",
+            ...     y_test="data/y_test.csv",
+            ...     model_name="xgb_seed_42",
+            ... )
+            >>> print(evaluator.summary())
         """
         model = joblib.load(model_path)
 
@@ -409,19 +454,34 @@ class ModelEvaluator:
         self,
         criterion: Literal["f1", "balanced_accuracy", "recall", "precision"] = "f1",
     ) -> tuple[float, dict[str, float]]:
-        """Sweep thresholds and return the one maximising the given criterion.
+        """Find the decision threshold that maximizes the given criterion.
+
+        Sweeps through thresholds from 0.0 to 1.0 in 0.01 increments and
+        evaluates each one against the specified metric. Returns the optimal
+        threshold and corresponding metric values.
 
         Args:
-            criterion: Metric to optimise. One of ``"f1"``, ``"balanced_accuracy"``,
-                ``"recall"``, or ``"precision"``.
+            criterion (Literal["f1", "balanced_accuracy", "recall", "precision"], optional):
+                Metric to optimize. Defaults to "f1".
 
         Returns:
-            Tuple of ``(threshold, metrics_at_threshold)`` where
-            ``metrics_at_threshold`` contains f1, balanced_accuracy, recall, and
-            precision at the optimal threshold.
+            tuple[float, dict[str, float]]: A 2-tuple containing:
+
+                - **threshold** (float): Optimal decision threshold (0.0 to 1.0).
+                - **metrics_at_threshold** (dict): Dictionary with keys "f1",
+                  "balanced_accuracy", "recall", "precision" evaluated at the
+                  optimal threshold.
 
         Raises:
-            ValueError: If probabilities are not available.
+            ValueError: If probability predictions are not available.
+
+        Examples:
+            >>> thresh, metrics = evaluator.optimize_threshold(criterion="f1")
+            >>> print(f"Optimal threshold: {thresh:.3f}")
+            >>> print(f"F1 at optimal: {metrics['f1']:.3f}")
+
+            >>> # Optimize for recall instead
+            >>> thresh, metrics = evaluator.optimize_threshold(criterion="recall")
         """
         if self._y_proba is None:
             raise ValueError("optimize_threshold requires probability predictions")

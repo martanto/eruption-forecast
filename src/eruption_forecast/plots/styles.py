@@ -116,13 +116,19 @@ SPINE_CONFIG: dict[str, Any] = {
 def setup_nature_style() -> dict:
     """Create matplotlib rcParams dict for Nature/Science journal style.
 
-    Returns:
-        dict: Matplotlib rcParams configuration dictionary.
+    Generates a complete configuration dictionary with publication-quality settings
+    including fonts, figure dimensions, axes styling, and color palettes.
 
-    Example:
+    Returns:
+        dict: Matplotlib rcParams configuration dictionary containing keys for
+            font settings, figure DPI, axes styling, grid configuration, and
+            color cycles.
+
+    Examples:
         >>> import matplotlib.pyplot as plt
         >>> style = setup_nature_style()
         >>> plt.rcParams.update(style)
+        >>> # Now all plots will use Nature/Science styling
     """
     return {
         # Font configuration
@@ -179,17 +185,18 @@ def apply_nature_style():
     """Context manager to temporarily apply Nature/Science journal style.
 
     Applies publication-quality styling within the context and restores
-    previous matplotlib settings upon exit.
+    previous matplotlib settings upon exit. Safe to nest and won't leak settings.
 
     Yields:
-        None
+        None: Context manager yields nothing but manages rcParams state.
 
-    Example:
+    Examples:
         >>> import matplotlib.pyplot as plt
         >>> with apply_nature_style():
         ...     fig, ax = plt.subplots()
         ...     ax.plot([1, 2, 3], [1, 4, 9])
         ...     plt.savefig("styled_plot.png")
+        >>> # Previous matplotlib settings are now restored
     """
     original_params = mpl.rcParams.copy()
     try:
@@ -205,22 +212,30 @@ def get_color(
 ) -> str:
     """Get a color from a named palette.
 
+    Retrieves a hex color code from either the NATURE_COLORS or OKABE_ITO palette.
+    For Nature palette, use color names. For Okabe-Ito, use numeric indices (0-7).
+
     Args:
-        name (str): Color name (for "nature") or index (for "okabe_ito").
-        palette (Literal["nature", "okabe_ito"], optional): Palette name.
-            Defaults to "nature".
+        name (str): Color name (for "nature") like "blue", "red", "green", etc.,
+            or numeric index as string (for "okabe_ito") like "0", "1", ..., "7".
+        palette (Literal["nature", "okabe_ito"], optional): Palette identifier.
+            Use "nature" for named colors or "okabe_ito" for colorblind-safe
+            indexed palette. Defaults to "nature".
 
     Returns:
-        str: Hex color code.
+        str: Hex color code (e.g., "#1f77b4").
 
     Raises:
-        ValueError: If color name or index is invalid.
+        ValueError: If color name is not in NATURE_COLORS, if index is out of
+            range for OKABE_ITO (must be 0-7), or if palette name is invalid.
 
-    Example:
+    Examples:
         >>> get_color("blue", "nature")
         '#1f77b4'
-        >>> get_color("0", "okabe_ito")  # First Okabe-Ito color
+        >>> get_color("0", "okabe_ito")  # First Okabe-Ito color (orange)
         '#E69F00'
+        >>> get_color("4", "okabe_ito")  # Blue
+        '#0072B2'
     """
     if palette == "nature":
         if name not in NATURE_COLORS:
@@ -242,14 +257,19 @@ def get_color(
 def configure_spine(ax: plt.Axes, which: list[str] | None = None) -> None:
     """Configure axis spines for publication quality.
 
-    Removes top and right spines by default (Nature/Science standard).
+    Removes top and right spines by default (Nature/Science standard). Visible
+    spines are styled with consistent linewidth and color.
 
     Args:
         ax (plt.Axes): Matplotlib axes object to configure.
-        which (list[str] | None, optional): List of spines to keep.
-            If None, keeps only "left" and "bottom". Defaults to None.
+        which (list[str] | None, optional): List of spines to keep. Valid values
+            are "left", "right", "top", "bottom". If None, keeps only "left" and
+            "bottom" (standard Nature/Science format). Defaults to None.
 
-    Example:
+    Returns:
+        None: Modifies axes in-place.
+
+    Examples:
         >>> import matplotlib.pyplot as plt
         >>> fig, ax = plt.subplots()
         >>> configure_spine(ax)  # Removes top and right spines
@@ -274,16 +294,28 @@ def get_figure_size(
 ) -> tuple[float, float]:
     """Get predefined figure size for journal publications.
 
+    Returns standard figure dimensions matching Nature/Science journal column widths.
+    Single column = 89mm (3.5"), double column = 178mm (7").
+
     Args:
-        size_key (Literal): Key for predefined figure size.
+        size_key (Literal["single_column", "double_column", "full_page", "square", "wide", "tall"]):
+            Key for predefined figure size. Options are:
+            - "single_column": 3.5" × 2.625" (Nature single column width)
+            - "double_column": 7.0" × 5.25" (Nature double column width)
+            - "full_page": 7.0" × 9.0" (full page height)
+            - "square": 5.0" × 5.0" (square format)
+            - "wide": 10.0" × 3.0" (wide time-series format)
+            - "tall": 4.0" × 8.0" (tall vertical bar chart format)
 
     Returns:
         tuple[float, float]: Figure size as (width, height) in inches.
 
-    Example:
+    Examples:
         >>> get_figure_size("single_column")
         (3.5, 2.625)
         >>> get_figure_size("double_column")
         (7.0, 5.25)
+        >>> get_figure_size("wide")
+        (10.0, 3.0)
     """
     return FIGURE_SIZES[size_key]

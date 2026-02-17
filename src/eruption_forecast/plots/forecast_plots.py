@@ -23,36 +23,46 @@ def plot_forecast(
 ) -> plt.Figure:
     """Plot eruption forecast probability and confidence time-series with Nature/Science styling.
 
-    Creates a dual-panel plot showing:
-    - Top panel: Eruption probability over time with uncertainty bands
-    - Bottom panel: Model confidence over time
-
-    For multi-model mode, shows individual classifier predictions plus consensus.
-    For single-model mode, shows the model's probability and confidence.
+    Creates a dual-panel plot showing eruption probability (top) and model confidence
+    (bottom) over time. Supports both single-model and multi-model consensus modes.
+    Multi-model mode shows individual classifier predictions plus consensus with uncertainty.
 
     Args:
-        df (pd.DataFrame): Forecast DataFrame with columns:
-            - For single model: "eruption_probability", "confidence", "prediction"
-            - For multi-model: "{name}_eruption_probability", "{name}_confidence",
-              "consensus_eruption_probability", "consensus_uncertainty", etc.
+        df (pd.DataFrame): Forecast DataFrame with datetime index and columns:
+            - Single model: "eruption_probability", "confidence", "prediction"
+              (or "{model_name}_eruption_probability", etc.)
+            - Multi-model: "{name}_eruption_probability", "{name}_confidence" for
+              each classifier, plus "consensus_eruption_probability",
+              "consensus_uncertainty", "consensus_confidence"
         model_names (list[str]): List of model names (keys for multi-model columns).
+            For single model, pass a list with one name, e.g., ["xgb"].
         multi_model (bool, optional): Whether this is a multi-model consensus plot.
+            If True, plots individual classifiers with dashed lines and consensus
+            with solid black line. If False, plots single model probability.
             Defaults to False.
-        title (str | None, optional): Plot title suffix. Defaults to None.
-        figsize (tuple[float, float], optional): Figure size. Defaults to (12, 6).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title suffix appended to "Eruption Forecast".
+            If None, no suffix is added. Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (12, 6).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
         format_dates (bool, optional): If True and index is datetime, format
-            x-axis as dates. Defaults to True.
+            x-axis as dates with rotation. If False, use sequential window index.
+            Defaults to True.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with two vertically stacked subplots.
 
     Examples:
-        >>> # Single model
+        >>> # Single model forecast
         >>> fig = plot_forecast(df, model_names=["xgb"], multi_model=False)
+        >>> fig.savefig("forecast_xgb.png")
         >>>
         >>> # Multi-model consensus
-        >>> fig = plot_forecast(df, model_names=["rf", "xgb"], multi_model=True)
+        >>> fig = plot_forecast(
+        ...     df, model_names=["rf", "xgb", "gb"], multi_model=True,
+        ...     title="3-Classifier Consensus"
+        ... )
+        >>> fig.savefig("forecast_consensus.png")
     """
     # Determine x-axis values (datetime index or sequential)
     if format_dates and hasattr(df.index, "to_pydatetime"):
@@ -224,26 +234,45 @@ def plot_forecast_with_events(
 ) -> plt.Figure:
     """Plot forecast with eruption event markers overlay.
 
-    Extends plot_forecast() by adding vertical lines at known eruption dates
-    for validation purposes.
+    Extends plot_forecast() by adding vertical red lines at known eruption dates
+    for validation purposes. Useful for visually assessing model performance against
+    historical events. Only eruptions within the DataFrame's date range are marked.
 
     Args:
-        df (pd.DataFrame): Forecast DataFrame (requires datetime index).
-        model_names (list[str]): List of model names.
+        df (pd.DataFrame): Forecast DataFrame with datetime index. See plot_forecast()
+            for required columns.
+        model_names (list[str]): List of model names (keys for multi-model columns).
+            For single model, pass list with one name.
         eruption_dates (list[str] | None, optional): List of eruption dates
-            in "YYYY-MM-DD" format. If None, no markers are added. Defaults to None.
-        multi_model (bool, optional): Multi-model mode. Defaults to False.
-        title (str | None, optional): Plot title suffix. Defaults to None.
-        figsize (tuple[float, float], optional): Figure size. Defaults to (12, 6).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+            in "YYYY-MM-DD" format (e.g., ["2025-03-20", "2025-06-15"]).
+            Only dates within df.index range are plotted. If None, no markers
+            are added. Defaults to None.
+        multi_model (bool, optional): Multi-model consensus mode. If True, shows
+            individual classifiers and consensus. Defaults to False.
+        title (str | None, optional): Plot title suffix appended to "Eruption Forecast".
+            Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (12, 6).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with eruption markers overlaid on
+            both probability and confidence subplots.
 
     Examples:
+        >>> # Single model with eruption markers
         >>> fig = plot_forecast_with_events(
         ...     df, model_names=["xgb"],
         ...     eruption_dates=["2025-03-20", "2025-06-15"]
+        ... )
+        >>> fig.savefig("forecast_with_events.png")
+        >>>
+        >>> # Multi-model with validation events
+        >>> fig = plot_forecast_with_events(
+        ...     df, model_names=["rf", "xgb"],
+        ...     eruption_dates=["2025-03-20"],
+        ...     multi_model=True,
+        ...     title="Validation Period"
         ... )
     """
     # Create base forecast plot

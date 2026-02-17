@@ -30,48 +30,84 @@ from eruption_forecast.features.feature_selector import FeatureSelector
 class ModelTrainer:
     """Train feature-selection and classifier models over multiple random seeds.
 
-    Loads pre-extracted features and labels, and for each seed performs:
+    Loads pre-extracted features and labels, then for each random seed performs:
+
     1. Train/test split (80/20, stratified) to prevent data leakage
-    2. Random under-sampling on training set only
-    3. Feature selection on training set only using tsfresh
-    4. Classifier training with GridSearchCV (supports RF, GB, SVM, LR, NN, etc.)
-    5. Evaluation on held-out test set
+    2. Random under-sampling on training set only to balance classes
+    3. Feature selection on training set using tsfresh relevance filtering
+    4. Classifier training with GridSearchCV and cross-validation
+    5. Evaluation on held-out test set (when using train_and_evaluate)
 
     This multi-seed approach provides robust feature selection and model
     evaluation by averaging results across many random data splits, reducing
-    the risk of overfitting to a particular train/test split.
+    the risk of overfitting to a particular train/test configuration.
+
+    Attributes:
+        df_features (pd.DataFrame): Loaded features DataFrame (from extracted_features_csv).
+        df_labels (pd.Series): Loaded labels Series (from label_features_csv).
+        output_dir (str): Root directory for training outputs.
+        n_jobs (int): Number of parallel workers for training.
+        prefix_filename (str | None): Optional prefix for output filenames.
+        classifier (str): Classifier type ("rf", "gb", "xgb", etc.).
+        cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "timeseries").
+        cv_splits (int): Number of CV splits.
+        number_of_significant_features (int): Number of top features to save separately.
+        feature_selection_method (str): Feature selection method ("tsfresh", "random_forest", "combined").
+        overwrite (bool): Whether to overwrite existing output files.
+        verbose (bool): Enable verbose logging.
+        debug (bool): Enable debug mode.
+        FeatureSelector: Feature selection component instance.
+        ClassifierModel: Classifier configuration and model instance.
+        classifier_name (str): Human-readable classifier name.
+        classifier_slug_name (str): Slugified classifier name.
+        classifier_slug_cv_name (str): Slugified CV strategy name.
+        classifier_id (str): Unique identifier combining classifier and CV.
+        features_dir (str): Directory for feature outputs.
+        significant_features_dir (str): Directory for significant features.
+        all_features_dir (str): Directory for all features.
+        figures_dir (str): Directory for plots.
+        significant_figures_dir (str): Directory for feature importance plots.
+        classifier_dir (str): Directory for classifier outputs.
+        models_dir (str): Directory for saved model files.
+        metrics_dir (str): Directory for metrics JSON files.
+        significant_features_csvs (list[str]): Paths to per-seed significant features.
+        df_significant_features (pd.DataFrame): Aggregated significant features across seeds.
+        df (pd.DataFrame): Model registry DataFrame.
+        csv (str | None): Path to saved model registry CSV.
 
     Args:
         extracted_features_csv (str): Path to the extracted features CSV file.
-            Can be found in:
-                ``<cwd>output/{nslc}/features/all_extracted_features_{dates}.csv``, or
-                ``<cwd>output/{nslc}/features/relevant_features_{dates}.csv``
-        label_features_csv (str): Path to the label CSV file. Built by using LabelBuilder.
-            Can be found in: ``<cwd>output/{nslc}/features/label_features_{dates}.csv``
+            Located at ``output/{nslc}/features/all_extracted_features_{dates}.csv``
+            or ``output/{nslc}/features/relevant_features_{dates}.csv``.
+        label_features_csv (str): Path to the label CSV file built by LabelBuilder.
+            Located at ``output/{nslc}/features/label_features_{dates}.csv``.
         output_dir (str | None, optional): Directory for output files. If None,
             defaults to ``root_dir/output/trainings``. Relative paths are resolved
             against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
             Absolute paths are used as-is. Defaults to None.
         root_dir (str | None, optional): Anchor directory for resolving relative
             ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
-        n_jobs (int, optional): Number of parallel workers. Defaults to 1.
-        prefix_filename (str, optional): Prefix for output filenames. Defaults to None.
-        classifier (str, optional): Classifier type ("rf", "gb", "xgb", "svm", "lr",
-            "nn", "dt", "knn", "nb", "voting"). Defaults to "rf".
-        cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
-            "timeseries"). Defaults to "shuffle".
+        prefix_filename (str | None, optional): Prefix for output filenames.
+            Defaults to None.
+        classifier (Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"], optional):
+            Classifier type. Defaults to "rf".
+        cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
+            Cross-validation strategy. Defaults to "shuffle".
         cv_splits (int, optional): Number of CV splits. Defaults to 5.
         number_of_significant_features (int, optional): Number of top features
-            to save separately. If provided, creates a separate CSV with
-            the most frequently occurring features across seeds. Defaults to 20.
-        verbose (bool, optional): Verbose logging. Defaults to False.
-        debug (bool, optional): Debug mode. Defaults to False.
+            to save separately. Defaults to 20.
+        feature_selection_method (Literal["tsfresh", "random_forest", "combined"], optional):
+            Feature selection method. Defaults to "tsfresh".
+        overwrite (bool, optional): Overwrite existing output files. Defaults to False.
+        n_jobs (int, optional): Number of parallel workers. Defaults to 1.
+        verbose (bool, optional): Enable verbose logging. Defaults to False.
+        debug (bool, optional): Enable debug mode. Defaults to False.
 
     Raises:
-        ValueError: If features or labels are empty, or their lengths
-            do not match.
+        ValueError: If features or labels are empty, or their lengths do not match.
+        ValueError: If n_jobs is <= 0.
 
-    Example:
+    Examples:
         >>> # Train with Random Forest (default)
         >>> trainer = ModelTrainer(
         ...     extracted_features_csv="output/features/extracted_features.csv",
@@ -86,30 +122,32 @@ class ModelTrainer:
         ...     sampling_strategy=0.75,
         ... )
 
-        >>> # Train with Gradient Boosting
+        >>> # Train with Gradient Boosting and TimeSeriesSplit
         >>> trainer = ModelTrainer(
         ...     extracted_features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
         ...     output_dir="output/trainings",
         ...     classifier="gb",
+        ...     cv_strategy="timeseries",
         ...     n_jobs=4,
         ... )
+        >>> trainer.fit(with_evaluation=True, random_state=0, total_seed=500)
 
-        >>> # Train with VotingClassifier ensemble and StratifiedShuffleSplit
+        >>> # Train VotingClassifier ensemble with combined feature selection
         >>> trainer = ModelTrainer(
         ...     extracted_features_csv="output/features/extracted_features.csv",
         ...     label_features_csv="output/features/label_features.csv",
-        ...     output_dir="output/trainings",
         ...     classifier="voting",
         ...     cv_strategy="shuffle",
-        ...     cv_splits=5,
+        ...     feature_selection_method="combined",
         ...     n_jobs=4,
         ... )
+        >>> trainer.train(random_state=0, total_seed=500)
 
         >>> # Results saved to:
         >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/features/significant_features.csv
-        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/models/  (trained models)
-        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/metrics/ (per-seed metrics)
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/models/ (trained models .pkl)
+        >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/metrics/ (per-seed metrics .json)
         >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/all_metrics_{suffix}.csv
         >>> # - output/trainings/model-with-evaluation/{classifier}/{cv}/metrics_summary_{suffix}.csv
     """
@@ -165,10 +203,9 @@ class ModelTrainer:
         output_dir = resolve_output_dir(
             output_dir,
             root_dir,
-            os.path.join("output", "trainings"),
+            os.path.join("output"),
         )
-
-        output_dir = os.path.join(output_dir, "model-with-evaluation")
+        output_dir = os.path.join(output_dir, "trainings", "model-with-evaluation")
 
         # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
         classifier_dir = os.path.join(
@@ -299,14 +336,26 @@ class ModelTrainer:
     ) -> tuple[str, str, str, str]:
         """Extract name, slug, and identifier strings from a ClassifierModel.
 
+        Convenience method to extract various string representations of the
+        classifier and CV strategy for use in filenames and directory paths.
+
         Args:
-            classifier_model: ClassifierModel instance to inspect.
-                Defaults to ``self.ClassifierModel`` when None.
+            classifier_model (ClassifierModel | None, optional): ClassifierModel
+                instance to inspect. If None, uses ``self.ClassifierModel``.
+                Defaults to None.
 
         Returns:
-            tuple[str, str, str, str]: A four-element tuple of
-                ``(classifier_name, classifier_slug_name,
-                classifier_slug_cv_name, classifier_id)``.
+            tuple[str, str, str, str]: A 4-tuple containing:
+
+                - **classifier_name** (str): Class name (e.g., "RandomForestClassifier")
+                - **classifier_slug_name** (str): Slugified classifier name (e.g., "random-forest-classifier")
+                - **classifier_slug_cv_name** (str): Slugified CV name (e.g., "stratified-k-fold")
+                - **classifier_id** (str): Combined identifier (e.g., "RandomForestClassifier-StratifiedKFold")
+
+        Examples:
+            >>> name, slug, cv_slug, id_ = trainer.get_classifier_properties()
+            >>> print(name)  # "RandomForestClassifier"
+            >>> print(slug)  # "random-forest-classifier"
         """
         classifier_model = classifier_model or self.ClassifierModel
 
@@ -334,13 +383,17 @@ class ModelTrainer:
         figures). Calls ``create_directories()`` to ensure the paths exist.
 
         Args:
-            output_dir: New base output directory. Resolved against ``root_dir``
-                (or ``os.getcwd()`` when None). Defaults to None.
-            root_dir: Anchor directory for resolving relative ``output_dir`` values.
-                Defaults to None.
+            output_dir (str | None, optional): New base output directory. Resolved
+                against ``root_dir`` (or ``os.getcwd()`` when None). Defaults to None.
+            root_dir (str | None, optional): Anchor directory for resolving relative
+                ``output_dir`` values. Defaults to None.
 
         Returns:
-            Self for method chaining.
+            Self: The ModelTrainer instance for method chaining.
+
+        Examples:
+            >>> trainer = ModelTrainer(...)
+            >>> trainer.update_directories(output_dir="new_output", root_dir="/project")
         """
         # Output training dir: ``<root_dir>/output/trainings``
         self.output_dir = resolve_output_dir(
@@ -382,16 +435,21 @@ class ModelTrainer:
     def update_grid_params(
         self, classifier: ClassifierModel, grid_params: dict[str, Any]
     ) -> ClassifierModel:
-        """Updates grid parameters with new grid parameters.
+        """Update the hyperparameter grid for a classifier.
 
-        Update self.ClassifierModel.grid value.
+        Replaces the current grid with new parameters and logs the change
+        if verbose mode is enabled.
 
         Args:
-            classifier (ClassifierModel): Classifier model to be updated.
-            grid_params (dict): Grid search parameters.
+            classifier (ClassifierModel): Classifier model instance to update.
+            grid_params (dict[str, Any]): New grid search parameter dictionary.
 
         Returns:
-            ClassifierModel: The updated classifier instance.
+            ClassifierModel: The updated classifier instance (same object, modified in-place).
+
+        Examples:
+            >>> new_grid = {"n_estimators": [100, 200], "max_depth": [10, 20]}
+            >>> trainer.update_grid_params(trainer.ClassifierModel, new_grid)
         """
         current_grid = classifier.grid
         classifier.grid = grid_params

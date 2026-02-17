@@ -11,12 +11,31 @@ from eruption_forecast.utils import calculate_window_metrics
 
 
 class RSAM:
-    """Real Seismic Amplitude Measurement (RSAM) class.
+    """Real Seismic Amplitude Measurement (RSAM) calculator.
+
+    Calculates mean absolute amplitude over time windows for seismic signals.
+    RSAM is a widely-used metric for monitoring volcanic tremor intensity.
+
+    Attributes:
+        trace (Trace): ObsPy Trace object containing seismic waveform data.
+        start_datetime (datetime): Start datetime of the trace.
+        start_datetime_str (str): Start date in "YYYY-MM-DD" format.
+        verbose (bool): If True, enables verbose logging.
+        debug (bool): If True, enables debug-level logging.
+        is_filtered (bool): True if bandpass filter has been applied.
+        series (pd.Series): Calculated RSAM time-series (set after calculate()).
 
     Args:
-        stream (Stream): Obspy stream object.
-        verbose (bool, optional): Verbose mode. Defaults to False.
-        debug (bool, optional): Debug mode. Defaults to False.
+        stream (Stream): ObsPy Stream object containing seismic trace.
+        verbose (bool): If True, enables verbose logging. Defaults to False.
+        debug (bool): If True, enables debug-level logging. Defaults to False.
+
+    Examples:
+        >>> from obspy import read
+        >>> stream = read("seismic_data.mseed")
+        >>> rsam = RSAM(stream, verbose=True)
+        >>> series = rsam.apply_filter(0.1, 2.0).calculate()
+        >>> print(series.head())
     """
 
     def __init__(self, stream: Stream, verbose: bool = False, debug: bool = False):
@@ -50,14 +69,22 @@ class RSAM:
         self.series: pd.Series = pd.Series(dtype=float)
 
     def apply_filter(self, freq_min: float, freq_max: float) -> Self:
-        """Apply filter to the trace.
+        """Apply bandpass filter to the seismic trace.
+
+        Filters the trace using a 4th-order Butterworth bandpass filter.
+        This method modifies the trace in-place and sets is_filtered to True.
 
         Args:
-            freq_min (float): Minimum frequency.
-            freq_max (float): Maximum frequency.
+            freq_min (float): Minimum frequency in Hz (lower corner).
+            freq_max (float): Maximum frequency in Hz (upper corner).
 
         Returns:
-            Self: RSAM object
+            Self: The RSAM instance for method chaining.
+
+        Examples:
+            >>> rsam = RSAM(stream)
+            >>> rsam.apply_filter(0.1, 2.0)
+            >>> print(rsam.is_filtered)  # True
         """
         self.trace = self.trace.filter(
             "bandpass", freqmin=freq_min, freqmax=freq_max, corners=4
@@ -82,18 +109,36 @@ class RSAM:
         minimum_completion_ratio: float = 0.3,
         interpolate: bool = True,
     ) -> pd.Series:
-        """Calculate metrics for defined time windows of a Trace.
+        """Calculate RSAM metrics over sliding time windows.
+
+        Divides the trace into non-overlapping windows and computes a metric
+        (typically mean absolute amplitude) for each window. Supports outlier
+        removal and linear interpolation of missing values.
 
         Args:
-            window_duration_minutes (int, optional): Duration of each window in minutes. Defaults to 10.
-            metric_function (callable, optional): Function to calculate metric (e.g., np.mean, np.max). Defaults to np.mean.
-            value_multiplier (float, optional): Value multiplier. Defaults to 1.0.
-            remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
-            minimum_completion_ratio (float, optional): Minimum ratio of data points required to calculate metric. Defaults to 0.3.
-            interpolate (bool, optional): Interpolate data. Defaults to True.
+            window_duration_minutes (int): Duration of each window in minutes.
+                Defaults to 10.
+            metric_function (Callable[[np.ndarray], float]): Function to calculate
+                the metric over each window (e.g., np.mean, np.max, np.median).
+                Defaults to np.mean.
+            value_multiplier (float): Scaling factor applied to all metric values.
+                Defaults to 1.0 (no scaling).
+            remove_outlier_method (Literal["all", "maximum"]): Outlier removal strategy.
+                "maximum" removes only the single maximum outlier per window;
+                "all" removes all detected outliers. Defaults to "maximum".
+            minimum_completion_ratio (float): Minimum fraction of data points required
+                in a window to compute the metric (0.0-1.0). Windows with fewer points
+                are set to NaN. Defaults to 0.3.
+            interpolate (bool): If True, applies linear interpolation to fill NaN values.
+                Defaults to True.
 
         Returns:
-            pd.Series: Series containing calculated RSAM metrics with datetime index.
+            pd.Series: Time-series of RSAM values with DatetimeIndex.
+
+        Examples:
+            >>> rsam = RSAM(stream)
+            >>> series = rsam.apply_filter(0.1, 2.0).calculate(window_duration_minutes=10)
+            >>> print(series.describe())
         """
         trace = self.trace
 

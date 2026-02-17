@@ -36,41 +36,78 @@ class CalculateTremor:
 
     Default frequency bands: (0.01-0.1), (0.1-2), (2-5), (4.5-8), (8-16) Hz
 
+    Attributes:
+        station (str): Seismic station code in uppercase.
+        channel (str): Seismic channel code in uppercase.
+        start_date (datetime): Start date for data processing.
+        end_date (datetime): End date for data processing.
+        network (str): Seismic network code.
+        location (str): Seismic location code.
+        methods (list[str]): Calculation methods to apply (rsam, dsar).
+        output_dir (str): Root output directory.
+        station_dir (str): Station-specific output directory.
+        forecast_dir (str): Forecast output directory.
+        tremor_dir (str): Tremor data output directory.
+        overwrite (bool): Whether to overwrite existing files.
+        filename_prefix (str | None): Custom prefix for output filenames.
+        n_jobs (int): Number of parallel jobs for daily processing.
+        remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
+        interpolate (bool): Whether to interpolate gaps in data.
+        value_multiplier (float | None): Scaling factor for seismic values.
+        cleanup_daily_dir (bool): Whether to delete daily directory after merging.
+        plot_daily (bool): Whether to plot intermediate daily results.
+        save_plot (bool): Whether to save final tremor plot to disk.
+        overwrite_plot (bool): Whether to overwrite existing plot files.
+        verbose (bool): If True, enables verbose logging.
+        debug (bool): If True, enables debug-level logging.
+        df (pd.DataFrame): Calculated tremor DataFrame.
+        start_date_str (str): Start date in "YYYY-MM-DD" format.
+        end_date_str (str): End date in "YYYY-MM-DD" format.
+        freq_bands (list[tuple[float, float]]): Frequency bands for analysis.
+        nslc (str): Network.Station.Location.Channel identifier.
+        daily_dir (str): Directory for daily CSV files.
+        csv (str): Path to final merged tremor CSV.
+        sds (SDS | None): SDS data reader (set after from_sds()).
+        daily_files (list[str]): List of daily CSV file paths.
+
     Args:
         start_date (str | datetime): Start date for data processing (YYYY-MM-DD).
         end_date (str | datetime): End date for data processing (YYYY-MM-DD).
         station (str): Seismic station code (e.g., "OJN").
         channel (str): Seismic channel code (e.g., "EHZ").
-        network (str, optional): Seismic network code. Defaults to "VG".
-        location (str, optional): Seismic location code. Defaults to "00".
-        methods (str | None, optional): Calculation methods to apply.
+        network (str): Seismic network code. Defaults to "VG".
+        location (str): Seismic location code. Defaults to "00".
+        methods (str | None): Calculation methods to apply.
             Currently unused; reserved for future extension. Defaults to None.
-        output_dir (str | None, optional): Directory for output files.
+        output_dir (str | None): Directory for output files.
             If None, defaults to ``root_dir/output``. Relative paths are resolved
             against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
             Absolute paths are used as-is. Defaults to None.
-        root_dir (str | None, optional): Anchor directory for resolving relative
+        root_dir (str | None): Anchor directory for resolving relative
             ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
-        overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
-        n_jobs (int, optional): Number of parallel jobs for daily processing. Defaults to 1.
-        remove_outlier_method (Literal["maximum", "all"], optional): Outlier removal strategy.
+        overwrite (bool): Whether to overwrite existing files. Defaults to False.
+        n_jobs (int): Number of parallel jobs for daily processing. Defaults to 1.
+        remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
             "maximum" removes only the single maximum outlier; "all" removes all outliers.
             Defaults to "maximum".
-        interpolate (bool, optional): If True, interpolates gaps in the data. Defaults to True.
-        value_multiplier (float | None, optional): Scaling factor applied to seismic values.
+        interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
+        value_multiplier (float | None): Scaling factor applied to seismic values.
             Defaults to None (no scaling).
-        cleanup_daily_dir (bool, optional): If True, deletes the daily directory after
+        cleanup_daily_dir (bool): If True, deletes the daily directory after
             merging daily results. Defaults to False.
-        plot_daily (bool, optional): If True, plots intermediate daily results for inspection.
+        plot_daily (bool): If True, plots intermediate daily results for inspection.
             Defaults to False.
-        save_plot (bool, optional): If True, saves the final tremor plot to disk. Defaults to False.
-        overwrite_plot (bool, optional): If True, overwrites existing plot files. Defaults to False.
-        filename_prefix (str | None, optional): Custom prefix for output filenames.
+        save_plot (bool): If True, saves the final tremor plot to disk. Defaults to False.
+        overwrite_plot (bool): If True, overwrites existing plot files. Defaults to False.
+        filename_prefix (str | None): Custom prefix for output filenames.
             Defaults to None (auto-generated).
-        verbose (bool, optional): If True, enables verbose logging. Defaults to False.
-        debug (bool, optional): If True, enables debug-level logging. Defaults to False.
+        verbose (bool): If True, enables verbose logging. Defaults to False.
+        debug (bool): If True, enables debug-level logging. Defaults to False.
 
-    Example:
+    Raises:
+        ValueError: If n_jobs <= 0, start_date >= end_date, or invalid method specified.
+
+    Examples:
         >>> tremor = CalculateTremor(
         ...     start_date="2025-01-01",
         ...     end_date="2025-01-31",
@@ -240,17 +277,28 @@ class CalculateTremor:
         )
 
     def change_freq_bands(self, freq_bands: list[tuple[float, float]]) -> Self:
-        """Change frequency bands default values.
+        """Change frequency bands for tremor calculation.
+
+        Updates the default frequency bands used for RSAM and DSAR calculations.
+        Each band is specified as a (min_freq, max_freq) tuple in Hz.
 
         Args:
             freq_bands (list[tuple[float, float]]): List of frequency band tuples.
+                Each tuple must contain exactly two numeric values (freq_min, freq_max)
+                where freq_min < freq_max. Example: [(0.1, 1.0), (1.0, 2.5), (2.0, 5.0)].
 
         Returns:
-            Self: CalculateTremor object.
+            Self: The CalculateTremor instance for method chaining.
 
         Raises:
-            TypeError: If freq_bands is not a list or contains non-tuple elements
-            ValueError: If frequency values are invalid
+            TypeError: If freq_bands is not a list, or contains non-tuple elements,
+                or frequency values are not numeric.
+            ValueError: If a tuple doesn't have exactly 2 elements, or freq_min >= freq_max.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.change_freq_bands([(0.1, 1.0), (1.0, 5.0), (5.0, 10.0)])
+            >>> print(tremor.freq_bands_alias)
         """
         if not isinstance(freq_bands, list):
             raise TypeError(
@@ -288,12 +336,15 @@ class CalculateTremor:
 
     @property
     def freq_bands_alias(self) -> dict[str, tuple[float, float]]:
-        """Freq band with alias.
+        """Get frequency bands with f0, f1, ... aliases.
 
         Returns:
-            dict[str, tuple[float, float]]: Contains band alias and freq min and max.
+            dict[str, tuple[float, float]]: Dictionary mapping band aliases
+                (f0, f1, f2, ...) to (freq_min, freq_max) tuples.
 
-        Example:
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> print(tremor.freq_bands_alias)
             {
                 'f0': (0.01, 0.1),
                 'f1': (0.1, 2),
@@ -309,7 +360,17 @@ class CalculateTremor:
 
     @property
     def filename(self) -> str:
-        """Return the default filename for the tremor CSV output."""
+        """Get the tremor CSV output filename.
+
+        Returns:
+            str: Filename for the tremor CSV output, optionally prefixed
+                with filename_prefix.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-12-31", station="OJN", channel="EHZ")
+            >>> print(tremor.filename)
+            tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31.csv
+        """
         # Example: tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31
         return (
             f"tremor_{self._filename}"
@@ -319,24 +380,43 @@ class CalculateTremor:
 
     @filename.setter
     def filename(self, filename: str) -> None:
+        """Set the tremor CSV output filename.
+
+        Args:
+            filename (str): Filename to set. '.csv' extension is added if missing.
+        """
         if not filename.endswith(".csv"):
             filename = f"{filename}.csv"
         self._filename = filename
 
     @cached_property
     def jobs(self) -> list[tuple[int, datetime]]:
-        """Generate jobs for multiprocessing
+        """Generate jobs for multiprocessing.
+
+        Creates a list of (job_index, date) tuples for parallel processing,
+        one per day in the date range.
 
         Returns:
-            list[tuple[int, datetime]]: List of job index and datetime
+            list[tuple[int, datetime]]: List of (job_index, date) tuples.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-03", station="OJN", channel="EHZ")
+            >>> print(len(tremor.jobs))  # 3 days
         """
         return [(job_index, date) for job_index, date in enumerate(self.dates)]
 
     def create_daily_dir(self) -> Self:
-        """Create daily directory.
+        """Create daily directory for temporary CSV files.
+
+        If cleanup_daily_dir is True, removes any existing daily directory first.
+        Creates the directory if it doesn't exist.
 
         Returns:
-            None
+            Self: The CalculateTremor instance for method chaining.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.create_daily_dir()
         """
         if self.cleanup_daily_dir:
             if self.verbose:
@@ -347,10 +427,14 @@ class CalculateTremor:
         return self
 
     def create_directories(self) -> None:
-        """Create the directories.
+        """Create all required output directories.
 
-        Returns:
-            None
+        Creates output_dir, station_dir, tremor_dir, daily_dir, and optionally
+        figures_dir (if plot_daily is True).
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.create_directories()
         """
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.station_dir, exist_ok=True)
@@ -361,13 +445,17 @@ class CalculateTremor:
             os.makedirs(self.figures_dir, exist_ok=True)
 
     def validate(self) -> None:
-        """Validate input parameters.
+        """Validate input parameters and create directories.
+
+        Checks that n_jobs > 0, start_date < end_date, and all methods are valid.
+        Creates required output directories.
 
         Raises:
-            ValueError: If n_jobs is invalid, dates are invalid, or method is not found
+            ValueError: If n_jobs <= 0, start_date >= end_date, or invalid method specified.
 
-        Returns:
-            None
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.validate()  # Automatically called in __init__
         """
         if self.n_jobs <= 0:
             raise ValueError(
@@ -388,16 +476,25 @@ class CalculateTremor:
         self.create_directories()
 
     def get_stream(self, date: datetime | None = None) -> Stream:
-        """Get the stream for a specific date.
+        """Get the seismic stream for a specific date.
+
+        Retrieves seismic data from the configured data source (SDS or FDSN)
+        for the specified date.
 
         Args:
-            date (datetime, optional): Date. Defaults to None.
+            date (datetime): Date for which to retrieve the stream.
 
         Returns:
-            Stream: Stream
+            Stream: ObsPy Stream object containing seismic traces for the date.
 
         Raises:
-            ValueError: If date is None or data source not set
+            ValueError: If date is None or data source not set via from_sds() or from_fdsn().
+
+        Examples:
+            >>> from datetime import datetime
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.from_sds("/data/sds")
+            >>> stream = tremor.get_stream(datetime(2025, 1, 1))
         """
         if date is None:
             raise ValueError("Date must be provided")
@@ -417,14 +514,21 @@ class CalculateTremor:
         return stream
 
     def from_sds(self, sds_dir: str) -> Self:
-        """Set the data source to Seiscomp Data Structure (SDS).
-        https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
+        """Set the data source to SeisComP Data Structure (SDS).
+
+        Configures the calculator to read seismic data from an SDS archive.
+        SDS is a standard directory structure for organizing seismic waveform data.
+        See: https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
 
         Args:
-            sds_dir (str): Root SDS directory
+            sds_dir (str): Root directory of the SDS archive.
 
         Returns:
-            Self
+            Self: The CalculateTremor instance for method chaining.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.from_sds("/data/sds").run()
         """
         self._source = "sds"
         self._sds_dir = sds_dir
@@ -440,23 +544,45 @@ class CalculateTremor:
         return self
 
     def from_fdsn(self, client_url: str | None = None) -> Self:
-        """Set the data source to FDSN.
+        """Set the data source to FDSN web services.
+
+        Configures the calculator to fetch seismic data from an FDSN web service.
+        FDSN (International Federation of Digital Seismograph Networks) provides
+        standardized web services for accessing seismic data.
 
         Args:
-            client_url (Optional[str], optional): Client URL. Defaults to None.
+            client_url (str | None): FDSN client URL. If None, defaults to
+                "https://service.iris.edu". Defaults to None.
 
         Returns:
-            Self
+            Self: The CalculateTremor instance for method chaining.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.from_fdsn("https://service.iris.edu").run()
         """
         self._source = "fdsn"
         self._client_url = client_url or self._client_url
         return self
 
     def run(self) -> Self:
-        """Run the calculation based on n_jobs.
+        """Execute tremor calculation workflow.
+
+        Orchestrates the full calculation: loads existing CSV if available and
+        overwrite=False, otherwise processes daily data (in parallel if n_jobs > 1),
+        merges results, and saves the final CSV. Optionally saves a plot.
 
         Returns:
-            Self
+            Self: The CalculateTremor instance with populated df and csv attributes.
+
+        Raises:
+            ValueError: If tremor CSV cannot be loaded when overwrite=False.
+
+        Examples:
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-03", station="OJN", channel="EHZ", n_jobs=4)
+            >>> tremor.from_sds("/data/sds").run()
+            >>> print(tremor.df.head())
+            >>> print(f"Saved to: {tremor.csv}")
         """
         csv = self.csv
 
@@ -521,15 +647,25 @@ class CalculateTremor:
 
     @logger.catch
     def run_job(self, job_index: int, date: datetime) -> str | None:
-        """Run a job for a specific date.
+        """Execute tremor calculation for a single day.
+
+        Processes one day of seismic data, calculates RSAM and DSAR metrics,
+        saves results to a daily CSV file, and optionally plots the data.
+        Skips processing if the file already exists and overwrite=False.
 
         Args:
-            job_index (int): Job index
-            date (datetime): Date to run the job
+            job_index (int): Job index for logging purposes.
+            date (datetime): Date to process.
 
         Returns:
-            str: CSV filepath
-            None: Not saved, if dataframe is empty
+            str | None: Path to the saved CSV file, or None if the DataFrame is empty
+                (no data available for that day).
+
+        Examples:
+            >>> from datetime import datetime
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.from_sds("/data/sds")
+            >>> csv_path = tremor.run_job(0, datetime(2025, 1, 1))
         """
         date_str = date.strftime("%Y-%m-%d")
         temp_file = os.path.join(self.daily_dir, f"{date_str}.csv")
@@ -581,14 +717,26 @@ class CalculateTremor:
         return temp_file
 
     def calculate(self, date: datetime) -> pd.DataFrame:
-        """Calculate tremor data.
-        This method calculates the tremor data using Real Seismic Amplitude Measurement (RSAM) and Displacement Seismic Amplitude Ratio (DSAR).
+        """Calculate tremor metrics for a single day.
+
+        Computes Real Seismic Amplitude Measurement (RSAM) and Displacement
+        Seismic Amplitude Ratio (DSAR) for the specified date across all
+        configured frequency bands. Returns an empty DataFrame if no data is available.
 
         Args:
-            date (datetime): Date to calculate
+            date (datetime): Date to process.
 
         Returns:
-            pd.DataFrame: Tremor data
+            pd.DataFrame: Tremor DataFrame with DatetimeIndex (10-minute intervals)
+                and columns for RSAM (rsam_f0, rsam_f1, ...) and DSAR (dsar_f0-f1, ...).
+                Returns empty DataFrame if no seismic data is available.
+
+        Examples:
+            >>> from datetime import datetime
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> tremor.from_sds("/data/sds")
+            >>> df = tremor.calculate(datetime(2025, 1, 1))
+            >>> print(df.head())
         """
         stream = self.get_stream(date)
 
@@ -741,18 +889,29 @@ class CalculateTremor:
     def calculate_rsam(
         self, date_str: str, df: pd.DataFrame, stream: Stream
     ) -> pd.DataFrame:
-        """Calculate RSAM for a given date
+        """Calculate Real Seismic Amplitude Measurement (RSAM) for a given date.
+
+        Computes RSAM (mean absolute amplitude) for each configured frequency band
+        and adds columns (rsam_f0, rsam_f1, ...) to the DataFrame.
 
         Args:
-            date_str (str): Date to calculate RSAM for
-            df (pd.DataFrame): Tremor data with datetime index
-            stream (Stream): Obspy Stream object
+            date_str (str): Date string in "YYYY-MM-DD" format (for logging).
+            df (pd.DataFrame): Tremor DataFrame with DatetimeIndex to populate.
+            stream (Stream): ObsPy Stream object containing seismic trace.
 
         Returns:
-            pd.DataFrame: Tremor data
+            pd.DataFrame: DataFrame with RSAM columns added.
 
         Raises:
-            TypeError: If dataframe index is not DatetimeIndex
+            TypeError: If DataFrame index is not DatetimeIndex.
+
+        Examples:
+            >>> from datetime import datetime
+            >>> from obspy import read
+            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
+            >>> stream = read("seismic_data.mseed")
+            >>> df = pd.DataFrame(index=pd.date_range("2025-01-01", periods=144, freq="10min"))
+            >>> df = tremor.calculate_rsam("2025-01-01", df, stream)
         """
         if not isinstance(df.index, pd.DatetimeIndex):
             raise TypeError("Index of dataframe should be pd.DatetimeIndex")
@@ -795,17 +954,26 @@ class CalculateTremor:
     def concat_tremor_data(
         daily_dir: str, tremor_dir: str | None = None
     ) -> pd.DataFrame:
-        """Concatenate calculated tremor data from daily dir to tremor dir.
+        """Concatenate daily tremor CSV files into a single DataFrame.
+
+        Reads all CSV files from the daily directory, concatenates them,
+        and returns a sorted DataFrame. Used to merge daily results after
+        parallel processing.
 
         Args:
-            daily_dir (str): Daily dir where calculated tremor saved
-            tremor_dir (str, optional): Directory where tremor data will be saved. Defaults to None.
+            daily_dir (str): Directory containing daily CSV files.
+            tremor_dir (str | None): Directory where merged tremor data will be saved.
+                If None, defaults to daily_dir with "daily" removed. Defaults to None.
 
         Returns:
-            pd.DataFrame: Tremor data
+            pd.DataFrame: Concatenated tremor DataFrame sorted by DatetimeIndex.
 
         Raises:
-            FileNotFoundError: If daily_dir doesn't exist or no CSV files found
+            FileNotFoundError: If daily_dir doesn't exist or contains no CSV files.
+
+        Examples:
+            >>> df = CalculateTremor.concat_tremor_data("/output/tremor/daily")
+            >>> print(df.head())
         """
         if not os.path.isdir(daily_dir):
             raise FileNotFoundError(f"Directory {daily_dir} does not exist")

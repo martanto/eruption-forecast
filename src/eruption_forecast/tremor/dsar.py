@@ -8,12 +8,33 @@ from eruption_forecast.utils import calculate_window_metrics
 
 
 class DSAR:
-    """Calculate Displacement Seismic Amplitude Ratio (DSAR).
+    """Displacement Seismic Amplitude Ratio (DSAR) calculator.
+
+    Computes the ratio of mean absolute amplitudes between two frequency bands.
+    DSAR helps identify changes in the spectral content of volcanic tremor.
+
+    Attributes:
+        remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
+        verbose (bool): If True, enables verbose logging.
+        debug (bool): If True, enables debug-level logging.
+        first_dsar (pd.Series | None): Amplitude series from the first stream (set after calculate()).
+        second_dsar (pd.Series | None): Amplitude series from the second stream (set after calculate()).
+        series (pd.Series | None): Calculated DSAR ratio series (set after calculate()).
 
     Args:
-        remove_outlier_method (Literal["maximum", "all"], optional): Remove outlier method. Defaults to "maximum".
-        verbose (bool, optional): Whether to enable verbose logging. Defaults to False.
-        debug (bool, optional): Whether to enable debug logging. Defaults to False.
+        remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
+            "maximum" removes only the single maximum outlier; "all" removes all outliers.
+            Defaults to "maximum".
+        verbose (bool): If True, enables verbose logging. Defaults to False.
+        debug (bool): If True, enables debug-level logging. Defaults to False.
+
+    Examples:
+        >>> from obspy import read
+        >>> stream_lf = read("low_freq.mseed")
+        >>> stream_hf = read("high_freq.mseed")
+        >>> dsar = DSAR(verbose=True)
+        >>> ratio = dsar.calculate(stream_lf, stream_hf)
+        >>> print(ratio.head())
     """
 
     def __init__(
@@ -47,18 +68,34 @@ class DSAR:
     ) -> pd.Series:
         """Calculate Displacement Seismic Amplitude Ratio (DSAR).
 
-        DSAR = Mean(Abs(Stream1)) / Mean(Abs(Stream2))
+        Computes the ratio of mean absolute amplitudes between two streams:
+        DSAR = Mean(|Stream1|) / Mean(|Stream2|). If a Stream object is provided,
+        it is first converted to a windowed amplitude series.
 
         Args:
-            first_stream (Stream | pd.Series): First stream (Low Frequency).
-            second_stream (Stream | pd.Series): Second stream (High Frequency).
-            window_duration_minutes (int, optional): Window duration in minutes. Defaults to 10.
-            value_multiplier (float, optional): Value multiplier. Defaults to 1.0.
-            minimum_completion_ratio (float, optional): Minimum completion ratio. Defaults to 0.3.
-            interpolate (bool, optional): Interpolate data. Defaults to True.
+            first_stream (Stream | pd.Series): First stream (typically low frequency band).
+                If Stream, amplitudes are computed over windows. If Series, used directly.
+            second_stream (Stream | pd.Series): Second stream (typically high frequency band).
+                If Stream, amplitudes are computed over windows. If Series, used directly.
+            window_duration_minutes (int): Duration of each window in minutes.
+                Defaults to 10.
+            value_multiplier (float): Scaling factor applied to the DSAR ratio.
+                Defaults to 1.0 (no scaling).
+            minimum_completion_ratio (float): Minimum fraction of data points required
+                in a window to compute metrics (0.0-1.0). Defaults to 0.3.
+            interpolate (bool): If True, applies linear interpolation to fill NaN values.
+                Defaults to True.
 
         Returns:
-            pd.Series: DSAR series.
+            pd.Series: DSAR ratio time-series with DatetimeIndex.
+
+        Examples:
+            >>> from obspy import read
+            >>> lf = read("low_freq.mseed")
+            >>> hf = read("high_freq.mseed")
+            >>> dsar = DSAR()
+            >>> ratio = dsar.calculate(lf, hf, window_duration_minutes=10)
+            >>> print(ratio.mean())
         """
         # Calculate mean of absolute values for both streams
         # Note: We use absolute_value=True inside calculate_window_metrics

@@ -9,7 +9,6 @@ from eruption_forecast.utils import (
     to_datetime,
     normalize_dates,
     validate_columns,
-    construct_windows,
     resolve_output_dir,
     validate_date_ranges,
 )
@@ -17,6 +16,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.model_trainer import ModelTrainer
+from eruption_forecast.model.model_predictor import ModelPredictor
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
@@ -24,14 +24,69 @@ from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 class ForecastModel:
-    """Create forecast model from seismic data.
+    """Orchestrate the complete volcanic eruption forecasting pipeline.
 
-    Orchestrates the complete eruption forecasting pipeline:
-    1. Calculate tremor data from seismic data (RSAM/DSAR metrics)
-    2. Build labels for supervised learning
-    3. Extract time-series features using tsfresh
-    4. Train classification models
-    5. Generate predictions
+    Provides a high-level interface to coordinate all pipeline stages from
+    raw seismic data to trained models and predictions. Uses method chaining
+    for fluent API design.
+
+    Pipeline stages:
+
+    1. **Calculate tremor**: Process seismic waveforms → RSAM/DSAR metrics
+    2. **Build labels**: Create time windows with eruption labels
+    3. **Extract features**: Apply tsfresh to generate ML features
+    4. **Train models**: Multi-seed training with cross-validation
+    5. **Generate predictions**: Forecast eruptions on new data
+
+    Attributes:
+        station (str): Seismic station code.
+        channel (str): Seismic channel code.
+        start_date (datetime): Pipeline start date.
+        end_date (datetime): Pipeline end date.
+        window_size (int): Window size in days for training data windows.
+        volcano_id (str): Volcano identifier for output naming.
+        network (str): Seismic network code.
+        location (str): Seismic location code.
+        output_dir (str): Root directory for all outputs.
+        root_dir (str | None): Anchor directory for path resolution.
+        overwrite (bool): Whether to overwrite existing files.
+        n_jobs (int): Number of parallel jobs.
+        verbose (bool): Enable verbose logging.
+        debug (bool): Enable debug mode.
+        start_date_minus_window_size (datetime): Adjusted start date for tremor calculation.
+        start_date_str (str): Start date as "YYYY-MM-DD".
+        end_date_str (str): End date as "YYYY-MM-DD".
+        nslc (str): Combined network.station.location.channel identifier.
+        station_dir (str): Station-specific output directory.
+        features_dir (str): Features output directory.
+        basename (str | None): Base filename for outputs.
+        CalculateTremor (CalculateTremor | None): Tremor calculation instance.
+        TremorData (TremorData | None): Loaded tremor data wrapper.
+        tremor_data (pd.DataFrame): Tremor metrics DataFrame.
+        tremor_csv (str | None): Path to tremor CSV file.
+        LabelBuilder (LabelBuilder | None): Label builder instance.
+        label_data (pd.DataFrame): Labels DataFrame.
+        label_csv (str | None): Path to labels CSV file.
+        total_eruption_class (int | None): Count of eruption windows.
+        total_non_eruption_class (int | None): Count of non-eruption windows.
+        class_ratio (float | None): Ratio of eruption to non-eruption windows.
+        TremorMatrixBuilder (TremorMatrixBuilder | None): Tremor matrix builder instance.
+        tremor_matrix_df (pd.DataFrame): Windowed tremor matrix.
+        tremor_matrix_csv (str | None): Path to tremor matrix CSV.
+        FeaturesBuilder (FeaturesBuilder | None): Feature extraction instance.
+        features_df (pd.DataFrame): Extracted features DataFrame.
+        features_csv (str | None): Path to features CSV file.
+        use_relevant_features (bool): Whether relevance filtering was applied.
+        select_tremor_columns (list[str] | None): Selected tremor columns for processing.
+        feature_selection_method (str): Feature selection method.
+        ModelTrainer (ModelTrainer | None): Model trainer instance.
+        trained_model_df (pd.DataFrame): Trained model registry DataFrame.
+        trained_model_csv (str | None): Path to model registry CSV.
+        ClassifierModel (ClassifierModel | None): Classifier configuration.
+        classifier_name (str | None): Classifier class name.
+        trained_models (dict[str, str]): Dictionary of trained model paths.
+        ModelPredictor (ModelPredictor | None): Predictor instance.
+        prediction_df (pd.DataFrame): Prediction results DataFrame.
 
     Args:
         station (str): Seismic station code (e.g., "OJN").
@@ -40,22 +95,27 @@ class ForecastModel:
         end_date (str | datetime): End date in YYYY-MM-DD format.
         window_size (int): Window size in days for training data windows.
         volcano_id (str): Volcano identifier for output naming.
-        network (str): Seismic network code. Defaults to "VG".
-        location (str): Seismic location code. Defaults to "00".
-        output_dir (str | None): Directory for output files. If None, defaults to
-            ``root_dir/output``. Relative paths are resolved against ``root_dir``
-            (or ``os.getcwd()`` when ``root_dir`` is None). Absolute paths are
-            used as-is. Defaults to None.
-        root_dir (str | None): Anchor directory for resolving relative ``output_dir``
-            values. Relative ``root_dir`` values are immediately normalised to an
-            absolute path via ``os.path.abspath``. Defaults to None (uses
-            ``os.getcwd()``).
-        overwrite (bool): Whether to overwrite existing files. Defaults to False.
-        n_jobs (int): Number of parallel jobs to use. Defaults to 1.
-        verbose (bool): If True, enables verbose logging. Defaults to False.
-        debug (bool): If True, enables debug mode. Defaults to False.
+        network (str, optional): Seismic network code. Defaults to "VG".
+        location (str, optional): Seismic location code. Defaults to "00".
+        output_dir (str | None, optional): Directory for output files. If None,
+            defaults to ``root_dir/output``. Relative paths are resolved against
+            ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None). Absolute
+            paths are used as-is. Defaults to None.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            ``output_dir`` values. Relative ``root_dir`` values are immediately
+            normalized to an absolute path via ``os.path.abspath``. Defaults to
+            None (uses ``os.getcwd()``).
+        overwrite (bool, optional): Whether to overwrite existing files.
+            Defaults to False.
+        n_jobs (int, optional): Number of parallel jobs to use. Defaults to 1.
+        verbose (bool, optional): If True, enables verbose logging. Defaults to False.
+        debug (bool, optional): If True, enables debug mode. Defaults to False.
 
-    Example:
+    Raises:
+        ValueError: If start_date >= end_date or window_size < 1.
+
+    Examples:
+        >>> # Complete pipeline example
         >>> model = ForecastModel(
         ...     station="OJN",
         ...     channel="EHZ",
@@ -73,6 +133,10 @@ class ForecastModel:
         ...     eruption_dates=["2024-03-15", "2024-05-20"],
         ... )
         >>> model.extract_features().train_and_evaluate()
+
+        >>> # Method chaining example
+        >>> model = ForecastModel(...).calculate(...).build_label(...).extract_features()
+        >>> model.train(classifier="xgb", random_state=42, total_seed=100)
     """
 
     def __init__(
@@ -164,6 +228,7 @@ class ForecastModel:
         self.features_df: pd.DataFrame = pd.DataFrame()
         self.features_csv: str | None = None
         self.use_relevant_features: bool = False
+        self.select_tremor_columns: list[str] | None = None
 
         # ------------------------------------------------------------------
         # Will be updated after set_feature_selection_method() called
@@ -180,11 +245,13 @@ class ForecastModel:
         self.trained_model_csv: str | None = None
         self.ClassifierModel: ClassifierModel | None = None
         self.classifier_name: str | None = None
+        self.trained_models: dict[str, str] = {}
 
         # ------------------------------------------------------------------
         # Will be set after predict() called
         # ------------------------------------------------------------------
-        self.prediction_features_csvs: set[str] = set()
+        self.ModelPredictor: ModelPredictor | None = None
+        self.prediction_df: pd.DataFrame = pd.DataFrame()
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -214,22 +281,34 @@ class ForecastModel:
         output_dir: str | None,
         root_dir: str | None = None,
     ) -> tuple[str, str, str, str]:
-        """Setup directory structure for forecast model outputs.
+        """Set up directory structure for forecast model outputs.
 
         Creates the NSLC (Network.Station.Location.Channel) identifier and
         builds the directory structure for storing model outputs.
 
         Args:
-            network: Network code
-            station: Station code
-            location: Location code
-            channel: Channel code
-            output_dir: Base output directory. Defaults to 'output' relative to root_dir.
-            root_dir: Anchor directory for resolving relative paths.
-                If None, falls back to ``os.getcwd()``.
+            network (str): Network code (e.g., "VG").
+            station (str): Station code (e.g., "OJN").
+            location (str): Location code (e.g., "00").
+            channel (str): Channel code (e.g., "EHZ").
+            output_dir (str | None): Base output directory. If None, defaults to
+                "output" relative to root_dir.
+            root_dir (str | None, optional): Anchor directory for resolving relative
+                paths. If None, falls back to ``os.getcwd()``. Defaults to None.
 
         Returns:
-            Tuple of (nslc, output_dir, station_dir, features_dir)
+            tuple[str, str, str, str]: A 4-tuple containing:
+
+                - **nslc** (str): Combined identifier (e.g., "VG.OJN.00.EHZ")
+                - **output_dir** (str): Resolved output directory path
+                - **station_dir** (str): Station-specific directory path
+                - **features_dir** (str): Features directory path
+
+        Examples:
+            >>> nslc, out, station, features = ForecastModel._setup_directories(
+            ...     "VG", "OJN", "00", "EHZ", None, "/project"
+            ... )
+            >>> print(nslc)  # "VG.OJN.00.EHZ"
         """
         nslc = f"{network}.{station}.{location}.{channel}"
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
@@ -253,27 +332,42 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> CalculateTremor:
-        """Setup CalculateTremor instance with configuration.
+        """Set up CalculateTremor instance with configuration.
 
         Creates and configures a CalculateTremor instance with all necessary
-        parameters. Updates start_date to include window_size buffer.
+        parameters. Automatically adjusts start_date to include window_size buffer.
 
         Args:
-            methods: Calculation methods to apply
-            filename_prefix: Prefix for generated filenames
-            remove_outlier_method: Method for outlier removal
-            interpolate: Whether to interpolate data
-            value_multiplier: Scaling factor for values
-            cleanup_daily_dir: Whether to clean daily directory
-            plot_daily: Whether to plot daily results
-            save_plot: Whether to save plots
-            overwrite_plot: Whether to overwrite existing plots
-            n_jobs: Number of jobs to run in parallel. Isolated on this method only
-            verbose: Enable verbose logging
-            debug: Enable debug mode
+            methods (str | None): Calculation methods to apply (e.g., "rsam,dsar").
+            filename_prefix (str | None): Prefix for generated filenames.
+            remove_outlier_method (Literal["all", "maximum"]): Method for outlier removal.
+            interpolate (bool): Whether to interpolate missing data.
+            value_multiplier (float | None): Scaling factor for tremor values.
+            cleanup_daily_dir (bool): Whether to clean up daily temporary directory.
+            plot_daily (bool): Whether to plot daily results.
+            save_plot (bool): Whether to save plots to disk.
+            overwrite_plot (bool): Whether to overwrite existing plots.
+            n_jobs (int | None, optional): Number of jobs to run in parallel.
+                Isolated to this method only. If None, uses ``self.n_jobs``.
+                Defaults to None.
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
+            debug (bool, optional): Enable debug mode. Defaults to False.
 
         Returns:
-            Configured CalculateTremor instance
+            CalculateTremor: Configured CalculateTremor instance ready for use.
+
+        Examples:
+            >>> calc = model._setup_calculate_tremor(
+            ...     methods="rsam,dsar",
+            ...     filename_prefix="tremor",
+            ...     remove_outlier_method="maximum",
+            ...     interpolate=True,
+            ...     value_multiplier=None,
+            ...     cleanup_daily_dir=True,
+            ...     plot_daily=False,
+            ...     save_plot=False,
+            ...     overwrite_plot=False,
+            ... )
         """
         verbose = verbose or self.verbose
         debug = debug or self.debug
@@ -512,12 +606,6 @@ class ForecastModel:
             >>> model = ForecastModel(...)
             >>> model.validate()  # Called automatically in __init__
         """
-        # Validate window size
-        if self.window_size <= 0:
-            raise ValueError(
-                f"window_size must be greater than 0. Got: {self.window_size}"
-            )
-
         # Validate date ranges
         validate_date_ranges(self.start_date, self.end_date)
 
@@ -744,6 +832,7 @@ class ForecastModel:
         self.features_csv = features_builder.csv
         self.label_csv = features_builder.label_features_csv
         self.use_relevant_features = use_relevant_features
+        self.select_tremor_columns = select_tremor_columns
 
         return self
 
@@ -943,11 +1032,7 @@ class ForecastModel:
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
-        output_dir = output_dir or os.path.join(
-            self.station_dir,
-            "trainings",
-        )
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = output_dir or self.station_dir
 
         train_model = ModelTrainer(
             extracted_features_csv=features_csv,
@@ -978,73 +1063,75 @@ class ForecastModel:
 
         self.ModelTrainer = train_model
         self.trained_model_df = train_model.df
-        self.trained_model_csv = train_model.csv
+        self.trained_model_csv: str = train_model.csv
         self.ClassifierModel = train_model.ClassifierModel
-        self.classifier_name = train_model.ClassifierModel.name
+        self.classifier_name: str = train_model.ClassifierModel.name
+
+        self.trained_models[self.classifier_name] = self.trained_model_csv
 
         return self
 
-    def predict(
+    def forecast(
         self,
         start_date: str | datetime,
         end_date: str | datetime,
+        window_size: int,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
+        save_predictions: bool = True,
+        save_plot: bool = True,
         output_dir: str | None = None,
-        verbose: bool | None = None,
+        n_jobs: int | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
     ) -> Self:
-        """Generate prediction windows for eruption forecasting.
-
-        Constructs sliding time windows over the given date range and saves
-        them to a CSV file.  Note: actual model inference is not yet
-        implemented — this method only prepares the prediction window layout.
+        """Eruption forecasting.
 
         Args:
-            start_date: Start date for prediction windows.
-            end_date: End date for prediction windows.
+            start_date: Start date for forecasting windows.
+            end_date: End date for forecasting windows.
+            window_size (int): Window size in days. Defaults to 1.
             window_step: Step size between consecutive windows.
             window_step_unit: Unit of the window step ("minutes" or "hours").
-            output_dir: Directory to write the prediction CSV.
-                Defaults to ``<station_dir>/predictions``.
+            save_predictions (bool): Whether to save the prediction windows. Defaults to True.
+            save_plot (bool): Whether to save the prediction plot. Defaults to True.
+            output_dir: Directory to write the prediction CSV. Defaults to None.
+            n_jobs (int, optional): Number of jobs. Defaults to 1.
+            overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose: Override instance verbose flag.
 
         Returns:
             Self for method chaining.
         """
         verbose = verbose or self.verbose
-
-        if self.trained_model_csv is None:
-            raise ValueError(
-                "Trained model CSV not found. Please run train() first. "
-                "Usually named as: trained_model_{classifier_name}_rs-0_ts-500_top-20.csv"
-            )
+        output_dir = output_dir or self.station_dir
+        overwrite = overwrite or self.overwrite
+        n_jobs = n_jobs or self.n_jobs
 
         if verbose:
-            logger.info("predict() started")
+            logger.info("Starting Prediction...")
 
-        start_date = to_datetime(start_date)
-        end_date = to_datetime(end_date)
-        start_date_str = start_date.strftime("%Y-%m-%d")
-        end_date_str = end_date.strftime("%Y-%m-%d")
-
-        output_dir = output_dir or os.path.join(self.station_dir, "predictions")
-        os.makedirs(output_dir, exist_ok=True)
-
-        filename = f"predict_window_{start_date_str}-{end_date_str}_step-{window_step}{window_step_unit}.csv"
-        predict_window_csv = os.path.join(output_dir, filename)
-
-        df_predict_window = construct_windows(
+        model_predictor = ModelPredictor(
             start_date=start_date,
             end_date=end_date,
-            window_step=window_step,
-            window_step_unit=window_step_unit,
+            trained_models=self.trained_models,
+            output_dir=output_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+            overwrite=overwrite,
         )
 
-        logger.debug(f"Total predicted windows generated: {len(df_predict_window)}")
+        df_prediction = model_predictor.predict_proba(
+            tremor_data=self.tremor_data,
+            window_size=window_size,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            select_tremor_columns=self.select_tremor_columns,
+            save_predictions=save_predictions,
+            plot=save_plot,
+        )
 
-        df_predict_window.to_csv(predict_window_csv, index=True)
-
-        if verbose:
-            logger.info(f"Prediction window saved to: {predict_window_csv}")
+        self.ModelPredictor = model_predictor
+        self.prediction_df = df_prediction
 
         return self

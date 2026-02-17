@@ -47,17 +47,36 @@ def plot_confusion_matrix(
 ) -> plt.Figure:
     """Plot a confusion matrix heatmap with Nature/Science styling.
 
+    Creates a 2×2 heatmap showing classification results with optional normalization.
+    Labels are "Not Erupted" (0) and "Erupted" (1). Uses blue colormap.
+
     Args:
-        y_true (np.ndarray): True labels.
-        y_pred (np.ndarray): Predicted labels.
-        normalize (str | None, optional): Normalization mode ("true", "pred",
-            "all", or None). Defaults to None (raw counts).
-        title (str | None, optional): Plot title. Defaults to "Confusion Matrix".
-        figsize (tuple[float, float], optional): Figure size. Defaults to (6, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_pred (np.ndarray): Predicted binary labels (0 or 1). Shape: (n_samples,).
+        normalize (str | None, optional): Normalization mode. Options:
+            - None: Raw counts (default)
+            - "true": Normalize over true labels (rows)
+            - "pred": Normalize over predicted labels (columns)
+            - "all": Normalize over entire matrix
+            Defaults to None.
+        title (str | None, optional): Plot title. If None, uses "Confusion Matrix".
+            Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (6, 5).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with the confusion matrix heatmap.
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1, 0])
+        >>> y_pred = np.array([0, 1, 1, 1, 0, 0])
+        >>> fig = plot_confusion_matrix(y_true, y_pred)
+        >>> fig.savefig("confusion_matrix.png")
+        >>>
+        >>> # Normalized by rows (shows recall per class)
+        >>> fig = plot_confusion_matrix(y_true, y_pred, normalize="true")
     """
     cm = confusion_matrix(y_true, y_pred, normalize=normalize)
     labels = ["Not Erupted", "Erupted"]
@@ -92,15 +111,29 @@ def plot_roc_curve(
 ) -> plt.Figure:
     """Plot ROC curve with AUC annotation and Nature/Science styling.
 
+    Creates a Receiver Operating Characteristic (ROC) curve showing true positive
+    rate vs. false positive rate. Includes diagonal reference line for random
+    classifier and AUC score in legend.
+
     Args:
-        y_true (np.ndarray): True labels.
-        y_proba (np.ndarray): Predicted probabilities for positive class.
-        title (str | None, optional): Plot title. Defaults to "ROC Curve".
-        figsize (tuple[float, float], optional): Figure size. Defaults to (6, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
+            Values should be in [0, 1]. Shape: (n_samples,).
+        title (str | None, optional): Plot title. If None, uses "ROC Curve".
+            Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (6, 5).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with the ROC curve.
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1])
+        >>> y_proba = np.array([0.1, 0.8, 0.3, 0.9, 0.6])
+        >>> fig = plot_roc_curve(y_true, y_proba)
+        >>> fig.savefig("roc_curve.png")
     """
     fpr, tpr, _ = roc_curve(y_true, y_proba)
     auc = roc_auc_score(y_true, y_proba)
@@ -148,16 +181,29 @@ def plot_precision_recall_curve(
 ) -> plt.Figure:
     """Plot Precision-Recall curve with AP annotation and Nature/Science styling.
 
+    Creates a Precision-Recall (PR) curve showing precision vs. recall across
+    decision thresholds. Includes horizontal baseline for random classifier and
+    Average Precision (AP) score in legend.
+
     Args:
-        y_true (np.ndarray): True labels.
-        y_proba (np.ndarray): Predicted probabilities for positive class.
-        title (str | None, optional): Plot title. Defaults to
-            "Precision-Recall Curve".
-        figsize (tuple[float, float], optional): Figure size. Defaults to (6, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
+            Values should be in [0, 1]. Shape: (n_samples,).
+        title (str | None, optional): Plot title. If None, uses
+            "Precision-Recall Curve". Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (6, 5).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with the PR curve.
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1])
+        >>> y_proba = np.array([0.1, 0.8, 0.3, 0.9, 0.6])
+        >>> fig = plot_precision_recall_curve(y_true, y_proba)
+        >>> fig.savefig("pr_curve.png")
     """
     precision, recall, _ = precision_recall_curve(y_true, y_proba)
     ap = average_precision_score(y_true, y_proba)
@@ -203,18 +249,33 @@ def plot_threshold_analysis(
     figsize: tuple[float, float] = (10, 6),
     dpi: int = 150,
 ) -> plt.Figure:
-    """Plot precision, recall, F1, and balanced accuracy vs. threshold.
+    """Plot precision, recall, F1, and balanced accuracy vs. decision threshold.
+
+    Creates a multi-metric threshold analysis plot showing how classification metrics
+    vary across decision thresholds from 0 to 1. Marks default threshold (0.5) and
+    optimal F1 threshold with vertical lines.
 
     Args:
-        y_true (np.ndarray): True labels.
-        y_proba (np.ndarray): Predicted probabilities for positive class.
-        title (str | None, optional): Plot title. Defaults to
-            "Threshold Analysis".
-        figsize (tuple[float, float], optional): Figure size. Defaults to (10, 6).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
+            Values should be in [0, 1]. Shape: (n_samples,).
+        title (str | None, optional): Plot title. If None, uses
+            "Threshold Analysis". Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (10, 6).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with threshold analysis plot showing
+            precision (blue), recall (orange), F1 score (green), and balanced
+            accuracy (pink) curves.
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1])
+        >>> y_proba = np.array([0.1, 0.8, 0.3, 0.9, 0.6, 0.2, 0.7])
+        >>> fig = plot_threshold_analysis(y_true, y_proba)
+        >>> fig.savefig("threshold_analysis.png")
     """
     thresholds = np.linspace(0, 1, 101)
     metrics = {"precision": [], "recall": [], "f1": [], "balanced_accuracy": []}
@@ -303,20 +364,44 @@ def plot_feature_importance(
 ) -> plt.Figure | None:
     """Plot horizontal bar chart of feature importances with Nature/Science styling.
 
+    Creates a horizontal bar chart showing the top-N most important features from
+    a trained model. Features are sorted by importance (highest to lowest from top
+    to bottom). Supports tree-based models and VotingClassifier (averages across
+    estimators).
+
     Args:
-        model (BaseEstimator): Fitted model with feature_importances_ attribute.
-        feature_names (list[str]): List of feature names.
-        top_n (int, optional): Number of top features to display. Defaults to 20.
-        title (str | None, optional): Plot title. Defaults to "Feature Importance".
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        model (BaseEstimator): Fitted scikit-learn model with feature_importances_
+            attribute. Supports RandomForest, GradientBoosting, XGBoost, LightGBM,
+            DecisionTree, and VotingClassifier.
+        feature_names (list[str]): List of feature names corresponding to model
+            features. Length must match model's n_features_in_.
+        top_n (int, optional): Number of top features to display. Features are
+            sorted by importance. Defaults to 20.
+        title (str | None, optional): Plot title. If None, uses
+            "Top {top_n} Feature Importances". Defaults to None.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
         plt.Figure | None: Matplotlib figure object, or None if model lacks
-            feature_importances_.
+            feature_importances_ attribute and is not a VotingClassifier with
+            tree-based estimators.
+
+    Examples:
+        >>> from sklearn.ensemble import RandomForestClassifier
+        >>> # Train model
+        >>> rf = RandomForestClassifier(random_state=0)
+        >>> rf.fit(X_train, y_train)
+        >>> # Plot importances
+        >>> fig = plot_feature_importance(rf, feature_names=X_train.columns)
+        >>> fig.savefig("feature_importance.png") if fig else None
+        >>>
+        >>> # Plot top 10 features only
+        >>> fig = plot_feature_importance(rf, feature_names, top_n=10)
     """
     # Extract importances
+    importances: np.ndarray
     if hasattr(model, "feature_importances_"):
-        importances = model.feature_importances_
+        importances = model.feature_importances_  # type: ignore[assignment]
     elif isinstance(model, VotingClassifier):
         # Average importances from voting estimators
         all_importances = []
@@ -382,16 +467,33 @@ def plot_calibration(
 ) -> plt.Figure:
     """Plot calibration curve with Nature/Science styling.
 
+    Creates a calibration plot showing predicted probability vs. observed frequency.
+    Well-calibrated models have points along the diagonal. Bins probabilities into
+    n_bins and plots fraction of positives vs. mean predicted probability per bin.
+
     Args:
-        y_true (np.ndarray): True labels.
-        y_proba (np.ndarray): Predicted probabilities for positive class.
-        n_bins (int, optional): Number of bins for calibration. Defaults to 10.
-        title (str | None, optional): Plot title. Defaults to "Calibration Curve".
-        figsize (tuple[float, float], optional): Figure size. Defaults to (6, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
+            Values should be in [0, 1]. Shape: (n_samples,).
+        n_bins (int, optional): Number of bins for calibration curve. More bins
+            give finer resolution but require more data. Defaults to 10.
+        title (str | None, optional): Plot title. If None, uses "Calibration Curve".
+            Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (6, 5).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with calibration curve showing model
+            performance (blue line with square markers) vs. perfect calibration
+            (diagonal gray dashed line).
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1, 0])
+        >>> y_proba = np.array([0.1, 0.9, 0.2, 0.85, 0.7, 0.3, 0.8, 0.15])
+        >>> fig = plot_calibration(y_true, y_proba, n_bins=5)
+        >>> fig.savefig("calibration.png")
     """
     fraction_of_positives, mean_predicted_value = calibration_curve(
         y_true, y_proba, n_bins=n_bins, strategy="uniform"
@@ -442,16 +544,30 @@ def plot_prediction_distribution(
 ) -> plt.Figure:
     """Plot histogram of predicted probabilities by true class with Nature/Science styling.
 
+    Creates overlapping histograms showing the distribution of predicted probabilities
+    for each true class. Well-separated distributions indicate good model discrimination.
+    Includes vertical line at 0.5 decision threshold.
+
     Args:
-        y_true (np.ndarray): True labels.
-        y_proba (np.ndarray): Predicted probabilities for positive class.
-        title (str | None, optional): Plot title. Defaults to
-            "Prediction Distribution".
-        figsize (tuple[float, float], optional): Figure size. Defaults to (8, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
+            Values should be in [0, 1]. Shape: (n_samples,).
+        title (str | None, optional): Plot title. If None, uses
+            "Prediction Distribution by True Class". Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (8, 5).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure object.
+        plt.Figure: Matplotlib figure object with overlapping histograms for
+            "Not Erupted" (blue) and "Erupted" (orange) classes.
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1, 0])
+        >>> y_proba = np.array([0.1, 0.9, 0.2, 0.85, 0.7, 0.3, 0.8, 0.15])
+        >>> fig = plot_prediction_distribution(y_true, y_proba)
+        >>> fig.savefig("prediction_distribution.png")
     """
     proba_0 = y_proba[y_true == 0]
     proba_1 = y_proba[y_true == 1]
