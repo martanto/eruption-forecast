@@ -30,46 +30,59 @@ def plot_significant_features(
     """Plot a horizontal bar chart of significant features with publication-quality styling.
 
     Displays the top ``number_of_features`` rows of ``df`` as a horizontal
-    bar chart sorted by ``values_column``, with a dashed reference line at
-    ``top_features``. Uses Nature/Science journal styling with colorblind-safe
-    color palette.
+    bar chart sorted by ``values_column``, with a dashed red reference line at
+    ``top_features``. Top features are highlighted with blue, others with gray.
+    Uses Nature/Science journal styling with colorblind-safe colors.
 
     Args:
         df (pd.DataFrame): DataFrame containing feature names and their
-            significance values (e.g. p-values or importance scores).
-        filepath (str): Full path (including filename) where the figure is
-            saved.
+            significance values (e.g., p-values or importance scores). Must contain
+            columns specified by features_column and values_column.
+        filepath (str): Full path (including filename and extension) where the
+            figure is saved. Parent directories must exist.
         number_of_features (int, optional): Total number of features to
-            display in the chart. Defaults to 50.
+            display in the chart. Features are sorted by values_column.
+            Defaults to 50.
         top_features (int, optional): Position at which to draw a reference
-            line marking the top-N cut-off. Defaults to 20.
+            line marking the top-N cut-off. Top features are colored blue, others
+            gray. Defaults to 20.
         title (str | None, optional): Chart title. If None, defaults to
-            ``"<number_of_features> Significant Features"``. Defaults to None.
+            "<number_of_features> Significant Features". Defaults to None.
         figsize (tuple[float, float], optional): Figure dimensions as
-            ``(width, height)`` in inches. If using the default value of
-            ``(4, 12)``, the height will be automatically calculated based on
-            ``number_of_features`` to prevent layout collapse
-            (formula: ``max(8, number_of_features * 0.3 + 2)``).
-            Custom values are respected as-is. Defaults to ``(4, 12)``.
+            (width, height) in inches. If using the default value of (4, 12),
+            the height will be automatically calculated based on number_of_features
+            to prevent layout collapse (formula: max(8, number_of_features * 0.3 + 2)).
+            Custom values are respected as-is. Defaults to (4, 12).
         features_column (str, optional): Name of the column containing
-            feature names. If missing, the index is used. Defaults to
-            ``"features"``.
+            feature names. If missing, the DataFrame index is used. Defaults to
+            "features".
         values_column (str, optional): Name of the column containing
-            significance values. Defaults to ``"p_values"``.
-        dpi (int, optional): Figure resolution in dots per inch. Defaults
-            to 150.
-        overwrite (bool, optional): If True, overwrite an existing file.
-            Defaults to True.
+            significance values (e.g., p-values or importance scores). Must be
+            numeric. Defaults to "p_values".
+        dpi (int, optional): Figure resolution in dots per inch for saved PNG.
+            Defaults to 150.
+        overwrite (bool, optional): If True, overwrite an existing file at
+            filepath. If False, skip plotting if file exists. Defaults to True.
 
     Returns:
-        None
+        None: Saves figure to disk, does not return matplotlib objects.
 
     Examples:
+        >>> # Basic usage with default parameters
         >>> plot_significant_features(
         ...     df=sig_features_df,
         ...     filepath="output/figures/significant_features.png",
         ...     number_of_features=30,
         ...     top_features=10,
+        ... )
+        >>>
+        >>> # Custom column names for importance scores
+        >>> plot_significant_features(
+        ...     df=importance_df,
+        ...     filepath="output/importance.png",
+        ...     features_column="feature_name",
+        ...     values_column="importance_score",
+        ...     title="Top Feature Importances",
         ... )
     """
     if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
@@ -176,21 +189,35 @@ def _process_single_file(
     dpi: int,
     kwargs: dict,
 ) -> str:
-    """Process a single CSV file and generate plot.
+    """Process a single CSV file and generate a feature importance plot.
 
     Helper function for multiprocessing support in replot_significant_features().
+    Loads a CSV, auto-detects feature and value columns, and generates a plot
+    using plot_significant_features(). Designed for use with Pool.starmap().
 
     Args:
-        csv_path: Path to input CSV file
-        output_dir: Directory for output plot
-        overwrite: Whether to overwrite existing files
-        number_of_features: Number of features to display
-        top_features: Number of top features to highlight
-        dpi: Plot resolution
-        kwargs: Additional keyword arguments for plot_significant_features()
+        csv_path (Path): Path to input CSV file containing feature data.
+        output_dir (Path): Directory where output plot will be saved.
+        overwrite (bool): If True, overwrite existing plots. If False, skip
+            plotting if file already exists.
+        number_of_features (int): Number of features to display in the plot.
+        top_features (int): Number of top features to highlight with blue color.
+        dpi (int): Plot resolution in dots per inch.
+        kwargs (dict): Additional keyword arguments for plot_significant_features(),
+            such as "features_column", "values_column", "title", "figsize".
 
     Returns:
-        str: Status string - "created", "skipped", or "failed"
+        str: Processing status - one of "created", "skipped", or "failed".
+
+    Raises:
+        Does not raise exceptions. Errors are logged via logger.error() and
+        "failed" status is returned.
+
+    Notes:
+        - Auto-detects features column (tries "features" or uses index)
+        - Auto-detects values column (tries "p_values", "importance", or first numeric)
+        - Output filename matches input CSV filename with .png extension
+        - Errors are logged but don't raise exceptions for robustness
     """
     # Generate output filename
     output_filename = csv_path.stem + ".png"
@@ -295,9 +322,14 @@ def replot_significant_features(
 
     Returns:
         dict[str, int]: Summary statistics with keys:
-            - ``'created'``: Number of plots successfully created
-            - ``'skipped'``: Number of plots skipped (file exists, overwrite=False)
-            - ``'failed'``: Number of plots that failed due to errors
+            - "created": Number of plots successfully created
+            - "skipped": Number of plots skipped (file exists, overwrite=False)
+            - "failed": Number of plots that failed due to errors
+
+    Raises:
+        FileNotFoundError: If all_features_dir does not exist.
+        NotADirectoryError: If all_features_dir is not a directory.
+        ValueError: If n_jobs is less than or equal to 0.
 
     Examples:
         >>> # Replot all features with default settings
@@ -307,12 +339,14 @@ def replot_significant_features(
         ... )
         >>> print(f"Created: {results['created']}, Failed: {results['failed']}")
 
-        >>> # Custom output directory, skip existing plots
+        >>> # Custom output directory with top 30 features
         >>> results = replot_significant_features(
         ...     all_features_dir="path/to/features",
         ...     output_dir="path/to/plots",
         ...     overwrite=False,
         ...     number_of_features=30,
+        ...     top_features=15,
+        ...     dpi=300,
         ... )
 
     Notes:
