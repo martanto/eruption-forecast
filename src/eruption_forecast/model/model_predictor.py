@@ -155,7 +155,6 @@ class ModelPredictor:
         )
         output_dir = os.path.join(output_dir, "predictions")
 
-        output_dir = output_dir
         tremor_dir = os.path.join(output_dir, "tremor")
         features_dir = os.path.join(output_dir, "features")
         extracted_dir = os.path.join(features_dir, "extracted")

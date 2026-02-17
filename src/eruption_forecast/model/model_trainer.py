@@ -1021,10 +1021,10 @@ class ModelTrainer:
             _,  # ignore; _run_train() uses a reduced skip check (no metrics file)
         ) = self._generate_filepaths(random_state=random_state)
 
-        # For train(), skip only based on significant + model files (no metrics).
+        # For train(), skip only based on significant + model files (no metrics,
+        # no figures — figures are optional and controlled by plot_significant_features).
         can_skip = (
             not self.overwrite
-            and os.path.exists(all_figures_filepath)
             and os.path.isfile(significant_filepath)
             and os.path.isfile(model_filepath)
         )
