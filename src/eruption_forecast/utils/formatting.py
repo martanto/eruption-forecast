@@ -4,8 +4,6 @@ This module provides utilities for converting class names to slugified format
 for use in filenames and directory names.
 """
 
-from __future__ import annotations
-
 
 def slugify_class_name(class_name: str) -> str:
     """Convert a class name to a slug for use in filenames.

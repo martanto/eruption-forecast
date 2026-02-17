@@ -4,8 +4,6 @@ This module provides functions for data balancing, feature selection, metrics
 computation, and eruption probability prediction.
 """
 
-from __future__ import annotations
-
 import os
 import json
 from typing import TYPE_CHECKING, Any, cast

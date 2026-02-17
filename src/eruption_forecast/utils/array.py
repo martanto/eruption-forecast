@@ -5,8 +5,6 @@ using z-score methods. Supports removing zero values, detecting maximum outliers
 and filtering all outliers from numpy arrays.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from eruption_forecast.logger import logger

@@ -5,8 +5,6 @@ validation, sampling consistency checks, series conversion, and feature
 concatenation for tsfresh processing.
 """
 
-from __future__ import annotations
-
 import pandas as pd
 
 

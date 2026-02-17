@@ -5,8 +5,6 @@ information from seismic traces, and calculating window-based metrics for
 tremor analysis.
 """
 
-from __future__ import annotations
-
 from typing import Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable

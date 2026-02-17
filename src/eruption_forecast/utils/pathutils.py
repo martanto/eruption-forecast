@@ -4,8 +4,6 @@ This module provides utilities for resolving output directory paths relative
 to a root anchor directory.
 """
 
-from __future__ import annotations
-
 import os
 
 

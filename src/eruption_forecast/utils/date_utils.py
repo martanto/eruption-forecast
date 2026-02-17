@@ -4,8 +4,6 @@ This module provides functions for date validation, conversion, normalization,
 and window step validation. Ensures consistent date handling across the package.
 """
 
-from __future__ import annotations
-
 from typing import Literal
 from datetime import datetime
 
