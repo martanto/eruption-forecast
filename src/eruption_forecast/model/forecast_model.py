@@ -92,9 +92,9 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT parameter
-        # =========================
+        # ------------------------------------------------------------------
         start_date, end_date, start_date_str, end_date_str = normalize_dates(
             start_date, end_date
         )
@@ -105,9 +105,9 @@ class ForecastModel:
             network, station, location, channel, output_dir, root_dir
         )
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.station = station
         self.channel = channel
         self.start_date: datetime = start_date
@@ -123,9 +123,9 @@ class ForecastModel:
         self.verbose = verbose
         self.debug = debug
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
-        # =========================
+        # ------------------------------------------------------------------
         self.start_date_minus_window_size = start_date - timedelta(days=window_size)
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
@@ -134,19 +134,19 @@ class ForecastModel:
         self.features_dir = features_dir
         self.basename: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Initialize state properties (set during lifecycle)
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after calculate() method called
-        # =========================
+        # ------------------------------------------------------------------
         self.CalculateTremor: CalculateTremor | None = None
         self.TremorData: TremorData | None = None
         self.tremor_data: pd.DataFrame = pd.DataFrame()
         self.tremor_csv: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after build_label() method called
-        # =========================
+        # ------------------------------------------------------------------
         self.LabelBuilder: LabelBuilder | None = None
         self.label_data: pd.DataFrame = pd.DataFrame()
         self.label_csv: str | None = None
@@ -154,9 +154,9 @@ class ForecastModel:
         self.total_non_eruption_class: int | None = None
         self.class_ratio: float | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after extract_features() called
-        # =========================
+        # ------------------------------------------------------------------
         self.TremorMatrixBuilder: TremorMatrixBuilder | None = None
         self.tremor_matrix_df: pd.DataFrame = pd.DataFrame()
         self.tremor_matrix_csv: str | None = None
@@ -165,36 +165,36 @@ class ForecastModel:
         self.features_csv: str | None = None
         self.use_relevant_features: bool = False
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be updated after set_feature_selection_method() called
-        # =========================
+        # ------------------------------------------------------------------
         self.feature_selection_method: Literal[
             "tsfresh", "random_forest", "combined"
         ] = "tsfresh"
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after train() called
-        # =========================
+        # ------------------------------------------------------------------
         self.ModelTrainer: ModelTrainer | None = None
         self.trained_model_df: pd.DataFrame = pd.DataFrame()
         self.trained_model_csv: str | None = None
         self.ClassifierModel: ClassifierModel | None = None
         self.classifier_name: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after predict() called
-        # =========================
+        # ------------------------------------------------------------------
         self.prediction_features_csvs: set[str] = set()
 
-        # =========================
+        # ------------------------------------------------------------------
         # Validate and create directories
-        # =========================
+        # ------------------------------------------------------------------
         self.validate()
         self.create_directories()
 
-        # =========================
+        # ------------------------------------------------------------------
         # Verbose and logging
-        # =========================
+        # ------------------------------------------------------------------
         if debug:
             logger.info("⚠️ Forecast Model :: Debug mode is ON")
 

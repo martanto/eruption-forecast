@@ -8,7 +8,6 @@ import joblib
 import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
-from eruption_forecast.plot import plot_significant_features as plot_significant
 from eruption_forecast.utils import (
     get_metrics,
     resolve_output_dir,
@@ -20,6 +19,9 @@ from eruption_forecast.features.constants import (
     ERUPTED_COLUMN,
     DATETIME_COLUMN,
     SIGNIFICANT_FEATURES_FILENAME,
+)
+from eruption_forecast.plots.feature_plots import (
+    plot_significant_features as _plot_significant_features,
 )
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
@@ -133,9 +135,9 @@ class ModelTrainer:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT parameter
-        # =========================
+        # ------------------------------------------------------------------
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
 
         df_labels = pd.read_csv(label_features_csv)
@@ -192,9 +194,9 @@ class ModelTrainer:
         figures_dir = os.path.join(features_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.df_features = df_features
         self.df_labels = df_labels
         self.output_dir = output_dir
@@ -209,9 +211,9 @@ class ModelTrainer:
         self.verbose = verbose
         self.debug = debug
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
-        # =========================
+        # ------------------------------------------------------------------
         self.FeatureSelector = FeatureSelector(
             method=feature_selection_method, verbose=verbose
         )
@@ -225,9 +227,9 @@ class ModelTrainer:
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after train_and_evaluate() method called
-        # =========================
+        # ------------------------------------------------------------------
         self.significant_features_csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
 
@@ -235,14 +237,14 @@ class ModelTrainer:
         self.df: pd.DataFrame = pd.DataFrame()
         self.csv: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Validate and create directories
-        # =========================
+        # ------------------------------------------------------------------
         self.validate()
 
-        # =========================
+        # ------------------------------------------------------------------
         # Verbose and logging
-        # =========================
+        # ------------------------------------------------------------------
         if verbose:
             logger.info(
                 f"Train model using {n_jobs} jobs with {self.classifier_name} classifier "
@@ -489,11 +491,10 @@ class ModelTrainer:
             )
 
             if plot:
-                plot_significant(
+                _plot_significant_features(
                     df=df.reset_index(),
                     filepath=os.path.join(self.features_dir, filename),
                     overwrite=True,
-                    dpi=72,
                 )
 
         return df
@@ -545,7 +546,7 @@ class ModelTrainer:
         if all_features_filepath:
             all_selected_features.to_csv(all_features_filepath, index=True)
             if all_figures_filepath:
-                self._plot_significant_features(
+                self._plot_all_significant_features(
                     all_selected_features=pd.DataFrame(
                         all_selected_features
                     ).reset_index(),
@@ -554,12 +555,12 @@ class ModelTrainer:
 
         return df_selected_features, all_selected_features, top_selected_features
 
-    def _plot_significant_features(
+    def _plot_all_significant_features(
         self,
         all_selected_features: pd.DataFrame,
         all_figures_filepath: str,
     ):
-        plot_significant(
+        _plot_significant_features(
             df=all_selected_features,
             filepath=all_figures_filepath,
             overwrite=self.overwrite,

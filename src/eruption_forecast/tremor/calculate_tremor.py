@@ -12,7 +12,6 @@ from obspy import Trace, Stream, UTCDateTime
 
 import eruption_forecast
 from eruption_forecast.sds import SDS
-from eruption_forecast.plot import plot_tremor
 from eruption_forecast.utils import (
     to_datetime,
     resolve_output_dir,
@@ -20,6 +19,7 @@ from eruption_forecast.utils import (
 )
 from eruption_forecast.logger import logger
 from eruption_forecast.tremor.rsam import RSAM
+from eruption_forecast.plots.tremor_plots import plot_tremor
 
 
 class CalculateTremor:
@@ -106,9 +106,9 @@ class CalculateTremor:
         verbose: bool = False,
         debug: bool = False,
     ):
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT parameter
-        # =========================
+        # ------------------------------------------------------------------
         start_date = to_datetime(start_date)
         end_date = to_datetime(end_date)
         network = network or "VG"
@@ -120,9 +120,9 @@ class CalculateTremor:
         tremor_dir = os.path.join(station_dir, "tremor")
         figures_dir = os.path.join(tremor_dir, "figures")
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.station = station.upper()
         self.channel = channel.upper()
         self.start_date: datetime = start_date
@@ -151,9 +151,9 @@ class CalculateTremor:
         self.verbose = verbose
         self.debug = debug
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
-        # =========================
+        # ------------------------------------------------------------------
         self.df: pd.DataFrame = pd.DataFrame()
         self.start_date_str: str = start_date.strftime("%Y-%m-%d")
         self.end_date_str: str = end_date.strftime("%Y-%m-%d")
@@ -178,30 +178,30 @@ class CalculateTremor:
         self._client_url = "https://service.iris.edu"
         self.csv = os.path.join(tremor_dir, self.filename)
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after from_sds() called
-        # =========================
+        # ------------------------------------------------------------------
         self.sds: SDS | None = None
         self._sds_dir: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after from_sds() or from_fdsn() called
-        # =========================
+        # ------------------------------------------------------------------
         self._source: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after run() called
-        # =========================
+        # ------------------------------------------------------------------
         self.daily_files: list[str] = []
 
-        # =========================
+        # ------------------------------------------------------------------
         # Validate and create directories
-        # =========================
+        # ------------------------------------------------------------------
         self.validate()
 
-        # =========================
+        # ------------------------------------------------------------------
         # Verbose and logging
-        # =========================
+        # ------------------------------------------------------------------
         if debug:
             logger.info("⚠️ Calculate Tremor :: Debug mode is ON")
 

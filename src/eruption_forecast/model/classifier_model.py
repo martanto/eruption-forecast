@@ -94,9 +94,9 @@ class ClassifierModel:
         class_weight: str | dict[int, float] | None = None,
         n_jobs: int = 1,
     ):
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.classifier = classifier
         self.random_state = random_state
         self.cv_strategy = cv_strategy
@@ -106,9 +106,9 @@ class ClassifierModel:
         self.class_weight = class_weight
         self.n_jobs = n_jobs
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
-        # =========================
+        # ------------------------------------------------------------------
         self._model: (
             SVC
             | KNeighborsClassifier
