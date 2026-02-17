@@ -270,6 +270,9 @@ class ModelPredictor:
         for model_name, df_models in self.trained_models.items():
             logger.info(f"Evaluating classifier: {model_name}")
 
+            model_output_dir = os.path.join(self.output_dir, model_name)
+            os.makedirs(model_output_dir, exist_ok=True)
+
             for random_state, row in df_models.iterrows():
                 significant_features_csv: str = row["significant_features_csv"]
                 model_filepath: str = row["trained_model_filepath"]
@@ -278,7 +281,7 @@ class ModelPredictor:
                 df_sig = pd.read_csv(significant_features_csv, index_col=0)
                 feature_names: list[str] = df_sig.index.tolist()
 
-                seed_output_dir = os.path.join(self.output_dir, model_name)
+                seed_output_dir = os.path.join(model_output_dir, model_name)
 
                 evaluator = ModelEvaluator.from_files(
                     model_path=model_filepath,
@@ -286,7 +289,7 @@ class ModelPredictor:
                     y_test=labels_df,
                     selected_features=feature_names,
                     model_name=model_name,
-                    output_dir=seed_output_dir if plot else self.output_dir,
+                    output_dir=seed_output_dir if plot else model_output_dir,
                 )
 
                 metrics = evaluator.get_metrics()
@@ -701,12 +704,15 @@ class ModelPredictor:
         for model_name, df_models in self.trained_models.items():
             logger.info(f"Forecasting with classifier: {model_name}")
 
+            model_output_dir = os.path.join(self.output_dir, model_name)
+            os.makedirs(model_output_dir, exist_ok=True)
+
             mean_probability, std_probability, confidence, prediction = (
                 compute_model_probabilities(
                     df_models=df_models,
                     features_df=features_df,
                     classifier_name=model_name,
-                    output_dir=self.output_dir,
+                    output_dir=model_output_dir,
                     save_predictions=save_predictions,
                     overwrite=self.overwrite,
                 )
@@ -749,7 +755,9 @@ class ModelPredictor:
 
         df_forecast = pd.DataFrame(cols, index=features_df.index)
 
-        csv_path = os.path.join(self.output_dir, f"predictions_{self.basename}.csv")
+        csv_path = os.path.join(
+            self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
+        )
         df_forecast.to_csv(csv_path)
         logger.info(f"Predictions saved to: {csv_path}")
 
@@ -835,7 +843,7 @@ class ModelPredictor:
         logger.info("=" * 60)
 
         # Save summary
-        summary_path = os.path.join(self.output_dir, "metrics_summary.csv")
+        summary_path = os.path.join(self.output_dir, "all_metrics_summary.csv")
         df.describe().T.to_csv(summary_path)
         logger.info(f"Metrics summary saved to: {summary_path}")
 
