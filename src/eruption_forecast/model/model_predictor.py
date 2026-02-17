@@ -36,41 +36,64 @@ _METRIC_KEYS = [
 class ModelPredictor:
     """Evaluate or forecast with one or more sets of trained full-dataset models.
 
-    Loads models produced by ``ModelTrainer.train()``.  Accepts either a single
-    registry CSV or a dict of multiple registries (one per classifier type),
-    enabling **consensus** aggregation across classifiers.
+    Loads models produced by ``ModelTrainer.train()`` and runs inference in
+    either evaluation or forecast mode. Supports single-model or multi-model
+    consensus predictions by aggregating across classifiers.
 
     Two operating modes are supported:
 
-    * **Evaluation mode** (``future_labels_csv`` provided): evaluates every
-      seed of every classifier on labelled future data and aggregates metrics
-      per classifier and across classifiers.  Use :meth:`predict` and
+    * **Evaluation mode** (``future_labels_csv`` provided): Evaluates every
+      seed of every classifier on labeled future data and aggregates metrics
+      per classifier and across classifiers. Use :meth:`predict` and
       :meth:`predict_best`.
 
-    * **Forecast mode** (no ``future_labels_csv``): aggregates eruption
-      probability across seeds *and* classifiers.  Use :meth:`predict_proba`.
+    * **Forecast mode** (no ``future_labels_csv``): Aggregates eruption
+      probability across seeds *and* classifiers with uncertainty quantification.
+      Use :meth:`predict_proba`.
+
+    Attributes:
+        start_date (datetime): Start of the prediction window.
+        end_date (datetime): End of the prediction window.
+        start_date_str (str): Start date as "YYYY-MM-DD" string.
+        end_date_str (str): End date as "YYYY-MM-DD" string.
+        trained_models_dict (dict[str, str]): Dictionary mapping classifier names
+            to their trained model registry CSV paths.
+        is_multi_model (bool): True if multiple classifier registries provided.
+        overwrite (bool): Whether to re-compute cached files.
+        n_jobs (int): Number of parallel jobs for feature extraction.
+        output_dir (str): Root directory for prediction outputs.
+        tremor_dir (str): Directory for tremor data cache.
+        features_dir (str): Directory for feature outputs.
+        extracted_dir (str): Directory for extracted features.
+        figures_dir (str): Directory for plots.
+        verbose (bool): Enable verbose logging.
+        debug (bool): Enable debug mode.
 
     Args:
-        start_date (str | datetime): Start of the prediction window.
-        end_date (str | datetime): End of the prediction window.
+        start_date (str | datetime): Start of the prediction window (YYYY-MM-DD).
+        end_date (str | datetime): End of the prediction window (YYYY-MM-DD).
         trained_models (str | dict[str, str]): Either a single path to a
-            ``trained_model_{suffix}.csv`` file produced by
-            ``ModelTrainer.train()``; or a dict mapping a classifier name to its
-            CSV path (e.g. ``{"rf": "...", "xgb": "...", "voting": "..."}``)
-            for multi-model consensus.
+            ``trained_model_{suffix}.csv`` file produced by ``ModelTrainer.train()``;
+            or a dict mapping classifier name to its CSV path
+            (e.g., ``{"rf": "...", "xgb": "...", "voting": "..."}``).
         overwrite (bool, optional): Re-compute cached files if True.
             Defaults to False.
         n_jobs (int, optional): Number of parallel jobs for feature extraction.
             Defaults to 1.
         output_dir (str | None, optional): Root directory for outputs.
             Defaults to ``<cwd>/output/predictions``.
-        root_dir (str | None, optional): Project root used to resolve
-            relative ``output_dir`` paths.  Defaults to None.
+        root_dir (str | None, optional): Project root used to resolve relative
+            ``output_dir`` paths. Defaults to None.
         verbose (bool, optional): Print extra progress information.
             Defaults to False.
+        debug (bool, optional): Enable debug mode. Defaults to False.
 
-    Example — single model, evaluation mode::
+    Raises:
+        ValueError: If start_date >= end_date.
+        FileNotFoundError: If any trained model registry CSV does not exist.
 
+    Examples:
+        >>> # Single model, evaluation mode
         >>> predictor = ModelPredictor(
         ...     start_date="2025-03-20",
         ...     end_date="2025-03-22",
@@ -86,8 +109,7 @@ class ModelPredictor:
         ... )
         >>> print(evaluator.summary())
 
-    Example — multi-model consensus, forecast mode::
-
+        >>> # Multi-model consensus, forecast mode
         >>> predictor = ModelPredictor(
         ...     start_date="2025-03-20",
         ...     end_date="2025-03-22",

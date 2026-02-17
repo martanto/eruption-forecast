@@ -41,17 +41,39 @@ class ClassifierModel:
         - xgb: XGBoost classifier (excellent for imbalanced data)
         - voting: Ensemble VotingClassifier combining rf and xgb
 
+    Attributes:
+        classifier (str): Classifier type identifier ("svm", "knn", "dt", etc.).
+        random_state (int | None): Random seed for reproducibility.
+        cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "timeseries").
+        n_splits (int): Number of cross-validation splits.
+        test_size (float): Proportion of data for test set (used with StratifiedShuffleSplit).
+        verbose (bool): Enable verbose logging.
+        class_weight (str | dict[int, float] | None): Class weight configuration.
+        n_jobs (int): Number of parallel jobs for compatible classifiers.
+        cv_name (str): Name of the cross-validation splitter class.
+        _model: Internal cached model instance.
+        _grid: Internal cached hyperparameter grid.
+
     Args:
-        classifier: Classifier type identifier.
-        random_state: Random seed for reproducibility. Applies to classifiers
-            that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
-        cv_strategy: Cross-validation strategy. Defaults to ``"shuffle"``.
-            - "shuffle": StratifiedShuffleSplit (randomised stratified folds)
+        classifier (Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"]):
+            Classifier type identifier.
+        random_state (int | None, optional): Random seed for reproducibility. Applies to
+            classifiers that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
+        cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
+            Cross-validation strategy. Defaults to "shuffle".
+            
+            - "shuffle": StratifiedShuffleSplit (randomized stratified folds)
             - "stratified": StratifiedKFold (preserves class distribution)
             - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
-        n_splits: Number of cross-validation splits. Defaults to 5.
+        n_splits (int, optional): Number of cross-validation splits. Defaults to 5.
+        test_size (float, optional): Test set proportion for StratifiedShuffleSplit.
+            Defaults to 0.2.
+        verbose (bool, optional): Enable verbose logging. Defaults to False.
+        class_weight (str | dict[int, float] | None, optional): Class weight for
+            imbalanced data. Defaults to None (will use "balanced" for most classifiers).
+        n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
 
-    Example:
+    Examples:
         >>> # Create a Random Forest classifier
         >>> clf = ClassifierModel("rf")
         >>> model, grid = clf.model_and_grid
@@ -154,21 +176,23 @@ class ClassifierModel:
     ) -> TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
         """Get the cross-validation splitter based on cv_strategy.
 
-        Returns the appropriate cross-validator for the configured strategy:
-        - "stratified": StratifiedKFold (preserves class distribution)
-        - "timeseries": TimeSeriesSplit (for temporal data)
+        Returns the appropriate cross-validator for the configured strategy.
+        Used with GridSearchCV for hyperparameter tuning.
 
         Args:
-            strategy: Cross-validation strategy. Defaults to ``self.cv_strategy``.
-                - "shuffle": StratifiedShuffleSplit (randomised stratified folds)
+            strategy (Literal["shuffle", "stratified", "timeseries"] | None, optional):
+                Cross-validation strategy. If None, uses ``self.cv_strategy``.
+                Defaults to None.
+                
+                - "shuffle": StratifiedShuffleSplit (randomized stratified folds)
                 - "stratified": StratifiedKFold (preserves class distribution)
                 - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
 
         Returns:
             TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
-                sklearn cross-validation splitter instance.
+                Configured sklearn cross-validation splitter instance.
 
-        Example:
+        Examples:
             >>> # Use StratifiedKFold (default)
             >>> clf = ClassifierModel("rf", cv_strategy="stratified")
             >>> cv = clf.get_cv_splitter()
@@ -204,27 +228,54 @@ class ClassifierModel:
 
     @property
     def slug_name(self) -> str:
-        """Slug name for this classifier."""
+        """Get the slugified classifier name.
+        
+        Returns:
+            str: Slugified version of the classifier class name (lowercase with hyphens).
+        
+        Examples:
+            >>> clf = ClassifierModel("rf")
+            >>> clf.slug_name
+            'random-forest-classifier'
+        """
         return slugify_class_name(self.name)
 
     @property
     def slug_cv_name(self) -> str:
-        """Slug name for cross-validation."""
+        """Get the slugified cross-validation strategy name.
+        
+        Returns:
+            str: Slugified version of the CV class name (lowercase with hyphens).
+        
+        Examples:
+            >>> clf = ClassifierModel("rf", cv_strategy="stratified")
+            >>> clf.slug_cv_name
+            'stratified-k-fold'
+        """
         return slugify_class_name(self.cv_name)
 
     @property
     def grid(self) -> dict[str, Any]:
-        """Hyperparameter grid for cross-validation.
+        """Get the hyperparameter grid for GridSearchCV.
 
-        Returns default grid if none set, otherwise returns custom grid.
+        Returns the default grid for the configured classifier if no custom
+        grid has been set. Otherwise returns the custom grid.
 
         Returns:
-            dict[str, Any]: Dictionary mapping parameter names to lists of values.
+            dict[str, Any]: Dictionary mapping parameter names to lists of values
+                to search over during hyperparameter optimization.
 
-        Example:
+        Raises:
+            ValueError: If the classifier type is unknown.
+
+        Examples:
             >>> clf = ClassifierModel("rf")
             >>> print(clf.grid["n_estimators"])
-            [10, 30, 100]
+            [50, 100, 200]
+            
+            >>> clf = ClassifierModel("xgb")
+            >>> print(clf.grid["learning_rate"])
+            [0.01, 0.1, 0.2]
         """
         if self._grid is not None:
             return self._grid
@@ -317,7 +368,15 @@ class ClassifierModel:
 
     @grid.setter
     def grid(self, grid: dict[str, Any]):
-        """Set a custom hyperparameter grid, overriding the default."""
+        """Set a custom hyperparameter grid, overriding the default.
+        
+        Args:
+            grid (dict[str, Any]): Custom hyperparameter grid for GridSearchCV.
+        
+        Examples:
+            >>> clf = ClassifierModel("rf")
+            >>> clf.grid = {"n_estimators": [100, 200], "max_depth": [10, None]}
+        """
         self._grid = grid
         if self.verbose:
             logger.info(f"Your grid parameters updated to: {grid}")
@@ -344,11 +403,14 @@ class ClassifierModel:
         to handle the imbalanced eruption/non-eruption data.
 
         Returns:
-            Classifier instance (SVC, KNeighborsClassifier, DecisionTreeClassifier,
-            RandomForestClassifier, GradientBoostingClassifier, MLPClassifier,
-            GaussianNB, LogisticRegression, or VotingClassifier).
+            SVC | KNeighborsClassifier | DecisionTreeClassifier | RandomForestClassifier | 
+            GradientBoostingClassifier | XGBClassifier | MLPClassifier | GaussianNB | 
+            LogisticRegression | VotingClassifier: Configured classifier instance.
 
-        Example:
+        Raises:
+            ValueError: If the classifier type is unknown.
+
+        Examples:
             >>> clf = ClassifierModel("rf")
             >>> model = clf.model
             >>> print(type(model).__name__)
@@ -452,19 +514,50 @@ class ClassifierModel:
             | VotingClassifier
         ),
     ):
-        """Set a custom classifier instance, overriding the default."""
+        """Set a custom classifier instance, overriding the default.
+        
+        Args:
+            model (SVC | KNeighborsClassifier | DecisionTreeClassifier | 
+                RandomForestClassifier | GradientBoostingClassifier | XGBClassifier | 
+                MLPClassifier | GaussianNB | LogisticRegression | VotingClassifier):
+                Custom classifier instance.
+        
+        Examples:
+            >>> from sklearn.ensemble import RandomForestClassifier
+            >>> clf = ClassifierModel("rf")
+            >>> clf.model = RandomForestClassifier(n_estimators=500, max_depth=20)
+        """
         self._model = model
         if self.verbose:
             logger.info(f"Your model to: {model.__class__.__name__}")
 
     @property
     def name(self) -> str:
-        """Get the classifier name."""
+        """Get the classifier class name.
+        
+        Returns:
+            str: The name of the classifier class (e.g., "RandomForestClassifier").
+        
+        Examples:
+            >>> clf = ClassifierModel("rf")
+            >>> clf.name
+            'RandomForestClassifier'
+        """
         return type(self.model).__name__
 
     @property
     def model_and_grid(self) -> tuple:
-        """Return a ``(model, grid)`` tuple for use with GridSearchCV."""
+        """Get a (model, grid) tuple for use with GridSearchCV.
+        
+        Returns:
+            tuple: A 2-tuple containing (classifier_instance, hyperparameter_grid).
+        
+        Examples:
+            >>> clf = ClassifierModel("rf")
+            >>> model, grid = clf.model_and_grid
+            >>> from sklearn.model_selection import GridSearchCV
+            >>> search = GridSearchCV(*clf.model_and_grid, cv=5)
+        """
         return self.model, self.grid
 
     def update_model_and_grid(
@@ -483,15 +576,35 @@ class ClassifierModel:
         ),
         grid: dict[str, Any],
     ) -> Self:
-        """Update model classifier and grid parameters.
+        """Update both model classifier and hyperparameter grid.
+
+        Convenience method to set both model and grid simultaneously with
+        method chaining support.
 
         Args:
-            model: Classifier instance to use. Accepts any supported sklearn
-                or XGBoost estimator (SVC, RandomForestClassifier, XGBClassifier, etc.).
+            model (SVC | KNeighborsClassifier | DecisionTreeClassifier | 
+                RandomForestClassifier | GradientBoostingClassifier | XGBClassifier | 
+                MLPClassifier | GaussianNB | LogisticRegression | VotingClassifier):
+                Classifier instance to use. Accepts any supported sklearn or
+                XGBoost estimator.
             grid (dict[str, Any]): Hyperparameter grid for GridSearchCV.
 
         Returns:
-            Self for method chaining.
+            Self: The ClassifierModel instance for method chaining.
+
+        Examples:
+            >>> from sklearn.svm import SVC
+            >>> clf = ClassifierModel("svm")
+            >>> clf.update_model_and_grid(
+            ...     SVC(kernel="rbf", probability=True),
+            ...     {"C": [0.1, 1, 10], "gamma": ["scale", "auto"]}
+            ... )
+            
+            >>> # Method chaining
+            >>> clf = ClassifierModel("rf").update_model_and_grid(
+            ...     RandomForestClassifier(n_estimators=500),
+            ...     {"max_depth": [10, 20, None]}
+            ... )
         """
         self._model = model
         self._grid = grid
