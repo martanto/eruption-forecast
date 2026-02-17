@@ -5,6 +5,10 @@
 **Branch:** `copilot/fix-all-docstrings`
 **Last Updated:** 2026-02-17
 
+## ⚠️ Important Notice
+
+This software includes comprehensive disclaimers emphasizing its research-only purpose. See [Important Disclaimers](#important-disclaimers-for-volcanic-eruption-forecasting-2026-02-17) for details on probabilistic predictions, model limitations, and required expert interpretation.
+
 ---
 
 ## Table of Contents
@@ -29,6 +33,7 @@
 18. [Features Module Docstring Standardization](#features-module-docstring-standardization-2026-02-16)
 19. [Plots Module Docstring Standardization](#plots-module-docstring-standardization-2026-02-16)
 20. [Complete Codebase Docstring Audit and Standardization](#complete-codebase-docstring-audit-and-standardization-2026-02-17)
+21. [Important Disclaimers for Volcanic Eruption Forecasting](#important-disclaimers-for-volcanic-eruption-forecasting-2026-02-17)
 ---
 
 ## Package Overview
@@ -1823,5 +1828,157 @@ This comprehensive audit has successfully standardized **100% of the codebase** 
 7. Class attribute listings
 
 The eruption-forecast package now has research-grade documentation following scientific software best practices and providing comprehensive API documentation for volcanic monitoring researchers.
+
+---
+
+## Important Disclaimers for Volcanic Eruption Forecasting (2026-02-17)
+
+**Branch:** `copilot/fix-all-docstrings`
+**Date:** 2026-02-17
+**Scope:** Added comprehensive disclaimers for research software dealing with public safety
+
+### Objective
+
+Add critical disclaimers to README.md and LICENSE file emphasizing the limitations, probabilistic nature, and research-only purpose of volcanic eruption forecasting software.
+
+### Changes Made
+
+#### 1. README.md — Prominent Disclaimer Section
+
+Added a new **"⚠️ Important Disclaimers"** section immediately after the package description with five key points:
+
+**1. Probabilistic Predictions**
+- Model provides probabilistic predictions, not deterministic guarantees
+- Results are likelihood estimates based on historical seismic patterns
+- Emphasizes inherent uncertainty in volcanic forecasting
+
+**2. No Guarantee of Accuracy**
+- Explicitly states model is **NOT guaranteed to predict every future eruption**
+- Acknowledges volcanic systems can exhibit unexpected behavior
+- Warns about possible false negatives (missed eruptions) and false positives (false alarms)
+
+**3. Software Limitations**
+- Software is **NOT guaranteed to be free of bugs or errors**
+- Users must validate results independently
+- Tool should be one component of comprehensive monitoring strategy
+
+**4. Not for Operational Use**
+- Package is a research tool only
+- Should NOT be sole basis for public safety decisions, evacuations, or emergency response
+- Requires expert volcanological assessment for operational use
+
+**5. Expert Interpretation Required**
+- Results must be interpreted by qualified volcanologists
+- Expertise in specific volcano being monitored is essential
+
+**Advisory Statement:**
+> "Always consult with local volcano observatories and follow official warnings from government agencies."
+
+#### 2. LICENSE File Enhancement
+
+Added **"ADDITIONAL DISCLAIMER FOR VOLCANIC ERUPTION FORECASTING"** section after standard MIT License:
+
+- Reiterates research-only purpose
+- States probabilistic predictions NOT GUARANTEED to predict every eruption
+- Lists software NOT GUARANTEED to be bug-free
+- Provides explicit guidance on proper use
+- Emphasizes need for validation, expert consultation, and official warnings
+- Accepts no liability for use in operational monitoring or public safety decisions
+
+#### 3. README.md License Section
+
+Enhanced with explicit disclaimer of liability:
+> "This software is provided 'as is' without warranty of any kind, express or implied. The authors and contributors shall not be liable for any damages or losses arising from the use of this software. Volcanic eruption forecasting is inherently uncertain, and this software should be used only as a research tool, not for operational volcano monitoring or public safety decisions."
+
+### Why These Disclaimers Are Critical
+
+#### Public Safety Responsibility
+Volcanic eruption forecasting directly relates to public safety. False alarms can cause:
+- Unnecessary evacuations (economic costs, social disruption)
+- Loss of public trust in warning systems
+- Evacuation fatigue (reduced response to future warnings)
+
+Missed eruptions can result in:
+- Loss of life
+- Property damage
+- Liability issues
+
+#### Scientific Uncertainty
+Volcanic systems are:
+- Highly complex and nonlinear
+- Each volcano has unique characteristics
+- Historical patterns may not predict future behavior
+- Limited observational data for many volcanoes
+
+#### Legal and Ethical Considerations
+- Protects researchers from liability
+- Sets appropriate expectations for users
+- Prevents misuse of research software in operational settings
+- Encourages responsible integration with expert volcanological assessment
+
+#### Research vs. Operational Tools
+Clear distinction between:
+- **Research tools** (this package) — experimental, requires validation
+- **Operational systems** — tested, validated, integrated with expert monitoring teams
+
+### Impact
+
+#### User Awareness
+- ✅ Users understand probabilistic nature of predictions
+- ✅ Clear expectations about model limitations
+- ✅ Emphasis on expert interpretation requirement
+- ✅ Prevents over-reliance on automated predictions
+
+#### Legal Protection
+- ✅ Explicit disclaimer of warranties and liability
+- ✅ Clear statement of research-only purpose
+- ✅ Protection for authors and contributors
+- ✅ Compliance with scientific software best practices
+
+#### Responsible Science
+- ✅ Transparent about uncertainties and limitations
+- ✅ Encourages integration with comprehensive monitoring
+- ✅ Promotes collaboration with volcano observatories
+- ✅ Supports evidence-based decision making
+
+### Placement and Visibility
+
+**README.md:**
+- Placed immediately after package description (high visibility)
+- Uses ⚠️ warning emoji for visual prominence
+- Included in Table of Contents
+- Numbered list for clarity
+
+**LICENSE:**
+- Appended after standard MIT License text
+- Clearly separated with "---" divider
+- Uses capital letters for emphasis (NOT GUARANTEED)
+
+### Cross-Reference with Scientific Standards
+
+These disclaimers align with:
+- USGS Volcano Hazards Program guidelines
+- International Association of Volcanology and Chemistry of the Earth's Interior (IAVCEI) recommendations
+- Scientific software development best practices for hazard monitoring
+- Academic research ethics for potentially sensitive applications
+
+### Commit Details
+
+**Branch:** `copilot/fix-all-docstrings`
+**Commit:** `3f10d7f`
+**Files Changed:** 2 (README.md, LICENSE)
+**Additions:** 42 lines
+
+### Conclusion
+
+These comprehensive disclaimers ensure that users of the eruption-forecast package understand:
+
+1. The **probabilistic** nature of volcanic eruption predictions
+2. The **limitations** of machine learning models for natural hazards
+3. The **requirement** for expert volcanological interpretation
+4. The **research-only** purpose of this software
+5. The **importance** of official volcano observatory warnings
+
+This responsible approach to scientific software distribution protects both users and developers while promoting appropriate use of the package in volcanic eruption research.
 
 ---
