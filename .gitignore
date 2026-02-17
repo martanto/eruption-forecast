@@ -9,3 +9,21 @@ wheels/
 
 # Virtual environments
 .venv
+/logs
+/output
+.uv_cache
+.mypy_cache
+.ruff_cache
+*.log
+*.csv
+*.png
+*.ipynb
+
+# Test outputs (cleaned up automatically)
+tests/output/
+/.cache/
+/.claude/
+
+# Temporary test files in root directory
+/test*.py
+/test_*.py

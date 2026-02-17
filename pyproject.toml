@@ -1,59 +1,53 @@
 [build-system]
-requires = ["uv_build>=0.8.22,<0.9.0"]
+requires = ["uv_build"]
 build-backend = "uv_build"
 
 [project]
 name = "eruption-forecast"
 version = "0.1.0"
-description = "Forecast eruption modelling"
+authors = [
+    {name = "Martanto", email = "martanto@live.com"},
+]
+description = "Eruptipn forecast modelling"
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["eruption", "forecast", "volcano", "volcanology", "seismic"]
 requires-python = ">=3.11"
 dependencies = [
-    "obspy",
-    "pandas",
-    "uv-build>=0.9.0",
+    "obspy>=1.4.2",
+    "tsfresh",
+    "numba>=0.63.1",
+    "loguru",
+    "pandas>=3.0.0",
+    "pip>=26.0",
+    "imbalanced-learn>=0.14.1",
+    "scikit-learn>=1.4",
+    "seaborn>=0.13.2",
+    "xgboost>=3.2.0",
+    "lightgbm>=4.6.0",
 ]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "black[d]",
-    "isort",
+    "uv-build",
+    "ruff",
+    "ty",
+    "ipykernel",
+    "notebook",
 ]
 
 [tool.uv]
-cache-dir = "./.uv_cache"
+cache-dir = "./.cache/uv"
+build-constraint-dependencies = ["setuptools==80.8.0"]
 
-[tool.black]
-line-length = 88
-target-version = ['py311','py312']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | examples
-  | output
-  | _build
-  | build
-  | dist
-  | venv
-  | \.env
-  | \.flake8
-)/
-'''
-
-[tool.isort]
-profile = "black"
-src_paths = ["src"]
-import_heading_stdlib = "Standard library imports"
-import_heading_thirdparty = "Third party imports"
-import_heading_firstparty = "Project imports"
-known_first_party = []
+[project.urls]
+Homepage = "https://github.com/martanto/eruption-forecast"
+Issues = "https://github.com/martanto/eruption-forecast/issues"
