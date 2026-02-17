@@ -6,8 +6,27 @@
 
 A comprehensive Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions based on seismic patterns.
 
+## ⚠️ Important Disclaimers
+
+**This software is intended for research purposes only.**
+
+1. **Probabilistic Predictions**: This eruption forecast model provides probabilistic predictions of future volcanic activity, not deterministic guarantees. Predictions should be interpreted as likelihood estimates based on historical seismic patterns.
+
+2. **No Guarantee of Accuracy**: This model is **not guaranteed to predict every future eruption**. Volcanic systems are complex and can exhibit unexpected behavior. False negatives (missed eruptions) and false positives (false alarms) are possible.
+
+3. **Software Limitations**: This software is **not guaranteed to be free of bugs or errors**. Users should validate results independently and use this tool as one component of a comprehensive volcano monitoring strategy.
+
+4. **Not for Operational Use**: This package is a research tool and should not be used as the sole basis for public safety decisions, evacuation orders, or emergency response without expert volcanological assessment.
+
+5. **Expert Interpretation Required**: Results should always be interpreted by qualified volcanologists familiar with the specific volcano being monitored.
+
+**Always consult with local volcano observatories and follow official warnings from government agencies.**
+
+---
+
 ## Table of Contents
 
+- [Important Disclaimers](#️-important-disclaimers)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
@@ -1526,6 +1545,8 @@ All code follows research-grade documentation standards:
 ## License
 
 MIT License — see LICENSE file for details.
+
+**Disclaimer of Liability**: This software is provided "as is" without warranty of any kind, express or implied. The authors and contributors shall not be liable for any damages or losses arising from the use of this software. Volcanic eruption forecasting is inherently uncertain, and this software should be used only as a research tool, not for operational volcano monitoring or public safety decisions.
 
 ## Citation
 
