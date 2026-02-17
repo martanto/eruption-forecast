@@ -4,7 +4,6 @@ from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
 import pandas as pd
-from sqlalchemy.sql.expression import over
 
 from eruption_forecast.utils import (
     to_datetime,
@@ -32,7 +31,7 @@ class ForecastModel:
     for fluent API design.
 
     Pipeline stages:
-    
+
     1. **Calculate tremor**: Process seismic waveforms → RSAM/DSAR metrics
     2. **Build labels**: Create time windows with eruption labels
     3. **Extract features**: Apply tsfresh to generate ML features
@@ -299,7 +298,7 @@ class ForecastModel:
 
         Returns:
             tuple[str, str, str, str]: A 4-tuple containing:
-            
+
                 - **nslc** (str): Combined identifier (e.g., "VG.OJN.00.EHZ")
                 - **output_dir** (str): Resolved output directory path
                 - **station_dir** (str): Station-specific directory path

@@ -61,7 +61,7 @@ class ClassifierModel:
             classifiers that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
         cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
             Cross-validation strategy. Defaults to "shuffle".
-            
+
             - "shuffle": StratifiedShuffleSplit (randomized stratified folds)
             - "stratified": StratifiedKFold (preserves class distribution)
             - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
@@ -183,7 +183,7 @@ class ClassifierModel:
             strategy (Literal["shuffle", "stratified", "timeseries"] | None, optional):
                 Cross-validation strategy. If None, uses ``self.cv_strategy``.
                 Defaults to None.
-                
+
                 - "shuffle": StratifiedShuffleSplit (randomized stratified folds)
                 - "stratified": StratifiedKFold (preserves class distribution)
                 - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
@@ -229,10 +229,10 @@ class ClassifierModel:
     @property
     def slug_name(self) -> str:
         """Get the slugified classifier name.
-        
+
         Returns:
             str: Slugified version of the classifier class name (lowercase with hyphens).
-        
+
         Examples:
             >>> clf = ClassifierModel("rf")
             >>> clf.slug_name
@@ -243,10 +243,10 @@ class ClassifierModel:
     @property
     def slug_cv_name(self) -> str:
         """Get the slugified cross-validation strategy name.
-        
+
         Returns:
             str: Slugified version of the CV class name (lowercase with hyphens).
-        
+
         Examples:
             >>> clf = ClassifierModel("rf", cv_strategy="stratified")
             >>> clf.slug_cv_name
@@ -272,7 +272,7 @@ class ClassifierModel:
             >>> clf = ClassifierModel("rf")
             >>> print(clf.grid["n_estimators"])
             [50, 100, 200]
-            
+
             >>> clf = ClassifierModel("xgb")
             >>> print(clf.grid["learning_rate"])
             [0.01, 0.1, 0.2]
@@ -369,10 +369,10 @@ class ClassifierModel:
     @grid.setter
     def grid(self, grid: dict[str, Any]):
         """Set a custom hyperparameter grid, overriding the default.
-        
+
         Args:
             grid (dict[str, Any]): Custom hyperparameter grid for GridSearchCV.
-        
+
         Examples:
             >>> clf = ClassifierModel("rf")
             >>> clf.grid = {"n_estimators": [100, 200], "max_depth": [10, None]}
@@ -403,8 +403,8 @@ class ClassifierModel:
         to handle the imbalanced eruption/non-eruption data.
 
         Returns:
-            SVC | KNeighborsClassifier | DecisionTreeClassifier | RandomForestClassifier | 
-            GradientBoostingClassifier | XGBClassifier | MLPClassifier | GaussianNB | 
+            SVC | KNeighborsClassifier | DecisionTreeClassifier | RandomForestClassifier |
+            GradientBoostingClassifier | XGBClassifier | MLPClassifier | GaussianNB |
             LogisticRegression | VotingClassifier: Configured classifier instance.
 
         Raises:
@@ -515,13 +515,13 @@ class ClassifierModel:
         ),
     ):
         """Set a custom classifier instance, overriding the default.
-        
+
         Args:
-            model (SVC | KNeighborsClassifier | DecisionTreeClassifier | 
-                RandomForestClassifier | GradientBoostingClassifier | XGBClassifier | 
+            model (SVC | KNeighborsClassifier | DecisionTreeClassifier |
+                RandomForestClassifier | GradientBoostingClassifier | XGBClassifier |
                 MLPClassifier | GaussianNB | LogisticRegression | VotingClassifier):
                 Custom classifier instance.
-        
+
         Examples:
             >>> from sklearn.ensemble import RandomForestClassifier
             >>> clf = ClassifierModel("rf")
@@ -534,10 +534,10 @@ class ClassifierModel:
     @property
     def name(self) -> str:
         """Get the classifier class name.
-        
+
         Returns:
             str: The name of the classifier class (e.g., "RandomForestClassifier").
-        
+
         Examples:
             >>> clf = ClassifierModel("rf")
             >>> clf.name
@@ -548,10 +548,10 @@ class ClassifierModel:
     @property
     def model_and_grid(self) -> tuple:
         """Get a (model, grid) tuple for use with GridSearchCV.
-        
+
         Returns:
             tuple: A 2-tuple containing (classifier_instance, hyperparameter_grid).
-        
+
         Examples:
             >>> clf = ClassifierModel("rf")
             >>> model, grid = clf.model_and_grid
@@ -582,8 +582,8 @@ class ClassifierModel:
         method chaining support.
 
         Args:
-            model (SVC | KNeighborsClassifier | DecisionTreeClassifier | 
-                RandomForestClassifier | GradientBoostingClassifier | XGBClassifier | 
+            model (SVC | KNeighborsClassifier | DecisionTreeClassifier |
+                RandomForestClassifier | GradientBoostingClassifier | XGBClassifier |
                 MLPClassifier | GaussianNB | LogisticRegression | VotingClassifier):
                 Classifier instance to use. Accepts any supported sklearn or
                 XGBoost estimator.
@@ -599,7 +599,7 @@ class ClassifierModel:
             ...     SVC(kernel="rbf", probability=True),
             ...     {"C": [0.1, 1, 10], "gamma": ["scale", "auto"]}
             ... )
-            
+
             >>> # Method chaining
             >>> clf = ClassifierModel("rf").update_model_and_grid(
             ...     RandomForestClassifier(n_estimators=500),

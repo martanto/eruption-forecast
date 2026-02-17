@@ -466,7 +466,7 @@ class ModelEvaluator:
 
         Returns:
             tuple[float, dict[str, float]]: A 2-tuple containing:
-                
+
                 - **threshold** (float): Optimal decision threshold (0.0 to 1.0).
                 - **metrics_at_threshold** (dict): Dictionary with keys "f1",
                   "balanced_accuracy", "recall", "precision" evaluated at the
@@ -479,7 +479,7 @@ class ModelEvaluator:
             >>> thresh, metrics = evaluator.optimize_threshold(criterion="f1")
             >>> print(f"Optimal threshold: {thresh:.3f}")
             >>> print(f"F1 at optimal: {metrics['f1']:.3f}")
-            
+
             >>> # Optimize for recall instead
             >>> thresh, metrics = evaluator.optimize_threshold(criterion="recall")
         """

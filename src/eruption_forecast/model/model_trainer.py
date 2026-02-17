@@ -31,7 +31,7 @@ class ModelTrainer:
     """Train feature-selection and classifier models over multiple random seeds.
 
     Loads pre-extracted features and labels, then for each random seed performs:
-    
+
     1. Train/test split (80/20, stratified) to prevent data leakage
     2. Random under-sampling on training set only to balance classes
     3. Feature selection on training set using tsfresh relevance filtering
@@ -346,7 +346,7 @@ class ModelTrainer:
 
         Returns:
             tuple[str, str, str, str]: A 4-tuple containing:
-            
+
                 - **classifier_name** (str): Class name (e.g., "RandomForestClassifier")
                 - **classifier_slug_name** (str): Slugified classifier name (e.g., "random-forest-classifier")
                 - **classifier_slug_cv_name** (str): Slugified CV name (e.g., "stratified-k-fold")

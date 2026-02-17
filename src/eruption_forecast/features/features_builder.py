@@ -2,7 +2,6 @@ import os
 from typing import Any
 
 import pandas as pd
-from cycler import V
 from tsfresh import (
     extract_features as tsfresh_extract_features,
     extract_relevant_features,

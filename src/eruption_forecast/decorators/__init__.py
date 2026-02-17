@@ -18,19 +18,39 @@ def save_parameters(
     include_self: bool = False,
     append_timestamp: bool = False,
 ):
-    """
-    Decorator to save method parameters to a file
+    """Decorator factory that saves function/method parameters to a file before execution.
+
+    Captures all parameters passed to the decorated function using introspection,
+    serializes them to JSON or YAML format, and saves them to disk. Useful for
+    tracking function calls, debugging, or creating audit logs.
 
     Args:
-        filepath: Path to save file (default: method_name_params.json)
-        save_as: 'json' or 'yaml'
-        include_self: Whether to include 'self' parameter for instance methods
-        append_timestamp: Whether to append timestamp to filename
+        filepath (str | None, optional): Path to the output file. If None, defaults
+            to `{function_name}_params.{save_as}`. Defaults to None.
+        save_as (Literal["json", "yaml"], optional): Serialization format for the
+            output file. Defaults to "json".
+        include_self (bool, optional): Whether to include `self` or `cls` parameters
+            in the saved data for instance or class methods. Defaults to False.
+        append_timestamp (bool, optional): Whether to append a timestamp in
+            `YYYYMMDD_HHMMSS` format to the filename. Defaults to False.
 
-    Example:
-        @save_parameters('my_params.json', format='json')
-        def my_function(x, y, z=10):
-            return x + y + z
+    Returns:
+        Callable: Decorator function that wraps the target function/method.
+
+    Examples:
+        >>> @save_parameters('my_params.json', save_as='json')
+        ... def my_function(x, y, z=10):
+        ...     return x + y + z
+        >>> my_function(5, 3)
+        8
+        >>> # Creates my_params.json with parameters x=5, y=3, z=10
+
+        >>> @save_parameters(append_timestamp=True, save_as='yaml')
+        ... def process_data(data, threshold=0.5):
+        ...     return len(data)
+        >>> process_data([1, 2, 3], threshold=0.8)
+        3
+        >>> # Creates process_data_params_20250120_143025.yaml
     """
 
     def decorator(func: Callable) -> Callable:
@@ -83,21 +103,45 @@ def save_properties(
     include_private: bool = False,
     properties: list | None = None,
 ):
-    """
-    Class decorator to add methods for saving class properties
+    """Class decorator that adds property persistence capabilities to a class.
+
+    Adds `save_properties()` and `enable_auto_save()` methods to the decorated
+    class, allowing instances to save their attributes to JSON or YAML files.
+    Useful for configuration management, state persistence, or checkpointing.
 
     Args:
-        filepath: Default path to save file
-        save_as: 'json' or 'yaml'
-        include_private: Whether to include private attributes (starting with _)
-        properties: Specific properties to save (None = all public properties)
+        filepath (str | None, optional): Default output file path. If None, defaults
+            to `{ClassName}_properties.{save_as}`. Defaults to None.
+        save_as (Literal["json", "yaml"], optional): Serialization format for saved
+            properties. Defaults to "json".
+        include_private (bool, optional): Whether to include attributes starting
+            with underscore (`_`) when saving. Defaults to False.
+        properties (list | None, optional): List of specific attribute names to save.
+            If None, all public (or private if enabled) attributes are saved.
+            Defaults to None.
 
-    Example:
-        @save_properties('my_class.json', save_as='json')
-        class MyClass:
-            def __init__(self, x, y):
-                self.x = x
-                self.y = y
+    Returns:
+        Callable: Decorator function that enhances the target class with save methods.
+
+    Examples:
+        >>> @save_properties('my_class.json', save_as='json')
+        ... class MyClass:
+        ...     def __init__(self, x, y):
+        ...         self.x = x
+        ...         self.y = y
+        >>> obj = MyClass(10, 20)
+        >>> obj.save_properties()
+        'my_class.json'
+        >>> # Creates my_class.json with properties x=10, y=20
+
+        >>> @save_properties(include_private=True, properties=['x', '_internal'])
+        ... class Config:
+        ...     def __init__(self):
+        ...         self.x = 5
+        ...         self._internal = "secret"
+        >>> cfg = Config()
+        >>> cfg.save_properties()
+        'Config_properties.json'
     """
 
     def decorator(cls):
@@ -114,7 +158,18 @@ def save_properties(
             output_path: str | None = None,
             output_format: Literal["json", "yaml"] | None = None,
         ):
-            """Save current properties to file"""
+            """Save current instance properties to a file.
+
+            Args:
+                output_path (str | None, optional): Path to the output file. If None,
+                    uses the default path configured in the decorator. Defaults to None.
+                output_format (Literal["json", "yaml"] | None, optional): Serialization
+                    format. If None, uses the format configured in the decorator.
+                    Defaults to None.
+
+            Returns:
+                str: Path to the saved file.
+            """
             path = output_path or self._save_filepath
             fmt = output_format or self._save_format
 
@@ -145,7 +200,17 @@ def save_properties(
             return path
 
         def save_on_change(self, attr_name: str):
-            """Enable auto-save when specific attribute changes"""
+            """Enable auto-save when a specific attribute changes.
+
+            Converts the attribute to a property with a setter that triggers
+            `save_properties()` whenever the attribute value is modified.
+
+            Args:
+                attr_name (str): Name of the attribute to monitor for changes.
+
+            Returns:
+                None
+            """
             original_value = getattr(self, attr_name)
 
             def setter(new_value):
@@ -169,13 +234,35 @@ def save_properties(
 
 
 def snapshot(filepath: str | None = None, save_as: Literal["json", "yaml"] = "json"):
-    """
-    Decorator to save method parameters and return value
+    """Decorator factory that captures function parameters and return value.
 
-    Example:
-        @snapshot('calculation.json')
-        def calculate(x, y):
-            return x * y
+    Saves both the input parameters and the function's return value to a file,
+    creating a complete snapshot of the function call for debugging or auditing.
+
+    Args:
+        filepath (str | None, optional): Path to the output file. If None, defaults
+            to `{function_name}_snapshot.{save_as}`. Defaults to None.
+        save_as (Literal["json", "yaml"], optional): Serialization format for the
+            snapshot file. Defaults to "json".
+
+    Returns:
+        Callable: Decorator function that wraps the target function.
+
+    Examples:
+        >>> @snapshot('calculation.json')
+        ... def calculate(x, y):
+        ...     return x * y
+        >>> result = calculate(5, 3)
+        >>> result
+        15
+        >>> # Creates calculation.json with parameters x=5, y=3, return_value=15
+
+        >>> @snapshot(save_as='yaml')
+        ... def process(data, multiplier=2):
+        ...     return [x * multiplier for x in data]
+        >>> process([1, 2, 3], multiplier=3)
+        [3, 6, 9]
+        >>> # Creates process_snapshot.yaml with full call details
     """
 
     def decorator(func: Callable) -> Callable:
@@ -211,20 +298,37 @@ def snapshot(filepath: str | None = None, save_as: Literal["json", "yaml"] = "js
 
 
 def timer(name: str | None = None, verbose: bool = True):
-    """
-    Decorator factory for timing functions.
+    """Decorator factory for measuring and displaying function execution time.
+
+    Measures the wall-clock time taken by a function and optionally prints a
+    formatted duration message in hours, minutes, and seconds format.
 
     Args:
-        name: Custom name for the operation (defaults to function name)
-        verbose: Whether to print timing results
+        name (str | None, optional): Custom name to display in the timing message.
+            If None, uses the function's `__name__`. Defaults to None.
+        verbose (bool, optional): Whether to print the timing results to stdout.
+            If False, the function executes silently. Defaults to True.
 
     Returns:
-        Decorated function
+        Callable: Decorator function that wraps the target function.
 
-    Example:
-        @timer()
-        def my_function():
-            time.sleep(1)
+    Examples:
+        >>> @timer()
+        ... def my_function():
+        ...     time.sleep(1)
+        >>> my_function()
+        ====================================================================================================
+        || my_function: took 00 hours, 00 minutes, 01 seconds
+        ====================================================================================================
+
+        >>> @timer(name="Data Processing", verbose=True)
+        ... def process_large_dataset(data):
+        ...     return sum(data)
+        >>> process_large_dataset(range(1000000))
+        ====================================================================================================
+        || Data Processing: took 00 hours, 00 minutes, 00 seconds
+        ====================================================================================================
+        499999500000
     """
 
     def decorator(func: Callable) -> Callable:
