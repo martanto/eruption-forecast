@@ -78,7 +78,9 @@ class ModelEvaluator:
         self.X_test = X_test
         self.y_test = y_test
         self.model_name = model_name
-        self.output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "evaluation"))
+        self.output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "evaluation")
+        )
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -203,14 +205,16 @@ class ModelEvaluator:
         cm = confusion_matrix(y_true, y_pred)
         if cm.shape == (2, 2):
             tn, fp, fn, tp = cm.ravel()
-            metrics.update({
-                "true_positives": int(tp),
-                "true_negatives": int(tn),
-                "false_positives": int(fp),
-                "false_negatives": int(fn),
-                "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0.0,
-                "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0.0,
-            })
+            metrics.update(
+                {
+                    "true_positives": int(tp),
+                    "true_negatives": int(tn),
+                    "false_positives": int(fp),
+                    "false_negatives": int(fn),
+                    "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0.0,
+                    "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0.0,
+                }
+            )
 
         # Optimal threshold analysis
         if y_proba is not None:
@@ -300,7 +304,7 @@ class ModelEvaluator:
         """
         # Delegate to styled plotting function
         fig = _plot_cm_styled(
-            y_true=self.y_test,
+            y_true=self.y_test,  # ty:ignore[invalid-argument-type]
             y_pred=self._y_pred,
             normalize=normalize,
             title=f"Confusion Matrix — {self.model_name}",
@@ -309,7 +313,9 @@ class ModelEvaluator:
         )
 
         if save:
-            path = os.path.join(self.output_dir, filename or f"{self.model_name}_confusion_matrix.png")
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_confusion_matrix.png"
+            )
             fig.savefig(path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved: {path}")
 
@@ -341,7 +347,7 @@ class ModelEvaluator:
 
         # Delegate to styled plotting function
         fig = _plot_roc_styled(
-            y_true=self.y_test,
+            y_true=self.y_test,  # ty:ignore[invalid-argument-type]
             y_proba=self._y_proba,
             title=f"ROC Curve — {self.model_name}",
             figsize=(6, 5),
@@ -349,7 +355,9 @@ class ModelEvaluator:
         )
 
         if save:
-            path = os.path.join(self.output_dir, filename or f"{self.model_name}_roc_curve.png")
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_roc_curve.png"
+            )
             fig.savefig(path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved: {path}")
 
@@ -381,7 +389,7 @@ class ModelEvaluator:
 
         # Delegate to styled plotting function
         fig = _plot_pr_styled(
-            y_true=self.y_test,
+            y_true=self.y_test,  # ty:ignore[invalid-argument-type]
             y_proba=self._y_proba,
             title=f"Precision-Recall Curve — {self.model_name}",
             figsize=(6, 5),
@@ -389,7 +397,9 @@ class ModelEvaluator:
         )
 
         if save:
-            path = os.path.join(self.output_dir, filename or f"{self.model_name}_pr_curve.png")
+            path = os.path.join(
+                self.output_dir, filename or f"{self.model_name}_pr_curve.png"
+            )
             fig.savefig(path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved: {path}")
 
@@ -613,7 +623,9 @@ class ModelEvaluator:
             predictions are unavailable.
         """
         if self._y_proba is None:
-            logger.warning("plot_prediction_distribution requires probability predictions")
+            logger.warning(
+                "plot_prediction_distribution requires probability predictions"
+            )
             return None
 
         # Delegate to styled plotting function
@@ -627,7 +639,8 @@ class ModelEvaluator:
 
         if save:
             path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_prediction_distribution.png"
+                self.output_dir,
+                filename or f"{self.model_name}_prediction_distribution.png",
             )
             fig.savefig(path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved: {path}")

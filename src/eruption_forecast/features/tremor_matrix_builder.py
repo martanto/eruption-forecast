@@ -80,24 +80,26 @@ class TremorMatrixBuilder:
         verbose: bool = False,
         debug: bool = False,
     ):
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT parameter
-        # =========================
+        # ------------------------------------------------------------------
         if not isinstance(tremor_df.index, pd.DatetimeIndex):
             raise TypeError("tremor_df.index is not a DatetimeIndex")
         if not isinstance(label_df.index, pd.DatetimeIndex):
             raise TypeError("label_df.index is not a DatetimeIndex")
         tremor_df = tremor_df.sort_index()
         label_df = label_df.sort_index()
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "features"))
+        output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "features")
+        )
         matrix_tmp_dir = os.path.join(output_dir, "tmp")
         tremor_start_date_str = tremor_df.index[0].strftime("%Y-%m-%d")
         tremor_end_date_str = tremor_df.index[-1].strftime("%Y-%m-%d")
         tremor_matrix_filename = f"tremor_matrix_unified_{tremor_start_date_str}_{tremor_end_date_str}_ws-{window_size}.csv"
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.tremor_df = tremor_df
         self.label_df = label_df
         self.output_dir = output_dir
@@ -108,23 +110,23 @@ class TremorMatrixBuilder:
         self.verbose = verbose
         self.debug = debug
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
-        # =========================
+        # ------------------------------------------------------------------
         self.start_date = label_df.index[0] - timedelta(days=self.window_size)
         self.end_date = tremor_df.index[-1]
         self.tremor_start_date_str = tremor_start_date_str
         self.tremor_end_date_str = tremor_end_date_str
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after build() method called
-        # =========================
+        # ------------------------------------------------------------------
         self.df: pd.DataFrame = pd.DataFrame()
         self.csv: str | None = None
 
-        # =========================
+        # ------------------------------------------------------------------
         # Validate and create directories
-        # =========================
+        # ------------------------------------------------------------------
         self.validate()
         self.create_directories()
 
@@ -156,11 +158,17 @@ class TremorMatrixBuilder:
         if self.start_date < tremor_start_date:
             self.start_date = tremor_start_date
             if self.verbose:
+                logger.info(
+                    f"start_date: {self.start_date}. Tremor start date: {tremor_start_date}"
+                )
                 logger.info(f"start_date updated to: {self.start_date}")
 
         if self.end_date > tremor_end_date:
             self.end_date = tremor_end_date
             if self.verbose:
+                logger.info(
+                    f"end_date: {self.end_date}. Tremor end date: {tremor_end_date}"
+                )
                 logger.info(f"end_date updated to: {self.end_date}")
 
     def create_directories(self) -> None:

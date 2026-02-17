@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 import pandas as pd
+from cycler import V
 from tsfresh import (
     extract_features as tsfresh_extract_features,
     extract_relevant_features,
@@ -96,17 +97,17 @@ class FeaturesBuilder:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT parameter
-        # =========================
+        # ------------------------------------------------------------------
         output_dir = resolve_output_dir(
             output_dir, root_dir, os.path.join("output", "features")
         )
         label_df = pd.DataFrame() if label_df is None else label_df
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.tremor_matrix_df = tremor_matrix_df
         self.output_dir = output_dir
         self.label_df = label_df
@@ -114,17 +115,17 @@ class FeaturesBuilder:
         self.n_jobs = n_jobs
         self.verbose = verbose
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
-        # =========================
+        # ------------------------------------------------------------------
         # Initialize feature parameters
         self.default_fc_parameters, self.excludes_features = (
             self._initialize_feature_parameters()
         )
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after extract_features() called
-        # =========================
+        # ------------------------------------------------------------------
         self.use_relevant_features: bool = False
         self.all_features_csvs: set[str] = set()
         self.relevant_features_csvs: set[str] = set()
@@ -133,22 +134,22 @@ class FeaturesBuilder:
         self.label_features_csv: str | None = None
         self.unique_ids: list[int] = []
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after concat_features() called
-        # =========================
+        # ------------------------------------------------------------------
         self.all_features_csv: str | None = None
         self.relevant_features_csv: str | None = None
         self.df_all_features: pd.DataFrame = pd.DataFrame()
         self.df_relevant_features: pd.DataFrame = pd.DataFrame()
 
-        # =========================
+        # ------------------------------------------------------------------
         # Validate and create directories
-        # =========================
+        # ------------------------------------------------------------------
         self.validate()
 
-        # =========================
+        # ------------------------------------------------------------------
         # Verbose and logging
-        # =========================
+        # ------------------------------------------------------------------
         if debug:
             logger.info("⚠️ Debug mode is ON")
 
@@ -450,6 +451,12 @@ class FeaturesBuilder:
             "No labels provided. Using relevant features will be disabled. "
             "All features will be extracted."
         )
+
+        if not isinstance(tremor_matrix_df[DATETIME_COLUMN], pd.Timestamp):
+            tremor_matrix_df[DATETIME_COLUMN] = pd.to_datetime(
+                tremor_matrix_df[DATETIME_COLUMN]
+            )
+
         tremor_dates = tremor_matrix_df[DATETIME_COLUMN].sort_values().unique().tolist()
         start_date_str = tremor_dates[0].strftime("%Y-%m-%d")
         end_date_str = tremor_dates[-1].strftime("%Y-%m-%d")

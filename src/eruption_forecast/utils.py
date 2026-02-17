@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import os
 import json
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 from datetime import datetime, timedelta
 from collections.abc import Callable
 
 import numpy as np
+import joblib
 import pandas as pd
 from obspy import Trace
 from sklearn.metrics import (
@@ -955,3 +956,202 @@ def slugify_class_name(class_name: str) -> str:
     s = re.sub("([A-Z]+)([A-Z][a-z])", r"\1-\2", s)
 
     return s.lower()
+
+
+def compute_seed_eruption_probability(
+    random_state: int,
+    features_df: pd.DataFrame,
+    significant_features_csv: str,
+    model_filepath: str,
+    classifier_name: str = "model",
+    output_dir: str | None = None,
+    save: bool = False,
+    overwrite: bool = False,
+    verbose: bool = False,
+    debug: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute eruption probability per seed
+
+    Args:
+        random_state (int): Random seed.
+        features_df (pd.DataFrame): Extracted features DataFrame.
+        significant_features_csv (str): Significant features CSV.
+        model_filepath (str): Model file.
+        classifier_name (str): Classifier name. Defaults to "model".
+        output_dir (str): Output directory. Defaults to "seeds".
+        save (bool, optional): Whether to save probability. Defaults to False.
+        overwrite (bool, optional): Whether to overwrite existing file. Defaults to False.
+        debug (bool, optional): Debug mode. Defaults to False.
+
+    Returns:
+        tuple[np.ndarray, ndarray]: Probabilities of eruptions (1-dimension), and
+            probabilities of eruptiions and non-eruptions (2-dimension).
+    """
+    output_dir = output_dir or os.path.join(
+        os.getcwd(), "output", "predictions", "seeds"
+    )
+    output_dir = os.path.join(output_dir, "seeds", classifier_name)
+
+    filename = f"p_{random_state:05d}.csv"
+    filepath = os.path.join(output_dir, f"{filename}")
+
+    if os.path.exists(filepath) and not overwrite:
+        seed_df = pd.read_csv(filepath, index_col=0)
+        eruption_probabilities = seed_df["p_eruption"]
+        return eruption_probabilities.to_numpy(), seed_df.to_numpy()
+
+    df_sig = pd.read_csv(significant_features_csv, index_col=0)
+    feature_names: list[str] = df_sig.index.tolist()
+
+    # Load trained model
+    model = joblib.load(model_filepath)
+
+    # Select features dataframe with top-n significant features
+    X = features_df[feature_names]
+
+    if hasattr(model, "predict_proba"):
+        # probabilities_scores has shape (n_rows, n_windows). Where n_window will reflect
+        # the number of the classifiications. In this case n_windows is 2 which indicates
+        # 0 as nnn-eruption, and 1 as an eruption.
+        probabilities_scores: np.ndarray = model.predict_proba(X)
+
+        if probabilities_scores.ndim == 1:
+            raise ValueError(
+                f"Your probability for seed {random_state} scores only has 1 dimensions. "
+                f"It should have 2 dimensions which consists of `0` (non-eruption) and `1` (eruption)."
+            )
+
+        # Select column 1 as eruption probabilities representative. Column 0 is non-eruption.
+        probabilities_eruption: np.ndarray = probabilities_scores[:, 1]
+
+        if debug:
+            logger.debug(f"{random_state:05d} :: predict_probe was used")
+            logger.debug(
+                f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
+            )
+
+    elif hasattr(model, "decision_function"):
+        probabilities_scores: np.ndarray = model.decision_function(X)
+        probabilities_eruption: np.ndarray = 1.0 / (1.0 + np.exp(-probabilities_scores))
+
+        if debug:
+            logger.debug(f"{random_state:05d} :: decision_function was used")
+            logger.debug(
+                f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
+            )
+
+    else:
+        raise RuntimeError(
+            f"[{classifier_name}] Model at {model_filepath} supports neither "
+            "predict_proba nor decision_function."
+        )
+
+    if save and not overwrite:
+        os.makedirs(output_dir, exist_ok=True)
+        probabilities_df = pd.DataFrame(
+            probabilities_scores, columns=["p_non_eruption", "p_eruption"]
+        )
+
+        probabilities_df.index.name = "label_id"
+        probabilities_df.to_csv(filepath, index=True)
+
+        if verbose:
+            logger.info(f"Saved seed {random_state:05d} probability to: {filepath}")
+
+    return probabilities_eruption, probabilities_scores
+
+
+def compute_model_probabilities(
+    df_models: pd.DataFrame,
+    features_df: pd.DataFrame,
+    features_csv_column: str = "significant_features_csv",
+    trained_model_filepath_column: str = "trained_model_filepath",
+    classifier_name: str = "model",
+    threshold: float = 0.7,
+    number_of_seeds: int | None = None,
+    output_dir: str | None = None,
+    save_predictions: bool = False,
+    overwrite: bool = False,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Aggregate probabilities across all seeds of a single classifier.
+
+    One classifier has many seeds. This function calculate prediction based on all
+    seeds prediction.
+
+    Args:
+        df_models: Registry DataFrame for this classifier.
+        features_df: Extracted feature matrix for the prediction windows.
+        features_csv_column (str, optional): CSV column name from extracted feature matrix.
+            Defaults to "significant_features_csv".
+        trained_model_filepath_column (str, optional): Trained model file path column name
+            from extracted feature matrix. Defaults to "trained_model_filepath".
+        classifier_name: Classifier name (used in log messages only). Defaults to "model".
+        threshold (float, optional): Minimum mean theshold value to classify as an eruption.
+        number_of_seeds (int, optional): limit number of seeds to use. Defaults to None.
+
+    Returns:
+        Tuple of (mean_probability, std_proba, confidence, prediction) arrays
+        of shape ``(n_windows,)``.
+    """
+    seed_eruption_probabilities: list[np.ndarray] = []
+
+    for random_state, row in df_models.iterrows():
+        random_state_int = int(cast(int, random_state))
+        significant_features_csv: str = row[features_csv_column]
+        model_filepath: str = row[trained_model_filepath_column]
+
+        probabilities_eruption, _ = compute_seed_eruption_probability(
+            random_state=random_state_int,
+            significant_features_csv=significant_features_csv,
+            model_filepath=model_filepath,
+            features_df=features_df,
+            output_dir=output_dir,
+            overwrite=overwrite,
+            save=save_predictions,
+        )
+
+        seed_eruption_probabilities.append(probabilities_eruption)
+        logger.debug(
+            f"[{classifier_name}] Seed {random_state:05d} — "
+            f"mean P(eruption): {probabilities_eruption.mean():.4f}"
+        )
+
+        if number_of_seeds is not None and random_state_int > number_of_seeds:
+            break
+
+    probabilities_eruption_matrix = np.stack(
+        seed_eruption_probabilities, axis=1
+    )  # (n_seeds, n_windows)
+
+    mean_probability: np.ndarray = probabilities_eruption_matrix.mean(axis=1)
+    std_proba: np.ndarray = probabilities_eruption_matrix.std(axis=1)
+    prediction: np.ndarray = (mean_probability >= threshold).astype(int)
+
+    votes_for_eruption: np.ndarray = (probabilities_eruption_matrix >= 0.5).sum(axis=1)
+    n_seeds = probabilities_eruption_matrix.shape[0]
+    majority_votes = np.where(
+        prediction == 1, votes_for_eruption, n_seeds - votes_for_eruption
+    )
+    confidence: np.ndarray = majority_votes / n_seeds
+
+    return mean_probability, std_proba, confidence, prediction
+
+
+def label_id_to_datetime(
+    label_df: pd.DataFrame | pd.Series, target_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Add datetime column to target datafram (target_df) based on label_df.
+
+    Args:
+        label_df (pd.DataFrame | pd.Series): Label which has 'id' and 'datetime' columns.
+        target_df (pd.DataFrame): Target dataframe which 'datetime' will be added.
+            Target dataframe can be extracted features, eruption probabilities, or
+            tremor matrix.
+
+    Returns:
+        pd.DataFrame: Targe dataframe with datetime column.
+    """
+    if isinstance(label_df, pd.Series):
+        label_df = pd.DataFrame(label_df)
+
+    return target_df.merge(label_df, left_index=True, right_index=True)

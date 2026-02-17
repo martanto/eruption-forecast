@@ -71,25 +71,25 @@ class FeatureSelector:
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> None:
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT parameter
-        # =========================
+        # ------------------------------------------------------------------
         output_dir = output_dir or os.path.join(
             os.getcwd(), "output", "features", "selected"
         )
 
-        # =========================
+        # ------------------------------------------------------------------
         # Set DEFAULT properties
-        # =========================
+        # ------------------------------------------------------------------
         self.method = method
         self.n_jobs = n_jobs
         self.random_state = random_state
         self.output_dir = output_dir
         self.verbose = verbose
 
-        # =========================
+        # ------------------------------------------------------------------
         # Will be set after fit() method called
-        # =========================
+        # ------------------------------------------------------------------
         self.selected_features_: pd.Series = pd.Series(dtype=float)
         self.p_values_: pd.Series = pd.Series(dtype=float)
         self.importance_scores_: pd.Series = pd.Series(dtype=float)
@@ -97,9 +97,9 @@ class FeatureSelector:
         self.n_features_rf: int = 0
         self.feature_names_: list[str] = []
 
-        # =========================
+        # ------------------------------------------------------------------
         # Validate and create directories
-        # =========================
+        # ------------------------------------------------------------------
         self.validate()
 
     def validate(self) -> None:
