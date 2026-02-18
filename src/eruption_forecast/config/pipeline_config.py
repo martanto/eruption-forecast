@@ -13,7 +13,42 @@ from dataclasses import field, asdict, fields, dataclass
 
 
 @dataclass
-class ModelConfig:
+class _ConfigBase:
+    """Base serialization mixin for pipeline config dataclasses.
+
+    Provides ``to_dict`` and ``from_dict`` so each config section avoids
+    repeating the same boilerplate serialization logic.
+    """
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert this config section to a plain dictionary.
+
+        Uses ``dataclasses.asdict`` to recursively serialize all fields.
+
+        Returns:
+            dict[str, Any]: A flat dictionary of all field values.
+        """
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create an instance from a plain dictionary.
+
+        Unknown keys are silently ignored so that older config files remain
+        forward-compatible.
+
+        Args:
+            data (dict[str, Any]): Dictionary of field names to values.
+
+        Returns:
+            Self: A new instance populated from *data*.
+        """
+        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
+        return cls(**valid)
+
+
+@dataclass
+class ModelConfig(_ConfigBase):
     """Configuration for ``ForecastModel.__init__`` parameters.
 
     Stores the core model initialization parameters so the pipeline can
@@ -35,33 +70,9 @@ class ModelConfig:
     verbose: bool = False
     debug: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the config section to a plain dictionary.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create a ``ModelConfig`` from a plain dictionary.
-
-        Unknown keys are silently ignored so that older config files remain
-        forward-compatible.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            ModelConfig: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
 
 @dataclass
-class CalculateConfig:
+class CalculateConfig(_ConfigBase):
     """Configuration for ``ForecastModel.calculate()`` parameters.
 
     Captures every argument accepted by ``calculate()`` so the tremor
@@ -84,32 +95,9 @@ class CalculateConfig:
     verbose: bool = False
     debug: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the config section to a plain dictionary.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create a ``CalculateConfig`` from a plain dictionary.
-
-        Unknown keys are silently ignored.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            CalculateConfig: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
 
 @dataclass
-class BuildLabelConfig:
+class BuildLabelConfig(_ConfigBase):
     """Configuration for ``ForecastModel.build_label()`` parameters.
 
     Stores label-building parameters so eruption windows can be re-created
@@ -126,32 +114,9 @@ class BuildLabelConfig:
     verbose: bool = False
     debug: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the config section to a plain dictionary.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create a ``BuildLabelConfig`` from a plain dictionary.
-
-        Unknown keys are silently ignored.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            BuildLabelConfig: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
 
 @dataclass
-class ExtractFeaturesConfig:
+class ExtractFeaturesConfig(_ConfigBase):
     """Configuration for ``ForecastModel.extract_features()`` parameters.
 
     Captures tsfresh feature extraction settings for reproducible runs.
@@ -166,32 +131,9 @@ class ExtractFeaturesConfig:
     n_jobs: int | None = None
     verbose: bool | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the config section to a plain dictionary.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create an ``ExtractFeaturesConfig`` from a plain dictionary.
-
-        Unknown keys are silently ignored.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            ExtractFeaturesConfig: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
 
 @dataclass
-class TrainConfig:
+class TrainConfig(_ConfigBase):
     """Configuration for ``ForecastModel.train()`` parameters.
 
     Stores classifier and cross-validation settings so a training run can be
@@ -212,32 +154,9 @@ class TrainConfig:
     overwrite: bool = False
     verbose: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the config section to a plain dictionary.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create a ``TrainConfig`` from a plain dictionary.
-
-        Unknown keys are silently ignored.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            TrainConfig: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
 
 @dataclass
-class ForecastConfig:
+class ForecastConfig(_ConfigBase):
     """Configuration for ``ForecastModel.forecast()`` parameters.
 
     Captures the forecasting window and output settings so a prediction run
@@ -255,32 +174,9 @@ class ForecastConfig:
     overwrite: bool = False
     verbose: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the config section to a plain dictionary.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create a ``ForecastConfig`` from a plain dictionary.
-
-        Unknown keys are silently ignored.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            ForecastConfig: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
 
 @dataclass
-class PipelineConfig:
+class PipelineConfig(_ConfigBase):
     """Full pipeline configuration container.
 
     Holds one optional section per pipeline stage plus metadata. Only
