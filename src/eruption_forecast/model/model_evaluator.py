@@ -9,19 +9,21 @@ from sklearn.base import BaseEstimator
 from sklearn.metrics import (
     f1_score,
     recall_score,
-    roc_auc_score,
     accuracy_score,
     precision_score,
     confusion_matrix,
-    average_precision_score,
     balanced_accuracy_score,
 )
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import resolve_output_dir
-
-# Import new styled plotting functions
+from eruption_forecast.config.constants import (
+    PLOT_DPI,
+    THRESHOLD_RESOLUTION,
+    PLOT_SEPARATOR_LENGTH,
+)
+from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve as _plot_roc_styled,
     plot_calibration as _plot_cal_styled,
@@ -115,6 +117,16 @@ class ModelEvaluator:
         self._y_proba: np.ndarray | None = self._get_proba()
         self._metrics: dict[str, Any] | None = None
 
+        # Initialize metrics computer
+        if self._y_proba is not None:
+            self._metrics_computer = MetricsComputer(
+                y_true=np.asarray(self.y_test),  # Convert Series to ndarray
+                y_proba=self._y_proba,
+                y_pred=self._y_pred,
+            )
+        else:
+            self._metrics_computer = None
+
     @classmethod
     def from_files(
         cls,
@@ -164,6 +176,35 @@ class ModelEvaluator:
             y_test = pd.read_csv(y_test, index_col=0).iloc[:, 0]
 
         return cls(model, X_test, y_test, model_name, output_dir, selected_features)
+
+    def _save_plot(
+        self,
+        fig,
+        save: bool,
+        filename: str | None,
+        default_filename: str,
+        dpi: int = PLOT_DPI,
+    ) -> None:
+        """
+        Save plot figure to output directory.
+
+        Args:
+            fig: Matplotlib figure object to save.
+            save: Whether to save the figure.
+            filename: Optional custom filename. If None, uses default_filename.
+            default_filename: Default filename if filename is None.
+            dpi: Dots per inch for saved figure. Defaults to PLOT_DPI constant.
+
+        Returns:
+            None
+        """
+        if save:
+            path = os.path.join(
+                self.output_dir, filename if filename else default_filename
+            )
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved: {path}")
+
 
     def _get_proba(self) -> np.ndarray | None:
         """Retrieve predicted probabilities or decision scores for the test set.
@@ -225,54 +266,40 @@ class ModelEvaluator:
         if self._metrics is not None:
             return self._metrics
 
-        y_true, y_pred, y_proba = self.y_test, self._y_pred, self._y_proba
-
-        metrics: dict[str, Any] = {
-            "model_name": self.model_name,
-            "accuracy": accuracy_score(y_true, y_pred),
-            "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
-            "precision": precision_score(y_true, y_pred, zero_division=0),
-            "recall": recall_score(y_true, y_pred, zero_division=0),
-            "f1_score": f1_score(y_true, y_pred, zero_division=0),
-        }
-
-        if y_proba is not None:
-            try:
-                metrics["roc_auc"] = roc_auc_score(y_true, y_proba)
-                metrics["pr_auc"] = average_precision_score(y_true, y_proba)
-            except ValueError:
-                metrics["roc_auc"] = np.nan
-                metrics["pr_auc"] = np.nan
+        # Delegate to MetricsComputer if available
+        if self._metrics_computer is not None:
+            computed_metrics = self._metrics_computer.compute_all_metrics()
+            metrics: dict[str, Any] = {**computed_metrics, "model_name": self.model_name}
         else:
-            metrics["roc_auc"] = np.nan
-            metrics["pr_auc"] = np.nan
+            # Fallback for models without probabilities
+            metrics: dict[str, Any] = {
+                "model_name": self.model_name,
+                "accuracy": accuracy_score(self.y_test, self._y_pred),
+                "balanced_accuracy": balanced_accuracy_score(self.y_test, self._y_pred),
+                "precision": precision_score(self.y_test, self._y_pred, zero_division=0),
+                "recall": recall_score(self.y_test, self._y_pred, zero_division=0),
+                "f1_score": f1_score(self.y_test, self._y_pred, zero_division=0),
+                "roc_auc": np.nan,
+                "pr_auc": np.nan,
+                "optimal_threshold": np.nan,
+                "f1_at_optimal": np.nan,
+                "recall_at_optimal": np.nan,
+                "precision_at_optimal": np.nan,
+            }
 
-        cm = confusion_matrix(y_true, y_pred)
-        if cm.shape == (2, 2):
-            tn, fp, fn, tp = cm.ravel()
-            metrics.update(
-                {
-                    "true_positives": int(tp),
-                    "true_negatives": int(tn),
-                    "false_positives": int(fp),
-                    "false_negatives": int(fn),
-                    "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0.0,
-                    "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0.0,
-                }
-            )
-
-        # Optimal threshold analysis
-        if y_proba is not None:
-            opt_thresh, opt_metrics = self.optimize_threshold(criterion="f1")
-            metrics["optimal_threshold"] = opt_thresh
-            metrics["f1_at_optimal"] = opt_metrics["f1"]
-            metrics["recall_at_optimal"] = opt_metrics["recall"]
-            metrics["precision_at_optimal"] = opt_metrics["precision"]
-        else:
-            metrics["optimal_threshold"] = np.nan
-            metrics["f1_at_optimal"] = np.nan
-            metrics["recall_at_optimal"] = np.nan
-            metrics["precision_at_optimal"] = np.nan
+            cm = confusion_matrix(self.y_test, self._y_pred)
+            if cm.shape == (2, 2):
+                tn, fp, fn, tp = cm.ravel()
+                metrics.update(
+                    {
+                        "true_positives": int(tp),
+                        "true_negatives": int(tn),
+                        "false_positives": int(fp),
+                        "false_negatives": int(fn),
+                        "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0.0,
+                        "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0.0,
+                    }
+                )
 
         self._metrics = metrics
         return metrics
@@ -295,9 +322,9 @@ class ModelEvaluator:
         """
         m = self.get_metrics()
         lines = [
-            "=" * 50,
+            "=" * PLOT_SEPARATOR_LENGTH,
             f"Model: {self.model_name}",
-            "=" * 50,
+            "=" * PLOT_SEPARATOR_LENGTH,
             f"  Accuracy:          {m['accuracy']:.4f}",
             f"  Balanced Accuracy: {m['balanced_accuracy']:.4f}",
             f"  Precision:         {m['precision']:.4f}",
@@ -317,7 +344,7 @@ class ModelEvaluator:
                 f"{m['true_positives']}/{m['true_negatives']}/"
                 f"{m['false_positives']}/{m['false_negatives']}",
             ]
-        lines.append("=" * 50)
+        lines.append("=" * PLOT_SEPARATOR_LENGTH)
         return "\n".join(lines)
 
     # -------------------------------------------------------------------------
@@ -357,12 +384,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        if save:
-            path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_confusion_matrix.png"
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(fig, save, filename, f"{self.model_name}_confusion_matrix.png", dpi)
 
         return fig
 
@@ -399,12 +421,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        if save:
-            path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_roc_curve.png"
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(fig, save, filename, f"{self.model_name}_roc_curve.png", dpi)
 
         return fig
 
@@ -441,12 +458,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        if save:
-            path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_pr_curve.png"
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(fig, save, filename, f"{self.model_name}_pr_curve.png", dpi)
 
         return fig
 
@@ -486,7 +498,7 @@ class ModelEvaluator:
         if self._y_proba is None:
             raise ValueError("optimize_threshold requires probability predictions")
 
-        thresholds = np.linspace(0.0, 1.0, 101)
+        thresholds = np.linspace(0.0, 1.0, THRESHOLD_RESOLUTION)
         best_thresh = 0.5
         best_score = -1.0
 
@@ -542,19 +554,16 @@ class ModelEvaluator:
 
         # Delegate to styled plotting function
         fig = _plot_threshold_styled(
-            y_true=self.y_test,
+            y_true=np.asarray(self.y_test),  # Convert Series to ndarray
             y_proba=self._y_proba,
             title=f"Threshold Analysis — {self.model_name}",
             figsize=(10, 6),
             dpi=dpi,
         )
 
-        if save:
-            path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_threshold_analysis.png"
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(
+            fig, save, filename, f"{self.model_name}_threshold_analysis.png", dpi
+        )
 
         return fig
 
@@ -601,12 +610,9 @@ class ModelEvaluator:
             )
             return None
 
-        if save:
-            path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_feature_importance.png"
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(
+            fig, save, filename, f"{self.model_name}_feature_importance.png", dpi
+        )
 
         return fig
 
@@ -642,7 +648,7 @@ class ModelEvaluator:
 
         # Delegate to styled plotting function
         fig = _plot_cal_styled(
-            y_true=self.y_test,
+            y_true=np.asarray(self.y_test),  # Convert Series to ndarray
             y_proba=self._y_proba,
             n_bins=n_bins,
             title=f"Calibration Curve — {self.model_name}",
@@ -650,12 +656,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        if save:
-            path = os.path.join(
-                self.output_dir, filename or f"{self.model_name}_calibration.png"
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(fig, save, filename, f"{self.model_name}_calibration.png", dpi)
 
         return fig
 
@@ -690,30 +691,16 @@ class ModelEvaluator:
 
         # Delegate to styled plotting function
         fig = _plot_pred_dist_styled(
-            y_true=self.y_test,
+            y_true=np.asarray(self.y_test),  # Convert Series to ndarray
             y_proba=self._y_proba,
             title=f"Prediction Distribution — {self.model_name}",
             figsize=(8, 5),
             dpi=dpi,
         )
 
-        if save:
-            path = os.path.join(
-                self.output_dir,
-                filename or f"{self.model_name}_prediction_distribution.png",
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
-
-        return fig
-
-        if save:
-            path = os.path.join(
-                self.output_dir,
-                filename or f"{self.model_name}_prediction_distribution.png",
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+        self._save_plot(
+            fig, save, filename, f"{self.model_name}_prediction_distribution.png", dpi
+        )
 
         return fig
 

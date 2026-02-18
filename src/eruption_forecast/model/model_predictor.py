@@ -54,9 +54,8 @@ class ModelPredictor:
         end_date (datetime): End of the prediction window.
         start_date_str (str): Start date as "YYYY-MM-DD" string.
         end_date_str (str): End date as "YYYY-MM-DD" string.
-        trained_models_dict (dict[str, str]): Dictionary mapping classifier names
+        trained_models (dict[str, str]): Dictionary mapping classifier names
             to their trained model registry CSV paths.
-        is_multi_model (bool): True if multiple classifier registries provided.
         overwrite (bool): Whether to re-compute cached files.
         n_jobs (int): Number of parallel jobs for feature extraction.
         output_dir (str): Root directory for prediction outputs.
@@ -156,7 +155,6 @@ class ModelPredictor:
         )
         output_dir = os.path.join(output_dir, "predictions")
 
-        output_dir = output_dir
         tremor_dir = os.path.join(output_dir, "tremor")
         features_dir = os.path.join(output_dir, "features")
         extracted_dir = os.path.join(features_dir, "extracted")
@@ -669,7 +667,7 @@ class ModelPredictor:
         window_step_unit: Literal["minutes", "hours"],
         use_relevant_features: bool = True,
         select_tremor_columns: list[str] | None = None,
-        save_predictions: bool = False,
+        save_predictions: bool = True,
         plot: bool = True,
     ) -> pd.DataFrame:
         """Forecast eruption probability for unlabelled future windows.
@@ -702,6 +700,7 @@ class ModelPredictor:
             window_step_unit (Literal["minutes", "hours"]): Window step unit to use.
             use_relevant_features (bool, optional): Whether to use relevant features. Defaults to True.
             select_tremor_columns (list[str] | None): List of tremor columns to use. Defaults to None.
+            save_predictions (bool, optional): Save predictions result. Defaults to True.
             plot (bool, optional): Save a probability time-series plot.
                 Defaults to True.
 

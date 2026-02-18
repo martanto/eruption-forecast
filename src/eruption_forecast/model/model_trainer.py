@@ -9,11 +9,13 @@ import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import (
-    get_metrics,
-    random_under_sampler,
-)
+from eruption_forecast.utils.ml import get_metrics, random_under_sampler
 from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.config.constants import (
+    TRAIN_TEST_SPLIT,
+    DEFAULT_CV_SPLITS,
+    DEFAULT_N_SIGNIFICANT_FEATURES,
+)
 from eruption_forecast.features.constants import (
     ID_COLUMN,
     ERUPTED_COLUMN,
@@ -163,8 +165,8 @@ class ModelTrainer:
             "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
-        cv_splits: int = 5,
-        number_of_significant_features: int = 20,
+        cv_splits: int = DEFAULT_CV_SPLITS,
+        number_of_significant_features: int = DEFAULT_N_SIGNIFICANT_FEATURES,
         feature_selection_method: Literal[
             "tsfresh", "random_forest", "combined"
         ] = "tsfresh",
@@ -819,7 +821,7 @@ class ModelTrainer:
         features_train, features_test, labels_train, labels_test = train_test_split(
             self.df_features,
             self.df_labels,
-            test_size=0.2,
+            test_size=TRAIN_TEST_SPLIT,
             random_state=random_state,
             stratify=self.df_labels,
         )
@@ -1019,10 +1021,10 @@ class ModelTrainer:
             _,  # ignore; _run_train() uses a reduced skip check (no metrics file)
         ) = self._generate_filepaths(random_state=random_state)
 
-        # For train(), skip only based on significant + model files (no metrics).
+        # For train(), skip only based on significant + model files (no metrics,
+        # no figures — figures are optional and controlled by plot_significant_features).
         can_skip = (
             not self.overwrite
-            and os.path.exists(all_figures_filepath)
             and os.path.isfile(significant_filepath)
             and os.path.isfile(model_filepath)
         )

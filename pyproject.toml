@@ -42,6 +42,7 @@ dev = [
     "ty",
     "ipykernel",
     "notebook",
+    "pytest>=9.0.2",
 ]
 
 [tool.uv]

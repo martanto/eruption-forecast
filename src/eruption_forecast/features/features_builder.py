@@ -201,7 +201,7 @@ class FeaturesBuilder:
         if not isinstance(self.label_df, pd.DataFrame):
             raise ValueError(
                 f"Label dataframe must be pd.DataFrame. "
-                f"Your label data type is {type(self.tremor_matrix_df)}"
+                f"Your label data type is {type(self.label_df)}"
             )
         validate_columns(self.tremor_matrix_df, [ID_COLUMN, DATETIME_COLUMN])
 

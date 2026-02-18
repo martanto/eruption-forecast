@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-17_
+_Last updated: 2026-02-18_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -99,10 +99,12 @@ CalculateTremor → LabelBuilder → TremorMatrixBuilder → FeaturesBuilder →
 - `RSAM`: Mean amplitude metrics (`rsam.py`)
 - `DSAR`: Amplitude ratios between bands (`dsar.py`)
 - `TremorData`: Loads and validates tremor CSV files (`tremor_data.py`)
-- `SDS`: Reads SeisComP Data Structure files (`sds.py`)
+- `SDS`: Reads SeisComP Data Structure files (`src/eruption_forecast/sources/sds.py`)
+- `FDSN`: Downloads seismic data from FDSN web services with local SDS caching (`src/eruption_forecast/sources/fdsn.py`)
 
 **Workflow:**
 ```python
+# From SDS archive
 calculate = CalculateTremor(
     station="OJN",
     channel="EHZ",
@@ -111,6 +113,14 @@ calculate = CalculateTremor(
     n_jobs=4
 ).from_sds(sds_dir="/path/to/sds").run()
 # Output CSV columns: rsam_f0, rsam_f1, dsar_f0-f1, etc.
+
+# From FDSN web service
+calculate = CalculateTremor(
+    station="OJN",
+    channel="EHZ",
+    start_date="2025-01-01",
+    end_date="2025-01-03",
+).from_fdsn(client_url="https://service.iris.edu").run()
 ```
 
 #### 2. Label Building (`src/eruption_forecast/label/`)
@@ -178,12 +188,22 @@ label_builder = LabelBuilder(
 
 **Key classes:**
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
+  - `fit(with_evaluation=True)`: Dispatches to `train_and_evaluate()` or `train()` based on flag
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
 - `ModelPredictor`: Runs inference in evaluation or forecast mode (`model_predictor.py`)
   - `predict()` / `predict_best()`: Requires labels (evaluation mode)
   - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
+- `PipelineConfig`: Serialisable pipeline configuration (`src/eruption_forecast/config/pipeline_config.py`)
+  - Sub-configs: `ModelConfig`, `CalculateConfig`, `BuildLabelConfig`, `ExtractFeaturesConfig`, `TrainConfig`, `ForecastConfig`
+
+**`ForecastModel` additional methods** (beyond the pipeline stages):
+- `load_tremor_data(tremor_csv)`: Load pre-calculated tremor data instead of calling `calculate()`
+- `set_feature_selection_method(using)`: Change feature selection method before `train()`
+- `save_config(path, fmt)` / `from_config(path)`: Persist and replay pipeline configuration
+- `save_model(path)` / `load_model(path)`: Serialise/restore full `ForecastModel` via joblib
+- `run()`: Replay all pipeline stages from a loaded config (use after `from_config()`)
 
 ### Data Classes
 
@@ -192,17 +212,17 @@ label_builder = LabelBuilder(
 
 Both use `@cached_property` for efficient attribute access.
 
-### Utility Functions (`src/eruption_forecast/utils.py`)
+### Utility Functions (`src/eruption_forecast/utils/`)
 
-- `construct_windows()`: Creates sliding time windows
-- `calculate_window_metrics()`: Metrics over windows with outlier removal
-- `detect_maximum_outlier()` / `remove_outliers()`: Z-score based outlier detection
-- `to_datetime()`: Date string validation and conversion
-- `validate_date_ranges()`: Ensures start_date < end_date
-- `validate_window_step()`: Validates window step parameters
-- `random_under_sampler()`: Balances classes via random undersampling
-- `get_significant_features()`: Retrieves statistically significant tsfresh features
-- `resolve_output_dir()`: Resolves paths relative to `root_dir`
+`utils.py` has been split into a package with focused sub-modules:
+
+- **`window.py`**: `construct_windows()`, `calculate_window_metrics()`
+- **`array.py`**: `detect_maximum_outlier()`, `remove_outliers()` — Z-score based outlier detection
+- **`date_utils.py`**: `to_datetime()`, `validate_date_ranges()`, `validate_window_step()`
+- **`ml.py`**: `random_under_sampler()`, `get_significant_features()`
+- **`pathutils.py`**: `resolve_output_dir()` — resolves paths relative to `root_dir`
+- **`dataframe.py`**: DataFrame validation utilities
+- **`formatting.py`**: Text formatting utilities
 
 ## Important Patterns
 
@@ -233,12 +253,13 @@ Frequency bands are aliased as `f0`, `f1`, `f2`, etc. in column names:
 ```
 output/
 └── {network}.{station}.{location}.{channel}/
+    ├── features/         # Extracted tsfresh features + aligned label CSV
     ├── tremor/
-    │   ├── tmp/          # Daily CSVs before merging
-    │   └── tremor.csv    # Final merged tremor data
-    ├── forecast/         # Model predictions
-    ├── figures/          # Plots
-    └── logs/             # Debug logs
+    │   ├── daily/        # Daily CSVs before merging (cleaned up if cleanup_daily_dir=True)
+    │   ├── figures/      # Daily tremor plots (created if plot_daily=True)
+    │   └── {nslc}_{start}_{end}.csv  # Final merged tremor data
+    ├── forecast/         # Forecast/prediction outputs
+    └── config.yaml       # Saved pipeline config (written by save_config())
 ```
 
 ## Dependencies
@@ -251,8 +272,13 @@ output/
 - **numba**: Performance optimization via JIT compilation
 
 ### Data Sources
-- **SDS (SeisComP Data Structure)**: Primary seismic data format
-- **FDSN**: Alternative data source via web services
+
+Both data-source adapters live in `src/eruption_forecast/sources/`:
+
+- **SDS (SeisComP Data Structure)**: Primary seismic data format — `sds.py`
+- **FDSN**: Downloads from any FDSN web service with transparent local SDS caching — `fdsn.py`
+  - `download_dir` is created automatically if absent
+  - Downloaded files are cached as SDS miniSEED so subsequent runs skip the network
 
 
 ## Common Workflows
@@ -292,7 +318,14 @@ fm.calculate(
     cv_strategy="stratified",
     random_state=0,
     total_seed=500,
+    with_evaluation=False,   # train on full dataset; set True for 80/20 split + metrics
     number_of_significant_features=20,
+).forecast(
+    start_date="2020-07-01",
+    end_date="2020-07-31",
+    window_size=2,
+    window_step=10,
+    window_step_unit="minutes",
 )
 ```
 

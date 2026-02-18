@@ -25,6 +25,7 @@ from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
+from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.model.classifier_model import ClassifierModel
 
 
@@ -353,7 +354,7 @@ def compute_model_probabilities(
     features_csv_column: str = "significant_features_csv",
     trained_model_filepath_column: str = "trained_model_filepath",
     classifier_name: str = "model",
-    threshold: float = 0.7,
+    threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
     number_of_seeds: int | None = None,
     output_dir: str | None = None,
     save_predictions: bool = False,

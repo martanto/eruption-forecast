@@ -11,9 +11,10 @@ import pandas as pd
 from obspy import Trace, Stream, UTCDateTime
 
 import eruption_forecast
-from eruption_forecast.sds import SDS
 from eruption_forecast.logger import logger
+from eruption_forecast.sources.sds import SDS
 from eruption_forecast.tremor.rsam import RSAM
+from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
@@ -210,14 +211,19 @@ class CalculateTremor:
         self.nslc = nslc
         self.daily_dir: str = os.path.join(tremor_dir, "daily")
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
-        self._client_url = "https://service.iris.edu"
         self.csv = os.path.join(tremor_dir, self.filename)
 
         # ------------------------------------------------------------------
         # Will be set after from_sds() called
         # ------------------------------------------------------------------
-        self.sds: SDS | None = None
+        self.SDS: SDS | None = None
         self._sds_dir: str | None = None
+
+        # ------------------------------------------------------------------
+        # Will be set after from_fdsn() called
+        # ------------------------------------------------------------------
+        self.FDSN: FDSN | None = None
+        self._client_url = "https://service.iris.edu"
 
         # ------------------------------------------------------------------
         # Will be set after from_sds() or from_fdsn() called
@@ -504,10 +510,10 @@ class CalculateTremor:
 
         stream = Stream()
 
-        if self._source == "sds" and self.sds:
-            stream = self.sds.get(date)
-        if self._source == "fdsn":
-            stream = Stream()
+        if self._source == "sds" and self.SDS:
+            stream = self.SDS.get(date)
+        if self._source == "fdsn" and self.FDSN:
+            stream = self.FDSN.get(date)
 
         return stream
 
@@ -530,7 +536,7 @@ class CalculateTremor:
         """
         self._source = "sds"
         self._sds_dir = sds_dir
-        self.sds = SDS(
+        self.SDS = SDS(
             sds_dir,
             network=self.network,
             station=self.station,
@@ -561,6 +567,15 @@ class CalculateTremor:
         """
         self._source = "fdsn"
         self._client_url = client_url or self._client_url
+        self.FDSN = FDSN(
+            client_url=self._client_url,
+            network=self.network,
+            station=self.station,
+            channel=self.channel,
+            location=self.location,
+            verbose=self.verbose,
+            debug=self.debug,
+        )
         return self
 
     def run(self) -> Self:

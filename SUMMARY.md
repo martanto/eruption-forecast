@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-18 (CLAUDE.md Pipeline section audit and corrections)
 
 ## ⚠️ Important Notice
 
@@ -35,6 +35,8 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 20. [Complete Codebase Docstring Audit and Standardization](#complete-codebase-docstring-audit-and-standardization-2026-02-17)
 21. [Important Disclaimers for Volcanic Eruption Forecasting](#important-disclaimers-for-volcanic-eruption-forecasting-2026-02-17)
 22. [Utils Module Refactoring: Decoupling into Focused Modules](#utils-module-refactoring-decoupling-into-focused-modules-2026-02-17)
+23. [Codebase Review and Bug Fixes](#codebase-review-and-bug-fixes-2026-02-17)
+24. [Pipeline Configuration Saving and Loading](#pipeline-configuration-saving-and-loading-2026-02-17)
 ---
 
 ## Package Overview
@@ -2193,3 +2195,263 @@ src/eruption_forecast/
 - ✅ **Pythonic Naming:** Avoids stdlib conflicts, uses `*utils` pattern
 
 ---
+
+---
+
+## Code Review & Architecture Refactoring (2026-02-17)
+
+### Overview
+Completed comprehensive architecture improvements focused on eliminating code duplication, centralizing configuration, improving type safety, and applying the Single Responsibility Principle to key classes.
+
+### Type Safety Improvements
+- **Fixed 4 type errors** in `model_evaluator.py`:
+  - Line 567: `plot_threshold_analysis()` - converted `self.y_test` to `np.ndarray`
+  - Line 659: `plot_calibration()` - converted `self.y_test` to `np.ndarray`
+  - Line 704: `plot_prediction_distribution()` - converted `self.y_test` to `np.ndarray`
+  - Line 125: `MetricsComputer` initialization - converted `self.y_test` to `np.ndarray`
+- **Result**: 100% type checker compliance (`uvx ty check src/` passes with 0 errors)
+
+### Code Organization & Constants
+- **Created `src/eruption_forecast/config/` module** with centralized constants:
+  - `TRAIN_TEST_SPLIT = 0.2` - Train/test split ratio
+  - `DEFAULT_CV_SPLITS = 5` - Cross-validation splits
+  - `DEFAULT_N_SIGNIFICANT_FEATURES = 20` - Feature selection count
+  - `DEFAULT_SAMPLING_STRATEGY = 0.75` - Undersampling ratio
+  - `ERUPTION_PROBABILITY_THRESHOLD = 0.7` - Classification threshold
+  - `THRESHOLD_RESOLUTION = 101` - ROC/PR curve resolution
+  - `PLOT_DPI = 300` - Figure DPI
+  - `PLOT_SEPARATOR_LENGTH = 50` - Console separator length
+- **Replaced 12+ hardcoded values** across:
+  - `model_evaluator.py` (4 locations)
+  - `model_trainer.py` (3 locations)
+  - `utils/ml.py` (1 location)
+
+### Code Duplication Elimination
+- **Extracted `ModelEvaluator._save_plot()` helper method**:
+  - Eliminated 7x duplicate save logic across all plot methods
+  - Reduced ~100 lines of duplicate code
+  - Centralized error handling and logging
+- **Added `build_model_directories()` to `utils/pathutils.py`**:
+  - Standardizes model output directory structure
+  - Supports two modes: `"with-evaluation"` and `"only"`
+  - Auto-creates all directories
+
+### Architecture Improvements (Single Responsibility Principle)
+- **Created `MetricsComputer` class** (`src/eruption_forecast/model/metrics_computer.py`):
+  - Extracted metrics calculation logic from `ModelEvaluator`
+  - Computes 20+ evaluation metrics (accuracy, precision, recall, F1, ROC-AUC, PR-AUC, sensitivity, specificity, optimal threshold, etc.)
+  - Method: `compute_all_metrics()` returns complete metrics dict
+- **Refactored `ModelEvaluator`** to use composition pattern:
+  - Delegates metrics computation to `MetricsComputer` instance
+  - `get_metrics()` now calls `_metrics_computer.compute_all_metrics()`
+  - Maintains backward compatibility (fallback for models without probabilities)
+
+### Import Conventions (PEP 8 Compliance)
+- **All imports moved to top of files** (stdlib → third-party → local, alphabetically sorted)
+- **No inline imports** in method bodies
+- Applied across: `model_evaluator.py`, `model_trainer.py`, `utils/ml.py`, `config/__init__.py`
+
+### Files Changed
+
+#### New Files (3)
+1. `src/eruption_forecast/config/__init__.py` - Config module exports
+2. `src/eruption_forecast/config/constants.py` - Centralized constants (8 constants)
+3. `src/eruption_forecast/model/metrics_computer.py` - Metrics computation class (145 lines)
+
+#### Modified Files (4)
+1. `src/eruption_forecast/model/model_evaluator.py` - Added `_save_plot()` helper, integrated `MetricsComputer`, fixed 4 type errors
+2. `src/eruption_forecast/model/model_trainer.py` - Updated imports, replaced 3 hardcoded values
+3. `src/eruption_forecast/utils/ml.py` - Reorganized imports, replaced threshold constant
+4. `src/eruption_forecast/utils/pathutils.py` - Added `build_model_directories()` function
+
+### Impact & Metrics
+- **Lines of code reduced**: ~100 (duplicate code eliminated)
+- **New helper functions**: 2 (`_save_plot`, `build_model_directories`)
+- **New classes**: 1 (`MetricsComputer`)
+- **Type errors fixed**: 4
+- **Hardcoded values eliminated**: 12+
+- **Breaking changes**: **0** (fully backward compatible)
+
+### Testing & Validation
+- ✅ **Type checker**: `uvx ty check src/` - All checks passed (0 errors)
+- ✅ **Linter**: `uv run ruff check src/` - All checks passed (10 auto-fixes applied)
+- ✅ **Public API**: No method signature changes
+
+### Backward Compatibility
+- **All public APIs unchanged**: `ForecastModel`, `ModelTrainer`, `ModelEvaluator`, `FeaturesBuilder`
+- **No breaking changes**: Existing code continues to work identically
+- **File formats preserved**: CSV, PKL, directory structure all unchanged
+
+---
+
+
+## Codebase Review and Bug Fixes (2026-02-17)
+
+Full codebase review after recent architecture improvements. Three bugs identified and fixed.
+
+### Bugs Fixed
+
+| File | Line | Issue | Fix |
+|------|------|-------|-----|
+| `features/features_builder.py` | 204 | Error message used `type(self.tremor_matrix_df)` instead of `type(self.label_df)` in the label validation branch | Changed to `type(self.label_df)` |
+| `model/model_trainer.py` | 1025–1030 | `_run_train()` skip check included `all_figures_filepath` (using `os.path.exists`) despite the comment stating "skip only based on significant + model files"; figures are optional and only generated when `plot_significant_features=True`, so including them caused seeds to always be retrained when figures were absent | Removed `all_figures_filepath` from check; changed `os.path.exists` to `os.path.isfile` for consistency |
+| `model/model_predictor.py` | 158 | No-op assignment `output_dir = output_dir` | Removed the redundant line |
+
+### Architecture Review
+
+The architecture is sound. Key components reviewed:
+
+- `ForecastModel` (orchestrator, ~1138 lines) — method chaining pipeline
+- `ModelTrainer` — multi-seed training with two modes (`train_and_evaluate` / `train`)
+- `ModelPredictor` — evaluation + forecast modes with consensus
+- `ModelEvaluator` — metrics, plots, threshold optimization
+- `ClassifierModel` — 10 classifiers + CV strategies
+- `FeaturesBuilder` — tsfresh extraction with training/prediction modes
+- Utils refactored into focused modules: `array`, `dataframe`, `date_utils`, `formatting`, `ml`, `pathutils`, `window`
+
+---
+
+## Pipeline Configuration Saving and Loading (2026-02-17)
+
+### Objective
+
+Persist the complete set of pipeline parameters so that any run can be replayed identically, and a trained model can be resumed without re-running earlier stages.
+
+### New File: `src/eruption_forecast/config/pipeline_config.py`
+
+Seven dataclasses covering every pipeline stage:
+
+| Class | Stage |
+|---|---|
+| `ModelConfig` | `ForecastModel.__init__` |
+| `CalculateConfig` | `.calculate()` |
+| `BuildLabelConfig` | `.build_label()` |
+| `ExtractFeaturesConfig` | `.extract_features()` |
+| `TrainConfig` | `.train()` |
+| `ForecastConfig` | `.forecast()` |
+| `PipelineConfig` | Top-level container with `save()` / `load()` |
+
+`PipelineConfig.save(path, fmt="yaml")` writes a human-readable YAML (or JSON). `PipelineConfig.load(path)` reconstructs the object from either format, detecting format by file extension.
+
+### ForecastModel changes
+
+- **`__init__`**: Creates `self._config = PipelineConfig(model=ModelConfig(...))` and `self._loaded_config = None`.
+- **Each stage method** stores a frozen config snapshot to `self._config.<section>` after execution.
+- **`train(save_model=True)`**: New `save_model` parameter (default `True`) auto-serialises the full instance to `{station_dir}/forecast_model.pkl` via `joblib`.
+- **`forecast()`**: Auto-saves `config.yaml` to `{station_dir}/config.yaml` at the end.
+- **`save_config(path, fmt)`**: Explicit config save; returns the path.
+- **`save_model(path)`**: Serialises the full instance via `joblib.dump`; returns the path.
+- **`from_config(path)`** *(classmethod)*: Loads config, constructs a fresh `ForecastModel`, attaches `_loaded_config`.
+- **`load_model(path)`** *(classmethod)*: Restores a pickled instance via `joblib.load`.
+- **`run()`**: Replays all stages from `_loaded_config` in order; raises `RuntimeError` if not loaded via `from_config`.
+
+### Exports
+
+- `PipelineConfig` added to `eruption_forecast.__init__.__all__`.
+- All six section classes exported from `eruption_forecast.config.__init__`.
+
+### Usage examples
+
+```python
+# Save config after a run
+fm.train(classifier="xgb")   # auto-saves forecast_model.pkl
+fm.forecast(...)              # auto-saves config.yaml
+
+# Replay from config
+fm2 = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
+fm2.run()
+
+# Resume from saved model (skip re-training)
+fm3 = ForecastModel.load_model("output/VG.OJN.00.EHZ/forecast_model.pkl")
+fm3.forecast(start_date="2025-04-01", end_date="2025-04-07", ...)
+```
+
+---
+
+## Unit Tests: PipelineConfig (2026-02-17)
+
+**File:** `tests/test_pipeline_config.py`
+
+58 tests covering all aspects of the config persistence feature, requiring no real seismic data.
+
+### Test classes
+
+| Class | Count | What is tested |
+|---|---|---|
+| `TestModelConfig` | 5 | defaults, `to_dict`, `from_dict` round-trip, unknown keys, partial dict |
+| `TestCalculateConfig` | 3 | defaults, round-trip, unknown keys |
+| `TestBuildLabelConfig` | 4 | defaults, mutable default isolation, list round-trip, unknown keys |
+| `TestExtractFeaturesConfig` | 3 | defaults, column list round-trip, unknown keys |
+| `TestTrainConfig` | 3 | defaults, full round-trip, unknown keys (`grid_params` ignored) |
+| `TestForecastConfig` | 3 | defaults, round-trip, unknown keys |
+| `TestPipelineConfigToDict` | 3 | omits `None` sections, all sections when set, nested values |
+| `TestPipelineConfigYaml` | 7 | file creation, comment header, full round-trip, partial config, `saved_at` refresh, parent dir creation, missing file error |
+| `TestPipelineConfigJson` | 3 | file creation + valid JSON, full round-trip, extension auto-detection |
+| `TestForecastModelConfigInit` | 3 | `_config.model` mirrors `__init__` params, stage sections are `None` at init, `_loaded_config` is `None` at init |
+| `TestForecastModelSaveConfig` | 6 | default path, custom path, JSON format, default JSON path, return value, YAML readable by `PipelineConfig.load` |
+| `TestForecastModelFromConfig` | 5 | restores params, sets `_loaded_config`, model section content, missing file error, JSON format |
+| `TestForecastModelSaveLoadModel` | 6 | default path, custom path, return value, attribute restoration, config preservation, missing file error |
+| `TestForecastModelRun` | 3 | raises without `from_config`, raises after `load_model`, no-op when all sections absent |
+| `TestTopLevelExport` | 1 | `from eruption_forecast import PipelineConfig` is same class |
+
+### Result
+
+```
+58 passed in 2.86s
+```
+
+---
+
+## FDSN Data Source Implementation (2026-02-18)
+
+Added full FDSN (International Federation of Digital Seismograph Networks) support
+as an alternative seismic data source alongside the existing SDS reader.
+
+### New `sources/` Package
+
+Both data-source adapters are now collected in a dedicated sub-package:
+
+```
+src/eruption_forecast/sources/
+├── __init__.py
+├── sds.py    # SeisComP Data Structure reader (moved from root package)
+└── fdsn.py   # New FDSN web-service client with local SDS caching
+```
+
+`sds.py` was **moved** from `src/eruption_forecast/sds.py` to
+`src/eruption_forecast/sources/sds.py`. All imports have been updated.
+
+### `FDSN` Class (`sources/fdsn.py`)
+
+| Feature | Detail |
+|---------|--------|
+| **Local caching** | Downloaded miniSEED files are saved to a local SDS archive (`download_dir`) so subsequent runs skip the network request |
+| **ObsPy integration** | Wraps `obspy.clients.fdsn.Client` for waveform retrieval |
+| **Cache-first logic** | Reads the local SDS file when present and `overwrite=False`; only fetches from FDSN when absent or `overwrite=True` |
+| **Auto-creates download_dir** | `os.makedirs(download_dir, exist_ok=True)` called in `__init__` before SDS is initialised |
+
+### Bug Fixes Applied
+
+| File | Bug | Fix |
+|------|-----|-----|
+| `fdsn.py` | Spurious `from numba.tests.doctest_usecase import d` import | Removed |
+| `fdsn.py` | `SDS.__init__` raised `FileNotFoundError` if `download_dir` didn't exist | Added `os.makedirs(download_dir, exist_ok=True)` before `SDS(...)` |
+| `fdsn.py` | Unreachable `return stream` after try/except block in `get()` | Removed |
+| `forecast_model.py` | `_calculate_from_fdsn` called `from_fdsn()` but never `.run()`, leaving `calculate.df` empty | Added `.run()` — consistent with the SDS path |
+
+### Updated API
+
+**`CalculateTremor`** — unchanged public API; `from_fdsn()` was already present:
+```python
+CalculateTremor(...).from_fdsn(client_url="https://service.iris.edu").run()
+```
+
+**`ForecastModel.calculate()`** — FDSN path now correctly runs tremor calculation:
+```python
+fm.calculate(source="fdsn", client_url="https://service.iris.edu")
+```
+
+### Documentation Updates
+
+- **CLAUDE.md**: Updated SDS path, added FDSN to key classes, extended Data Sources section, added FDSN workflow example
+- **README.md**: Added `sources/` to package architecture tree, added FDSN code example in §1 (Calculate Tremor), added FDSN alternative workflow under ForecastModel advanced usage
