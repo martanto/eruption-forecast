@@ -27,3 +27,4 @@ tests/output/
 # Temporary test files in root directory
 /test*.py
 /test_*.py
+/.github/
