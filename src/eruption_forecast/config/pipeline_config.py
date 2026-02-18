@@ -5,11 +5,9 @@ Each pipeline stage has a dedicated config section. The top-level
 as YAML or JSON.
 """
 
-from __future__ import annotations
-
 import os
 import json
-from typing import Any, Literal
+from typing import Any, Self, Literal
 from datetime import datetime
 from dataclasses import field, asdict, fields, dataclass
 
@@ -46,7 +44,7 @@ class ModelConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ModelConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a ``ModelConfig`` from a plain dictionary.
 
         Unknown keys are silently ignored so that older config files remain
@@ -95,7 +93,7 @@ class CalculateConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> CalculateConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a ``CalculateConfig`` from a plain dictionary.
 
         Unknown keys are silently ignored.
@@ -137,7 +135,7 @@ class BuildLabelConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> BuildLabelConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a ``BuildLabelConfig`` from a plain dictionary.
 
         Unknown keys are silently ignored.
@@ -177,7 +175,7 @@ class ExtractFeaturesConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ExtractFeaturesConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create an ``ExtractFeaturesConfig`` from a plain dictionary.
 
         Unknown keys are silently ignored.
@@ -223,7 +221,7 @@ class TrainConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TrainConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a ``TrainConfig`` from a plain dictionary.
 
         Unknown keys are silently ignored.
@@ -266,7 +264,7 @@ class ForecastConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ForecastConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a ``ForecastConfig`` from a plain dictionary.
 
         Unknown keys are silently ignored.
@@ -374,7 +372,7 @@ class PipelineConfig:
         return path
 
     @classmethod
-    def load(cls, path: str) -> PipelineConfig:
+    def load(cls, path: str) -> Self:
         """Load a pipeline configuration from *path*.
 
         The format (YAML or JSON) is detected from the file extension.
