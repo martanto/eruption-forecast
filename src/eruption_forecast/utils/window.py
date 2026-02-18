@@ -12,9 +12,14 @@ from collections.abc import Callable
 import numpy as np
 import pandas as pd
 from obspy import Trace
+from scipy.stats import norm
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.array import remove_outliers, remove_maximum_outlier
+from eruption_forecast.utils.array import (
+    remove_outliers,
+    chunk_daily_data,
+    remove_maximum_outlier,
+)
 from eruption_forecast.utils.date_utils import (
     validate_date_ranges,
     validate_window_step,
@@ -77,6 +82,35 @@ def get_windows_information(
     }
 
 
+def shanon_entropy(data: np.ndarray) -> float:
+    """Calculate the Shannon entropy of a seismic data window.
+
+    Models the amplitude distribution as a Gaussian and computes the differential
+    entropy as ``H = -Σ p(x) · log2(p(x))``. Returns NaN when signal energy is
+    below 1.0, which guards against computing entropy on near-zero noise.
+
+    Args:
+        data (np.ndarray): 1-D array of seismic amplitude values for one window.
+
+    Returns:
+        float: Shannon entropy value, or NaN if energy is below threshold.
+    """
+    energy = np.sum(np.square(data))
+
+    if energy < 1.0:
+        return np.nan
+
+    y = norm.pdf(data, loc=np.mean(data), scale=np.std(data))
+
+    # Zero PDF values would produce -inf in log; mask them before summing
+    y_masked = np.ma.MaskedArray(y, (y == 0))
+    y = y_masked.filled(np.nan)
+
+    entropy = -1 * np.sum(y * np.log2(y))
+
+    return entropy
+
+
 def calculate_window_metrics(
     trace: Trace,
     window_duration_minutes: int = 10,
@@ -85,6 +119,7 @@ def calculate_window_metrics(
     mask_zero_value: bool = False,
     minimum_completion_ratio: float = 0.3,
     absolute_value: bool = False,
+    window_overlap: float | None = None,
     value_multiplier: float = 1.0,
 ) -> pd.Series:
     """Calculate metrics for defined time windows of an ObsPy Trace.
@@ -109,6 +144,7 @@ def calculate_window_metrics(
             Defaults to 0.3.
         absolute_value (bool, optional): If True, use absolute values of trace data.
             Defaults to False.
+        window_overlap (float, optional): Overlap windows percentage. Defaults to None.
         value_multiplier (float, optional): Multiplier applied to the final metric value.
             Defaults to 1.0.
 
@@ -125,56 +161,60 @@ def calculate_window_metrics(
         ... )
         >>> print(rsam.head())
     """
-    if not isinstance(trace, Trace):
-        raise TypeError("Input must be an ObsPy Trace object")
-
     start_datetime = trace.stats.starttime.datetime
-    start_datetime = start_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    trace_data = abs(trace.data) if absolute_value else trace.data
     sampling_rate = trace.stats.sampling_rate
 
-    samples_per_window = int(sampling_rate * 60 * window_duration_minutes)
-    samples_per_day = int(sampling_rate * 60 * 60 * 24)
-    total_windows = int(np.ceil(samples_per_day / samples_per_window))
+    data = trace.data
+    if absolute_value:
+        data = np.abs(data)
 
-    indices: list[datetime] = []
-    data_points: list[float] = []
+    chunking_data = chunk_daily_data(
+        data=data,
+        sampling_rate=sampling_rate,
+        window_min=window_duration_minutes,
+        window_overlap=window_overlap,
+        mask_zero_value=mask_zero_value,
+    )
 
-    for index_window in range(total_windows):
-        first_index = int(index_window * samples_per_window)
-        last_index = int((index_window + 1) * samples_per_window)
-
-        window_data = trace_data[first_index:last_index]
-        length_window_data = len(window_data)
-        minimum_samples = int(np.ceil(minimum_completion_ratio * length_window_data))
-
+    indices = []
+    data_points = []
+    for index, window_data in enumerate(chunking_data):
         # Initialize metric_value to np.nan
-        metric_value = window_data[0] if length_window_data == 1 else np.nan
+        metric_value = np.nan
 
-        if remove_outlier_method and (length_window_data > minimum_samples):
+        minimum_sample_acquired = True
+        if isinstance(window_data, np.ma.MaskedArray):
+            valid_samples = window_data.count()
+            valid_samples_ratio = valid_samples / len(window_data)
+            minimum_sample_acquired = valid_samples_ratio >= minimum_completion_ratio
+
+        if not minimum_sample_acquired:
+            metric_value = np.nan
+
+        elif len(window_data) == 1:
+            metric_value = window_data[0]
+
+        elif remove_outlier_method is None:
+            metric_value = metric_function(window_data)
+
+        elif remove_outlier_method:
             window_data = (
-                remove_maximum_outlier(window_data, mask_zero_value=mask_zero_value)
+                remove_maximum_outlier(window_data)
                 if remove_outlier_method == "maximum"
-                else remove_outliers(window_data, mask_zero_value=mask_zero_value)
+                else remove_outliers(window_data)
             )
 
             # Re-check length after outlier removal just in case,
             # though remove_maximum_outlier mostly removes one
             if len(window_data) > 0:
-                # Update metric value
                 metric_value = metric_function(window_data)
-
                 if value_multiplier != 1.0 and not np.isnan(metric_value):
                     metric_value *= value_multiplier
 
-        # Calculate timestamp for the window
-        window_time = start_datetime + timedelta(
-            minutes=index_window * window_duration_minutes
+        indices.append(
+            start_datetime + timedelta(minutes=index * window_duration_minutes)
         )
-
-        indices.append(window_time)
-        data_points.append(float(metric_value))
+        data_points.append(metric_value)
 
     return pd.Series(data=data_points, index=indices, name="datetime", dtype=float)
 
