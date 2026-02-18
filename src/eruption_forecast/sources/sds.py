@@ -74,11 +74,55 @@ class SDS:
         self.verbose = verbose
         self.debug = debug
 
-        self.nslc = f"{self.network}.{self.station}.{self.location}.{self.channel}"
+        self.nslc: str = f"{self.network}.{self.station}.{self.location}.{self.channel}"
         self.files: list[dict[str, Any]] = []
 
         if self.verbose:
             logger.info(f"SDS initialized: {self.nslc} from {self.sds_dir}")
+
+    def save(self, stream: Stream, date: datetime) -> str | None:
+        """Save stream to SDS filepath.
+
+        Args:
+            stream (Stream): Stream object to be saved.
+            date (datetime): Date for which to save SDS filepath.
+
+        Returns:
+            str | None: Absolute path to the SDS filepath. None if stream is empty or
+                there was en error when trying to save the SDS filepath.
+        """
+
+        date_str = date.strftime("%Y-%m-%d")
+        prefix = f"{date_str} :: {self.nslc}"
+
+        # Return None if stream contains zero traces.
+        if len(stream) == 0:
+            if self.verbose:
+                logger.info(f"{prefix}. No data available")
+            return None
+
+        data_dir = os.path.join(
+            self.sds_dir,
+            str(date.year),
+            self.network,
+            self.station,
+            f"{self.channel}.D",
+        )
+        filepath = self.get_filepath(date)
+
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+            stream.write(filepath, format="MSEED")
+
+            logger.info(f"{prefix}. Saved to: {filepath}")
+
+            return filepath
+        except OSError as e:
+            if self.debug:
+                logger.error(
+                    f"{prefix}. Cannot save SDS file to {filepath}. Error: {e}"
+                )
+            return None
 
     def get_filepath(self, date: datetime) -> str:
         """Construct SDS filepath for a specific date.

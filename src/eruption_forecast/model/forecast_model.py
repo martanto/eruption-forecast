@@ -438,7 +438,7 @@ class ForecastModel:
 
     @staticmethod
     def _calculate_from_sds(
-        calculate: CalculateTremor, sds_dir: str | None
+        calculate: CalculateTremor, sds_dir: str
     ) -> CalculateTremor:
         """Calculate tremor from SDS data source.
 
@@ -466,7 +466,6 @@ class ForecastModel:
     def _calculate_from_fdsn(
         self, calculate: CalculateTremor, client_url: str
     ) -> CalculateTremor:
-        # TODO: Calculate using FDSN
         """Calculate tremor from FDSN data source.
 
         Args:
@@ -475,12 +474,11 @@ class ForecastModel:
 
         Returns:
             Calculated CalculateTremor instance with data
-
-        Raises:
-            NotImplementedError: FDSN source is not yet supported
         """
-        logger.error(f"FDSN source is not yet supported. Client url: {client_url}")
-        raise NotImplementedError("FDSN source is not yet supported")
+        if self.verbose:
+            logger.info(f"Calculating tremor using FDSN with client URL: {client_url}")
+
+        return calculate.from_fdsn(client_url=client_url).run()
 
     def _adjust_dates_to_tremor_range(self, tremor_data: TremorData) -> None:
         """Adjust start_date and end_date to match available tremor data.
@@ -767,7 +765,7 @@ class ForecastModel:
         self.CalculateTremor = calculate
 
         # Calculate from appropriate source
-        if source == "sds":
+        if source == "sds" and sds_dir:
             calculate = self._calculate_from_sds(calculate, sds_dir)
         elif source == "fdsn":
             calculate = self._calculate_from_fdsn(calculate, client_url)
