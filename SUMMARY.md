@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-17 (config persistence + unit tests)
+**Last Updated:** 2026-02-18 (CLAUDE.md Pipeline section audit and corrections)
 
 ## ⚠️ Important Notice
 
@@ -2399,3 +2399,59 @@ fm3.forecast(start_date="2025-04-01", end_date="2025-04-07", ...)
 ```
 58 passed in 2.86s
 ```
+
+---
+
+## FDSN Data Source Implementation (2026-02-18)
+
+Added full FDSN (International Federation of Digital Seismograph Networks) support
+as an alternative seismic data source alongside the existing SDS reader.
+
+### New `sources/` Package
+
+Both data-source adapters are now collected in a dedicated sub-package:
+
+```
+src/eruption_forecast/sources/
+├── __init__.py
+├── sds.py    # SeisComP Data Structure reader (moved from root package)
+└── fdsn.py   # New FDSN web-service client with local SDS caching
+```
+
+`sds.py` was **moved** from `src/eruption_forecast/sds.py` to
+`src/eruption_forecast/sources/sds.py`. All imports have been updated.
+
+### `FDSN` Class (`sources/fdsn.py`)
+
+| Feature | Detail |
+|---------|--------|
+| **Local caching** | Downloaded miniSEED files are saved to a local SDS archive (`download_dir`) so subsequent runs skip the network request |
+| **ObsPy integration** | Wraps `obspy.clients.fdsn.Client` for waveform retrieval |
+| **Cache-first logic** | Reads the local SDS file when present and `overwrite=False`; only fetches from FDSN when absent or `overwrite=True` |
+| **Auto-creates download_dir** | `os.makedirs(download_dir, exist_ok=True)` called in `__init__` before SDS is initialised |
+
+### Bug Fixes Applied
+
+| File | Bug | Fix |
+|------|-----|-----|
+| `fdsn.py` | Spurious `from numba.tests.doctest_usecase import d` import | Removed |
+| `fdsn.py` | `SDS.__init__` raised `FileNotFoundError` if `download_dir` didn't exist | Added `os.makedirs(download_dir, exist_ok=True)` before `SDS(...)` |
+| `fdsn.py` | Unreachable `return stream` after try/except block in `get()` | Removed |
+| `forecast_model.py` | `_calculate_from_fdsn` called `from_fdsn()` but never `.run()`, leaving `calculate.df` empty | Added `.run()` — consistent with the SDS path |
+
+### Updated API
+
+**`CalculateTremor`** — unchanged public API; `from_fdsn()` was already present:
+```python
+CalculateTremor(...).from_fdsn(client_url="https://service.iris.edu").run()
+```
+
+**`ForecastModel.calculate()`** — FDSN path now correctly runs tremor calculation:
+```python
+fm.calculate(source="fdsn", client_url="https://service.iris.edu")
+```
+
+### Documentation Updates
+
+- **CLAUDE.md**: Updated SDS path, added FDSN to key classes, extended Data Sources section, added FDSN workflow example
+- **README.md**: Added `sources/` to package architecture tree, added FDSN code example in §1 (Calculate Tremor), added FDSN alternative workflow under ForecastModel advanced usage

@@ -108,6 +108,9 @@ eruption-forecast/
 │   │   ├── model_predictor.py
 │   │   ├── model_evaluator.py
 │   │   └── classifier_model.py
+│   ├── sources/             # Seismic data source adapters
+│   │   ├── sds.py           # SDS (SeisComP Data Structure) reader
+│   │   └── fdsn.py          # FDSN web service client with local caching
 │   ├── plots/               # Visualization utilities
 │   │   └── ...
 │   ├── utils/               # Focused utility modules
@@ -287,7 +290,7 @@ Process raw seismic data to calculate RSAM (amplitude) and DSAR (ratios) across 
 ```python
 from eruption_forecast import CalculateTremor
 
-# Basic usage with SDS data
+# From a local SDS archive
 tremor = CalculateTremor(
     start_date="2025-01-01",
     end_date="2025-01-31",
@@ -296,7 +299,15 @@ tremor = CalculateTremor(
     n_jobs=4,
 ).from_sds(sds_dir="/data/sds").run()
 
-# Custom frequency bands
+# From an FDSN web service (downloads and caches locally as SDS)
+tremor = CalculateTremor(
+    start_date="2025-01-01",
+    end_date="2025-01-31",
+    station="OJN",
+    channel="EHZ",
+).from_fdsn(client_url="https://service.iris.edu").run()
+
+# Custom frequency bands (works with both SDS and FDSN)
 tremor = CalculateTremor(
     start_date="2025-01-01",
     end_date="2025-01-31",
@@ -1049,6 +1060,16 @@ print(f"Forecast plot: {model.forecast_plot_path}")
 5. **forecast()** — Generate probabilistic eruption predictions for future period
 
 #### Alternative Workflows
+
+**Use FDSN web service instead of a local SDS archive:**
+
+```python
+model.calculate(
+    source="fdsn",
+    client_url="https://service.iris.edu",  # Any FDSN-compatible URL
+).build_label(...).extract_features(...).train(...)
+# Downloaded miniSEED files are cached locally so subsequent runs skip the network.
+```
 
 **Skip tremor calculation if data already exists:**
 
@@ -1892,7 +1913,7 @@ This project uses:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-18
 
 **Recent Updates:**
 - **2026-02-17**: Added `PipelineConfig` — save/replay full pipeline configs as YAML/JSON; `save_model`/`load_model` for joblib serialization; `from_config`/`run` for one-line pipeline replay
