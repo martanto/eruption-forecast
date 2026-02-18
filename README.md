@@ -71,7 +71,7 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 
 ## Features
 
-- **Tremor Calculation**: Process raw seismic data (SDS/FDSN) to calculate RSAM and DSAR metrics across multiple frequency bands
+- **Tremor Calculation**: Process raw seismic data (SDS/FDSN) to calculate RSAM, DSAR, and Shannon Entropy metrics across multiple frequency bands
 - **Label Building**: Generate training labels from eruption dates with configurable forecast horizons
 - **Feature Extraction**: Extract 700+ time-series features using tsfresh for machine learning
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
@@ -94,6 +94,7 @@ eruption-forecast/
 │   │   ├── calculate_tremor.py
 │   │   ├── rsam.py          # Real Seismic Amplitude Measurement
 │   │   ├── dsar.py          # Displacement Seismic Amplitude Ratio
+│   │   ├── shanon_entropy.py  # Shannon Entropy metric
 │   │   └── tremor_data.py
 │   ├── label/               # Training label generation
 │   │   ├── label_builder.py
@@ -138,7 +139,7 @@ Raw Seismic Data (SDS / FDSN)
          │
          ▼
 ┌─────────────────────┐
-│   CalculateTremor   │  RSAM + DSAR metrics (10-min intervals)
+│   CalculateTremor   │  RSAM + DSAR + Shannon Entropy (10-min intervals)
 └─────────┬───────────┘
           │  tremor.csv
           ▼
@@ -216,6 +217,7 @@ fm = ForecastModel(
 fm.calculate(
     source="sds",
     sds_dir="/path/to/sds/data",
+    methods=["rsam", "dsar", "entropy"],  # Enable all three metrics
     plot_daily=True,                 # Generate daily tremor plots
     save_plot=True,
     remove_outlier_method="maximum", # Remove outliers from tremor data
@@ -233,7 +235,7 @@ fm.calculate(
         "2025-07-07",
     ],
 ).extract_features(
-    select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+    select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4", "entropy"],
     save_tremor_matrix_per_method=True,
     exclude_features=[               # Exclude problematic features
         "agg_linear_trend",
@@ -262,7 +264,7 @@ fm.calculate(
 
 **What this pipeline does:**
 
-1. **Calculate tremor** (RSAM/DSAR) from raw seismic data with outlier removal
+1. **Calculate tremor** (RSAM, DSAR, Shannon Entropy) from raw seismic data with outlier removal
 2. **Build labels** from known eruption dates (training period: Jan 1 - Jul 24)
 3. **Extract features** using tsfresh (700+ features) and select top 20
 4. **Train models** using Random Forest with 500 random seeds for robust predictions
@@ -285,18 +287,27 @@ See `main.py` in the repository for the complete working example.
 
 ### 1. Calculate Tremor Metrics
 
-Process raw seismic data to calculate RSAM (amplitude) and DSAR (ratios) across frequency bands.
+Process raw seismic data to calculate RSAM (amplitude), DSAR (ratios), and Shannon Entropy across frequency bands.
 
 ```python
 from eruption_forecast import CalculateTremor
 
-# From a local SDS archive
+# From a local SDS archive (all three metrics enabled by default)
 tremor = CalculateTremor(
     start_date="2025-01-01",
     end_date="2025-01-31",
     station="OJN",
     channel="EHZ",
     n_jobs=4,
+).from_sds(sds_dir="/data/sds").run()
+
+# Select specific metrics
+tremor = CalculateTremor(
+    start_date="2025-01-01",
+    end_date="2025-01-31",
+    station="OJN",
+    channel="EHZ",
+    methods=["rsam", "dsar", "entropy"],  # default: all three
 ).from_sds(sds_dir="/data/sds").run()
 
 # From an FDSN web service (downloads and caches locally as SDS)
@@ -321,7 +332,7 @@ tremor = CalculateTremor(
 
 # Access the DataFrame
 print(tremor.df.head())
-# Output columns: rsam_f0, rsam_f1, rsam_f2, dsar_f0-f1, dsar_f1-f2
+# Output columns: rsam_f0, rsam_f1, rsam_f2, dsar_f0-f1, dsar_f1-f2, entropy
 
 # Get file path
 print(f"Saved to: {tremor.csv}")
@@ -331,6 +342,7 @@ print(f"Saved to: {tremor.csv}")
 - DateTime index with 10-minute intervals
 - RSAM columns: `rsam_f0`, `rsam_f1`, `rsam_f2`, `rsam_f3`, `rsam_f4`
 - DSAR columns: `dsar_f0-f1`, `dsar_f1-f2`, `dsar_f2-f3`, `dsar_f3-f4`
+- Shannon Entropy: `entropy` (signal complexity, single broadband column)
 - Default bands: (0.01–0.1), (0.1–2), (2–5), (4.5–8), (8–16) Hz
 
 ### 2. Build Training Labels
@@ -1002,6 +1014,7 @@ model = ForecastModel(
 model.calculate(
     source="sds",
     sds_dir="/path/to/sds/data",
+    methods=["rsam", "dsar", "entropy"],
     plot_daily=True,
     save_plot=True,
     remove_outlier_method="maximum",
@@ -1019,7 +1032,7 @@ model.calculate(
         "2025-07-07",
     ],
 ).extract_features(
-    select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+    select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4", "entropy"],
     save_tremor_matrix_per_method=True,
     exclude_features=[
         "agg_linear_trend",
@@ -1053,7 +1066,7 @@ print(f"Forecast plot: {model.forecast_plot_path}")
 
 **Pipeline stages:**
 
-1. **calculate()** — Process raw seismic data into RSAM/DSAR tremor metrics
+1. **calculate()** — Process raw seismic data into RSAM, DSAR, and Shannon Entropy tremor metrics
 2. **build_label()** — Create binary labels from eruption dates
 3. **extract_features()** — Extract 700+ tsfresh features from tremor windows
 4. **train()** — Train classifier ensemble with feature selection
@@ -1913,10 +1926,10 @@ This project uses:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-18
+**Last Updated:** 2026-02-19
 
 **Recent Updates:**
-- **2026-02-17**: Added `PipelineConfig` — save/replay full pipeline configs as YAML/JSON; `save_model`/`load_model` for joblib serialization; `from_config`/`run` for one-line pipeline replay
-- **2026-02-17**: Refactored utils.py into 7 focused modules for improved maintainability
-- **2026-02-17**: All 30 Python files standardized to Google docstring format
-- **2026-02-17**: Added comprehensive safety disclaimers for volcanic forecasting
+- **2026-02-19**: Added Shannon Entropy (`entropy`) as a third tremor metric alongside RSAM and DSAR; implemented `ShanonEntropy` class and `shanon_entropy()` utility; updated `CalculateTremor` with `calculate_entropy()` method; entropy plots use reddish-purple (Okabe-Ito palette)
+- **2026-02-18**: Added `PipelineConfig` — save/replay full pipeline configs as YAML/JSON; `save_model`/`load_model` for joblib serialization; `from_config`/`run` for one-line pipeline replay
+- **2026-02-18**: Refactored utils.py into 7 focused modules for improved maintainability
+- **2026-02-18**: All Python files standardized to Google docstring format with comprehensive descriptions

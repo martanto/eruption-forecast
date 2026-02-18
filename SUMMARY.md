@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-18 (CLAUDE.md Pipeline section audit and corrections)
+**Last Updated:** 2026-02-19 (Shannon Entropy metric — docstring fixes, import cleanup, README update)
 
 ## ⚠️ Important Notice
 
@@ -37,6 +37,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 22. [Utils Module Refactoring: Decoupling into Focused Modules](#utils-module-refactoring-decoupling-into-focused-modules-2026-02-17)
 23. [Codebase Review and Bug Fixes](#codebase-review-and-bug-fixes-2026-02-17)
 24. [Pipeline Configuration Saving and Loading](#pipeline-configuration-saving-and-loading-2026-02-17)
+25. [Shannon Entropy Metric — Docstring Fixes and README Update](#shannon-entropy-metric--docstring-fixes-and-readme-update-2026-02-19)
 ---
 
 ## Package Overview
@@ -2455,3 +2456,68 @@ fm.calculate(source="fdsn", client_url="https://service.iris.edu")
 
 - **CLAUDE.md**: Updated SDS path, added FDSN to key classes, extended Data Sources section, added FDSN workflow example
 - **README.md**: Added `sources/` to package architecture tree, added FDSN code example in §1 (Calculate Tremor), added FDSN alternative workflow under ForecastModel advanced usage
+
+---
+
+## Shannon Entropy Metric — Docstring Fixes and README Update (2026-02-19)
+
+**Branch:** `ft/shanon-entropy`
+**Date:** 2026-02-19
+**Scope:** Docstring audit following Shannon Entropy feature addition; unused import removal; README and SUMMARY updates
+
+### Changes Made
+
+#### 1. Removed Unused Import (`shanon_entropy.py`)
+- Removed `from scipy import stats` — `stats` was never referenced in the file. The `norm` object used for entropy calculation is imported in `window.py`, not here.
+
+#### 2. Added Missing Docstrings
+
+| File | Location | Change |
+|------|----------|--------|
+| `shanon_entropy.py` | `ShanonEntropy` class | Added full class docstring with Attributes, Args, Examples |
+| `shanon_entropy.py` | `__init__` | Added method docstring |
+| `shanon_entropy.py` | `filter()` | Added description paragraph; fixed Returns type |
+| `shanon_entropy.py` | `calculate()` | Expanded description; improved parameter/return docs |
+| `calculate_tremor.py` | `calculate_entropy()` | Added complete docstring (was missing entirely) |
+| `main.py` | `main()` | Added function docstring |
+
+#### 3. Fixed Pseudo-Docstrings (`window.py`)
+Removed two string literals used incorrectly as inline comments inside `shanon_entropy()` and one inside `calculate_window_metrics()`. These violated the comment guidelines ("never describe the code — explain *why*, not *what*"). The zero-masking rationale was preserved as a proper `#` comment.
+
+#### 4. Fixed Incorrect/Outdated Docstring Content
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `calculate_tremor.py` (class) | `methods (str \| None): Currently unused` | Corrected to `list[str] \| None` with current valid values |
+| `calculate_tremor.py` → `calculate()` | Only mentioned RSAM/DSAR | Added Shannon Entropy to description and Returns |
+| `array.py` → `chunk_daily_data()` | Summary on wrong line; typo "Masing" | Moved to opening quote line; fixed spelling; added Raises |
+| `sds.py` → `save()` | Typo "en error" | Fixed to "an error" |
+| `sds.py` → `load_stream()` | `Raises: None:` (invalid Google style) | Removed invalid Raises entry |
+
+#### 5. Fixed Private Method Args in `forecast_model.py`
+All private helper methods (`_calculate_from_sds`, `_calculate_from_fdsn`, `_adjust_dates_to_tremor_range`, `_prepare_tremor_for_labeling`, `_validate_tremor_for_labeling`, `_validate_label_tremor_date_range`, `_calculate_eruption_statistics`) had Args without types. Added explicit types to all.
+
+#### 6. Fixed Public Method Returns and Descriptions in `forecast_model.py`
+
+| Method | Issue | Fix |
+|--------|-------|-----|
+| `calculate()` | Missing description paragraph | Added description |
+| `calculate()` | `Returns: Self for method chaining.` (no type) | `Returns: Self: ForecastModel instance for method chaining.` |
+| `set_feature_selection_method()` | Missing description; short Returns | Added full description; fixed Returns |
+| `extract_features()` | `Self for method chaining.` | Fixed Returns format |
+| `build_label()` | `self (Self): ForecastModel object` | Standardized Returns |
+| `train()` | `self (Self): ForecastModel object` | Standardized Returns |
+| `forecast()` | Missing description; all Args missing types | Added full description; added all types |
+
+#### 7. Updated `tremor_plots.py`
+- Updated `plot_tremor()` description to mention entropy's reddish-purple color assignment.
+
+#### 8. README.md Updates
+- **Features** bullet: added Shannon Entropy
+- **Package Architecture**: added `shanon_entropy.py` to tremor module listing
+- **Pipeline Overview**: updated CalculateTremor box to include "Shannon Entropy"
+- **Section 1** (Calculate Tremor Metrics): updated heading and output format; added `entropy` column; added `methods` parameter to examples
+- **Quick Start**: added `methods=["rsam", "dsar", "entropy"]` to `calculate()`; added `"entropy"` to `select_tremor_columns`
+- **Advanced Usage**: mirrored all Quick Start changes in the ForecastModel example
+- **Pipeline stages**: updated all "RSAM/DSAR" references to include Entropy
+- **Last Updated**: bumped to 2026-02-19; added Recent Updates entry
