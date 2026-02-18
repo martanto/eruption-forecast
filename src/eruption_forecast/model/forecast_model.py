@@ -353,7 +353,7 @@ class ForecastModel:
 
     def _setup_calculate_tremor(
         self,
-        methods: str | None,
+        methods: list[str] | None,
         filename_prefix: str | None,
         remove_outlier_method: Literal["all", "maximum"],
         interpolate: bool,
@@ -372,7 +372,7 @@ class ForecastModel:
         parameters. Automatically adjusts start_date to include window_size buffer.
 
         Args:
-            methods (str | None): Calculation methods to apply (e.g., "rsam,dsar").
+            methods (list[str] | None): Calculation methods to apply (e.g., "rsam,dsar").
             filename_prefix (str | None): Prefix for generated filenames.
             remove_outlier_method (Literal["all", "maximum"]): Method for outlier removal.
             interpolate (bool): Whether to interpolate missing data.
@@ -392,7 +392,7 @@ class ForecastModel:
 
         Examples:
             >>> calc = model._setup_calculate_tremor(
-            ...     methods="rsam,dsar",
+            ...     methods=["rsam","dsar","entropy"]
             ...     filename_prefix="tremor",
             ...     remove_outlier_method="maximum",
             ...     interpolate=True,
@@ -440,17 +440,20 @@ class ForecastModel:
     def _calculate_from_sds(
         calculate: CalculateTremor, sds_dir: str
     ) -> CalculateTremor:
-        """Calculate tremor from SDS data source.
+        """Calculate tremor from an SDS archive.
+
+        Configures the calculator for SDS mode, validates the directory, and
+        runs the full tremor calculation workflow.
 
         Args:
-            calculate: CalculateTremor instance
-            sds_dir: Path to SDS directory
+            calculate (CalculateTremor): Pre-configured CalculateTremor instance.
+            sds_dir (str): Root path to the SDS archive directory.
 
         Returns:
-            Calculated CalculateTremor instance with data
+            CalculateTremor: The same instance after running the calculation.
 
         Raises:
-            ValueError: If sds_dir is None or doesn't exist
+            ValueError: If sds_dir is None or does not exist on disk.
         """
         if sds_dir is None:
             raise ValueError(
@@ -466,14 +469,17 @@ class ForecastModel:
     def _calculate_from_fdsn(
         self, calculate: CalculateTremor, client_url: str
     ) -> CalculateTremor:
-        """Calculate tremor from FDSN data source.
+        """Calculate tremor from an FDSN web service.
+
+        Configures the calculator for FDSN mode and runs the full tremor
+        calculation workflow, downloading and caching data as needed.
 
         Args:
-            calculate: CalculateTremor instance
-            client_url: FDSN service URL
+            calculate (CalculateTremor): Pre-configured CalculateTremor instance.
+            client_url (str): FDSN web-service base URL.
 
         Returns:
-            Calculated CalculateTremor instance with data
+            CalculateTremor: The same instance after running the calculation.
         """
         if self.verbose:
             logger.info(f"Calculating tremor using FDSN with client URL: {client_url}")
@@ -484,11 +490,11 @@ class ForecastModel:
         """Adjust start_date and end_date to match available tremor data.
 
         Updates self.start_date, self.end_date, and their string representations
-        if they fall outside the tremor data range. Logs changes if verbose mode
+        if they fall outside the tremor data range. Logs changes when verbose mode
         is enabled.
 
         Args:
-            tremor_data: TremorData instance with date range
+            tremor_data (TremorData): Loaded tremor data wrapper with date range info.
         """
         # Adjust start date if earlier than tremor start
         if self.start_date_minus_window_size < tremor_data.start_date:
@@ -515,16 +521,19 @@ class ForecastModel:
         tremor_data: pd.DataFrame,
         tremor_columns: list[str] | None,
     ) -> None:
-        """Validate tremor data is available for label building.
+        """Validate that tremor data is available for label building.
 
-        Checks that tremor data is loaded and that specified columns exist.
+        Checks that tremor data is a non-empty DataFrame and that all specified
+        column names are present.
 
         Args:
-            tremor_data: Tremor dataframe
-            tremor_columns: Columns to validate
+            tremor_data (pd.DataFrame): Tremor metrics DataFrame to validate.
+            tremor_columns (list[str] | None): Column names to check, or None to
+                skip column validation.
 
         Raises:
-            ValueError: If tremor data is not loaded or columns are invalid
+            ValueError: If tremor_data is not a DataFrame, is empty, or any
+                column in tremor_columns is missing.
         """
         if not isinstance(tremor_data, pd.DataFrame) or len(tremor_data) == 0:
             raise ValueError(
@@ -541,14 +550,15 @@ class ForecastModel:
     ) -> pd.DataFrame:
         """Prepare tremor data for label building.
 
-        Creates a copy of tremor data and optionally selects specific columns.
-        Sorts the data by datetime index.
+        Creates a sorted copy of tremor data and optionally subsets it to the
+        specified columns.
 
         Args:
-            tremor_columns: Specific columns to select, or None for all
+            tremor_columns (list[str] | None): Column names to retain, or None
+                to keep all columns.
 
         Returns:
-            Prepared tremor dataframe
+            pd.DataFrame: Sorted copy of the tremor DataFrame.
         """
         df_tremor = self.tremor_data.copy()
 
@@ -564,17 +574,18 @@ class ForecastModel:
         df_label: pd.DataFrame,
         df_tremor: pd.DataFrame,
     ) -> None:
-        """Validate label date range falls within tremor data range.
+        """Validate that label date range falls within the tremor data range.
 
-        Ensures that the label windows are completely covered by available
-        tremor data, preventing gaps in feature extraction.
+        Ensures label windows are fully covered by available tremor data,
+        preventing silent gaps during feature extraction.
 
         Args:
-            df_label: Label dataframe with datetime index
-            df_tremor: Tremor dataframe with datetime index
+            df_label (pd.DataFrame): Label DataFrame with DatetimeIndex.
+            df_tremor (pd.DataFrame): Tremor DataFrame with DatetimeIndex.
 
         Raises:
-            ValueError: If label dates fall outside tremor data range
+            ValueError: If label start date precedes tremor start date, or
+                label end date exceeds tremor end date.
         """
         label_start_date: pd.Timestamp = df_label.index[0]
         label_end_date: pd.Timestamp = df_label.index[-1]
@@ -601,11 +612,13 @@ class ForecastModel:
     ) -> None:
         """Calculate and log eruption class statistics.
 
-        Computes the number of eruption and non-eruption windows, and their
-        ratio. Logs statistics if verbose mode is enabled.
+        Computes the count of eruption and non-eruption windows and their ratio,
+        storing results in ``self.total_eruption_class``,
+        ``self.total_non_eruption_class``, and ``self.class_ratio``.
+        Logs the statistics when verbose mode is enabled.
 
         Args:
-            label_builder: LabelBuilder instance with built labels
+            label_builder (LabelBuilder): Fully built LabelBuilder instance.
         """
         self.total_eruption_class = len(label_builder.df_eruption)
         self.total_non_eruption_class = (
@@ -703,7 +716,7 @@ class ForecastModel:
     def calculate(
         self,
         source: Literal["sds", "fdsn"] = "sds",
-        methods: str | None = None,
+        methods: list[str] | None = None,
         filename_prefix: str | None = None,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         interpolate: bool = True,
@@ -718,11 +731,16 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> Self:
-        """Calculate Tremor Data from seismic data source.
+        """Calculate tremor metrics from a seismic data source.
+
+        Delegates to ``CalculateTremor`` to compute RSAM, DSAR, and Shannon
+        Entropy metrics from either a local SDS archive or an FDSN web service.
+        The resulting tremor DataFrame is stored in ``self.tremor_data`` and
+        the pipeline date range is clipped to the available data.
 
         Args:
             source (Literal["sds", "fdsn"]): Seismic data source. Defaults to "sds".
-            methods (str | None): Calculation methods to apply. Defaults to None.
+            methods (list[str] | None): Calculation methods to apply. Defaults to None.
             filename_prefix (str | None): Prefix for generated filenames. Defaults to None.
             remove_outlier_method (Literal["all", "maximum"]): Outlier removal method.
                 Defaults to "maximum".
@@ -744,7 +762,7 @@ class ForecastModel:
             debug (bool): If True, enables debug mode. Defaults to False.
 
         Returns:
-            Self for method chaining.
+            Self: ForecastModel instance for method chaining.
         """
         # Setup CalculateTremor instance
         calculate = self._setup_calculate_tremor(
@@ -836,10 +854,10 @@ class ForecastModel:
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
             n_jobs (int | None): Parallel workers for tsfresh extraction. Overrides the
                 instance-level ``n_jobs`` when provided. Defaults to None.
-            verbose (bool | None): If True, enables verbose logging. Defaults to None.
+            verbose (bool | None, optional): If True, enables verbose logging. Defaults to None.
 
         Returns:
-            Self for method chaining.
+            Self: ForecastModel instance for method chaining.
         """
         output_dir = output_dir or self.features_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -925,11 +943,11 @@ class ForecastModel:
             end_date (str, optional): Override self.end_date.
             output_dir (Optional[str], optional): Output directory. Defaults to None.
             tremor_columns (Optional[list[str]], optional): Columns to select. Defaults to None.
-            verbose (bool): If True, enables verbose logging. Defaults to False.
-            debug (bool): If True, enables debug mode. Defaults to False.
+            verbose (bool | None, optional): If True, enables verbose logging. Defaults to None.
+            debug (bool | None, optional): If True, enables debug mode. Defaults to None.
 
         Returns:
-            self (Self): ForecastModel object
+            Self: ForecastModel instance for method chaining.
         """
         # Setup parameters
         tremor_data = self.tremor_data
@@ -1000,16 +1018,21 @@ class ForecastModel:
         self,
         using: Literal["tsfresh", "random_forest", "combined"],
     ) -> Self:
-        """Change feature selection method.
+        """Change the feature selection method used during training.
+
+        Updates ``self.feature_selection_method``, which is read by ``train()``
+        when it constructs the ``ModelTrainer``. Call this before ``train()``
+        to switch strategies without re-extracting features.
 
         Args:
-            using (str): Feature selection method:
-                - "tsfresh": Statistical significance only.
-                - "random_forest": Permutation importance only.
-                - "combined": Two-stage (tsfresh → RandomForest).
+            using (Literal["tsfresh", "random_forest", "combined"]): Feature
+                selection strategy:
+                - ``"tsfresh"``: Statistical significance filtering only.
+                - ``"random_forest"``: Permutation importance only.
+                - ``"combined"``: Two-stage — tsfresh then RandomForest.
 
         Returns:
-            Self for method chaining.
+            Self: ForecastModel instance for method chaining.
         """
         self.feature_selection_method = using
         return self
@@ -1076,7 +1099,7 @@ class ForecastModel:
                 Defaults to True.
 
         Returns:
-            self (Self): ForecastModel object
+            Self: ForecastModel instance for method chaining.
         """
         if verbose or self.verbose:
             print("=" * 50)
@@ -1182,23 +1205,33 @@ class ForecastModel:
         overwrite: bool = False,
         verbose: bool = False,
     ) -> Self:
-        """Eruption forecasting.
+        """Generate probabilistic eruption forecasts for a future date range.
+
+        Constructs a ``ModelPredictor`` from the trained model registry, runs
+        ``predict_proba()`` on the provided tremor data for the specified future
+        window, and stores results in ``self.prediction_df``. Saves the pipeline
+        configuration to ``config.yaml`` after completion.
 
         Args:
-            start_date: Start date for forecasting windows.
-            end_date: End date for forecasting windows.
-            window_size (int): Window size in days. Defaults to 1.
-            window_step: Step size between consecutive windows.
-            window_step_unit: Unit of the window step ("minutes" or "hours").
-            save_predictions (bool): Whether to save the prediction windows. Defaults to True.
-            save_plot (bool): Whether to save the prediction plot. Defaults to True.
-            output_dir: Directory to write the prediction CSV. Defaults to None.
-            n_jobs (int, optional): Number of jobs. Defaults to 1.
-            overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
-            verbose: Override instance verbose flag.
+            start_date (str | datetime): Start date for forecasting windows.
+            end_date (str | datetime): End date for forecasting windows.
+            window_size (int): Window size in days.
+            window_step (int): Step size between consecutive forecast windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of window step.
+            save_predictions (bool, optional): If True, saves the prediction DataFrame
+                to a CSV file. Defaults to True.
+            save_plot (bool, optional): If True, saves the forecast probability plot.
+                Defaults to True.
+            output_dir (str | None, optional): Directory for forecast output files.
+                Defaults to ``self.station_dir``.
+            n_jobs (int | None, optional): Parallel workers for feature extraction.
+                Defaults to None (uses ``self.n_jobs``).
+            overwrite (bool, optional): If True, overwrites existing output files.
+                Defaults to False.
+            verbose (bool, optional): If True, enables verbose logging. Defaults to False.
 
         Returns:
-            Self for method chaining.
+            Self: ForecastModel instance for method chaining.
         """
         verbose = verbose or self.verbose
         output_dir = output_dir or self.station_dir

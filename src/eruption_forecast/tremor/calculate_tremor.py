@@ -19,6 +19,7 @@ from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
+from eruption_forecast.tremor.shanon_entropy import ShanonEntropy
 
 
 class CalculateTremor:
@@ -66,7 +67,7 @@ class CalculateTremor:
         nslc (str): Network.Station.Location.Channel identifier.
         daily_dir (str): Directory for daily CSV files.
         csv (str): Path to final merged tremor CSV.
-        sds (SDS | None): SDS data reader (set after from_sds()).
+        SDS (SDS | None): SDS data reader (set after from_sds()).
         daily_files (list[str]): List of daily CSV file paths.
 
     Args:
@@ -76,8 +77,9 @@ class CalculateTremor:
         channel (str): Seismic channel code (e.g., "EHZ").
         network (str): Seismic network code. Defaults to "VG".
         location (str): Seismic location code. Defaults to "00".
-        methods (str | None): Calculation methods to apply.
-            Currently unused; reserved for future extension. Defaults to None.
+        methods (list[str] | None): Calculation methods to apply
+            (e.g., ``["rsam", "dsar", "entropy"]``). If None, defaults to all
+            three methods. Defaults to None.
         output_dir (str | None): Directory for output files.
             If None, defaults to ``root_dir/output``. Relative paths are resolved
             against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
@@ -89,7 +91,7 @@ class CalculateTremor:
         remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
             "maximum" removes only the single maximum outlier; "all" removes all outliers.
             Defaults to "maximum".
-        interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
+        interpolate (bool): If True, interpolates gaps in the data. Defaults to False.
         value_multiplier (float | None): Scaling factor applied to seismic values.
             Defaults to None (no scaling).
         cleanup_daily_dir (bool): If True, deletes the daily directory after
@@ -126,12 +128,12 @@ class CalculateTremor:
         channel: str,
         network: str = "VG",
         location: str = "00",
-        methods: str | None = None,
+        methods: list[str] | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
-        interpolate: bool = True,
+        interpolate: bool = False,
         value_multiplier: float | None = None,
         cleanup_daily_dir: bool = False,
         plot_daily: bool = False,
@@ -166,10 +168,8 @@ class CalculateTremor:
         self.network = network or "VG"
         self.location = location or "00"
 
-        # TODO: Add Shannon entropy and kurtosis
-        self.methods: list[str] = (
-            [methods] if isinstance(methods, str) else list(methods or ["rsam", "dsar"])
-        )
+        # TODO: Add kurtosis
+        self.methods: list[str] = methods or ["rsam", "dsar", "entropy"]
         self.output_dir: str = output_dir
         self.station_dir: str = station_dir
         self.forecast_dir: str = forecast_dir
@@ -470,7 +470,10 @@ class CalculateTremor:
                 f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
             )
 
-        valid_methods = ["rsam", "dsar"]
+        valid_methods = ["rsam", "dsar", "entropy"]
+        if not isinstance(self.methods, list):
+            raise ValueError(f"Methods must be a list. Your value: {self.methods}")
+
         for method in self.methods:
             if method not in valid_methods:
                 raise ValueError(
@@ -543,6 +546,7 @@ class CalculateTremor:
             channel=self.channel,
             location=self.location,
             verbose=self.verbose,
+            interpolate=self.interpolate,
             debug=self.debug,
         )
         return self
@@ -629,6 +633,9 @@ class CalculateTremor:
         # Merge calculated tremor CSV files from daily dir
         df = self.concat_tremor_data(self.daily_dir, self.tremor_dir)
 
+        # Handle missing data to all columns
+        df = df.interpolate(method="polynomial", order=2, limit_direction="both")
+
         start_date = df.index[0].strftime("%Y-%m-%d")
         end_date = df.index[-1].strftime("%Y-%m-%d")
 
@@ -681,20 +688,20 @@ class CalculateTremor:
             >>> csv_path = tremor.run_job(0, datetime(2025, 1, 1))
         """
         date_str = date.strftime("%Y-%m-%d")
-        temp_file = os.path.join(self.daily_dir, f"{date_str}.csv")
+        daily_file = os.path.join(self.daily_dir, f"{date_str}.csv")
         temp_plot = os.path.join(self.figures_dir, f"{date_str}.png")
 
         logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
 
         can_skip = (
             not self.overwrite
-            and os.path.exists(temp_file)
+            and os.path.exists(daily_file)
             and (not self.plot_daily or os.path.exists(temp_plot))
         )
 
         if can_skip:
-            logger.info(f"{date_str} :: File Exists: {temp_file}")
-            return temp_file
+            logger.info(f"{date_str} :: File Exists: {daily_file}")
+            return daily_file
 
         df = self.calculate(date)
 
@@ -704,7 +711,7 @@ class CalculateTremor:
 
         # save tremor data
         df.to_csv(
-            temp_file,
+            daily_file,
             index=True,
             index_label="datetime",
         )
@@ -723,26 +730,25 @@ class CalculateTremor:
             )
 
         if self.verbose:
-            logger.info(
-                f"{date_str} :: File CSV saved {os.path.join(self.daily_dir, date_str)}"
-            )
+            logger.info(f"{date_str} :: File CSV saved to {daily_file}")
 
-        return temp_file
+        return daily_file
 
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor metrics for a single day.
 
-        Computes Real Seismic Amplitude Measurement (RSAM) and Displacement
-        Seismic Amplitude Ratio (DSAR) for the specified date across all
-        configured frequency bands. Returns an empty DataFrame if no data is available.
+        Computes each enabled method (RSAM, DSAR, Shannon Entropy) for the specified
+        date across all configured frequency bands. Returns an empty DataFrame if no
+        seismic data is available for that day.
 
         Args:
             date (datetime): Date to process.
 
         Returns:
             pd.DataFrame: Tremor DataFrame with DatetimeIndex (10-minute intervals)
-                and columns for RSAM (rsam_f0, rsam_f1, ...) and DSAR (dsar_f0-f1, ...).
-                Returns empty DataFrame if no seismic data is available.
+                and columns for each enabled method: RSAM (``rsam_f0``, ``rsam_f1``, …),
+                DSAR (``dsar_f0-f1``, …), and Shannon Entropy (``entropy``).
+                Returns an empty DataFrame if no seismic data is available.
 
         Examples:
             >>> from datetime import datetime
@@ -782,6 +788,9 @@ class CalculateTremor:
                     )
                     continue
                 df = self.calculate_dsar(date_str, df, stream)
+
+            if method == "entropy":
+                df = self.calculate_entropy(date_str, df, stream)
 
         if self.verbose:
             logger.info(f"{date_str} :: Calculation finished.")
@@ -960,6 +969,52 @@ class CalculateTremor:
                 logger.debug(
                     f"{date_str} :: RSAM ({column_name}) calculation completed."
                 )
+
+        return df
+
+    def calculate_entropy(
+        self, date_str: str, df: pd.DataFrame, stream: Stream
+    ) -> pd.DataFrame:
+        """Calculate Shannon entropy for a given date.
+
+        Computes windowed Shannon entropy over the full broadband seismic signal
+        (without per-band filtering) and stores the result in a single ``entropy``
+        column of the DataFrame.
+
+        Args:
+            date_str (str): Date string in "YYYY-MM-DD" format (used for logging).
+            df (pd.DataFrame): Tremor DataFrame with DatetimeIndex to populate.
+            stream (Stream): ObsPy Stream object containing the seismic trace.
+
+        Returns:
+            pd.DataFrame: DataFrame with an ``entropy`` column added.
+
+        Raises:
+            TypeError: If the DataFrame index is not a DatetimeIndex.
+        """
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index of dataframe should be pd.DatetimeIndex")
+
+        column_name = "entropy"
+
+        stream_copy = stream.copy()
+
+        df[column_name] = (
+            ShanonEntropy(
+                stream=stream_copy,
+                verbose=self.verbose,
+                debug=self.debug,
+            )
+            .calculate(
+                remove_outlier_method=self.remove_outlier_method,
+            )
+            .to_numpy()
+        )
+
+        del stream_copy
+
+        if self.verbose:
+            logger.debug(f"{date_str} :: Entropy calculation completed.")
 
         return df
 

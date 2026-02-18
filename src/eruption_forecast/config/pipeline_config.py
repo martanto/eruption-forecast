@@ -81,7 +81,7 @@ class CalculateConfig(_ConfigBase):
 
     source: str = "sds"
     sds_dir: str | None = None
-    methods: str | None = None
+    methods: list[str] | None = None
     filename_prefix: str | None = None
     remove_outlier_method: str = "maximum"
     interpolate: bool = True

@@ -246,3 +246,69 @@ def remove_outliers(
         return outliers
 
     return filtered_data
+
+
+def chunk_daily_data(
+    data: np.ndarray,
+    sampling_rate: float,
+    window_min: int = 10,
+    window_overlap: float | None = None,
+    mask_zero_value: bool = True,
+) -> np.ndarray | np.ma.MaskedArray:
+    """Chunk a daily time series into fixed-size windows.
+
+    Splits a 1-D seismic data array into consecutive windows of equal length.
+    Incomplete trailing windows are zero-padded with NaN before slicing.
+    When ``mask_zero_value=True``, zero samples (indicating dead channels or
+    missing data) and NaN values are masked so downstream metrics ignore them.
+
+    Args:
+        data (np.ndarray): 1-D array of daily seismic amplitude data.
+        sampling_rate (float): Sampling rate in Hz.
+        window_min (int, optional): Window duration in minutes. Defaults to 10.
+        window_overlap (float, optional): Overlap between consecutive windows as a
+            percentage in [0, 100). If None, non-overlapping windows are used.
+            Defaults to None.
+        mask_zero_value (bool, optional): If True, mask zero and NaN samples.
+            Zeros in seismic data typically indicate dead or missing samples.
+            Defaults to True.
+
+    Returns:
+        np.ndarray | np.ma.MaskedArray: Array of shape (n_windows, samples_per_window).
+            Returns a masked array when ``mask_zero_value=True``, otherwise a plain
+            float64 ndarray.
+
+    Raises:
+        ValueError: If ``window_overlap`` is not in range [0, 100).
+    """
+    window_samples = int(sampling_rate * 60 * window_min)
+
+    if window_overlap is None:
+        step_samples = window_samples
+    else:
+        if not (0.0 <= window_overlap < 100.0):
+            raise ValueError("window_overlap must be in range [0, 100)")
+        step_samples = int(window_samples * (1 - window_overlap / 100.0))
+
+    # Pad data so the last incomplete window is filled with NaN
+    remainder = (len(data) - window_samples) % step_samples
+    if remainder != 0:
+        pad_size = step_samples - remainder
+        data = np.concatenate([data, np.full(pad_size, np.nan)])
+
+    n_windows = (len(data) - window_samples) // step_samples + 1
+
+    chunks = np.array(
+        [
+            data[i * step_samples : i * step_samples + window_samples]
+            for i in range(n_windows)
+        ],
+        dtype=float,
+    )
+
+    # Mask zeros (dead samples) and NaN (gaps + padding)
+    if mask_zero_value:
+        mask = (chunks == 0) | np.isnan(chunks)
+        return np.ma.MaskedArray(chunks, mask=mask)
+
+    return chunks

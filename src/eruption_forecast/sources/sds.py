@@ -3,6 +3,7 @@ from typing import Any
 from pathlib import Path
 from datetime import datetime
 
+import numpy as np
 from obspy import Trace, Stream, ObsPyReadingError, read
 
 from eruption_forecast.logger import logger
@@ -22,6 +23,7 @@ class SDS:
         channel (str): Channel code (e.g., "EHZ").
         network (str, optional): Network code. Defaults to "VG".
         location (str, optional): Location code. Defaults to "00".
+        interpolate (bool, optional): Interpolate missing data. Defaults to True.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
         debug (bool, optional): Enable debug logging. Defaults to False.
 
@@ -31,6 +33,7 @@ class SDS:
         channel (str): Channel code (uppercase).
         network (str): Network code (uppercase).
         location (str): Location code (uppercase).
+        interpolate (bool): Interpolate missing data. Defaults to True.
         nslc (str): Network.Station.Location.Channel identifier.
         files (list[dict[str, Any]]): Metadata of loaded files.
 
@@ -50,6 +53,7 @@ class SDS:
         channel: str,
         network: str = "VG",
         location: str = "00",
+        interpolate: bool = True,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -71,6 +75,7 @@ class SDS:
         self.channel = channel.upper()
         self.network = network.upper()
         self.location = location.upper()
+        self.interpolate = interpolate
         self.verbose = verbose
         self.debug = debug
 
@@ -81,15 +86,19 @@ class SDS:
             logger.info(f"SDS initialized: {self.nslc} from {self.sds_dir}")
 
     def save(self, stream: Stream, date: datetime) -> str | None:
-        """Save stream to SDS filepath.
+        """Save a seismic stream to its SDS filepath.
+
+        Constructs the SDS directory structure and writes the stream as a
+        miniSEED file. Returns None silently if the stream is empty or if an
+        OS error prevents writing.
 
         Args:
-            stream (Stream): Stream object to be saved.
-            date (datetime): Date for which to save SDS filepath.
+            stream (Stream): ObsPy Stream object to be saved.
+            date (datetime): Date for which to derive the SDS file path.
 
         Returns:
-            str | None: Absolute path to the SDS filepath. None if stream is empty or
-                there was en error when trying to save the SDS filepath.
+            str | None: Absolute path to the saved SDS file, or None if the stream
+                is empty or an error occurred while writing.
         """
 
         date_str = date.strftime("%Y-%m-%d")
@@ -174,10 +183,8 @@ class SDS:
             date_str (str): Date string (YYYY-MM-DD) for logging purposes.
 
         Returns:
-            Stream: ObsPy Stream object, or empty Stream if loading fails.
-
-        Raises:
-            None: Returns empty Stream on error instead of raising exceptions.
+            Stream: ObsPy Stream object with traces merged, or an empty Stream
+                if the file cannot be read.
         """
         try:
             # Read miniSEED file
@@ -192,7 +199,9 @@ class SDS:
             }
 
             # Merge traces if there are gaps (interpolate missing data)
-            stream = stream.merge(fill_value="interpolate")
+            stream = stream.merge(
+                fill_value="interpolate" if self.interpolate else np.nan
+            )
 
             # Track successfully loaded files
             self.files.append(file_metadata)
@@ -264,3 +273,26 @@ class SDS:
             )
 
         return stream
+
+    def get_trace(self, date: datetime) -> Trace | None:
+        """Get Trace object and data.
+
+        Args:
+            date (datetime): Date for which to retrieve data.
+
+        Returns:
+            Trace: Trace object, or empty Trace if unavailable.
+            np.ndarray: Array of trace data, or empty np.ndarray if unavailable.
+        """
+        stream = self.get(date)
+
+        if len(stream) == 0:
+            return None
+
+        if len(stream) > 1:
+            raise ValueError(
+                f"Stream has more than one traces ({len(stream)} trace(s)). "
+                f"SDS should handle only one trace (after merged)."
+            )
+
+        return stream[0]

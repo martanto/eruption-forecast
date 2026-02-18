@@ -33,7 +33,8 @@ def plot_tremor(
 
     Creates one subplot per column in the DataFrame (or per selected column),
     with Nature/Science journal formatting, colorblind-safe colors (Okabe-Ito palette),
-    and configurable x-axis tick interval. RSAM columns use blue tones, DSAR uses orange.
+    and configurable x-axis tick interval. RSAM columns use blue, DSAR uses orange,
+    and Shannon Entropy uses reddish purple; all other columns cycle through the palette.
 
     Args:
         df (pd.DataFrame): Tremor data with a DatetimeIndex and columns like
@@ -136,6 +137,8 @@ def plot_tremor(
                 color = OKABE_ITO[4]  # Blue
             elif "dsar" in column.lower():
                 color = OKABE_ITO[0]  # Orange
+            elif "entropy" in column.lower():
+                color = OKABE_ITO[6]  # Reddish purple
             else:
                 color = OKABE_ITO[index % len(OKABE_ITO)]
 
@@ -154,7 +157,15 @@ def plot_tremor(
             ax.legend(loc="upper left", frameon=False)
 
             # Add y-axis label with units
-            ylabel = "Amplitude (counts)" if "rsam" in column.lower() else "Ratio"
+            if "rsam" in column.lower():
+                ylabel = "Amp. (counts)"
+            elif "dsar" in column.lower():
+                ylabel = "Ratio"
+            elif "entropy" in column.lower():
+                ylabel = "Entropy"
+            else:
+                ylabel = "A.U."
+
             ax.set_ylabel(ylabel)
 
             # Configure x-axis
