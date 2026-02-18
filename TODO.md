@@ -47,7 +47,13 @@
 - [x] Add detailed evaluation metrics with export and plotting (ModelEvaluator class)
 - [x] Implement enhanced feature selection (tsfresh + RandomForest + combined)
 - [ ] Implement probability calibration (CalibratedClassifierCV)
-- [ ] Add StandardScaler to pipeline for SVM/KNN/NN
+- [ ] Add StandardScaler to pipeline for SVM/KNN/NN/LR (use `sklearn.pipeline.Pipeline` to prevent data leakage)
+- [ ] Fix `value_multiplier` ignored when `remove_outlier_method=None` in `window.py` (logic issue from REVIEW.md)
+- [ ] Fix `set_random_state()` not invalidating cached `_model` in `classifier_model.py` (logic issue from REVIEW.md)
+- [ ] Guard `shutil.rmtree` with `os.path.exists` check in `calculate_tremor.py` (logic issue from REVIEW.md)
+- [ ] Fix `source="sds"` with `sds_dir=None` silently skipping in `forecast_model.py` (logic issue from REVIEW.md)
+- [ ] Remove `sleep(3)` in `ForecastModel.train()` (quality issue from REVIEW.md)
+- [ ] Rename `shanon`→`shannon` throughout (breaking rename — defer to next major version)
 
 ## Low Priority
 
@@ -76,4 +82,4 @@
 - [x] Add l1_ratio parameter for elasticnet
 
 ### Naive Bayes
-- [ ] Expand var_smoothing grid to [1e-9, 1e-8, 1e-7, 1e-6]
+- [ ] Expand var_smoothing grid to [1e-9, 1e-8, 1e-7, 1e-6] (also fixes the no-op grid from REVIEW.md)

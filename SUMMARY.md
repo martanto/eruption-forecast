@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-19 (Shannon Entropy metric — docstring fixes, import cleanup, README update)
+**Last Updated:** 2026-02-19 (Full code review + 8 bug fixes)
 
 ## ⚠️ Important Notice
 
@@ -38,6 +38,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 23. [Codebase Review and Bug Fixes](#codebase-review-and-bug-fixes-2026-02-17)
 24. [Pipeline Configuration Saving and Loading](#pipeline-configuration-saving-and-loading-2026-02-17)
 25. [Shannon Entropy Metric — Docstring Fixes and README Update](#shannon-entropy-metric--docstring-fixes-and-readme-update-2026-02-19)
+26. [Full Code Review and Bug Fixes](#full-code-review-and-bug-fixes-2026-02-19)
 ---
 
 ## Package Overview
@@ -2521,3 +2522,36 @@ All private helper methods (`_calculate_from_sds`, `_calculate_from_fdsn`, `_adj
 - **Advanced Usage**: mirrored all Quick Start changes in the ForecastModel example
 - **Pipeline stages**: updated all "RSAM/DSAR" references to include Entropy
 - **Last Updated**: bumped to 2026-02-19; added Recent Updates entry
+
+---
+
+## Full Code Review and Bug Fixes (2026-02-19)
+
+**Branch:** `claude/fix-bugs`
+**Status:** Complete
+
+### Overview
+
+Performed a complete read-only audit of all 47 source files under `src/eruption_forecast/`. Findings written to `REVIEW.md`. Eight confirmed bugs were fixed.
+
+### Bugs Fixed
+
+| File | Issue | Fix |
+|---|---|---|
+| `utils/ml.py:432` | Early-exit in `compute_model_probabilities()` compared seed **value** to `number_of_seeds` count — broke with any seed > N | Replaced with loop counter `seed_count >= number_of_seeds` |
+| `utils/ml.py:435` | Shape comment `# (n_seeds, n_windows)` was transposed — `np.stack(..., axis=1)` gives `(n_windows, n_seeds)` | Corrected comment |
+| `tremor/dsar.py:133` | `value_multiplier > 1` silently ignored multipliers in (0, 1] (e.g. 0.5 to scale down) | Changed to `!= 1.0` |
+| `tremor/calculate_tremor.py:891` | Same `value_multiplier > 1` bug in `calculate_dsar()` | Changed to `!= 1.0` |
+| `model/model_trainer.py:408` | `classifier_dir` was built from the raw unresolved `output_dir` parameter instead of `self.output_dir` — produced wrong path for relative or `None` inputs | Changed to `self.output_dir` |
+| `model/model_predictor.py:300` | Inner loop reassigned `model_name` (the outer loop variable) to a seed-specific string — corrupted all subsequent uses of `model_name` in the outer loop body | Renamed inner variable to `seed_model_name` |
+| `features/tremor_matrix_builder.py:467` | `self.csv` never set when loading from the CSV cache — downstream code received `None` | Added `self.csv = tremor_matrix_csv` on cache hit |
+| `label/label_data.py:306,320` | `basename` and `filetype` used `split(".")` — gives wrong result for paths with multiple dots | Replaced with `os.path.splitext()` |
+| `features/features_builder.py:392-394` | `.index` assigned on a column slice — unsafe in pandas ≥ 3.0 (`SettingWithCopyWarning`) | Replaced with `pd.Series(values, index=...)` |
+
+### Additional Non-Bug Findings in REVIEW.md
+
+`REVIEW.md` documents all remaining findings:
+
+- **🟠 Logic Issues (7):** `value_multiplier` ignored when `remove_outlier_method=None`; `set_random_state()` not invalidating cached `_model`; `shutil.rmtree` before directory exists; `source="sds"` with `sds_dir=None` silently skips; transposed comment in `ml.py`; eruption labels re-applied on cache hit; sampling rate from first two rows only.
+- **🔵 Quality (8):** `sleep(3)` burning 25 min per 500-seed run; dead `if labels_df is None` check; commented-out code block; triple-redundant log message; no-op NB grid; `noqa: B904` suppressing exception chaining; broad `except Exception` in batch workers; `build_model_directories()` creating dirs as side effect.
+- **🟡 Docs (7):** Shannon/Shanon misspelling; dead `np.ndarray` line in `get_trace()` docstring; missing blank lines in `metrics_computer.py`; `_save_plot()` not Google style; `build_model_directories()` args without types; `# ty:ignore` missing space; logger comment/config mismatch.
