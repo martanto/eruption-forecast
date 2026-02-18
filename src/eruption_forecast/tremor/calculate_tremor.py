@@ -888,7 +888,7 @@ class CalculateTremor:
                 dsar_series = dsar_series.replace([np.inf, -np.inf], np.nan)
 
                 # Apply value multiplier if specified
-                if self.value_multiplier and self.value_multiplier > 1:
+                if self.value_multiplier and self.value_multiplier != 1.0:
                     dsar_series = dsar_series * self.value_multiplier
 
                 # Store in dataframe

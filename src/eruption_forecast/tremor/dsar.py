@@ -130,7 +130,7 @@ class DSAR:
         # Pandas handles division of Series with same index automatically
         series: pd.Series[float] = first_dsar / second_dsar
 
-        if value_multiplier > 1:
+        if value_multiplier != 1.0:
             series: pd.Series[float] = series.apply(lambda x: x * value_multiplier)
 
         if interpolate:

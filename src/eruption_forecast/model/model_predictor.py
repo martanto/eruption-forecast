@@ -297,25 +297,25 @@ class ModelPredictor:
             for random_state, row in df_models.iterrows():
                 significant_features_csv: str = row["significant_features_csv"]
                 model_filepath: str = row["trained_model_filepath"]
-                model_name = f"{model_name}_seed_{random_state:05d}"
+                seed_model_name = f"{model_name}_seed_{random_state:05d}"
 
                 df_sig = pd.read_csv(significant_features_csv, index_col=0)
                 feature_names: list[str] = df_sig.index.tolist()
 
-                seed_output_dir = os.path.join(model_output_dir, model_name)
+                seed_output_dir = os.path.join(model_output_dir, seed_model_name)
 
                 evaluator = ModelEvaluator.from_files(
                     model_path=model_filepath,
                     X_test=features_df,
                     y_test=labels_df,
                     selected_features=feature_names,
-                    model_name=model_name,
+                    model_name=seed_model_name,
                     output_dir=seed_output_dir if plot else model_output_dir,
                 )
 
                 metrics = evaluator.get_metrics()
                 assert isinstance(metrics, dict)
-                metrics["classifier"] = model_name
+                metrics["classifier"] = seed_model_name
                 metrics["random_state"] = random_state
                 all_metrics.append(metrics)
                 evaluators.append(evaluator)
