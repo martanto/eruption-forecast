@@ -377,7 +377,7 @@ class CalculateTremor:
         """
         # Example: tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31
         return (
-            f"tremor_{self._filename}"
+            f"tremor_interpolated_{self._filename}"
             if self.filename_prefix is None
             else f"{self.filename_prefix}_{self._filename}"
         )
@@ -633,11 +633,15 @@ class CalculateTremor:
         # Merge calculated tremor CSV files from daily dir
         df = self.concat_tremor_data(self.daily_dir, self.tremor_dir)
 
-        # Handle missing data to all columns
-        df = df.interpolate(method="polynomial", order=2, limit_direction="both")
-
         start_date = df.index[0].strftime("%Y-%m-%d")
         end_date = df.index[-1].strftime("%Y-%m-%d")
+
+        # Save non-interpolated dataframe
+        non_interpolated_filename = (
+            f"tremor_non-interpolated_{self.nslc}_{start_date}-{end_date}.csv"
+        )
+        csv_non_interpolated = os.path.join(self.tremor_dir, non_interpolated_filename)
+        df.to_csv(csv_non_interpolated, index=True)
 
         # Update filename with latest datetime index from df.
         # Set _filename directly (not via the property setter) to avoid the
@@ -645,9 +649,11 @@ class CalculateTremor:
         self._filename = f"{self.nslc}_{start_date}-{end_date}.csv"
         csv = os.path.join(self.tremor_dir, self.filename)
 
+        # Handle missing data to all columns
+        df = df.interpolate(method="time", limit_direction="both")
         df.to_csv(csv, index=True)
 
-        logger.info(f"Tremor data saved to {csv}")
+        logger.info(f"Interpolated tremor data saved to {csv}")
 
         if self.save_plot:
             plot_tremor(
@@ -874,7 +880,7 @@ class CalculateTremor:
             )
 
             # Interpolate missing values
-            current_series = current_series.interpolate(method="linear")
+            # current_series = current_series.interpolate(method="time")
 
             # Free filtered stream immediately to reduce memory footprint
             del filtered_stream
@@ -959,7 +965,7 @@ class CalculateTremor:
                 .calculate(
                     value_multiplier=self.value_multiplier or 1.0,
                     remove_outlier_method=self.remove_outlier_method,
-                    interpolate=True,
+                    interpolate=False,
                 )
                 .to_numpy()
             )
@@ -1008,6 +1014,7 @@ class CalculateTremor:
             )
             .calculate(
                 remove_outlier_method=self.remove_outlier_method,
+                interpolate=False,
             )
             .to_numpy()
         )

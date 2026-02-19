@@ -156,7 +156,7 @@ class RSAM:
         # No need to apply it again here
 
         if interpolate:
-            series = series.interpolate(method="linear")
+            series = series.interpolate(method="time")
 
         self.series = series
 
