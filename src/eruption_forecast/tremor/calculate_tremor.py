@@ -723,9 +723,7 @@ class CalculateTremor:
 
         # Remove anomalies and interpolate NaN values
         if self.remove_tremor_anomalies:
-            df = remove_anomalies(
-                df, interpolate=True, threshold=300, inplace=False, debug=self.debug
-            )
+            df = remove_anomalies(df, threshold=300, inplace=False, debug=self.debug)
 
         # Save daily tremor data
         df.to_csv(daily_file, index=True, index_label="datetime")
