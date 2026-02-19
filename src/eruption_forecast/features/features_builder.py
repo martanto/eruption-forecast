@@ -389,12 +389,13 @@ class FeaturesBuilder:
         # Extract features
         if use_relevant_features and not y.empty:
             # Prepare target labels: Series with window ID as index
-            y_index = y[ID_COLUMN]
-            y = y[ERUPTED_COLUMN]
-            y.index = y_index
+            y_series = pd.Series(
+                y[ERUPTED_COLUMN].values,
+                index=y[ID_COLUMN].values,
+            )
 
             # Extract Relevant Features
-            extracted_features = extract_relevant_features(df, y, **extract_params)
+            extracted_features = extract_relevant_features(df, y_series, **extract_params)
         else:
             extracted_features = tsfresh_extract_features(
                 df,

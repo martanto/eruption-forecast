@@ -127,6 +127,6 @@ class ShanonEntropy:
         )
 
         if interpolate:
-            series = series.interpolate(method="linear")
+            series = series.interpolate(method="time")
 
         return series

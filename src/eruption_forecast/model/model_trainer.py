@@ -406,7 +406,7 @@ class ModelTrainer:
 
         # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
         self.classifier_dir = os.path.join(
-            output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
+            self.output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
         )
 
         # Classifier training model dir: ``<classifier_dir>/models``

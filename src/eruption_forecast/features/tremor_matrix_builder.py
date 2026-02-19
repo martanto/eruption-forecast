@@ -465,6 +465,7 @@ class TremorMatrixBuilder:
             if verbose:
                 logger.info(f"Tremor matrix {tremor_matrix_csv} already exists.")
             self.df = pd.read_csv(tremor_matrix_csv)
+            self.csv = tremor_matrix_csv
             return self
 
         if verbose:

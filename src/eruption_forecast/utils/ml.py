@@ -408,7 +408,7 @@ def compute_model_probabilities(
     """
     seed_eruption_probabilities: list[np.ndarray] = []
 
-    for random_state, row in df_models.iterrows():
+    for seed_count, (random_state, row) in enumerate(df_models.iterrows(), start=1):
         random_state_int = int(cast(int, random_state))
         significant_features_csv: str = row[features_csv_column]
         model_filepath: str = row[trained_model_filepath_column]
@@ -429,12 +429,12 @@ def compute_model_probabilities(
             f"mean P(eruption): {probabilities_eruption.mean():.4f}"
         )
 
-        if number_of_seeds is not None and random_state_int > number_of_seeds:
+        if number_of_seeds is not None and seed_count >= number_of_seeds:
             break
 
     probabilities_eruption_matrix = np.stack(
         seed_eruption_probabilities, axis=1
-    )  # (n_seeds, n_windows)
+    )  # (n_windows, n_seeds)
 
     mean_probability: np.ndarray = probabilities_eruption_matrix.mean(axis=1)
     std_proba: np.ndarray = probabilities_eruption_matrix.std(axis=1)

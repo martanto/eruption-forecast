@@ -303,7 +303,7 @@ class LabelData:
             >>> label_data.basename
             'label_2020-01-01_2020-12-31_step-12-hours_dtf-2'
         """
-        return self.filename.split(".")[0]
+        return os.path.splitext(self.filename)[0]
 
     @cached_property
     def filetype(self) -> str:
@@ -317,7 +317,7 @@ class LabelData:
             >>> label_data.filetype
             'csv'
         """
-        return self.filename.split(".")[1]
+        return os.path.splitext(self.filename)[1].lstrip(".")
 
     @cached_property
     def parameters(self) -> dict[str, str | datetime | int]:
