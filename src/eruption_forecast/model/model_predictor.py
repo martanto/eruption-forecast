@@ -777,11 +777,12 @@ class ModelPredictor:
 
         df_forecast = pd.DataFrame(cols, index=features_df.index)
 
-        csv_path = os.path.join(
-            self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
-        )
-        df_forecast.to_csv(csv_path)
-        logger.info(f"Predictions saved to: {csv_path}")
+        if save_predictions:
+            csv_path = os.path.join(
+                self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
+            )
+            df_forecast.to_csv(csv_path)
+            logger.info(f"Predictions saved to: {csv_path}")
 
         self._log_forecast_summary(df_forecast, model_mean_probabilities)
 
