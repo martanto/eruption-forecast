@@ -6,8 +6,35 @@ and filtering all outliers from numpy arrays.
 """
 
 import numpy as np
+from numpy.typing import NDArray
 
 from eruption_forecast.logger import logger
+
+
+def detect_anomalies_zscore(data: np.ndarray, threshold=3.5) -> NDArray[np.bool_]:
+    """Detect anomalies using z-score method.
+
+    Args:
+        data (np.ndarray): Array of numerical data.
+        threshold (float, optional): Z-score threshold. Defaults to 3.5.
+
+    Returns
+    """
+    # Compute on non-NaN values only
+    valid = data[~np.isnan(data)]
+    median = np.median(valid)
+
+    # Median Absolute Deviation
+    mad = np.median(np.abs(valid - median))
+    if mad == 0:
+        return np.zeros(len(data), dtype=bool)
+
+    # 0.6745 quantile of the standard normal distribution
+    modified_z_score = 0.6745 * (data - median) / mad
+
+    # NaN inputs stay NaN in modified_z, so exclude them from flagging
+    anomalies = np.abs(modified_z_score) > threshold
+    return anomalies
 
 
 def mask_zero_values(data: np.ndarray) -> np.ndarray:
@@ -166,7 +193,7 @@ def remove_maximum_outlier(
 
 def remove_outliers(
     data: np.ndarray,
-    outlier_threshold: float = 3.0,
+    outlier_threshold: float = 3.5,
     mask_zero_value: bool = True,
     return_outliers: bool = False,
 ) -> np.ndarray:
@@ -179,7 +206,7 @@ def remove_outliers(
     Args:
         data (np.ndarray): Input array of numerical data.
         outlier_threshold (float, optional): Z-score threshold in standard deviations.
-            Defaults to 3.0 (3σ).
+            Defaults to 3.5 (3σ).
         mask_zero_value (bool, optional): If True, remove zero values before processing.
             Defaults to True.
         return_outliers (bool, optional): If True, return outliers instead of filtered data.
@@ -206,9 +233,6 @@ def remove_outliers(
 
     if outlier_threshold <= 0:
         raise ValueError("Outlier threshold must be positive")
-
-    # Make a copy to avoid modifying the original
-    data = data.copy()
 
     # Optionally mask zero values
     if mask_zero_value:

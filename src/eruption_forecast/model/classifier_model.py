@@ -40,6 +40,7 @@ class ClassifierModel:
         - lr: Logistic Regression (with balanced class weights)
         - xgb: XGBoost classifier (excellent for imbalanced data)
         - voting: Ensemble VotingClassifier combining rf and xgb
+        - lite-rf: Random Forest but faster with more simple grid parameters
 
     Attributes:
         classifier (str): Classifier type identifier ("svm", "knn", "dt", etc.).
@@ -55,7 +56,7 @@ class ClassifierModel:
         _grid: Internal cached hyperparameter grid.
 
     Args:
-        classifier (Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"]):
+        classifier (Literal[ "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"]):
             Classifier type identifier.
         random_state (int | None, optional): Random seed for reproducibility. Applies to
             classifiers that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
@@ -106,7 +107,7 @@ class ClassifierModel:
     def __init__(
         self,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ],
         random_state: int | None = None,
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
@@ -364,6 +365,16 @@ class ClassifierModel:
                 "xgb__max_depth": [5, 7],
             }
 
+        if self.classifier == "lite-rf" or isinstance(
+            self._model, RandomForestClassifier
+        ):
+            return {
+                "n_estimators": [10, 30, 100],
+                "max_depth": [3, 5, 7],
+                "criterion": ["gini", "entropy"],
+                "max_features": ["sqrt", "log2", None],
+            }
+
         raise ValueError(f"Unknown classifier: {self.classifier}")
 
     @grid.setter
@@ -441,7 +452,7 @@ class ClassifierModel:
                 class_weight=_cw, random_state=self.random_state
             )
 
-        if self.classifier == "rf":
+        if self.classifier == "rf" or self.classifier == "lite-rf":
             return RandomForestClassifier(
                 class_weight=_cw,
                 random_state=self.random_state,
@@ -543,7 +554,10 @@ class ClassifierModel:
             >>> clf.name
             'RandomForestClassifier'
         """
-        return type(self.model).__name__
+        class_type = type(self.model).__name__
+        if self.classifier == "lite-rf":
+            return f"Lite{class_type}"
+        return class_type
 
     @property
     def model_and_grid(self) -> tuple:

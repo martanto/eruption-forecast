@@ -1,5 +1,5 @@
 import os
-from typing import Any, Literal
+from typing import Any, Self, Literal
 
 import numpy as np
 import joblib
@@ -136,7 +136,7 @@ class ModelEvaluator:
         selected_features: list[str] | None = None,
         model_name: str = "model",
         output_dir: str | None = None,
-    ) -> "ModelEvaluator":
+    ) -> Self:
         """Load model and data from files and construct a ModelEvaluator.
 
         Convenience factory method to load a saved model and test data from
@@ -205,7 +205,6 @@ class ModelEvaluator:
             fig.savefig(path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved: {path}")
 
-
     def _get_proba(self) -> np.ndarray | None:
         """Retrieve predicted probabilities or decision scores for the test set.
 
@@ -269,14 +268,19 @@ class ModelEvaluator:
         # Delegate to MetricsComputer if available
         if self._metrics_computer is not None:
             computed_metrics = self._metrics_computer.compute_all_metrics()
-            metrics: dict[str, Any] = {**computed_metrics, "model_name": self.model_name}
+            metrics: dict[str, Any] = {
+                **computed_metrics,
+                "model_name": self.model_name,
+            }
         else:
             # Fallback for models without probabilities
             metrics: dict[str, Any] = {
                 "model_name": self.model_name,
                 "accuracy": accuracy_score(self.y_test, self._y_pred),
                 "balanced_accuracy": balanced_accuracy_score(self.y_test, self._y_pred),
-                "precision": precision_score(self.y_test, self._y_pred, zero_division=0),
+                "precision": precision_score(
+                    self.y_test, self._y_pred, zero_division=0
+                ),
                 "recall": recall_score(self.y_test, self._y_pred, zero_division=0),
                 "f1_score": f1_score(self.y_test, self._y_pred, zero_division=0),
                 "roc_auc": np.nan,
@@ -384,7 +388,9 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(fig, save, filename, f"{self.model_name}_confusion_matrix.png", dpi)
+        self._save_plot(
+            fig, save, filename, f"{self.model_name}_confusion_matrix.png", dpi
+        )
 
         return fig
 

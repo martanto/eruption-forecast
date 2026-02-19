@@ -91,7 +91,7 @@ class ModelTrainer:
             ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         prefix_filename (str | None, optional): Prefix for output filenames.
             Defaults to None.
-        classifier (Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"], optional):
+        classifier (Literal[ "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"], optional):
             Classifier type. Defaults to "rf".
         cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
             Cross-validation strategy. Defaults to "shuffle".
@@ -162,7 +162,7 @@ class ModelTrainer:
         root_dir: str | None = None,
         prefix_filename: str | None = None,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         cv_splits: int = DEFAULT_CV_SPLITS,
@@ -862,6 +862,13 @@ class ModelTrainer:
         # ========== STEP 5: Evaluate on Test Set ==========
         labels_pred = best_model.predict(features_test_selected)
 
+        # ========== STEP 6: Save Outputs ==========
+        # Save model
+        joblib.dump(best_model, model_filepath)
+
+        if self.verbose:
+            logger.info(f"{random_state:05d}: Model at {model_filepath}")
+
         # Get and save metrics
         metrics = get_metrics(
             classifier_model=clf,
@@ -874,13 +881,8 @@ class ModelTrainer:
             metrics_filepath=metrics_filepath,
         )
 
-        # ========== STEP 6: Save Outputs ==========
-        # Save model
-        joblib.dump(best_model, model_filepath)
-
         if self.verbose:
-            logger.info(f"Model {random_state:05d}: {model_filepath}")
-            logger.info(f"Metrics {random_state:05d}: {metrics_filepath}")
+            logger.info(f"{random_state:05d}: Metrics at {metrics_filepath}")
             logger.info(
                 f"Seed {random_state:05d} - Test Balanced Accuracy: {metrics['balanced_accuracy']:.4f}"
             )
@@ -921,6 +923,7 @@ class ModelTrainer:
             ... )
         """
         self.create_directories()
+        os.makedirs(self.metrics_dir, exist_ok=True)
 
         if save_all_features:
             os.makedirs(self.all_features_dir, exist_ok=True)
