@@ -362,6 +362,7 @@ class ForecastModel:
         plot_daily: bool,
         save_plot: bool,
         overwrite_plot: bool,
+        remove_tremor_anomalies: bool = False,
         n_jobs: int | None = None,
         verbose: bool = False,
         debug: bool = False,
@@ -381,6 +382,8 @@ class ForecastModel:
             plot_daily (bool): Whether to plot daily results.
             save_plot (bool): Whether to save plots to disk.
             overwrite_plot (bool): Whether to overwrite existing plots.
+            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calciulated.
+                Using Z-score analysis to determine the anomalies. Defaults to False.
             n_jobs (int | None, optional): Number of jobs to run in parallel.
                 Isolated to this method only. If None, uses ``self.n_jobs``.
                 Defaults to None.
@@ -420,6 +423,7 @@ class ForecastModel:
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
+            remove_tremor_anomalies=remove_tremor_anomalies,
             interpolate=interpolate,
             value_multiplier=value_multiplier,
             cleanup_daily_dir=cleanup_daily_dir,
@@ -725,6 +729,7 @@ class ForecastModel:
         methods: list[str] | None = None,
         filename_prefix: str | None = None,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
+        remove_tremor_anomalies: bool = False,
         interpolate: bool = True,
         value_multiplier: float | None = None,
         cleanup_daily_dir: bool = False,
@@ -750,6 +755,8 @@ class ForecastModel:
             filename_prefix (str | None): Prefix for generated filenames. Defaults to None.
             remove_outlier_method (Literal["all", "maximum"]): Outlier removal method.
                 Defaults to "maximum".
+            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calciulated.
+                Using Z-score analysis to determine the anomalies. Defaults to False.
             interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
             value_multiplier (float | None): Scaling factor for seismic values. Defaults to None.
             cleanup_daily_dir (bool): If True, deletes the daily directory after merging.
@@ -775,6 +782,7 @@ class ForecastModel:
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
+            remove_tremor_anomalies=remove_tremor_anomalies,
             interpolate=interpolate,
             value_multiplier=value_multiplier,
             cleanup_daily_dir=cleanup_daily_dir,
@@ -789,14 +797,12 @@ class ForecastModel:
         self.CalculateTremor = calculate
 
         # Calculate from appropriate source
-        if source == "sds":
+        if source == "sds" and sds_dir is not None:
             calculate = self._calculate_from_sds(calculate, sds_dir)
         elif source == "fdsn":
             calculate = self._calculate_from_fdsn(calculate, client_url)
         else:
-            raise ValueError(
-                f"Unknown source '{source}'. Choose 'sds' or 'fdsn'."
-            )
+            raise ValueError(f"Unknown source '{source}'. Choose 'sds' or 'fdsn'.")
 
         # Wrap calculated data
         tremor_data = TremorData(calculate.df)
@@ -1050,7 +1056,7 @@ class ForecastModel:
     def train(
         self,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         random_state: int = 0,
@@ -1081,6 +1087,7 @@ class ForecastModel:
             - lr: Logistic Regression (with balanced class weights)
             - xgb: XGBoost classifier (excellent for imbalanced data)
             - voting: Ensemble VotingClassifier combining rf and xgb
+            - lite-rf: Random Forest but faster with more simple grid parameters
 
         Args:
             classifier (str, optional): Classifier type ("svm", "knn", "dt", "rf", "gb",

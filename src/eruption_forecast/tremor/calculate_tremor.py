@@ -16,6 +16,7 @@ from eruption_forecast.sources.sds import SDS
 from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
+from eruption_forecast.utils.dataframe import remove_anomalies
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
@@ -91,6 +92,8 @@ class CalculateTremor:
         remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
             "maximum" removes only the single maximum outlier; "all" removes all outliers.
             Defaults to "maximum".
+        remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calciulated.
+            Using Z-score analysis to determine the anomalies. Defaults to False.
         interpolate (bool): If True, interpolates gaps in the data. Defaults to False.
         value_multiplier (float | None): Scaling factor applied to seismic values.
             Defaults to None (no scaling).
@@ -133,6 +136,7 @@ class CalculateTremor:
         root_dir: str | None = None,
         overwrite: bool = False,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
+        remove_tremor_anomalies: bool = False,
         interpolate: bool = False,
         value_multiplier: float | None = None,
         cleanup_daily_dir: bool = False,
@@ -212,6 +216,7 @@ class CalculateTremor:
         self.daily_dir: str = os.path.join(tremor_dir, "daily")
         self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
         self.csv = os.path.join(tremor_dir, self.filename)
+        self.remove_tremor_anomalies: bool = remove_tremor_anomalies
 
         # ------------------------------------------------------------------
         # Will be set after from_sds() called
@@ -716,12 +721,12 @@ class CalculateTremor:
         if df.empty:
             return None
 
-        # save tremor data
-        df.to_csv(
-            daily_file,
-            index=True,
-            index_label="datetime",
-        )
+        # Remove anomalies and interpolate NaN values
+        if self.remove_tremor_anomalies:
+            df = remove_anomalies(df, threshold=300, inplace=False, debug=self.debug)
+
+        # Save daily tremor data
+        df.to_csv(daily_file, index=True, index_label="datetime")
 
         # plot tremor data
         if self.plot_daily:

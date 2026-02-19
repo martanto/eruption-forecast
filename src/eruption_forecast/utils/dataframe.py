@@ -5,7 +5,69 @@ validation, sampling consistency checks, series conversion, and feature
 concatenation for tsfresh processing.
 """
 
+import numpy as np
 import pandas as pd
+
+from eruption_forecast.logger import logger
+from eruption_forecast.utils.array import detect_anomalies_zscore
+
+
+def remove_anomalies(
+    df: pd.DataFrame,
+    columns: list[str] | None = None,
+    interpolate: bool = False,
+    threshold=3.5,
+    inplace: bool = False,
+    debug: bool = False,
+) -> pd.DataFrame:
+    """Remove anomalies from a DataFrame.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list[str] | None): List of column names needs to be checked.
+        interpolate (bool, optional): Interpolate dataframe after anomalies removal. Defaults to False.
+        threshold (float, optional): Threshold for anomalies. Defaults to 3.5 std.
+        inplace (bool, optional): Inplace current dataframe. Defaults to False.
+        debug (bool, optional): Debug mode. Defaults to False.
+
+    Returns:
+        pd.DataFrame: DataFrame with anomalies removed.
+    """
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("Dataframe index should be a DatetimeIndex")
+
+    if threshold <= 0:
+        raise ValueError("Threshold should be a positive number")
+
+    _df = df if inplace else df.copy()
+    total_data = _df.shape[0]
+
+    df_columns = _df.columns.tolist()
+    columns = columns or df_columns
+
+    for column in columns:
+        if column not in df_columns:
+            raise ValueError(
+                f"Column `{column}` not in dataframe columns: {df_columns}"
+            )
+
+    for column in columns:
+        anomalies = detect_anomalies_zscore(_df[column].values, threshold=threshold)
+        anomalies_removed = anomalies.sum()
+        percentage_removed = anomalies_removed / total_data * 100
+
+        # Replace anomalies with NaN
+        _df.loc[anomalies, column] = np.nan
+
+        if debug:
+            logger.info(
+                f"Column {column}: Removed {anomalies_removed} ({percentage_removed:.2f}%) anomalie(s)"
+            )
+
+        # Interpolate
+        if interpolate:
+            _df[column] = _df[column].interpolate(method="time")
+    return _df
 
 
 def to_series(
@@ -130,13 +192,13 @@ def check_sampling_consistency(
         sampling_rate = (df.index[1] - df.index[0]).seconds
 
     if verbose:
-        print(f"Total rows: {len(df)}")
-        print(f"Inconsistent rows found: {len(inconsistent_data)}")
-        print(f"Consistent rows: {len(consistent_data)}")
+        logger.info(f"Total rows: {len(df)}")
+        logger.info(f"Inconsistent rows found: {len(inconsistent_data)}")
+        logger.info(f"Consistent rows: {len(consistent_data)}")
 
         if len(inconsistent_data) > 0:
-            print("\nInconsistent time differences:")
-            print(time_diffs[inconsistent_mask].describe())
+            logger.warning("\nInconsistent time differences:")
+            logger.warning(time_diffs[inconsistent_mask].describe())
 
     return is_consistent, consistent_data, inconsistent_data, sampling_rate
 

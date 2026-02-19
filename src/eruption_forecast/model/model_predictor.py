@@ -234,7 +234,7 @@ class ModelPredictor:
         self.df: pd.DataFrame | None = None
 
         if verbose:
-            print(f"Models registered: {len(self.trained_models)}")
+            logger.info(f"Models registered: {len(self.trained_models)}")
 
     @property
     def model_names(self) -> list[str]:

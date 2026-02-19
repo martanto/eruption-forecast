@@ -218,7 +218,7 @@ class FeatureSelector:
 
         if self.verbose:
             logger.info(
-                f"{self.random_state:05d} Features reduced: {X.shape[1]} → {self.n_features_tsfresh} "
+                f"{self.random_state:05d}: Features reduced: {X.shape[1]} → {self.n_features_tsfresh} "
                 f"(FDR={fdr_level})"
             )
 
@@ -326,7 +326,7 @@ class FeatureSelector:
 
         if self.verbose:
             logger.info(
-                f"{self.random_state:05d} Features reduced: {X.shape[1]} → {X_selected.shape[1]} features"
+                f"{self.random_state:05d}: Features reduced: {X.shape[1]} → {X_selected.shape[1]} features"
             )
 
         return X_selected, importance_scores
