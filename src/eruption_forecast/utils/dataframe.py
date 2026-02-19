@@ -192,13 +192,13 @@ def check_sampling_consistency(
         sampling_rate = (df.index[1] - df.index[0]).seconds
 
     if verbose:
-        print(f"Total rows: {len(df)}")
-        print(f"Inconsistent rows found: {len(inconsistent_data)}")
-        print(f"Consistent rows: {len(consistent_data)}")
+        logger.info(f"Total rows: {len(df)}")
+        logger.info(f"Inconsistent rows found: {len(inconsistent_data)}")
+        logger.info(f"Consistent rows: {len(consistent_data)}")
 
         if len(inconsistent_data) > 0:
-            print("\nInconsistent time differences:")
-            print(time_diffs[inconsistent_mask].describe())
+            logger.warning("\nInconsistent time differences:")
+            logger.warning(time_diffs[inconsistent_mask].describe())
 
     return is_consistent, consistent_data, inconsistent_data, sampling_rate
 
