@@ -91,7 +91,7 @@ class ModelTrainer:
             ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
         prefix_filename (str | None, optional): Prefix for output filenames.
             Defaults to None.
-        classifier (Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"], optional):
+        classifier (Literal[ "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"], optional):
             Classifier type. Defaults to "rf".
         cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
             Cross-validation strategy. Defaults to "shuffle".
@@ -162,7 +162,7 @@ class ModelTrainer:
         root_dir: str | None = None,
         prefix_filename: str | None = None,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
+             "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         cv_splits: int = DEFAULT_CV_SPLITS,

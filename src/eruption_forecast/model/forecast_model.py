@@ -1056,7 +1056,7 @@ class ForecastModel:
     def train(
         self,
         classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting"
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         random_state: int = 0,
@@ -1087,6 +1087,7 @@ class ForecastModel:
             - lr: Logistic Regression (with balanced class weights)
             - xgb: XGBoost classifier (excellent for imbalanced data)
             - voting: Ensemble VotingClassifier combining rf and xgb
+            - lite-rf: Random Forest but faster with more simple grid parameters
 
         Args:
             classifier (str, optional): Classifier type ("svm", "knn", "dt", "rf", "gb",
