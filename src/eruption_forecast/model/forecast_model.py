@@ -651,6 +651,12 @@ class ForecastModel:
             >>> model = ForecastModel(...)
             >>> model.validate()  # Called automatically in __init__
         """
+        # Validate window size
+        if self.window_size <= 0:
+            raise ValueError(
+                f"window_size must be greater than 0. Got: {self.window_size}"
+            )
+
         # Validate date ranges
         validate_date_ranges(self.start_date, self.end_date)
 
@@ -783,10 +789,14 @@ class ForecastModel:
         self.CalculateTremor = calculate
 
         # Calculate from appropriate source
-        if source == "sds" and sds_dir:
+        if source == "sds":
             calculate = self._calculate_from_sds(calculate, sds_dir)
         elif source == "fdsn":
             calculate = self._calculate_from_fdsn(calculate, client_url)
+        else:
+            raise ValueError(
+                f"Unknown source '{source}'. Choose 'sds' or 'fdsn'."
+            )
 
         # Wrap calculated data
         tremor_data = TremorData(calculate.df)

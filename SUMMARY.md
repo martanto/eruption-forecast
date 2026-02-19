@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-19 (Full code review + 8 bug fixes)
+**Last Updated:** 2026-02-19 (Architecture review + 4 additional bug fixes)
 
 ## ⚠️ Important Notice
 
@@ -39,6 +39,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 24. [Pipeline Configuration Saving and Loading](#pipeline-configuration-saving-and-loading-2026-02-17)
 25. [Shannon Entropy Metric — Docstring Fixes and README Update](#shannon-entropy-metric--docstring-fixes-and-readme-update-2026-02-19)
 26. [Full Code Review and Bug Fixes](#full-code-review-and-bug-fixes-2026-02-19)
+27. [Architecture Review and Additional Bug Fixes](#architecture-review-and-additional-bug-fixes-2026-02-19)
 ---
 
 ## Package Overview
@@ -2555,3 +2556,29 @@ Performed a complete read-only audit of all 47 source files under `src/eruption_
 - **🟠 Logic Issues (7):** `value_multiplier` ignored when `remove_outlier_method=None`; `set_random_state()` not invalidating cached `_model`; `shutil.rmtree` before directory exists; `source="sds"` with `sds_dir=None` silently skips; transposed comment in `ml.py`; eruption labels re-applied on cache hit; sampling rate from first two rows only.
 - **🔵 Quality (8):** `sleep(3)` burning 25 min per 500-seed run; dead `if labels_df is None` check; commented-out code block; triple-redundant log message; no-op NB grid; `noqa: B904` suppressing exception chaining; broad `except Exception` in batch workers; `build_model_directories()` creating dirs as side effect.
 - **🟡 Docs (7):** Shannon/Shanon misspelling; dead `np.ndarray` line in `get_trace()` docstring; missing blank lines in `metrics_computer.py`; `_save_plot()` not Google style; `build_model_directories()` args without types; `# ty:ignore` missing space; logger comment/config mismatch.
+
+---
+
+## Architecture Review and Additional Bug Fixes (2026-02-19)
+
+**Branch:** `claude/fix-bugs`
+**Status:** Complete
+
+### Overview
+
+Conducted a second full architecture review of all 47 source files. Identified 20 findings across four severity tiers. Fixed the 4 confirmed bugs; design, quality, and docs issues left for future work.
+
+### Bugs Fixed
+
+| File | Issue | Fix |
+|---|---|---|
+| `tremor/calculate_tremor.py` — `run()` | `self.filename = filename` triggered the property setter, which prepended `"tremor_"` again → double prefix `"tremor_tremor_VG.OJN.00.EHZ_..."` | Bypass the setter: assign `self._filename` directly with the plain `{nslc}_{start}-{end}.csv` value |
+| `model/forecast_model.py` — `validate()` | Docstring stated `window_size > 0` was enforced, but no such check existed — callers could pass 0 or negative values silently | Added `if self.window_size <= 0: raise ValueError(...)` at the top of `validate()` |
+| `model/forecast_model.py` — `calculate()` | `if source == "sds" and sds_dir:` — when `sds_dir=None` the condition was `False` so neither branch ran; `tremor_data` stayed `None` silently | Changed to `if source == "sds":` (letting `_calculate_from_sds` raise its own `ValueError` for missing `sds_dir`) and added an `else: raise ValueError(...)` for unknown sources |
+| `model/model_predictor.py` — `predict_proba()` | The aggregated `result_all_model_predictions_*.csv` was always written regardless of the `save_predictions` flag | Wrapped `df_forecast.to_csv(...)` and the log line with `if save_predictions:` |
+
+### Remaining Findings (not fixed this session)
+
+- **🟠 Design (7):** `ForecastModel` god-class (1 700 lines); `pipeline_config.py` god-dataclass; no `__all__` in public modules; `validate()` called only from `__init__`; `ModelPredictor` init does file I/O; `sleep(3)` in training loop; `ForecastModel.run()` undocumented replay semantics.
+- **🔵 Quality (6):** `calculate_tremor.py` `filename` property leaks internal `_filename`; `TremorData` and `LabelData` `cached_property` not invalidated on reload; `ClassifierModel` `_build_grid` hardcodes `None` grid for NB; broad `except Exception` in batch workers; `FeatureSelector` `combined` method duplicates tsfresh call; `ModelEvaluator.from_files()` re-reads CSV on every call.
+- **🟡 Docs / Minor (7):** `window_size` validation docstring was stale (now fixed by Bug 2); `source` parameter in `calculate()` missing valid values; `_calculate_from_sds` / `_calculate_from_fdsn` not in public API docs; several single-sentence docstrings missing description paragraphs; comment style inconsistencies in `model_predictor.py`.
