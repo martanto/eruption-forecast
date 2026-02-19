@@ -639,9 +639,11 @@ class CalculateTremor:
         start_date = df.index[0].strftime("%Y-%m-%d")
         end_date = df.index[-1].strftime("%Y-%m-%d")
 
-        # Update filename with latest datetime index from df
-        filename = f"tremor_{self.nslc}_{start_date}-{end_date}"
-        csv = os.path.join(self.tremor_dir, f"{filename}.csv")
+        # Update filename with latest datetime index from df.
+        # Set _filename directly (not via the property setter) to avoid the
+        # property re-adding the "tremor_" prefix and producing a double prefix.
+        self._filename = f"{self.nslc}_{start_date}-{end_date}.csv"
+        csv = os.path.join(self.tremor_dir, self.filename)
 
         df.to_csv(csv, index=True)
 
@@ -653,14 +655,13 @@ class CalculateTremor:
                 interval=14,
                 interval_unit="days",
                 figure_dir=self.tremor_dir,
-                filename=filename,
+                filename=self.filename,
                 title=self.nslc,
                 overwrite=self.overwrite or self.overwrite_plot,
                 verbose=self.verbose,
             )
 
         self.df = df
-        self.filename = filename
         self.csv = csv
 
         return self
