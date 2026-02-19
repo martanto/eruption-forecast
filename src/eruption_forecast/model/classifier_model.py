@@ -554,7 +554,10 @@ class ClassifierModel:
             >>> clf.name
             'RandomForestClassifier'
         """
-        return type(self.model).__name__
+        class_type = type(self.model).__name__
+        if self.classifier == "lite-rf":
+            return f"Lite{class_type}"
+        return class_type
 
     @property
     def model_and_grid(self) -> tuple:
