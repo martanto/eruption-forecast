@@ -789,14 +789,12 @@ class ForecastModel:
         self.CalculateTremor = calculate
 
         # Calculate from appropriate source
-        if source == "sds":
+        if source == "sds" and sds_dir is not None:
             calculate = self._calculate_from_sds(calculate, sds_dir)
         elif source == "fdsn":
             calculate = self._calculate_from_fdsn(calculate, client_url)
         else:
-            raise ValueError(
-                f"Unknown source '{source}'. Choose 'sds' or 'fdsn'."
-            )
+            raise ValueError(f"Unknown source '{source}'. Choose 'sds' or 'fdsn'.")
 
         # Wrap calculated data
         tremor_data = TremorData(calculate.df)
