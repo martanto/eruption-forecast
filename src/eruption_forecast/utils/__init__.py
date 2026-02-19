@@ -8,4 +8,5 @@ This package contains focused utility modules:
 - ml: Machine learning utilities
 - pathutils: File path operations
 - formatting: Text formatting utilities
+- aggregate: Aggregate metric computation for multi-seed model evaluation
 """
