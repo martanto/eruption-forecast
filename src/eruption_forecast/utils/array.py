@@ -254,6 +254,7 @@ def chunk_daily_data(
     window_min: int = 10,
     window_overlap: float | None = None,
     mask_zero_value: bool = True,
+    debug: bool = False,
 ) -> np.ndarray | np.ma.MaskedArray:
     """Chunk a daily time series into fixed-size windows.
 
@@ -272,6 +273,7 @@ def chunk_daily_data(
         mask_zero_value (bool, optional): If True, mask zero and NaN samples.
             Zeros in seismic data typically indicate dead or missing samples.
             Defaults to True.
+        debug (bool, optional): Debug mode. Defaults to False.
 
     Returns:
         np.ndarray | np.ma.MaskedArray: Array of shape (n_windows, samples_per_window).
@@ -282,6 +284,7 @@ def chunk_daily_data(
         ValueError: If ``window_overlap`` is not in range [0, 100).
     """
     window_samples = int(sampling_rate * 60 * window_min)
+    samples_per_day = 24 * 60 * 60 * sampling_rate
 
     if window_overlap is None:
         step_samples = window_samples
@@ -290,13 +293,16 @@ def chunk_daily_data(
             raise ValueError("window_overlap must be in range [0, 100)")
         step_samples = int(window_samples * (1 - window_overlap / 100.0))
 
-    # Pad data so the last incomplete window is filled with NaN
-    remainder = (len(data) - window_samples) % step_samples
-    if remainder != 0:
-        pad_size = step_samples - remainder
-        data = np.concatenate([data, np.full(pad_size, np.nan)])
+    n_windows = (int(samples_per_day) - window_samples) // step_samples + 1
 
-    n_windows = (len(data) - window_samples) // step_samples + 1
+    # Pad data so the last incomplete window is filled with NaN
+    difference_samples = int(samples_per_day) - len(data)
+    if difference_samples != 0:
+        data = np.concatenate([data, np.full(difference_samples, np.nan)])
+
+    if debug:
+        if len(data) != 144:
+            raise ValueError(f"n_windows should be 144, but got {len(data)}")
 
     chunks = np.array(
         [
