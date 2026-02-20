@@ -9,7 +9,7 @@ import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import get_metrics, random_under_sampler
+from eruption_forecast.utils.ml import random_under_sampler
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
@@ -25,6 +25,7 @@ from eruption_forecast.features.constants import (
 from eruption_forecast.plots.feature_plots import (
     plot_significant_features as _plot_significant_features,
 )
+from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
 
@@ -73,7 +74,7 @@ class ModelTrainer:
         models_dir (str): Directory for saved model files.
         metrics_dir (str): Directory for metrics JSON files.
         tests_dir (str): Directory for per-seed held-out test splits (X_test/y_test CSVs).
-        plots_dir (str): Directory for aggregate evaluation figures and data CSVs.
+        figures_dir (str): Directory for aggregate evaluation figures and data CSVs.
         significant_features_csvs (list[str]): Paths to per-seed significant features.
         df_significant_features (pd.DataFrame): Aggregated significant features across seeds.
         df (pd.DataFrame): Model registry DataFrame.
@@ -226,7 +227,7 @@ class ModelTrainer:
         tests_dir = os.path.join(classifier_dir, "tests")
 
         # Aggregate plots and data dir: ``<classifier_dir>/plots``
-        plots_dir = os.path.join(classifier_dir, "plots")
+        figures_dir = os.path.join(classifier_dir, "figures")
 
         # Filtered features dir: ``<classifier_dir>/features``
         features_dir = os.path.join(classifier_dir, "features")
@@ -252,7 +253,7 @@ class ModelTrainer:
         self.classifier = classifier
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
-        self.number_of_significant_features = number_of_significant_features
+        self.number_of_significant_features: int = number_of_significant_features
         self.feature_selection_method = feature_selection_method
         self.overwrite = overwrite
         self.verbose = verbose
@@ -274,7 +275,7 @@ class ModelTrainer:
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir
         self.tests_dir = tests_dir
-        self.plots_dir = plots_dir
+        self.figures_dir = figures_dir
 
         # ------------------------------------------------------------------
         # Will be set after train_and_evaluate() method called
@@ -429,7 +430,7 @@ class ModelTrainer:
         self.tests_dir = os.path.join(self.classifier_dir, "tests")
 
         # Aggregate plots and data dir: ``<classifier_dir>/plots``
-        self.plots_dir = os.path.join(self.classifier_dir, "plots")
+        self.figures_dir = os.path.join(self.classifier_dir, "plots")
 
         # Filtered features dir: ``<classifier_dir>/features``
         self.features_dir = os.path.join(self.classifier_dir, "features")
@@ -494,7 +495,7 @@ class ModelTrainer:
         os.makedirs(self.significant_features_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
         os.makedirs(self.tests_dir, exist_ok=True)
-        os.makedirs(self.plots_dir, exist_ok=True)
+        os.makedirs(self.figures_dir, exist_ok=True)
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
@@ -577,6 +578,7 @@ class ModelTrainer:
 
         return df
 
+    @logger.catch(level="ERROR")
     def select_features(
         self,
         features: pd.DataFrame,
@@ -585,7 +587,7 @@ class ModelTrainer:
         random_state: int = 42,
         all_features_filepath: str | None = None,
         all_figures_filepath: str | None = None,
-    ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    ) -> tuple[pd.DataFrame, pd.Series, pd.Series, int]:
         """Select the most predictive features from a resampled training set.
 
         Uses tsfresh statistical significance testing with FDR control
@@ -600,21 +602,31 @@ class ModelTrainer:
             all_figures_filepath (str, optional): Save path for all features figures.
 
         Returns:
-            tuple[pd.DataFrame, pd.Series, pd.Series]: Selected features dataframe,
-                all selected features, top (n) features
+            tuple[pd.DataFrame, pd.Series, pd.Series, int]: Selected features dataframe,
+                top (n) features, all selected features, (n) features
         """
         selector = self.FeatureSelector.set_random_state(random_state)
+        number_of_significant_features = self.number_of_significant_features
 
         # Reduced features/columns
         df_selected_features = selector.fit_transform(
-            features, labels, top_n=self.number_of_significant_features
+            features, labels, top_n=number_of_significant_features
         )
 
         # Series indexed by feature name; values are p-values sorted by significance.
         all_selected_features = selector.selected_features_
 
+        # Handle if columns in df_selected_features has less than number_of_significant_features
+        len_features_columns = len(df_selected_features.columns)
+        if len_features_columns < number_of_significant_features:
+            logger.warning(
+                f"{random_state:05d}: Number of features after extracted ({len_features_columns}) "
+                f"are less than {number_of_significant_features} features."
+            )
+            number_of_significant_features = len_features_columns
+
         top_selected_features = all_selected_features.head(
-            self.number_of_significant_features
+            number_of_significant_features
         )
 
         # Save TOP-N significant features
@@ -629,18 +641,26 @@ class ModelTrainer:
                         all_selected_features
                     ).reset_index(),
                     all_figures_filepath=all_figures_filepath,
+                    top_features=number_of_significant_features,
                 )
 
-        return df_selected_features, all_selected_features, top_selected_features
+        return (
+            df_selected_features,
+            top_selected_features,
+            all_selected_features,
+            number_of_significant_features,
+        )
 
     def _plot_all_significant_features(
         self,
         all_selected_features: pd.DataFrame,
         all_figures_filepath: str,
+        top_features: int | None = None,
     ):
         _plot_significant_features(
             df=all_selected_features,
             filepath=all_figures_filepath,
+            top_features=top_features or self.number_of_significant_features,
             overwrite=self.overwrite,
             dpi=150,
         )
@@ -878,8 +898,9 @@ class ModelTrainer:
         # ========== STEP 3: Feature Selection ONLY on Training Data ==========
         (
             features_train_resampled_selected,
-            selected_features,
             top_selected_features,
+            _selected_features,
+            _n_features,
         ) = self.select_features(
             features=features_train_resampled,
             labels=labels_train_resampled,
@@ -911,16 +932,30 @@ class ModelTrainer:
             logger.info(f"{random_state:05d}: Model at {model_filepath}")
 
         # Get and save metrics
-        metrics = get_metrics(
-            classifier_model=clf,
-            labels_test=labels_test,
-            labels_pred=labels_pred,
-            labels_train=labels_train_resampled,
-            top_n=len(top_n_features),
-            grid_search=grid_search,
-            random_state=random_state,
-            metrics_filepath=metrics_filepath,
+        model_evaluator = ModelEvaluator(
+            model=grid_search,
+            X_test=features_test_selected,
+            y_test=labels_test,
+            model_name=self.classifier_name,
+            output_dir=self.classifier_dir,
+            selected_features=top_n_features,
         )
+
+        grid_params = grid_search.best_params_
+        with open(metrics_filepath, "w") as f:
+            metrics = model_evaluator.get_metrics()
+            metrics.update(
+                {
+                    "cv_strategy": clf.cv_strategy,
+                    "random_state": random_state,
+                    "best_params_criterion": grid_params["criterion"],
+                    "best_params_max_depth": grid_params["max_depth"],
+                    "best_params_max_features": grid_params["max_features"],
+                    "best_params_n_estimators": grid_params["n_estimators"],
+                    "best_cv_score": grid_search.best_score_,
+                }
+            )
+            json.dump(metrics, f, indent=4)
 
         if self.verbose:
             logger.info(f"{random_state:05d}: Metrics at {metrics_filepath}")
@@ -1101,8 +1136,9 @@ class ModelTrainer:
         # ========== STEP 2: Feature Selection on Resampled Data ==========
         (
             features_resampled_selected,
-            _selected_features,
             top_selected_features,
+            _selected_features,
+            _n_features,
         ) = self.select_features(
             features=features_resampled,
             labels=labels_resampled,
