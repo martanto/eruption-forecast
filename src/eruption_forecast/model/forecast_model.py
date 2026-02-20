@@ -1,5 +1,4 @@
 import os
-from time import sleep
 from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
@@ -1132,9 +1131,6 @@ class ForecastModel:
             if not with_evaluation:
                 print("|- Training model only. No evaluation.")
             print("=" * 50)
-
-        # Give a chance to show message
-        sleep(3)
 
         features_csv = extracted_features_csv or self.features_csv
 

@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Any, Self, Literal
 
 import numpy as np
@@ -709,6 +710,44 @@ class ModelEvaluator:
         )
 
         return fig
+
+    def save_metrics(self, path: str | None = None) -> str:
+        """Serialize evaluation metrics to a JSON file.
+
+        Computes metrics via ``get_metrics()`` and writes them to disk as JSON.
+        NaN values are serialized as JSON ``null``.
+
+        Args:
+            path (str | None, optional): Destination file path. If None,
+                defaults to ``{output_dir}/{model_name}_metrics.json``.
+                Defaults to None.
+
+        Returns:
+            str: Absolute path to the saved JSON file.
+
+        Examples:
+            >>> saved_path = evaluator.save_metrics()
+            >>> saved_path = evaluator.save_metrics(path="results/my_metrics.json")
+        """
+        if path is None:
+            path = os.path.join(self.output_dir, f"{self.model_name}_metrics.json")
+
+        metrics = self.get_metrics()
+
+        def _convert(v: Any) -> Any:
+            if isinstance(v, float) and np.isnan(v):
+                return None
+            if isinstance(v, (np.integer,)):
+                return int(v)
+            if isinstance(v, (np.floating,)):
+                return float(v)
+            return v
+
+        serializable = {k: _convert(v) for k, v in metrics.items()}
+        with open(path, "w") as f:
+            json.dump(serializable, f, indent=2)
+        logger.info(f"Saved metrics: {path}")
+        return path
 
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
         """Generate and save all evaluation plots.
