@@ -22,7 +22,8 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 7. **Always use `tests` directory when running testing.** Create the tests output inside `tests` directory.
 8. **Do not commit temporary test files.** Files starting with `test` in the root directory (e.g., `test_*.py`, `test.py`) should not be committed. These are temporary test scripts and are excluded via `.gitignore`.
 9. **All module imports must be at the top of the file.** Never place `import` statements inside functions, methods, or conditional blocks. All stdlib, third-party, and local imports belong at the module level, grouped and sorted by ruff.
-10. **No Claude signatures in markdown files.** Remove any `Co-Authored-By: Claude`, `🤖 Generated with [Claude Code]`, `Author: Claude Code`, or similar Claude attribution lines from all `.md` files. Use the GitHub username `martanto` wherever an author attribution is needed.
+11. **Run circular import test after every module change.** After adding, removing, or reorganising any module or import, run `uv run pytest tests/test_imports.py -v` to confirm no circular imports were introduced.
+10. **Always use `martanto` for author contributions.** Use the GitHub username `martanto` for all author attributions in any file.
 
 ## Testing
 
