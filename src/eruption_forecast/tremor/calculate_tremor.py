@@ -746,21 +746,51 @@ class CalculateTremor:
 
         return daily_file
 
+    def _expected_columns(self) -> list[str]:
+        """Build the list of column names that calculate() would produce.
+
+        Derives column names from the configured methods and frequency band aliases,
+        mirroring the exact structure produced by a successful calculate() call.
+        Used to construct NaN-filled placeholder DataFrames when no seismic data
+        is available for a given day.
+
+        Returns:
+            list[str]: Ordered list of column names. RSAM columns appear first
+                (``rsam_f0``, ``rsam_f1``, …), followed by DSAR columns
+                (``dsar_f0-f1``, …), and finally ``entropy`` when enabled.
+        """
+        columns: list[str] = []
+        aliases = list(self.freq_bands_alias.keys())
+
+        for method in self.methods:
+            if method == "rsam":
+                columns.extend([f"rsam_{b}" for b in aliases])
+            elif method == "dsar" and len(aliases) >= 2:
+                columns.extend(
+                    [f"dsar_{aliases[i]}-{aliases[i + 1]}" for i in range(len(aliases) - 1)]
+                )
+            elif method == "entropy":
+                columns.append("entropy")
+
+        return columns
+
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor metrics for a single day.
 
         Computes each enabled method (RSAM, DSAR, Shannon Entropy) for the specified
-        date across all configured frequency bands. Returns an empty DataFrame if no
-        seismic data is available for that day.
+        date across all configured frequency bands. Returns a 144-row NaN-filled
+        DataFrame (one row per 10-minute interval) when no seismic data is available,
+        preserving the expected column structure for downstream processing.
 
         Args:
             date (datetime): Date to process.
 
         Returns:
-            pd.DataFrame: Tremor DataFrame with DatetimeIndex (10-minute intervals)
-                and columns for each enabled method: RSAM (``rsam_f0``, ``rsam_f1``, …),
-                DSAR (``dsar_f0-f1``, …), and Shannon Entropy (``entropy``).
-                Returns an empty DataFrame if no seismic data is available.
+            pd.DataFrame: Tremor DataFrame with DatetimeIndex (10-minute intervals,
+                144 rows per day) and columns for each enabled method: RSAM
+                (``rsam_f0``, ``rsam_f1``, …), DSAR (``dsar_f0-f1``, …), and
+                Shannon Entropy (``entropy``). When no seismic data is available,
+                all values are NaN but the shape and columns are preserved.
 
         Examples:
             >>> from datetime import datetime
@@ -771,10 +801,17 @@ class CalculateTremor:
         """
         stream = self.get_stream(date)
 
-        # Return empty dataframe if stream is empty
-        # (no traces found or miniseed file not exists)
+        # Return NaN-filled DataFrame with correct shape when no data is available.
+        # Using 144 rows guarantees consistent shape for downstream processing.
         if len(stream) == 0:
-            return pd.DataFrame()
+            datetime_index = pd.date_range(
+                start=date,
+                end=date + timedelta(days=1),
+                freq="10min",
+                inclusive="left",
+            )
+            columns = self._expected_columns()
+            return pd.DataFrame(index=datetime_index, columns=columns, dtype=float)
 
         date_str = date.strftime("%Y-%m-%d")
 
@@ -1077,3 +1114,211 @@ class CalculateTremor:
         )
 
         return df.sort_index()
+
+    def update(
+        self,
+        new_end_date: str | datetime,
+        existing_csv: str | None = None,
+    ) -> Self:
+        """Extend an existing tremor CSV with new data up to new_end_date.
+
+        Determines the gap between the last timestamp in the existing CSV and
+        ``new_end_date``, calculates tremor for each day in the gap, appends
+        the new rows to the existing DataFrame, and writes a new merged CSV.
+        Only complete days (full 24-hour periods within the gap) are saved as
+        daily CSV files; partial boundary days are processed but not saved.
+
+        The gap is measured in 10-minute intervals. A complete day must have its
+        full 24-hour window contained within the gap. Every complete day produces
+        exactly 144 rows (NaN-filled when seismic data is missing). No data
+        leakage occurs because only rows strictly within the gap are appended.
+
+        Args:
+            new_end_date (str | datetime): New end datetime for the extended
+                tremor CSV. Must be later than the last timestamp in the
+                existing file.
+            existing_csv (str | None): Path to the existing tremor CSV to extend.
+                If None, falls back to ``self.csv``. Defaults to None.
+
+        Returns:
+            Self: The CalculateTremor instance with updated ``df``, ``csv``, and
+                ``_filename`` attributes reflecting the extended date range.
+
+        Raises:
+            FileNotFoundError: If ``existing_csv`` does not exist and ``self.csv``
+                is not a valid file.
+
+        Examples:
+            >>> tremor = CalculateTremor(
+            ...     start_date="2025-03-16",
+            ...     end_date="2025-03-18",
+            ...     station="OJN",
+            ...     channel="EHZ",
+            ... ).from_sds("/data/sds").run()
+            >>> tremor.update("2025-03-22")
+            >>> print(tremor.df.index[-1])
+        """
+        # ------------------------------------------------------------------
+        # 1. Resolve existing CSV path
+        # ------------------------------------------------------------------
+        csv_path = existing_csv if existing_csv is not None else self.csv
+        if not os.path.isfile(csv_path):
+            raise FileNotFoundError(f"Existing tremor CSV not found: {csv_path}")
+
+        # ------------------------------------------------------------------
+        # 2. Load existing DataFrame
+        # ------------------------------------------------------------------
+        existing_df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+
+        # ------------------------------------------------------------------
+        # 3. Determine gap period
+        # ------------------------------------------------------------------
+        gap_start: datetime = existing_df.index[-1].to_pydatetime() + timedelta(minutes=10)
+        gap_end: datetime = to_datetime(new_end_date)
+
+        if gap_start > gap_end:
+            logger.info("Tremor data is already up to date.")
+            return self
+
+        logger.info(
+            f"Updating tremor from {gap_start.strftime('%Y-%m-%dT%H:%M')} "
+            f"to {gap_end.strftime('%Y-%m-%dT%H:%M')}"
+        )
+
+        # ------------------------------------------------------------------
+        # 4. Build per-day processing list
+        # ------------------------------------------------------------------
+        gap_days = pd.date_range(
+            start=gap_start.replace(hour=0, minute=0, second=0, microsecond=0),
+            end=gap_end.replace(hour=0, minute=0, second=0, microsecond=0),
+            freq="D",
+        )
+
+        accumulated: list[pd.DataFrame] = []
+
+        def _process_day(date: datetime) -> pd.DataFrame | None:
+            """Calculate tremor for one day, filter to gap, save if complete."""
+            day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1) - timedelta(minutes=10)
+
+            # Determine if this is a complete day within the gap
+            is_complete = day_start >= gap_start and day_end <= gap_end
+
+            day_df = self.calculate(date)
+
+            if self.remove_tremor_anomalies:
+                day_df = remove_anomalies(day_df, threshold=300, inplace=False, debug=self.debug)
+
+            # Filter to only rows within the gap
+            day_df = day_df[
+                (day_df.index >= gap_start) & (day_df.index <= gap_end)
+            ]
+
+            if day_df.empty:
+                return None
+
+            # Save daily CSV only for complete days
+            if is_complete:
+                date_str = date.strftime("%Y-%m-%d")
+                daily_file = os.path.join(self.daily_dir, f"{date_str}.csv")
+                if self.overwrite or not os.path.exists(daily_file):
+                    day_df.to_csv(daily_file, index=True, index_label="datetime")
+                    if self.verbose:
+                        logger.info(f"{date_str} :: Daily CSV saved to {daily_file}")
+
+            return day_df
+
+        # ------------------------------------------------------------------
+        # 5. Process each day
+        # ------------------------------------------------------------------
+        if self.n_jobs > 1:
+            # Identify complete vs partial days for parallel vs sequential handling
+            complete_days = [
+                d for d in gap_days
+                if d.replace(hour=0, minute=0, second=0, microsecond=0) >= gap_start
+                and d.replace(hour=23, minute=50, second=0, microsecond=0) <= gap_end
+            ]
+            partial_days = [d for d in gap_days if d not in complete_days]
+
+            if complete_days:
+                # Enumerate with dummy job index for Pool.starmap compatibility
+                jobs = [(i, d) for i, d in enumerate(complete_days)]
+
+                def _pool_job(job_index: int, date: datetime) -> pd.DataFrame | None:
+                    """Wrap _process_day for Pool.starmap."""
+                    return _process_day(date)
+
+                with Pool(self.n_jobs) as pool:
+                    results = pool.starmap(_pool_job, jobs)
+                    accumulated.extend([r for r in results if r is not None])
+
+            for d in partial_days:
+                result = _process_day(d)
+                if result is not None:
+                    accumulated.append(result)
+        else:
+            for d in gap_days:
+                result = _process_day(d)
+                if result is not None:
+                    accumulated.append(result)
+
+        # ------------------------------------------------------------------
+        # 6. Skip if no new rows
+        # ------------------------------------------------------------------
+        if not accumulated:
+            logger.warning("No new tremor rows produced during update. Returning unchanged.")
+            return self
+
+        # ------------------------------------------------------------------
+        # 7. Merge with existing DataFrame
+        # ------------------------------------------------------------------
+        new_df = pd.concat(accumulated).sort_index()
+        merged = pd.concat([existing_df, new_df])
+        merged = merged[~merged.index.duplicated(keep="last")]
+        merged = merged.sort_index()
+
+        # ------------------------------------------------------------------
+        # 8. Determine merged date range for new filename
+        # ------------------------------------------------------------------
+        start_date = merged.index[0].strftime("%Y-%m-%d")
+        end_date = merged.index[-1].strftime("%Y-%m-%d")
+
+        # ------------------------------------------------------------------
+        # 9. Save non-interpolated version
+        # ------------------------------------------------------------------
+        non_interpolated_filename = (
+            f"tremor_non-interpolated_{self.nslc}_{start_date}-{end_date}.csv"
+        )
+        csv_non_interpolated = os.path.join(self.tremor_dir, non_interpolated_filename)
+        merged.to_csv(csv_non_interpolated, index=True)
+        logger.info(f"Non-interpolated tremor saved to {csv_non_interpolated}")
+
+        # ------------------------------------------------------------------
+        # 10. Interpolate and save final CSV
+        # ------------------------------------------------------------------
+        merged = merged.interpolate(method="time", limit_direction="both")
+
+        self._filename = f"{self.nslc}_{start_date}-{end_date}.csv"
+        csv = os.path.join(self.tremor_dir, self.filename)
+        merged.to_csv(csv, index=True)
+        logger.info(f"Interpolated tremor data saved to {csv}")
+
+        self.df = merged
+        self.csv = csv
+
+        # ------------------------------------------------------------------
+        # 11. Optionally plot
+        # ------------------------------------------------------------------
+        if self.save_plot:
+            plot_tremor(
+                df=merged,
+                interval=14,
+                interval_unit="days",
+                figure_dir=self.tremor_dir,
+                filename=self.filename,
+                title=self.nslc,
+                overwrite=self.overwrite or self.overwrite_plot,
+                verbose=self.verbose,
+            )
+
+        return self

@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-20 (ModelEvaluator refactor + MultiModelEvaluator)
+**Last Updated:** 2026-02-20 (Add CalculateTremor.update() + fix calculate() NaN fallback)
 
 ## ⚠️ Important Notice
 
@@ -45,6 +45,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 30. [Decouple Aggregate Evaluation Code from ModelEvaluator](#decouple-aggregate-evaluation-code-from-modelevaluator-2026-02-20)
 31. [4 New Visualization Features](#4-new-visualization-features-2026-02-20)
 31. [ModelEvaluator Refactor + MultiModelEvaluator](#modelevaluator-refactor--multimodelevaluator-2026-02-20)
+32. [CalculateTremor.update() + Fix calculate() NaN Fallback](#calculatetremorUpdate--fix-calculate-nan-fallback-2026-02-20)
 ---
 
 ## Package Overview
@@ -2784,3 +2785,38 @@ Separated the aggregate evaluation logic out of `model_evaluator.py` (which was 
 - Exported `plot_classifier_comparison`, `plot_seed_stability`, `plot_frequency_band_contribution`, `plot_shap_summary`, `plot_aggregate_shap_summary`
 
 **`pyproject.toml`** — added `shap>=0.46` dependency
+
+---
+
+## 32. CalculateTremor.update() + Fix calculate() NaN Fallback (2026-02-20)
+
+**Branch:** `claude/update-calculate-tremor`
+
+### Changed
+
+**`src/eruption_forecast/tremor/calculate_tremor.py`**
+
+- **`_expected_columns()` (new private method):** Derives the ordered list of column
+  names that `calculate()` would produce for the current `methods` and `freq_bands_alias`
+  configuration. Used to build NaN placeholder DataFrames with identical structure to
+  real results.
+
+- **`calculate()` fix:** Replaced `return pd.DataFrame()` (0 rows, no columns) when
+  `len(stream) == 0` with a 144-row NaN-filled DataFrame built from `_expected_columns()`.
+  The new return has a proper DatetimeIndex (10-min intervals for the full day) and
+  `dtype=float`, guaranteeing consistent shape and columns for downstream processing.
+  Updated docstring to reflect the new behaviour.
+
+- **`update()` (new method):** Extends an existing tremor CSV with new data up to
+  `new_end_date`. Key behaviour:
+  - Resolves the gap from `existing_df.index[-1] + 10 min` to `new_end_date`.
+  - Logs "Tremor data is already up to date" and returns early when gap is empty.
+  - Processes each calendar day in the gap via `calculate(date)`, filters rows to the
+    gap window, and applies `remove_anomalies()` when enabled.
+  - Saves daily CSVs only for complete days (full 24-hour windows within the gap).
+  - Supports `n_jobs > 1` via `Pool.starmap` for complete days; partial days run
+    sequentially.
+  - Merges new rows with existing DataFrame, deduplicates by index (keep=last), and
+    saves both a non-interpolated and an interpolated CSV with updated filenames.
+  - Updates `self._filename`, `self.csv`, and `self.df` to reflect the merged range.
+  - Optionally calls `plot_tremor()` when `self.save_plot` is True.
