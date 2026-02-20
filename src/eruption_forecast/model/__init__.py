@@ -12,6 +12,13 @@ Classes:
     ForecastModel: Orchestrates the complete forecasting pipeline.
 """
 
+try:
+    from sklearnex import patch_sklearn
+
+    patch_sklearn()
+except ImportError:
+    pass
+
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
