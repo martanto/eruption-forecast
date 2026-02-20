@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-20 (ModelEvaluator refactor + MultiModelEvaluator)
+**Last Updated:** 2026-02-20 (Refactor CalculateTremor.update() to @classmethod)
 
 ## ⚠️ Important Notice
 
@@ -45,6 +45,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 30. [Decouple Aggregate Evaluation Code from ModelEvaluator](#decouple-aggregate-evaluation-code-from-modelevaluator-2026-02-20)
 31. [4 New Visualization Features](#4-new-visualization-features-2026-02-20)
 31. [ModelEvaluator Refactor + MultiModelEvaluator](#modelevaluator-refactor--multimodelevaluator-2026-02-20)
+32. [CalculateTremor.update() + Fix calculate() NaN Fallback](#calculatetremorUpdate--fix-calculate-nan-fallback-2026-02-20)
 ---
 
 ## Package Overview
@@ -1119,7 +1120,7 @@ Updated all ModelPredictor examples in README.md:
 > **Note:** The HTTP API layer has been moved to a separate project (`eruption-forecast-api`) and is maintained independently. This document covers the core `eruption-forecast` package only.
 
 **Document Version:** 3.6
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-20 (Refactor CalculateTremor.update() to @classmethod)
 **Author:** martanto
 
 
@@ -2527,7 +2528,7 @@ All private helper methods (`_calculate_from_sds`, `_calculate_from_fdsn`, `_adj
 - **Quick Start**: added `methods=["rsam", "dsar", "entropy"]` to `calculate()`; added `"entropy"` to `select_tremor_columns`
 - **Advanced Usage**: mirrored all Quick Start changes in the ForecastModel example
 - **Pipeline stages**: updated all "RSAM/DSAR" references to include Entropy
-- **Last Updated**: bumped to 2026-02-19; added Recent Updates entry
+- **Last Updated:** 2026-02-20 (Refactor CalculateTremor.update() to @classmethod)
 
 ---
 
@@ -2634,7 +2635,7 @@ Extended the training and evaluation pipeline so that per-seed held-out test dat
 - Added `tests/` and `plots/` directories to the output directory structure diagram (plots/ lists all 7 PNG+CSV pairs)
 - Extended the evaluation_plots import block with 7 aggregate function names
 - Updated "Available Plot Types" section to list both single-seed and aggregate plot methods
-- Bumped `Last Updated` to 2026-02-20 and added two changelog entries
+- Bumped `Last Updated:** 2026-02-20 (Refactor CalculateTremor.update() to @classmethod)
 
 ---
 
@@ -2784,3 +2785,50 @@ Separated the aggregate evaluation logic out of `model_evaluator.py` (which was 
 - Exported `plot_classifier_comparison`, `plot_seed_stability`, `plot_frequency_band_contribution`, `plot_shap_summary`, `plot_aggregate_shap_summary`
 
 **`pyproject.toml`** — added `shap>=0.46` dependency
+
+---
+
+## 32. CalculateTremor.update() + Fix calculate() NaN Fallback (2026-02-20)
+
+**Branch:** `claude/update-calculate-tremor`
+
+### Changed
+
+**`src/eruption_forecast/tremor/calculate_tremor.py`**
+
+- **`_expected_columns()` (new private method):** Derives the ordered list of column
+  names that `calculate()` would produce for the current `methods` and `freq_bands_alias`
+  configuration. Used to build NaN placeholder DataFrames with identical structure to
+  real results.
+
+- **`calculate()` fix:** Replaced `return pd.DataFrame()` (0 rows, no columns) when
+  `len(stream) == 0` with a 144-row NaN-filled DataFrame built from `_expected_columns()`.
+  The new return has a proper DatetimeIndex (10-min intervals for the full day) and
+  `dtype=float`, guaranteeing consistent shape and columns for downstream processing.
+  Updated docstring to reflect the new behaviour.
+
+- **`update()` (new method):** Extends an existing tremor CSV with new data up to
+  `new_end_date`. Key behaviour:
+  - Resolves the gap from `existing_df.index[-1] + 10 min` to `new_end_date`.
+  - Logs "Tremor data is already up to date" and returns early when gap is empty.
+  - Processes each calendar day in the gap via `calculate(date)`, filters rows to the
+    gap window, and applies `remove_anomalies()` when enabled.
+  - Saves daily CSVs only for complete days (full 24-hour windows within the gap).
+  - Supports `n_jobs > 1` via `Pool.starmap` for complete days; partial days run
+    sequentially.
+  - Merges new rows with existing DataFrame, deduplicates by index (keep=last), and
+    saves both a non-interpolated and an interpolated CSV with updated filenames.
+  - Updates `self._filename`, `self.csv`, and `self.df` to reflect the merged range.
+  - Optionally calls `plot_tremor()` when `self.save_plot` is True.
+
+### Refactored (2026-02-20 follow-up)
+
+- **`update()` converted to `@classmethod`:** No `CalculateTremor` instance is
+  required to call it. The caller provides `existing_csv`, `new_end_date`, and
+  station/source parameters directly. `output_dir` is derived automatically from
+  the CSV path (3 levels up) when not supplied. An internal instance is constructed
+  for the gap period only — eliminating the confusing requirement to pass meaningless
+  `start_date`/`end_date` arguments.
+- **`_update_process_day()` (new instance method):** Extracted from the former closure
+  inside `update()` so it is a proper bound method and picklable by `Pool.starmap`
+  for parallel execution.
