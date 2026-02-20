@@ -43,6 +43,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 28. [Aggregate Evaluation Plots Across All Seeds](#aggregate-evaluation-plots-across-all-seeds-2026-02-20)
 29. [Aggregate Metric Computation Utility Functions](#aggregate-metric-computation-utility-functions-2026-02-20)
 30. [Decouple Aggregate Evaluation Code from ModelEvaluator](#decouple-aggregate-evaluation-code-from-modelevaluator-2026-02-20)
+31. [4 New Visualization Features](#4-new-visualization-features-2026-02-20)
 31. [ModelEvaluator Refactor + MultiModelEvaluator](#modelevaluator-refactor--multimodelevaluator-2026-02-20)
 ---
 
@@ -2749,3 +2750,37 @@ Separated the aggregate evaluation logic out of `model_evaluator.py` (which was 
 
 **`src/eruption_forecast/__init__.py`**
 - Added `ModelEvaluator`, `MultiModelEvaluator` to top-level exports
+
+---
+
+## 31. 4 New Visualization Features (2026-02-20)
+
+**Branch:** `dev/visualization`
+
+### Added
+
+**`src/eruption_forecast/plots/shap_plots.py`** (new)
+- `plot_shap_summary(model, X, feature_names, max_display, title, dpi)` — SHAP beeswarm dot plot for a single model; auto-selects TreeExplainer/LinearExplainer
+- `plot_aggregate_shap_summary(models, X_tests, feature_names, ...)` — horizontal bar chart of mean |SHAP| ± std across seeds; returns `(fig, df)` with `feature/mean_shap/std_shap`
+
+**`src/eruption_forecast/plots/evaluation_plots.py`**
+- `plot_classifier_comparison(metrics_by_classifier, metrics_to_show, ...)` — viridis heatmap comparing mean ± std of metrics across classifiers; rows sorted by mean F1; returns `(fig, summary_df)` with MultiIndex `(classifier, metric)`
+- `plot_seed_stability(metrics_by_classifier, metric, ...)` — violin + strip plot of a metric across seeds per classifier; sorted by median; mean marked with white horizontal line; returns `(fig, long_df)`
+
+**`src/eruption_forecast/plots/feature_plots.py`**
+- `plot_frequency_band_contribution(feature_names, ...)` — horizontal bar chart of feature counts grouped by seismic band prefix (`rsam_f*`=blue, `dsar_f*-f*`=orange); supports single-seed (list[str]) and multi-seed (list[list[str]]) with mean ± std; returns `(fig, df)`
+
+**`src/eruption_forecast/model/model_evaluator.py`**
+- `plot_shap_summary(max_display, save, filename, dpi)` — delegates to `plot_shap_summary()` from `shap_plots.py`; added to `plot_all()` output dict
+
+**`src/eruption_forecast/model/multi_model_evaluator.py`**
+- `get_metrics_list()` — loads per-seed JSON metrics as `list[dict]` (raw, no aggregation)
+- `plot_shap_summary(max_display, save, filename, dpi)` — aggregate SHAP bar chart across all registry seeds
+- `plot_seed_stability(metric, save, filename, dpi)` — single-classifier seed stability violin using JSON metrics
+- `plot_frequency_band_contribution(save, filename, dpi)` — reads significant_features_csv per seed, plots band contribution with mean ± std
+- `plot_all()` — updated to include `shap_summary`, `seed_stability`, `frequency_band_contribution`
+
+**`src/eruption_forecast/plots/__init__.py`**
+- Exported `plot_classifier_comparison`, `plot_seed_stability`, `plot_frequency_band_contribution`, `plot_shap_summary`, `plot_aggregate_shap_summary`
+
+**`pyproject.toml`** — added `shap>=0.46` dependency
