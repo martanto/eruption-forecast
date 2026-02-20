@@ -104,13 +104,13 @@ class ModelEvaluator:
         if selected_features is not None:
             X_test = X_test[selected_features]
 
+        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output"))
+
         self.model = model
         self.X_test = X_test
         self.y_test = y_test
         self.model_name = model_name
-        self.output_dir = resolve_output_dir(
-            output_dir, root_dir, os.path.join("output", "evaluation")
-        )
+        self.output_dir = os.path.join(output_dir, "evaluations")
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -127,6 +127,12 @@ class ModelEvaluator:
             )
         else:
             self._metrics_computer = None
+
+    @property
+    def metrics(self) -> dict[str, Any]:
+        if self._metrics is None:
+            raise ValueError("No metrics computed. Please run get_metrics() first.")
+        return self._metrics
 
     @classmethod
     def from_files(
@@ -270,8 +276,8 @@ class ModelEvaluator:
         if self._metrics_computer is not None:
             computed_metrics = self._metrics_computer.compute_all_metrics()
             metrics: dict[str, Any] = {
-                **computed_metrics,
                 "model_name": self.model_name,
+                **computed_metrics,
             }
         else:
             # Fallback for models without probabilities
