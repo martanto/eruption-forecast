@@ -749,6 +749,49 @@ class ModelEvaluator:
         logger.info(f"Saved metrics: {path}")
         return path
 
+    def plot_shap_summary(
+        self,
+        max_display: int = 20,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure:
+        """Plot a SHAP beeswarm summary for this model on the test set.
+
+        Uses ``shap.Explainer`` to compute SHAP values for the test features
+        and renders a beeswarm dot plot showing both direction and magnitude of
+        feature contributions.
+
+        Args:
+            max_display (int, optional): Maximum number of features to show,
+                sorted by mean |SHAP| descending. Defaults to 20.
+            save (bool, optional): If True, save the figure to
+                ``output_dir``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<model_name>_shap_summary.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the SHAP beeswarm plot.
+
+        Examples:
+            >>> fig = evaluator.plot_shap_summary(max_display=15)
+            >>> fig.savefig("custom_shap.png")
+        """
+        from eruption_forecast.plots.shap_plots import plot_shap_summary as _shap
+
+        fig = _shap(
+            model=self.model,
+            X=self.X_test,
+            feature_names=list(self.X_test.columns),
+            max_display=max_display,
+            title=f"SHAP Summary — {self.model_name}",
+            dpi=dpi,
+        )
+        self._save_plot(fig, save, filename, f"{self.model_name}_shap_summary.png", dpi)
+        return fig
+
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
         """Generate and save all evaluation plots.
 
@@ -764,8 +807,9 @@ class ModelEvaluator:
             object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
             ``"pr_curve"``, ``"threshold_analysis"``,
             ``"feature_importance"``, ``"calibration"``,
-            ``"prediction_distribution"``. Values are None when a plot
-            could not be generated (e.g. probabilities unavailable).
+            ``"prediction_distribution"``, ``"shap_summary"``. Values are
+            None when a plot could not be generated (e.g. probabilities
+            unavailable).
 
         Examples:
             >>> figs = evaluator.plot_all(dpi=200)
@@ -779,4 +823,5 @@ class ModelEvaluator:
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
+            "shap_summary": self.plot_shap_summary(dpi=dpi),
         }

@@ -7,9 +7,13 @@ This module provides publication-quality visualizations for ML model evaluation:
 - Feature importance
 - Calibration curves
 - Prediction distributions
+- Classifier comparison heatmaps
+- Seed stability violin plots
 
 All plots follow Nature/Science journal standards with consistent styling.
 """
+
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -1349,3 +1353,230 @@ def plot_aggregate_feature_importance(
         }
     )
     return fig, data
+
+
+# ---------------------------------------------------------------------------
+# Cross-classifier comparison plots
+# ---------------------------------------------------------------------------
+
+_DEFAULT_METRICS = [
+    "balanced_accuracy",
+    "f1_score",
+    "precision",
+    "recall",
+    "roc_auc",
+    "pr_auc",
+]
+
+
+def plot_classifier_comparison(
+    metrics_by_classifier: dict[str, list[dict[str, Any]]],
+    metrics_to_show: list[str] | None = None,
+    figsize: tuple[float, float] = (12, 5),
+    dpi: int = 150,
+    title: str | None = None,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot a heatmap comparing metrics across multiple classifiers.
+
+    Computes mean and standard deviation of each metric across seeds for
+    every classifier, then renders a heatmap where each cell shows
+    ``mean ± std``. Classifiers are sorted by mean F1 descending.
+
+    Args:
+        metrics_by_classifier (dict[str, list[dict[str, Any]]]): Mapping
+            from classifier name to a list of per-seed metrics dicts.
+            Each dict must contain numeric keys matching ``metrics_to_show``.
+        metrics_to_show (list[str] | None, optional): Metric keys to include
+            as heatmap columns. Defaults to
+            ``["balanced_accuracy", "f1_score", "precision", "recall",
+            "roc_auc", "pr_auc"]``.
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (12, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, uses
+            "Classifier Comparison". Defaults to None.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a summary
+            DataFrame with MultiIndex ``(classifier, metric)`` and columns
+            ``mean`` and ``std``.
+
+    Examples:
+        >>> metrics_by_clf = {
+        ...     "rf":  [{"f1_score": 0.8, "precision": 0.75, ...}, ...],
+        ...     "xgb": [{"f1_score": 0.85, "precision": 0.80, ...}, ...],
+        ... }
+        >>> fig, df = plot_classifier_comparison(metrics_by_clf)
+        >>> fig.savefig("classifier_comparison.png")
+        >>> df.to_csv("comparison_summary.csv")
+    """
+    if metrics_to_show is None:
+        metrics_to_show = _DEFAULT_METRICS
+
+    # Build summary: mean and std per (classifier, metric)
+    records: list[dict[str, Any]] = []
+    for clf_name, seeds_list in metrics_by_classifier.items():
+        for metric in metrics_to_show:
+            values = [s[metric] for s in seeds_list if metric in s]
+            if values:
+                records.append(
+                    {
+                        "classifier": clf_name,
+                        "metric": metric,
+                        "mean": float(np.mean(values)),
+                        "std": float(np.std(values)),
+                    }
+                )
+
+    summary_df = pd.DataFrame(records).set_index(["classifier", "metric"])
+
+    # Build mean matrix (rows = classifiers, cols = metrics)
+    classifiers = list(metrics_by_classifier.keys())
+
+    # Sort classifiers by mean F1
+    def _mean_f1(clf: str) -> float:
+        try:
+            return float(summary_df.loc[(clf, "f1_score"), "mean"])
+        except KeyError:
+            return 0.0
+
+    classifiers = sorted(classifiers, key=_mean_f1, reverse=True)
+
+    mean_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=float)
+    std_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=float)
+    annot_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=str)
+
+    for clf in classifiers:
+        for metric in metrics_to_show:
+            try:
+                m = float(summary_df.loc[(clf, metric), "mean"])
+                s = float(summary_df.loc[(clf, metric), "std"])
+            except KeyError:
+                m, s = float("nan"), 0.0
+            mean_matrix.loc[clf, metric] = m
+            std_matrix.loc[clf, metric] = s
+            annot_matrix.loc[clf, metric] = f"{m:.3f}\n±{s:.3f}"
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+        sns.heatmap(
+            mean_matrix.astype(float),
+            annot=annot_matrix,
+            fmt="",
+            cmap="viridis",
+            vmin=0.0,
+            vmax=1.0,
+            ax=ax,
+            linewidths=0.5,
+            cbar_kws={"label": "Mean Score"},
+            annot_kws={"size": 8},
+        )
+        ax.set_xlabel("Metric")
+        ax.set_ylabel("Classifier")
+        ax.set_title(title or "Classifier Comparison")
+        plt.tight_layout()
+
+    return fig, summary_df
+
+
+def plot_seed_stability(
+    metrics_by_classifier: dict[str, list[dict[str, Any]]],
+    metric: str = "f1_score",
+    figsize: tuple[float, float] | None = None,
+    dpi: int = 150,
+    title: str | None = None,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot a violin plot showing metric stability across random seeds per classifier.
+
+    Renders one violin per classifier with individual seed dots overlaid as a
+    jittered strip plot. Classifiers are sorted by median descending. The mean
+    across seeds is marked with a horizontal white line.
+
+    Args:
+        metrics_by_classifier (dict[str, list[dict[str, Any]]]): Mapping
+            from classifier name to a list of per-seed metrics dicts.
+        metric (str, optional): Metric key to plot. Must be present in each
+            seed dict. Defaults to ``"f1_score"``.
+        figsize (tuple[float, float] | None, optional): Figure size in inches.
+            If None, auto-sizes based on number of classifiers using
+            ``(10, max(5, n * 0.6))``. Defaults to None.
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, uses
+            ``"Seed Stability — {metric}"``. Defaults to None.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a long-form
+            DataFrame with columns ``classifier``, ``seed_idx``, and
+            ``value``.
+
+    Examples:
+        >>> metrics_by_clf = {
+        ...     "rf":  [{"f1_score": 0.8}, {"f1_score": 0.82}, ...],
+        ...     "xgb": [{"f1_score": 0.85}, {"f1_score": 0.84}, ...],
+        ... }
+        >>> fig, df = plot_seed_stability(metrics_by_clf, metric="balanced_accuracy")
+        >>> fig.savefig("seed_stability.png")
+    """
+    # Build long-form DataFrame
+    rows: list[dict[str, Any]] = []
+    for clf_name, seeds_list in metrics_by_classifier.items():
+        for seed_idx, seed_metrics in enumerate(seeds_list):
+            if metric in seed_metrics:
+                rows.append(
+                    {
+                        "classifier": clf_name,
+                        "seed_idx": seed_idx,
+                        "value": seed_metrics[metric],
+                    }
+                )
+    long_df = pd.DataFrame(rows)
+
+    # Sort classifiers by median descending
+    order = (
+        long_df.groupby("classifier")["value"]
+        .median()
+        .sort_values(ascending=False)
+        .index.tolist()
+    )
+
+    n_classifiers = len(order)
+    if figsize is None:
+        figsize = (10, max(5, n_classifiers * 0.6))
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        sns.violinplot(
+            data=long_df,
+            x="classifier",
+            y="value",
+            order=order,
+            ax=ax,
+            color=OKABE_ITO[4],
+            alpha=0.7,
+            inner=None,
+        )
+        sns.stripplot(
+            data=long_df,
+            x="classifier",
+            y="value",
+            order=order,
+            ax=ax,
+            color="black",
+            size=3,
+            alpha=0.5,
+            jitter=True,
+        )
+
+        # Mark mean per classifier
+        for i, clf in enumerate(order):
+            mean_val = long_df.loc[long_df["classifier"] == clf, "value"].mean()
+            ax.hlines(mean_val, i - 0.3, i + 0.3, colors="white", linewidths=2.0)
+
+        configure_spine(ax)
+        ax.set_xlabel("Classifier")
+        ax.set_ylabel(metric.replace("_", " ").title())
+        ax.set_title(title or f"Seed Stability — {metric}")
+        plt.tight_layout()
+
+    return fig, long_df

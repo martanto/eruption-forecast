@@ -16,7 +16,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
+from eruption_forecast.plots.shap_plots import plot_aggregate_shap_summary
+from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
 from eruption_forecast.plots.evaluation_plots import (
+    plot_seed_stability,
     plot_aggregate_roc_curve as _plot_roc_styled,
     plot_aggregate_calibration as _plot_cal_styled,
     plot_aggregate_confusion_matrix as _plot_cm_styled,
@@ -685,4 +688,188 @@ class MultiModelEvaluator:
                 dpi=dpi, show_individual=show_individual
             ),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
+            "shap_summary": self.plot_shap_summary(dpi=dpi),
+            "seed_stability": self.plot_seed_stability(dpi=dpi),
+            "frequency_band_contribution": self.plot_frequency_band_contribution(
+                dpi=dpi
+            ),
         }
+
+    # ------------------------------------------------------------------
+    # New visualizations: SHAP, seed stability, frequency band, classifier comparison
+    # ------------------------------------------------------------------
+
+    def get_metrics_list(self) -> list[dict[str, Any]]:
+        """Load and return all per-seed metrics as a list of dicts.
+
+        Reads each JSON file resolved from ``metrics_files`` or
+        ``metrics_dir`` and returns the raw records without aggregation.
+        Useful for feeding ``plot_classifier_comparison`` and
+        ``plot_seed_stability`` when combining multiple evaluators.
+
+        Returns:
+            list[dict[str, Any]]: List of per-seed metrics dicts, one per
+                JSON file. Each dict matches the output of
+                ``ModelEvaluator.save_metrics()``.
+
+        Raises:
+            ValueError: If no metrics source was provided at construction.
+
+        Examples:
+            >>> records = evaluator.get_metrics_list()
+            >>> f1_scores = [r["f1_score"] for r in records]
+        """
+        paths = self._resolve_metrics_files()
+        records: list[dict[str, Any]] = []
+        for p in paths:
+            with open(p) as f:
+                records.append(json.load(f))
+        return records
+
+    def plot_shap_summary(
+        self,
+        max_display: int = 20,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure:
+        """Plot aggregate mean |SHAP| values across all seeds.
+
+        Loads every seed's model and test set from the registry, computes
+        SHAP values per seed, then plots the mean absolute SHAP per feature
+        as a bar chart with ±1 std error bars.
+
+        Args:
+            max_display (int, optional): Number of top features to show,
+                sorted by mean |SHAP| descending. Defaults to 20.
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename.
+                Defaults to ``"aggregate_shap_summary.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the aggregate SHAP bar chart.
+
+        Examples:
+            >>> fig = evaluator.plot_shap_summary(max_display=15)
+        """
+        registry = self._require_registry()
+        models: list[Any] = []
+        x_tests: list[Any] = []
+        feature_names: list[str] = []
+
+        for _, row in registry.iterrows():
+            model, X_test, _, _ = self._load_seed_data(row)
+            models.append(model)
+            x_tests.append(X_test)
+            if not feature_names:
+                feature_names = pd.read_csv(
+                    row["significant_features_csv"], index_col=0
+                ).index.tolist()
+
+        fig, data = plot_aggregate_shap_summary(
+            models=models,
+            X_tests=x_tests,
+            feature_names=feature_names,
+            max_display=max_display,
+            dpi=dpi,
+        )
+        self._save_outputs(
+            fig,
+            data,
+            filename or "aggregate_shap_summary.png",
+            "aggregate_shap_summary.csv",
+            dpi,
+            save,
+        )
+        return fig
+
+    def plot_seed_stability(
+        self,
+        metric: str = "f1_score",
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure:
+        """Plot seed stability violin for this single-classifier evaluator.
+
+        Shows the distribution of ``metric`` across random seeds as a violin
+        with individual seed dots and a mean line. Requires JSON metrics files
+        to have been provided at construction.
+
+        Args:
+            metric (str, optional): Metric key to plot. Must be present in
+                each seed's JSON metrics file. Defaults to ``"f1_score"``.
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename.
+                Defaults to ``"seed_stability_{metric}.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the seed stability violin.
+
+        Examples:
+            >>> fig = evaluator.plot_seed_stability(metric="balanced_accuracy")
+        """
+        records = self.get_metrics_list()
+
+        # Use model_name from first record as classifier label, fall back to "model"
+        clf_name = records[0].get("model_name", "model") if records else "model"
+        metrics_by_clf = {clf_name: records}
+
+        fig, data = plot_seed_stability(
+            metrics_by_classifier=metrics_by_clf,
+            metric=metric,
+            dpi=dpi,
+        )
+        default_fn = f"seed_stability_{metric}.png"
+        self._save_outputs(fig, data, filename or default_fn, None, dpi, save)
+        return fig
+
+    def plot_frequency_band_contribution(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure:
+        """Plot the frequency band contribution across all seeds.
+
+        Loads the significant-features CSV for each seed from the registry,
+        collects per-seed feature lists, and passes them to
+        ``plot_frequency_band_contribution`` for multi-seed aggregation
+        (mean ± std count per band).
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename.
+                Defaults to ``"frequency_band_contribution.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the frequency band bar chart.
+
+        Examples:
+            >>> fig = evaluator.plot_frequency_band_contribution()
+        """
+        registry = self._require_registry()
+        per_seed_features: list[list[str]] = []
+
+        for _, row in registry.iterrows():
+            features = pd.read_csv(
+                row["significant_features_csv"], index_col=0
+            ).index.tolist()
+            per_seed_features.append(features)
+
+        fig, data = plot_frequency_band_contribution(
+            feature_names=per_seed_features,  # type: ignore[arg-type]
+            dpi=dpi,
+        )
+        self._save_outputs(
+            fig,
+            data,
+            filename or "frequency_band_contribution.png",
+            "frequency_band_contribution.csv",
+            dpi,
+            save,
+        )
+        return fig
