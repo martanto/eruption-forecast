@@ -1118,19 +1118,19 @@ class ForecastModel:
             Self: ForecastModel instance for method chaining.
         """
         if verbose or self.verbose:
-            print("=" * 50)
-            print(f"| Training model using: {classifier}")
+            logger.info("=" * 50)
+            logger.info(f"| Training model using: {classifier}")
             if self.use_relevant_features:
-                print("|- Relevant Features selected.")
+                logger.info("|- Relevant Features selected.")
             # Model evaluation only works if self.label_data is not empty
             if not self.label_data.empty and with_evaluation:
-                print("|- Training model with evaluation.")
+                logger.info("|- Training model with evaluation.")
             if self.label_data.empty and with_evaluation:
-                print("|- Label is empty. Model evaluation will be set to False.")
+                logger.info("|- Label is empty. Model evaluation will be set to False.")
                 with_evaluation = False
             if not with_evaluation:
-                print("|- Training model only. No evaluation.")
-            print("=" * 50)
+                logger.info("|- Training model only. No evaluation.")
+            logger.info("=" * 50)
 
         features_csv = extracted_features_csv or self.features_csv
 
