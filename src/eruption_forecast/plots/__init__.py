@@ -47,18 +47,6 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_prediction_distribution,
 )
 
-# Aggregate evaluation plotting
-from eruption_forecast.plots.aggregate_evaluation_plots import (
-    plot_aggregate_roc,
-    plot_all_aggregate,
-    plot_aggregate_calibration,
-    plot_aggregate_confusion_matrix,
-    plot_aggregate_precision_recall,
-    plot_aggregate_feature_importance,
-    plot_aggregate_threshold_analysis,
-    plot_aggregate_prediction_distribution,
-)
-
 
 __all__ = [
     # Style configuration
@@ -82,15 +70,6 @@ __all__ = [
     "plot_feature_importance",
     "plot_calibration",
     "plot_prediction_distribution",
-    # Aggregate evaluation plotting
-    "plot_aggregate_roc",
-    "plot_aggregate_precision_recall",
-    "plot_aggregate_calibration",
-    "plot_aggregate_prediction_distribution",
-    "plot_aggregate_confusion_matrix",
-    "plot_aggregate_threshold_analysis",
-    "plot_aggregate_feature_importance",
-    "plot_all_aggregate",
     # Forecast plotting
     "plot_forecast",
     "plot_forecast_with_events",
