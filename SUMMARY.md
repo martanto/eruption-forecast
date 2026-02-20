@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-19 (Architecture review + 4 additional bug fixes)
+**Last Updated:** 2026-02-20 (ModelEvaluator refactor + MultiModelEvaluator)
 
 ## ⚠️ Important Notice
 
@@ -40,6 +40,10 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 25. [Shannon Entropy Metric — Docstring Fixes and README Update](#shannon-entropy-metric--docstring-fixes-and-readme-update-2026-02-19)
 26. [Full Code Review and Bug Fixes](#full-code-review-and-bug-fixes-2026-02-19)
 27. [Architecture Review and Additional Bug Fixes](#architecture-review-and-additional-bug-fixes-2026-02-19)
+28. [Aggregate Evaluation Plots Across All Seeds](#aggregate-evaluation-plots-across-all-seeds-2026-02-20)
+29. [Aggregate Metric Computation Utility Functions](#aggregate-metric-computation-utility-functions-2026-02-20)
+30. [Decouple Aggregate Evaluation Code from ModelEvaluator](#decouple-aggregate-evaluation-code-from-modelevaluator-2026-02-20)
+31. [ModelEvaluator Refactor + MultiModelEvaluator](#modelevaluator-refactor--multimodelevaluator-2026-02-20)
 ---
 
 ## Package Overview
@@ -1115,7 +1119,7 @@ Updated all ModelPredictor examples in README.md:
 
 **Document Version:** 3.6
 **Last Updated:** 2026-02-16
-**Author:** Claude Code (Sonnet 4.5)
+**Author:** martanto
 
 
 ## Tremor Module Docstring Standardization (2026-02-16)
@@ -2582,3 +2586,166 @@ Conducted a second full architecture review of all 47 source files. Identified 2
 - **🟠 Design (7):** `ForecastModel` god-class (1 700 lines); `pipeline_config.py` god-dataclass; no `__all__` in public modules; `validate()` called only from `__init__`; `ModelPredictor` init does file I/O; `sleep(3)` in training loop; `ForecastModel.run()` undocumented replay semantics.
 - **🔵 Quality (6):** `calculate_tremor.py` `filename` property leaks internal `_filename`; `TremorData` and `LabelData` `cached_property` not invalidated on reload; `ClassifierModel` `_build_grid` hardcodes `None` grid for NB; broad `except Exception` in batch workers; `FeatureSelector` `combined` method duplicates tsfresh call; `ModelEvaluator.from_files()` re-reads CSV on every call.
 - **🟡 Docs / Minor (7):** `window_size` validation docstring was stale (now fixed by Bug 2); `source` parameter in `calculate()` missing valid values; `_calculate_from_sds` / `_calculate_from_fdsn` not in public API docs; several single-sentence docstrings missing description paragraphs; comment style inconsistencies in `model_predictor.py`.
+
+---
+
+## Aggregate Evaluation Plots Across All Seeds (2026-02-20)
+
+**Branch:** `claude/aggregate-evaluation-plots`
+
+### What Was Implemented
+
+Extended the training and evaluation pipeline so that per-seed held-out test data is persisted to disk and can be used to generate ensemble-level aggregate evaluation plots across all 500 seeds.
+
+### Changes
+
+**`src/eruption_forecast/model/model_trainer.py`**
+- Added `tests_dir` attribute (`<classifier_dir>/tests/`) — created in `__init__`, `update_directories()`, and `create_directories()`
+- Extended `_generate_filepaths()` from a 7-tuple to a 9-tuple, adding `X_test_filepath` and `y_test_filepath`; both included in the `can_skip` file check
+- In `_run_train_and_evaluate()`: saves `features_test` and `labels_test` as CSVs immediately after the train/test split; return expanded from 4-tuple to 6-tuple (adds the two file paths)
+- In `train_and_evaluate()`: unpacks 6-tuple and adds `X_test_filepath`/`y_test_filepath` to each registry record
+- Updated `_run_train()` to unpack the new 9-tuple from `_generate_filepaths()`
+
+**`src/eruption_forecast/plots/evaluation_plots.py`**
+- Added 7 new `plot_aggregate_*` functions at the end of the module:
+  - `plot_aggregate_roc_curve` — interpolated mean ROC ± std band across seeds
+  - `plot_aggregate_precision_recall_curve` — mean PR curve ± std band
+  - `plot_aggregate_calibration` — mean calibration curve ± std band
+  - `plot_aggregate_prediction_distribution` — pooled KDE by true class
+  - `plot_aggregate_confusion_matrix` — summed confusion matrix (optional normalization)
+  - `plot_aggregate_threshold_analysis` — mean metric curves vs threshold ± std bands
+  - `plot_aggregate_feature_importance` — mean importance ± std error bars, top-N features
+
+**`src/eruption_forecast/model/model_evaluator.py`**
+- Extended import block with 7 aggregate plot function aliases
+- Added `_load_seed_data(row)` staticmethod — loads model, X_test, y_test, filters to significant features, returns `(model, X_test_filtered, y_true, y_proba)`
+- Added `_save_aggregate_outputs()` classmethod helper — saves both PNG figure and data CSV to `plots/` subdir (defaults to `<classifier_dir>/plots/`)
+- Added 7 `plot_aggregate_*` classmethods (one per plot type), each reading the registry CSV and calling the matching plot function
+- Added `plot_all_aggregate()` classmethod — convenience method that runs all 7 aggregate plots and returns `dict[str, Figure | None]`
+- All 7 `plot_aggregate_*` functions in `evaluation_plots.py` now return `tuple[plt.Figure, pd.DataFrame]` (feature importance returns `tuple | None`); data CSVs saved alongside PNGs in `plots/` dir
+
+**`src/eruption_forecast/model/model_trainer.py`**
+- Added `plots_dir` attribute (`<classifier_dir>/plots/`) in `__init__`, `update_directories()`, and docstring
+- `create_directories()` now creates `plots_dir` on startup
+
+**`README.md`**
+- Added "Aggregate Evaluation (All Seeds)" subsection in Section 11 with usage examples
+- Added `tests/` and `plots/` directories to the output directory structure diagram (plots/ lists all 7 PNG+CSV pairs)
+- Extended the evaluation_plots import block with 7 aggregate function names
+- Updated "Available Plot Types" section to list both single-seed and aggregate plot methods
+- Bumped `Last Updated` to 2026-02-20 and added two changelog entries
+
+---
+
+## Aggregate Metric Computation Utility Functions (2026-02-20)
+
+**Branch:** `claude/aggregate-evaluation-plots`
+
+### What Was Implemented
+
+Added a suite of pure data-computation functions that compute the same aggregate statistics as the `plot_aggregate_*` functions but without rendering any matplotlib figures. These are useful for headless environments, batch pipelines, and downstream custom analysis.
+
+### Changes
+
+**`src/eruption_forecast/plots/evaluation_plots.py`**
+- Added 7 standalone `compute_aggregate_*_data()` functions (no matplotlib):
+  - `compute_aggregate_roc_data(y_trues, y_probas)` → `pd.DataFrame` with `fpr, mean_tpr, std_tpr`
+  - `compute_aggregate_pr_data(y_trues, y_probas)` → `pd.DataFrame` with `recall, mean_precision, std_precision`
+  - `compute_aggregate_calibration_data(y_trues, y_probas, n_bins)` → `pd.DataFrame` with `prob_bin, mean_frac_positives, std_frac_positives`
+  - `compute_aggregate_prediction_distribution_data(y_trues, y_probas)` → `pd.DataFrame` with `y_proba, y_true` (pooled across all seeds)
+  - `compute_aggregate_confusion_matrix_data(y_trues, y_preds)` → 2×2 `pd.DataFrame` (not_erupted / erupted)
+  - `compute_aggregate_threshold_data(y_trues, y_probas)` → `pd.DataFrame` with `threshold` + mean/std for precision, recall, F1, balanced_accuracy
+  - `compute_aggregate_feature_importance_data(models, feature_names)` → `pd.DataFrame` or `None` with `feature, mean_importance, std_importance` (all features, sorted)
+- All functions accept `y_trues` as a single array (broadcast) or list of per-seed arrays
+- Each function's output DataFrame has the exact same column structure as the CSV saved alongside the corresponding aggregate plot
+
+**`src/eruption_forecast/model/model_evaluator.py`**
+- Added 7 new `_compute_agg_*` imports from `evaluation_plots`
+- Added `compute_aggregate_metrics(registry_csv, output_dir, save, n_bins)` classmethod:
+  - Loads seed data using `_load_seed_data()` (no figure rendering)
+  - Calls all 7 compute functions to build a `dict[str, pd.DataFrame | None]`
+  - Saves each DataFrame as a CSV to `<registry_dir>/plots/` (or `output_dir`) when `save=True`
+  - Returns the dict for further analysis or custom plotting
+
+**`README.md`**
+- Added "Aggregate Metrics Without Plots" subsection after the plot-based aggregate section
+- Added `compute_aggregate_metrics()` usage example showing dict access and threshold optimisation
+- Added standalone compute function import example
+- Added changelog entry
+
+---
+
+## Decouple Aggregate Evaluation Code from ModelEvaluator (2026-02-20)
+
+**Branch:** `claude/aggregate-evaluation-plots`
+
+### What Was Implemented
+
+Separated the aggregate evaluation logic out of `model_evaluator.py` (which was growing too large) into two dedicated, focused modules with clear responsibilities.
+
+### Changes
+
+**`src/eruption_forecast/plots/aggregate_evaluation_plots.py`** (new file)
+- Standalone module for all aggregate (multi-seed) plotting functions
+- Contains `save_aggregate_outputs(fig, data, ...)` helper for writing PNG + CSV
+- Contains 7 `plot_aggregate_*()` functions moved from `ModelEvaluator` classmethods:
+  `plot_aggregate_roc`, `plot_aggregate_precision_recall`, `plot_aggregate_calibration`,
+  `plot_aggregate_prediction_distribution`, `plot_aggregate_confusion_matrix`,
+  `plot_aggregate_threshold_analysis`, `plot_aggregate_feature_importance`
+- Contains `plot_all_aggregate(registry_csv, ...)` convenience wrapper
+- Imports `load_seed_data` from `eruption_forecast.utils.aggregate`
+
+**`src/eruption_forecast/utils/aggregate.py`** (new file)
+- Standalone module for aggregate metric computation (no matplotlib)
+- Contains `load_seed_data(row)` — loads model, X_test, y_true, y_proba for one seed
+- Contains `compute_aggregate_metrics(registry_csv, output_dir, save, n_bins)` — computes and saves all 7 metric DataFrames
+
+**`src/eruption_forecast/model/model_evaluator.py`** (simplified)
+- Removed all aggregate methods: `_load_seed_data`, `_save_aggregate_outputs`, 7 `plot_aggregate_*` classmethods, `plot_all_aggregate`, `compute_aggregate_metrics`
+- Now focused exclusively on single-seed evaluation (instance methods only)
+- Reduced from ~1374 lines to ~744 lines
+
+**`src/eruption_forecast/plots/__init__.py`**
+- Added imports and `__all__` entries for all 8 functions from `aggregate_evaluation_plots`
+
+**`src/eruption_forecast/utils/__init__.py`**
+- Added `aggregate` to module docstring
+
+**`README.md`**
+- Updated "Aggregate Evaluation (All Seeds)" code example to import from `aggregate_evaluation_plots`
+- Updated "Aggregate Metrics Without Plots" to import `compute_aggregate_metrics` from `utils.aggregate`
+- Updated "Available Plot Types" to note correct module locations
+- Updated imports section to show the three separate import groups
+- Added changelog entry
+
+---
+
+## ModelEvaluator Refactor + MultiModelEvaluator (2026-02-20)
+
+**Goal:** Clean two-class design — `ModelEvaluator` for single-seed, `MultiModelEvaluator` for multi-seed aggregation.
+
+### Changes
+
+**`src/eruption_forecast/model/model_evaluator.py`**
+- Added `save_metrics(path=None) -> str` — serializes `get_metrics()` to JSON (`np.nan` → `null`); default path `{output_dir}/{model_name}_metrics.json`
+
+**`src/eruption_forecast/model/multi_model_evaluator.py`** (new)
+- `MultiModelEvaluator` class with constructor: `__init__(metrics_dir, metrics_files, registry_csv, output_dir)`
+- `get_aggregate_metrics()` — loads per-seed JSON files, returns summary DataFrame (mean/std/min/max per metric)
+- `save_aggregate_metrics(filename)` — saves summary to CSV
+- `_load_seed_data(row)` — absorbs `load_seed_data()` from deleted `utils/aggregate.py`
+- 7 `plot_*()` methods: `plot_roc`, `plot_precision_recall`, `plot_calibration`, `plot_prediction_distribution`, `plot_confusion_matrix`, `plot_threshold_analysis`, `plot_feature_importance`
+- `plot_all(dpi, show_individual)` — runs all 7 plots; saves to `{output_dir}/figures/`
+
+**`src/eruption_forecast/plots/aggregate_evaluation_plots.py`** — **deleted**
+
+**`src/eruption_forecast/utils/aggregate.py`** — **deleted**
+
+**`src/eruption_forecast/model/__init__.py`**
+- Added imports and `__all__` for `ModelEvaluator`, `MultiModelEvaluator`
+
+**`src/eruption_forecast/plots/__init__.py`**
+- Removed all `plot_aggregate_*` imports from deleted `aggregate_evaluation_plots`
+
+**`src/eruption_forecast/__init__.py`**
+- Added `ModelEvaluator`, `MultiModelEvaluator` to top-level exports
