@@ -82,7 +82,7 @@ def get_windows_information(
     }
 
 
-def shanon_entropy(data: np.ndarray) -> float:
+def shannon_entropy(data: np.ndarray) -> float:
     """Calculate the Shannon entropy of a seismic data window.
 
     Models the amplitude distribution as a Gaussian and computes the differential

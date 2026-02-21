@@ -20,7 +20,7 @@ from eruption_forecast.utils.dataframe import remove_anomalies
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
-from eruption_forecast.tremor.shanon_entropy import ShanonEntropy
+from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
 
 
 class CalculateTremor:
