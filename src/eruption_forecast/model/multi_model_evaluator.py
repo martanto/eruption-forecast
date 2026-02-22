@@ -82,6 +82,27 @@ class MultiModelEvaluator:
         trained_model_csv: str | None = None,
         output_dir: str | None = None,
     ) -> None:
+        """Initialize the MultiModelEvaluator with one or more metrics sources.
+
+        Exactly one of metrics_dir, metrics_files, or trained_model_csv must be
+        provided. The output directory is inferred from the supplied source when
+        output_dir is not given explicitly.
+
+        Args:
+            metrics_dir (str | None, optional): Directory containing per-seed JSON
+                metrics files (*.json). Defaults to None.
+            metrics_files (list[str] | None, optional): Explicit list of paths to
+                per-seed JSON metrics files. Defaults to None.
+            trained_model_csv (str | None, optional): Path to a trained model registry
+                CSV produced by ModelTrainer. Used for aggregate plot generation.
+                Defaults to None.
+            output_dir (str | None, optional): Directory for saving evaluation outputs.
+                When None, resolved from the provided source path. Defaults to None.
+
+        Raises:
+            ValueError: If none of metrics_dir, metrics_files, or trained_model_csv
+                is provided.
+        """
         if metrics_dir is None and metrics_files is None and trained_model_csv is None:
             raise ValueError(
                 "At least one of metrics_dir, metrics_files, or trained_model_csv must be provided."

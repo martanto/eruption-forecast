@@ -54,8 +54,22 @@ def save_parameters(
     """
 
     def decorator(func: Callable) -> Callable:
+        """Wrap the target function to save its parameters before execution.
+
+        Args:
+            func (Callable): The function to decorate.
+
+        Returns:
+            Callable: Wrapped function that saves parameters then calls func.
+        """
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            """Execute the wrapped function after saving its call parameters to disk.
+
+            Returns:
+                Any: The return value of the original function.
+            """
             # Get function signature
             sig = inspect.signature(func)
             bound_args = sig.bind(*args, **kwargs)
@@ -145,10 +159,24 @@ def save_properties(
     """
 
     def decorator(cls):
+        """Enhance the target class with property save methods.
+
+        Args:
+            cls: The class to decorate.
+
+        Returns:
+            type: The decorated class with save_properties and enable_auto_save methods.
+        """
         original_init = cls.__init__
 
         @functools.wraps(original_init)
         def new_init(self, *args, **kwargs):
+            """Initialize the instance and inject save-related configuration attributes.
+
+            Args:
+                *args: Positional arguments forwarded to the original __init__.
+                **kwargs: Keyword arguments forwarded to the original __init__.
+            """
             original_init(self, *args, **kwargs)
             self._save_format = save_as
             self._save_filepath = filepath or f"{cls.__name__}_properties.{save_as}"
@@ -214,10 +242,20 @@ def save_properties(
             original_value = getattr(self, attr_name)
 
             def setter(new_value):
+                """Set the monitored attribute value and trigger auto-save.
+
+                Args:
+                    new_value: The new value to assign to the monitored attribute.
+                """
                 setattr(self, f"_{attr_name}_internal", new_value)
                 self.save_properties()
 
             def getter():
+                """Return the current value of the monitored attribute.
+
+                Returns:
+                    Any: The current value of the monitored attribute.
+                """
                 return getattr(self, f"_{attr_name}_internal", original_value)
 
             setattr(self, f"_{attr_name}_internal", original_value)
@@ -266,8 +304,22 @@ def snapshot(filepath: str | None = None, save_as: Literal["json", "yaml"] = "js
     """
 
     def decorator(func: Callable) -> Callable:
+        """Wrap the target function to capture its call as a snapshot.
+
+        Args:
+            func (Callable): The function to decorate.
+
+        Returns:
+            Callable: Wrapped function that captures parameters and return value.
+        """
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            """Execute the wrapped function and save both its parameters and return value.
+
+            Returns:
+                Any: The return value of the original function.
+            """
             # Capture parameters
             sig = inspect.signature(func)
             bound_args = sig.bind(*args, **kwargs)
@@ -332,10 +384,23 @@ def timer(name: str | None = None, verbose: bool = True):
     """
 
     def decorator(func: Callable) -> Callable:
+        """Wrap the target function with execution timing logic.
+
+        Args:
+            func (Callable): The function to decorate.
+
+        Returns:
+            Callable: Wrapped function that measures and optionally prints elapsed time.
+        """
         operation_name = name if name else func.__name__  # ty:ignore[unresolved-attribute]
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
+            """Execute the wrapped function and measure its elapsed wall-clock time.
+
+            Returns:
+                Any: The return value of the original function.
+            """
             start = time.perf_counter()
             result = func(*args, **kwargs)
             end = time.perf_counter()

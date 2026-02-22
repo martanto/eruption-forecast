@@ -139,6 +139,35 @@ class ModelPredictor:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        """Initialize the ModelPredictor with date range, trained model registry, and output settings.
+
+        Normalises dates to cover full calendar days, resolves output directory structure,
+        and stores the trained model registry path(s). No models are loaded until
+        predict(), predict_best(), or predict_proba() is called.
+
+        Args:
+            start_date (str | datetime): Start of the prediction window in "YYYY-MM-DD"
+                format or as a datetime. Time is normalised to 00:00:00.
+            end_date (str | datetime): End of the prediction window in "YYYY-MM-DD"
+                format or as a datetime. Time is normalised to 23:59:59.
+            trained_models (str | dict[str, str]): Path to a single trained model
+                registry CSV, or a dict mapping classifier names to their registry
+                CSV paths for multi-model consensus mode.
+            overwrite (bool, optional): Re-compute cached intermediate files.
+                Defaults to False.
+            n_jobs (int, optional): Number of parallel jobs for feature extraction.
+                Defaults to 1.
+            output_dir (str | None, optional): Root directory for prediction outputs.
+                Defaults to ``<root_dir>/output/predictions``. Defaults to None.
+            root_dir (str | None, optional): Anchor directory for relative path
+                resolution. Defaults to None.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+
+        Raises:
+            ValueError: If start_date >= end_date.
+            FileNotFoundError: If any trained model registry CSV does not exist.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------

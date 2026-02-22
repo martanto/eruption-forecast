@@ -11,6 +11,8 @@ from typing import Any, Self, Literal
 from datetime import datetime
 from dataclasses import field, asdict, fields, dataclass
 
+import yaml
+
 
 @dataclass
 class _ConfigBase:
@@ -253,8 +255,6 @@ class PipelineConfig(_ConfigBase):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         else:
-            import yaml  # lazy import — PyYAML is a transitive dependency
-
             with open(path, "w", encoding="utf-8") as f:
                 f.write("# eruption-forecast pipeline configuration\n")
                 yaml.safe_dump(
@@ -290,8 +290,6 @@ class PipelineConfig(_ConfigBase):
             if ext == ".json":
                 data = json.load(f)
             else:
-                import yaml  # lazy import
-
                 data = yaml.safe_load(f)
 
         config = cls(

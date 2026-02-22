@@ -99,6 +99,24 @@ class FeatureSelector:
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> None:
+        """Initialize the FeatureSelector with method, random state, and output settings.
+
+        Sets up selection parameters and initialises result attributes to empty defaults.
+        Calls validate() to check that n_jobs is at least 1.
+
+        Args:
+            method (Literal["tsfresh", "random_forest", "combined"], optional):
+                Feature selection strategy. Defaults to "tsfresh".
+            random_state (int, optional): Random seed for reproducibility.
+                Defaults to 42.
+            output_dir (str | None, optional): Directory for saving selected features.
+                Defaults to ``os.getcwd()/output/features/selected``.
+            n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
+
+        Raises:
+            ValueError: If n_jobs is less than 1.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------

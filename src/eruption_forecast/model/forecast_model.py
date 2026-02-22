@@ -165,6 +165,34 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        """Initialize the ForecastModel pipeline orchestrator.
+
+        Normalises dates, resolves all output directory paths, and initialises
+        lifecycle state attributes. No data is loaded or processed until the
+        pipeline stage methods (calculate, build_label, extract_features, train,
+        forecast) are called.
+
+        Args:
+            station (str): Seismic station code (e.g., "OJN").
+            channel (str): Channel code (e.g., "EHZ").
+            start_date (str | datetime): Start date for the analysis period in
+                "YYYY-MM-DD" format or as a datetime object.
+            end_date (str | datetime): End date for the analysis period in
+                "YYYY-MM-DD" format or as a datetime object.
+            window_size (int): Window size in days used for matrix building and forecasting.
+            volcano_id (str): Unique volcano identifier used for labelling.
+            network (str, optional): Seismic network code. Defaults to "VG".
+            location (str, optional): Location code. Defaults to "00".
+            output_dir (str | None, optional): Base output directory. Defaults to None
+                (resolved from root_dir or os.getcwd()).
+            root_dir (str | None, optional): Root project directory used to anchor
+                relative output paths. Defaults to None.
+            overwrite (bool, optional): Overwrite existing output files. Defaults to False.
+            n_jobs (int, optional): Number of parallel jobs for tremor calculation
+                and feature extraction. Defaults to 1.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------

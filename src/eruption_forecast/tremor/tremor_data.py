@@ -41,12 +41,30 @@ class TremorData:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        """Initialize the TremorData container with an optional DataFrame.
+
+        Stores the provided DataFrame (or an empty one when df is None),
+        initialises csv to None, and configures logging flags.
+
+        Args:
+            df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame with
+                DatetimeIndex and metric columns (rsam_*, dsar_*). Pass None to
+                create an empty container and load data later via from_csv().
+                Defaults to None.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         self.verbose = verbose
         self.debug = debug
         self.csv: str | None = None
         self.df = df if df is not None else pd.DataFrame()
 
     def __repr__(self) -> str:
+        """Return a detailed string representation of this TremorData instance.
+
+        Returns:
+            str: A string showing the CSV path, DataFrame shape, and logging flags.
+        """
         return (
             f"{self.__class__.__name__}(csv={self.csv}, df={self.df.shape}, "
             f"verbose={self.verbose}, debug={self.debug})"

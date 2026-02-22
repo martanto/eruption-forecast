@@ -148,6 +148,50 @@ class CalculateTremor:
         verbose: bool = False,
         debug: bool = False,
     ):
+        """Initialize the CalculateTremor pipeline with station metadata and processing options.
+
+        Converts date strings to datetime objects, constructs the NSLC identifier,
+        resolves output directories, and sets all processing flags. No data is loaded
+        or computed until from_sds() or from_fdsn() followed by run() is called.
+
+        Args:
+            start_date (str | datetime): Analysis start date in "YYYY-MM-DD" format
+                or as a datetime object.
+            end_date (str | datetime): Analysis end date in "YYYY-MM-DD" format
+                or as a datetime object.
+            station (str): Seismic station code (e.g., "OJN").
+            channel (str): Channel code (e.g., "EHZ").
+            network (str, optional): Seismic network code. Defaults to "VG".
+            location (str, optional): Location code. Defaults to "00".
+            methods (list[str] | None, optional): Tremor metrics to compute.
+                Defaults to ["rsam", "dsar", "entropy"].
+            output_dir (str | None, optional): Base output directory. Defaults to
+                ``root_dir/output``. Defaults to None.
+            root_dir (str | None, optional): Anchor directory for relative path
+                resolution. Defaults to None (uses os.getcwd()).
+            overwrite (bool, optional): Overwrite existing daily CSV files.
+                Defaults to False.
+            remove_outlier_method (Literal["all", "maximum"], optional): Outlier
+                removal strategy applied after computing metrics. Defaults to "maximum".
+            remove_tremor_anomalies (bool, optional): Remove anomalous tremor spikes.
+                Defaults to False.
+            interpolate (bool, optional): Interpolate missing values in daily streams.
+                Defaults to False.
+            value_multiplier (float | None, optional): Scaling factor applied to all
+                metric values. Defaults to None (no scaling).
+            cleanup_daily_dir (bool, optional): Delete per-day CSV files after merging.
+                Defaults to False.
+            plot_daily (bool, optional): Generate a plot for each day's tremor data.
+                Defaults to False.
+            save_plot (bool, optional): Save daily plots to disk. Defaults to False.
+            overwrite_plot (bool, optional): Overwrite existing daily plot files.
+                Defaults to False.
+            filename_prefix (str | None, optional): Custom prefix for the merged CSV
+                filename. Defaults to None (auto-derived from NSLC and date range).
+            n_jobs (int, optional): Number of parallel worker processes. Defaults to 1.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
@@ -265,6 +309,12 @@ class CalculateTremor:
             logger.info(f"Freq Bands: {self.freq_bands_alias}")
 
     def __str__(self) -> str:
+        """Return a concise human-readable summary of this CalculateTremor instance.
+
+        Returns:
+            str: A summary string including version, job count, date range, NSLC,
+                frequency bands, and the path to the merged tremor CSV.
+        """
         return (
             f"{self.__class__.__name__}(Version: {eruption_forecast.__version__}). "
             f"Running on {self.n_jobs} job(s) from {self.start_date_str} "
@@ -274,6 +324,12 @@ class CalculateTremor:
         )
 
     def __repr__(self) -> str:
+        """Return a detailed string representation of this CalculateTremor instance.
+
+        Returns:
+            str: A string listing all constructor parameters and their current values,
+                suitable for reconstructing or debugging the instance.
+        """
         return (
             f"{self.__class__.__name__}(start_date={self.start_date_str}, "
             f"end_date={self.end_date_str}, station={self.station}, network={self.network}, "

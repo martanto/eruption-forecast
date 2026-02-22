@@ -101,6 +101,30 @@ class ModelEvaluator:
         root_dir: str | None = None,
         verbose: bool = False,
     ) -> None:
+        """Initialize the ModelEvaluator with a fitted model and test data.
+
+        Extracts the best estimator from a GridSearchCV if provided, filters
+        X_test columns to selected_features when specified, resolves output
+        directories, runs model predictions, and sets up the metrics computer.
+
+        Args:
+            model (BaseEstimator | GridSearchCV): A fitted scikit-learn estimator or
+                GridSearchCV. If GridSearchCV, the best_estimator_ is used.
+            X_test (pd.DataFrame): Test feature DataFrame. Filtered to selected_features
+                if that argument is provided.
+            y_test (pd.Series): True labels for the test set.
+            model_name (str, optional): Identifier used in output filenames.
+                Defaults to "model".
+            output_dir (str | None, optional): Base directory for evaluation outputs.
+                Defaults to ``root_dir/output/evaluations``. Defaults to None.
+            selected_features (list[str] | None, optional): Subset of X_test columns
+                to use. If None, all columns are used. Defaults to None.
+            random_state (int | None, optional): Seed used to derive a filename prefix.
+                Defaults to None.
+            root_dir (str | None, optional): Anchor directory for relative path
+                resolution. Defaults to None.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+        """
         if isinstance(model, GridSearchCV):
             model = model.best_estimator_
 
@@ -144,6 +168,14 @@ class ModelEvaluator:
 
     @property
     def metrics(self) -> dict[str, Any]:
+        """Return the cached metrics dictionary computed by get_metrics().
+
+        Returns:
+            dict[str, Any]: Mapping of metric names to their computed values.
+
+        Raises:
+            ValueError: If get_metrics() has not been called yet.
+        """
         if self._metrics is None:
             raise ValueError("No metrics computed. Please run get_metrics() first.")
         return self._metrics
@@ -377,6 +409,22 @@ class ModelEvaluator:
     # -------------------------------------------------------------------------
 
     def _get_plot_filepath(self, plot_type: str, filename: str | None = None) -> str:
+        """Resolve and create the output filepath for a named plot type.
+
+        Creates the plot sub-directory under figures_dir if it does not exist,
+        then returns the full filepath using the provided filename or a default
+        constructed from the model prefix and plot type.
+
+        Args:
+            plot_type (str): Short name for the plot category (e.g., "roc_curve",
+                "confusion_matrix"). Used as both the sub-directory name and part
+                of the default filename.
+            filename (str | None, optional): Custom filename. If None, defaults to
+                ``{prefix}_{plot_type}.png``. Defaults to None.
+
+        Returns:
+            str: Absolute path to the output plot file.
+        """
         plot_dir = os.path.join(self.figures_dir, plot_type)
         os.makedirs(plot_dir, exist_ok=True)
 
@@ -795,6 +843,17 @@ class ModelEvaluator:
         metrics = self.get_metrics()
 
         def _convert(v: Any) -> Any:
+            """Convert a metric value to a JSON-serializable Python scalar.
+
+            Converts NumPy integer and floating types to their Python equivalents
+            and replaces NaN floats with None so that json.dump succeeds.
+
+            Args:
+                v (Any): The metric value to convert.
+
+            Returns:
+                Any: A JSON-serializable representation of v.
+            """
             if isinstance(v, float) and np.isnan(v):
                 return None
             if isinstance(v, (np.integer,)):

@@ -1437,6 +1437,17 @@ def plot_classifier_comparison(
 
     # Sort classifiers by mean F1
     def _mean_f1(clf: str) -> float:
+        """Return the mean F1 score for a classifier from the summary DataFrame.
+
+        Used as a sort key to order classifiers by descending mean F1 score.
+        Returns 0.0 when the classifier has no F1 entry in the summary.
+
+        Args:
+            clf (str): Classifier name as it appears in the summary_df index.
+
+        Returns:
+            float: Mean F1 score, or 0.0 if the entry is missing.
+        """
         try:
             return float(summary_df.loc[(clf, "f1_score"), "mean"])
         except KeyError:
