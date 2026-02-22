@@ -24,6 +24,7 @@ from eruption_forecast.config.constants import (
     THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
 )
+from eruption_forecast.plots.shap_plots import plot_shap_summary as _shap
 from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve as _plot_roc_styled,
@@ -96,7 +97,9 @@ class ModelEvaluator:
         model_name: str = "model",
         output_dir: str | None = None,
         selected_features: list[str] | None = None,
+        random_state: int | None = None,
         root_dir: str | None = None,
+        verbose: bool = False,
     ) -> None:
         if isinstance(model, GridSearchCV):
             model = model.best_estimator_
@@ -104,16 +107,27 @@ class ModelEvaluator:
         if selected_features is not None:
             X_test = X_test[selected_features]
 
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output"))
+        output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "evaluations")
+        )
+        metrics_dir = os.path.join(output_dir, "metrics")
+        figures_dir = os.path.join(output_dir, "figures")
 
         self.model = model
         self.X_test = X_test
         self.y_test = y_test
         self.model_name = model_name
-        self.output_dir = os.path.join(output_dir, "evaluations")
+        self.random_state = random_state
+        self.output_dir = output_dir
+        self.metrics_dir = metrics_dir
+        self.figures_dir = figures_dir
+        self.verbose = verbose
 
         os.makedirs(self.output_dir, exist_ok=True)
 
+        self._prefix = (
+            f"{random_state:05d}" if random_state is not None else f"{model_name}"
+        )
         self._y_pred: np.ndarray = model.predict(X_test)  # type: ignore[union-attr]
         self._y_proba: np.ndarray | None = self._get_proba()
         self._metrics: dict[str, Any] | None = None
@@ -188,29 +202,29 @@ class ModelEvaluator:
         self,
         fig,
         save: bool,
-        filename: str | None,
-        default_filename: str,
+        filepath: str,
         dpi: int = PLOT_DPI,
     ) -> None:
-        """
-        Save plot figure to output directory.
+        """Save and close a plot figure.
+
+        Saves the figure to disk when requested, then always closes it to
+        remove it from pyplot's figure manager. This prevents stale figures
+        from being reused by subsequent plot calls.
 
         Args:
             fig: Matplotlib figure object to save.
-            save: Whether to save the figure.
-            filename: Optional custom filename. If None, uses default_filename.
-            default_filename: Default filename if filename is None.
-            dpi: Dots per inch for saved figure. Defaults to PLOT_DPI constant.
+            save (bool): Whether to save the figure to disk.
+            filepath (str): Destination file path for the saved figure.
+            dpi (int): Dots per inch for saved figure. Defaults to PLOT_DPI constant.
 
         Returns:
             None
         """
         if save:
-            path = os.path.join(
-                self.output_dir, filename if filename else default_filename
-            )
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved: {path}")
+            fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
+            if self.verbose:
+                logger.info(f"Saved: {filepath}")
+        plt.close(fig)
 
     def _get_proba(self) -> np.ndarray | None:
         """Retrieve predicted probabilities or decision scores for the test set.
@@ -362,6 +376,16 @@ class ModelEvaluator:
     # Plots
     # -------------------------------------------------------------------------
 
+    def _get_plot_filepath(self, plot_type: str, filename: str | None = None) -> str:
+        plot_dir = os.path.join(self.figures_dir, plot_type)
+        os.makedirs(plot_dir, exist_ok=True)
+
+        default_filepath = os.path.join(
+            plot_dir, filename or f"{self._prefix}_{plot_type}.png"
+        )
+
+        return default_filepath
+
     def plot_confusion_matrix(
         self,
         normalize: str | None = None,
@@ -396,7 +420,10 @@ class ModelEvaluator:
         )
 
         self._save_plot(
-            fig, save, filename, f"{self.model_name}_confusion_matrix.png", dpi
+            fig,
+            save,
+            filepath=self._get_plot_filepath("confusion_matrix", filename=filename),
+            dpi=dpi,
         )
 
         return fig
@@ -434,7 +461,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(fig, save, filename, f"{self.model_name}_roc_curve.png", dpi)
+        self._save_plot(
+            fig,
+            save,
+            filepath=self._get_plot_filepath("roc_curve", filename=filename),
+            dpi=dpi,
+        )
 
         return fig
 
@@ -471,7 +503,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(fig, save, filename, f"{self.model_name}_pr_curve.png", dpi)
+        self._save_plot(
+            fig,
+            save,
+            filepath=self._get_plot_filepath("pr_curve", filename=filename),
+            dpi=dpi,
+        )
 
         return fig
 
@@ -575,7 +612,10 @@ class ModelEvaluator:
         )
 
         self._save_plot(
-            fig, save, filename, f"{self.model_name}_threshold_analysis.png", dpi
+            fig,
+            save,
+            filepath=self._get_plot_filepath("threshold_analysis", filename=filename),
+            dpi=dpi,
         )
 
         return fig
@@ -624,7 +664,10 @@ class ModelEvaluator:
             return None
 
         self._save_plot(
-            fig, save, filename, f"{self.model_name}_feature_importance.png", dpi
+            fig,
+            save,
+            filepath=self._get_plot_filepath("feature_importance", filename=filename),
+            dpi=dpi,
         )
 
         return fig
@@ -669,7 +712,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(fig, save, filename, f"{self.model_name}_calibration.png", dpi)
+        self._save_plot(
+            fig,
+            save,
+            filepath=self._get_plot_filepath("calibration", filename=filename),
+            dpi=dpi,
+        )
 
         return fig
 
@@ -712,7 +760,12 @@ class ModelEvaluator:
         )
 
         self._save_plot(
-            fig, save, filename, f"{self.model_name}_prediction_distribution.png", dpi
+            fig,
+            save,
+            filepath=self._get_plot_filepath(
+                "prediction_distribution", filename=filename
+            ),
+            dpi=dpi,
         )
 
         return fig
@@ -736,7 +789,8 @@ class ModelEvaluator:
             >>> saved_path = evaluator.save_metrics(path="results/my_metrics.json")
         """
         if path is None:
-            path = os.path.join(self.output_dir, f"{self.model_name}_metrics.json")
+            os.makedirs(self.metrics_dir, exist_ok=True)
+            path = os.path.join(self.metrics_dir, f"{self.model_name}_metrics.json")
 
         metrics = self.get_metrics()
 
@@ -785,7 +839,6 @@ class ModelEvaluator:
             >>> fig = evaluator.plot_shap_summary(max_display=15)
             >>> fig.savefig("custom_shap.png")
         """
-        from eruption_forecast.plots.shap_plots import plot_shap_summary as _shap
 
         fig = _shap(
             model=self.model,
@@ -795,7 +848,12 @@ class ModelEvaluator:
             title=f"SHAP Summary — {self.model_name}",
             dpi=dpi,
         )
-        self._save_plot(fig, save, filename, f"{self.model_name}_shap_summary.png", dpi)
+        self._save_plot(
+            fig,
+            save,
+            filepath=self._get_plot_filepath("shap_summary", filename=filename),
+            dpi=dpi,
+        )
         return fig
 
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
@@ -828,6 +886,6 @@ class ModelEvaluator:
             "threshold_analysis": self.plot_threshold_analysis(dpi=dpi),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
-            "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
             "shap_summary": self.plot_shap_summary(dpi=dpi),
+            "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
         }
