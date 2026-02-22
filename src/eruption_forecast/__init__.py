@@ -23,7 +23,11 @@ Examples:
     ... ).extract_features().train(classifier="xgb")
 """
 
+import logging
 from importlib.metadata import version
+
+
+logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.tremor.tremor_data import TremorData

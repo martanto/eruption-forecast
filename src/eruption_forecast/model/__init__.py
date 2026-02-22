@@ -12,10 +12,13 @@ Classes:
     ForecastModel: Orchestrates the complete forecasting pipeline.
 """
 
-try:
-    from sklearnex import patch_sklearn
+import logging
 
-    patch_sklearn()
+logging.getLogger("sklearnex").setLevel(logging.WARNING)
+
+try:
+    from sklearnex import patch_sklearn  # type: ignore[import-untyped]
+    patch_sklearn(verbose=False)
 except ImportError:
     pass
 
