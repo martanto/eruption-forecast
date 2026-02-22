@@ -1200,7 +1200,11 @@ class ForecastModel:
         )
 
         if save_model:
-            self.save_model()
+            self.save_config(os.path.join(self.station_dir, "config_train.yaml"))
+
+            self.save_model(
+                path=os.path.join(self.station_dir, "forecast_model_train.pkl")
+            )
 
         return self
 
@@ -1320,7 +1324,7 @@ class ForecastModel:
         """
         if path is None:
             ext = "json" if fmt == "json" else "yaml"
-            path = os.path.join(self.station_dir, f"config.{ext}")
+            path = os.path.join(self.station_dir, f"config_forecast.{ext}")
         return self._config.save(path, fmt=fmt)
 
     @classmethod
