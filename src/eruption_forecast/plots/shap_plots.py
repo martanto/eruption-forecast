@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     configure_spine,
@@ -63,7 +64,11 @@ def plot_shap_summary(
         >>> fig.savefig("shap_summary.png")
     """
     explainer = shap.Explainer(model, X)
-    shap_values = explainer(X)
+    try:
+        shap_values = explainer(X)
+    except Exception as e:
+        logger.warning(f"SHAP summary plot: {e}")
+        shap_values = explainer(X, check_additivity=False)
 
     # For binary classifiers shap_values may have shape (n, features, 2);
     # take the positive-class slice.
@@ -134,7 +139,11 @@ def plot_aggregate_shap_summary(
 
     for model, X in zip(models, X_tests, strict=False):
         explainer = shap.Explainer(model, X)
-        shap_values = explainer(X)
+        try:
+            shap_values = explainer(X)
+        except Exception as e:
+            logger.warning(f"SHAP aggregate summary plot: {e}")
+            shap_values = explainer(X, check_additivity=False)
 
         if hasattr(shap_values, "values") and shap_values.values.ndim == 3:  # noqa: PD011
             vals = shap_values.values[:, :, 1]  # noqa: PD011

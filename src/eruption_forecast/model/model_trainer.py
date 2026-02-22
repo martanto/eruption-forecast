@@ -1,13 +1,16 @@
-import json
 import os
+import json
+from typing import Any, Self, Literal
 from collections.abc import Callable
 from multiprocessing import Pool
-from typing import Any, Self, Literal
 
 import joblib
 import pandas as pd
 from sklearn.model_selection import GridSearchCV, train_test_split
 
+from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import random_under_sampler
+from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
     DEFAULT_CV_SPLITS,
@@ -19,15 +22,12 @@ from eruption_forecast.features.constants import (
     DATETIME_COLUMN,
     SIGNIFICANT_FEATURES_FILENAME,
 )
-from eruption_forecast.features.feature_selector import FeatureSelector
-from eruption_forecast.logger import logger
-from eruption_forecast.model.classifier_model import ClassifierModel
-from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.plots.feature_plots import (
     plot_significant_features as _plot_significant_features,
 )
-from eruption_forecast.utils.ml import random_under_sampler
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.features.feature_selector import FeatureSelector
 
 
 class ModelTrainer:
@@ -1114,6 +1114,10 @@ class ModelTrainer:
         suffix_filename = self._save_models_registry(
             significant_features_and_trained_models, random_state, total_seed
         )
+
+        # Save all metrics indexed by random_state
+        df_all_metrics = pd.DataFrame(all_metrics).set_index("random_state")
+        df_all_metrics.to_csv(os.path.join(self.classifier_dir, "all_metrics.csv"))
 
         # Aggregate and save metrics
         self._aggregate_metrics(all_metrics, suffix_filename=suffix_filename)
