@@ -5,28 +5,17 @@ computation, and eruption probability prediction.
 """
 
 import os
-import json
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import joblib
 import pandas as pd
-from sklearn.metrics import (
-    f1_score,
-    recall_score,
-    accuracy_score,
-    precision_score,
-    confusion_matrix,
-    balanced_accuracy_score,
-)
 from tsfresh.transformers import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
-from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
-from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 def random_under_sampler(

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import shap
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -61,8 +62,6 @@ def plot_shap_summary(
         >>> fig = plot_shap_summary(rf, X_test, feature_names=X_test.columns.tolist())
         >>> fig.savefig("shap_summary.png")
     """
-    import shap
-
     explainer = shap.Explainer(model, X)
     shap_values = explainer(X)
 
@@ -72,15 +71,17 @@ def plot_shap_summary(
         shap_values = shap_values[:, :, 1]
 
     with apply_nature_style():
-        fig = plt.figure(dpi=dpi)
+        existing_fignums = set(plt.get_fignums())
         shap.plots.beeswarm(
             shap_values,
             max_display=max_display,
             show=False,
         )
-        fig = plt.gcf()
+        new_fignums = set(plt.get_fignums()) - existing_fignums
+        fig = plt.figure(new_fignums.pop()) if new_fignums else plt.gcf()
+        fig.set_size_inches(20, max(8, max_display * 0.5))
+        fig.set_dpi(dpi)
         fig.suptitle(title or "SHAP Summary Plot", y=1.02)
-        plt.tight_layout()
 
     return fig
 
@@ -129,8 +130,6 @@ def plot_aggregate_shap_summary(
         >>> fig.savefig("aggregate_shap.png")
         >>> df.head()
     """
-    import shap
-
     all_abs_shap: list[np.ndarray] = []
 
     for model, X in zip(models, X_tests, strict=False):

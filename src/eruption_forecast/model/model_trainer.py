@@ -931,8 +931,9 @@ class ModelTrainer:
         if self.verbose:
             logger.info(f"{random_state:05d}: Model at {model_filepath}")
 
-        # Get and save metrics
+        # Get metrics evaluations
         model_evaluator = ModelEvaluator(
+            random_state=random_state,
             model=grid_search,
             X_test=features_test_selected,
             y_test=labels_test,
@@ -941,6 +942,7 @@ class ModelTrainer:
             selected_features=top_n_features,
         )
 
+        # Save metrics evaluations
         grid_params = grid_search.best_params_
         with open(metrics_filepath, "w") as f:
             metrics = model_evaluator.get_metrics()
@@ -955,6 +957,11 @@ class ModelTrainer:
                     "best_cv_score": grid_search.best_score_,
                 }
             )
+
+            # Plot evaluation
+            model_evaluator.plot_all(dpi=150)
+
+            # Save training model per seed
             json.dump(metrics, f, indent=4)
 
         if self.verbose:

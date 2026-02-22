@@ -200,16 +200,16 @@ class MultiModelEvaluator:
             dpi (int): Figure resolution in dots per inch.
             save (bool): When False, nothing is written.
         """
-        if not save:
-            return
         os.makedirs(self.output_dir, exist_ok=True)
         fig_path = os.path.join(self.output_dir, fig_filename)
-        fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
-        logger.info(f"Saved aggregate plot: {fig_path}")
-        if data is not None and data_filename is not None:
-            data_path = os.path.join(self.output_dir, data_filename)
-            data.to_csv(data_path)
-            logger.info(f"Saved aggregate data: {data_path}")
+        if save:
+            fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
+            logger.info(f"Saved aggregate plot: {fig_path}")
+            if data is not None and data_filename is not None:
+                data_path = os.path.join(self.output_dir, data_filename)
+                data.to_csv(data_path)
+                logger.info(f"Saved aggregate data: {data_path}")
+        plt.close(fig)
 
     # ------------------------------------------------------------------
     # Aggregate metrics (from JSON files)
