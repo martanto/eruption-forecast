@@ -102,7 +102,6 @@ def plot_confusion_matrix(
         ax.set_xlabel("Predicted Label")
         ax.set_ylabel("True Label")
         ax.set_title(title or "Confusion Matrix")
-        plt.tight_layout()
 
     return fig
 
@@ -577,13 +576,17 @@ def plot_prediction_distribution(
     proba_0 = y_proba[y_true == 0]
     proba_1 = y_proba[y_true == 1]
 
+    # Cap bins to unique values in each class to avoid "too many bins" errors
+    # when predicted probabilities cluster in a narrow range.
+    bins = max(1, min(20, len(np.unique(proba_0)), len(np.unique(proba_1))))
+
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=figsize)
 
         # Plot histograms for each class
         ax.hist(
             proba_0,
-            bins=20,
+            bins=bins,
             alpha=0.6,
             color=OKABE_ITO[4],  # Blue
             label=f"Not Erupted (n={len(proba_0)})",
@@ -592,7 +595,7 @@ def plot_prediction_distribution(
         )
         ax.hist(
             proba_1,
-            bins=20,
+            bins=bins,
             alpha=0.6,
             color=OKABE_ITO[0],  # Orange
             label=f"Erupted (n={len(proba_1)})",
@@ -1089,7 +1092,6 @@ def plot_aggregate_confusion_matrix(
         ax.set_xlabel("Predicted Label")
         ax.set_ylabel("True Label")
         ax.set_title(title or "Aggregate Confusion Matrix")
-        plt.tight_layout()
 
     # Always save raw counts regardless of display normalization
     data = pd.DataFrame(
@@ -1474,7 +1476,6 @@ def plot_classifier_comparison(
         ax.set_xlabel("Metric")
         ax.set_ylabel("Classifier")
         ax.set_title(title or "Classifier Comparison")
-        plt.tight_layout()
 
     return fig, summary_df
 
@@ -1577,6 +1578,5 @@ def plot_seed_stability(
         ax.set_xlabel("Classifier")
         ax.set_ylabel(metric.replace("_", " ").title())
         ax.set_title(title or f"Seed Stability — {metric}")
-        plt.tight_layout()
 
     return fig, long_df
