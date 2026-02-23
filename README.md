@@ -30,6 +30,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - [Package Architecture](#package-architecture)
 - [Pipeline Overview](#pipeline-overview)
 - [Installation](#installation)
+- [Data Sources](#data-sources)
 - [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
 - [Advanced Usage](#advanced-usage)
 - [Supported Classifiers](#supported-classifiers)
@@ -149,6 +150,79 @@ uv sync
 # Install with dev dependencies
 uv sync --group dev
 ```
+
+## Data Sources
+
+The package reads seismic data from two sources, both routed through `CalculateTremor`.
+
+### SDS — SeisComP Data Structure
+
+SDS is a standardized directory and file layout used by [SeisComP](https://www.seiscomp.de/) to store waveform data portably across data servers and analysis tools. See the [official SDS specification](https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html) for full details.
+
+**Directory layout:**
+
+```
+<sds_dir>/
+└── YEAR/
+    └── NET/
+        └── STA/
+            └── CHAN.TYPE/
+                └── NET.STA.LOC.CHAN.TYPE.YEAR.DAY
+```
+
+**Example** for network `VG`, station `OJN`, channel `EHZ`, day 075 of 2025:
+
+```
+/data/sds/
+└── 2025/
+    └── VG/
+        └── OJN/
+            └── EHZ.D/
+                └── VG.OJN.00.EHZ.D.2025.075
+```
+
+**Field reference:**
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `YEAR` | Four-digit year | `2025` |
+| `NET` | Network code (≤ 8 chars) | `VG` |
+| `STA` | Station code (≤ 8 chars) | `OJN` |
+| `CHAN` | Channel code (≤ 8 chars) | `EHZ` |
+| `LOC` | Location code (≤ 8 chars, may be empty) | `00` |
+| `TYPE` | Data type — `D` = waveform data (most common) | `D` |
+| `DAY` | Three-digit day-of-year, zero-padded | `075` |
+
+Files are miniSEED format. Periods in filenames are always present even when a field is empty.
+
+**Usage:**
+
+```python
+from eruption_forecast import CalculateTremor
+
+tremor = CalculateTremor(
+    station="OJN",
+    channel="EHZ",
+    start_date="2025-01-01",
+    end_date="2025-01-31",
+    n_jobs=4,
+).from_sds(sds_dir="/data/sds").run()
+```
+
+### FDSN — Web Service
+
+FDSN downloads waveform data from any FDSN-compatible web service (IRIS, GEOFON, etc.) and caches it locally as SDS miniSEED so subsequent runs skip the network.
+
+```python
+tremor = CalculateTremor(
+    station="OJN",
+    channel="EHZ",
+    start_date="2025-01-01",
+    end_date="2025-01-31",
+).from_fdsn(client_url="https://service.iris.edu").run()
+```
+
+---
 
 ## Quick Start: Complete Pipeline
 
