@@ -1,0 +1,292 @@
+# Visualization
+
+All plots use colorblind-safe palettes and high-DPI output suitable for publications and presentations.
+
+---
+
+## Tremor Time-Series Plots
+
+### `plot_tremor()`
+
+Visualize RSAM, DSAR, and Shannon Entropy as multi-panel time-series plots.
+
+```python
+from eruption_forecast.plots.tremor_plots import plot_tremor
+import pandas as pd
+
+df = pd.read_csv("output/VG.OJN.00.EHZ/tremor/tremor.csv", index_col=0, parse_dates=True)
+
+# Basic plot — all columns
+plot_tremor(df=df, figure_dir="output/figures", dpi=150)
+
+# Custom interval and selected columns
+plot_tremor(
+    df=df,
+    interval=6,
+    interval_unit="hours",
+    selected_columns=["rsam_f2", "rsam_f3", "dsar_f2-f3"],
+    figure_dir="output/figures",
+    filename="tremor_selected",
+    dpi=300,
+)
+```
+
+### `replot_tremor()` — Batch Replot
+
+Regenerate plots for all daily tremor CSV files (sequential or parallel).
+
+```python
+from eruption_forecast.plots.tremor_plots import replot_tremor
+
+results = replot_tremor(
+    daily_dir="output/VG.OJN.00.EHZ/tremor/daily",
+    output_dir="output/VG.OJN.00.EHZ/tremor/figures",
+    n_jobs=4,
+    dpi=300,
+    overwrite=False,
+)
+print(f"Created: {results['created']}, Skipped: {results['skipped']}, Failed: {results['failed']}")
+```
+
+---
+
+## Feature Importance Plots
+
+### `plot_significant_features()`
+
+Horizontal bar chart of feature importance or p-values.
+
+```python
+from eruption_forecast.plots.feature_plots import plot_significant_features
+
+plot_significant_features(
+    features="path/to/features.csv",  # or a DataFrame
+    number_of_features=50,
+    top_features=20,                   # Highlighted with darker colour
+    values_column="importance",        # or "p_values"
+    output_dir="output/figures",
+    filename="feature_importance",
+    dpi=150,
+)
+```
+
+### `replot_significant_features()` — Batch Replot
+
+```python
+from eruption_forecast.plots.feature_plots import replot_significant_features
+
+results = replot_significant_features(
+    all_features_dir="output/trainings/features/all_features",
+    output_dir="output/trainings/features/figures/significant",
+    n_jobs=4,
+    number_of_features=50,
+    top_features=20,
+    dpi=300,
+    overwrite=False,
+)
+```
+
+---
+
+## Model Evaluation Plots
+
+### Single-Seed (`ModelEvaluator`)
+
+`plot_all()` generates all 7–8 plots at once. Individual methods:
+
+```python
+from eruption_forecast import ModelEvaluator
+
+evaluator = ModelEvaluator.from_files(
+    model_path="output/.../models/00042.pkl",
+    X_test="output/.../tests/00042_X_test.csv",
+    y_test="output/.../tests/00042_y_test.csv",
+    model_name="xgb_seed_42",
+    output_dir="output/eval",
+)
+
+evaluator.plot_all()                      # All plots
+evaluator.plot_confusion_matrix()
+evaluator.plot_roc_curve()
+evaluator.plot_precision_recall_curve()
+evaluator.plot_threshold_analysis()
+evaluator.plot_feature_importance()
+evaluator.plot_calibration()
+evaluator.plot_prediction_distribution()
+evaluator.plot_shap_summary(max_display=20)  # Requires shap>=0.46
+```
+
+### Aggregate (`MultiModelEvaluator`)
+
+Requires `train_and_evaluate()` output — loads test data per seed and aggregates.
+
+```python
+from eruption_forecast import MultiModelEvaluator
+
+base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+ev = MultiModelEvaluator(
+    trained_model_csv=f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
+)
+
+figs = ev.plot_all(dpi=150, show_individual=True)
+# Keys: roc_curve, pr_curve, calibration, prediction_distribution,
+#       confusion_matrix, threshold_analysis, feature_importance,
+#       shap_summary, seed_stability, frequency_band_contribution
+```
+
+### Aggregation Strategy
+
+| Plot | How seeds are combined |
+|------|----------------------|
+| ROC Curve | Each seed's TPR interpolated onto shared FPR grid → mean ± std band |
+| Precision-Recall | Precision interpolated onto shared recall grid → mean ± std band |
+| Threshold Analysis | Metrics computed per threshold per seed → mean ± std bands |
+| Calibration | Fraction of positives interpolated → mean ± std band |
+| Prediction Distribution | Predicted probabilities pooled across seeds → single KDE per class |
+| Confusion Matrix | Raw confusion matrices summed across all seeds |
+| Feature Importance | Importances stacked → mean bar + std error bar |
+
+---
+
+## Classifier Comparison Heatmap
+
+Compare metrics across multiple classifiers. Each cell shows `mean ± std`; rows sorted by mean F1 descending.
+
+```python
+from eruption_forecast import MultiModelEvaluator
+from eruption_forecast.plots import plot_classifier_comparison
+
+base = "output/trainings/model-with-evaluation"
+metrics_by_clf = {}
+for clf in ["xgb", "rf", "gb"]:
+    ev = MultiModelEvaluator(
+        metrics_dir=f"{base}/{clf}-classifier/stratified-shuffle-split/metrics"
+    )
+    metrics_by_clf[clf] = ev.get_metrics_list()
+
+fig, summary_df = plot_classifier_comparison(
+    metrics_by_classifier=metrics_by_clf,
+    metrics_to_show=["balanced_accuracy", "f1_score", "precision", "recall", "roc_auc", "pr_auc"],
+    figsize=(12, 5),
+    dpi=150,
+)
+fig.savefig("classifier_comparison.png", bbox_inches="tight")
+```
+
+---
+
+## SHAP Explainability
+
+Understand which features drive predictions and in which direction.
+
+```python
+from eruption_forecast import ModelEvaluator, MultiModelEvaluator
+
+# Single-seed beeswarm
+evaluator = ModelEvaluator.from_files(
+    model_path="output/.../models/00042.pkl",
+    X_test="output/.../tests/00042_X_test.csv",
+    y_test="output/.../tests/00042_y_test.csv",
+    model_name="xgb_seed_42",
+)
+fig = evaluator.plot_shap_summary(max_display=20)
+
+# Aggregate mean |SHAP| bar chart across seeds
+ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
+fig = ev.plot_shap_summary(max_display=20)
+```
+
+> Requires `shap >= 0.46`.
+
+---
+
+## Seed Stability Plot
+
+Visualize metric variability across random seeds using a violin + strip plot.
+
+```python
+from eruption_forecast import MultiModelEvaluator
+from eruption_forecast.plots import plot_seed_stability
+
+# Single classifier
+ev = MultiModelEvaluator(
+    metrics_dir="output/.../xgb-classifier/stratified-shuffle-split/metrics"
+)
+fig = ev.plot_seed_stability(metric="f1_score")
+
+# Compare multiple classifiers side-by-side
+metrics_by_clf = {}
+for clf in ["xgb", "rf", "gb", "svm"]:
+    ev = MultiModelEvaluator(metrics_dir=f"output/.../{clf}/metrics")
+    metrics_by_clf[clf] = ev.get_metrics_list()
+
+fig, df = plot_seed_stability(
+    metrics_by_classifier=metrics_by_clf,
+    metric="balanced_accuracy",
+    dpi=150,
+)
+```
+
+---
+
+## Frequency Band Contribution
+
+Shows which seismic frequency bands dominate the selected features. RSAM bands are blue; DSAR bands are orange.
+
+```python
+from eruption_forecast import MultiModelEvaluator
+
+# Multi-seed, mean ± std per band
+ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
+fig = ev.plot_frequency_band_contribution()
+
+# Single-seed standalone
+from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
+import pandas as pd
+
+features = pd.read_csv("output/.../significant_features.csv", index_col=0).index.tolist()
+fig, df = plot_frequency_band_contribution(feature_names=features)
+# df columns: band, count
+```
+
+---
+
+## Forecast Visualization
+
+`ModelPredictor.predict_proba(plot=True)` automatically generates an eruption probability time-series plot saved to `figures/eruption_forecast.png`.
+
+- Per-classifier lines (dashed)
+- Consensus line (solid black)
+- Uncertainty band (shaded ± std)
+- Eruption event markers (if labels provided)
+
+---
+
+## Common Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dpi` | `int` | `150` | Resolution (use 300 for publication) |
+| `overwrite` | `bool` | `True` | Replace existing plots |
+| `n_jobs` | `int` | `1` | Parallel workers for batch utilities |
+| `output_dir` / `figure_dir` | `str` | varies | Directory for saved plots |
+| `verbose` | `bool` | `False` | Log plot generation |
+| `filename` | `str` | auto | Custom filename stem (extension added automatically) |
+
+---
+
+## Import Reference
+
+```python
+from eruption_forecast.plots.tremor_plots import plot_tremor, replot_tremor
+from eruption_forecast.plots.feature_plots import (
+    plot_significant_features,
+    replot_significant_features,
+    plot_frequency_band_contribution,
+)
+from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
+from eruption_forecast.plots import plot_classifier_comparison, plot_seed_stability
+
+# Top-level shortcuts
+from eruption_forecast import ModelEvaluator, MultiModelEvaluator
+```
