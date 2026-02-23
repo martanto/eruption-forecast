@@ -79,7 +79,6 @@ def main(use_relevant_features: bool = False):
     ).forecast(
         start_date="2025-07-28",
         end_date="2025-08-04",
-        window_size=2,
         window_step=10,
         window_step_unit="minutes",
     )

@@ -850,8 +850,10 @@ class ModelTrainer:
         df = pd.DataFrame(records).set_index("random_state")
         if df.empty:
             raise ValueError("No significant features or trained models found.")
+
         csv = os.path.join(self.classifier_dir, filename)
         df.to_csv(csv, index=True)
+
         self.df = df
         self.csv = csv
 
@@ -1072,6 +1074,7 @@ class ModelTrainer:
                 _y_test_filepath,
                 _can_skip,
             ) = self._generate_filepaths(_random_state)
+
             if _can_skip:
                 logger.info(f"Seed {_random_state:05d} already trained.")
                 with open(_metrics_filepath) as f:
