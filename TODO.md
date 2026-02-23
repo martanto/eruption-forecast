@@ -62,6 +62,7 @@
 - [ ] Create user documentation
 - [ ] Add example Jupyter notebooks
 - [ ] Performance benchmarking
+- [ ] **GPU acceleration** — Enable XGBoost GPU (`device="cuda"` in `classifier_model.py:444`); consider RAPIDS cuML (WSL2/Linux only) for RF/SVM/LR/KNN GPU support. XGBoost change is one line and works natively on Windows with NVIDIA GPU + CUDA drivers. tsfresh and GridSearchCV are CPU-bound and not GPU-friendly.
 - [ ] Explore LSTM/Transformer for sequential patterns
 - [ ] Add SHAP values for model explainability
 
