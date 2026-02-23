@@ -14,6 +14,7 @@ Classes:
 
 import logging
 
+
 logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
 try:
