@@ -80,7 +80,8 @@ def main(use_relevant_features: bool = False):
         sampling_strategy=0.75,
         save_all_features=True,
         plot_significant_features=True,
-        # n_jobs=1,
+        n_jobs=4,
+        grid_search_n_jobs=2,
         overwrite=False,
         verbose=True,
     )
