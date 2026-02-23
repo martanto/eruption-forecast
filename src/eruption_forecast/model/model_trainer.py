@@ -158,25 +158,25 @@ class ModelTrainer:
     """
 
     def __init__(
-            self,
-            extracted_features_csv: str,
-            label_features_csv: str,
-            output_dir: str | None = None,
-            root_dir: str | None = None,
-            prefix_filename: str | None = None,
-            classifier: Literal[
-                "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
-            ] = "rf",
-            cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
-            cv_splits: int = DEFAULT_CV_SPLITS,
-            number_of_significant_features: int = DEFAULT_N_SIGNIFICANT_FEATURES,
-            feature_selection_method: Literal[
-                "tsfresh", "random_forest", "combined"
-            ] = "tsfresh",
-            overwrite: bool = False,
-            n_jobs: int = 1,
-            verbose: bool = False,
-            debug: bool = False,
+        self,
+        extracted_features_csv: str,
+        label_features_csv: str,
+        output_dir: str | None = None,
+        root_dir: str | None = None,
+        prefix_filename: str | None = None,
+        classifier: Literal[
+            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
+        ] = "rf",
+        cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
+        cv_splits: int = DEFAULT_CV_SPLITS,
+        number_of_significant_features: int = DEFAULT_N_SIGNIFICANT_FEATURES,
+        feature_selection_method: Literal[
+            "tsfresh", "random_forest", "combined"
+        ] = "tsfresh",
+        overwrite: bool = False,
+        n_jobs: int = 1,
+        verbose: bool = False,
+        debug: bool = False,
     ) -> None:
         """Initialize the ModelTrainer with feature data, classifier settings, and output paths.
 
@@ -257,12 +257,6 @@ class ModelTrainer:
         # Classifier metrics dir: ``<classifier_dir>/metrics``
         metrics_dir = os.path.join(classifier_dir, "metrics")
 
-        # Per-seed test data dir: ``<classifier_dir>/tests``
-        tests_dir = os.path.join(classifier_dir, "tests")
-
-        # Aggregate plots and data dir: ``<classifier_dir>/plots``
-        figures_dir = os.path.join(classifier_dir, "figures")
-
         # Filtered features dir: ``<classifier_dir>/features``
         features_dir = os.path.join(classifier_dir, "features")
 
@@ -271,6 +265,9 @@ class ModelTrainer:
 
         # Significant features dir: ``<features_dir>/significant_features``
         significant_features_dir = os.path.join(features_dir, "significant_features")
+
+        # Per-seed test data dir: ``<features_dir>/tests``
+        tests_dir = os.path.join(features_dir, "tests")
 
         # Plot significant features dir: ``<features_dir>/figures/significant``
         figures_dir = os.path.join(features_dir, "figures")
@@ -378,8 +375,8 @@ class ModelTrainer:
             )
 
     def get_classifier_properties(
-            self,
-            classifier_model: ClassifierModel | None = None,
+        self,
+        classifier_model: ClassifierModel | None = None,
     ) -> tuple[str, str, str, str]:
         """Extract name, slug, and identifier strings from a ClassifierModel.
 
@@ -421,7 +418,7 @@ class ModelTrainer:
         )
 
     def update_directories(
-            self, output_dir: str | None = None, root_dir: str | None = None
+        self, output_dir: str | None = None, root_dir: str | None = None
     ) -> Self:
         """Recompute and update all subdirectory paths from a new output directory.
 
@@ -460,9 +457,6 @@ class ModelTrainer:
         # Classifier metrics dir: ``<classifier_dir>/metrics``
         self.metrics_dir = os.path.join(self.classifier_dir, "metrics")
 
-        # Per-seed test data dir: ``<classifier_dir>/tests``
-        self.tests_dir = os.path.join(self.classifier_dir, "tests")
-
         # Aggregate plots and data dir: ``<classifier_dir>/plots``
         self.figures_dir = os.path.join(self.classifier_dir, "plots")
 
@@ -481,12 +475,15 @@ class ModelTrainer:
         figures_dir = os.path.join(self.features_dir, "figures")
         self.significant_figures_dir = os.path.join(figures_dir, "significant")
 
+        # Per-seed test data dir: ``<features_dir>/tests``
+        self.tests_dir = os.path.join(self.features_dir, "tests")
+
         self.create_directories()
 
         return self
 
     def update_grid_params(
-            self, classifier: ClassifierModel, grid_params: dict[str, Any]
+        self, classifier: ClassifierModel, grid_params: dict[str, Any]
     ) -> ClassifierModel:
         """Update the hyperparameter grid for a classifier.
 
@@ -583,8 +580,8 @@ class ModelTrainer:
 
         # Save number_of_significant_features
         if (
-                number_of_significant_features is not None
-                and number_of_significant_features > 0
+            number_of_significant_features is not None
+            and number_of_significant_features > 0
         ):
             filename = (
                 f"{self.prefix_filename}_top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
@@ -614,13 +611,13 @@ class ModelTrainer:
 
     @logger.catch(level="ERROR")
     def select_features(
-            self,
-            features: pd.DataFrame,
-            labels: pd.Series,
-            significant_filepath: str,
-            random_state: int = 42,
-            all_features_filepath: str | None = None,
-            all_figures_filepath: str | None = None,
+        self,
+        features: pd.DataFrame,
+        labels: pd.Series,
+        significant_filepath: str,
+        random_state: int = 42,
+        all_features_filepath: str | None = None,
+        all_figures_filepath: str | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Series, int]:
         """Select the most predictive features from a resampled training set.
 
@@ -686,10 +683,10 @@ class ModelTrainer:
         )
 
     def _plot_all_significant_features(
-            self,
-            all_selected_features: pd.DataFrame,
-            all_figures_filepath: str,
-            top_features: int | None = None,
+        self,
+        all_selected_features: pd.DataFrame,
+        all_figures_filepath: str,
+        top_features: int | None = None,
     ):
         """Plot the significant feature importances accumulated across all seeds.
 
@@ -717,8 +714,8 @@ class ModelTrainer:
         return None
 
     def _generate_filepaths(
-            self,
-            random_state: int,
+        self,
+        random_state: int,
     ) -> tuple[str, str, str, str, str, str, str, str, bool]:
         """Generate filepaths based on random seed.
 
@@ -728,8 +725,8 @@ class ModelTrainer:
         Returns:
             str: Base filename
             str: Significant filepath
-            str: All features filepath
-            str: All figures filepath
+            str: All features CSV filepath
+            str: All features figures filepath
             str: Model filepath
             str: Metrics filepath
             str: X_test filepath (held-out features for this seed)
@@ -779,11 +776,11 @@ class ModelTrainer:
         )
 
     def _setup_grid_search(
-            self,
-            random_state: int,
-            features: pd.DataFrame,
-            labels: pd.Series,
-            top_n_features: list[str],
+        self,
+        random_state: int,
+        features: pd.DataFrame,
+        labels: pd.Series,
+        top_n_features: list[str],
     ) -> tuple[ClassifierModel, GridSearchCV, Any]:
         """Set up, fit, and return a GridSearchCV with the configured classifier.
 
@@ -817,10 +814,10 @@ class ModelTrainer:
         return [method(*job) for job in jobs]
 
     def _save_models_registry(
-            self,
-            records: list[dict],
-            random_state: int,
-            total_seed: int,
+        self,
+        records: list[dict],
+        random_state: int,
+        total_seed: int,
     ) -> str:
         """Build and save the trained-models registry CSV.
 
@@ -861,11 +858,11 @@ class ModelTrainer:
         return suffix
 
     def _run_train_and_evaluate(
-            self,
-            random_state: int,
-            sampling_strategy: str | float = 0.75,
-            save_features: bool = False,
-            plot_features: bool = False,
+        self,
+        random_state: int,
+        sampling_strategy: str | float = 0.75,
+        save_features: bool = False,
+        plot_features: bool = False,
     ) -> tuple[int, str, str, dict, str, str]:
         """Train feature selection and classifier model for a single random seed.
 
@@ -903,22 +900,8 @@ class ModelTrainer:
             metrics_filepath,
             X_test_filepath,
             y_test_filepath,
-            can_skip,
+            _,
         ) = self._generate_filepaths(random_state=random_state)
-
-        # Skip if files already exist
-        if can_skip:
-            logger.info(f"Seed {random_state:05d} already trained.")
-            with open(metrics_filepath) as f:
-                metrics = json.load(f)
-            return (
-                random_state,
-                significant_filepath,
-                model_filepath,
-                metrics,
-                X_test_filepath,
-                y_test_filepath,
-            )
 
         logger.info(f"Training Seed: {random_state:05d}")
 
@@ -1029,12 +1012,12 @@ class ModelTrainer:
         )
 
     def train_and_evaluate(
-            self,
-            random_state: int = 0,
-            total_seed: int = 500,
-            sampling_strategy: str | float = 0.75,
-            save_all_features: bool = False,
-            plot_significant_features: bool = False,
+        self,
+        random_state: int = 0,
+        total_seed: int = 500,
+        sampling_strategy: str | float = 0.75,
+        save_all_features: bool = False,
+        plot_significant_features: bool = False,
     ) -> None:
         """Train feature selection and classifier models across multiple random seeds.
 
@@ -1070,30 +1053,58 @@ class ModelTrainer:
         if plot_significant_features:
             os.makedirs(self.significant_figures_dir, exist_ok=True)
 
-        # Set job parameters
-        random_states: list[int] = [random_state + seed for seed in range(total_seed)]
-        jobs: list[tuple[int, str | float, bool, bool]] = [
-            (
-                _random_state,
-                sampling_strategy,
-                save_all_features,
-                plot_significant_features,
-            )
-            for _random_state in random_states
-        ]
-
         # Accumulate results across all seeds before aggregating
         all_metrics = []
         significant_features_and_trained_models = []
 
+        # Pre-filter: collect already-completed seeds without re-running them
+        random_states: list[int] = [random_state + seed for seed in range(total_seed)]
+        pending_jobs: list[tuple[int, str | float, bool, bool]] = []
+        for _random_state in random_states:
+            (
+                _,
+                _significant_filepath,
+                _,
+                _,
+                _model_filepath,
+                _metrics_filepath,
+                _X_test_filepath,
+                _y_test_filepath,
+                _can_skip,
+            ) = self._generate_filepaths(_random_state)
+            if _can_skip:
+                logger.info(f"Seed {_random_state:05d} already trained.")
+                with open(_metrics_filepath) as f:
+                    metrics = json.load(f)
+                self.significant_features_csvs.append(_significant_filepath)
+                significant_features_and_trained_models.append(
+                    {
+                        "random_state": _random_state,
+                        "significant_features_csv": _significant_filepath,
+                        "trained_model_filepath": _model_filepath,
+                        "X_test_filepath": _X_test_filepath,
+                        "y_test_filepath": _y_test_filepath,
+                    }
+                )
+                all_metrics.append(metrics)
+            else:
+                pending_jobs.append(
+                    (
+                        _random_state,
+                        sampling_strategy,
+                        save_all_features,
+                        plot_significant_features,
+                    )
+                )
+
         for (
-                _random_state,
-                significant_features_csv,
-                trained_model_filepath,
-                metrics,
-                X_test_filepath,
-                y_test_filepath,
-        ) in self._run_jobs(self._run_train_and_evaluate, jobs):
+            _random_state,
+            significant_features_csv,
+            trained_model_filepath,
+            metrics,
+            X_test_filepath,
+            y_test_filepath,
+        ) in self._run_jobs(self._run_train_and_evaluate, pending_jobs):
             self.significant_features_csvs.append(significant_features_csv)
             significant_features_and_trained_models.append(
                 {
@@ -1115,10 +1126,6 @@ class ModelTrainer:
             significant_features_and_trained_models, random_state, total_seed
         )
 
-        # Save all metrics indexed by random_state
-        df_all_metrics = pd.DataFrame(all_metrics).set_index("random_state")
-        df_all_metrics.to_csv(os.path.join(self.classifier_dir, "all_metrics.csv"))
-
         # Aggregate and save metrics
         self._aggregate_metrics(all_metrics, suffix_filename=suffix_filename)
 
@@ -1128,11 +1135,11 @@ class ModelTrainer:
         return None
 
     def _run_train(
-            self,
-            random_state: int,
-            sampling_strategy: str | float = 0.75,
-            save_features: bool = False,
-            plot_features: bool = False,
+        self,
+        random_state: int,
+        sampling_strategy: str | float = 0.75,
+        save_features: bool = False,
+        plot_features: bool = False,
     ) -> tuple[int, str, str]:
         """Train on the full dataset (no train/test split) for a single random seed.
 
@@ -1162,28 +1169,16 @@ class ModelTrainer:
 
         # ========== STEP 0: Preparation ==========
         (
-            _filename,
+            _,
             significant_filepath,
             all_features_filepath,
             all_figures_filepath,
             model_filepath,
-            _metrics_filepath,
-            _X_test_filepath,  # not used — train() has no test split
-            _y_test_filepath,  # not used — train() has no test split
-            _can_skip,  # ignored; _run_train() uses its own reduced skip check below
+            _,
+            _,
+            _,
+            _,
         ) = self._generate_filepaths(random_state=random_state)
-
-        # For train(), skip only based on significant + model files (no metrics,
-        # no figures — figures are optional and controlled by plot_significant_features).
-        can_skip = (
-                not self.overwrite
-                and os.path.isfile(significant_filepath)
-                and os.path.isfile(model_filepath)
-        )
-
-        if can_skip:
-            logger.info(f"Seed {random_state:05d} already fitted.")
-            return random_state, significant_filepath, model_filepath
 
         # ========== STEP 1: Resample Full Dataset ==========
         features_resampled, labels_resampled = random_under_sampler(
@@ -1229,12 +1224,12 @@ class ModelTrainer:
         return random_state, significant_filepath, model_filepath
 
     def train(
-            self,
-            random_state: int = 0,
-            total_seed: int = 500,
-            sampling_strategy: str | float = 0.75,
-            save_all_features: bool = False,
-            plot_significant_features: bool = False,
+        self,
+        random_state: int = 0,
+        total_seed: int = 500,
+        sampling_strategy: str | float = 0.75,
+        save_all_features: bool = False,
+        plot_significant_features: bool = False,
     ) -> None:
         """Train on the full dataset across multiple seeds (no train/test split).
 
@@ -1280,24 +1275,53 @@ class ModelTrainer:
         if plot_significant_features:
             os.makedirs(self.significant_figures_dir, exist_ok=True)
 
-        random_states: list[int] = [random_state + seed for seed in range(total_seed)]
-        jobs: list[tuple[int, str | float, bool, bool]] = [
-            (
-                _random_state,
-                sampling_strategy,
-                save_all_features,
-                plot_significant_features,
-            )
-            for _random_state in random_states
-        ]
-
         significant_features_and_trained_models = []
 
+        # Pre-filter: collect already-completed seeds without re-running them
+        random_states: list[int] = [random_state + seed for seed in range(total_seed)]
+        pending_jobs: list[tuple[int, str | float, bool, bool]] = []
+        for _rs in random_states:
+            (
+                _,
+                _significant_filepath,
+                _,
+                _,
+                _model_filepath,
+                _,
+                _,
+                _,
+                _,
+            ) = self._generate_filepaths(_rs)
+            _can_skip = (
+                not self.overwrite
+                and os.path.isfile(_significant_filepath)
+                and os.path.isfile(_model_filepath)
+            )
+            if _can_skip:
+                logger.info(f"Seed {_rs:05d} already fitted.")
+                self.significant_features_csvs.append(_significant_filepath)
+                significant_features_and_trained_models.append(
+                    {
+                        "random_state": _rs,
+                        "significant_features_csv": _significant_filepath,
+                        "trained_model_filepath": _model_filepath,
+                    }
+                )
+            else:
+                pending_jobs.append(
+                    (
+                        _rs,
+                        sampling_strategy,
+                        save_all_features,
+                        plot_significant_features,
+                    )
+                )
+
         for (
-                _random_state,
-                significant_features_csv,
-                trained_model_filepath,
-        ) in self._run_jobs(self._run_train, jobs):
+            _random_state,
+            significant_features_csv,
+            trained_model_filepath,
+        ) in self._run_jobs(self._run_train, pending_jobs):
             self.significant_features_csvs.append(significant_features_csv)
             significant_features_and_trained_models.append(
                 {
@@ -1335,7 +1359,7 @@ class ModelTrainer:
         return self.train(**kwargs)
 
     def _aggregate_metrics(
-            self, all_metrics: list[dict], suffix_filename: str = ""
+        self, all_metrics: list[dict], suffix_filename: str = ""
     ) -> None:
         """Aggregate metrics across all seeds.
 
@@ -1367,10 +1391,8 @@ class ModelTrainer:
         all_metrics_filepath = os.path.join(
             self.classifier_dir, f"all_metrics_{suffix_filename}.csv"
         )
-        df_metrics.to_csv(
-            all_metrics_filepath,
-            index=False,
-        )
+        df_metrics = df_metrics.set_index("random_state")
+        df_metrics.to_csv(all_metrics_filepath, index=True)
 
         logger.info("=" * 60)
         logger.info("Metrics Summary (mean ± std across seeds)")

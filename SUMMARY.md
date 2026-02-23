@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-20 (Refactor CalculateTremor.update() to @classmethod)
+**Last Updated:** 2026-02-22 (Complete Google-style docstrings across all source modules)
 
 ## ⚠️ Important Notice
 
@@ -2832,3 +2832,42 @@ Separated the aggregate evaluation logic out of `model_evaluator.py` (which was 
 - **`_update_process_day()` (new instance method):** Extracted from the former closure
   inside `update()` so it is a proper bound method and picklable by `Pool.starmap`
   for parallel execution.
+
+---
+
+## 2026-02-22 - Complete Google-style Docstrings Across All Source Modules
+
+### Overview
+
+Added missing Google-style docstrings to all functions, methods, and classes that lacked
+them across 19 source files. Every `__init__`, `__repr__`, `__str__`, inner decorator
+function, private helper, and property that was missing a docstring now has a full
+Google-style docstring including a summary sentence, description paragraph (where
+appropriate), Args, Returns, and Raises sections.
+
+### Files Modified
+
+1. `decorators/__init__.py` — inner `decorator` and `wrapper` functions in `save_parameters`, `save_properties`, `snapshot`, and `timer`; `setter` and `getter` closures in `save_on_change`; `new_init` wrapper
+2. `decorators/decorator_class.py` — `AutoSaveDict.__init__`
+3. `features/feature_selector.py` — `FeatureSelector.__init__`
+4. `features/features_builder.py` — `FeaturesBuilder.__init__`
+5. `features/tremor_matrix_builder.py` — `TremorMatrixBuilder.__init__`
+6. `label/label_builder.py` — `LabelBuilder.__repr__`, `LabelBuilder.__str__`
+7. `model/classifier_model.py` — `ClassifierModel.__init__`
+8. `model/forecast_model.py` — `ForecastModel.__init__`
+9. `model/model_evaluator.py` — `ModelEvaluator.__init__`, `metrics` property, `_get_plot_filepath`, `_convert` inner function
+10. `model/model_predictor.py` — `ModelPredictor.__init__`
+11. `model/model_trainer.py` — `ModelTrainer.__init__`, `_plot_all_significant_features`
+12. `model/multi_model_evaluator.py` — `MultiModelEvaluator.__init__`
+13. `plots/evaluation_plots.py` — `_mean_f1` inner function
+14. `sources/fdsn.py` — `FDSN.__init__`
+15. `sources/sds.py` — `SDS.__init__`
+16. `tremor/calculate_tremor.py` — `CalculateTremor.__init__`, `__str__`, `__repr__`
+17. `tremor/dsar.py` — `DSAR.__init__`
+18. `tremor/rsam.py` — `RSAM.__init__`
+19. `tremor/tremor_data.py` — `TremorData.__init__`, `TremorData.__repr__`
+
+### Verification
+
+- `uv run ruff check --fix src/` — all checks passed
+- `uv run pytest tests/test_imports.py -v` — 2/2 tests passed, no circular imports
