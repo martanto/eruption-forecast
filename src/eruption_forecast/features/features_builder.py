@@ -121,6 +121,33 @@ class FeaturesBuilder:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        """Initialize the FeaturesBuilder with tremor matrix, labels, and output settings.
+
+        Resolves the output directory, stores all parameters, initialises tsfresh
+        feature configuration, and sets result attributes to empty defaults.
+        Operates in training mode when label_df is provided, and in prediction
+        mode when label_df is None.
+
+        Args:
+            tremor_matrix_df (pd.DataFrame): Windowed tremor matrix from TremorMatrixBuilder.
+                Must contain 'id' and 'datetime' columns plus tremor metric columns.
+            output_dir (str | None, optional): Directory for saved feature CSVs.
+                Defaults to ``root_dir/output/features``. Defaults to None.
+            label_df (pd.DataFrame | None, optional): Label DataFrame with DatetimeIndex
+                and columns 'id' and 'is_erupted'. Pass None for prediction mode.
+                Defaults to None.
+            root_dir (str | None, optional): Anchor directory for relative path resolution.
+                Defaults to None (uses os.getcwd()).
+            overwrite (bool, optional): Re-extract even when output files exist.
+                Defaults to False.
+            n_jobs (int, optional): Number of parallel jobs for tsfresh. Defaults to 1.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+
+        Raises:
+            ValueError: If tremor_matrix_df or label_df is not a pd.DataFrame.
+            ValueError: If required columns are missing from tremor_matrix_df or label_df.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------

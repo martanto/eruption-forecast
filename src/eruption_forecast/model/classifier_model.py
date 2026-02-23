@@ -117,6 +117,28 @@ class ClassifierModel:
         class_weight: str | dict[int, float] | None = None,
         n_jobs: int = 1,
     ):
+        """Initialize the ClassifierModel with a classifier type and cross-validation settings.
+
+        Stores configuration and lazily initialises the underlying scikit-learn or
+        XGBoost estimator and its hyperparameter grid via the model and grid properties.
+        Also determines the CV splitter class name for logging purposes.
+
+        Args:
+            classifier (Literal["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb",
+                "lr", "voting", "lite-rf"]): Short identifier for the classifier to use.
+            random_state (int | None, optional): Random seed passed to classifiers
+                that support it. Defaults to None.
+            cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
+                Cross-validation strategy. Defaults to "shuffle".
+            n_splits (int, optional): Number of CV folds. Defaults to 5.
+            test_size (float, optional): Fraction of data used for the test split
+                when cv_strategy is "shuffle". Defaults to 0.2.
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
+            class_weight (str | dict[int, float] | None, optional): Class weight
+                scheme passed to classifiers that support it. Defaults to None.
+            n_jobs (int, optional): Number of parallel jobs for supported classifiers.
+                Defaults to 1.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT properties
         # ------------------------------------------------------------------

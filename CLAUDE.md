@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-18_
+_Last updated: 2026-02-20_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -21,6 +21,9 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 6. **ALWAYS create a new branch before any commits or modifications.** Use `git checkout -b copilot/<branch-name>` to create a new branch with `copilot/` prefix before making ANY commits or code modifications (e.g., `copilot/fix-docstrings`, `copilot/add-feature-x`). Never work directly on main or dev branches.
 7. **Always use `tests` directory when running testing.** Create the tests output inside `tests` directory.
 8. **Do not commit temporary test files.** Files starting with `test` in the root directory (e.g., `test_*.py`, `test.py`) should not be committed. These are temporary test scripts and are excluded via `.gitignore`.
+9. **All module imports must be at the top of the file.** Never place `import` statements inside functions, methods, or conditional blocks. All stdlib, third-party, and local imports belong at the module level, grouped and sorted by ruff.
+11. **Run circular import test after every module change.** After adding, removing, or reorganising any module or import, run `uv run pytest tests/test_imports.py -v` to confirm no circular imports were introduced.
+10. **Always use `martanto` for author contributions.** Use the GitHub username `martanto` for all author attributions in any file.
 
 ## Testing
 

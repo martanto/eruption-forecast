@@ -3,7 +3,7 @@ from typing import Self, Literal
 import pandas as pd
 from obspy import Trace, Stream
 
-from eruption_forecast.utils.window import shanon_entropy, calculate_window_metrics
+from eruption_forecast.utils.window import shannon_entropy, calculate_window_metrics
 
 
 class ShanonEntropy:
@@ -118,7 +118,7 @@ class ShanonEntropy:
         series = calculate_window_metrics(
             trace=trace,
             window_duration_minutes=window_duration_minutes,
-            metric_function=shanon_entropy,
+            metric_function=shannon_entropy,
             remove_outlier_method=remove_outlier_method,
             mask_zero_value=True,
             minimum_completion_ratio=minimum_completion_ratio,

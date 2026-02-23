@@ -7,11 +7,16 @@ This module provides publication-quality visualizations for ML model evaluation:
 - Feature importance
 - Calibration curves
 - Prediction distributions
+- Classifier comparison heatmaps
+- Seed stability violin plots
 
 All plots follow Nature/Science journal standards with consistent styling.
 """
 
+from typing import Any
+
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
@@ -97,7 +102,6 @@ def plot_confusion_matrix(
         ax.set_xlabel("Predicted Label")
         ax.set_ylabel("True Label")
         ax.set_title(title or "Confusion Matrix")
-        plt.tight_layout()
 
     return fig
 
@@ -572,13 +576,17 @@ def plot_prediction_distribution(
     proba_0 = y_proba[y_true == 0]
     proba_1 = y_proba[y_true == 1]
 
+    # Cap bins to unique values in each class to avoid "too many bins" errors
+    # when predicted probabilities cluster in a narrow range.
+    bins = max(1, min(20, len(np.unique(proba_0)), len(np.unique(proba_1))))
+
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=figsize)
 
         # Plot histograms for each class
         ax.hist(
             proba_0,
-            bins=20,
+            bins=bins,
             alpha=0.6,
             color=OKABE_ITO[4],  # Blue
             label=f"Not Erupted (n={len(proba_0)})",
@@ -587,7 +595,7 @@ def plot_prediction_distribution(
         )
         ax.hist(
             proba_1,
-            bins=20,
+            bins=bins,
             alpha=0.6,
             color=OKABE_ITO[0],  # Orange
             label=f"Erupted (n={len(proba_1)})",
@@ -613,3 +621,973 @@ def plot_prediction_distribution(
         ax.set_xlim((0.0, 1.0))
 
     return fig
+
+
+# ---------------------------------------------------------------------------
+# Aggregate (multi-seed) plot functions
+# ---------------------------------------------------------------------------
+
+
+def plot_aggregate_roc_curve(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    show_individual: bool = True,
+    title: str | None = None,
+    figsize: tuple[float, float] = (6, 5),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot aggregate ROC curves across multiple seeds with a mean ± std band.
+
+    Interpolates each seed's ROC curve onto a shared FPR grid, then plots the
+    mean curve as a bold line with a ±1 std confidence band. Individual seed
+    curves can optionally be drawn as thin background lines.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
+            for the positive class.
+        show_individual (bool, optional): Draw individual seed curves as thin
+            background lines. Defaults to True.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate ROC Curve".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (6, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``fpr``, ``mean_tpr``, ``std_tpr``.
+
+    Examples:
+        >>> fig, data = plot_aggregate_roc_curve(y_true, y_probas_list, dpi=150)
+        >>> fig.savefig("aggregate_roc.png")
+        >>> data.to_csv("roc_data.csv", index=False)
+    """
+    fpr_grid = np.linspace(0, 1, 200)
+    tprs: list[np.ndarray] = []
+    aucs: list[float] = []
+
+    # Broadcast single y_true to all seeds
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_probas)
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        for y_true, y_proba in zip(y_trues, y_probas, strict=False):
+            fpr, tpr, _ = roc_curve(y_true, y_proba)
+            tpr_interp = np.interp(fpr_grid, fpr, tpr)
+            tpr_interp[0] = 0.0
+            tprs.append(tpr_interp)
+            aucs.append(roc_auc_score(y_true, y_proba))
+
+            if show_individual:
+                ax.plot(
+                    fpr_grid,
+                    tpr_interp,
+                    color=OKABE_ITO[4],
+                    alpha=0.15,
+                    linewidth=0.5,
+                )
+
+        mean_tpr = np.mean(tprs, axis=0)
+        std_tpr = np.std(tprs, axis=0)
+        mean_auc = float(np.mean(aucs))
+        std_auc = float(np.std(aucs))
+
+        ax.plot(
+            fpr_grid,
+            mean_tpr,
+            color=OKABE_ITO[4],
+            linewidth=2.0,
+            label=f"Mean ROC (AUC = {mean_auc:.3f} ± {std_auc:.3f})",
+        )
+        ax.fill_between(
+            fpr_grid,
+            np.clip(mean_tpr - std_tpr, 0, 1),
+            np.clip(mean_tpr + std_tpr, 0, 1),
+            color=OKABE_ITO[4],
+            alpha=0.2,
+        )
+        ax.plot(
+            [0, 1],
+            [0, 1],
+            color=NATURE_COLORS["gray"],
+            linestyle="--",
+            linewidth=1.5,
+            label="Random Classifier",
+            alpha=0.7,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("False Positive Rate")
+        ax.set_ylabel("True Positive Rate")
+        ax.set_title(title or "Aggregate ROC Curve")
+        ax.legend(loc="lower right", frameon=False)
+        ax.set_xlim((0.0, 1.0))
+        ax.set_ylim((0.0, 1.05))
+
+    data = pd.DataFrame({"fpr": fpr_grid, "mean_tpr": mean_tpr, "std_tpr": std_tpr})
+    return fig, data
+
+
+def plot_aggregate_precision_recall_curve(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    show_individual: bool = True,
+    title: str | None = None,
+    figsize: tuple[float, float] = (6, 5),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot aggregate Precision-Recall curves across multiple seeds.
+
+    Interpolates each seed's PR curve onto a shared recall grid, then plots
+    the mean curve with a ±1 std confidence band.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
+            for the positive class.
+        show_individual (bool, optional): Draw individual seed curves as thin
+            background lines. Defaults to True.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate Precision-Recall Curve".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (6, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``recall``, ``mean_precision``, ``std_precision``.
+
+    Examples:
+        >>> fig, data = plot_aggregate_precision_recall_curve(y_true, y_probas_list)
+        >>> fig.savefig("aggregate_pr.png")
+        >>> data.to_csv("pr_data.csv", index=False)
+    """
+    recall_grid = np.linspace(0, 1, 200)
+    precisions: list[np.ndarray] = []
+    aps: list[float] = []
+
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_probas)
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        for y_true, y_proba in zip(y_trues, y_probas, strict=False):
+            precision, recall, _ = precision_recall_curve(y_true, y_proba)
+            # precision_recall_curve returns decreasing recall; flip for interp
+            prec_interp = np.interp(recall_grid, recall[::-1], precision[::-1])
+            precisions.append(prec_interp)
+            aps.append(average_precision_score(y_true, y_proba))
+
+            if show_individual:
+                ax.plot(
+                    recall_grid,
+                    prec_interp,
+                    color=OKABE_ITO[0],
+                    alpha=0.15,
+                    linewidth=0.5,
+                )
+
+        mean_prec = np.mean(precisions, axis=0)
+        std_prec = np.std(precisions, axis=0)
+        mean_ap = float(np.mean(aps))
+        std_ap = float(np.std(aps))
+
+        ax.plot(
+            recall_grid,
+            mean_prec,
+            color=OKABE_ITO[0],
+            linewidth=2.0,
+            label=f"Mean PR (AP = {mean_ap:.3f} ± {std_ap:.3f})",
+        )
+        ax.fill_between(
+            recall_grid,
+            np.clip(mean_prec - std_prec, 0, 1),
+            np.clip(mean_prec + std_prec, 0, 1),
+            color=OKABE_ITO[0],
+            alpha=0.2,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Recall")
+        ax.set_ylabel("Precision")
+        ax.set_title(title or "Aggregate Precision-Recall Curve")
+        ax.legend(loc="best", frameon=False)
+        ax.set_xlim((0.0, 1.0))
+        ax.set_ylim((0.0, 1.05))
+
+    data = pd.DataFrame(
+        {"recall": recall_grid, "mean_precision": mean_prec, "std_precision": std_prec}
+    )
+    return fig, data
+
+
+def plot_aggregate_calibration(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    n_bins: int = 10,
+    title: str | None = None,
+    figsize: tuple[float, float] = (6, 5),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot an aggregate calibration curve averaged across multiple seeds.
+
+    Computes each seed's calibration curve on a uniform bin grid, then
+    plots the mean fraction of positives with a ±1 std band against the
+    perfect calibration diagonal.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
+            for the positive class.
+        n_bins (int, optional): Number of calibration bins. Defaults to 10.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate Calibration Curve".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (6, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``prob_bin``, ``mean_frac_positives``,
+            ``std_frac_positives``.
+
+    Examples:
+        >>> fig, data = plot_aggregate_calibration(y_true, y_probas_list, n_bins=10)
+        >>> fig.savefig("aggregate_calibration.png")
+        >>> data.to_csv("calibration_data.csv", index=False)
+    """
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_probas)
+
+    # Use uniform mean_predicted_value grid for consistent alignment
+    prob_grid = np.linspace(0, 1, n_bins)
+    fracs: list[np.ndarray] = []
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        for y_true, y_proba in zip(y_trues, y_probas, strict=False):
+            frac, mean_pred = calibration_curve(
+                y_true, y_proba, n_bins=n_bins, strategy="uniform"
+            )
+            frac_interp = np.interp(prob_grid, mean_pred, frac)
+            fracs.append(frac_interp)
+
+        mean_frac = np.mean(fracs, axis=0)
+        std_frac = np.std(fracs, axis=0)
+
+        ax.plot(
+            prob_grid,
+            mean_frac,
+            marker="s",
+            markersize=5,
+            linewidth=2.0,
+            color=OKABE_ITO[4],
+            label=f"Mean Model (n={len(y_probas)} seeds)",
+        )
+        ax.fill_between(
+            prob_grid,
+            np.clip(mean_frac - std_frac, 0, 1),
+            np.clip(mean_frac + std_frac, 0, 1),
+            color=OKABE_ITO[4],
+            alpha=0.2,
+        )
+        ax.plot(
+            [0, 1],
+            [0, 1],
+            color=NATURE_COLORS["gray"],
+            linestyle="--",
+            linewidth=1.5,
+            label="Perfectly Calibrated",
+            alpha=0.7,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Mean Predicted Probability")
+        ax.set_ylabel("Fraction of Positives")
+        ax.set_title(title or "Aggregate Calibration Curve")
+        ax.legend(loc="best", frameon=False)
+        ax.set_xlim((0.0, 1.0))
+        ax.set_ylim((0.0, 1.0))
+
+    data = pd.DataFrame(
+        {
+            "prob_bin": prob_grid,
+            "mean_frac_positives": mean_frac,
+            "std_frac_positives": std_frac,
+        }
+    )
+    return fig, data
+
+
+def plot_aggregate_prediction_distribution(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    title: str | None = None,
+    figsize: tuple[float, float] = (8, 5),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot overlaid KDE distributions of predicted probabilities across all seeds.
+
+    Pools predicted probabilities from all seeds by true class and plots
+    kernel density estimates. This gives a smooth ensemble-level view of
+    model discrimination.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
+            for the positive class.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate Prediction Distribution".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (8, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``y_proba`` and ``y_true`` containing the pooled
+            probabilities and labels from all seeds.
+
+    Examples:
+        >>> fig, data = plot_aggregate_prediction_distribution(y_true, y_probas_list)
+        >>> fig.savefig("aggregate_pred_dist.png")
+        >>> data.to_csv("prediction_distribution_data.csv", index=False)
+    """
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_probas)
+
+    all_proba_0: list[float] = []
+    all_proba_1: list[float] = []
+
+    for y_true, y_proba in zip(y_trues, y_probas, strict=False):
+        all_proba_0.extend(y_proba[y_true == 0].tolist())
+        all_proba_1.extend(y_proba[y_true == 1].tolist())
+
+    proba_0 = np.array(all_proba_0)
+    proba_1 = np.array(all_proba_1)
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        sns.kdeplot(
+            proba_0,
+            ax=ax,
+            color=OKABE_ITO[4],
+            fill=True,
+            alpha=0.4,
+            linewidth=2.0,
+            label=f"Not Erupted (n={len(proba_0)})",
+        )
+        sns.kdeplot(
+            proba_1,
+            ax=ax,
+            color=OKABE_ITO[0],
+            fill=True,
+            alpha=0.4,
+            linewidth=2.0,
+            label=f"Erupted (n={len(proba_1)})",
+        )
+        ax.axvline(
+            0.5,
+            color=NATURE_COLORS["gray"],
+            linestyle="--",
+            linewidth=1.5,
+            label="Threshold (0.5)",
+            alpha=0.7,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Predicted Probability")
+        ax.set_ylabel("Density")
+        ax.set_title(title or "Aggregate Prediction Distribution")
+        ax.legend(loc="best", frameon=False)
+        ax.set_xlim((0.0, 1.0))
+
+    pooled_probas = np.concatenate([proba_0, proba_1])
+    pooled_trues = np.concatenate([np.zeros(len(proba_0)), np.ones(len(proba_1))])
+    data = pd.DataFrame({"y_proba": pooled_probas, "y_true": pooled_trues.astype(int)})
+    return fig, data
+
+
+def plot_aggregate_confusion_matrix(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_preds: list[np.ndarray],
+    normalize: str | None = None,
+    title: str | None = None,
+    figsize: tuple[float, float] = (6, 5),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot a summed confusion matrix across all seeds.
+
+    Accumulates raw confusion matrices from every seed, then optionally
+    normalises the result and displays it as a heatmap. The returned DataFrame
+    always contains raw (un-normalised) counts so the data can be re-analysed
+    independently of the display normalization.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_preds (list[np.ndarray]): List of per-seed binary predictions.
+        normalize (str | None, optional): Normalisation mode: ``"true"``,
+            ``"pred"``, ``"all"``, or None (raw counts). Defaults to None.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate Confusion Matrix".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (6, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            containing the raw summed confusion matrix with index and columns
+            ``["not_erupted", "erupted"]``.
+
+    Examples:
+        >>> fig, data = plot_aggregate_confusion_matrix(y_true, y_preds_list)
+        >>> fig.savefig("aggregate_cm.png")
+        >>> data.to_csv("confusion_matrix_data.csv")
+    """
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_preds)
+
+    # Sum raw confusion matrices across all seeds
+    cm_sum = np.zeros((2, 2), dtype=np.int64)
+    for y_true, y_pred in zip(y_trues, y_preds, strict=False):
+        cm_sum += confusion_matrix(y_true, y_pred)
+
+    labels = ["Not Erupted", "Erupted"]
+
+    if normalize == "true":
+        cm_display = cm_sum.astype(float) / cm_sum.sum(axis=1, keepdims=True)
+        fmt = ".2f"
+    elif normalize == "pred":
+        cm_display = cm_sum.astype(float) / cm_sum.sum(axis=0, keepdims=True)
+        fmt = ".2f"
+    elif normalize == "all":
+        cm_display = cm_sum.astype(float) / cm_sum.sum()
+        fmt = ".2f"
+    else:
+        cm_display = cm_sum
+        fmt = "d"
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+        sns.heatmap(
+            cm_display,
+            annot=True,
+            fmt=fmt,
+            cmap="Blues",
+            xticklabels=labels,
+            yticklabels=labels,
+            ax=ax,
+            cbar_kws={"label": "Normalized" if normalize else "Count (summed)"},
+        )
+        ax.set_xlabel("Predicted Label")
+        ax.set_ylabel("True Label")
+        ax.set_title(title or "Aggregate Confusion Matrix")
+
+    # Always save raw counts regardless of display normalization
+    data = pd.DataFrame(
+        cm_sum,
+        index=["not_erupted", "erupted"],
+        columns=["not_erupted", "erupted"],
+    )
+    return fig, data
+
+
+def plot_aggregate_threshold_analysis(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    show_individual: bool = True,
+    title: str | None = None,
+    figsize: tuple[float, float] = (10, 6),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot mean metric curves vs. decision threshold across multiple seeds.
+
+    Sweeps thresholds from 0 to 1 and computes F1, precision, recall, and
+    balanced accuracy per seed. Plots the mean of each metric with a ±1 std
+    confidence band.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
+            for the positive class.
+        show_individual (bool, optional): Draw individual seed curves as thin
+            background lines. Defaults to True.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate Threshold Analysis".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (10, 6).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``threshold``, ``mean_precision``, ``std_precision``,
+            ``mean_recall``, ``std_recall``, ``mean_f1``, ``std_f1``,
+            ``mean_balanced_accuracy``, ``std_balanced_accuracy``.
+
+    Examples:
+        >>> fig, data = plot_aggregate_threshold_analysis(y_true, y_probas_list)
+        >>> fig.savefig("aggregate_threshold.png")
+        >>> data.to_csv("threshold_data.csv", index=False)
+    """
+    thresholds = np.linspace(0, 1, 101)
+    metric_keys = ["precision", "recall", "f1", "balanced_accuracy"]
+    colors = {
+        "precision": OKABE_ITO[4],
+        "recall": OKABE_ITO[0],
+        "f1": OKABE_ITO[2],
+        "balanced_accuracy": OKABE_ITO[6],
+    }
+    labels_map = {
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1 Score",
+        "balanced_accuracy": "Balanced Accuracy",
+    }
+
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_probas)
+
+    # all_curves[key] is a list of 1-D arrays, one per seed
+    all_curves: dict[str, list[np.ndarray]] = {k: [] for k in metric_keys}
+
+    for y_true, y_proba in zip(y_trues, y_probas, strict=False):
+        curves: dict[str, list[float]] = {k: [] for k in metric_keys}
+        for t in thresholds:
+            y_pred_t = (y_proba >= t).astype(int)
+            curves["precision"].append(
+                precision_score(y_true, y_pred_t, zero_division=0)
+            )
+            curves["recall"].append(recall_score(y_true, y_pred_t, zero_division=0))
+            curves["f1"].append(f1_score(y_true, y_pred_t, zero_division=0))
+            curves["balanced_accuracy"].append(
+                balanced_accuracy_score(y_true, y_pred_t)
+            )
+        for k in metric_keys:
+            all_curves[k].append(np.array(curves[k]))
+
+    # Compute mean and std per metric for the data DataFrame
+    mean_curves: dict[str, np.ndarray] = {}
+    std_curves: dict[str, np.ndarray] = {}
+    for key in metric_keys:
+        matrix = np.stack(all_curves[key], axis=0)
+        mean_curves[key] = matrix.mean(axis=0)
+        std_curves[key] = matrix.std(axis=0)
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        for key in metric_keys:
+            mean_curve = mean_curves[key]
+            std_curve = std_curves[key]
+
+            if show_individual:
+                for seed_curve in all_curves[key]:
+                    ax.plot(
+                        thresholds,
+                        seed_curve,
+                        color=colors[key],
+                        alpha=0.10,
+                        linewidth=0.5,
+                    )
+
+            ax.plot(
+                thresholds,
+                mean_curve,
+                color=colors[key],
+                linewidth=2.0,
+                label=labels_map[key],
+            )
+            ax.fill_between(
+                thresholds,
+                np.clip(mean_curve - std_curve, 0, 1),
+                np.clip(mean_curve + std_curve, 0, 1),
+                color=colors[key],
+                alpha=0.15,
+            )
+
+        ax.axvline(
+            0.5,
+            color=NATURE_COLORS["gray"],
+            linestyle=":",
+            linewidth=1.5,
+            label="Default (0.5)",
+            alpha=0.7,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Decision Threshold")
+        ax.set_ylabel("Score")
+        ax.set_title(title or "Aggregate Threshold Analysis")
+        ax.legend(loc="best", frameon=False, ncol=2)
+        ax.set_xlim((0.0, 1.0))
+        ax.set_ylim((0.0, 1.05))
+
+    data = pd.DataFrame(
+        {
+            "threshold": thresholds,
+            "mean_precision": mean_curves["precision"],
+            "std_precision": std_curves["precision"],
+            "mean_recall": mean_curves["recall"],
+            "std_recall": std_curves["recall"],
+            "mean_f1": mean_curves["f1"],
+            "std_f1": std_curves["f1"],
+            "mean_balanced_accuracy": mean_curves["balanced_accuracy"],
+            "std_balanced_accuracy": std_curves["balanced_accuracy"],
+        }
+    )
+    return fig, data
+
+
+def plot_aggregate_feature_importance(
+    models: list[BaseEstimator],
+    feature_names: list[str],
+    top_n: int = 20,
+    title: str | None = None,
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame] | None:
+    """Plot mean feature importances across multiple seeds with ±1 std error bars.
+
+    Extracts feature importances from each seed's model, computes the mean and
+    standard deviation across seeds, and displays a horizontal bar chart for the
+    top-N features. Returns None if no model exposes feature importances. The
+    returned DataFrame contains all features (not just top-N) so users can
+    re-filter or re-rank without recomputing.
+
+    Args:
+        models (list[BaseEstimator]): List of fitted scikit-learn estimators.
+            Supports tree-based models and VotingClassifier.
+        feature_names (list[str]): Feature names matching the model's input
+            columns.
+        top_n (int, optional): Number of top features to display. Defaults to 20.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate Top-{top_n} Feature Importances".
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame] | None: Matplotlib figure and a
+            DataFrame with columns ``feature``, ``mean_importance``,
+            ``std_importance`` sorted by descending mean importance
+            (all features, not just top-N). Returns None if no model exposes
+            ``feature_importances_``.
+
+    Examples:
+        >>> result = plot_aggregate_feature_importance(models_list, feature_names)
+        >>> if result:
+        ...     fig, data = result
+        ...     fig.savefig("aggregate_fi.png")
+        ...     data.to_csv("feature_importance_data.csv", index=False)
+    """
+    all_importances: list[np.ndarray] = []
+
+    for model in models:
+        importances: np.ndarray | None = None
+        if hasattr(model, "feature_importances_"):
+            importances = model.feature_importances_  # type: ignore[assignment]
+        elif isinstance(model, VotingClassifier):
+            sub_imps = [
+                est.feature_importances_
+                for est in model.estimators_
+                if hasattr(est, "feature_importances_")
+            ]
+            if sub_imps:
+                importances = np.mean(sub_imps, axis=0)
+
+        if importances is not None:
+            all_importances.append(importances)
+
+    if not all_importances:
+        return None
+
+    stacked = np.stack(all_importances, axis=0)  # shape (n_seeds, n_features)
+    mean_imp = stacked.mean(axis=0)
+    std_imp = stacked.std(axis=0)
+
+    # Select top-N by mean importance for display
+    indices = np.argsort(mean_imp)[::-1][:top_n]
+    top_features = [feature_names[i] for i in indices]
+    top_mean = mean_imp[indices]
+    top_std = std_imp[indices]
+
+    # Reverse for bottom-to-top display
+    top_features = top_features[::-1]
+    top_mean = top_mean[::-1]
+    top_std = top_std[::-1]
+
+    figheight = max(4, top_n * 0.35)
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=(8, figheight), dpi=dpi)
+
+        ax.barh(
+            range(len(top_features)),
+            top_mean,
+            xerr=top_std,
+            color=OKABE_ITO[4],
+            alpha=0.8,
+            error_kw={"ecolor": NATURE_COLORS["gray"], "capsize": 3, "linewidth": 1.0},
+        )
+        ax.set_yticks(range(len(top_features)))
+        ax.set_yticklabels(top_features)
+
+        configure_spine(ax)
+        ax.set_xlabel("Mean Importance Score ± Std")
+        ax.set_ylabel("Feature")
+        ax.set_title(title or f"Aggregate Top-{top_n} Feature Importances")
+
+    # Save all features (not just top-N) for downstream filtering
+    all_sorted_idx = np.argsort(mean_imp)[::-1]
+    data = pd.DataFrame(
+        {
+            "feature": [feature_names[i] for i in all_sorted_idx],
+            "mean_importance": mean_imp[all_sorted_idx],
+            "std_importance": std_imp[all_sorted_idx],
+        }
+    )
+    return fig, data
+
+
+# ---------------------------------------------------------------------------
+# Cross-classifier comparison plots
+# ---------------------------------------------------------------------------
+
+_DEFAULT_METRICS = [
+    "balanced_accuracy",
+    "f1_score",
+    "precision",
+    "recall",
+    "roc_auc",
+    "pr_auc",
+]
+
+
+def plot_classifier_comparison(
+    metrics_by_classifier: dict[str, list[dict[str, Any]]],
+    metrics_to_show: list[str] | None = None,
+    figsize: tuple[float, float] = (12, 5),
+    dpi: int = 150,
+    title: str | None = None,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot a heatmap comparing metrics across multiple classifiers.
+
+    Computes mean and standard deviation of each metric across seeds for
+    every classifier, then renders a heatmap where each cell shows
+    ``mean ± std``. Classifiers are sorted by mean F1 descending.
+
+    Args:
+        metrics_by_classifier (dict[str, list[dict[str, Any]]]): Mapping
+            from classifier name to a list of per-seed metrics dicts.
+            Each dict must contain numeric keys matching ``metrics_to_show``.
+        metrics_to_show (list[str] | None, optional): Metric keys to include
+            as heatmap columns. Defaults to
+            ``["balanced_accuracy", "f1_score", "precision", "recall",
+            "roc_auc", "pr_auc"]``.
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (12, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, uses
+            "Classifier Comparison". Defaults to None.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a summary
+            DataFrame with MultiIndex ``(classifier, metric)`` and columns
+            ``mean`` and ``std``.
+
+    Examples:
+        >>> metrics_by_clf = {
+        ...     "rf":  [{"f1_score": 0.8, "precision": 0.75, ...}, ...],
+        ...     "xgb": [{"f1_score": 0.85, "precision": 0.80, ...}, ...],
+        ... }
+        >>> fig, df = plot_classifier_comparison(metrics_by_clf)
+        >>> fig.savefig("classifier_comparison.png")
+        >>> df.to_csv("comparison_summary.csv")
+    """
+    if metrics_to_show is None:
+        metrics_to_show = _DEFAULT_METRICS
+
+    # Build summary: mean and std per (classifier, metric)
+    records: list[dict[str, Any]] = []
+    for clf_name, seeds_list in metrics_by_classifier.items():
+        for metric in metrics_to_show:
+            values = [s[metric] for s in seeds_list if metric in s]
+            if values:
+                records.append(
+                    {
+                        "classifier": clf_name,
+                        "metric": metric,
+                        "mean": float(np.mean(values)),
+                        "std": float(np.std(values)),
+                    }
+                )
+
+    summary_df = pd.DataFrame(records).set_index(["classifier", "metric"])
+
+    # Build mean matrix (rows = classifiers, cols = metrics)
+    classifiers = list(metrics_by_classifier.keys())
+
+    # Sort classifiers by mean F1
+    def _mean_f1(clf: str) -> float:
+        """Return the mean F1 score for a classifier from the summary DataFrame.
+
+        Used as a sort key to order classifiers by descending mean F1 score.
+        Returns 0.0 when the classifier has no F1 entry in the summary.
+
+        Args:
+            clf (str): Classifier name as it appears in the summary_df index.
+
+        Returns:
+            float: Mean F1 score, or 0.0 if the entry is missing.
+        """
+        try:
+            return float(summary_df.loc[(clf, "f1_score"), "mean"])
+        except KeyError:
+            return 0.0
+
+    classifiers = sorted(classifiers, key=_mean_f1, reverse=True)
+
+    mean_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=float)
+    std_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=float)
+    annot_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=str)
+
+    for clf in classifiers:
+        for metric in metrics_to_show:
+            try:
+                m = float(summary_df.loc[(clf, metric), "mean"])
+                s = float(summary_df.loc[(clf, metric), "std"])
+            except KeyError:
+                m, s = float("nan"), 0.0
+            mean_matrix.loc[clf, metric] = m
+            std_matrix.loc[clf, metric] = s
+            annot_matrix.loc[clf, metric] = f"{m:.3f}\n±{s:.3f}"
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+        sns.heatmap(
+            mean_matrix.astype(float),
+            annot=annot_matrix,
+            fmt="",
+            cmap="viridis",
+            vmin=0.0,
+            vmax=1.0,
+            ax=ax,
+            linewidths=0.5,
+            cbar_kws={"label": "Mean Score"},
+            annot_kws={"size": 8},
+        )
+        ax.set_xlabel("Metric")
+        ax.set_ylabel("Classifier")
+        ax.set_title(title or "Classifier Comparison")
+
+    return fig, summary_df
+
+
+def plot_seed_stability(
+    metrics_by_classifier: dict[str, list[dict[str, Any]]],
+    metric: str = "f1_score",
+    figsize: tuple[float, float] | None = None,
+    dpi: int = 150,
+    title: str | None = None,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot a violin plot showing metric stability across random seeds per classifier.
+
+    Renders one violin per classifier with individual seed dots overlaid as a
+    jittered strip plot. Classifiers are sorted by median descending. The mean
+    across seeds is marked with a horizontal white line.
+
+    Args:
+        metrics_by_classifier (dict[str, list[dict[str, Any]]]): Mapping
+            from classifier name to a list of per-seed metrics dicts.
+        metric (str, optional): Metric key to plot. Must be present in each
+            seed dict. Defaults to ``"f1_score"``.
+        figsize (tuple[float, float] | None, optional): Figure size in inches.
+            If None, auto-sizes based on number of classifiers using
+            ``(10, max(5, n * 0.6))``. Defaults to None.
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, uses
+            ``"Seed Stability — {metric}"``. Defaults to None.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a long-form
+            DataFrame with columns ``classifier``, ``seed_idx``, and
+            ``value``.
+
+    Examples:
+        >>> metrics_by_clf = {
+        ...     "rf":  [{"f1_score": 0.8}, {"f1_score": 0.82}, ...],
+        ...     "xgb": [{"f1_score": 0.85}, {"f1_score": 0.84}, ...],
+        ... }
+        >>> fig, df = plot_seed_stability(metrics_by_clf, metric="balanced_accuracy")
+        >>> fig.savefig("seed_stability.png")
+    """
+    # Build long-form DataFrame
+    rows: list[dict[str, Any]] = []
+    for clf_name, seeds_list in metrics_by_classifier.items():
+        for seed_idx, seed_metrics in enumerate(seeds_list):
+            if metric in seed_metrics:
+                rows.append(
+                    {
+                        "classifier": clf_name,
+                        "seed_idx": seed_idx,
+                        "value": seed_metrics[metric],
+                    }
+                )
+    long_df = pd.DataFrame(rows)
+
+    # Sort classifiers by median descending
+    order = (
+        long_df.groupby("classifier")["value"]
+        .median()
+        .sort_values(ascending=False)
+        .index.tolist()
+    )
+
+    n_classifiers = len(order)
+    if figsize is None:
+        figsize = (10, max(5, n_classifiers * 0.6))
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        sns.violinplot(
+            data=long_df,
+            x="classifier",
+            y="value",
+            order=order,
+            ax=ax,
+            color=OKABE_ITO[4],
+            alpha=0.7,
+            inner=None,
+        )
+        sns.stripplot(
+            data=long_df,
+            x="classifier",
+            y="value",
+            order=order,
+            ax=ax,
+            color="black",
+            size=3,
+            alpha=0.5,
+            jitter=True,
+        )
+
+        # Mark mean per classifier
+        for i, clf in enumerate(order):
+            mean_val = long_df.loc[long_df["classifier"] == clf, "value"].mean()
+            ax.hlines(mean_val, i - 0.3, i + 0.3, colors="white", linewidths=2.0)
+
+        configure_spine(ax)
+        ax.set_xlabel("Classifier")
+        ax.set_ylabel(metric.replace("_", " ").title())
+        ax.set_title(title or f"Seed Stability — {metric}")
+
+    return fig, long_df

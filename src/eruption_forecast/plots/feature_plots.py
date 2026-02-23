@@ -1,14 +1,17 @@
 """Feature importance and selection visualization with Nature/Science styling."""
 
 import os
+import re
 from pathlib import Path
 from multiprocessing import Pool
 
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import (
+    OKABE_ITO,
     NATURE_COLORS,
     configure_spine,
     apply_nature_style,
@@ -431,3 +434,171 @@ def replot_significant_features(
     )
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Frequency band contribution plot
+# ---------------------------------------------------------------------------
+
+_BAND_PREFIX_RE = re.compile(r"^((?:rsam|dsar)_[^_]+)")
+
+
+def _extract_band_prefix(feature_name: str) -> str:
+    """Extract the seismic band prefix from a tsfresh feature name.
+
+    Parses the leading ``rsam_fN`` or ``dsar_fN-fM`` segment from a
+    tsfresh feature string such as ``rsam_f2__mean`` or
+    ``dsar_f0-f1__quantile__q_0.9``.
+
+    Args:
+        feature_name (str): Full tsfresh feature name.
+
+    Returns:
+        str: Band prefix (e.g. ``"rsam_f2"`` or ``"dsar_f0-f1"``), or the
+            full string if no prefix is recognised.
+    """
+    match = _BAND_PREFIX_RE.match(feature_name)
+    return match.group(1) if match else feature_name
+
+
+def plot_frequency_band_contribution(
+    feature_names: list[str] | list[list[str]],
+    figsize: tuple[float, float] = (8, 5),
+    dpi: int = 150,
+    title: str | None = None,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot the number of selected features grouped by seismic frequency band.
+
+    Parses tsfresh feature names to extract band prefixes (e.g. ``rsam_f2``,
+    ``dsar_f0-f1``) and counts how many features belong to each band. When
+    ``feature_names`` is a list of lists (multi-seed), computes mean ± std
+    count per band across seeds.
+
+    RSAM bands are coloured blue and DSAR bands are coloured orange to make
+    the contribution of each measurement type immediately apparent.
+
+    Args:
+        feature_names (list[str] | list[list[str]]): Either a flat list of
+            feature names (single seed) or a list of lists (one list per
+            seed for multi-seed aggregation).
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (8, 5).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, uses
+            "Feature Count by Frequency Band". Defaults to None.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame.
+            For single-seed input: columns ``band`` and ``count``.
+            For multi-seed input: columns ``band``, ``mean_count``, and
+            ``std_count``.
+
+    Examples:
+        >>> # Single seed
+        >>> fig, df = plot_frequency_band_contribution(selected_feature_names)
+        >>> fig.savefig("band_contribution.png")
+
+        >>> # Multi-seed (one list of features per seed)
+        >>> per_seed_features = [seed0_features, seed1_features, ...]
+        >>> fig, df = plot_frequency_band_contribution(per_seed_features)
+        >>> fig.savefig("band_contribution_aggregate.png")
+    """
+    is_multi_seed = feature_names and isinstance(feature_names[0], list)
+
+    if is_multi_seed:
+        # Build count DataFrame per seed then aggregate
+        seed_counts: list[pd.Series] = []
+        for seed_features in feature_names:  # type: ignore[union-attr]
+            prefixes = [_extract_band_prefix(f) for f in seed_features]
+            counts = pd.Series(prefixes).value_counts()
+            seed_counts.append(counts)
+
+        count_df = pd.DataFrame(seed_counts).fillna(0)
+        mean_counts = count_df.mean()
+        std_counts = count_df.std().fillna(0)
+
+        # Sort by mean count descending
+        order = mean_counts.sort_values(ascending=False).index.tolist()
+        display_mean = mean_counts[order]
+        display_std = std_counts[order]
+
+        # Reverse for bottom-to-top bar display
+        display_bands = order[::-1]
+        display_mean = display_mean.iloc[::-1]
+        display_std = display_std.iloc[::-1]
+
+        bar_colors = [
+            OKABE_ITO[4] if b.startswith("rsam") else OKABE_ITO[0]
+            for b in display_bands
+        ]
+
+        with apply_nature_style():
+            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+            ax.barh(
+                range(len(display_bands)),
+                display_mean,
+                xerr=display_std,
+                color=bar_colors,
+                alpha=0.8,
+                error_kw={"ecolor": "gray", "capsize": 3, "linewidth": 1.0},
+            )
+            ax.set_yticks(range(len(display_bands)))
+            ax.set_yticklabels(display_bands)
+            configure_spine(ax)
+            ax.set_xlabel("Mean Feature Count ± Std")
+            ax.set_ylabel("Frequency Band")
+            ax.set_title(title or "Feature Count by Frequency Band")
+            # Legend
+            legend_handles = [
+                Patch(facecolor=OKABE_ITO[4], alpha=0.8, label="RSAM"),
+                Patch(facecolor=OKABE_ITO[0], alpha=0.8, label="DSAR"),
+            ]
+            ax.legend(handles=legend_handles, frameon=False)
+            plt.tight_layout()
+
+        data = pd.DataFrame(
+            {
+                "band": order,
+                "mean_count": mean_counts[order].to_numpy(),
+                "std_count": std_counts[order].to_numpy(),
+            }
+        )
+
+    else:
+        # Single seed
+        prefixes = [_extract_band_prefix(f) for f in feature_names]  # type: ignore[arg-type]
+        counts = pd.Series(prefixes).value_counts()
+
+        order = counts.index.tolist()
+        display_bands = order[::-1]
+        display_counts = counts.iloc[::-1]
+
+        bar_colors = [
+            OKABE_ITO[4] if b.startswith("rsam") else OKABE_ITO[0]
+            for b in display_bands
+        ]
+
+        with apply_nature_style():
+            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+            ax.barh(
+                range(len(display_bands)),
+                display_counts,
+                color=bar_colors,
+                alpha=0.8,
+            )
+            ax.set_yticks(range(len(display_bands)))
+            ax.set_yticklabels(display_bands)
+            configure_spine(ax)
+            ax.set_xlabel("Feature Count")
+            ax.set_ylabel("Frequency Band")
+            ax.set_title(title or "Feature Count by Frequency Band")
+            legend_handles = [
+                Patch(facecolor=OKABE_ITO[4], alpha=0.8, label="RSAM"),
+                Patch(facecolor=OKABE_ITO[0], alpha=0.8, label="DSAR"),
+            ]
+            ax.legend(handles=legend_handles, frameon=False)
+            plt.tight_layout()
+
+        data = pd.DataFrame({"band": order, "count": counts[order].to_numpy()})
+
+    return fig, data

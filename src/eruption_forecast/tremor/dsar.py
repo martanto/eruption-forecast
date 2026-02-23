@@ -43,6 +43,19 @@ class DSAR:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        """Initialize the DSAR calculator with outlier removal and logging settings.
+
+        Sets processing flags and initialises result attributes to None. No
+        computation occurs until calculate() is called.
+
+        Args:
+            remove_outlier_method (Literal["maximum", "all"], optional): Outlier
+                removal strategy applied to each amplitude series before computing
+                the ratio. "maximum" removes only the global maximum outlier;
+                "all" removes all Z-score outliers. Defaults to "maximum".
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT properties
         # ------------------------------------------------------------------

@@ -104,6 +104,30 @@ class TremorMatrixBuilder:
         verbose: bool = False,
         debug: bool = False,
     ):
+        """Initialize the TremorMatrixBuilder with tremor data, labels, and window settings.
+
+        Validates that both DataFrames carry a DatetimeIndex, derives output paths and
+        filename, and sets result attributes to empty defaults. Calls validate() and
+        create_directories() before returning.
+
+        Args:
+            tremor_df (pd.DataFrame): Tremor DataFrame with DatetimeIndex. Must contain
+                tremor metric columns (rsam_*, dsar_*).
+            label_df (pd.DataFrame): Label DataFrame with DatetimeIndex and at least
+                an 'id' column.
+            output_dir (str | None, optional): Directory for saved matrix CSVs.
+                Defaults to ``root_dir/output/features``. Defaults to None.
+            window_size (int, optional): Window size in days. Defaults to 1.
+            root_dir (str | None, optional): Anchor directory for relative path resolution.
+                Defaults to None (uses os.getcwd()).
+            overwrite (bool, optional): Overwrite existing output files. Defaults to False.
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
+            debug (bool, optional): Enable debug mode. Defaults to False.
+
+        Raises:
+            TypeError: If tremor_df or label_df index is not a pd.DatetimeIndex.
+            ValueError: If required label columns are missing or tremor columns are absent.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------

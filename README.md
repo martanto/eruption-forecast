@@ -54,6 +54,10 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
   - [Tremor Time-Series Plots](#tremor-time-series-plots)
   - [Feature Importance Plots](#feature-importance-plots)
   - [Model Evaluation Plots](#model-evaluation-plots)
+  - [Classifier Comparison Heatmap](#classifier-comparison-heatmap)
+  - [SHAP Explainability Plots](#shap-explainability-plots)
+  - [Seed Stability Plot](#seed-stability-plot)
+  - [Frequency Band Contribution](#frequency-band-contribution)
   - [Forecast Visualization](#forecast-visualization)
   - [Batch Replot Utilities](#batch-replot-utilities)
   - [Common Parameters](#common-parameters)
@@ -76,7 +80,7 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - **Feature Extraction**: Extract 700+ time-series features using tsfresh for machine learning
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
-- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, and feature importance
+- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, classifier comparison heatmaps, seed stability violin plots, and frequency band contribution charts
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Logging**: Built-in logging with loguru for debugging and monitoring
@@ -107,7 +111,8 @@ eruption-forecast/
 │   │   ├── forecast_model.py
 │   │   ├── model_trainer.py
 │   │   ├── model_predictor.py
-│   │   ├── model_evaluator.py
+│   │   ├── model_evaluator.py       # Single-seed evaluation
+│   │   ├── multi_model_evaluator.py # Multi-seed aggregate evaluation
 │   │   └── classifier_model.py
 │   ├── sources/             # Seismic data source adapters
 │   │   ├── sds.py           # SDS (SeisComP Data Structure) reader
@@ -937,6 +942,108 @@ print(f"Optimal threshold: {threshold:.3f}")
 print(f"F1 at threshold:   {threshold_metrics['f1']:.4f}")
 ```
 
+#### Save Single-Seed Metrics to JSON
+
+After evaluating a single seed, call `save_metrics()` to persist the metrics dict as JSON:
+
+```python
+# Metrics are serialized with np.nan → null
+path = evaluator.save_metrics()
+# Saved to: {output_dir}/{model_name}_metrics.json
+
+# Or specify an explicit path
+path = evaluator.save_metrics("results/xgb_42_metrics.json")
+print(f"Saved: {path}")
+```
+
+#### Aggregate Evaluation (All Seeds) with MultiModelEvaluator
+
+When training with `with_evaluation=True`, each seed's held-out test split is saved to a `tests/`
+directory alongside per-seed `metrics/*.json` files. Use `MultiModelEvaluator` to aggregate across all seeds:
+
+```python
+from eruption_forecast import MultiModelEvaluator
+
+base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
+
+# --- From a model registry CSV (enables plots) ---
+evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
+
+# Generate all 7 aggregate plots at once (saved to <registry_dir>/figures/)
+figs = evaluator.plot_all(dpi=150, show_individual=True)
+# Keys: roc_curve, pr_curve, calibration, prediction_distribution,
+#       confusion_matrix, threshold_analysis, feature_importance
+
+# Or generate individual aggregate plots
+evaluator.plot_roc(show_individual=True)
+evaluator.plot_precision_recall(show_individual=True)
+evaluator.plot_calibration(n_bins=10)
+evaluator.plot_prediction_distribution()
+evaluator.plot_confusion_matrix(normalize=None)
+evaluator.plot_threshold_analysis(show_individual=True)
+evaluator.plot_feature_importance(top_n=20)
+```
+
+Each plot method accepts `save=True` (default), `filename=None`, `dpi=150`, and `title=None`. Figures and their CSV data are saved to `{output_dir}/figures/` (defaults to `<registry_dir>/figures/`).
+
+#### Aggregate Metrics from JSON Files
+
+Use `get_aggregate_metrics()` to summarize per-seed JSON metrics written by `save_metrics()`:
+
+```python
+# --- From per-seed metrics JSON files ---
+metrics_dir = f"{base}/metrics"
+evaluator = MultiModelEvaluator(metrics_dir=metrics_dir)
+
+# Returns a DataFrame: index = metric name, columns = mean/std/min/max
+summary = evaluator.get_aggregate_metrics()
+print(summary.loc["f1_score"])
+# mean     0.7842
+# std      0.0321
+# min      0.6900
+# max      0.8500
+
+# Save to CSV
+path = evaluator.save_aggregate_metrics()
+# Saved to: {metrics_dir}/figures/aggregate_metrics.csv
+
+path = evaluator.save_aggregate_metrics("my_summary.csv")
+```
+
+You can also provide an explicit list of JSON files or a custom output directory:
+
+```python
+import glob
+
+json_files = sorted(glob.glob(f"{base}/metrics/*.json"))
+evaluator = MultiModelEvaluator(
+    metrics_files=json_files,
+    output_dir="output/eval/aggregate",
+)
+summary = evaluator.get_aggregate_metrics()
+evaluator.save_aggregate_metrics()
+```
+
+#### Combining Metrics and Plots
+
+Pass both `metrics_dir` and `trained_model_csv` to get everything in one object:
+
+```python
+evaluator = MultiModelEvaluator(
+    metrics_dir=f"{base}/metrics",
+    trained_model_csv=trained_model_csv,
+    output_dir="output/eval/aggregate",
+)
+
+# JSON-based aggregate stats
+summary = evaluator.get_aggregate_metrics()
+evaluator.save_aggregate_metrics()
+
+# Registry-based aggregate plots
+figs = evaluator.plot_all()
+```
+
 ### 12. Analyze Training Results
 
 ```python
@@ -1330,10 +1437,11 @@ plot_significant_features(
 
 ### Model Evaluation Plots
 
-The `ModelEvaluator` class provides 7 evaluation plot types for comprehensive model analysis.
+The `ModelEvaluator` class provides 7 evaluation plot types for single-seed and aggregate (ensemble-level) analysis.
 
 #### Available Plot Types
 
+**Single-seed** (instance methods on `ModelEvaluator`):
 1. **Confusion Matrix** - Classification performance breakdown
 2. **ROC Curve** - True/false positive rate tradeoff with AUC score
 3. **Precision-Recall Curve** - Precision/recall tradeoff with Average Precision
@@ -1341,18 +1449,53 @@ The `ModelEvaluator` class provides 7 evaluation plot types for comprehensive mo
 5. **Feature Importance** - Top contributing features to predictions
 6. **Calibration Curve** - Predicted vs actual probabilities (reliability diagram)
 7. **Prediction Distribution** - Score distributions by class (histogram + KDE)
+8. **SHAP Summary** - Beeswarm plot showing feature impact direction and magnitude
 
-#### Usage Example
+**Aggregate across all seeds** (`MultiModelEvaluator`, requires `train_and_evaluate()`):
+- `evaluator.plot_all()` — runs all 10 aggregate plots at once
+- `evaluator.plot_roc()` — mean ROC ± std band across seeds
+- `evaluator.plot_precision_recall()` — mean PR curve ± std band
+- `evaluator.plot_calibration()` — mean calibration ± std band
+- `evaluator.plot_prediction_distribution()` — pooled KDE by class
+- `evaluator.plot_confusion_matrix()` — summed confusion matrix
+- `evaluator.plot_threshold_analysis()` — mean metrics vs threshold ± std
+- `evaluator.plot_feature_importance()` — mean importance ± std error bars
+- `evaluator.plot_shap_summary()` — mean |SHAP| bar chart across seeds
+- `evaluator.plot_seed_stability()` — violin plot of a metric across seeds
+- `evaluator.plot_frequency_band_contribution()` — feature counts per seismic band
+
+**Aggregate metrics (from JSON files, no plots)**:
+- `evaluator.get_aggregate_metrics()` — returns mean/std/min/max per metric
+- `evaluator.get_metrics_list()` — returns raw per-seed metrics as list of dicts
+- `evaluator.save_aggregate_metrics()` — saves summary to CSV
+
+#### How Aggregation Works
+
+Each seed produces its own 80/20 train/test split; the held-out `X_test` and `y_test` are saved to `tests/` during training. Aggregate plots load every seed's test data and model, then apply the following strategy per plot type:
+
+| Plot | Aggregation method |
+|---|---|
+| **ROC Curve** | Each seed's TPR is interpolated onto a shared FPR grid (200 points, 0→1). All curves are stacked into an `(n_seeds × 200)` matrix. **Mean** TPR is the bold line; **±1 std** is the shaded band. Mean AUC ± std is shown in the legend. |
+| **Precision-Recall Curve** | Each seed's precision is interpolated onto a shared recall grid (200 points). **Mean** precision is the bold line; **±1 std** is the shaded band. Mean AP ± std in legend. |
+| **Threshold Analysis** | For each of 101 thresholds (0→1), F1, precision, recall, and balanced accuracy are computed per seed. Each metric is stacked `(n_seeds × 101)` and the **mean** curve is plotted bold with **±1 std** shaded bands. |
+| **Calibration Curve** | Each seed's calibration curve is interpolated onto a shared probability grid (n_bins points). **Mean** fraction of positives is the bold line; **±1 std** is the shaded band. |
+| **Prediction Distribution** | Predicted probabilities from all seeds are **pooled** (concatenated) separately for class 0 and class 1, then a single KDE is computed over the full pool for each class. |
+| **Confusion Matrix** | Raw confusion matrices are **summed** across all seeds (total TP/TN/FP/FN across the entire ensemble). Optional normalization is applied after summing. |
+| **Feature Importance** | Importances are stacked `(n_seeds × n_features)`. **Mean** importance per feature is the bar length; **±1 std** is the error bar. Top-N features selected by mean importance. |
+
+#### Single-Seed Usage Example
 
 ```python
-from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast import ModelEvaluator
 
-# Create evaluator from trained model
+# Load from files
 evaluator = ModelEvaluator.from_files(
-    model_path="output/trainings/model.pkl",
-    features_csv="output/features.csv",
-    label_csv="output/label.csv",
-    output_dir="output/figures",
+    model_path="output/trainings/models/00042.pkl",
+    X_test="output/trainings/tests/00042_X_test.csv",
+    y_test="output/trainings/tests/00042_y_test.csv",
+    selected_features=["feat_a", "feat_b"],  # optional
+    model_name="xgb_seed_42",
+    output_dir="output/eval",
 )
 
 # Generate all 7 plots at once
@@ -1366,9 +1509,159 @@ evaluator.plot_threshold_analysis()
 evaluator.plot_feature_importance()
 evaluator.plot_calibration()
 evaluator.plot_prediction_distribution()
+evaluator.plot_shap_summary(max_display=20)
+
+# Save metrics to JSON
+path = evaluator.save_metrics()
 ```
 
 All plots are saved to `output_dir` with publication-quality styling.
+
+#### Multi-Seed Usage Example
+
+```python
+from eruption_forecast import MultiModelEvaluator
+
+base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
+
+# Plots from registry CSV
+evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
+figs = evaluator.plot_all(dpi=150, show_individual=True)
+
+# Aggregate stats from JSON metrics files
+evaluator = MultiModelEvaluator(metrics_dir=f"{base}/metrics")
+summary = evaluator.get_aggregate_metrics()
+evaluator.save_aggregate_metrics()
+print(summary.loc[["f1_score", "roc_auc", "balanced_accuracy"]])
+```
+
+### Classifier Comparison Heatmap
+
+Compare performance metrics across multiple classifiers in a single viridis heatmap. Each cell shows `mean ± std` over seeds; rows are sorted by mean F1 descending.
+
+```python
+from eruption_forecast import MultiModelEvaluator
+from eruption_forecast.plots import plot_classifier_comparison
+
+base = "output/trainings/model-with-evaluation"
+
+# Load metrics from each classifier's evaluator
+metrics_by_clf = {}
+for clf in ["xgb", "rf", "gb"]:
+    ev = MultiModelEvaluator(
+        metrics_dir=f"{base}/{clf}-classifier/stratified-shuffle-split/metrics"
+    )
+    metrics_by_clf[clf] = ev.get_metrics_list()
+
+# Plot comparison heatmap
+fig, summary_df = plot_classifier_comparison(
+    metrics_by_classifier=metrics_by_clf,
+    metrics_to_show=["balanced_accuracy", "f1_score", "precision", "recall", "roc_auc", "pr_auc"],
+    figsize=(12, 5),
+    dpi=150,
+)
+fig.savefig("classifier_comparison.png", bbox_inches="tight")
+
+# summary_df has MultiIndex (classifier, metric) with columns mean/std
+print(summary_df.loc[("xgb", "f1_score")])
+```
+
+### SHAP Explainability Plots
+
+Understand *why* the model makes predictions using SHAP (SHapley Additive exPlanations). The beeswarm plot shows both the direction (positive/negative) and magnitude of each feature's contribution.
+
+```python
+from eruption_forecast import ModelEvaluator, MultiModelEvaluator
+
+# Single-seed beeswarm plot
+evaluator = ModelEvaluator.from_files(
+    model_path="output/.../models/00042.pkl",
+    X_test="output/.../tests/00042_X_test.csv",
+    y_test="output/.../tests/00042_y_test.csv",
+    model_name="xgb_seed_42",
+)
+fig = evaluator.plot_shap_summary(max_display=20)
+fig.savefig("shap_single.png", bbox_inches="tight")
+
+# Aggregate mean |SHAP| bar chart across all seeds
+ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
+fig = ev.plot_shap_summary(max_display=20)  # saves automatically
+
+# Low-level standalone functions
+from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
+
+fig = plot_shap_summary(model, X_test, feature_names=features, max_display=15)
+
+fig, df = plot_aggregate_shap_summary(
+    models=trained_models,
+    X_tests=x_test_list,
+    feature_names=feature_names,
+    max_display=20,
+)
+# df has columns: feature, mean_shap, std_shap
+```
+
+### Seed Stability Plot
+
+Visualize how stable a metric is across random seeds using a violin + strip plot. Useful for detecting high-variance classifiers or seed-sensitive configurations.
+
+```python
+from eruption_forecast import MultiModelEvaluator
+from eruption_forecast.plots import plot_seed_stability
+
+# From a single classifier's evaluator (single violin)
+ev = MultiModelEvaluator(
+    metrics_dir="output/.../xgb-classifier/stratified-shuffle-split/metrics",
+    trained_model_csv="output/.../trained_model_registry.csv",
+)
+fig = ev.plot_seed_stability(metric="f1_score")  # saves automatically
+
+# Compare multiple classifiers side-by-side using standalone function
+metrics_by_clf = {}
+for clf in ["xgb", "rf", "gb", "svm"]:
+    ev = MultiModelEvaluator(
+        metrics_dir=f"output/.../trainings/{clf}/metrics"
+    )
+    metrics_by_clf[clf] = ev.get_metrics_list()
+
+fig, df = plot_seed_stability(
+    metrics_by_classifier=metrics_by_clf,
+    metric="balanced_accuracy",
+    dpi=150,
+)
+fig.savefig("seed_stability.png", bbox_inches="tight")
+# df has columns: classifier, seed_idx, value
+```
+
+### Frequency Band Contribution
+
+See which seismic frequency bands dominate the selected features. RSAM bands are coloured blue; DSAR bands are orange. Supports single-seed (exact counts) and multi-seed (mean ± std).
+
+```python
+from eruption_forecast import MultiModelEvaluator
+from eruption_forecast.plots import plot_frequency_band_contribution
+
+# From a registry (multi-seed, mean ± std per band)
+ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
+fig = ev.plot_frequency_band_contribution()  # saves automatically
+
+# Standalone — single seed
+from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
+import pandas as pd
+
+features = pd.read_csv("output/.../significant_features.csv", index_col=0).index.tolist()
+fig, df = plot_frequency_band_contribution(feature_names=features)
+# df has columns: band, count
+
+# Standalone — multi-seed (pass list of lists)
+per_seed = [
+    pd.read_csv(p, index_col=0).index.tolist()
+    for p in significant_feature_csvs
+]
+fig, df = plot_frequency_band_contribution(feature_names=per_seed)
+# df has columns: band, mean_count, std_count
+```
 
 ### Forecast Visualization
 
@@ -1494,15 +1787,23 @@ from eruption_forecast.plots.tremor_plots import plot_tremor, replot_tremor
 from eruption_forecast.plots.feature_plots import (
     plot_significant_features,
     replot_significant_features,
+    plot_frequency_band_contribution,
 )
 
-# Evaluation plots (via ModelEvaluator)
+# Single-seed evaluation (top-level shortcut)
+from eruption_forecast import ModelEvaluator
+
+# Multi-seed aggregate evaluation (top-level shortcut)
+from eruption_forecast import MultiModelEvaluator
+
+# Or import from their modules directly
 from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
 # Forecast plots (via ModelPredictor)
 from eruption_forecast.model.model_predictor import ModelPredictor
 
-# All evaluation plot functions available individually:
+# Low-level single-seed plot functions (used internally by ModelEvaluator):
 from eruption_forecast.plots.evaluation_plots import (
     plot_confusion_matrix,
     plot_roc_curve,
@@ -1511,6 +1812,18 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_feature_importance,
     plot_calibration,
     plot_prediction_distribution,
+)
+
+# Cross-classifier and stability plots
+from eruption_forecast.plots import (
+    plot_classifier_comparison,
+    plot_seed_stability,
+)
+
+# SHAP explainability plots
+from eruption_forecast.plots.shap_plots import (
+    plot_shap_summary,
+    plot_aggregate_shap_summary,
 )
 ```
 
@@ -1556,6 +1869,26 @@ output/
         │           ├── metrics/
         │           │   ├── 00000.json    # Per-seed metrics
         │           │   └── ...
+        │           ├── tests/
+        │           │   ├── 00000_X_test.csv   # Per-seed held-out features
+        │           │   ├── 00000_y_test.csv   # Per-seed held-out labels
+        │           │   └── ...
+        │           ├── figures/
+        │           │   ├── aggregate_roc_curve.png
+        │           │   ├── aggregate_roc_curve.csv
+        │           │   ├── aggregate_pr_curve.png
+        │           │   ├── aggregate_pr_curve.csv
+        │           │   ├── aggregate_calibration.png
+        │           │   ├── aggregate_calibration.csv
+        │           │   ├── aggregate_prediction_distribution.png
+        │           │   ├── aggregate_prediction_distribution.csv
+        │           │   ├── aggregate_confusion_matrix.png
+        │           │   ├── aggregate_confusion_matrix.csv
+        │           │   ├── aggregate_threshold_analysis.png
+        │           │   ├── aggregate_threshold_analysis.csv
+        │           │   ├── aggregate_feature_importance.png
+        │           │   ├── aggregate_feature_importance.csv
+        │           │   └── aggregate_metrics.csv        # from save_aggregate_metrics()
         │           ├── trained_model_{suffix}.csv    # Registry of all trained models
         │           ├── all_metrics_{suffix}.csv      # All seed metrics
         │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
@@ -1926,9 +2259,12 @@ This project uses:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-19
+**Last Updated:** 2026-02-20 (4 new visualization features: SHAP, classifier comparison, seed stability, frequency band contribution)
 
 **Recent Updates:**
+- **2026-02-20**: Replaced `aggregate_evaluation_plots.py` and `utils/aggregate.py` with the new `MultiModelEvaluator` class — a single object for aggregate plots (`plot_all()`, `plot_roc()`, …) from a registry CSV and aggregate metrics (`get_aggregate_metrics()`, `save_aggregate_metrics()`) from per-seed JSON files; added `ModelEvaluator.save_metrics()` for per-seed JSON export; aggregate outputs now go to `figures/` (was `plots/`); `ModelEvaluator` and `MultiModelEvaluator` exported from top-level `eruption_forecast`
+- **2026-02-20**: Added 4 new visualization features — `plot_classifier_comparison` heatmap, `plot_shap_summary`/`plot_aggregate_shap_summary` (SHAP explainability, requires `shap>=0.46`), `plot_seed_stability` violin, `plot_frequency_band_contribution` bar chart; added `get_metrics_list()` to `MultiModelEvaluator`; `ModelEvaluator.plot_all()` now includes SHAP; `MultiModelEvaluator.plot_all()` now runs 10 plots
+- **2026-02-20**: Added per-seed `X_test`/`y_test` persistence in `train_and_evaluate()` (saved to `tests/` dir) and per-seed metrics JSON files (saved to `metrics/` dir); added 7 aggregate plot functions in `evaluation_plots.py`; all aggregate plots save both PNG and CSV data alongside the figure
 - **2026-02-19**: Added Shannon Entropy (`entropy`) as a third tremor metric alongside RSAM and DSAR; implemented `ShanonEntropy` class and `shanon_entropy()` utility; updated `CalculateTremor` with `calculate_entropy()` method; entropy plots use reddish-purple (Okabe-Ito palette)
 - **2026-02-18**: Added `PipelineConfig` — save/replay full pipeline configs as YAML/JSON; `save_model`/`load_model` for joblib serialization; `from_config`/`run` for one-line pipeline replay
 - **2026-02-18**: Refactored utils.py into 7 focused modules for improved maintainability

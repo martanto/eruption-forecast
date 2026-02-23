@@ -1,504 +1,345 @@
-"""Unit tests for ClassifierModel (Phase 5).
+"""Unit tests for ClassifierModel.
 
-Tests cover initialisation, validation, the validate/create_directories
-separation, and the train() pipeline.  All tests use synthetic data and
-temporary directories — no real seismic data required.
+Tests cover construction, CV splitter selection, model/grid defaults for every
+supported classifier, property accessors, and mutation helpers.  No I/O or
+training — ClassifierModel is a pure factory/configuration class.
 """
 
-# Standard library imports
-import os
-import tempfile
-
-import numpy as np
-
-# Third party imports
-import joblib
-import pandas as pd
 import pytest
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, TimeSeriesSplit
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
 
-# Project imports
-from eruption_forecast.features.constants import ID_COLUMN, ERUPTED_COLUMN
 from eruption_forecast.model.classifier_model import ClassifierModel
 
 
 # ---------------------------------------------------------------------------
-# Helpers — synthetic data factories
+# Helpers
 # ---------------------------------------------------------------------------
 
-_FAST_GRID: dict[str, list] = {
-    "n_estimators": [10],
-    "max_depth": [3],
-    "criterion": ["gini"],
-    "max_features": ["sqrt"],
+ALL_CLASSIFIERS = ["svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"]
+
+CLASSIFIER_TYPES: dict[str, type] = {
+    "svm": SVC,
+    "knn": KNeighborsClassifier,
+    "dt": DecisionTreeClassifier,
+    "rf": RandomForestClassifier,
+    "lite-rf": RandomForestClassifier,
+    "gb": GradientBoostingClassifier,
+    "xgb": XGBClassifier,
+    "nn": MLPClassifier,
+    "nb": GaussianNB,
+    "lr": LogisticRegression,
+    "voting": VotingClassifier,
 }
-"""Single-combination grid so each seed does exactly one fit."""
-
-
-def _write_synthetic_csvs(
-    tmp: str, n_features: int = 5, n_samples: int = 30
-) -> tuple[str, str]:
-    """Write synthetic features and label CSVs.
-
-    30 rows by default; the last 6 rows are class 1 (~20 % imbalance).
-    Returns ``(features_csv, label_csv)`` paths.
-    """
-    rng = np.random.default_rng(42)
-    features = pd.DataFrame(
-        rng.random((n_samples, n_features)),
-        columns=[f"feat_{i}" for i in range(n_features)],
-    )
-    features.index.name = ID_COLUMN
-    features_csv = os.path.join(tmp, "features.csv")
-    features.to_csv(features_csv)
-
-    labels = pd.DataFrame(
-        {
-            ID_COLUMN: range(n_samples),
-            ERUPTED_COLUMN: [0] * (n_samples - 6) + [1] * 6,
-        }
-    )
-    label_csv = os.path.join(tmp, "labels.csv")
-    labels.to_csv(label_csv, index=False)
-
-    return features_csv, label_csv
 
 
 # ---------------------------------------------------------------------------
-# ClassifierModel — initialisation & validation
+# Initialisation
 # ---------------------------------------------------------------------------
 
 
 class TestClassifierModelInit:
-    """Test ClassifierModel construction and validation."""
+    """Test default construction behaviour."""
 
-    def test_valid_initialization(self) -> None:
-        """Constructs successfully; features shape is 30 and output_dir exists."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=os.path.join(tmp, "out"),
-            )
-            assert model.df_features.shape[0] == 30
-            assert os.path.isdir(model.output_dir)
+    def test_stores_classifier_string(self) -> None:
+        """Constructor stores the classifier identifier unchanged."""
+        clf = ClassifierModel("rf")
+        assert clf.classifier == "rf"
 
-    def test_empty_features_raises(self) -> None:
-        """ValueError when features CSV has zero rows."""
-        with tempfile.TemporaryDirectory() as tmp:
-            pd.DataFrame(columns=["feat_0"]).to_csv(os.path.join(tmp, "features.csv"))
-            pd.DataFrame({ID_COLUMN: [0], ERUPTED_COLUMN: [0]}).to_csv(
-                os.path.join(tmp, "labels.csv"), index=False
-            )
+    def test_default_random_state_is_none(self) -> None:
+        """random_state defaults to None when not provided."""
+        clf = ClassifierModel("rf")
+        assert clf.random_state is None
 
-            with pytest.raises(ValueError, match="Features cannot be empty"):
-                ClassifierModel(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
-                    output_dir=os.path.join(tmp, "out"),
-                )
+    def test_default_cv_strategy_is_shuffle(self) -> None:
+        """cv_strategy defaults to 'shuffle'."""
+        clf = ClassifierModel("rf")
+        assert clf.cv_strategy == "shuffle"
 
-    def test_empty_labels_raises(self) -> None:
-        """ValueError when label CSV has zero rows."""
-        with tempfile.TemporaryDirectory() as tmp:
-            pd.DataFrame({"feat_0": range(5)}).to_csv(os.path.join(tmp, "features.csv"))
-            pd.DataFrame(columns=[ID_COLUMN, ERUPTED_COLUMN]).to_csv(
-                os.path.join(tmp, "labels.csv"), index=False
-            )
+    def test_cv_name_set_on_init(self) -> None:
+        """cv_name is derived from the CV splitter class on init."""
+        clf = ClassifierModel("rf", cv_strategy="stratified")
+        assert clf.cv_name == "StratifiedKFold"
 
-            with pytest.raises(ValueError, match="Labels cannot be empty"):
-                ClassifierModel(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
-                    output_dir=os.path.join(tmp, "out"),
-                )
+    def test_custom_n_splits_stored(self) -> None:
+        """n_splits is stored as provided."""
+        clf = ClassifierModel("rf", n_splits=10)
+        assert clf.n_splits == 10
 
-    def test_mismatched_lengths_raises(self) -> None:
-        """ValueError when features and labels row counts differ."""
-        with tempfile.TemporaryDirectory() as tmp:
-            pd.DataFrame({"feat_0": range(10)}).to_csv(
-                os.path.join(tmp, "features.csv")
-            )
-            pd.DataFrame({ID_COLUMN: range(5), ERUPTED_COLUMN: [0] * 5}).to_csv(
-                os.path.join(tmp, "labels.csv"), index=False
-            )
-
-            with pytest.raises(ValueError, match="do not match"):
-                ClassifierModel(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
-                    output_dir=os.path.join(tmp, "out"),
-                )
-
-    def test_output_directories_created(self) -> None:
-        """Nested output path is created on init."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "deep", "models")
-            ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            assert os.path.isdir(out)
+    def test_custom_n_jobs_stored(self) -> None:
+        """n_jobs is stored as provided."""
+        clf = ClassifierModel("rf", n_jobs=4)
+        assert clf.n_jobs == 4
 
 
 # ---------------------------------------------------------------------------
-# ClassifierModel — validate
+# set_random_state
 # ---------------------------------------------------------------------------
 
 
-class TestClassifierModelValidate:
-    """Prove that validate() does not create directories."""
+class TestSetRandomState:
+    """Test set_random_state() validation and chaining."""
 
-    def test_validate_does_not_create_dirs(self) -> None:
-        """Calling validate() after directory removal does not recreate it."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            assert os.path.isdir(out)
+    def test_sets_random_state(self) -> None:
+        """set_random_state() updates random_state attribute."""
+        clf = ClassifierModel("rf")
+        clf.set_random_state(42)
+        assert clf.random_state == 42
 
-            os.rmdir(out)
-            model.validate()
-            assert not os.path.isdir(out)
+    def test_returns_self_for_chaining(self) -> None:
+        """set_random_state() returns the same instance."""
+        clf = ClassifierModel("rf")
+        result = clf.set_random_state(0)
+        assert result is clf
 
+    def test_zero_is_valid(self) -> None:
+        """random_state=0 is a valid seed."""
+        clf = ClassifierModel("rf")
+        clf.set_random_state(0)
+        assert clf.random_state == 0
 
-# ---------------------------------------------------------------------------
-# ClassifierModel — train
-# ---------------------------------------------------------------------------
-
-
-class TestClassifierModelTrain:
-    """Test ClassifierModel.train() behaviour."""
-
-    def test_train_saves_models(self) -> None:
-        """After train(), exactly total_seed .pkl files exist in output_dir."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
-
-            pkls = [f for f in os.listdir(out) if f.endswith(".pkl")]
-            assert len(pkls) == 2
-
-    def test_train_returns_none(self) -> None:
-        """train() returns None."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            result = model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
-            assert result is None
-
-    def test_train_skip_existing(self) -> None:
-        """Second train() with overwrite=False does not touch existing files."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
-
-            pkls = sorted(f for f in os.listdir(out) if f.endswith(".pkl"))
-            mtime_before = os.path.getmtime(os.path.join(out, pkls[0]))
-
-            # Second run — should skip every file
-            model.train(
-                total_seed=2, grid_params=_FAST_GRID, n_splits=2, overwrite=False
-            )
-            mtime_after = os.path.getmtime(os.path.join(out, pkls[0]))
-            assert mtime_before == mtime_after
-
-    def test_train_model_is_loadable(self) -> None:
-        """Saved .pkl file loads as a RandomForestClassifier."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
-
-            pkl_files = [f for f in os.listdir(out) if f.endswith(".pkl")]
-            loaded = joblib.load(os.path.join(out, pkl_files[0]))
-            assert isinstance(loaded, RandomForestClassifier)
-
-    def test_train_model_can_predict(self) -> None:
-        """Loaded model can predict on feature-shaped input."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
-
-            pkl_files = [f for f in os.listdir(out) if f.endswith(".pkl")]
-            loaded = joblib.load(os.path.join(out, pkl_files[0]))
-
-            X = pd.read_csv(features_csv, index_col=0)
-            predictions = loaded.predict(X)
-            assert len(predictions) == len(X)
+    def test_negative_raises(self) -> None:
+        """Negative random_state raises ValueError."""
+        clf = ClassifierModel("rf")
+        with pytest.raises(ValueError, match="random_state must be >= 0"):
+            clf.set_random_state(-1)
 
 
 # ---------------------------------------------------------------------------
-# ClassifierModel — evaluate
+# get_cv_splitter
 # ---------------------------------------------------------------------------
 
 
-class TestClassifierModelEvaluate:
-    """Test ClassifierModel.evaluate() behaviour."""
+class TestGetCvSplitter:
+    """Test get_cv_splitter() returns correct CV object for each strategy."""
 
-    def test_evaluate_returns_dataframe(self) -> None:
-        """evaluate() returns a DataFrame with correct structure."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    def test_shuffle_returns_stratified_shuffle_split(self) -> None:
+        """'shuffle' strategy returns StratifiedShuffleSplit."""
+        clf = ClassifierModel("rf", cv_strategy="shuffle")
+        assert isinstance(clf.get_cv_splitter(), StratifiedShuffleSplit)
 
-            results = model.evaluate(save_results=False)
+    def test_stratified_returns_stratified_k_fold(self) -> None:
+        """'stratified' strategy returns StratifiedKFold."""
+        clf = ClassifierModel("rf", cv_strategy="stratified")
+        assert isinstance(clf.get_cv_splitter(), StratifiedKFold)
 
-            # 2 models + MEAN + STD rows
-            assert len(results) == 4
-            assert "model" in results.columns
-            assert "accuracy" in results.columns
-            assert "f1" in results.columns
-            assert "roc_auc" in results.columns
-            assert results.iloc[-2]["model"] == "MEAN"
-            assert results.iloc[-1]["model"] == "STD"
+    def test_timeseries_returns_time_series_split(self) -> None:
+        """'timeseries' strategy returns TimeSeriesSplit."""
+        clf = ClassifierModel("rf", cv_strategy="timeseries")
+        assert isinstance(clf.get_cv_splitter(), TimeSeriesSplit)
 
-    def test_evaluate_saves_csv(self) -> None:
-        """evaluate() saves results to CSV when save_results=True."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    def test_override_strategy_via_argument(self) -> None:
+        """Passing strategy argument overrides self.cv_strategy."""
+        clf = ClassifierModel("rf", cv_strategy="shuffle")
+        assert isinstance(clf.get_cv_splitter(strategy="timeseries"), TimeSeriesSplit)
 
-            model.evaluate(save_results=True)
+    def test_n_splits_is_propagated(self) -> None:
+        """n_splits is passed through to the CV splitter."""
+        clf = ClassifierModel("rf", cv_strategy="stratified", n_splits=7)
+        cv = clf.get_cv_splitter()
+        assert cv.n_splits == 7
 
-            csv_path = os.path.join(out, "evaluation_results.csv")
-            assert os.path.isfile(csv_path)
-
-            loaded = pd.read_csv(csv_path)
-            assert len(loaded) == 4
-
-    def test_evaluate_custom_filename(self) -> None:
-        """evaluate() uses custom filename when provided."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
-
-            model.evaluate(save_results=True, output_filename="custom_eval.csv")
-
-            assert os.path.isfile(os.path.join(out, "custom_eval.csv"))
-
-    def test_evaluate_no_models_raises(self) -> None:
-        """evaluate() raises ValueError when no models exist."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            # Do NOT train
-
-            with pytest.raises(ValueError, match="No trained models found"):
-                model.evaluate()
-
-    def test_evaluate_metrics_in_range(self) -> None:
-        """All evaluation metrics are in valid ranges."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=3, grid_params=_FAST_GRID, n_splits=2)
-
-            results = model.evaluate(save_results=False)
-
-            # Check model rows (exclude MEAN and STD)
-            model_rows = results[~results["model"].isin(["MEAN", "STD"])]
-
-            for _, row in model_rows.iterrows():
-                assert 0 <= row["accuracy"] <= 1
-                assert 0 <= row["precision"] <= 1
-                assert 0 <= row["recall"] <= 1
-                assert 0 <= row["f1"] <= 1
-                assert 0 <= row["roc_auc"] <= 1
+    def test_random_state_is_propagated_to_stratified_kfold(self) -> None:
+        """random_state is passed to StratifiedKFold."""
+        clf = ClassifierModel("rf", cv_strategy="stratified", random_state=99)
+        cv = clf.get_cv_splitter()
+        assert cv.random_state == 99
 
 
 # ---------------------------------------------------------------------------
-# ClassifierModel — get_classification_report
+# model property — correct type for every classifier
 # ---------------------------------------------------------------------------
 
 
-class TestClassifierModelClassificationReport:
-    """Test ClassifierModel.get_classification_report() behaviour."""
+class TestModelProperty:
+    """Test that model property returns the expected sklearn estimator type."""
 
-    def test_classification_report_returns_string(self) -> None:
-        """get_classification_report() returns a string."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    @pytest.mark.parametrize("classifier", ALL_CLASSIFIERS)
+    def test_model_returns_correct_type(self, classifier: str) -> None:
+        """model property returns an instance of the expected estimator class."""
+        clf = ClassifierModel(classifier, random_state=0)
+        model = clf.model
+        assert isinstance(model, CLASSIFIER_TYPES[classifier])
 
-            report = model.get_classification_report()
+    def test_svm_has_probability_enabled(self) -> None:
+        """SVC model is created with probability=True."""
+        clf = ClassifierModel("svm")
+        assert clf.model.probability is True
 
-            assert isinstance(report, str)
-            assert "precision" in report
-            assert "recall" in report
-            assert "f1-score" in report
-            assert "Not Erupted" in report
-            assert "Erupted" in report
+    def test_rf_receives_n_jobs(self) -> None:
+        """RandomForestClassifier is created with the configured n_jobs."""
+        clf = ClassifierModel("rf", n_jobs=4)
+        assert clf.model.n_jobs == 4
 
-    def test_classification_report_no_models_raises(self) -> None:
-        """get_classification_report() raises ValueError when no models exist."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
+    def test_xgb_receives_n_jobs(self) -> None:
+        """XGBClassifier is created with the configured n_jobs."""
+        clf = ClassifierModel("xgb", n_jobs=4)
+        assert clf.model.n_jobs == 4
 
-            with pytest.raises(ValueError, match="No trained models found"):
-                model.get_classification_report()
+    def test_voting_contains_rf_and_xgb(self) -> None:
+        """VotingClassifier ensemble contains 'rf' and 'xgb' sub-estimators."""
+        clf = ClassifierModel("voting")
+        estimator_names = [name for name, _ in clf.model.estimators]
+        assert "rf" in estimator_names
+        assert "xgb" in estimator_names
 
-    def test_classification_report_invalid_index_raises(self) -> None:
-        """get_classification_report() raises IndexError for out-of-range index."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_samples=50)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    def test_model_setter_overrides_default(self) -> None:
+        """Assigning to model replaces the default instance."""
+        clf = ClassifierModel("rf")
+        custom = RandomForestClassifier(n_estimators=999)
+        clf.model = custom
+        assert clf.model.n_estimators == 999
 
-            with pytest.raises(IndexError, match="out of range"):
-                model.get_classification_report(model_index=10)
+    def test_model_returns_same_instance_after_set(self) -> None:
+        """model property returns the exact object that was set."""
+        clf = ClassifierModel("rf")
+        custom = RandomForestClassifier()
+        clf.model = custom
+        assert clf.model is custom
 
 
 # ---------------------------------------------------------------------------
-# ClassifierModel — get_feature_importances
+# grid property — correct keys for every classifier
 # ---------------------------------------------------------------------------
 
 
-class TestClassifierModelFeatureImportances:
-    """Test ClassifierModel.get_feature_importances() behaviour."""
+class TestGridProperty:
+    """Test that grid property returns a non-empty dict for every classifier."""
 
-    def test_feature_importances_returns_dataframe(self) -> None:
-        """get_feature_importances() returns a DataFrame with correct columns."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_features=5)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    @pytest.mark.parametrize("classifier", ALL_CLASSIFIERS)
+    def test_grid_is_non_empty_dict(self, classifier: str) -> None:
+        """grid property returns a non-empty dict for every supported classifier."""
+        clf = ClassifierModel(classifier)
+        grid = clf.grid
+        assert isinstance(grid, dict)
+        assert len(grid) > 0
 
-            importances = model.get_feature_importances()
+    def test_rf_grid_contains_n_estimators(self) -> None:
+        """RF grid includes 'n_estimators' key."""
+        clf = ClassifierModel("rf")
+        assert "n_estimators" in clf.grid
 
-            assert isinstance(importances, pd.DataFrame)
-            assert "feature" in importances.columns
-            assert "importance" in importances.columns
-            assert len(importances) == 5
+    def test_svm_grid_contains_c(self) -> None:
+        """SVM grid includes 'C' key."""
+        clf = ClassifierModel("svm")
+        assert "C" in clf.grid
 
-    def test_feature_importances_sorted_descending(self) -> None:
-        """get_feature_importances() returns importances sorted descending."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_features=5)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    def test_xgb_grid_contains_learning_rate(self) -> None:
+        """XGB grid includes 'learning_rate' key."""
+        clf = ClassifierModel("xgb")
+        assert "learning_rate" in clf.grid
 
-            importances = model.get_feature_importances()
+    def test_lr_grid_contains_penalty(self) -> None:
+        """LR grid includes 'penalty' key."""
+        clf = ClassifierModel("lr")
+        assert "penalty" in clf.grid
 
-            values = importances["importance"].tolist()
-            assert values == sorted(values, reverse=True)
+    def test_grid_setter_overrides_default(self) -> None:
+        """Assigning a custom grid replaces the default."""
+        clf = ClassifierModel("rf")
+        custom_grid = {"n_estimators": [5]}
+        clf.grid = custom_grid
+        assert clf.grid == custom_grid
 
-    def test_feature_importances_top_n(self) -> None:
-        """get_feature_importances(top_n=3) returns only top 3 features."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp, n_features=10)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
-            model.train(total_seed=2, grid_params=_FAST_GRID, n_splits=2)
+    def test_custom_grid_is_returned_unchanged(self) -> None:
+        """Custom grid dict is returned by reference after setting."""
+        clf = ClassifierModel("rf")
+        custom_grid = {"n_estimators": [5, 10], "max_depth": [2]}
+        clf.grid = custom_grid
+        assert clf.grid is custom_grid
 
-            importances = model.get_feature_importances(top_n=3)
 
-            assert len(importances) == 3
+# ---------------------------------------------------------------------------
+# name and slug properties
+# ---------------------------------------------------------------------------
 
-    def test_feature_importances_no_models_raises(self) -> None:
-        """get_feature_importances() raises ValueError when no models exist."""
-        with tempfile.TemporaryDirectory() as tmp:
-            features_csv, label_csv = _write_synthetic_csvs(tmp)
-            out = os.path.join(tmp, "out")
-            model = ClassifierModel(
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=out,
-            )
 
-            with pytest.raises(ValueError, match="No trained models found"):
-                model.get_feature_importances()
+class TestNameAndSlugProperties:
+    """Test name, slug_name, and slug_cv_name properties."""
+
+    def test_name_returns_class_name(self) -> None:
+        """name property returns the classifier's class name."""
+        clf = ClassifierModel("rf")
+        assert clf.name == "RandomForestClassifier"
+
+    def test_lite_rf_name_is_prefixed(self) -> None:
+        """'lite-rf' classifier name is prefixed with 'Lite'."""
+        clf = ClassifierModel("lite-rf")
+        assert clf.name == "LiteRandomForestClassifier"
+
+    def test_slug_name_is_lowercase_hyphenated(self) -> None:
+        """slug_name is lowercase with hyphens (no uppercase, no underscores)."""
+        clf = ClassifierModel("rf")
+        slug = clf.slug_name
+        assert slug == slug.lower()
+        assert "_" not in slug
+
+    def test_slug_cv_name_is_lowercase_hyphenated(self) -> None:
+        """slug_cv_name is lowercase with hyphens."""
+        clf = ClassifierModel("rf", cv_strategy="stratified")
+        slug = clf.slug_cv_name
+        assert slug == slug.lower()
+        assert "_" not in slug
+
+
+# ---------------------------------------------------------------------------
+# model_and_grid property
+# ---------------------------------------------------------------------------
+
+
+class TestModelAndGrid:
+    """Test model_and_grid convenience property."""
+
+    def test_returns_two_tuple(self) -> None:
+        """model_and_grid returns a 2-tuple of (model, grid)."""
+        clf = ClassifierModel("rf")
+        result = clf.model_and_grid
+        assert len(result) == 2
+
+    def test_first_element_is_model(self) -> None:
+        """First element of model_and_grid is the classifier instance."""
+        clf = ClassifierModel("rf")
+        model, _ = clf.model_and_grid
+        assert isinstance(model, RandomForestClassifier)
+
+    def test_second_element_is_dict(self) -> None:
+        """Second element of model_and_grid is the hyperparameter grid dict."""
+        clf = ClassifierModel("rf")
+        _, grid = clf.model_and_grid
+        assert isinstance(grid, dict)
+
+
+# ---------------------------------------------------------------------------
+# update_model_and_grid
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateModelAndGrid:
+    """Test update_model_and_grid() convenience method."""
+
+    def test_updates_model(self) -> None:
+        """update_model_and_grid() replaces the model."""
+        clf = ClassifierModel("rf")
+        custom_model = SVC(probability=True)
+        clf.update_model_and_grid(custom_model, {"C": [1]})
+        assert clf.model is custom_model
+
+    def test_updates_grid(self) -> None:
+        """update_model_and_grid() replaces the grid."""
+        clf = ClassifierModel("rf")
+        custom_grid = {"C": [0.1, 1]}
+        clf.update_model_and_grid(SVC(probability=True), custom_grid)
+        assert clf.grid is custom_grid
+
+    def test_returns_self_for_chaining(self) -> None:
+        """update_model_and_grid() returns the same instance."""
+        clf = ClassifierModel("rf")
+        result = clf.update_model_and_grid(RandomForestClassifier(), {"n_estimators": [10]})
+        assert result is clf

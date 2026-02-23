@@ -57,6 +57,27 @@ class SDS:
         verbose: bool = False,
         debug: bool = False,
     ):
+        """Initialize the SDS reader with archive location and station metadata.
+
+        Validates station and channel codes, checks that the SDS directory exists,
+        derives the NSLC identifier, and emits an info log message when verbose is True.
+
+        Args:
+            sds_dir (str): Absolute path to the root of the SDS archive.
+            station (str): Seismic station code (e.g., "OJN"). Must be non-empty.
+            channel (str): Channel code (e.g., "EHZ"). Must be non-empty.
+            network (str, optional): Seismic network code. Defaults to "VG".
+            location (str, optional): Location code. Defaults to "00".
+            interpolate (bool, optional): Apply linear interpolation to fill gaps
+                in loaded streams. Defaults to True.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+
+        Raises:
+            ValueError: If station or channel codes are empty or not strings.
+            FileNotFoundError: If the SDS directory does not exist.
+            NotADirectoryError: If the SDS path exists but is not a directory.
+        """
         # Validate inputs
         if not station or not isinstance(station, str):
             raise ValueError("Station code must be a non-empty string")

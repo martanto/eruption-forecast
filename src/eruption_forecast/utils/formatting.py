@@ -4,6 +4,8 @@ This module provides utilities for converting class names to slugified format
 for use in filenames and directory names.
 """
 
+import re
+
 
 def slugify_class_name(class_name: str) -> str:
     """Convert a class name to a slug for use in filenames.
@@ -28,8 +30,6 @@ def slugify_class_name(class_name: str) -> str:
         >>> slugify_class_name("XGBClassifier")
         'xgb-classifier'
     """
-    import re
-
     # Insert hyphens before uppercase letters (except at start)
     s = re.sub("([a-z0-9])([A-Z])", r"\1-\2", class_name)
     # Handle consecutive uppercase letters (e.g., HTTP)

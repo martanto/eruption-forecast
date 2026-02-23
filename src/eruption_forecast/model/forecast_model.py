@@ -1,5 +1,4 @@
 import os
-from time import sleep
 from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
@@ -166,6 +165,34 @@ class ForecastModel:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
+        """Initialize the ForecastModel pipeline orchestrator.
+
+        Normalises dates, resolves all output directory paths, and initialises
+        lifecycle state attributes. No data is loaded or processed until the
+        pipeline stage methods (calculate, build_label, extract_features, train,
+        forecast) are called.
+
+        Args:
+            station (str): Seismic station code (e.g., "OJN").
+            channel (str): Channel code (e.g., "EHZ").
+            start_date (str | datetime): Start date for the analysis period in
+                "YYYY-MM-DD" format or as a datetime object.
+            end_date (str | datetime): End date for the analysis period in
+                "YYYY-MM-DD" format or as a datetime object.
+            window_size (int): Window size in days used for matrix building and forecasting.
+            volcano_id (str): Unique volcano identifier used for labelling.
+            network (str, optional): Seismic network code. Defaults to "VG".
+            location (str, optional): Location code. Defaults to "00".
+            output_dir (str | None, optional): Base output directory. Defaults to None
+                (resolved from root_dir or os.getcwd()).
+            root_dir (str | None, optional): Root project directory used to anchor
+                relative output paths. Defaults to None.
+            overwrite (bool, optional): Overwrite existing output files. Defaults to False.
+            n_jobs (int, optional): Number of parallel jobs for tremor calculation
+                and feature extraction. Defaults to 1.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
@@ -1119,22 +1146,19 @@ class ForecastModel:
             Self: ForecastModel instance for method chaining.
         """
         if verbose or self.verbose:
-            print("=" * 50)
-            print(f"| Training model using: {classifier}")
+            logger.info("=" * 50)
+            logger.info(f"| Training model using: {classifier}")
             if self.use_relevant_features:
-                print("|- Relevant Features selected.")
+                logger.info("|- Relevant Features selected.")
             # Model evaluation only works if self.label_data is not empty
             if not self.label_data.empty and with_evaluation:
-                print("|- Training model with evaluation.")
+                logger.info("|- Training model with evaluation.")
             if self.label_data.empty and with_evaluation:
-                print("|- Label is empty. Model evaluation will be set to False.")
+                logger.info("|- Label is empty. Model evaluation will be set to False.")
                 with_evaluation = False
             if not with_evaluation:
-                print("|- Training model only. No evaluation.")
-            print("=" * 50)
-
-        # Give a chance to show message
-        sleep(3)
+                logger.info("|- Training model only. No evaluation.")
+            logger.info("=" * 50)
 
         features_csv = extracted_features_csv or self.features_csv
 
@@ -1204,7 +1228,11 @@ class ForecastModel:
         )
 
         if save_model:
-            self.save_model()
+            self.save_config(os.path.join(self.station_dir, "config_train.yaml"))
+
+            self.save_model(
+                path=os.path.join(self.station_dir, "forecast_model_train.pkl")
+            )
 
         return self
 
@@ -1324,7 +1352,7 @@ class ForecastModel:
         """
         if path is None:
             ext = "json" if fmt == "json" else "yaml"
-            path = os.path.join(self.station_dir, f"config.{ext}")
+            path = os.path.join(self.station_dir, f"config_forecast.{ext}")
         return self._config.save(path, fmt=fmt)
 
     @classmethod

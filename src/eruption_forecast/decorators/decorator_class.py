@@ -155,6 +155,20 @@ class AutoSaveDict(dict):
     def __init__(
         self, filepath: str, save_as: Literal["json", "yaml"] = "json", *args, **kwargs
     ):
+        """Initialize the AutoSaveDict and persist the initial state to disk.
+
+        Calls dict.__init__ with any extra positional/keyword arguments, configures
+        the output file path and format, then immediately writes the (possibly empty)
+        dictionary to disk.
+
+        Args:
+            filepath (str): Destination file path for automatic persistence.
+                Parent directories are created automatically if absent.
+            save_as (Literal["json", "yaml"], optional): Serialization format.
+                Defaults to "json".
+            *args: Additional positional arguments forwarded to dict.__init__.
+            **kwargs: Additional keyword arguments forwarded to dict.__init__.
+        """
         super().__init__(*args, **kwargs)
         self.filepath = filepath
         self.save_as = save_as

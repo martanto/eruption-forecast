@@ -20,7 +20,7 @@ from eruption_forecast.utils.dataframe import remove_anomalies
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
-from eruption_forecast.tremor.shanon_entropy import ShanonEntropy
+from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
 
 
 class CalculateTremor:
@@ -148,6 +148,50 @@ class CalculateTremor:
         verbose: bool = False,
         debug: bool = False,
     ):
+        """Initialize the CalculateTremor pipeline with station metadata and processing options.
+
+        Converts date strings to datetime objects, constructs the NSLC identifier,
+        resolves output directories, and sets all processing flags. No data is loaded
+        or computed until from_sds() or from_fdsn() followed by run() is called.
+
+        Args:
+            start_date (str | datetime): Analysis start date in "YYYY-MM-DD" format
+                or as a datetime object.
+            end_date (str | datetime): Analysis end date in "YYYY-MM-DD" format
+                or as a datetime object.
+            station (str): Seismic station code (e.g., "OJN").
+            channel (str): Channel code (e.g., "EHZ").
+            network (str, optional): Seismic network code. Defaults to "VG".
+            location (str, optional): Location code. Defaults to "00".
+            methods (list[str] | None, optional): Tremor metrics to compute.
+                Defaults to ["rsam", "dsar", "entropy"].
+            output_dir (str | None, optional): Base output directory. Defaults to
+                ``root_dir/output``. Defaults to None.
+            root_dir (str | None, optional): Anchor directory for relative path
+                resolution. Defaults to None (uses os.getcwd()).
+            overwrite (bool, optional): Overwrite existing daily CSV files.
+                Defaults to False.
+            remove_outlier_method (Literal["all", "maximum"], optional): Outlier
+                removal strategy applied after computing metrics. Defaults to "maximum".
+            remove_tremor_anomalies (bool, optional): Remove anomalous tremor spikes.
+                Defaults to False.
+            interpolate (bool, optional): Interpolate missing values in daily streams.
+                Defaults to False.
+            value_multiplier (float | None, optional): Scaling factor applied to all
+                metric values. Defaults to None (no scaling).
+            cleanup_daily_dir (bool, optional): Delete per-day CSV files after merging.
+                Defaults to False.
+            plot_daily (bool, optional): Generate a plot for each day's tremor data.
+                Defaults to False.
+            save_plot (bool, optional): Save daily plots to disk. Defaults to False.
+            overwrite_plot (bool, optional): Overwrite existing daily plot files.
+                Defaults to False.
+            filename_prefix (str | None, optional): Custom prefix for the merged CSV
+                filename. Defaults to None (auto-derived from NSLC and date range).
+            n_jobs (int, optional): Number of parallel worker processes. Defaults to 1.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
@@ -265,6 +309,12 @@ class CalculateTremor:
             logger.info(f"Freq Bands: {self.freq_bands_alias}")
 
     def __str__(self) -> str:
+        """Return a concise human-readable summary of this CalculateTremor instance.
+
+        Returns:
+            str: A summary string including version, job count, date range, NSLC,
+                frequency bands, and the path to the merged tremor CSV.
+        """
         return (
             f"{self.__class__.__name__}(Version: {eruption_forecast.__version__}). "
             f"Running on {self.n_jobs} job(s) from {self.start_date_str} "
@@ -274,6 +324,12 @@ class CalculateTremor:
         )
 
     def __repr__(self) -> str:
+        """Return a detailed string representation of this CalculateTremor instance.
+
+        Returns:
+            str: A string listing all constructor parameters and their current values,
+                suitable for reconstructing or debugging the instance.
+        """
         return (
             f"{self.__class__.__name__}(start_date={self.start_date_str}, "
             f"end_date={self.end_date_str}, station={self.station}, network={self.network}, "
@@ -746,21 +802,51 @@ class CalculateTremor:
 
         return daily_file
 
+    def _expected_columns(self) -> list[str]:
+        """Build the list of column names that calculate() would produce.
+
+        Derives column names from the configured methods and frequency band aliases,
+        mirroring the exact structure produced by a successful calculate() call.
+        Used to construct NaN-filled placeholder DataFrames when no seismic data
+        is available for a given day.
+
+        Returns:
+            list[str]: Ordered list of column names. RSAM columns appear first
+                (``rsam_f0``, ``rsam_f1``, …), followed by DSAR columns
+                (``dsar_f0-f1``, …), and finally ``entropy`` when enabled.
+        """
+        columns: list[str] = []
+        aliases = list(self.freq_bands_alias.keys())
+
+        for method in self.methods:
+            if method == "rsam":
+                columns.extend([f"rsam_{b}" for b in aliases])
+            elif method == "dsar" and len(aliases) >= 2:
+                columns.extend(
+                    [f"dsar_{aliases[i]}-{aliases[i + 1]}" for i in range(len(aliases) - 1)]
+                )
+            elif method == "entropy":
+                columns.append("entropy")
+
+        return columns
+
     def calculate(self, date: datetime) -> pd.DataFrame:
         """Calculate tremor metrics for a single day.
 
         Computes each enabled method (RSAM, DSAR, Shannon Entropy) for the specified
-        date across all configured frequency bands. Returns an empty DataFrame if no
-        seismic data is available for that day.
+        date across all configured frequency bands. Returns a 144-row NaN-filled
+        DataFrame (one row per 10-minute interval) when no seismic data is available,
+        preserving the expected column structure for downstream processing.
 
         Args:
             date (datetime): Date to process.
 
         Returns:
-            pd.DataFrame: Tremor DataFrame with DatetimeIndex (10-minute intervals)
-                and columns for each enabled method: RSAM (``rsam_f0``, ``rsam_f1``, …),
-                DSAR (``dsar_f0-f1``, …), and Shannon Entropy (``entropy``).
-                Returns an empty DataFrame if no seismic data is available.
+            pd.DataFrame: Tremor DataFrame with DatetimeIndex (10-minute intervals,
+                144 rows per day) and columns for each enabled method: RSAM
+                (``rsam_f0``, ``rsam_f1``, …), DSAR (``dsar_f0-f1``, …), and
+                Shannon Entropy (``entropy``). When no seismic data is available,
+                all values are NaN but the shape and columns are preserved.
 
         Examples:
             >>> from datetime import datetime
@@ -771,10 +857,17 @@ class CalculateTremor:
         """
         stream = self.get_stream(date)
 
-        # Return empty dataframe if stream is empty
-        # (no traces found or miniseed file not exists)
+        # Return NaN-filled DataFrame with correct shape when no data is available.
+        # Using 144 rows guarantees consistent shape for downstream processing.
         if len(stream) == 0:
-            return pd.DataFrame()
+            datetime_index = pd.date_range(
+                start=date,
+                end=date + timedelta(days=1),
+                freq="10min",
+                inclusive="left",
+            )
+            columns = self._expected_columns()
+            return pd.DataFrame(index=datetime_index, columns=columns, dtype=float)
 
         date_str = date.strftime("%Y-%m-%d")
 
@@ -1077,3 +1170,343 @@ class CalculateTremor:
         )
 
         return df.sort_index()
+
+    def _update_process_day(
+        self,
+        date: datetime,
+        gap_start: datetime,
+        gap_end: datetime,
+    ) -> pd.DataFrame | None:
+        """Calculate tremor for one gap day, filter to the gap window, and save if complete.
+
+        Processes a single calendar day during an ``update()`` run. The result is
+        filtered to rows that fall within ``[gap_start, gap_end]``. A daily CSV is
+        written to ``self.daily_dir`` only when the full 24-hour window of ``date``
+        lies entirely within the gap (a "complete" day).
+
+        This is a proper instance method (not a closure) so it is picklable and
+        safe to use with ``Pool.starmap`` for parallel execution.
+
+        Args:
+            date (datetime): Calendar day to process.
+            gap_start (datetime): First 10-minute timestamp of the gap (inclusive).
+            gap_end (datetime): Last 10-minute timestamp of the gap (inclusive).
+
+        Returns:
+            pd.DataFrame | None: Filtered tremor DataFrame for the day, or None
+                if no rows fall within the gap after filtering.
+        """
+        day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1) - timedelta(minutes=10)
+
+        # A complete day has its entire 24-hour window within the gap
+        is_complete = day_start >= gap_start and day_end <= gap_end
+
+        day_df = self.calculate(date)
+
+        if self.remove_tremor_anomalies:
+            day_df = remove_anomalies(day_df, threshold=300, inplace=False, debug=self.debug)
+
+        # Restrict to rows inside the gap
+        day_df = day_df[(day_df.index >= gap_start) & (day_df.index <= gap_end)]
+
+        if day_df.empty:
+            return None
+
+        if is_complete:
+            date_str = date.strftime("%Y-%m-%d")
+            daily_file = os.path.join(self.daily_dir, f"{date_str}.csv")
+            if self.overwrite or not os.path.exists(daily_file):
+                day_df.to_csv(daily_file, index=True, index_label="datetime")
+                if self.verbose:
+                    logger.info(f"{date_str} :: Daily CSV saved to {daily_file}")
+
+        return day_df
+
+    @classmethod
+    def update(
+        cls,
+        existing_csv: str,
+        new_end_date: str | datetime,
+        station: str,
+        channel: str,
+        network: str = "VG",
+        location: str = "00",
+        methods: list[str] | None = None,
+        output_dir: str | None = None,
+        root_dir: str | None = None,
+        freq_bands: list[tuple[float, float]] | None = None,
+        sds_dir: str | None = None,
+        client_url: str | None = None,
+        n_jobs: int = 1,
+        overwrite: bool = False,
+        remove_outlier_method: Literal["all", "maximum"] = "maximum",
+        remove_tremor_anomalies: bool = False,
+        interpolate: bool = False,
+        value_multiplier: float | None = None,
+        save_plot: bool = False,
+        overwrite_plot: bool = False,
+        verbose: bool = False,
+        debug: bool = False,
+    ) -> "CalculateTremor":
+        """Extend an existing tremor CSV with new data up to new_end_date.
+
+        Reads the existing CSV to determine the gap between its last timestamp
+        and ``new_end_date``, then calculates tremor for each day in the gap and
+        appends the new rows to the existing DataFrame. The result is saved as a
+        new merged CSV whose filename reflects the full extended date range.
+
+        This is a ``@classmethod`` so no prior ``CalculateTremor`` instance is
+        needed — just supply the existing CSV path and the data-source parameters.
+        The data source must be configured via ``sds_dir`` (SDS archive) or
+        ``client_url`` (FDSN web service); at least one must be provided.
+
+        Only complete days (full 24-hour periods fully within the gap) are written
+        as daily CSV files. Every complete day produces exactly 144 rows (NaN-filled
+        when seismic data is missing). Partial boundary days are processed but not
+        saved to the daily directory.
+
+        When ``output_dir`` is not given, it is derived automatically from the
+        ``existing_csv`` path by ascending three directory levels
+        (``csv → tremor/ → {nslc}/ → output/``).
+
+        Args:
+            existing_csv (str): Path to the existing interpolated tremor CSV to extend.
+            new_end_date (str | datetime): New end datetime for the extended CSV.
+                Must be later than the last timestamp already in ``existing_csv``.
+            station (str): Seismic station code (e.g. ``"OJN"``).
+            channel (str): Seismic channel code (e.g. ``"EHZ"``).
+            network (str): Seismic network code. Defaults to ``"VG"``.
+            location (str): Seismic location code. Defaults to ``"00"``.
+            methods (list[str] | None): Calculation methods to apply
+                (``"rsam"``, ``"dsar"``, ``"entropy"``). Must match those used
+                when the original CSV was created. Defaults to None (all three).
+            output_dir (str | None): Root output directory. If None, derived
+                from ``existing_csv`` by ascending three levels. Defaults to None.
+            root_dir (str | None): Anchor for resolving a relative ``output_dir``.
+                Defaults to None.
+            freq_bands (list[tuple[float, float]] | None): Frequency bands to use.
+                Must match those used when the original CSV was created. If None,
+                uses the class default bands. Defaults to None.
+            sds_dir (str | None): Root directory of an SDS archive. Provide this
+                or ``client_url``. Defaults to None.
+            client_url (str | None): FDSN web-service URL. Provide this or
+                ``sds_dir``. Defaults to None (``"https://service.iris.edu"``).
+            n_jobs (int): Number of parallel jobs for complete-day processing.
+                Defaults to 1.
+            overwrite (bool): If True, overwrites existing daily CSV files.
+                Defaults to False.
+            remove_outlier_method (Literal["all", "maximum"]): Outlier removal
+                strategy. Defaults to ``"maximum"``.
+            remove_tremor_anomalies (bool): Apply Z-score anomaly removal after
+                each day's calculation. Defaults to False.
+            interpolate (bool): If True, enables stream-level interpolation in
+                the data source. Defaults to False.
+            value_multiplier (float | None): Scaling factor for seismic values.
+                Defaults to None.
+            save_plot (bool): If True, saves a tremor plot of the merged CSV.
+                Defaults to False.
+            overwrite_plot (bool): If True, overwrites an existing plot file.
+                Defaults to False.
+            verbose (bool): Enables verbose logging. Defaults to False.
+            debug (bool): Enables debug-level logging. Defaults to False.
+
+        Returns:
+            CalculateTremor: A new instance with ``df``, ``csv``, and ``_filename``
+                set to the merged result.
+
+        Raises:
+            FileNotFoundError: If ``existing_csv`` does not exist.
+            ValueError: If neither ``sds_dir`` nor ``client_url`` is provided.
+
+        Examples:
+            >>> tremor = CalculateTremor.update(
+            ...     existing_csv="output/VG.OJN.00.EHZ/tremor/tremor_interpolated_VG.OJN.00.EHZ_2025-03-16-2025-03-18.csv",
+            ...     new_end_date="2025-03-22",
+            ...     station="OJN",
+            ...     channel="EHZ",
+            ...     sds_dir="D:/Data/OJN",
+            ...     n_jobs=4,
+            ... )
+            >>> print(tremor.df.index[-1])
+        """
+        # ------------------------------------------------------------------
+        # 1. Validate existing CSV
+        # ------------------------------------------------------------------
+        if not os.path.isfile(existing_csv):
+            raise FileNotFoundError(f"Existing tremor CSV not found: {existing_csv}")
+
+        if sds_dir is None and client_url is None:
+            raise ValueError("Provide either sds_dir (SDS archive) or client_url (FDSN).")
+
+        # ------------------------------------------------------------------
+        # 2. Load existing DataFrame and determine gap
+        # ------------------------------------------------------------------
+        existing_df = pd.read_csv(existing_csv, index_col=0, parse_dates=True)
+
+        gap_start: datetime = existing_df.index[-1].to_pydatetime() + timedelta(minutes=10)
+        gap_end: datetime = to_datetime(new_end_date)
+
+        # ------------------------------------------------------------------
+        # 3. Derive output_dir from existing CSV path when not supplied.
+        #    Assumed layout: {output_dir}/{nslc}/tremor/filename.csv
+        # ------------------------------------------------------------------
+        if output_dir is None:
+            output_dir = os.path.dirname(  # output_dir
+                os.path.dirname(           # {nslc}/
+                    os.path.dirname(existing_csv)  # tremor/
+                )
+            )
+
+        # ------------------------------------------------------------------
+        # 4. Build CalculateTremor instance for the gap period.
+        #    start_date / end_date only need to satisfy start < end; the actual
+        #    processing range is controlled by gap_start / gap_end below.
+        # ------------------------------------------------------------------
+        instance_start = gap_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        instance_end = gap_end.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+        instance: CalculateTremor = cls(
+            start_date=instance_start,
+            end_date=instance_end,
+            station=station,
+            channel=channel,
+            network=network,
+            location=location,
+            methods=methods,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            overwrite=overwrite,
+            remove_outlier_method=remove_outlier_method,
+            remove_tremor_anomalies=remove_tremor_anomalies,
+            interpolate=interpolate,
+            value_multiplier=value_multiplier,
+            n_jobs=n_jobs,
+            save_plot=save_plot,
+            overwrite_plot=overwrite_plot,
+            verbose=verbose,
+            debug=debug,
+        )
+
+        if freq_bands is not None:
+            instance.change_freq_bands(freq_bands)
+
+        # ------------------------------------------------------------------
+        # 5. Configure data source
+        # ------------------------------------------------------------------
+        if sds_dir is not None:
+            instance.from_sds(sds_dir)
+        else:
+            instance.from_fdsn(client_url)
+
+        # ------------------------------------------------------------------
+        # 6. Early exit when already up to date
+        # ------------------------------------------------------------------
+        if gap_start > gap_end:
+            logger.info("Tremor data is already up to date.")
+            instance.df = existing_df
+            instance.csv = existing_csv
+            return instance
+
+        logger.info(
+            f"Updating tremor from {gap_start.strftime('%Y-%m-%dT%H:%M')} "
+            f"to {gap_end.strftime('%Y-%m-%dT%H:%M')}"
+        )
+
+        # ------------------------------------------------------------------
+        # 7. Build per-day list and process
+        # ------------------------------------------------------------------
+        gap_days = pd.date_range(
+            start=gap_start.replace(hour=0, minute=0, second=0, microsecond=0),
+            end=gap_end.replace(hour=0, minute=0, second=0, microsecond=0),
+            freq="D",
+        )
+
+        accumulated: list[pd.DataFrame] = []
+
+        if n_jobs > 1:
+            complete_days = [
+                d for d in gap_days
+                if d.replace(hour=0, minute=0, second=0, microsecond=0) >= gap_start
+                and d.replace(hour=23, minute=50, second=0, microsecond=0) <= gap_end
+            ]
+            partial_days = [d for d in gap_days if d not in complete_days]
+
+            if complete_days:
+                args = [(d, gap_start, gap_end) for d in complete_days]
+                with Pool(n_jobs) as pool:
+                    results = pool.starmap(instance._update_process_day, args)
+                    accumulated.extend([r for r in results if r is not None])
+
+            for d in partial_days:
+                result = instance._update_process_day(d, gap_start, gap_end)
+                if result is not None:
+                    accumulated.append(result)
+        else:
+            for d in gap_days:
+                result = instance._update_process_day(d, gap_start, gap_end)
+                if result is not None:
+                    accumulated.append(result)
+
+        # ------------------------------------------------------------------
+        # 8. Skip if no new rows
+        # ------------------------------------------------------------------
+        if not accumulated:
+            logger.warning("No new tremor rows produced during update. Returning unchanged.")
+            instance.df = existing_df
+            instance.csv = existing_csv
+            return instance
+
+        # ------------------------------------------------------------------
+        # 9. Merge with existing DataFrame
+        # ------------------------------------------------------------------
+        new_df = pd.concat(accumulated).sort_index()
+        merged = pd.concat([existing_df, new_df])
+        merged = merged[~merged.index.duplicated(keep="last")]
+        merged = merged.sort_index()
+
+        # ------------------------------------------------------------------
+        # 10. Determine merged date range for new filename
+        # ------------------------------------------------------------------
+        start_date = merged.index[0].strftime("%Y-%m-%d")
+        end_date = merged.index[-1].strftime("%Y-%m-%d")
+
+        # ------------------------------------------------------------------
+        # 11. Save non-interpolated version
+        # ------------------------------------------------------------------
+        non_interpolated_filename = (
+            f"tremor_non-interpolated_{instance.nslc}_{start_date}-{end_date}.csv"
+        )
+        csv_non_interpolated = os.path.join(instance.tremor_dir, non_interpolated_filename)
+        merged.to_csv(csv_non_interpolated, index=True)
+        logger.info(f"Non-interpolated tremor saved to {csv_non_interpolated}")
+
+        # ------------------------------------------------------------------
+        # 12. Interpolate and save final CSV
+        # ------------------------------------------------------------------
+        merged = merged.interpolate(method="time", limit_direction="both")
+
+        instance._filename = f"{instance.nslc}_{start_date}-{end_date}.csv"
+        csv = os.path.join(instance.tremor_dir, instance.filename)
+        merged.to_csv(csv, index=True)
+        logger.info(f"Interpolated tremor data saved to {csv}")
+
+        instance.df = merged
+        instance.csv = csv
+
+        # ------------------------------------------------------------------
+        # 13. Optionally plot
+        # ------------------------------------------------------------------
+        if save_plot:
+            plot_tremor(
+                df=merged,
+                interval=14,
+                interval_unit="days",
+                figure_dir=instance.tremor_dir,
+                filename=instance.filename,
+                title=instance.nslc,
+                overwrite=overwrite or overwrite_plot,
+                verbose=verbose,
+            )
+
+        return instance

@@ -65,6 +65,27 @@ class FDSN:
         verbose: bool = False,
         debug: bool = False,
     ):
+        """Initialize the FDSN adapter with station metadata and cache settings.
+
+        Creates an ObsPy FDSN client for the given URL, ensures the local download
+        directory exists, and initialises an SDS instance to serve as the local
+        miniSEED cache for downloaded data.
+
+        Args:
+            station (str): Seismic station code (e.g., "OJN").
+            channel (str): Channel code (e.g., "EHZ").
+            network (str, optional): Seismic network code. Defaults to "VG".
+            location (str, optional): Location code. Defaults to "00".
+            client_url (str | None, optional): FDSN web service base URL.
+                Defaults to "https://service.iris.edu".
+            download_dir (str | None, optional): Local directory used as the SDS
+                cache for downloaded miniSEED files. Created automatically if absent.
+                Defaults to ``<cwd>/downloads``.
+            overwrite (bool, optional): Re-download data even when a cached SDS file
+                exists. Defaults to False.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         client_url = client_url or "https://service.iris.edu"
         client = FDSNClient(client_url)
         download_dir = download_dir or os.path.join(os.getcwd(), "downloads")

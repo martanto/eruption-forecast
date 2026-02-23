@@ -39,6 +39,18 @@ class RSAM:
     """
 
     def __init__(self, stream: Stream, verbose: bool = False, debug: bool = False):
+        """Initialize the RSAM calculator with a seismic stream and logging settings.
+
+        Extracts the first trace from the stream, records the trace start time,
+        and initialises result attributes to their empty defaults. No filtering
+        or metric computation occurs until apply_filter() and calculate() are called.
+
+        Args:
+            stream (Stream): ObsPy Stream object containing the seismic waveform.
+                The first trace (stream[0]) is used for all subsequent operations.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
+            debug (bool, optional): Emit debug log messages. Defaults to False.
+        """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------

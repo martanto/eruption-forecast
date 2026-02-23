@@ -207,6 +207,13 @@ class LabelBuilder:
             logger.info(f"Volcano ID: {volcano_id}")
 
     def __repr__(self) -> str:
+        """Return a detailed string representation of this LabelBuilder instance.
+
+        Returns:
+            str: A string in the form
+                ``LabelBuilder(start_date, end_date, window_step, window_step_unit,
+                day_to_forecast, eruption_dates), volcano_id``.
+        """
         return (
             f"LabelBuilder({self.start_date_str}, "
             f"{self.end_date_str}, "
@@ -218,6 +225,11 @@ class LabelBuilder:
         )
 
     def __str__(self) -> str:
+        """Return a human-readable string representation of this LabelBuilder instance.
+
+        Returns:
+            str: The same string produced by __repr__.
+        """
         return self.__repr__()
 
     @property
