@@ -80,6 +80,7 @@ def plot_shap_summary(
         shap.plots.beeswarm(
             shap_values,
             max_display=max_display,
+            s=32,  # Default 16
             show=False,
         )
         new_fignums = set(plt.get_fignums()) - existing_fignums
