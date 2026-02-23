@@ -273,7 +273,7 @@ class ModelPredictor:
     def predict(
         self, future_features_csv: str, future_labels_csv: str, plot: bool = False
     ) -> pd.DataFrame:
-        """Evaluate every trained model on labelled future data.
+        """Evaluate every trained model on LABELLED future data.
 
         Iterates over all classifiers and all seeds within each classifier,
         computing evaluation metrics for each (classifier, seed) pair.
@@ -699,7 +699,7 @@ class ModelPredictor:
         save_predictions: bool = True,
         plot: bool = True,
     ) -> pd.DataFrame:
-        """Forecast eruption probability for unlabelled future windows.
+        """Forecast eruption probability for UNLABELLED future windows.
 
         For each classifier and each of its seed models,
         ``model.predict_proba()`` is called on the future feature set.

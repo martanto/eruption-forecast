@@ -281,7 +281,6 @@ class ForecastConfig(_ConfigBase):
             Defaults to ``""``.
         end_date (str): Forecast period end date in ``"YYYY-MM-DD"`` format.
             Defaults to ``""``.
-        window_size (int): Duration in days of each forecast window. Defaults to ``1``.
         window_step (int): Step size between consecutive forecast windows.
             Defaults to ``12``.
         window_step_unit (str): Unit of ``window_step`` — ``"minutes"`` or
@@ -300,7 +299,6 @@ class ForecastConfig(_ConfigBase):
 
     start_date: str = ""
     end_date: str = ""
-    window_size: int = 1
     window_step: int = 12
     window_step_unit: str = "hours"
     save_predictions: bool = True

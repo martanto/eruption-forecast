@@ -1343,7 +1343,6 @@ class ForecastModel:
         self,
         start_date: str | datetime,
         end_date: str | datetime,
-        window_size: int,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         save_predictions: bool = True,
@@ -1363,7 +1362,6 @@ class ForecastModel:
         Args:
             start_date (str | datetime): Start date for forecasting windows.
             end_date (str | datetime): End date for forecasting windows.
-            window_size (int): Window size in days.
             window_step (int): Step size between consecutive forecast windows.
             window_step_unit (Literal["minutes", "hours"]): Unit of window step.
             save_predictions (bool, optional): If True, saves the prediction DataFrame
@@ -1401,7 +1399,7 @@ class ForecastModel:
 
         df_prediction = model_predictor.predict_proba(
             tremor_data=self.tremor_data,
-            window_size=window_size,
+            window_size=self.window_size,
             window_step=window_step,
             window_step_unit=window_step_unit,
             select_tremor_columns=self.select_tremor_columns,
@@ -1415,7 +1413,6 @@ class ForecastModel:
         self._config.forecast = ForecastConfig(
             start_date=str(to_datetime(start_date).date()),
             end_date=str(to_datetime(end_date).date()),
-            window_size=window_size,
             window_step=window_step,
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,
