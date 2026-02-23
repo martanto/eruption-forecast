@@ -1087,6 +1087,7 @@ class ForecastModel:
         number_of_significant_features: int = 20,
         grid_params: dict[str, Any] | None = None,
         n_jobs: int = 1,
+        grid_search_n_jobs: int = 1,
         overwrite: bool = False,
         verbose: bool = False,
     ) -> Self:
@@ -1114,6 +1115,11 @@ class ForecastModel:
                 Defaults to None.
             n_jobs (int, optional): Parallel workers for this classifier run.
                 Defaults to 1.
+            grid_search_n_jobs (int, optional): Number of parallel jobs inside each
+                GridSearchCV call (inner loop). Safe to set > 1 because the loky
+                backend handles nested parallelism without deadlocks. Combine with
+                ``n_jobs`` to control the total CPU budget:
+                ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
             overwrite (bool, optional): If True, overwrites existing output files.
                 Defaults to False.
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
@@ -1131,6 +1137,7 @@ class ForecastModel:
             feature_selection_method=self.feature_selection_method,
             overwrite=overwrite,
             n_jobs=n_jobs,
+            grid_search_n_jobs=grid_search_n_jobs,
             verbose=verbose,
         )
 
@@ -1173,6 +1180,7 @@ class ForecastModel:
         extracted_features_csv: str | None = None,
         output_dir: str | None = None,
         n_jobs: int | None = None,
+        grid_search_n_jobs: int = 1,
         overwrite: bool = False,
         verbose: bool = False,
         save_model: bool = True,
@@ -1215,7 +1223,12 @@ class ForecastModel:
             plot_significant_features (bool, optional): Whether to plot each significant feature. Defaults to False.
             extracted_features_csv (str | None): Path to extracted features.
             output_dir (str, optional): Path to output directory. Defaults to None.
-            n_jobs (int, optional): Number of jobs. Defaults to 1.
+            n_jobs (int, optional): Number of jobs. Defaults to None.
+            grid_search_n_jobs (int, optional): Number of parallel jobs inside each
+                GridSearchCV call (inner loop). Safe to set > 1 because the loky
+                backend handles nested parallelism without deadlocks. Combine with
+                ``n_jobs`` to control the total CPU budget:
+                ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
             save_model (bool, optional): If True, serialises the full ``ForecastModel``
@@ -1304,6 +1317,7 @@ class ForecastModel:
                 number_of_significant_features=number_of_significant_features,
                 grid_params=grid_params,
                 n_jobs=n_jobs or self.n_jobs,
+                grid_search_n_jobs=grid_search_n_jobs,
                 overwrite=overwrite or self.overwrite,
                 verbose=verbose or self.verbose,
             )
