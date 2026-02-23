@@ -257,9 +257,6 @@ class ModelTrainer:
         # Classifier metrics dir: ``<classifier_dir>/metrics``
         metrics_dir = os.path.join(classifier_dir, "metrics")
 
-        # Per-seed test data dir: ``<classifier_dir>/tests``
-        tests_dir = os.path.join(classifier_dir, "tests")
-
         # Filtered features dir: ``<classifier_dir>/features``
         features_dir = os.path.join(classifier_dir, "features")
 
@@ -268,6 +265,9 @@ class ModelTrainer:
 
         # Significant features dir: ``<features_dir>/significant_features``
         significant_features_dir = os.path.join(features_dir, "significant_features")
+
+        # Per-seed test data dir: ``<features_dir>/tests``
+        tests_dir = os.path.join(features_dir, "tests")
 
         # Plot significant features dir: ``<features_dir>/figures/significant``
         figures_dir = os.path.join(features_dir, "figures")
@@ -475,7 +475,7 @@ class ModelTrainer:
         figures_dir = os.path.join(self.features_dir, "figures")
         self.significant_figures_dir = os.path.join(figures_dir, "significant")
 
-        # Per-seed test data dir: ``<classifier_dir>/tests``
+        # Per-seed test data dir: ``<features_dir>/tests``
         self.tests_dir = os.path.join(self.features_dir, "tests")
 
         self.create_directories()
