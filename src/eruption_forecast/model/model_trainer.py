@@ -318,7 +318,6 @@ class ModelTrainer:
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir
         self.tests_dir = tests_dir
-        self.figures_dir = figures_dir
 
         # ------------------------------------------------------------------
         # Will be set after train_and_evaluate() method called
@@ -488,9 +487,6 @@ class ModelTrainer:
         # Classifier metrics dir: ``<classifier_dir>/metrics``
         self.metrics_dir = os.path.join(self.classifier_dir, "metrics")
 
-        # Aggregate plots and data dir: ``<classifier_dir>/plots``
-        self.figures_dir = os.path.join(self.classifier_dir, "plots")
-
         # Filtered features dir: ``<classifier_dir>/features``
         self.features_dir = os.path.join(self.classifier_dir, "features")
 
@@ -503,8 +499,8 @@ class ModelTrainer:
         )
 
         # Plot significant features dir: ``<features_dir>/figures/significant``
-        figures_dir = os.path.join(self.features_dir, "figures")
-        self.significant_figures_dir = os.path.join(figures_dir, "significant")
+        self.figures_dir = os.path.join(self.features_dir, "figures")
+        self.significant_figures_dir = os.path.join(self.figures_dir, "significant")
 
         # Per-seed test data dir: ``<features_dir>/tests``
         self.tests_dir = os.path.join(self.features_dir, "tests")
@@ -556,7 +552,6 @@ class ModelTrainer:
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
-        os.makedirs(self.tests_dir, exist_ok=True)
         os.makedirs(self.figures_dir, exist_ok=True)
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
@@ -1097,6 +1092,7 @@ class ModelTrainer:
             ... )
         """
         self.create_directories()
+        os.makedirs(self.tests_dir, exist_ok=True)
         os.makedirs(self.metrics_dir, exist_ok=True)
 
         if save_all_features:
