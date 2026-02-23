@@ -844,6 +844,7 @@ class ForecastModel:
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
+            remove_tremor_anomalies=remove_tremor_anomalies,
             interpolate=interpolate,
             value_multiplier=value_multiplier,
             cleanup_daily_dir=cleanup_daily_dir,
@@ -1340,6 +1341,7 @@ class ForecastModel:
             save_all_features=save_all_features,
             plot_significant_features=plot_significant_features,
             n_jobs=n_jobs,
+            grid_search_n_jobs=grid_search_n_jobs,
             overwrite=overwrite,
             verbose=verbose,
         )

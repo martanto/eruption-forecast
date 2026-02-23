@@ -1,0 +1,89 @@
+# eruption-forecast pipeline configuration example
+# Copy this file to config.yaml and adjust the values for your run.
+# Load with: ForecastModel.from_config("config.yaml")
+version: '1.0'
+
+model:
+  station: OJN             # Station code (e.g. OJN, MEPAS)
+  channel: EHZ             # Channel code (e.g. EHZ, BHZ)
+  start_date: '2025-03-16' # Start date of the full dataset (YYYY-MM-DD)
+  end_date: '2025-03-22'   # End date of the full dataset (YYYY-MM-DD)
+  window_size: 1            # Sliding window size in days
+  volcano_id: MERAPI        # Volcano identifier used in label filenames
+  network: VG               # SEED network code
+  location: '00'            # SEED location code
+  output_dir: null          # Override default output directory (null = auto)
+  root_dir: null            # Root directory anchor for relative output paths (null = cwd)
+  overwrite: false          # Overwrite existing output files
+  n_jobs: 4                 # Parallel workers for the outer pipeline
+  verbose: false
+  debug: false
+
+calculate:
+  source: sds               # Data source: 'sds' or 'fdsn'
+  sds_dir: D:/Data/OJN      # Path to SDS archive root (required when source='sds')
+  methods: null             # Tremor methods to compute (null = all: rsam + dsar)
+  filename_prefix: null     # Optional prefix for the merged output CSV filename
+  remove_outlier_method: maximum  # Outlier removal method ('maximum', 'zscore', or null)
+  remove_tremor_anomalies: false  # Remove anomalous tremor windows before feature extraction
+  interpolate: true         # Interpolate missing values in tremor time-series
+  value_multiplier: null    # Multiply tremor values by a scalar (null = no scaling)
+  cleanup_daily_dir: false  # Delete per-day CSV files after merging
+  plot_daily: false         # Plot each day's tremor data
+  save_plot: false          # Save tremor plots to disk
+  overwrite_plot: false     # Overwrite existing tremor plots
+  client_url: https://service.iris.edu  # FDSN client URL (used when source='fdsn')
+  n_jobs: null              # Parallel workers for daily tremor calculation (null = model.n_jobs)
+  verbose: false
+  debug: false
+
+build_label:
+  window_step: 12           # Step between consecutive windows
+  window_step_unit: hours   # Unit for window_step: 'minutes' or 'hours'
+  day_to_forecast: 2        # Days before an eruption to start labelling positive (1)
+  eruption_dates:
+    - '2025-03-20'          # List of known eruption dates (YYYY-MM-DD)
+  start_date: null          # Override label start date (null = model.start_date)
+  end_date: null            # Override label end date (null = model.end_date)
+  tremor_columns: null      # Subset of tremor columns to include (null = all)
+  verbose: false
+  debug: false
+
+extract_features:
+  select_tremor_columns:    # Tremor columns to use for feature extraction
+    - rsam_f2
+    - rsam_f3
+  save_tremor_matrix_per_method: false  # Save a separate tremor matrix per tremor column
+  save_tremor_matrix_per_id: false      # Save a separate tremor matrix per window id
+  exclude_features: null    # tsfresh feature names to exclude (null = none)
+  use_relevant_features: false          # Use only statistically relevant features (tsfresh FDR)
+  overwrite: false
+  n_jobs: null              # Workers for tsfresh extraction (null = model.n_jobs)
+  verbose: null
+
+train:
+  classifiers:              # One or more classifier keys to train
+    - xgb                   # Options: rf, lite-rf, gb, xgb, svm, lr, nn, dt, knn, nb, voting
+  cv_strategy: stratified   # Cross-validation strategy: 'shuffle', 'stratified', 'timeseries'
+  random_state: 0           # Starting random seed
+  total_seed: 500           # Number of seeds (random_state … random_state + total_seed - 1)
+  with_evaluation: false    # true = 80/20 split + metrics; false = train on full dataset
+  number_of_significant_features: 20   # Top-N features to keep after selection
+  sampling_strategy: 0.75   # RandomUnderSampler ratio (minority / majority)
+  save_all_features: false  # Save all ranked features (not just top-N) per seed
+  plot_significant_features: false      # Plot feature importances per seed
+  n_jobs: null              # Outer seed-level parallel workers (null = model.n_jobs)
+  grid_search_n_jobs: 1     # Inner GridSearchCV workers (n_jobs × grid_search_n_jobs ≤ cpu_count)
+  overwrite: false
+  verbose: false
+
+forecast:
+  start_date: '2025-03-23' # Forecast period start date
+  end_date: '2025-03-30'   # Forecast period end date
+  window_step: 12           # Step between forecast windows
+  window_step_unit: hours   # Unit for window_step: 'minutes' or 'hours'
+  save_predictions: true    # Save prediction CSV to disk
+  save_plot: true           # Save forecast probability plot
+  n_jobs: null              # Workers for feature extraction during forecast (null = model.n_jobs)
+  overwrite: false
+  verbose: false
