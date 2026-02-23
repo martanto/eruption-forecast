@@ -398,12 +398,12 @@ Example with `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
 ```
 Timeline (each tick = 12 hours):
 
-──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15 ☄
+──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15  ☄
  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00
      │      │      │      │      │      │      │      │      │      │      │      │
-     ← window_step: 12h →         │      │      │      │      │
-                                  │      ◄──────────── day_to_forecast=2d ───────────►│
-                                  │                       label = 1 zone              │
+     ← window_step: 12h →        │      │      │      │      │      │      │      │
+                                 │      ◄───────── day_to_forecast=2d ───────────►│
+                                 │                    label = 1 zone              │
 ```
 
 ```
@@ -528,28 +528,28 @@ print(scores.head(10))
 Two training workflows are available depending on your evaluation strategy.
 
 ```
-  train_and_evaluate()              train()
-  ─────────────────────            ─────────────────────
-  Full Dataset                     Full Dataset
-       │                                │
-       ▼                                ▼
-   80/20 Split                  RandomUnderSampler
-   (stratified)                  (full dataset)
-  ┌────┴────┐                          │
-Train     Test                  Feature Selection
-  │         │                    (full dataset)
-RandomUnder │                          │
-Sampler     │                    GridSearchCV
-  │         │                     + CV folds
-Feature     │                          │
-Selection   │                   ┌──────┴──────┐
-  │         │               model.pkl   registry.csv
-GridSearchCV│
- + CV folds │
-  │         │
-Evaluate ◄──┘
-  │
-Save model + metrics
+   train_and_evaluate()                  train()
+  ─────────────────────            ────────────────────
+      Full Dataset                      Full Dataset
+           │                                │
+           ▼                                ▼
+      80/20 Split                    RandomUnderSampler
+      (stratified)                     (full dataset)
+      ┌────┴────┐                           │
+    Train     Test                   Feature Selection
+      │         │                      (full dataset)
+    RandomUnder │                           │
+    Sampler     │                      GridSearchCV
+      │         │                       + CV folds
+    Feature     │                           │
+    Selection   │                    ┌──────┴──────┐
+      │         │                model.pkl   registry.csv
+    GridSearchCV│
+    + CV folds  │
+      │         │
+    Evaluate ◄──┘
+      │
+    Save model + metrics
 ```
 
 #### Which workflow should I use?
