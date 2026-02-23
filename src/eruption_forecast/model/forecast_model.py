@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
@@ -26,7 +27,6 @@ from eruption_forecast.config.pipeline_config import (
     BuildLabelConfig,
     ExtractFeaturesConfig,
 )
-from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
@@ -88,12 +88,11 @@ class ForecastModel:
         use_relevant_features (bool): Whether relevance filtering was applied.
         select_tremor_columns (list[str] | None): Selected tremor columns for processing.
         feature_selection_method (str): Feature selection method.
-        ModelTrainer (ModelTrainer | None): Model trainer instance.
-        trained_model_df (pd.DataFrame): Trained model registry DataFrame.
-        trained_model_csv (str | None): Path to model registry CSV.
-        ClassifierModel (ClassifierModel | None): Classifier configuration.
-        classifier_name (str | None): Classifier class name.
-        trained_models (dict[str, str]): Dictionary of trained model paths.
+        trainers (list[dict[str, Any]]): List of trainer info dicts, one per classifier run.
+            Each dict contains keys ``classifier_model``, ``classifier_name``,
+            ``model_trainer``, ``trained_model_df``, and ``trained_model_csv``.
+        trained_models (dict[str, str]): Mapping of classifier name to trained model
+            registry CSV path. Populated after ``train()``; used by ``forecast()``.
         ModelPredictor (ModelPredictor | None): Predictor instance.
         prediction_df (pd.DataFrame): Prediction results DataFrame.
 
@@ -141,11 +140,11 @@ class ForecastModel:
         ...     day_to_forecast=2,
         ...     eruption_dates=["2024-03-15", "2024-05-20"],
         ... )
-        >>> model.extract_features().train_and_evaluate()
+        >>> model.extract_features().train(classifier="rf", total_seed=100)
 
         >>> # Method chaining example
         >>> model = ForecastModel(...).calculate(...).build_label(...).extract_features()
-        >>> model.train(classifier="xgb", random_state=42, total_seed=100)
+        >>> model.train(classifier=["rf", "xgb"], random_state=42, total_seed=100)
     """
 
     def __init__(
@@ -277,11 +276,7 @@ class ForecastModel:
         # ------------------------------------------------------------------
         # Will be set after train() called
         # ------------------------------------------------------------------
-        self.ModelTrainer: ModelTrainer | None = None
-        self.trained_model_df: pd.DataFrame = pd.DataFrame()
-        self.trained_model_csv: str | None = None
-        self.ClassifierModel: ClassifierModel | None = None
-        self.classifier_name: str | None = None
+        self.trainers: list[dict[str, Any]] = []
         self.trained_models: dict[str, str] = {}
 
         # ------------------------------------------------------------------
@@ -1080,15 +1075,96 @@ class ForecastModel:
         self.feature_selection_method = using
         return self
 
+    def _train_per_classifier(
+        self,
+        classifier: str,
+        cv_strategy: Literal["shuffle", "stratified", "timeseries"],
+        features_csv: str,
+        label_csv: str,
+        output_dir: str,
+        train_params: dict[str, Any],
+        with_evaluation: bool = False,
+        number_of_significant_features: int = 20,
+        grid_params: dict[str, Any] | None = None,
+        n_jobs: int = 1,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ) -> Self:
+        """Train a single classifier and append results to instance state.
+
+        Creates a ``ModelTrainer`` for the given classifier, optionally overrides
+        its hyperparameter grid, runs ``fit()``, then stores the trainer info dict
+        in ``self.trainers`` and the registry CSV path in ``self.trained_models``.
+
+        Args:
+            classifier (str): Classifier key (e.g. ``"rf"``, ``"xgb"``).
+            cv_strategy (Literal["shuffle", "stratified", "timeseries"]): Cross-validation
+                strategy passed to ``ModelTrainer``.
+            features_csv (str): Path to the extracted features CSV file.
+            label_csv (str): Path to the aligned labels CSV file.
+            output_dir (str): Root directory for training outputs.
+            train_params (dict[str, Any]): Keyword arguments forwarded to
+                ``ModelTrainer.fit()`` (e.g. ``random_state``, ``total_seed``).
+            with_evaluation (bool, optional): If True, performs an 80/20 train/test
+                split and computes evaluation metrics. Defaults to False.
+            number_of_significant_features (int, optional): Top-N features retained
+                per seed. Defaults to 20.
+            grid_params (dict[str, Any] | None, optional): Custom hyperparameter grid
+                for GridSearchCV. If None, the classifier default grid is used.
+                Defaults to None.
+            n_jobs (int, optional): Parallel workers for this classifier run.
+                Defaults to 1.
+            overwrite (bool, optional): If True, overwrites existing output files.
+                Defaults to False.
+            verbose (bool, optional): If True, enables verbose logging. Defaults to False.
+
+        Returns:
+            Self: ForecastModel instance for method chaining.
+        """
+        train_model = ModelTrainer(
+            extracted_features_csv=features_csv,
+            label_features_csv=label_csv,
+            output_dir=output_dir,
+            classifier=classifier,  # ty:ignore[invalid-argument-type]
+            cv_strategy=cv_strategy,
+            number_of_significant_features=number_of_significant_features,
+            feature_selection_method=self.feature_selection_method,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
+        # Override default grid search parameters
+        if grid_params is not None:
+            train_model.ClassifierModel.grid = grid_params
+
+        train_model.fit(with_evaluation=with_evaluation, **train_params)
+
+        classifier_name: str = train_model.ClassifierModel.name
+        trained_model_csv = str(train_model.csv)
+
+        self.trainers.append(
+            {
+                "classifier_model": train_model.ClassifierModel,
+                "classifier_name": classifier_name,
+                "model_trainer": train_model,
+                "trained_model_df": train_model.df,
+                "trained_model_csv": train_model.csv,
+            }
+        )
+
+        # Use in forecast()
+        self.trained_models[classifier_name] = trained_model_csv
+
+        return self
+
     def train(
         self,
-        classifier: Literal[
-            "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
-        ] = "rf",
+        classifier: str | list[str] = "rf",
         cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
         random_state: int = 0,
         total_seed: int = 500,
-        with_evaluation: bool = True,
+        with_evaluation: bool = False,
         grid_params: dict[str, Any] | None = None,
         number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
@@ -1117,14 +1193,18 @@ class ForecastModel:
             - lite-rf: Random Forest but faster with more simple grid parameters
 
         Args:
-            classifier (str, optional): Classifier type ("svm", "knn", "dt", "rf", "gb",
-                "xgb", "nn", "nb", "lr", "voting"). Defaults to "rf".
+            classifier (str | list[str], optional): Classifier type or list of classifier
+                types to train sequentially. Supported values: ``"svm"``, ``"knn"``,
+                ``"dt"``, ``"rf"``, ``"gb"``, ``"xgb"``, ``"nn"``, ``"nb"``,
+                ``"lr"``, ``"voting"``, ``"lite-rf"``. A comma-separated string
+                (e.g. ``"rf,xgb"``) is also accepted. Defaults to ``"rf"``.
             cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
                 "timeseries"). Defaults to "shuffle".
             random_state (int, optional): Initial random seed. Defaults to 0.
             total_seed (int, optional): Total number of random seeds. Defaults to 500.
-            with_evaluation (bool, optional): If True, performs 80/20 train/test split and
-                computes evaluation metrics. Requires labels. Defaults to True.
+            with_evaluation (bool, optional): If True, performs an 80/20 train/test split
+                and computes evaluation metrics per seed. Requires labels. Set to False
+                to train on the full dataset without metrics. Defaults to False.
             grid_params (dict[str, Any], optional): Override default hyperparameter grid
                 for GridSearchCV. Defaults to None.
             number_of_significant_features (int, optional): Number of top features to retain
@@ -1145,6 +1225,34 @@ class ForecastModel:
         Returns:
             Self: ForecastModel instance for method chaining.
         """
+        CLASSIFIERS: list[str] = [
+            "svm",
+            "knn",
+            "dt",
+            "rf",
+            "gb",
+            "xgb",
+            "nn",
+            "nb",
+            "lr",
+            "voting",
+            "lite-rf",
+        ]
+
+        if isinstance(classifier, str):
+            classifiers: list[str] = list(classifier.split(","))
+        elif isinstance(classifier, list):
+            for _classifier in classifier:
+                if _classifier not in CLASSIFIERS:
+                    raise ValueError(
+                        f"Classifier {_classifier} not supported. Choose from {CLASSIFIERS}"
+                    )
+            classifiers = classifier
+        else:
+            raise TypeError(
+                f"Classifier ({classifier}) type `{type(classifier)}` not supported."
+            )
+
         if verbose or self.verbose:
             logger.info("=" * 50)
             logger.info(f"| Training model using: {classifier}")
@@ -1175,23 +1283,6 @@ class ForecastModel:
 
         output_dir = output_dir or self.station_dir
 
-        train_model = ModelTrainer(
-            extracted_features_csv=features_csv,
-            label_features_csv=label_csv,
-            output_dir=output_dir,
-            classifier=classifier,
-            cv_strategy=cv_strategy,
-            number_of_significant_features=number_of_significant_features,
-            feature_selection_method=self.feature_selection_method,
-            overwrite=overwrite or self.overwrite,
-            n_jobs=n_jobs or self.n_jobs,
-            verbose=verbose or self.verbose,
-        )
-
-        # Override default grid search parameters
-        if grid_params is not None:
-            train_model.ClassifierModel.grid = grid_params
-
         train_params: dict[str, Any] = {
             "random_state": random_state,
             "total_seed": total_seed,
@@ -1200,18 +1291,30 @@ class ForecastModel:
             "plot_significant_features": plot_significant_features,
         }
 
-        train_model.fit(with_evaluation=with_evaluation, **train_params)
+        # Train multi classifiers
+        for _classifier in classifiers:
+            self._train_per_classifier(
+                classifier=_classifier,
+                cv_strategy=cv_strategy,
+                features_csv=features_csv,
+                label_csv=label_csv,
+                output_dir=output_dir,
+                train_params=train_params,
+                with_evaluation=with_evaluation,
+                number_of_significant_features=number_of_significant_features,
+                grid_params=grid_params,
+                n_jobs=n_jobs or self.n_jobs,
+                overwrite=overwrite or self.overwrite,
+                verbose=verbose or self.verbose,
+            )
 
-        self.ModelTrainer = train_model
-        self.trained_model_df = train_model.df
-        self.trained_model_csv: str = train_model.csv
-        self.ClassifierModel = train_model.ClassifierModel
-        self.classifier_name: str = train_model.ClassifierModel.name
-
-        self.trained_models[self.classifier_name] = self.trained_model_csv
+        # Save trained models csv
+        trained_models_filepath = os.path.join(self.station_dir, "trained_models.json")
+        with open(trained_models_filepath, "w") as f:
+            json.dump(self.trained_models, f, indent=4)
 
         self._config.train = TrainConfig(
-            classifier=classifier,
+            classifiers=classifiers,
             cv_strategy=cv_strategy,
             random_state=random_state,
             total_seed=total_seed,

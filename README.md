@@ -639,7 +639,7 @@ without dropping down to `ModelTrainer`.
 | `output_dir` | `str \| None` | `None` | Output directory; resolved against `root_dir` when relative. Defaults to `root_dir/output/trainings` |
 | `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Defaults to `os.getcwd()` |
 | `prefix_filename` | `str \| None` | `None` | Optional prefix prepended to every output filename |
-| `classifier` | `str` | `"rf"` | Classifier type — see [Supported Classifiers](#7-supported-classifiers) |
+| `classifier` | `str` | `"rf"` | Classifier type — see [Supported Classifiers](#7-supported-classifiers). `ForecastModel.train()` also accepts a `list[str]` or comma-separated string to train multiple classifiers in sequence |
 | `cv_strategy` | `str` | `"shuffle"` | Cross-validation strategy — `"shuffle"`, `"stratified"`, or `"timeseries"` |
 | `cv_splits` | `int` | `5` | Number of CV folds |
 | `number_of_significant_features` | `int` | `20` | Top-N features retained per seed and aggregated across seeds |
@@ -1216,6 +1216,45 @@ model.train(
     classifier="xgb",
     with_evaluation=True,  # Split data for evaluation
     total_seed=100,
+)
+```
+
+**Train multiple classifiers in a single call:**
+
+Pass a `list[str]` or a comma-separated string to `classifier`. Each classifier is
+trained sequentially with the same hyperparameters, and all trained model registries
+are available in `model.trained_models` for multi-model consensus forecasting.
+
+```python
+# Using a list
+model.train(
+    classifier=["rf", "xgb", "gb"],
+    cv_strategy="stratified",
+    total_seed=500,
+    with_evaluation=False,
+)
+
+# Using a comma-separated string
+model.train(
+    classifier="rf,xgb",
+    cv_strategy="stratified",
+    total_seed=500,
+)
+
+# trained_models is now populated with one entry per classifier
+print(model.trained_models)
+# {
+#   "RandomForestClassifier": "output/.../trained_model_rf_*.csv",
+#   "XGBClassifier": "output/.../trained_model_xgb_*.csv",
+# }
+
+# Pass directly to ModelPredictor for consensus forecasting
+model.forecast(
+    start_date="2025-07-28",
+    end_date="2025-08-04",
+    window_size=2,
+    window_step=10,
+    window_step_unit="minutes",
 )
 ```
 

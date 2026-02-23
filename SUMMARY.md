@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-22 (Complete Google-style docstrings across all source modules)
+**Last Updated:** 2026-02-23 (Multi-classifier support in ForecastModel.train())
 
 ## ⚠️ Important Notice
 
@@ -46,6 +46,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 31. [4 New Visualization Features](#4-new-visualization-features-2026-02-20)
 31. [ModelEvaluator Refactor + MultiModelEvaluator](#modelevaluator-refactor--multimodelevaluator-2026-02-20)
 32. [CalculateTremor.update() + Fix calculate() NaN Fallback](#calculatetremorUpdate--fix-calculate-nan-fallback-2026-02-20)
+33. [Multi-Classifier Support in ForecastModel.train()](#multi-classifier-support-in-forecastmodeltrain-2026-02-23)
 ---
 
 ## Package Overview
@@ -2871,3 +2872,20 @@ appropriate), Args, Returns, and Raises sections.
 
 - `uv run ruff check --fix src/` — all checks passed
 - `uv run pytest tests/test_imports.py -v` — 2/2 tests passed, no circular imports
+
+---
+
+## Multi-Classifier Support in ForecastModel.train() (2026-02-23)
+
+### Changes
+
+- **`ForecastModel.train()`** — `classifier` parameter updated from `str` to `str | list[str]`. A list of classifier names trains each classifier sequentially. A comma-separated string (e.g. `"rf,xgb"`) is also accepted and split internally. All trained model registry CSV paths are stored in `self.trained_models` keyed by classifier name, enabling direct multi-model consensus via `forecast()`.
+- **`TrainConfig`** (`pipeline_config.py`) — field renamed from `classifier: str` to `classifiers: str | list[str]` to match the actual parameter type. The `forecast_model.py` call site was updated accordingly.
+- **`ForecastModel` class docstring** — fixed `trainers` attribute type annotation (`list[str, Any]` → `list[dict[str, Any]]`) and expanded description of `trained_models`.
+- **`train()` docstring** — `classifier` arg type updated to `str | list[str]` with examples.
+- **README.md** — added "Train multiple classifiers in a single call" alternative workflow example; updated `classifier` row in the ModelTrainer constructor parameters table.
+
+### Verification
+
+- `uv run ruff check --fix src/` — all checks passed
+- `uvx ty check src/` — all checks passed
