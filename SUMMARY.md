@@ -48,6 +48,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 32. [CalculateTremor.update() + Fix calculate() NaN Fallback](#calculatetremorUpdate--fix-calculate-nan-fallback-2026-02-20)
 33. [Multi-Classifier Support in ForecastModel.train()](#multi-classifier-support-in-forecastmodeltrain-2026-02-23)
 34. [ModelTrainer Parallelism Overhaul](#modeltrainer-parallelism-overhaul-2026-02-23)
+35. [README and PipelineConfig Alignment Audit](#readme-and-pipelineconfig-alignment-audit-2026-02-23)
 ---
 
 ## Package Overview
@@ -2935,4 +2936,66 @@ ModelTrainer(..., n_jobs=7, grid_search_n_jobs=2)
 
 # Use all available cores automatically
 ModelTrainer(..., n_jobs=-1, grid_search_n_jobs=1)
+```
+
+---
+
+## README and PipelineConfig Alignment Audit (2026-02-23)
+
+### Overview
+
+Full audit and alignment of `README.md` YAML examples against `pipeline_config.py` dataclasses and `forecast_model.py` constructor calls.
+
+### Changes Made
+
+**`README.md`**
+- Added `lite-rf` classifier row to Section 7 Supported Classifiers table (same as `rf` but smaller hyperparameter grid)
+- Rewrote Output Directory Structure to match actual code paths: `tmp/` → `daily/`, added `tremor/figures/`, moved `tests/` inside `features/`, expanded `model-only/` substructure, renamed `top_20_` → `top_{n}_`
+- Expanded all 6 YAML config blocks to show complete field lists with inline comments
+
+**`src/eruption_forecast/config/pipeline_config.py`**
+- Added `grid_search_n_jobs: int = 1` to `TrainConfig`
+- Added `remove_tremor_anomalies: bool = False` to `CalculateConfig`
+
+**`src/eruption_forecast/model/forecast_model.py`**
+- Passed `grid_search_n_jobs=grid_search_n_jobs` into `TrainConfig(...)` constructor
+- Passed `remove_tremor_anomalies=remove_tremor_anomalies` into `CalculateConfig(...)` constructor
+
+### Final Verified Field Counts
+
+| Config | Fields |
+|---|---|
+| `ModelConfig` | 13 |
+| `CalculateConfig` | 15 (incl. `remove_tremor_anomalies`) |
+| `BuildLabelConfig` | 9 |
+| `ExtractFeaturesConfig` | 8 |
+| `TrainConfig` | 13 (incl. `grid_search_n_jobs`) |
+| `ForecastConfig` | 9 |
+
+All sections verified against `forecast_model.py` constructor calls — no gaps remaining.
+
+---
+
+## Example YAML Config File (2026-02-23)
+
+### Overview
+
+Created `config.example.yaml` in the project root as a ready-to-copy template for pipeline configuration.
+
+### Changes Made
+
+- **`config.example.yaml`** (new file): Full YAML template covering all 6 config sections (`model`, `calculate`, `build_label`, `extract_features`, `train`, `forecast`) with inline comments explaining every field and its valid values. Mirrors the YAML blocks documented in README Section 8.
+- **`.gitignore`**: Added `/config.yaml` so user's live config is excluded from version control; `config.example.yaml` is tracked.
+
+### Usage
+
+```bash
+cp config.example.yaml config.yaml
+# Edit config.yaml with your paths and dates, then:
+```
+
+```python
+from eruption_forecast import ForecastModel
+fm = ForecastModel.from_config("config.yaml")
+fm.run()
 ```

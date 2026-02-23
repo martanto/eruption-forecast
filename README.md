@@ -701,6 +701,7 @@ without dropping down to `ModelTrainer`.
 | `knn` | K-Nearest Neighbors (simple baseline) | None |
 | `nb` | Gaussian Naive Bayes (fast baseline) | None |
 | `voting` | Soft VotingClassifier (RF + XGBoost ensemble) | Combined |
+| `lite-rf` | Random Forest with a smaller grid for faster training | `class_weight="balanced"` |
 
 ### 8. Hyperparameter Grids
 
@@ -1886,7 +1887,8 @@ All outputs are organized under `{output_dir}/{network}.{station}.{location}.{ch
 output/
 └── VG.OJN.00.EHZ/
     ├── tremor/
-    │   ├── tmp/                              # Temporary daily files
+    │   ├── daily/                            # Per-day CSV files (removed if cleanup_daily_dir=True)
+    │   ├── figures/                          # Daily tremor plots (created if plot_daily=True)
     │   └── tremor_*.csv                      # Final merged tremor data
     │
     ├── features/
@@ -1906,10 +1908,15 @@ output/
         │           │   ├── all_features/             # All ranked features (optional)
         │           │   │   ├── 00000.csv
         │           │   │   └── ...
-        │           │   ├── figures/significant/      # Feature plots (optional)
-        │           │   │   └── 00000.jpg
+        │           │   ├── figures/
+        │           │   │   └── significant/          # Feature importance plots (optional)
+        │           │   │       └── 00000.jpg
+        │           │   ├── tests/                    # Per-seed held-out test splits
+        │           │   │   ├── 00000_X_test.csv
+        │           │   │   ├── 00000_y_test.csv
+        │           │   │   └── ...
         │           │   ├── significant_features.csv  # Aggregated features (all seeds)
-        │           │   └── top_20_significant_features.csv
+        │           │   └── top_{n}_significant_features.csv
         │           ├── models/
         │           │   ├── 00000.pkl     # Trained model (seed 0)
         │           │   ├── 00001.pkl
@@ -1917,11 +1924,7 @@ output/
         │           ├── metrics/
         │           │   ├── 00000.json    # Per-seed metrics
         │           │   └── ...
-        │           ├── tests/
-        │           │   ├── 00000_X_test.csv   # Per-seed held-out features
-        │           │   ├── 00000_y_test.csv   # Per-seed held-out labels
-        │           │   └── ...
-        │           ├── figures/
+        │           ├── figures/              # Aggregate evaluation plots (MultiModelEvaluator)
         │           │   ├── aggregate_roc_curve.png
         │           │   ├── aggregate_roc_curve.csv
         │           │   ├── aggregate_pr_curve.png
@@ -1945,10 +1948,21 @@ output/
             └── {classifier-slug}/
                 └── {cv-slug}/
                     ├── features/
-                    │   ├── significant_features/
-                    │   └── ...
+                    │   ├── significant_features/     # Per-seed top-N features
+                    │   │   ├── 00000.csv
+                    │   │   └── ...
+                    │   ├── all_features/             # All ranked features (optional)
+                    │   │   ├── 00000.csv
+                    │   │   └── ...
+                    │   ├── figures/
+                    │   │   └── significant/          # Feature importance plots (optional)
+                    │   │       └── 00000.jpg
+                    │   ├── significant_features.csv  # Aggregated features (all seeds)
+                    │   └── top_{n}_significant_features.csv
                     ├── models/
-                    └── trained_model_{suffix}.csv
+                    │   ├── 00000.pkl
+                    │   └── ...
+                    └── trained_model_{suffix}.csv    # Registry of all trained models
 ```
 
 **ModelPredictor output** (`output_dir/predictions/`):
@@ -2019,6 +2033,8 @@ fm.save_model("my_model.pkl")             # custom path
 
 #### Saved YAML format
 
+A fully annotated template with all fields and inline comments is available at [`config.example.yaml`](config.example.yaml) in the project root. Copy it, edit the values for your run, and load it with `ForecastModel.from_config("config.yaml")`.
+
 ```yaml
 # eruption-forecast pipeline configuration
 version: '1.0'
@@ -2044,9 +2060,19 @@ calculate:
   source: sds
   sds_dir: D:/Data/OJN
   methods: null
+  filename_prefix: null
   remove_outlier_method: maximum
+  remove_tremor_anomalies: false
   interpolate: true
-  # ... remaining calculate() parameters
+  value_multiplier: null
+  cleanup_daily_dir: false
+  plot_daily: false
+  save_plot: false
+  overwrite_plot: false
+  client_url: https://service.iris.edu
+  n_jobs: null
+  verbose: false
+  debug: false
 
 build_label:
   window_step: 12
@@ -2056,27 +2082,48 @@ build_label:
   - '2025-03-20'
   start_date: null
   end_date: null
+  tremor_columns: null
+  verbose: false
+  debug: false
 
 extract_features:
   select_tremor_columns:
   - rsam_f2
   - rsam_f3
+  save_tremor_matrix_per_method: true
+  save_tremor_matrix_per_id: false
+  exclude_features: null
   use_relevant_features: false
+  overwrite: false
+  n_jobs: null
+  verbose: null
 
 train:
-  classifier: xgb
+  classifiers:
+  - xgb
   cv_strategy: stratified
   random_state: 0
   total_seed: 500
   with_evaluation: false
   number_of_significant_features: 20
   sampling_strategy: 0.75
+  save_all_features: false
+  plot_significant_features: false
+  n_jobs: null
+  grid_search_n_jobs: 1
+  overwrite: false
+  verbose: false
 
 forecast:
   start_date: '2025-03-23'
   end_date: '2025-03-30'
   window_step: 12
   window_step_unit: hours
+  save_predictions: true
+  save_plot: true
+  n_jobs: null
+  overwrite: false
+  verbose: false
 ```
 
 Sections that were not called are omitted from the file. A partial run produces a partial YAML that can still be loaded.

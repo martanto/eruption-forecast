@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-23_
+_Last updated: 2026-02-23 (added config.example.yaml sync rule)_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -13,7 +13,7 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 
 ## Rules
 
-1. **SUMMARY.md must be updated after every completed task.** Any finished task — bug fix, refactor, new feature, test, documentation change — must have its outcome recorded in SUMMARY.md before moving on.
+1. **Log every completed task in the daily changelog.** Any finished task — bug fix, refactor, new feature, test, documentation change — must have its outcome recorded in `changelogs/YYYY-mm-dd.md` (using today's date) before moving on. Create the file if it does not exist. Append new entries; never overwrite previous entries in the same file. The `changelogs/` directory is git-ignored (local only).
 2. **TODO.md tracks pending work.** Use TODO.md for next things to do. Check off items when complete and add new items as they arise.
 3. **Type checker is `ty`.** Use `uvx ty check src/` for type checking.
 4. **Lint with ruff.** Use `uv run ruff check --fix src/` for linting.
@@ -24,6 +24,7 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 9. **All module imports must be at the top of the file.** Never place `import` statements inside functions, methods, or conditional blocks. All stdlib, third-party, and local imports belong at the module level, grouped and sorted by ruff.
 11. **Run circular import test after every module change.** After adding, removing, or reorganising any module or import, run `uv run pytest tests/test_imports.py -v` to confirm no circular imports were introduced.
 10. **Always use `martanto` for author contributions.** Use the GitHub username `martanto` for all author attributions in any file.
+12. **Keep `config.example.yaml` in sync.** Whenever `src/eruption_forecast/model/forecast_model.py` or `src/eruption_forecast/config/pipeline_config.py` is modified — new parameter added, removed, renamed, or default changed — update `config.example.yaml` to reflect the change. The YAML keys, defaults, and inline comments must match the current dataclass fields and `forecast_model.py` constructor calls exactly.
 
 ## Testing
 
