@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-active%20development-orange)
 
-A comprehensive Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions based on seismic patterns.
+A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions based on seismic patterns.
 
 ## ⚠️ Important Disclaimers
 
@@ -26,52 +26,29 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 
 ## Table of Contents
 
-- [Important Disclaimers](#️-important-disclaimers)
 - [Features](#features)
 - [Package Architecture](#package-architecture)
 - [Pipeline Overview](#pipeline-overview)
 - [Installation](#installation)
+- [Data Sources](#data-sources)
 - [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
-- [Step-by-Step Usage Guide](#step-by-step-usage-guide)
-  - [1. Calculate Tremor Metrics](#1-calculate-tremor-metrics)
-  - [2. Build Training Labels](#2-build-training-labels)
-  - [3. Build Tremor Matrix](#3-build-tremor-matrix)
-  - [4. Extract Time-Series Features](#4-extract-time-series-features)
-  - [5. Feature Selection](#5-feature-selection)
-  - [6. Train Models with Multiple Seeds](#6-train-models-with-multiple-seeds)
-  - [7. Supported Classifiers](#7-supported-classifiers)
-  - [8. Hyperparameter Grids](#8-hyperparameter-grids)
-  - [9. Cross-Validation Strategies](#9-cross-validation-strategies)
-  - [10. Predict on Future Data with ModelPredictor](#10-predict-on-future-data-with-modelpredictor)
-  - [11. Model Evaluation](#11-model-evaluation)
-  - [12. Analyze Training Results](#12-analyze-training-results)
 - [Advanced Usage](#advanced-usage)
-  - [ForecastModel — Orchestrated Pipeline](#forecastmodel--orchestrated-pipeline)
-  - [Comparing Multiple Classifiers](#comparing-multiple-classifiers)
-  - [train() + ModelPredictor Workflow](#train--modelpredictor-workflow-recommended-for-operational-use)
-  - [Custom Frequency Bands](#custom-frequency-bands)
-- [Visualization & Plotting](#visualization--plotting)
-  - [Tremor Time-Series Plots](#tremor-time-series-plots)
-  - [Feature Importance Plots](#feature-importance-plots)
-  - [Model Evaluation Plots](#model-evaluation-plots)
-  - [Classifier Comparison Heatmap](#classifier-comparison-heatmap)
-  - [SHAP Explainability Plots](#shap-explainability-plots)
-  - [Seed Stability Plot](#seed-stability-plot)
-  - [Frequency Band Contribution](#frequency-band-contribution)
-  - [Forecast Visualization](#forecast-visualization)
-  - [Batch Replot Utilities](#batch-replot-utilities)
-  - [Common Parameters](#common-parameters)
-  - [Import Examples](#import-examples)
+- [Supported Classifiers](#supported-classifiers)
+- [Cross-Validation Strategies](#cross-validation-strategies)
 - [Output Directory Structure](#output-directory-structure)
-- [Configuration](#configuration)
-  - [Decorators](#decorators)
-    - [notify — Telegram Notifications](#notify--telegram-notifications)
-  - [Pipeline Configuration — Save & Replay](#pipeline-configuration--save--replay)
-  - [Logging](#logging)
 - [Requirements](#requirements)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
+- [Citation](#citation)
+
+**Detailed documentation:**
+- [Step-by-Step Usage Guide](docs/step-by-step-guide.md) — Sections 1–12, per-stage code examples
+- [API Reference](docs/api-reference.md) — Constructor and method parameter tables
+- [Visualization & Plotting](docs/visualization.md) — All plot types and usage
+- [Configuration](docs/configuration.md) — notify decorator, pipeline config save/replay, logging
+- [Output Directory Structure](docs/output-structure.md) — Full directory tree
+- [Architecture](docs/architecture.md) — Component details, design principles, key classes
 
 ---
 
@@ -85,60 +62,26 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, classifier comparison heatmaps, seed stability violin plots, and frequency band contribution charts
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
-- **Logging**: Built-in logging with loguru for debugging and monitoring
-- **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion; credentials loaded from `.env` via python-dotenv
-- **Professional Documentation**: 100% Google-style docstrings with explicit types, comprehensive examples, and detailed API documentation
-- **Modular Architecture**: Clean separation of concerns with focused utility modules (array operations, time windows, date validation, DataFrame ops, ML utilities, path resolution, text formatting)
+- **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
+- **Modular Architecture**: Clean separation of concerns with focused utility modules
 
 ## Package Architecture
-
-The package is organized into focused modules with clear responsibilities:
 
 ```
 eruption-forecast/
 ├── src/eruption_forecast/
 │   ├── tremor/              # Seismic tremor processing
-│   │   ├── calculate_tremor.py
-│   │   ├── rsam.py          # Real Seismic Amplitude Measurement
-│   │   ├── dsar.py          # Displacement Seismic Amplitude Ratio
-│   │   ├── shanon_entropy.py  # Shannon Entropy metric
-│   │   └── tremor_data.py
 │   ├── label/               # Training label generation
-│   │   ├── label_builder.py
-│   │   └── label_data.py
 │   ├── features/            # Feature extraction & selection
-│   │   ├── features_builder.py
-│   │   ├── feature_selector.py
-│   │   └── tremor_matrix_builder.py
 │   ├── model/               # ML model training & prediction
-│   │   ├── forecast_model.py
-│   │   ├── model_trainer.py
-│   │   ├── model_predictor.py
-│   │   ├── model_evaluator.py       # Single-seed evaluation
-│   │   ├── multi_model_evaluator.py # Multi-seed aggregate evaluation
-│   │   └── classifier_model.py
-│   ├── sources/             # Seismic data source adapters
-│   │   ├── sds.py           # SDS (SeisComP Data Structure) reader
-│   │   └── fdsn.py          # FDSN web service client with local caching
+│   ├── sources/             # SDS and FDSN data source adapters
 │   ├── plots/               # Visualization utilities
-│   │   └── ...
 │   ├── utils/               # Focused utility modules
-│   │   ├── array.py         # Array operations, outlier detection
-│   │   ├── window.py        # Time window operations
-│   │   ├── date_utils.py    # Date/time validation & conversion
-│   │   ├── dataframe.py     # DataFrame validation & ops
-│   │   ├── ml.py            # ML utilities (sampling, metrics)
-│   │   ├── pathutils.py     # Path resolution
-│   │   └── formatting.py    # Text formatting
 │   └── decorators/          # Function decorators
 └── tests/                   # Unit tests
 ```
 
-**Key Design Principles:**
-- **Single Responsibility**: Each module has one clear purpose
-- **Explicit Imports**: No hidden re-exports (e.g., `from eruption_forecast.utils.date_utils import to_datetime`)
-- **Minimal Dependencies**: Each utils module imports only what it needs
-- **Clean Architecture**: Reduced coupling, easier testing and maintenance
+> Full directory tree, design principles, and per-component details: [docs/architecture.md](docs/architecture.md)
 
 ## Pipeline Overview
 
@@ -147,7 +90,7 @@ Raw Seismic Data (SDS / FDSN)
          │
          ▼
 ┌─────────────────────┐
-│   CalculateTremor   │  RSAM + DSAR → tremor.csv
+│   CalculateTremor   │  RSAM + DSAR + Entropy → tremor.csv
 └─────────┬───────────┘
           │
           ▼
@@ -208,6 +151,79 @@ uv sync
 uv sync --group dev
 ```
 
+## Data Sources
+
+The package reads seismic data from two sources, both routed through `CalculateTremor`.
+
+### SDS — SeisComP Data Structure
+
+SDS is a standardized directory and file layout used by [SeisComP](https://www.seiscomp.de/) to store waveform data portably across data servers and analysis tools. See the [official SDS specification](https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html) for full details.
+
+**Directory layout:**
+
+```
+<sds_dir>/
+└── YEAR/
+    └── NET/
+        └── STA/
+            └── CHAN.TYPE/
+                └── NET.STA.LOC.CHAN.TYPE.YEAR.DAY
+```
+
+**Example** for network `VG`, station `OJN`, channel `EHZ`, day 075 of 2025:
+
+```
+/data/sds/
+└── 2025/
+    └── VG/
+        └── OJN/
+            └── EHZ.D/
+                └── VG.OJN.00.EHZ.D.2025.075
+```
+
+**Field reference:**
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `YEAR` | Four-digit year | `2025` |
+| `NET` | Network code (≤ 8 chars) | `VG` |
+| `STA` | Station code (≤ 8 chars) | `OJN` |
+| `CHAN` | Channel code (≤ 8 chars) | `EHZ` |
+| `LOC` | Location code (≤ 8 chars, may be empty) | `00` |
+| `TYPE` | Data type — `D` = waveform data (most common) | `D` |
+| `DAY` | Three-digit day-of-year, zero-padded | `075` |
+
+Files are miniSEED format. Periods in filenames are always present even when a field is empty.
+
+**Usage:**
+
+```python
+from eruption_forecast import CalculateTremor
+
+tremor = CalculateTremor(
+    station="OJN",
+    channel="EHZ",
+    start_date="2025-01-01",
+    end_date="2025-01-31",
+    n_jobs=4,
+).from_sds(sds_dir="/data/sds").run()
+```
+
+### FDSN — Web Service
+
+FDSN downloads waveform data from any FDSN-compatible web service (IRIS, GEOFON, etc.) and caches it locally as SDS miniSEED so subsequent runs skip the network.
+
+```python
+tremor = CalculateTremor(
+    station="OJN",
+    channel="EHZ",
+    start_date="2025-01-01",
+    end_date="2025-01-31",
+).from_fdsn(client_url="https://service.iris.edu").run()
+```
+
+---
+
 ## Quick Start: Complete Pipeline
 
 Here's a complete end-to-end example from raw seismic data to trained models and eruption forecasting (adapted from `main.py`):
@@ -217,14 +233,14 @@ from eruption_forecast import ForecastModel
 
 # Initialize the forecast model with station and time range
 fm = ForecastModel(
-    root_dir="output",              # All outputs anchored to this directory
+    root_dir="output",
     station="OJN",
     channel="EHZ",
     start_date="2025-01-01",
     end_date="2025-12-31",
-    window_size=2,                   # 2-day windows for feature extraction
+    window_size=2,
     volcano_id="Lewotobi Laki-laki",
-    n_jobs=4,                        # Parallel processing
+    n_jobs=4,
     verbose=True,
 )
 
@@ -232,14 +248,14 @@ fm = ForecastModel(
 fm.calculate(
     source="sds",
     sds_dir="/path/to/sds/data",
-    methods=["rsam", "dsar", "entropy"],  # Enable all three metrics
-    plot_daily=True,                 # Generate daily tremor plots
+    methods=["rsam", "dsar", "entropy"],
+    plot_daily=True,
     save_plot=True,
-    remove_outlier_method="maximum", # Remove outliers from tremor data
+    remove_outlier_method="maximum",
 ).build_label(
     start_date="2025-01-01",
-    end_date="2025-07-24",           # Training period ends before last eruption
-    day_to_forecast=2,               # Label windows 2 days before eruptions
+    end_date="2025-07-24",
+    day_to_forecast=2,
     window_step=6,
     window_step_unit="hours",
     eruption_dates=[
@@ -252,26 +268,22 @@ fm.calculate(
 ).extract_features(
     select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4", "entropy"],
     save_tremor_matrix_per_method=True,
-    exclude_features=[               # Exclude problematic features
-        "agg_linear_trend",
-        "linear_trend_timewise",
-        "length",
-    ],
-    use_relevant_features=True,      # Apply tsfresh relevance filtering
+    exclude_features=["agg_linear_trend", "linear_trend_timewise", "length"],
+    use_relevant_features=True,
 ).train(
-    classifier="rf",                 # Random Forest classifier
+    classifier="rf",
     cv_strategy="stratified",
     random_state=0,
-    total_seed=500,                  # Train 500 models with different seeds
-    with_evaluation=False,           # Train on full dataset (use for production)
+    total_seed=500,
+    with_evaluation=False,
     number_of_significant_features=20,
-    sampling_strategy=0.75,          # Balance classes (75% of majority class)
+    sampling_strategy=0.75,
     save_all_features=True,
     plot_significant_features=True,
 ).forecast(
-    start_date="2025-07-28",         # Forecast period (future data)
+    start_date="2025-07-28",
     end_date="2025-08-04",
-    window_step=10,                  # 10-minute windows for real-time forecasting
+    window_step=10,
     window_step_unit="minutes",
 )
 ```
@@ -279,418 +291,96 @@ fm.calculate(
 **What this pipeline does:**
 
 1. **Calculate tremor** (RSAM, DSAR, Shannon Entropy) from raw seismic data with outlier removal
-2. **Build labels** from known eruption dates (training period: Jan 1 - Jul 24)
+2. **Build labels** from known eruption dates (training period: Jan 1 – Jul 24)
 3. **Extract features** using tsfresh (700+ features) and select top 20
 4. **Train models** using Random Forest with 500 random seeds for robust predictions
-5. **Forecast** future eruptions (Jul 28 - Aug 4) using the trained ensemble
-
-**Output includes:**
-- Tremor CSV files with daily plots
-- Label CSV with eruption windows
-- Extracted features and selected top 20
-- 500 trained models (.pkl files)
-- Model registry CSV
-- Forecast predictions with probabilities, uncertainty, and confidence
-- Eruption forecast plot
+5. **Forecast** future eruptions (Jul 28 – Aug 4) using the trained ensemble
 
 See `main.py` in the repository for the complete working example.
 
+> Full per-stage guide with code examples: [docs/step-by-step-guide.md](docs/step-by-step-guide.md)
+
 ---
 
-## Step-by-Step Usage Guide
+## Advanced Usage
 
-### 1. Calculate Tremor Metrics
-
-Process raw seismic data to calculate RSAM (amplitude), DSAR (ratios), and Shannon Entropy across frequency bands.
+### Use FDSN instead of a local SDS archive
 
 ```python
-from eruption_forecast import CalculateTremor
-
-# From a local SDS archive (all three metrics enabled by default)
-tremor = CalculateTremor(
-    start_date="2025-01-01",
-    end_date="2025-01-31",
-    station="OJN",
-    channel="EHZ",
-    n_jobs=4,
-).from_sds(sds_dir="/data/sds").run()
-
-# Select specific metrics
-tremor = CalculateTremor(
-    start_date="2025-01-01",
-    end_date="2025-01-31",
-    station="OJN",
-    channel="EHZ",
-    methods=["rsam", "dsar", "entropy"],  # default: all three
-).from_sds(sds_dir="/data/sds").run()
-
-# From an FDSN web service (downloads and caches locally as SDS)
-tremor = CalculateTremor(
-    start_date="2025-01-01",
-    end_date="2025-01-31",
-    station="OJN",
-    channel="EHZ",
-).from_fdsn(client_url="https://service.iris.edu").run()
-
-# Custom frequency bands (works with both SDS and FDSN)
-tremor = CalculateTremor(
-    start_date="2025-01-01",
-    end_date="2025-01-31",
-    station="OJN",
-    channel="EHZ",
-).change_freq_bands([
-    (0.1, 1.0),   # Low frequency
-    (1.0, 5.0),   # Mid frequency
-    (5.0, 10.0),  # High frequency
-]).from_sds(sds_dir="/data/sds").run()
-
-# Access the DataFrame
-print(tremor.df.head())
-# Output columns: rsam_f0, rsam_f1, rsam_f2, dsar_f0-f1, dsar_f1-f2, entropy
-
-# Get file path
-print(f"Saved to: {tremor.csv}")
+fm.calculate(
+    source="fdsn",
+    client_url="https://service.iris.edu",
+).build_label(...).train(...)
+# Downloaded miniSEED files are cached locally so subsequent runs skip the network.
 ```
 
-**Output format:**
-- DateTime index with 10-minute intervals
-- RSAM columns: `rsam_f0`, `rsam_f1`, `rsam_f2`, `rsam_f3`, `rsam_f4`
-- DSAR columns: `dsar_f0-f1`, `dsar_f1-f2`, `dsar_f2-f3`, `dsar_f3-f4`
-- Shannon Entropy: `entropy` (signal complexity, single broadband column)
-- Default bands: (0.01–0.1), (0.1–2), (2–5), (4.5–8), (8–16) Hz
-
-### 2. Build Training Labels
-
-Create binary labels (erupted/not erupted) based on known eruption dates.
+### Skip tremor calculation if data already exists
 
 ```python
-from eruption_forecast import LabelBuilder
-
-labels = LabelBuilder(
-    start_date="2020-01-01",
-    end_date="2020-12-31",
-    window_step=12,          # Slide by 12 hours
-    window_step_unit="hours",
-    day_to_forecast=2,       # Label 2 days before eruption as positive
-    eruption_dates=[
-        "2020-03-15",
-        "2020-06-20",
-        "2020-09-10",
-    ],
-    volcano_id="VOLCANO_001",
-).build()
-
-# Access the DataFrame
-print(labels.df.head())
-# Columns: id, is_erupted
-
-# Check label distribution
-print(f"Positive labels: {(labels.df['is_erupted'] == 1).sum()}")
-print(f"Negative labels: {(labels.df['is_erupted'] == 0).sum()}")
+fm.load_tremor_data(
+    tremor_csv="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv"
+).build_label(...).extract_features(...).train(...).forecast(...)
 ```
 
-**Label logic:**
-- Windows whose **end time** falls within `[eruption_date − day_to_forecast, eruption_date]` are labeled `is_erupted = 1`
-- All other windows: `is_erupted = 0`
-- Each window's datetime index is its **end time** (tremor data for the preceding `window_size` days)
-
-#### Labeling Strategy Visualization
-
-Example with `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
-
-```
-Timeline (each tick = 12 hours):
-
-──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15  ☄
- 00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00
-     │      │      │      │      │      │      │      │      │      │      │      │
-     ← window_step: 12h →        │      │      │      │      │      │      │      │
-                                 │      ◄───────── day_to_forecast=2d ───────────►│
-                                 │                    label = 1 zone              │
-```
-
-```
- ID  Window data span                     End time (index)    Label
- ──  ──────────────────────────────────── ──────────────────  ──────
-  1  Jan09·12:00 ══════════ Jan10·12:00   Jan10 12:00           0
-  2  Jan10·00:00 ══════════ Jan11·00:00   Jan11 00:00           0
-  3  Jan10·12:00 ══════════ Jan11·12:00   Jan11 12:00           0
-  4  Jan11·00:00 ══════════ Jan12·00:00   Jan12 00:00           0
-  5  Jan11·12:00 ══════════ Jan12·12:00   Jan12 12:00           0
-  6  Jan12·00:00 ══════════ Jan13·00:00   Jan13 00:00           1  ← label zone starts
-  7  Jan12·12:00 ══════════ Jan13·12:00   Jan13 12:00           1
-  8  Jan13·00:00 ══════════ Jan14·00:00   Jan14 00:00           1
-  9  Jan13·12:00 ══════════ Jan14·12:00   Jan14 12:00           1
- 10  Jan14·00:00 ══════════ Jan15·00:00   Jan15 00:00           1  ← eruption day
-```
-
-> **Key:** The window's datetime index = its **end time**. A window gets `label=1` when its
-> end time falls within `[eruption_date − day_to_forecast, eruption_date]`.
-
-**Parameter reference:**
-
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `window_step` | `int` | How far to shift the window between consecutive labels | `12` |
-| `window_step_unit` | `"minutes"` \| `"hours"` | Unit for `window_step` | `"hours"` |
-| `day_to_forecast` | `int` (days) | How many days before the eruption to start labeling as positive (`is_erupted=1`) | `2` |
-| `eruption_dates` | `list[str]` | Known eruption dates in `YYYY-MM-DD` format | `["2025-03-20"]` |
-| `start_date` / `end_date` | `str` | Date range for generating all label windows | `"2025-01-01"` |
-| `volcano_id` | `str` | Identifier used in output filenames | `"LEWOTOBI"` |
-
-### 3. Build Tremor Matrix
-
-Align tremor time-series with label windows to create a unified feature matrix.
+### Change feature selection method
 
 ```python
-from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
-
-builder = TremorMatrixBuilder(
-    tremor_df=tremor.df,
-    label_df=labels.df,
-    output_dir="output/features",
-    window_size=1,
-).build(
-    select_tremor_columns=["rsam_f0", "rsam_f1", "dsar_f0-f1"],
-    save_tremor_matrix_per_method=True,
-)
-
-print(builder.df.shape)  # (n_windows × n_samples_per_window, n_columns)
-```
-
-### 4. Extract Time-Series Features
-
-Extract 700+ statistical features from tremor data using tsfresh.
-
-```python
-from eruption_forecast import FeaturesBuilder
-
-features_builder = FeaturesBuilder(
-    tremor_matrix_df=builder.df,
-    label_df=labels.df,
-    output_dir="output/features",
-    n_jobs=4,
-)
-
-# Extract all features
-features = features_builder.extract_features(
-    select_tremor_columns=["rsam_f0", "rsam_f1"],
-    exclude_features=["length", "has_duplicate"],
-)
-
-print(f"Features shape: {features.shape}")
-# Example: (5000 windows, 1500 features)
-```
-
-**Feature types extracted:**
-- Statistical: mean, median, std, variance, min, max, quantiles
-- Time-domain: autocorrelation, partial autocorrelation
-- Frequency-domain: FFT coefficients, spectral entropy
-- Complexity: approximate entropy, sample entropy
-- Peaks: number of peaks, peak positions
-
-### 5. Feature Selection
-
-Select the most informative features using one of three available methods.
-
-```python
-from eruption_forecast.features import FeatureSelector
-
-# Two-stage combined selection (recommended)
-selector = FeatureSelector(method="combined", n_jobs=4, verbose=True)
-X_selected = selector.fit_transform(
-    X_train, y_train,
-    fdr_level=0.05,  # Stage 1: tsfresh FDR level
-    top_n=30,        # Stage 2: final feature count
-)
-print(f"Reduced: {X_train.shape[1]} → {X_selected.shape[1]} features")
-
-# tsfresh statistical selection only
-selector = FeatureSelector(method="tsfresh", n_jobs=4)
-X_selected = selector.fit_transform(X_train, y_train, fdr_level=0.05)
-
-# RandomForest permutation importance only
-selector = FeatureSelector(method="random_forest", n_jobs=4)
-X_selected = selector.fit_transform(X_train, y_train, top_n=30)
-
-# Get comprehensive feature scores
-scores = selector.get_feature_scores()
-print(scores.head(10))
-```
-
-**Selection methods:**
-
-| Method | Reduces | Captures Interactions | Speed |
-|--------|---------|-----------------------|-------|
-| `tsfresh` | 1000s → 100s | No | Fast |
-| `random_forest` | Direct → N | Yes | Slow |
-| `combined` | 1000s → 100s → N | Yes | Fast |
-
-### 6. Train Models with Multiple Seeds
-
-Two training workflows are available depending on your evaluation strategy.
-
-```
-   train_and_evaluate()                  train()
-  ─────────────────────            ────────────────────
-      Full Dataset                      Full Dataset
-           │                                │
-           ▼                                ▼
-      80/20 Split                    RandomUnderSampler
-      (stratified)                     (full dataset)
-      ┌────┴────┐                           │
-    Train     Test                   Feature Selection
-      │         │                      (full dataset)
-    RandomUnder │                           │
-    Sampler     │                      GridSearchCV
-      │         │                       + CV folds
-    Feature     │                           │
-    Selection   │                    ┌──────┴──────┐
-      │         │                model.pkl   registry.csv
-    GridSearchCV│
-    + CV folds  │
-      │         │
-    Evaluate ◄──┘
-      │
-    Save model + metrics
-```
-
-#### Which workflow should I use?
-
-- **`train_and_evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
-- **`train()`** — treats data as two separate time periods: a **current/present dataset** used for training (passed via `extracted_features_csv`) and a **future dataset** evaluated separately via `ModelPredictor`. No internal split; the model is trained on 100% of the current data.
-
-| Question | `train_and_evaluate()` | `train()` |
-|---|---|---|
-| Do I want to measure in-sample performance? | ✅ Yes — evaluates each seed on held-out 20% | ❌ No metrics computed |
-| Do I have a separate future dataset to evaluate on? | — | ✅ Use with `ModelPredictor` |
-| Am I exploring classifiers and hyperparameters? | ✅ Quick feedback per run | ❌ Not suitable |
-| Am I training the final production model? | ❌ Wastes 20% of data | ✅ Uses 100% of data |
-
-#### `train_and_evaluate()` — with held-out test set (80/20 split)
-
-Splits data **before** resampling and feature selection to prevent data leakage.
-Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
-
-```python
-from eruption_forecast.model.model_trainer import ModelTrainer
-
-trainer = ModelTrainer(
-    extracted_features_csv="output/features/all_features.csv",
-    label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings",
-    classifier="xgb",
-    cv_strategy="stratified",
-    number_of_significant_features=20,
-    feature_selection_method="combined",
-    n_jobs=4,
-)
-
-trainer.train_and_evaluate(
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
-)
-```
-
-#### `train()` — full dataset training (no split)
-
-Trains on the **entire current/present dataset** across multiple seeds — no internal 80/20 split.
-The dataset passed here represents your known historical period. Evaluation is deferred to
-`ModelPredictor` using a **separate future dataset** that was not seen during training.
-
-```python
-trainer = ModelTrainer(
-    extracted_features_csv="output/features/all_features.csv",
-    label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings",
+fm.set_feature_selection_method("combined").train(
     classifier="rf",
-    n_jobs=4,
-)
-
-trainer.train(
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
+    cv_strategy="timeseries",
+    total_seed=200,
 )
 ```
 
-#### `fit()` — Unified entry point
-
-`fit()` dispatches to `train_and_evaluate()` or `train()` based on the
-`with_evaluation` flag. Use it when the calling code needs a single method
-regardless of which workflow is active.
+### Train with evaluation (80/20 split) for in-sample testing
 
 ```python
-# Equivalent to train_and_evaluate()
-trainer.fit(
+fm.train(
+    classifier="xgb",
     with_evaluation=True,
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
-)
-
-# Equivalent to train()
-trainer.fit(
-    with_evaluation=False,
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
+    total_seed=100,
 )
 ```
 
-`ForecastModel.train()` calls `fit()` internally and exposes `with_evaluation`
-as a direct parameter, so you can control the workflow from the high-level API
-without dropping down to `ModelTrainer`.
+### Train multiple classifiers and run consensus forecast
 
-#### ModelTrainer constructor parameters
+Pass a `list[str]` or comma-separated string to `classifier`. Each classifier is trained sequentially; all trained model registries are available for multi-model consensus forecasting.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `extracted_features_csv` | `str` | — | Path to extracted features CSV (output of `FeaturesBuilder`) |
-| `label_features_csv` | `str` | — | Path to aligned labels CSV (output of `FeaturesBuilder`) |
-| `output_dir` | `str \| None` | `None` | Output directory; resolved against `root_dir` when relative. Defaults to `root_dir/output/trainings` |
-| `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Defaults to `os.getcwd()` |
-| `prefix_filename` | `str \| None` | `None` | Optional prefix prepended to every output filename |
-| `classifier` | `str` | `"rf"` | Classifier type — see [Supported Classifiers](#7-supported-classifiers). `ForecastModel.train()` also accepts a `list[str]` or comma-separated string to train multiple classifiers in sequence |
-| `cv_strategy` | `str` | `"shuffle"` | Cross-validation strategy — `"shuffle"`, `"stratified"`, or `"timeseries"` |
-| `cv_splits` | `int` | `5` | Number of CV folds |
-| `number_of_significant_features` | `int` | `20` | Top-N features retained per seed and aggregated across seeds |
-| `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |
-| `overwrite` | `bool` | `False` | Re-run even if output files already exist |
-| `n_jobs` | `int` | `1` | Parallel seed workers (outer loop). Pass `-1` to use all available cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
-| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension |
-| `verbose` | `bool` | `False` | Print progress messages |
-| `debug` | `bool` | `False` | Enable debug-level logging |
+```python
+fm.train(
+    classifier=["rf", "xgb", "gb"],
+    cv_strategy="stratified",
+    total_seed=500,
+    with_evaluation=False,
+).forecast(
+    start_date="2025-07-28",
+    end_date="2025-08-04",
+    window_step=10,
+    window_step_unit="minutes",
+)
+```
 
-#### `train_and_evaluate()` method parameters
+### Save and replay pipeline configuration
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `random_state` | `int` | `0` | Starting random seed; seeds are `random_state, random_state+1, …, random_state+total_seed−1` |
-| `total_seed` | `int` | `500` | Number of seeds (independent train/test splits) to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on training data only |
-| `save_all_features` | `bool` | `False` | Save all ranked features per seed (can produce many files) |
-| `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
+```python
+fm.save_config()          # YAML → {station_dir}/config.yaml
+fm.save_model()           # joblib → {station_dir}/forecast_model.pkl
 
-#### `train()` method parameters
+# Replay the full pipeline from a saved config
+fm2 = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
+fm2.run()
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `random_state` | `int` | `0` | Starting random seed |
-| `total_seed` | `int` | `500` | Number of seeds to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on full dataset |
-| `save_all_features` | `bool` | `False` | Save all ranked features per seed |
-| `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
+# Resume from a saved model (skip re-training)
+fm3 = ForecastModel.load_model("output/VG.OJN.00.EHZ/forecast_model.pkl")
+fm3.forecast(start_date="2025-04-01", end_date="2025-04-07",
+             window_step=12, window_step_unit="hours")
+```
 
-#### `fit()` method parameters
+> Full configuration reference: [docs/configuration.md](docs/configuration.md)
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
-| `**kwargs` | — | — | Forwarded to `train_and_evaluate()` or `train()` (same parameters as those methods) |
+---
 
-### 7. Supported Classifiers
+## Supported Classifiers
 
 | Classifier | Description | Imbalance Handling |
 |------------|-------------|---------------------|
@@ -706,1178 +396,15 @@ without dropping down to `ModelTrainer`.
 | `voting` | Soft VotingClassifier (RF + XGBoost ensemble) | Combined |
 | `lite-rf` | Random Forest with a smaller grid for faster training | `class_weight="balanced"` |
 
-### 8. Hyperparameter Grids
+> Hyperparameter grids and overriding them: [docs/step-by-step-guide.md#8-hyperparameter-grids](docs/step-by-step-guide.md#8-hyperparameter-grids)
 
-Each classifier comes with a built-in hyperparameter grid for `GridSearchCV`. You can override the grid via `ClassifierModel`:
-
-```python
-from eruption_forecast.model.classifier_model import ClassifierModel
-
-clf = ClassifierModel("xgb", random_state=42)
-
-# Override default grid
-clf.grid = {
-    "n_estimators": [200, 300, 500],
-    "max_depth": [3, 5, 7, 9],
-    "learning_rate": [0.01, 0.05, 0.1],
-    "scale_pos_weight": [1, 5, 10, 20],
-}
-```
-
-**Default grids by classifier:**
-
-<details>
-<summary>Random Forest (<code>rf</code>)</summary>
-
-```python
-{
-    "n_estimators": [50, 100, 200],
-    "max_depth": [3, 5, 7],
-    "criterion": ["gini", "entropy"],
-    "max_features": ["sqrt", "log2", None],
-    "min_samples_split": [2, 5, 10],
-    "min_samples_leaf": [1, 2, 4],
-}
-```
-</details>
-
-<details>
-<summary>Gradient Boosting (<code>gb</code>)</summary>
-
-```python
-{
-    "n_estimators": [50, 100, 200],
-    "max_depth": [3, 5, 7],
-    "learning_rate": [0.01, 0.1, 0.2],
-    "subsample": [0.8, 1.0],
-    "min_samples_split": [2, 5],
-    "min_samples_leaf": [1, 2],
-}
-```
-</details>
-
-<details>
-<summary>XGBoost (<code>xgb</code>)</summary>
-
-```python
-{
-    "n_estimators": [100, 200, 300],
-    "max_depth": [3, 5, 7],
-    "learning_rate": [0.01, 0.1, 0.2],
-    "subsample": [0.8, 1.0],
-    "colsample_bytree": [0.8, 1.0],
-    "min_child_weight": [1, 3],
-    "scale_pos_weight": [1, 5, 10, 15],  # Tunes positive-class weighting
-}
-```
-
-> `scale_pos_weight` controls how much extra weight positive (eruption) samples receive. Higher values increase sensitivity at the cost of more false positives.
-</details>
-
-<details>
-<summary>Voting Ensemble (<code>voting</code>)</summary>
-
-```python
-{
-    "rf__n_estimators": [100, 200],
-    "rf__max_depth": [10, None],
-    "xgb__n_estimators": [50, 100],
-    "xgb__learning_rate": [0.05, 0.1],
-    "xgb__max_depth": [5, 7],
-}
-```
-
-> Combines Random Forest and XGBoost with soft voting (probability averaging).
-</details>
-
-### 9. Cross-Validation Strategies
+## Cross-Validation Strategies
 
 | Strategy | Class | Best For |
 |----------|-------|----------|
 | `shuffle` | `StratifiedShuffleSplit` | Random splits with stratification (default) |
 | `stratified` | `StratifiedKFold` | Preserves class distribution across folds |
 | `timeseries` | `TimeSeriesSplit` | Temporal data, strict no-future-leakage |
-
-### 10. Predict on Future Data with ModelPredictor
-
-`ModelPredictor` supports two modes after `train()`:
-
-#### Single model — evaluation mode (labelled data)
-
-Evaluates each seed model against known eruption labels and aggregates metrics across seeds.
-
-```python
-from eruption_forecast.model.model_predictor import ModelPredictor
-
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,  # trained_model_*.csv from train()
-    output_dir="output/predictions",
-)
-
-# One row per (classifier, seed)
-df_metrics = predictor.predict(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-)
-print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
-
-# Best (classifier, seed) overall
-evaluator = predictor.predict_best(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-    criterion="balanced_accuracy",
-)
-print(evaluator.summary())
-evaluator.plot_all()
-```
-
-`predict_best()` accepts any metric column as `criterion`:
-`"accuracy"`, `"balanced_accuracy"`, `"f1_score"`, `"precision"`, `"recall"`, `"roc_auc"`, `"pr_auc"`.
-
-#### ModelPredictor constructor parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `start_date` | `str \| datetime` | — | Start date for prediction period (format: YYYY-MM-DD) |
-| `end_date` | `str \| datetime` | — | End date for prediction period (format: YYYY-MM-DD) |
-| `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path (from `train()`) or a `{name: path}` dict for multi-model consensus |
-| `overwrite` | `bool` | `False` | Overwrite existing output files |
-| `n_jobs` | `int` | `1` | Number of parallel jobs for feature extraction |
-| `output_dir` | `str \| None` | `None` | Output directory; defaults to `<root_dir>/output/predictions` |
-| `root_dir` | `str \| None` | `None` | Root directory for resolving output paths |
-| `verbose` | `bool` | `False` | Enable verbose logging |
-
-#### Single model — forecast mode (unlabelled data)
-
-When no ground-truth labels are available, use `predict_proba()`.
-
-```python
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,
-    output_dir="output/predictions",
-)
-
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",  # or pd.DataFrame
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
-```
-
-#### Multi-model consensus
-
-Pass a dict of classifier registries.  `predict_proba()` aggregates within
-each classifier (across seeds) and then across classifiers (consensus).
-
-```python
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
-        "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
-    },
-    output_dir="output/predictions",
-)
-
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
-```
-
-**Output columns (multi-model):**
-
-| Column | Description |
-|--------|-------------|
-| `{name}_eruption_probability` | Mean P(eruption) across seeds of that classifier |
-| `{name}_uncertainty` | Std across seeds of that classifier |
-| `{name}_confidence` | Seed-level agreement fraction (0.5–1.0) |
-| `{name}_prediction` | Hard label for that classifier |
-| `consensus_eruption_probability` | Mean P(eruption) averaged across all classifiers |
-| `consensus_uncertainty` | Std of per-classifier means (inter-model disagreement) |
-| `consensus_confidence` | Fraction of classifiers voting with consensus majority |
-| `consensus_prediction` | Hard label — `1` if `consensus_eruption_probability ≥ 0.5` |
-
-Results are saved to `predictions.csv`.  The plot shows each classifier as a
-dashed line and the consensus as a solid black line with a shaded uncertainty
-band (`eruption_forecast.png` in `figures/`).
-
-### 11. Model Evaluation
-
-```python
-from eruption_forecast.model.model_evaluator import ModelEvaluator
-
-# From in-memory objects
-evaluator = ModelEvaluator(
-    model=trained_model,
-    X_test=X_test,
-    y_test=y_test,
-    model_name="xgb_42",
-    output_dir="output/eval",
-)
-
-# Or load directly from files
-evaluator = ModelEvaluator.from_files(
-    model_path="output/trainings/classifier/XGBClassifier/stratified/models/00042.pkl",
-    X_test="output/features/all_features.csv",
-    y_test="output/features/label_features.csv",
-    selected_features=["feat_a", "feat_b"],  # optional
-    model_name="xgb_42",
-    output_dir="output/eval",
-)
-
-# Print a formatted summary
-print(evaluator.summary())
-
-# Get metrics as a dict
-metrics = evaluator.get_metrics()
-# Keys: accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc, pr_auc,
-#       true_positives, true_negatives, false_positives, false_negatives,
-#       sensitivity, specificity, optimal_threshold, f1_at_optimal,
-#       recall_at_optimal, precision_at_optimal
-
-# Generate all plots (saved to output_dir)
-evaluator.plot_all()
-# Produces: confusion_matrix, roc_curve, pr_curve, threshold_analysis,
-#            feature_importance, calibration, prediction_distribution
-
-# Find optimal decision threshold
-threshold, threshold_metrics = evaluator.optimize_threshold(criterion="f1")
-print(f"Optimal threshold: {threshold:.3f}")
-print(f"F1 at threshold:   {threshold_metrics['f1']:.4f}")
-```
-
-#### Save Single-Seed Metrics to JSON
-
-After evaluating a single seed, call `save_metrics()` to persist the metrics dict as JSON:
-
-```python
-# Metrics are serialized with np.nan → null
-path = evaluator.save_metrics()
-# Saved to: {output_dir}/{model_name}_metrics.json
-
-# Or specify an explicit path
-path = evaluator.save_metrics("results/xgb_42_metrics.json")
-print(f"Saved: {path}")
-```
-
-#### Aggregate Evaluation (All Seeds) with MultiModelEvaluator
-
-When training with `with_evaluation=True`, each seed's held-out test split is saved to a `tests/`
-directory alongside per-seed `metrics/*.json` files. Use `MultiModelEvaluator` to aggregate across all seeds:
-
-```python
-from eruption_forecast import MultiModelEvaluator
-
-base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
-trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
-
-# --- From a model registry CSV (enables plots) ---
-evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
-
-# Generate all 7 aggregate plots at once (saved to <registry_dir>/figures/)
-figs = evaluator.plot_all(dpi=150, show_individual=True)
-# Keys: roc_curve, pr_curve, calibration, prediction_distribution,
-#       confusion_matrix, threshold_analysis, feature_importance
-
-# Or generate individual aggregate plots
-evaluator.plot_roc(show_individual=True)
-evaluator.plot_precision_recall(show_individual=True)
-evaluator.plot_calibration(n_bins=10)
-evaluator.plot_prediction_distribution()
-evaluator.plot_confusion_matrix(normalize=None)
-evaluator.plot_threshold_analysis(show_individual=True)
-evaluator.plot_feature_importance(top_n=20)
-```
-
-Each plot method accepts `save=True` (default), `filename=None`, `dpi=150`, and `title=None`. Figures and their CSV data are saved to `{output_dir}/figures/` (defaults to `<registry_dir>/figures/`).
-
-#### Aggregate Metrics from JSON Files
-
-Use `get_aggregate_metrics()` to summarize per-seed JSON metrics written by `save_metrics()`:
-
-```python
-# --- From per-seed metrics JSON files ---
-metrics_dir = f"{base}/metrics"
-evaluator = MultiModelEvaluator(metrics_dir=metrics_dir)
-
-# Returns a DataFrame: index = metric name, columns = mean/std/min/max
-summary = evaluator.get_aggregate_metrics()
-print(summary.loc["f1_score"])
-# mean     0.7842
-# std      0.0321
-# min      0.6900
-# max      0.8500
-
-# Save to CSV
-path = evaluator.save_aggregate_metrics()
-# Saved to: {metrics_dir}/figures/aggregate_metrics.csv
-
-path = evaluator.save_aggregate_metrics("my_summary.csv")
-```
-
-You can also provide an explicit list of JSON files or a custom output directory:
-
-```python
-import glob
-
-json_files = sorted(glob.glob(f"{base}/metrics/*.json"))
-evaluator = MultiModelEvaluator(
-    metrics_files=json_files,
-    output_dir="output/eval/aggregate",
-)
-summary = evaluator.get_aggregate_metrics()
-evaluator.save_aggregate_metrics()
-```
-
-#### Combining Metrics and Plots
-
-Pass both `metrics_dir` and `trained_model_csv` to get everything in one object:
-
-```python
-evaluator = MultiModelEvaluator(
-    metrics_dir=f"{base}/metrics",
-    trained_model_csv=trained_model_csv,
-    output_dir="output/eval/aggregate",
-)
-
-# JSON-based aggregate stats
-summary = evaluator.get_aggregate_metrics()
-evaluator.save_aggregate_metrics()
-
-# Registry-based aggregate plots
-figs = evaluator.plot_all()
-```
-
-### 12. Analyze Training Results
-
-```python
-import pandas as pd
-
-# Suffix format: {ClassifierName}-{CVName}_rs-{random_state}_ts-{total_seed}_top-{n}
-# e.g., XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20
-base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
-suffix = "XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20"
-
-# All per-seed metrics
-metrics = pd.read_csv(f"{base}/all_metrics_{suffix}.csv")
-
-# Summary statistics (mean ± std)
-summary = pd.read_csv(f"{base}/metrics_summary_{suffix}.csv", index_col=0)
-print(summary[["balanced_accuracy", "f1_score", "precision", "recall"]])
-
-# Best seed
-best_seed = metrics.loc[metrics["balanced_accuracy"].idxmax()]
-print(f"Best seed:          {best_seed['random_state']}")
-print(f"Balanced Accuracy:  {best_seed['balanced_accuracy']:.4f}")
-print(f"F1 Score:           {best_seed['f1_score']:.4f}")
-
-# Aggregated significant features
-sig_features = pd.read_csv(f"{base}/features/significant_features.csv")
-print(sig_features.head(10))
-```
-
----
-
-## Advanced Usage
-
-### ForecastModel — Orchestrated Pipeline
-
-`ForecastModel` chains the entire pipeline in a single fluent API, from raw seismic data to eruption forecasting. It internally delegates to `ModelTrainer.train_and_evaluate()` or `ModelTrainer.train()` (controlled by `with_evaluation`) when you call `.train()`, and uses `ModelPredictor` internally for `.forecast()`.
-
-#### ForecastModel constructor parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `station` | `str` | — | Seismic station code (e.g. `"OJN"`) |
-| `channel` | `str` | — | Seismic channel code (e.g. `"EHZ"`) |
-| `start_date` | `str \| datetime` | — | Training period start date (`YYYY-MM-DD`) |
-| `end_date` | `str \| datetime` | — | Training period end date (`YYYY-MM-DD`) |
-| `window_size` | `int` | — | Duration (days) of each tremor window fed into tsfresh |
-| `volcano_id` | `str` | — | Identifier used in output filenames (e.g. `"Lewotobi Laki-laki"`) |
-| `network` | `str` | `"VG"` | Seismic network code |
-| `location` | `str` | `"00"` | Seismic location code |
-| `output_dir` | `str \| None` | `None` | Base output directory; relative paths are resolved against `root_dir`. Defaults to `root_dir/output` |
-| `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Relative values are normalised to an absolute path immediately. Defaults to `os.getcwd()` |
-| `overwrite` | `bool` | `False` | Re-run and overwrite existing output files |
-| `n_jobs` | `int` | `1` | Parallel workers propagated to all pipeline stages |
-| `verbose` | `bool` | `False` | Enable verbose logging |
-| `debug` | `bool` | `False` | Enable debug-level logging |
-
-#### Complete Pipeline Example (from `main.py`)
-
-```python
-from eruption_forecast import ForecastModel
-
-# Initialize with station and time parameters
-model = ForecastModel(
-    root_dir="output",
-    station="OJN",
-    channel="EHZ",
-    start_date="2025-01-01",
-    end_date="2025-12-31",
-    window_size=2,
-    volcano_id="Lewotobi Laki-laki",
-    n_jobs=4,
-    verbose=True,
-)
-
-# Chain all pipeline stages
-model.calculate(
-    source="sds",
-    sds_dir="/path/to/sds/data",
-    methods=["rsam", "dsar", "entropy"],
-    plot_daily=True,
-    save_plot=True,
-    remove_outlier_method="maximum",
-).build_label(
-    start_date="2025-01-01",
-    end_date="2025-07-24",           # Training period
-    day_to_forecast=2,
-    window_step=6,
-    window_step_unit="hours",
-    eruption_dates=[
-        "2025-03-20",
-        "2025-04-22",
-        "2025-05-18",
-        "2025-06-17",
-        "2025-07-07",
-    ],
-).extract_features(
-    select_tremor_columns=["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4", "entropy"],
-    save_tremor_matrix_per_method=True,
-    exclude_features=[
-        "agg_linear_trend",
-        "linear_trend_timewise",
-        "length",
-    ],
-    use_relevant_features=True,
-).train(
-    classifier="rf",
-    cv_strategy="stratified",
-    random_state=0,
-    total_seed=500,
-    with_evaluation=False,           # Train on full dataset for forecasting
-    number_of_significant_features=20,
-    sampling_strategy=0.75,
-    save_all_features=True,
-    plot_significant_features=True,
-).forecast(
-    start_date="2025-07-28",         # Future forecast period
-    end_date="2025-08-04",
-    window_step=10,
-    window_step_unit="minutes",
-)
-
-# Access results
-print(f"Trained models: {model.trained_model_csv}")
-print(f"Forecast predictions: {model.predictions_csv}")
-print(f"Forecast plot: {model.forecast_plot_path}")
-```
-
-**Pipeline stages:**
-
-1. **calculate()** — Process raw seismic data into RSAM, DSAR, and Shannon Entropy tremor metrics
-2. **build_label()** — Create binary labels from eruption dates
-3. **extract_features()** — Extract 700+ tsfresh features from tremor windows
-4. **train()** — Train classifier ensemble with feature selection
-5. **forecast()** — Generate probabilistic eruption predictions for future period
-
-#### Alternative Workflows
-
-**Use FDSN web service instead of a local SDS archive:**
-
-```python
-model.calculate(
-    source="fdsn",
-    client_url="https://service.iris.edu",  # Any FDSN-compatible URL
-).build_label(...).extract_features(...).train(...)
-# Downloaded miniSEED files are cached locally so subsequent runs skip the network.
-```
-
-**Skip tremor calculation if data already exists:**
-
-```python
-model.load_tremor_data(
-    tremor_csv="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv"
-).build_label(...).extract_features(...).train(...).forecast(...)
-```
-
-**Change feature selection method:**
-
-```python
-model.set_feature_selection_method("combined").train(
-    classifier="rf",
-    cv_strategy="timeseries",
-    total_seed=200,
-)
-```
-
-**Train with evaluation (80/20 split) for in-sample testing:**
-
-```python
-model.train(
-    classifier="xgb",
-    with_evaluation=True,  # Split data for evaluation
-    total_seed=100,
-)
-```
-
-**Train multiple classifiers in a single call:**
-
-Pass a `list[str]` or a comma-separated string to `classifier`. Each classifier is
-trained sequentially with the same hyperparameters, and all trained model registries
-are available in `model.trained_models` for multi-model consensus forecasting.
-
-```python
-# Using a list
-model.train(
-    classifier=["rf", "xgb", "gb"],
-    cv_strategy="stratified",
-    total_seed=500,
-    with_evaluation=False,
-)
-
-# Using a comma-separated string
-model.train(
-    classifier="rf,xgb",
-    cv_strategy="stratified",
-    total_seed=500,
-)
-
-# trained_models is now populated with one entry per classifier
-print(model.trained_models)
-# {
-#   "RandomForestClassifier": "output/.../trained_model_rf_*.csv",
-#   "XGBClassifier": "output/.../trained_model_xgb_*.csv",
-# }
-
-# Pass directly to ModelPredictor for consensus forecasting
-model.forecast(
-    start_date="2025-07-28",
-    end_date="2025-08-04",
-    window_step=10,
-    window_step_unit="minutes",
-)
-```
-
-### Comparing Multiple Classifiers
-
-```python
-import pandas as pd
-
-base = "output/trainings/model-with-evaluation"
-suffix = "rs-0_ts-500_top-20"
-classifiers = {
-    "rf":     f"{base}/random-forest-classifier/stratified-shuffle-split/all_metrics_RandomForestClassifier-StratifiedShuffleSplit_{suffix}.csv",
-    "gb":     f"{base}/gradient-boosting-classifier/stratified-shuffle-split/all_metrics_GradientBoostingClassifier-StratifiedShuffleSplit_{suffix}.csv",
-    "xgb":    f"{base}/xgb-classifier/stratified-shuffle-split/all_metrics_XGBClassifier-StratifiedShuffleSplit_{suffix}.csv",
-    "voting": f"{base}/voting-classifier/stratified-shuffle-split/all_metrics_VotingClassifier-StratifiedShuffleSplit_{suffix}.csv",
-}
-
-results = []
-for name, path in classifiers.items():
-    df = pd.read_csv(path)
-    results.append({
-        "classifier": name,
-        "mean_balanced_acc": df["balanced_accuracy"].mean(),
-        "std_balanced_acc":  df["balanced_accuracy"].std(),
-        "mean_f1":           df["f1_score"].mean(),
-        "mean_roc_auc":      df["roc_auc"].mean(),
-    })
-
-comparison = pd.DataFrame(results).sort_values("mean_balanced_acc", ascending=False)
-print(comparison.to_string(index=False))
-```
-
-### train() + ModelPredictor Workflow (Recommended for Operational Use)
-
-Use `train()` to train on all available historical data, then evaluate on future events
-or forecast on unlabelled data.
-
-```python
-from eruption_forecast.model.model_trainer import ModelTrainer
-from eruption_forecast.model.model_predictor import ModelPredictor
-
-# --- Stage 1: Train on historical data ---
-trainer = ModelTrainer(
-    extracted_features_csv="data/historical/all_features.csv",
-    label_features_csv="data/historical/label_features.csv",
-    output_dir="output/trainings",
-    classifier="xgb",
-    cv_strategy="stratified",
-    number_of_significant_features=20,
-    n_jobs=4,
-)
-
-trainer.train(
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
-)
-
-# --- Stage 2a: Evaluate on future/held-out labelled data ---
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,
-    output_dir="output/predictions",
-)
-
-df_metrics = predictor.predict(
-    future_features_csv="data/future/all_features.csv",
-    future_labels_csv="data/future/label_features.csv",  # known labels
-    plot=True,
-)
-print(df_metrics[["classifier", "balanced_accuracy", "f1_score", "roc_auc"]])
-
-best_evaluator = predictor.predict_best(
-    future_features_csv="data/future/all_features.csv",
-    future_labels_csv="data/future/label_features.csv",
-    criterion="balanced_accuracy",
-)
-print(best_evaluator.summary())
-best_evaluator.plot_all()
-
-# --- Stage 2b: Forecast on unlabelled data (single model) ---
-predictor = ModelPredictor(
-    start_date="2025-03-23",
-    end_date="2025-03-30",
-    trained_models=trainer.csv,
-    output_dir="output/forecast",
-)
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
-print(df_forecast[df_forecast["model_prediction"] == 1])
-
-# --- Stage 2c: Multi-model consensus forecast ---
-predictor = ModelPredictor(
-    start_date="2025-03-23",
-    end_date="2025-03-30",
-    trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
-        "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
-    },
-    output_dir="output/consensus",
-)
-df_consensus = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
-# Inspect windows where all classifiers agree on eruption
-eruption_windows = df_consensus[df_consensus["consensus_confidence"] == 1.0]
-print(eruption_windows[["consensus_eruption_probability", "consensus_confidence"]])
-```
-
-### Custom Frequency Bands
-
-```python
-tremor = CalculateTremor(
-    start_date="2025-01-01",
-    end_date="2025-01-31",
-    station="OJN",
-    channel="EHZ",
-).change_freq_bands([
-    (0.1, 0.5),    # Very low frequency
-    (0.5, 2.0),    # Low frequency
-    (2.0, 5.0),    # Mid frequency
-    (5.0, 10.0),   # High frequency
-    (10.0, 20.0),  # Very high frequency
-]).from_sds(sds_dir="/data/sds").run()
-```
-
----
-
-## Visualization & Plotting
-
-The `plots/` module provides publication-quality visualization functions with consistent Nature/Science journal styling. All plots use colorblind-safe palettes, clean typography, and high DPI output suitable for papers and presentations.
-
-### Tremor Time-Series Plots
-
-#### plot_tremor()
-
-Visualize tremor metrics (RSAM/DSAR) as multi-panel time-series plots.
-
-```python
-from eruption_forecast.plots.tremor_plots import plot_tremor
-import pandas as pd
-
-# Load tremor data
-df = pd.read_csv("output/VG.OJN.00.EHZ/tremor/tremor.csv", index_col=0, parse_dates=True)
-
-# Basic tremor plot
-plot_tremor(
-    df=df,
-    figure_dir="output/figures",
-    dpi=150,
-)
-
-# Custom interval and selected columns
-plot_tremor(
-    df=df,
-    interval=6,
-    interval_unit="hours",
-    selected_columns=["rsam_f2", "rsam_f3", "dsar_f2-f3"],
-    figure_dir="output/figures",
-    filename="tremor_selected",
-    dpi=300,
-    verbose=True,
-)
-```
-
-**Key Parameters:**
-- `df` - Tremor DataFrame with datetime index
-- `interval` - X-axis tick interval (default: 1)
-- `interval_unit` - "hours" or "days" (default: "hours")
-- `selected_columns` - Subset of columns to plot (default: all)
-- `dpi` - Resolution (default: 150)
-
-### Feature Importance Plots
-
-#### plot_significant_features()
-
-Visualize feature importance or p-values as horizontal bar charts.
-
-```python
-from eruption_forecast.plots.feature_plots import plot_significant_features
-import pandas as pd
-
-# From DataFrame
-df_features = pd.read_csv("features.csv")
-plot_significant_features(
-    features=df_features,
-    number_of_features=50,
-    top_features=20,
-    output_dir="output/figures",
-    filename="feature_importance",
-    dpi=150,
-)
-
-# From CSV file directly
-plot_significant_features(
-    features="path/to/features.csv",
-    number_of_features=30,
-    top_features=10,
-    values_column="importance",  # or "p_values"
-    output_dir="output/figures",
-)
-```
-
-**Key Parameters:**
-- `features` - DataFrame or CSV path with feature data
-- `number_of_features` - Total features to display (default: 50)
-- `top_features` - Number highlighted with darker color (default: 20)
-- `values_column` - Column name for values (auto-detected if None)
-
-### Model Evaluation Plots
-
-The `ModelEvaluator` class provides 7 evaluation plot types for single-seed and aggregate (ensemble-level) analysis.
-
-#### Available Plot Types
-
-**Single-seed** (instance methods on `ModelEvaluator`):
-1. **Confusion Matrix** - Classification performance breakdown
-2. **ROC Curve** - True/false positive rate tradeoff with AUC score
-3. **Precision-Recall Curve** - Precision/recall tradeoff with Average Precision
-4. **Threshold Analysis** - Metrics vs decision threshold
-5. **Feature Importance** - Top contributing features to predictions
-6. **Calibration Curve** - Predicted vs actual probabilities (reliability diagram)
-7. **Prediction Distribution** - Score distributions by class (histogram + KDE)
-8. **SHAP Summary** - Beeswarm plot showing feature impact direction and magnitude
-
-**Aggregate across all seeds** (`MultiModelEvaluator`, requires `train_and_evaluate()`):
-- `evaluator.plot_all()` — runs all 10 aggregate plots at once
-- `evaluator.plot_roc()` — mean ROC ± std band across seeds
-- `evaluator.plot_precision_recall()` — mean PR curve ± std band
-- `evaluator.plot_calibration()` — mean calibration ± std band
-- `evaluator.plot_prediction_distribution()` — pooled KDE by class
-- `evaluator.plot_confusion_matrix()` — summed confusion matrix
-- `evaluator.plot_threshold_analysis()` — mean metrics vs threshold ± std
-- `evaluator.plot_feature_importance()` — mean importance ± std error bars
-- `evaluator.plot_shap_summary()` — mean |SHAP| bar chart across seeds
-- `evaluator.plot_seed_stability()` — violin plot of a metric across seeds
-- `evaluator.plot_frequency_band_contribution()` — feature counts per seismic band
-
-**Aggregate metrics (from JSON files, no plots)**:
-- `evaluator.get_aggregate_metrics()` — returns mean/std/min/max per metric
-- `evaluator.get_metrics_list()` — returns raw per-seed metrics as list of dicts
-- `evaluator.save_aggregate_metrics()` — saves summary to CSV
-
-#### How Aggregation Works
-
-Each seed produces its own 80/20 train/test split; the held-out `X_test` and `y_test` are saved to `tests/` during training. Aggregate plots load every seed's test data and model, then apply the following strategy per plot type:
-
-| Plot | Aggregation method |
-|---|---|
-| **ROC Curve** | Each seed's TPR is interpolated onto a shared FPR grid (200 points, 0→1). All curves are stacked into an `(n_seeds × 200)` matrix. **Mean** TPR is the bold line; **±1 std** is the shaded band. Mean AUC ± std is shown in the legend. |
-| **Precision-Recall Curve** | Each seed's precision is interpolated onto a shared recall grid (200 points). **Mean** precision is the bold line; **±1 std** is the shaded band. Mean AP ± std in legend. |
-| **Threshold Analysis** | For each of 101 thresholds (0→1), F1, precision, recall, and balanced accuracy are computed per seed. Each metric is stacked `(n_seeds × 101)` and the **mean** curve is plotted bold with **±1 std** shaded bands. |
-| **Calibration Curve** | Each seed's calibration curve is interpolated onto a shared probability grid (n_bins points). **Mean** fraction of positives is the bold line; **±1 std** is the shaded band. |
-| **Prediction Distribution** | Predicted probabilities from all seeds are **pooled** (concatenated) separately for class 0 and class 1, then a single KDE is computed over the full pool for each class. |
-| **Confusion Matrix** | Raw confusion matrices are **summed** across all seeds (total TP/TN/FP/FN across the entire ensemble). Optional normalization is applied after summing. |
-| **Feature Importance** | Importances are stacked `(n_seeds × n_features)`. **Mean** importance per feature is the bar length; **±1 std** is the error bar. Top-N features selected by mean importance. |
-
-#### Single-Seed Usage Example
-
-```python
-from eruption_forecast import ModelEvaluator
-
-# Load from files
-evaluator = ModelEvaluator.from_files(
-    model_path="output/trainings/models/00042.pkl",
-    X_test="output/trainings/tests/00042_X_test.csv",
-    y_test="output/trainings/tests/00042_y_test.csv",
-    selected_features=["feat_a", "feat_b"],  # optional
-    model_name="xgb_seed_42",
-    output_dir="output/eval",
-)
-
-# Generate all 7 plots at once
-evaluator.plot_all()
-
-# Or generate individual plots
-evaluator.plot_confusion_matrix()
-evaluator.plot_roc_curve()
-evaluator.plot_precision_recall_curve()
-evaluator.plot_threshold_analysis()
-evaluator.plot_feature_importance()
-evaluator.plot_calibration()
-evaluator.plot_prediction_distribution()
-evaluator.plot_shap_summary(max_display=20)
-
-# Save metrics to JSON
-path = evaluator.save_metrics()
-```
-
-All plots are saved to `output_dir` with publication-quality styling.
-
-#### Multi-Seed Usage Example
-
-```python
-from eruption_forecast import MultiModelEvaluator
-
-base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
-trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
-
-# Plots from registry CSV
-evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
-figs = evaluator.plot_all(dpi=150, show_individual=True)
-
-# Aggregate stats from JSON metrics files
-evaluator = MultiModelEvaluator(metrics_dir=f"{base}/metrics")
-summary = evaluator.get_aggregate_metrics()
-evaluator.save_aggregate_metrics()
-print(summary.loc[["f1_score", "roc_auc", "balanced_accuracy"]])
-```
-
-### Classifier Comparison Heatmap
-
-Compare performance metrics across multiple classifiers in a single viridis heatmap. Each cell shows `mean ± std` over seeds; rows are sorted by mean F1 descending.
-
-```python
-from eruption_forecast import MultiModelEvaluator
-from eruption_forecast.plots import plot_classifier_comparison
-
-base = "output/trainings/model-with-evaluation"
-
-# Load metrics from each classifier's evaluator
-metrics_by_clf = {}
-for clf in ["xgb", "rf", "gb"]:
-    ev = MultiModelEvaluator(
-        metrics_dir=f"{base}/{clf}-classifier/stratified-shuffle-split/metrics"
-    )
-    metrics_by_clf[clf] = ev.get_metrics_list()
-
-# Plot comparison heatmap
-fig, summary_df = plot_classifier_comparison(
-    metrics_by_classifier=metrics_by_clf,
-    metrics_to_show=["balanced_accuracy", "f1_score", "precision", "recall", "roc_auc", "pr_auc"],
-    figsize=(12, 5),
-    dpi=150,
-)
-fig.savefig("classifier_comparison.png", bbox_inches="tight")
-
-# summary_df has MultiIndex (classifier, metric) with columns mean/std
-print(summary_df.loc[("xgb", "f1_score")])
-```
-
-### SHAP Explainability Plots
-
-Understand *why* the model makes predictions using SHAP (SHapley Additive exPlanations). The beeswarm plot shows both the direction (positive/negative) and magnitude of each feature's contribution.
-
-```python
-from eruption_forecast import ModelEvaluator, MultiModelEvaluator
-
-# Single-seed beeswarm plot
-evaluator = ModelEvaluator.from_files(
-    model_path="output/.../models/00042.pkl",
-    X_test="output/.../tests/00042_X_test.csv",
-    y_test="output/.../tests/00042_y_test.csv",
-    model_name="xgb_seed_42",
-)
-fig = evaluator.plot_shap_summary(max_display=20)
-fig.savefig("shap_single.png", bbox_inches="tight")
-
-# Aggregate mean |SHAP| bar chart across all seeds
-ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
-fig = ev.plot_shap_summary(max_display=20)  # saves automatically
-
-# Low-level standalone functions
-from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
-
-fig = plot_shap_summary(model, X_test, feature_names=features, max_display=15)
-
-fig, df = plot_aggregate_shap_summary(
-    models=trained_models,
-    X_tests=x_test_list,
-    feature_names=feature_names,
-    max_display=20,
-)
-# df has columns: feature, mean_shap, std_shap
-```
-
-### Seed Stability Plot
-
-Visualize how stable a metric is across random seeds using a violin + strip plot. Useful for detecting high-variance classifiers or seed-sensitive configurations.
-
-```python
-from eruption_forecast import MultiModelEvaluator
-from eruption_forecast.plots import plot_seed_stability
-
-# From a single classifier's evaluator (single violin)
-ev = MultiModelEvaluator(
-    metrics_dir="output/.../xgb-classifier/stratified-shuffle-split/metrics",
-    trained_model_csv="output/.../trained_model_registry.csv",
-)
-fig = ev.plot_seed_stability(metric="f1_score")  # saves automatically
-
-# Compare multiple classifiers side-by-side using standalone function
-metrics_by_clf = {}
-for clf in ["xgb", "rf", "gb", "svm"]:
-    ev = MultiModelEvaluator(
-        metrics_dir=f"output/.../trainings/{clf}/metrics"
-    )
-    metrics_by_clf[clf] = ev.get_metrics_list()
-
-fig, df = plot_seed_stability(
-    metrics_by_classifier=metrics_by_clf,
-    metric="balanced_accuracy",
-    dpi=150,
-)
-fig.savefig("seed_stability.png", bbox_inches="tight")
-# df has columns: classifier, seed_idx, value
-```
-
-### Frequency Band Contribution
-
-See which seismic frequency bands dominate the selected features. RSAM bands are coloured blue; DSAR bands are orange. Supports single-seed (exact counts) and multi-seed (mean ± std).
-
-```python
-from eruption_forecast import MultiModelEvaluator
-from eruption_forecast.plots import plot_frequency_band_contribution
-
-# From a registry (multi-seed, mean ± std per band)
-ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
-fig = ev.plot_frequency_band_contribution()  # saves automatically
-
-# Standalone — single seed
-from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
-import pandas as pd
-
-features = pd.read_csv("output/.../significant_features.csv", index_col=0).index.tolist()
-fig, df = plot_frequency_band_contribution(feature_names=features)
-# df has columns: band, count
-
-# Standalone — multi-seed (pass list of lists)
-per_seed = [
-    pd.read_csv(p, index_col=0).index.tolist()
-    for p in significant_feature_csvs
-]
-fig, df = plot_frequency_band_contribution(feature_names=per_seed)
-# df has columns: band, mean_count, std_count
-```
-
-### Forecast Visualization
-
-#### Plotting with ModelPredictor
-
-Visualize eruption probability forecasts as time-series plots.
-
-```python
-from eruption_forecast.model.model_predictor import ModelPredictor
-
-predictor = ModelPredictor(
-    start_date="2025-03-23",
-    end_date="2025-03-30",
-    trained_models="output/trainings/model-only/random-forest-classifier/stratified-k-fold/trained_model_*.csv",
-    output_dir="output/forecast",
-)
-
-# With labeled data (evaluation mode)
-df_metrics = predictor.predict(
-    future_features_csv="output/features_forecast.csv",
-    future_labels_csv="output/label_forecast.csv",
-    plot=True,
-)
-
-# Without labels (forecasting mode)
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
-```
-
-**Plot Features:**
-- Probability time-series for each classifier
-- Consensus probability (mean across classifiers)
-- Confidence bands (standard deviation)
-- Eruption event markers (if labels provided)
-- Saved as `eruption_forecast.png` in `figures/` subdirectory
-
-### Batch Replot Utilities
-
-Regenerate plots for multiple files in parallel — useful for applying style updates or reprocessing after data changes.
-
-#### replot_tremor()
-
-Batch replot daily tremor CSV files.
-
-```python
-from eruption_forecast.plots.tremor_plots import replot_tremor
-
-# Sequential processing
-results = replot_tremor(
-    daily_dir="output/VG.OJN.00.EHZ/tremor/daily",
-    output_dir="output/VG.OJN.00.EHZ/tremor/figures",
-    overwrite=True,
-)
-print(f"Created: {results['created']}, Skipped: {results['skipped']}")
-
-# Parallel processing with custom parameters
-results = replot_tremor(
-    daily_dir="output/VG.OJN.00.EHZ/tremor/daily",
-    n_jobs=4,
-    interval=6,
-    interval_unit="hours",
-    dpi=300,
-    selected_columns=["rsam_f2", "rsam_f3"],
-    overwrite=False,
-)
-```
-
-#### replot_significant_features()
-
-Batch replot feature importance across multiple seeds.
-
-```python
-from eruption_forecast.plots.feature_plots import replot_significant_features
-
-# Sequential processing
-results = replot_significant_features(
-    all_features_dir="output/trainings/features/all_features",
-    output_dir="output/trainings/features/figures/significant",
-    overwrite=True,
-)
-
-# Parallel processing
-results = replot_significant_features(
-    all_features_dir="output/trainings/features/all_features",
-    n_jobs=4,
-    number_of_features=50,
-    top_features=20,
-    dpi=300,
-    overwrite=False,
-)
-print(f"Processed: Created {results['created']}, Skipped {results['skipped']}, Failed {results['failed']}")
-```
-
-**Return Value:**
-Both functions return a dict with counts:
-- `'created'` - Plots successfully generated
-- `'skipped'` - Plots skipped (file exists, overwrite=False)
-- `'failed'` - Plots that encountered errors
-
-### Common Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `dpi` | `int` | `150` | Resolution in dots per inch (use 300 for publication) |
-| `overwrite` | `bool` | `True` | Replace existing plots if they exist |
-| `n_jobs` | `int` | `1` | Parallel workers for batch utilities (use >1 for large datasets) |
-| `output_dir` / `figure_dir` | `str` | varies | Directory where plots are saved |
-| `verbose` | `bool` | `False` | Enable logging of plot generation |
-| `filename` | `str` | auto | Custom filename stem (extension added automatically) |
-
-### Import Examples
-
-```python
-# Tremor plots
-from eruption_forecast.plots.tremor_plots import plot_tremor, replot_tremor
-
-# Feature plots
-from eruption_forecast.plots.feature_plots import (
-    plot_significant_features,
-    replot_significant_features,
-    plot_frequency_band_contribution,
-)
-
-# Single-seed evaluation (top-level shortcut)
-from eruption_forecast import ModelEvaluator
-
-# Multi-seed aggregate evaluation (top-level shortcut)
-from eruption_forecast import MultiModelEvaluator
-
-# Or import from their modules directly
-from eruption_forecast.model.model_evaluator import ModelEvaluator
-from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
-
-# Forecast plots (via ModelPredictor)
-from eruption_forecast.model.model_predictor import ModelPredictor
-
-# Low-level single-seed plot functions (used internally by ModelEvaluator):
-from eruption_forecast.plots.evaluation_plots import (
-    plot_confusion_matrix,
-    plot_roc_curve,
-    plot_precision_recall_curve,
-    plot_threshold_analysis,
-    plot_feature_importance,
-    plot_calibration,
-    plot_prediction_distribution,
-)
-
-# Cross-classifier and stability plots
-from eruption_forecast.plots import (
-    plot_classifier_comparison,
-    plot_seed_stability,
-)
-
-# SHAP explainability plots
-from eruption_forecast.plots.shap_plots import (
-    plot_shap_summary,
-    plot_aggregate_shap_summary,
-)
-```
 
 ---
 
@@ -1889,467 +416,14 @@ All outputs are organized under `{output_dir}/{network}.{station}.{location}.{ch
 ```
 output/
 └── VG.OJN.00.EHZ/
-    ├── tremor/
-    │   ├── daily/                            # Per-day CSV files (removed if cleanup_daily_dir=True)
-    │   ├── figures/                          # Daily tremor plots (created if plot_daily=True)
-    │   └── tremor_*.csv                      # Final merged tremor data
-    │
-    ├── features/
-    │   ├── tremor_matrix_*.csv               # Aligned tremor matrix (all columns)
-    │   ├── tremor_matrix_per_method/         # Per-column tremor matrices (optional)
-    │   ├── all_extracted_features_*.csv      # tsfresh output per tremor column
-    │   └── label_features_*.csv             # Labels aligned with features
-    │
+    ├── tremor/          # Merged tremor CSVs + daily plots
+    ├── features/        # Extracted features + aligned labels
     └── trainings/
-        ├── model-with-evaluation/        # Output of train_and_evaluate()
-        │   └── {classifier-slug}/        # e.g., random-forest-classifier
-        │       └── {cv-slug}/            # e.g., stratified-shuffle-split
-        │           ├── features/
-        │           │   ├── significant_features/     # Per-seed top-N features
-        │           │   │   ├── 00000.csv
-        │           │   │   └── ...
-        │           │   ├── all_features/             # All ranked features (optional)
-        │           │   │   ├── 00000.csv
-        │           │   │   └── ...
-        │           │   ├── figures/
-        │           │   │   └── significant/          # Feature importance plots (optional)
-        │           │   │       └── 00000.jpg
-        │           │   ├── tests/                    # Per-seed held-out test splits
-        │           │   │   ├── 00000_X_test.csv
-        │           │   │   ├── 00000_y_test.csv
-        │           │   │   └── ...
-        │           │   ├── significant_features.csv  # Aggregated features (all seeds)
-        │           │   └── top_{n}_significant_features.csv
-        │           ├── models/
-        │           │   ├── 00000.pkl     # Trained model (seed 0)
-        │           │   ├── 00001.pkl
-        │           │   └── ...
-        │           ├── metrics/
-        │           │   ├── 00000.json    # Per-seed metrics
-        │           │   └── ...
-        │           ├── figures/              # Aggregate evaluation plots (MultiModelEvaluator)
-        │           │   ├── aggregate_roc_curve.png
-        │           │   ├── aggregate_roc_curve.csv
-        │           │   ├── aggregate_pr_curve.png
-        │           │   ├── aggregate_pr_curve.csv
-        │           │   ├── aggregate_calibration.png
-        │           │   ├── aggregate_calibration.csv
-        │           │   ├── aggregate_prediction_distribution.png
-        │           │   ├── aggregate_prediction_distribution.csv
-        │           │   ├── aggregate_confusion_matrix.png
-        │           │   ├── aggregate_confusion_matrix.csv
-        │           │   ├── aggregate_threshold_analysis.png
-        │           │   ├── aggregate_threshold_analysis.csv
-        │           │   ├── aggregate_feature_importance.png
-        │           │   ├── aggregate_feature_importance.csv
-        │           │   └── aggregate_metrics.csv        # from save_aggregate_metrics()
-        │           ├── trained_model_{suffix}.csv    # Registry of all trained models
-        │           ├── all_metrics_{suffix}.csv      # All seed metrics
-        │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
-        │
-        └── model-only/                   # Output of train()
-            └── {classifier-slug}/
-                └── {cv-slug}/
-                    ├── features/
-                    │   ├── significant_features/     # Per-seed top-N features
-                    │   │   ├── 00000.csv
-                    │   │   └── ...
-                    │   ├── all_features/             # All ranked features (optional)
-                    │   │   ├── 00000.csv
-                    │   │   └── ...
-                    │   ├── figures/
-                    │   │   └── significant/          # Feature importance plots (optional)
-                    │   │       └── 00000.jpg
-                    │   ├── significant_features.csv  # Aggregated features (all seeds)
-                    │   └── top_{n}_significant_features.csv
-                    ├── models/
-                    │   ├── 00000.pkl
-                    │   └── ...
-                    └── trained_model_{suffix}.csv    # Registry of all trained models
+        ├── model-with-evaluation/   # Output of train_and_evaluate()
+        └── model-only/              # Output of train()
 ```
 
-**ModelPredictor output** (`output_dir/predictions/`):
-
-*Evaluation mode (`predict()` / `predict_best()`):*
-
-```
-predictions/
-├── metrics/
-│   ├── all_metrics.csv
-│   └── metrics_summary.csv
-└── seed_00000/                    # Only created when plot=True
-    ├── seed_00000_confusion_matrix.png
-    ├── seed_00000_roc_curve.png
-    ├── seed_00000_pr_curve.png
-    ├── seed_00000_threshold_analysis.png
-    ├── seed_00000_feature_importance.png
-    ├── seed_00000_calibration.png
-    └── seed_00000_prediction_distribution.png
-```
-
-*Forecast mode (`predict_proba()`):*
-
-```
-predictions/
-├── predictions.csv                # eruption_probability, uncertainty, confidence, prediction
-└── figures/
-    └── eruption_forecast.png      # Probability + confidence time-series plot
-```
-
----
-
-## Decorators
-
-The `decorators` package provides utilities for wrapping functions with cross-cutting behaviour such as timing, parameter persistence, and remote notifications.
-
-### notify — Telegram Notifications
-
-`notify` sends a structured Telegram message when the decorated function finishes (success) or raises an exception (error). Useful for long-running pipeline steps such as tremor calculation or multi-seed training.
-
-#### Setup
-
-1. Copy `.env.example` to `.env` and fill in your credentials:
-
-```
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
-```
-
-2. Obtain a bot token from [@BotFather](https://t.me/BotFather) and your chat ID from [@userinfobot](https://t.me/userinfobot).
-
-#### Basic Usage
-
-```python
-from eruption_forecast.decorators import notify
-
-# Credentials read automatically from .env
-@notify(name="Training Run")
-def train_model():
-    ...
-
-# Or pass credentials explicitly
-@notify(bot_token="TOKEN", chat_id="CHAT_ID", name="Training Run")
-def train_model():
-    ...
-```
-
-#### Message Format
-
-**Success:**
-```
-🖥 Host:
-`DESKTOP-ABC`
-
-📋 Task:
-`train_model`
-
-🕐 Time:
-`2026-02-23 14:05:00`
-
-✅ Status:
-finished successfully.
-
-💬 Message:
-Function completed without errors.
-
-⏱ Elapsed:
-`00h 02m 35s`
-```
-
-**Error:**
-```
-🖥 Host:
-`DESKTOP-ABC`
-
-📋 Task:
-`train_model`
-
-🕐 Time:
-`2026-02-23 14:05:12`
-
-❌ Status:
-raised `ValueError`
-
-💬 Message:
-`Something went wrong`
-
-⏱ Elapsed:
-`00h 00m 12s`
-```
-
-#### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `bot_token` | `str \| None` | `None` | Telegram bot token. Falls back to `TELEGRAM_BOT_TOKEN` env var |
-| `chat_id` | `str \| int \| None` | `None` | Telegram chat ID. Falls back to `TELEGRAM_CHAT_ID` env var |
-| `name` | `str \| None` | `None` | Display name in messages. Defaults to `func.__name__` |
-| `on_success` | `bool` | `True` | Send notification on successful completion |
-| `on_error` | `bool` | `True` | Send notification when an exception is raised |
-| `include_elapsed` | `bool` | `True` | Include elapsed time in the message |
-| `files` | `list[str \| Path] \| Callable \| None` | `None` | Files to attach after a success notification. May be a static list or a callable receiving the return value |
-
-#### File Attachments
-
-```python
-# Static list of files
-@notify(files=["output/plot.png", "output/metrics.csv"])
-def generate_report():
-    ...
-
-# Dynamic — receive the function's return value
-@notify(files=lambda result: [result["plot_path"]])
-def run_pipeline():
-    return {"plot_path": "output/forecast.png"}
-```
-
-PNG/JPG files are sent via `sendPhoto`; all other files via `sendDocument`.
-
-#### Suppressing Notifications
-
-```python
-# Only notify on error (skip success messages)
-@notify(on_success=False)
-def long_running_job():
-    ...
-
-# Only notify on success (skip error messages)
-@notify(on_error=False)
-def experimental_step():
-    ...
-```
-
-> **Note:** Exceptions are always re-raised after the error notification — `notify` never swallows errors. Network errors during notification are logged via loguru and never propagate.
-
----
-
-## Configuration
-
-### Pipeline Configuration — Save & Replay
-
-After any pipeline run, every parameter is recorded in a `PipelineConfig` object. You can persist it as YAML or JSON, then reload it to replay the exact same run or resume from a saved model.
-
-> **Important — output files are required for replay.**
-> The config file (or pickled model) stores *parameters*, not data. To replay or resume a pipeline, the output files produced by each stage must still exist on disk at the same paths:
->
-> | Stage | Required output files |
-> |---|---|
-> | `calculate()` | `tremor/tremor_*.csv` |
-> | `build_label()` | `label_*.csv` |
-> | `extract_features()` | `features/all_extracted_features_*.csv`, `features/label_features_*.csv`, `features/tremor_matrix_*.csv` |
-> | `train()` | `trainings/.../trained_model_*.csv`, `trainings/.../models/*.pkl` |
->
-> If any of these files have been moved or deleted, the corresponding stage must be re-run with `overwrite=True`.
-> To avoid this, keep the entire `output/VG.OJN.00.EHZ/` directory intact alongside the config and model files.
-
-#### How it works
-
-`ForecastModel` accumulates parameters automatically as each stage completes:
-
-- `train(save_model=True)` *(default)*: serialises the full instance to `{station_dir}/forecast_model.pkl`
-- `forecast()`: saves `{station_dir}/config.yaml` after each call
-
-You can also save explicitly at any point:
-
-```python
-fm.save_config()                          # YAML → {station_dir}/config.yaml
-fm.save_config("my_run.yaml")             # custom path
-fm.save_config("my_run.json", fmt="json") # JSON format
-fm.save_model()                           # joblib → {station_dir}/forecast_model.pkl
-fm.save_model("my_model.pkl")             # custom path
-```
-
-#### Saved YAML format
-
-A fully annotated template with all fields and inline comments is available at [`config.example.yaml`](config.example.yaml) in the project root. Copy it, edit the values for your run, and load it with `ForecastModel.from_config("config.yaml")`.
-
-```yaml
-# eruption-forecast pipeline configuration
-version: '1.0'
-saved_at: '2026-02-17T12:00:00'
-
-model:
-  station: OJN
-  channel: EHZ
-  start_date: '2025-03-16'
-  end_date: '2025-03-22'
-  window_size: 1
-  volcano_id: MERAPI
-  network: VG
-  location: '00'
-  output_dir: null
-  root_dir: null
-  overwrite: false
-  n_jobs: 4
-  verbose: false
-  debug: false
-
-calculate:
-  source: sds
-  sds_dir: D:/Data/OJN
-  methods: null
-  filename_prefix: null
-  remove_outlier_method: maximum
-  remove_tremor_anomalies: false
-  interpolate: true
-  value_multiplier: null
-  cleanup_daily_dir: false
-  plot_daily: false
-  save_plot: false
-  overwrite_plot: false
-  client_url: https://service.iris.edu
-  n_jobs: null
-  verbose: false
-  debug: false
-
-build_label:
-  window_step: 12
-  window_step_unit: hours
-  day_to_forecast: 2
-  eruption_dates:
-  - '2025-03-20'
-  start_date: null
-  end_date: null
-  tremor_columns: null
-  verbose: false
-  debug: false
-
-extract_features:
-  select_tremor_columns:
-  - rsam_f2
-  - rsam_f3
-  save_tremor_matrix_per_method: true
-  save_tremor_matrix_per_id: false
-  exclude_features: null
-  use_relevant_features: false
-  overwrite: false
-  n_jobs: null
-  verbose: null
-
-train:
-  classifiers:
-  - xgb
-  cv_strategy: stratified
-  random_state: 0
-  total_seed: 500
-  with_evaluation: false
-  number_of_significant_features: 20
-  sampling_strategy: 0.75
-  save_all_features: false
-  plot_significant_features: false
-  n_jobs: null
-  grid_search_n_jobs: 1
-  overwrite: false
-  verbose: false
-
-forecast:
-  start_date: '2025-03-23'
-  end_date: '2025-03-30'
-  window_step: 12
-  window_step_unit: hours
-  save_predictions: true
-  save_plot: true
-  n_jobs: null
-  overwrite: false
-  verbose: false
-```
-
-Sections that were not called are omitted from the file. A partial run produces a partial YAML that can still be loaded.
-
-#### Replay the full pipeline from a config file
-
-`from_config` + `run()` re-executes every stage using the saved parameters. Stages that already produced output files are skipped automatically (because `overwrite` defaults to `False`); stages whose config section is absent are silently skipped too.
-
-```python
-from eruption_forecast import ForecastModel
-
-# All stage output files must still exist in the output directory
-fm = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
-fm.run()  # calculate() → build_label() → extract_features() → train() → forecast()
-```
-
-To force a specific stage to re-run from scratch, set `overwrite=True` in the corresponding config section before calling `run()`:
-
-```python
-fm = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
-fm._loaded_config.train.overwrite = True  # force re-train only
-fm.run()
-```
-
-#### Resume from a saved model (skip re-training)
-
-After `train()` saves `forecast_model.pkl`, you can load it later and call `forecast()` directly. The pickle file embeds all in-memory state — the tremor DataFrame, labels, feature DataFrame, trained model paths — so no intermediate CSV files need to be re-read. However, the **trained model `.pkl` files** referenced in `trained_models` must still be accessible on disk, because `forecast()` / `ModelPredictor` loads them at inference time.
-
-```python
-fm = ForecastModel.load_model("output/VG.OJN.00.EHZ/forecast_model.pkl")
-fm.forecast(
-    start_date="2025-04-01",
-    end_date="2025-04-07",
-    window_step=12,
-    window_step_unit="hours",
-)
-```
-
-#### Build a config manually and save it without running
-
-`PipelineConfig` can also be used standalone — useful for preparing a run before executing it:
-
-```python
-from eruption_forecast import PipelineConfig
-from eruption_forecast.config import (
-    ModelConfig, CalculateConfig, BuildLabelConfig,
-    ExtractFeaturesConfig, TrainConfig, ForecastConfig,
-)
-
-config = PipelineConfig(
-    model=ModelConfig(
-        station="OJN", channel="EHZ",
-        start_date="2025-03-16", end_date="2025-03-22",
-        window_size=1, volcano_id="MERAPI", n_jobs=4,
-    ),
-    calculate=CalculateConfig(source="sds", sds_dir="D:/Data/OJN"),
-    build_label=BuildLabelConfig(
-        window_step=12, window_step_unit="hours",
-        day_to_forecast=2, eruption_dates=["2025-03-20"],
-    ),
-    extract_features=ExtractFeaturesConfig(
-        select_tremor_columns=["rsam_f2", "rsam_f3"],
-    ),
-    train=TrainConfig(classifier="xgb", cv_strategy="stratified", total_seed=500),
-    forecast=ForecastConfig(
-        start_date="2025-03-23", end_date="2025-03-30",
-        window_step=12, window_step_unit="hours",
-    ),
-)
-
-config.save("my_run.yaml")           # YAML
-config.save("my_run.json", fmt="json")  # JSON
-
-# Load and run
-fm = ForecastModel.from_config("my_run.yaml")
-fm.run()
-```
-
-#### API summary
-
-| Method / Classmethod | Description |
-|---|---|
-| `fm.save_config(path=None, fmt="yaml")` | Saves accumulated config; defaults to `{station_dir}/config.yaml` |
-| `fm.save_model(path=None)` | joblib-dumps the full instance; defaults to `{station_dir}/forecast_model.pkl` |
-| `ForecastModel.from_config(path)` | Loads config, constructs instance, attaches `_loaded_config` |
-| `ForecastModel.load_model(path)` | Restores a joblib-pickled instance with all pipeline state |
-| `fm.run()` | Replays all stages from `_loaded_config`; only valid after `from_config()` |
-| `PipelineConfig.save(path, fmt)` | Standalone save to YAML or JSON |
-| `PipelineConfig.load(path)` | Loads YAML or JSON; format detected from extension |
-
-### Logging
-
-```python
-from eruption_forecast.logger import set_log_level, set_log_directory
-
-set_log_level("DEBUG")  # Options: DEBUG, INFO, WARNING, ERROR
-set_log_directory("/custom/logs")
-```
+> Full directory tree with all sub-paths: [docs/output-structure.md](docs/output-structure.md)
 
 ---
 
@@ -2416,29 +490,9 @@ pytest tests/test_train_model.py
 5. Update documentation
 6. Submit a pull request
 
-### Code Style
+**Commit convention:** Use `fix/` for bug fixes, `ft/` for new features, `dev/` as default.
 
-- Follow PEP 8 guidelines
-- Use comprehensive Google-style docstrings with:
-  - Summary (one-line description)
-  - Detailed description and usage guidance
-  - Args with explicit types (e.g., `param (type): Description`)
-  - Returns with explicit types
-  - Examples with `>>>` format
-  - Raises sections documenting all exceptions
-  - Class Attributes sections before `__init__`
-- Include type hints for all functions
-- Write unit tests for new features
-
-**Documentation Standards:**
-
-All code follows research-grade documentation standards:
-- 30 Python files with 100% Google-style docstrings
-- 200+ attributes documented with types
-- 200+ usage examples with `>>>` format
-- 150+ methods/functions with comprehensive documentation
-- Consistent terminology and formatting across all modules
-- Modular architecture with 7 focused utility modules for improved maintainability
+**Code style:** PEP 8, Google-style docstrings with explicit types, type hints on all functions.
 
 ---
 
@@ -2461,34 +515,8 @@ If you use this package in your research, please cite:
 }
 ```
 
-## Support
-
-- **Documentation**: See [CLAUDE.md](CLAUDE.md) for detailed architecture and [SUMMARY.md](SUMMARY.md) for technical summary
-- **API Documentation**: All modules have comprehensive Google-style docstrings with examples
-- **Issues**: Report bugs and request features on GitHub
-- **Email**: martanto@live.com
-
-## Acknowledgments
-
-This project uses:
-- [ObsPy](https://github.com/obspy/obspy) for seismic data processing
-- [tsfresh](https://github.com/blue-yonder/tsfresh) for feature extraction
-- [scikit-learn](https://scikit-learn.org/) for machine learning
-- [XGBoost](https://xgboost.readthedocs.io/) for gradient boosting
-- [uv](https://docs.astral.sh/uv/) for package management
-
 ---
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-23 (Telegram notify decorator)
-
-**Recent Updates:**
-- **2026-02-23**: Added `notify` decorator — sends structured Telegram success/error messages with hostname, task name, timestamp, status, and elapsed time; supports file/photo attachments; credentials loaded from `.env` via python-dotenv
-- **2026-02-20**: Replaced `aggregate_evaluation_plots.py` and `utils/aggregate.py` with the new `MultiModelEvaluator` class — a single object for aggregate plots (`plot_all()`, `plot_roc()`, …) from a registry CSV and aggregate metrics (`get_aggregate_metrics()`, `save_aggregate_metrics()`) from per-seed JSON files; added `ModelEvaluator.save_metrics()` for per-seed JSON export; aggregate outputs now go to `figures/` (was `plots/`); `ModelEvaluator` and `MultiModelEvaluator` exported from top-level `eruption_forecast`
-- **2026-02-20**: Added 4 new visualization features — `plot_classifier_comparison` heatmap, `plot_shap_summary`/`plot_aggregate_shap_summary` (SHAP explainability, requires `shap>=0.46`), `plot_seed_stability` violin, `plot_frequency_band_contribution` bar chart; added `get_metrics_list()` to `MultiModelEvaluator`; `ModelEvaluator.plot_all()` now includes SHAP; `MultiModelEvaluator.plot_all()` now runs 10 plots
-- **2026-02-20**: Added per-seed `X_test`/`y_test` persistence in `train_and_evaluate()` (saved to `tests/` dir) and per-seed metrics JSON files (saved to `metrics/` dir); added 7 aggregate plot functions in `evaluation_plots.py`; all aggregate plots save both PNG and CSV data alongside the figure
-- **2026-02-19**: Added Shannon Entropy (`entropy`) as a third tremor metric alongside RSAM and DSAR; implemented `ShanonEntropy` class and `shanon_entropy()` utility; updated `CalculateTremor` with `calculate_entropy()` method; entropy plots use reddish-purple (Okabe-Ito palette)
-- **2026-02-18**: Added `PipelineConfig` — save/replay full pipeline configs as YAML/JSON; `save_model`/`load_model` for joblib serialization; `from_config`/`run` for one-line pipeline replay
-- **2026-02-18**: Refactored utils.py into 7 focused modules for improved maintainability
-- **2026-02-18**: All Python files standardized to Google docstring format with comprehensive descriptions
+**Last Updated:** 2026-02-23
