@@ -15,10 +15,10 @@ def main(use_relevant_features: bool = False):
     params: dict[str, Any] = {
         "station": "OJN",
         "channel": "EHZ",
-        # "start_date": "2025-01-01",
-        # "end_date": "2025-12-31",
-        "start_date": "2025-03-01",
-        "end_date": "2025-03-31",
+        "start_date": "2025-01-01",
+        "end_date": "2025-08-24",
+        # "start_date": "2025-03-01",
+        # "end_date": "2025-03-31",
         "window_size": 2,
         "volcano_id": "Lewotobi Laki-laki",
         "verbose": True,
@@ -49,8 +49,8 @@ def main(use_relevant_features: bool = False):
         save_plot=True,
         remove_outlier_method="maximum",
     ).build_label(
-        start_date="2025-03-01",
-        end_date="2025-03-31",
+        start_date="2025-01-01",
+        end_date="2025-08-24",
         day_to_forecast=2,
         window_step=6,
         window_step_unit="hours",
@@ -70,25 +70,20 @@ def main(use_relevant_features: bool = False):
         ],
         use_relevant_features=use_relevant_features,
         overwrite=False,
+    ).train(
+        with_evaluation=True,
+        classifier=["lite-rf", "rf"],
+        cv_strategy="stratified",
+        random_state=0,
+        total_seed=500,
+        number_of_significant_features=20,
+        sampling_strategy=0.75,
+        save_all_features=True,
+        plot_significant_features=True,
+        # n_jobs=1,
+        overwrite=False,
+        verbose=True,
     )
-
-    classifiers = ["lite-rf", "rf"]
-
-    for classifier in classifiers:
-        fm.train(
-            with_evaluation=True,
-            classifier=classifier,  # ty:ignore[invalid-argument-type]
-            cv_strategy="stratified",
-            random_state=0,
-            total_seed=500,
-            number_of_significant_features=20,
-            sampling_strategy=0.75,
-            save_all_features=True,
-            plot_significant_features=True,
-            n_jobs=1,
-            overwrite=False,
-            verbose=True,
-        )
 
 
 if __name__ == "__main__":

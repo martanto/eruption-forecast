@@ -44,7 +44,7 @@ def main(use_relevant_features: bool = False):
         remove_outlier_method="maximum",
     ).build_label(
         start_date="2025-01-01",
-        end_date="2025-07-24",
+        end_date="2025-07-27",
         day_to_forecast=2,
         window_step=6,
         window_step_unit="hours",
@@ -64,35 +64,19 @@ def main(use_relevant_features: bool = False):
         ],
         use_relevant_features=use_relevant_features,
         overwrite=False,
-    )
-
-    classifiers = ["rf"]
-    grid_params = {
-        "rf": {
-            "n_estimators": [10, 30, 100],
-            "max_depth": [3, 5, 7],
-            "criterion": ["gini", "entropy"],
-            "max_features": ["sqrt", "log2", None],
-        }
-    }
-
-    for classifier in classifiers:
-        fm.train(
-            classifier=classifier,  # ty:ignore[invalid-argument-type]
-            cv_strategy="stratified",
-            random_state=0,
-            total_seed=500,
-            with_evaluation=False,
-            grid_params=grid_params[classifier],
-            number_of_significant_features=20,
-            sampling_strategy=0.75,
-            save_all_features=True,
-            plot_significant_features=True,
-            overwrite=False,
-            verbose=True,
-        )
-
-    fm.forecast(
+    ).train(
+        classifier=["lite-rf", "rf"],
+        cv_strategy="stratified",
+        random_state=0,
+        total_seed=500,
+        with_evaluation=False,
+        number_of_significant_features=20,
+        sampling_strategy=0.75,
+        save_all_features=True,
+        plot_significant_features=True,
+        overwrite=False,
+        verbose=True,
+    ).forecast(
         start_date="2025-07-28",
         end_date="2025-08-04",
         window_size=2,
