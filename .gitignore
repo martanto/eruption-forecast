@@ -24,6 +24,12 @@ tests/output/
 /.cache/
 /.claude/
 
+# Live pipeline config (user-specific; use config.example.yaml as template)
+/config.yaml
+
+# Daily changelogs (local only)
+/changelogs/
+
 # Temporary test files in root directory
 /test*.py
 /test_*.py

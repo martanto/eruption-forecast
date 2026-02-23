@@ -144,42 +144,49 @@ Raw Seismic Data (SDS / FDSN)
          │
          ▼
 ┌─────────────────────┐
-│   CalculateTremor   │  RSAM + DSAR + Shannon Entropy (10-min intervals)
+│   CalculateTremor   │  RSAM + DSAR → tremor.csv
 └─────────┬───────────┘
-          │  tremor.csv
+          │
           ▼
 ┌─────────────────────┐
-│    LabelBuilder     │  Binary labels (1 = eruption, 0 = normal)
+│    LabelBuilder     │  Binary labels → label_*.csv
 └─────────┬───────────┘
-          │  label_*.csv
+          │
           ▼
 ┌─────────────────────┐
-│ TremorMatrixBuilder │  Windowed tremor matrix aligned to labels
+│ TremorMatrixBuilder │  Windowed matrix → tremor_matrix_*.csv
 └─────────┬───────────┘
-          │  tremor_matrix_*.csv
+          │
           ▼
 ┌─────────────────────┐
-│   FeaturesBuilder   │  700+ tsfresh features per tremor column
+│   FeaturesBuilder   │  700+ features → all_extracted_features_*.csv
 └─────────┬───────────┘
-          │  all_extracted_features_*.csv
+          │
           ▼
-┌─────────────────────┐
-│   ModelTrainer      │  Multi-seed GridSearchCV training
-│  ┌───────────────┐  │
-│  │FeatureSelector│  │  tsfresh / RandomForest / combined
-│  └───────────────┘  │
-│  ┌───────────────┐  │
-│  │ClassifierModel│  │  10 classifiers, 3 CV strategies
-│  └───────────────┘  │
-└─────────┬───────────┘
-          │  trained_model_*.csv  +  *.pkl models
+┌─────────────────────────────────────────────┐
+│                 ModelTrainer                │
+│  ┌─────────────┐   ┌──────────────────────┐ │
+│  │FeatureSelect│   │   ClassifierModel    │ │
+│  │   or        │   │ (10 classifiers,     │ │
+│  │  combined   │   │  3 CV strategies)    │ │
+│  └─────────────┘   └──────────────────────┘ │
+│         ↓  train_and_evaluate()  ↓ train()  │
+│    80/20 split + metrics   Full dataset     │
+└─────────┬───────────────────────────────────┘
+          │  trained_model_*.csv  +  *.pkl
           ▼
-┌─────────────────────┐
-│   ModelPredictor    │  Evaluation or forecast on future data
-│  ┌───────────────┐  │
-│  │ModelEvaluator │  │  Metrics, plots, threshold analysis
-│  └───────────────┘  │
-└─────────────────────┘
+┌─────────────────────────────────────────────┐
+│               ModelPredictor                │
+│  ┌──────────────────────────────────────┐   │
+│  │ predict() / predict_best()           │   │
+│  │ (evaluation mode — requires labels)  │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │ predict_proba()                      │   │
+│  │ (forecast mode — no labels needed)   │   │
+│  └──────────────────────────────────────┘   │
+│  Single model or multi-model consensus      │
+└─────────────────────────────────────────────┘
 ```
 
 ## Installation
@@ -391,12 +398,12 @@ Example with `window_step=12h`, `day_to_forecast=2d`, `eruption=Jan 15`.
 ```
 Timeline (each tick = 12 hours):
 
-──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15 ☄
+──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15  ☄
  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00
      │      │      │      │      │      │      │      │      │      │      │      │
-     ← window_step: 12h →         │      │      │      │      │
-                                  │      ◄──────────── day_to_forecast=2d ───────────►│
-                                  │                       label = 1 zone              │
+     ← window_step: 12h →        │      │      │      │      │      │      │      │
+                                 │      ◄───────── day_to_forecast=2d ───────────►│
+                                 │                    label = 1 zone              │
 ```
 
 ```
@@ -521,30 +528,34 @@ print(scores.head(10))
 Two training workflows are available depending on your evaluation strategy.
 
 ```
-train_and_evaluate() workflow:         train() workflow:
-
-Full Dataset                           Full Dataset
-     │                                      │
-     ▼                                      ▼
- 80/20 Split                          RandomUnderSampler
-     │                                 (full dataset)
-  ┌──┴──┐                                   │
-Train  Test                           Feature Selection
-  │     │                              (full dataset)
-RandomUnder                                 │
-Sampler                               GridSearchCV + CV
-  │                                         │
-Feature                               ┌─────┴──────┐
-Selection                          Save model  Save registry
-  │                                (.pkl)      (.csv)
-GridSearchCV + CV
-  │
-Evaluate on Test
-  │
-Save model + metrics
+   train_and_evaluate()                  train()
+  ─────────────────────            ────────────────────
+      Full Dataset                      Full Dataset
+           │                                │
+           ▼                                ▼
+      80/20 Split                    RandomUnderSampler
+      (stratified)                     (full dataset)
+      ┌────┴────┐                           │
+    Train     Test                   Feature Selection
+      │         │                      (full dataset)
+    RandomUnder │                           │
+    Sampler     │                      GridSearchCV
+      │         │                       + CV folds
+    Feature     │                           │
+    Selection   │                    ┌──────┴──────┐
+      │         │                model.pkl   registry.csv
+    GridSearchCV│
+    + CV folds  │
+      │         │
+    Evaluate ◄──┘
+      │
+    Save model + metrics
 ```
 
 #### Which workflow should I use?
+
+- **`train_and_evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
+- **`train()`** — treats data as two separate time periods: a **current/present dataset** used for training (passed via `extracted_features_csv`) and a **future dataset** evaluated separately via `ModelPredictor`. No internal split; the model is trained on 100% of the current data.
 
 | Question | `train_and_evaluate()` | `train()` |
 |---|---|---|
@@ -552,7 +563,6 @@ Save model + metrics
 | Do I have a separate future dataset to evaluate on? | — | ✅ Use with `ModelPredictor` |
 | Am I exploring classifiers and hyperparameters? | ✅ Quick feedback per run | ❌ Not suitable |
 | Am I training the final production model? | ❌ Wastes 20% of data | ✅ Uses 100% of data |
-| Does order of data matter (time-series)? | ✅ Use `cv_strategy="timeseries"` | ✅ Use `cv_strategy="timeseries"` |
 
 #### `train_and_evaluate()` — with held-out test set (80/20 split)
 
@@ -582,8 +592,9 @@ trainer.train_and_evaluate(
 
 #### `train()` — full dataset training (no split)
 
-Trains on the **entire** dataset across multiple seeds. No metrics are computed here —
-evaluation is deferred to `ModelPredictor` using a separate future dataset.
+Trains on the **entire current/present dataset** across multiple seeds — no internal 80/20 split.
+The dataset passed here represents your known historical period. Evaluation is deferred to
+`ModelPredictor` using a **separate future dataset** that was not seen during training.
 
 ```python
 trainer = ModelTrainer(
@@ -601,7 +612,7 @@ trainer.train(
 )
 ```
 
-#### `fit()` — unified entry point
+#### `fit()` — Unified entry point
 
 `fit()` dispatches to `train_and_evaluate()` or `train()` based on the
 `with_evaluation` flag. Use it when the calling code needs a single method
@@ -644,7 +655,8 @@ without dropping down to `ModelTrainer`.
 | `number_of_significant_features` | `int` | `20` | Top-N features retained per seed and aggregated across seeds |
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |
 | `overwrite` | `bool` | `False` | Re-run even if output files already exist |
-| `n_jobs` | `int` | `1` | Parallel workers for multi-seed dispatch |
+| `n_jobs` | `int` | `1` | Parallel seed workers (outer loop). Pass `-1` to use all available cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
+| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension |
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
@@ -689,6 +701,7 @@ without dropping down to `ModelTrainer`.
 | `knn` | K-Nearest Neighbors (simple baseline) | None |
 | `nb` | Gaussian Naive Bayes (fast baseline) | None |
 | `voting` | Soft VotingClassifier (RF + XGBoost ensemble) | Combined |
+| `lite-rf` | Random Forest with a smaller grid for faster training | `class_weight="balanced"` |
 
 ### 8. Hyperparameter Grids
 
@@ -1874,7 +1887,8 @@ All outputs are organized under `{output_dir}/{network}.{station}.{location}.{ch
 output/
 └── VG.OJN.00.EHZ/
     ├── tremor/
-    │   ├── tmp/                              # Temporary daily files
+    │   ├── daily/                            # Per-day CSV files (removed if cleanup_daily_dir=True)
+    │   ├── figures/                          # Daily tremor plots (created if plot_daily=True)
     │   └── tremor_*.csv                      # Final merged tremor data
     │
     ├── features/
@@ -1894,10 +1908,15 @@ output/
         │           │   ├── all_features/             # All ranked features (optional)
         │           │   │   ├── 00000.csv
         │           │   │   └── ...
-        │           │   ├── figures/significant/      # Feature plots (optional)
-        │           │   │   └── 00000.jpg
+        │           │   ├── figures/
+        │           │   │   └── significant/          # Feature importance plots (optional)
+        │           │   │       └── 00000.jpg
+        │           │   ├── tests/                    # Per-seed held-out test splits
+        │           │   │   ├── 00000_X_test.csv
+        │           │   │   ├── 00000_y_test.csv
+        │           │   │   └── ...
         │           │   ├── significant_features.csv  # Aggregated features (all seeds)
-        │           │   └── top_20_significant_features.csv
+        │           │   └── top_{n}_significant_features.csv
         │           ├── models/
         │           │   ├── 00000.pkl     # Trained model (seed 0)
         │           │   ├── 00001.pkl
@@ -1905,11 +1924,7 @@ output/
         │           ├── metrics/
         │           │   ├── 00000.json    # Per-seed metrics
         │           │   └── ...
-        │           ├── tests/
-        │           │   ├── 00000_X_test.csv   # Per-seed held-out features
-        │           │   ├── 00000_y_test.csv   # Per-seed held-out labels
-        │           │   └── ...
-        │           ├── figures/
+        │           ├── figures/              # Aggregate evaluation plots (MultiModelEvaluator)
         │           │   ├── aggregate_roc_curve.png
         │           │   ├── aggregate_roc_curve.csv
         │           │   ├── aggregate_pr_curve.png
@@ -1933,10 +1948,21 @@ output/
             └── {classifier-slug}/
                 └── {cv-slug}/
                     ├── features/
-                    │   ├── significant_features/
-                    │   └── ...
+                    │   ├── significant_features/     # Per-seed top-N features
+                    │   │   ├── 00000.csv
+                    │   │   └── ...
+                    │   ├── all_features/             # All ranked features (optional)
+                    │   │   ├── 00000.csv
+                    │   │   └── ...
+                    │   ├── figures/
+                    │   │   └── significant/          # Feature importance plots (optional)
+                    │   │       └── 00000.jpg
+                    │   ├── significant_features.csv  # Aggregated features (all seeds)
+                    │   └── top_{n}_significant_features.csv
                     ├── models/
-                    └── trained_model_{suffix}.csv
+                    │   ├── 00000.pkl
+                    │   └── ...
+                    └── trained_model_{suffix}.csv    # Registry of all trained models
 ```
 
 **ModelPredictor output** (`output_dir/predictions/`):
@@ -2007,6 +2033,8 @@ fm.save_model("my_model.pkl")             # custom path
 
 #### Saved YAML format
 
+A fully annotated template with all fields and inline comments is available at [`config.example.yaml`](config.example.yaml) in the project root. Copy it, edit the values for your run, and load it with `ForecastModel.from_config("config.yaml")`.
+
 ```yaml
 # eruption-forecast pipeline configuration
 version: '1.0'
@@ -2032,9 +2060,19 @@ calculate:
   source: sds
   sds_dir: D:/Data/OJN
   methods: null
+  filename_prefix: null
   remove_outlier_method: maximum
+  remove_tremor_anomalies: false
   interpolate: true
-  # ... remaining calculate() parameters
+  value_multiplier: null
+  cleanup_daily_dir: false
+  plot_daily: false
+  save_plot: false
+  overwrite_plot: false
+  client_url: https://service.iris.edu
+  n_jobs: null
+  verbose: false
+  debug: false
 
 build_label:
   window_step: 12
@@ -2044,27 +2082,48 @@ build_label:
   - '2025-03-20'
   start_date: null
   end_date: null
+  tremor_columns: null
+  verbose: false
+  debug: false
 
 extract_features:
   select_tremor_columns:
   - rsam_f2
   - rsam_f3
+  save_tremor_matrix_per_method: true
+  save_tremor_matrix_per_id: false
+  exclude_features: null
   use_relevant_features: false
+  overwrite: false
+  n_jobs: null
+  verbose: null
 
 train:
-  classifier: xgb
+  classifiers:
+  - xgb
   cv_strategy: stratified
   random_state: 0
   total_seed: 500
   with_evaluation: false
   number_of_significant_features: 20
   sampling_strategy: 0.75
+  save_all_features: false
+  plot_significant_features: false
+  n_jobs: null
+  grid_search_n_jobs: 1
+  overwrite: false
+  verbose: false
 
 forecast:
   start_date: '2025-03-23'
   end_date: '2025-03-30'
   window_step: 12
   window_step_unit: hours
+  save_predictions: true
+  save_plot: true
+  n_jobs: null
+  overwrite: false
+  verbose: false
 ```
 
 Sections that were not called are omitted from the file. A partial run produces a partial YAML that can still be loaded.

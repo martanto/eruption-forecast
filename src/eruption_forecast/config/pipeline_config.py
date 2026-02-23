@@ -109,6 +109,8 @@ class CalculateConfig(_ConfigBase):
             Defaults to ``None``.
         remove_outlier_method (str): Outlier removal strategy — ``"all"`` or
             ``"maximum"``. Defaults to ``"maximum"``.
+        remove_tremor_anomalies (bool): Whether to remove anomalies after tremor
+            calculation using Z-score analysis. Defaults to ``False``.
         interpolate (bool): Whether to interpolate gaps in the tremor data.
             Defaults to ``True``.
         value_multiplier (float | None): Scaling factor applied to tremor values.
@@ -133,6 +135,7 @@ class CalculateConfig(_ConfigBase):
     methods: list[str] | None = None
     filename_prefix: str | None = None
     remove_outlier_method: str = "maximum"
+    remove_tremor_anomalies: bool = False
     interpolate: bool = True
     value_multiplier: float | None = None
     cleanup_daily_dir: bool = False
@@ -250,6 +253,10 @@ class TrainConfig(_ConfigBase):
             plot per seed. Defaults to ``False``.
         n_jobs (int | None): Parallel workers for multi-seed dispatch. ``None``
             inherits from ``ForecastModel.n_jobs``. Defaults to ``None``.
+        grid_search_n_jobs (int): Parallel jobs inside each ``GridSearchCV``
+            call (inner loop). Uses the ``loky`` backend so it is safe for
+            nested parallelism. Enforce ``n_jobs × grid_search_n_jobs ≤
+            cpu_count``. Defaults to ``1``.
         overwrite (bool): Whether to overwrite existing training output files.
             Defaults to ``False``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
@@ -265,6 +272,7 @@ class TrainConfig(_ConfigBase):
     save_all_features: bool = False
     plot_significant_features: bool = False
     n_jobs: int | None = None
+    grid_search_n_jobs: int = 1
     overwrite: bool = False
     verbose: bool = False
 

@@ -2,10 +2,10 @@ import os
 import json
 from typing import Any, Self, Literal
 from collections.abc import Callable
-from multiprocessing import Pool
 
 import joblib
 import pandas as pd
+from joblib import Parallel, delayed
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
@@ -49,7 +49,8 @@ class ModelTrainer:
         df_features (pd.DataFrame): Loaded features DataFrame (from extracted_features_csv).
         df_labels (pd.Series): Loaded labels Series (from label_features_csv).
         output_dir (str): Root directory for training outputs.
-        n_jobs (int): Number of parallel workers for training.
+        n_jobs (int): Number of parallel seed workers (outer loop).
+        grid_search_n_jobs (int): Number of parallel jobs inside each GridSearchCV call.
         prefix_filename (str | None): Optional prefix for output filenames.
         classifier (str): Classifier type ("rf", "gb", "xgb", etc.).
         cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "timeseries").
@@ -104,7 +105,10 @@ class ModelTrainer:
         feature_selection_method (Literal["tsfresh", "random_forest", "combined"], optional):
             Feature selection method. Defaults to "tsfresh".
         overwrite (bool, optional): Overwrite existing output files. Defaults to False.
-        n_jobs (int, optional): Number of parallel workers. Defaults to 1.
+        n_jobs (int, optional): Number of parallel seed workers (outer loop). Pass -1
+            to use all available cores. Defaults to 1.
+        grid_search_n_jobs (int, optional): Number of parallel jobs inside each
+            GridSearchCV call (inner loop). Defaults to 1.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
         debug (bool, optional): Enable debug mode. Defaults to False.
 
@@ -175,6 +179,7 @@ class ModelTrainer:
         ] = "tsfresh",
         overwrite: bool = False,
         n_jobs: int = 1,
+        grid_search_n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -208,7 +213,13 @@ class ModelTrainer:
             feature_selection_method (Literal["tsfresh", "random_forest", "combined"],
                 optional): Feature selection method. Defaults to "tsfresh".
             overwrite (bool, optional): Overwrite existing output files. Defaults to False.
-            n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+            n_jobs (int, optional): Number of parallel seed workers (outer loop).
+                Defaults to 1.
+            grid_search_n_jobs (int, optional): Number of parallel jobs inside each
+                GridSearchCV call (inner loop). Safe to set > 1 because the loky
+                backend handles nested parallelism without deadlocks. Combine with
+                ``n_jobs`` to control the total CPU budget:
+                ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
@@ -280,6 +291,7 @@ class ModelTrainer:
         self.df_labels = df_labels
         self.output_dir = output_dir
         self.n_jobs = n_jobs
+        self.grid_search_n_jobs = grid_search_n_jobs
         self.prefix_filename = prefix_filename
         self.classifier = classifier
         self.cv_strategy = cv_strategy
@@ -294,7 +306,7 @@ class ModelTrainer:
         # Set ADDITIONAL properties (derived values)
         # ------------------------------------------------------------------
         self.FeatureSelector = FeatureSelector(
-            method=feature_selection_method, verbose=verbose
+            method=feature_selection_method, verbose=verbose, n_jobs=grid_search_n_jobs
         )
         self.ClassifierModel = classifier_model
         self.features_dir = features_dir
@@ -341,8 +353,9 @@ class ModelTrainer:
         Raises:
             ValueError: If features DataFrame is empty (0 rows).
             ValueError: If labels DataFrame is empty (0 rows).
-            ValueError: If the number of rows in features and labels
-                do not match.
+            ValueError: If the number of rows in features and labels do not match.
+            ValueError: If n_jobs or grid_search_n_jobs is zero or negative (excluding -1).
+            ValueError: If n_jobs × grid_search_n_jobs exceeds the available CPU cores.
 
         Example:
             >>> trainer = ModelTrainer(
@@ -369,9 +382,27 @@ class ModelTrainer:
                 f"with filename starting with extracted_features_(start_date)_(end_date).csv or "
                 f"extracted_relevant_(start_date)_(end_date).csv"
             )
-        if self.n_jobs <= 0:
+        total_cores: int = os.cpu_count() or 1
+
+        # Resolve -1 to actual core count (joblib convention)
+        effective_n_jobs = total_cores if self.n_jobs == -1 else self.n_jobs
+        effective_gs_jobs = (
+            total_cores if self.grid_search_n_jobs == -1 else self.grid_search_n_jobs
+        )
+
+        if effective_n_jobs <= 0:
             raise ValueError(
-                "n_jobs cannot be negative or equals to 0. Check your n_jobs parameter."
+                f"n_jobs must be -1 or a positive integer. Got {self.n_jobs}."
+            )
+        if effective_gs_jobs <= 0:
+            raise ValueError(
+                f"grid_search_n_jobs must be -1 or a positive integer. Got {self.grid_search_n_jobs}."
+            )
+        if effective_n_jobs * effective_gs_jobs > total_cores:
+            raise ValueError(
+                f"n_jobs ({effective_n_jobs}) × grid_search_n_jobs ({effective_gs_jobs}) = "
+                f"{effective_n_jobs * effective_gs_jobs} exceeds available cores ({total_cores}). "
+                f"Reduce n_jobs or grid_search_n_jobs so their product is ≤ {total_cores}."
             )
 
     def get_classifier_properties(
@@ -799,18 +830,37 @@ class ModelTrainer:
             param_grid=clf.grid,
             cv=clf.get_cv_splitter(),
             scoring="balanced_accuracy",
-            n_jobs=1,  # Nested parallelism would deadlock.
+            n_jobs=self.grid_search_n_jobs,
             verbose=0,
         )
-        grid_search.fit(features[top_n_features], labels)
+
+        # Force loky backend to avoid the threading backend that Intel's
+        # scikit-learn extension (sklearnex) does not support.
+        # See: https://joblib.readthedocs.io/en/latest/parallel.html
+        with joblib.parallel_backend("loky"):
+            grid_search.fit(features[top_n_features], labels)
+
         return clf, grid_search, grid_search.best_estimator_
 
     def _run_jobs(self, method: Callable, jobs: list[tuple]) -> list[tuple]:
-        """Dispatch jobs sequentially or in parallel depending on n_jobs."""
-        if self.n_jobs > 1:
+        """Dispatch jobs sequentially or in parallel depending on n_jobs.
+
+        Uses joblib's loky backend so that nested parallelism inside each worker
+        (e.g. GridSearchCV with grid_search_n_jobs > 1) is safe and free of
+        deadlocks that would occur with multiprocessing.Pool.
+
+        Args:
+            method (Callable): The function to call for each job.
+            jobs (list[tuple]): List of argument tuples, one per job.
+
+        Returns:
+            list[tuple]: Collected return values in submission order.
+        """
+        if self.n_jobs != 1:
             logger.info(f"Running on {self.n_jobs} job(s)")
-            with Pool(self.n_jobs) as pool:
-                return pool.starmap(method, jobs)
+            return Parallel(n_jobs=self.n_jobs, backend="loky")(
+                delayed(method)(*job) for job in jobs
+            )
         return [method(*job) for job in jobs]
 
     def _save_models_registry(
