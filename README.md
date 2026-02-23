@@ -554,13 +554,15 @@ Save model + metrics
 
 #### Which workflow should I use?
 
+- **`train_and_evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
+- **`train()`** — treats data as two separate time periods: a **current/present dataset** used for training (passed via `extracted_features_csv`) and a **future dataset** evaluated separately via `ModelPredictor`. No internal split; the model is trained on 100% of the current data.
+
 | Question | `train_and_evaluate()` | `train()` |
 |---|---|---|
 | Do I want to measure in-sample performance? | ✅ Yes — evaluates each seed on held-out 20% | ❌ No metrics computed |
 | Do I have a separate future dataset to evaluate on? | — | ✅ Use with `ModelPredictor` |
 | Am I exploring classifiers and hyperparameters? | ✅ Quick feedback per run | ❌ Not suitable |
 | Am I training the final production model? | ❌ Wastes 20% of data | ✅ Uses 100% of data |
-| Does order of data matter (time-series)? | ✅ Use `cv_strategy="timeseries"` | ✅ Use `cv_strategy="timeseries"` |
 
 #### `train_and_evaluate()` — with held-out test set (80/20 split)
 
@@ -590,8 +592,9 @@ trainer.train_and_evaluate(
 
 #### `train()` — full dataset training (no split)
 
-Trains on the **entire** dataset across multiple seeds. No metrics are computed here —
-evaluation is deferred to `ModelPredictor` using a separate future dataset.
+Trains on the **entire current/present dataset** across multiple seeds — no internal 80/20 split.
+The dataset passed here represents your known historical period. Evaluation is deferred to
+`ModelPredictor` using a **separate future dataset** that was not seen during training.
 
 ```python
 trainer = ModelTrainer(
@@ -609,7 +612,7 @@ trainer.train(
 )
 ```
 
-#### `fit()` — unified entry point
+#### `fit()` — Unified entry point
 
 `fit()` dispatches to `train_and_evaluate()` or `train()` based on the
 `with_evaluation` flag. Use it when the calling code needs a single method
