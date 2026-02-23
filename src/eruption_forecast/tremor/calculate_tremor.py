@@ -485,7 +485,7 @@ class CalculateTremor:
         """
         if self.cleanup_daily_dir:
             if self.verbose:
-                logger.info(f"Cleaning up temp dir: {self.daily_dir}")
+                logger.info(f"Cleaning up daily dir: {self.daily_dir}")
             shutil.rmtree(self.daily_dir)
 
         os.makedirs(self.daily_dir, exist_ok=True)
@@ -773,8 +773,8 @@ class CalculateTremor:
 
         df = self.calculate(date)
 
-        # Pass if df is empty. No data to process
-        if df.empty:
+        # Pass if df has no data to process (all columns are NaN)
+        if df.empty or df.isna().all(axis=None):
             return None
 
         # Remove anomalies and interpolate NaN values
@@ -823,7 +823,10 @@ class CalculateTremor:
                 columns.extend([f"rsam_{b}" for b in aliases])
             elif method == "dsar" and len(aliases) >= 2:
                 columns.extend(
-                    [f"dsar_{aliases[i]}-{aliases[i + 1]}" for i in range(len(aliases) - 1)]
+                    [
+                        f"dsar_{aliases[i]}-{aliases[i + 1]}"
+                        for i in range(len(aliases) - 1)
+                    ]
                 )
             elif method == "entropy":
                 columns.append("entropy")
@@ -1204,13 +1207,19 @@ class CalculateTremor:
 
         day_df = self.calculate(date)
 
+        if day_df.empty or day_df.isna().all(axis=None):
+            return None
+
         if self.remove_tremor_anomalies:
-            day_df = remove_anomalies(day_df, threshold=300, inplace=False, debug=self.debug)
+            day_df = remove_anomalies(
+                day_df, threshold=300, inplace=False, debug=self.debug
+            )
 
         # Restrict to rows inside the gap
         day_df = day_df[(day_df.index >= gap_start) & (day_df.index <= gap_end)]
 
-        if day_df.empty:
+        # Check agian after anomalies removal
+        if day_df.empty or day_df.isna().all(axis=None):
             return None
 
         if is_complete:
@@ -1337,14 +1346,18 @@ class CalculateTremor:
             raise FileNotFoundError(f"Existing tremor CSV not found: {existing_csv}")
 
         if sds_dir is None and client_url is None:
-            raise ValueError("Provide either sds_dir (SDS archive) or client_url (FDSN).")
+            raise ValueError(
+                "Provide either sds_dir (SDS archive) or client_url (FDSN)."
+            )
 
         # ------------------------------------------------------------------
         # 2. Load existing DataFrame and determine gap
         # ------------------------------------------------------------------
         existing_df = pd.read_csv(existing_csv, index_col=0, parse_dates=True)
 
-        gap_start: datetime = existing_df.index[-1].to_pydatetime() + timedelta(minutes=10)
+        gap_start: datetime = existing_df.index[-1].to_pydatetime() + timedelta(
+            minutes=10
+        )
         gap_end: datetime = to_datetime(new_end_date)
 
         # ------------------------------------------------------------------
@@ -1353,7 +1366,7 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         if output_dir is None:
             output_dir = os.path.dirname(  # output_dir
-                os.path.dirname(           # {nslc}/
+                os.path.dirname(  # {nslc}/
                     os.path.dirname(existing_csv)  # tremor/
                 )
             )
@@ -1364,7 +1377,9 @@ class CalculateTremor:
         #    processing range is controlled by gap_start / gap_end below.
         # ------------------------------------------------------------------
         instance_start = gap_start.replace(hour=0, minute=0, second=0, microsecond=0)
-        instance_end = gap_end.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        instance_end = gap_end.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
 
         instance: CalculateTremor = cls(
             start_date=instance_start,
@@ -1426,7 +1441,8 @@ class CalculateTremor:
 
         if n_jobs > 1:
             complete_days = [
-                d for d in gap_days
+                d
+                for d in gap_days
                 if d.replace(hour=0, minute=0, second=0, microsecond=0) >= gap_start
                 and d.replace(hour=23, minute=50, second=0, microsecond=0) <= gap_end
             ]
@@ -1452,7 +1468,9 @@ class CalculateTremor:
         # 8. Skip if no new rows
         # ------------------------------------------------------------------
         if not accumulated:
-            logger.warning("No new tremor rows produced during update. Returning unchanged.")
+            logger.warning(
+                "No new tremor rows produced during update. Returning unchanged."
+            )
             instance.df = existing_df
             instance.csv = existing_csv
             return instance
@@ -1477,7 +1495,9 @@ class CalculateTremor:
         non_interpolated_filename = (
             f"tremor_non-interpolated_{instance.nslc}_{start_date}-{end_date}.csv"
         )
-        csv_non_interpolated = os.path.join(instance.tremor_dir, non_interpolated_filename)
+        csv_non_interpolated = os.path.join(
+            instance.tremor_dir, non_interpolated_filename
+        )
         merged.to_csv(csv_non_interpolated, index=True)
         logger.info(f"Non-interpolated tremor saved to {csv_non_interpolated}")
 
