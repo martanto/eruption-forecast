@@ -55,6 +55,24 @@ class ModelConfig(_ConfigBase):
 
     Stores the core model initialization parameters so the pipeline can
     be reconstructed from a saved configuration file.
+
+    Attributes:
+        station (str): Seismic station code (e.g. ``"OJN"``). Defaults to ``""``.
+        channel (str): Seismic channel code (e.g. ``"EHZ"``). Defaults to ``""``.
+        start_date (str): Pipeline start date in ``"YYYY-MM-DD"`` format. Defaults to ``""``.
+        end_date (str): Pipeline end date in ``"YYYY-MM-DD"`` format. Defaults to ``""``.
+        window_size (int): Duration in days of each tremor window. Defaults to ``1``.
+        volcano_id (str): Unique volcano identifier used in output filenames. Defaults to ``""``.
+        network (str): Seismic network code. Defaults to ``"VG"``.
+        location (str): Seismic location code. Defaults to ``"00"``.
+        output_dir (str | None): Base output directory. ``None`` resolves to
+            ``root_dir/output``. Defaults to ``None``.
+        root_dir (str | None): Anchor directory for resolving relative paths.
+            ``None`` falls back to ``os.getcwd()``. Defaults to ``None``.
+        overwrite (bool): Whether to overwrite existing output files. Defaults to ``False``.
+        n_jobs (int): Number of parallel workers. Defaults to ``1``.
+        verbose (bool): Enable verbose logging. Defaults to ``False``.
+        debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
     station: str = ""
@@ -79,6 +97,35 @@ class CalculateConfig(_ConfigBase):
 
     Captures every argument accepted by ``calculate()`` so the tremor
     calculation step can be replayed identically.
+
+    Attributes:
+        source (str): Seismic data source — ``"sds"`` or ``"fdsn"``. Defaults to ``"sds"``.
+        sds_dir (str | None): Path to the SDS archive directory. Required when
+            ``source="sds"``. Defaults to ``None``.
+        methods (list[str] | None): Tremor calculation methods to apply (e.g.
+            ``["rsam", "dsar", "entropy"]``). ``None`` enables all methods.
+            Defaults to ``None``.
+        filename_prefix (str | None): Optional prefix for generated filenames.
+            Defaults to ``None``.
+        remove_outlier_method (str): Outlier removal strategy — ``"all"`` or
+            ``"maximum"``. Defaults to ``"maximum"``.
+        interpolate (bool): Whether to interpolate gaps in the tremor data.
+            Defaults to ``True``.
+        value_multiplier (float | None): Scaling factor applied to tremor values.
+            ``None`` disables scaling. Defaults to ``None``.
+        cleanup_daily_dir (bool): Whether to delete the daily temporary directory
+            after merging. Defaults to ``False``.
+        plot_daily (bool): Whether to generate a plot for each daily result.
+            Defaults to ``False``.
+        save_plot (bool): Whether to save the merged tremor plot. Defaults to ``False``.
+        overwrite_plot (bool): Whether to overwrite existing plot files.
+            Defaults to ``False``.
+        client_url (str): FDSN web-service base URL. Used when ``source="fdsn"``.
+            Defaults to ``"https://service.iris.edu"``.
+        n_jobs (int | None): Parallel workers for this stage. ``None`` inherits
+            from ``ForecastModel.n_jobs``. Defaults to ``None``.
+        verbose (bool): Enable verbose logging. Defaults to ``False``.
+        debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
     source: str = "sds"
@@ -104,6 +151,24 @@ class BuildLabelConfig(_ConfigBase):
 
     Stores label-building parameters so eruption windows can be re-created
     with identical settings.
+
+    Attributes:
+        window_step (int): Step size between consecutive label windows.
+            Defaults to ``12``.
+        window_step_unit (str): Unit of ``window_step`` — ``"minutes"`` or
+            ``"hours"``. Defaults to ``"hours"``.
+        day_to_forecast (int): Number of days before an eruption whose windows
+            are labeled positive (``is_erupted=1``). Defaults to ``2``.
+        eruption_dates (list[str]): Known eruption dates in ``"YYYY-MM-DD"``
+            format. Defaults to ``[]``.
+        start_date (str | None): Override for the training period start date.
+            ``None`` uses ``ForecastModel.start_date``. Defaults to ``None``.
+        end_date (str | None): Override for the training period end date.
+            ``None`` uses ``ForecastModel.end_date``. Defaults to ``None``.
+        tremor_columns (list[str] | None): Subset of tremor columns to retain
+            for labeling. ``None`` keeps all columns. Defaults to ``None``.
+        verbose (bool): Enable verbose logging. Defaults to ``False``.
+        debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
     window_step: int = 12
@@ -122,6 +187,26 @@ class ExtractFeaturesConfig(_ConfigBase):
     """Configuration for ``ForecastModel.extract_features()`` parameters.
 
     Captures tsfresh feature extraction settings for reproducible runs.
+
+    Attributes:
+        select_tremor_columns (list[str] | None): Tremor columns to use for feature
+            extraction. ``None`` uses all available columns. Defaults to ``None``.
+        save_tremor_matrix_per_method (bool): Whether to save a separate tremor-matrix
+            CSV for each tremor column. Defaults to ``True``.
+        save_tremor_matrix_per_id (bool): Whether to save one tremor-matrix CSV per
+            label window. Intended for debugging only — can generate many files.
+            Defaults to ``False``.
+        exclude_features (list[str] | None): tsfresh feature calculator names to skip
+            during extraction. ``None`` excludes nothing. Defaults to ``None``.
+        use_relevant_features (bool): If ``True``, applies tsfresh relevance filtering
+            to retain only statistically significant features. Requires labels.
+            Defaults to ``False``.
+        overwrite (bool): Whether to overwrite existing feature files.
+            Defaults to ``False``.
+        n_jobs (int | None): Parallel workers for tsfresh extraction. ``None``
+            inherits from ``ForecastModel.n_jobs``. Defaults to ``None``.
+        verbose (bool | None): Enable verbose logging. ``None`` inherits from
+            ``ForecastModel.verbose``. Defaults to ``None``.
     """
 
     select_tremor_columns: list[str] | None = None
@@ -141,13 +226,40 @@ class TrainConfig(_ConfigBase):
     Stores classifier and cross-validation settings so a training run can be
     replayed. Complex objects such as ``grid_params`` are intentionally
     excluded because they are not trivially serialisable.
+
+    Attributes:
+        classifiers (list[str]): Ordered list of classifier keys to train
+            (e.g. ``["rf", "xgb"]``). Defaults to ``["rf"]``.
+        cv_strategy (str): Cross-validation strategy — ``"shuffle"``,
+            ``"stratified"``, or ``"timeseries"``. Defaults to ``"shuffle"``.
+        random_state (int): Starting random seed. Seeds run from
+            ``random_state`` to ``random_state + total_seed - 1``.
+            Defaults to ``0``.
+        total_seed (int): Number of independent training runs (seeds).
+            Defaults to ``500``.
+        with_evaluation (bool): If ``True``, performs an 80/20 train/test split
+            and computes per-seed evaluation metrics. If ``False``, trains on the
+            full dataset without metrics. Defaults to ``False``.
+        number_of_significant_features (int): Top-N features retained per seed
+            after feature selection. Defaults to ``20``.
+        sampling_strategy (float): Under-sampling ratio passed to
+            ``RandomUnderSampler`` to balance classes. Defaults to ``0.75``.
+        save_all_features (bool): Whether to save all ranked features per seed
+            in addition to the top-N. Defaults to ``False``.
+        plot_significant_features (bool): Whether to save a feature-importance
+            plot per seed. Defaults to ``False``.
+        n_jobs (int | None): Parallel workers for multi-seed dispatch. ``None``
+            inherits from ``ForecastModel.n_jobs``. Defaults to ``None``.
+        overwrite (bool): Whether to overwrite existing training output files.
+            Defaults to ``False``.
+        verbose (bool): Enable verbose logging. Defaults to ``False``.
     """
 
-    classifier: str = "rf"
+    classifiers: list[str] = field(default_factory=lambda: ["rf"])
     cv_strategy: str = "shuffle"
     random_state: int = 0
     total_seed: int = 500
-    with_evaluation: bool = True
+    with_evaluation: bool = False
     number_of_significant_features: int = 20
     sampling_strategy: float = 0.75
     save_all_features: bool = False
@@ -163,6 +275,27 @@ class ForecastConfig(_ConfigBase):
 
     Captures the forecasting window and output settings so a prediction run
     can be replayed on new data.
+
+    Attributes:
+        start_date (str): Forecast period start date in ``"YYYY-MM-DD"`` format.
+            Defaults to ``""``.
+        end_date (str): Forecast period end date in ``"YYYY-MM-DD"`` format.
+            Defaults to ``""``.
+        window_size (int): Duration in days of each forecast window. Defaults to ``1``.
+        window_step (int): Step size between consecutive forecast windows.
+            Defaults to ``12``.
+        window_step_unit (str): Unit of ``window_step`` — ``"minutes"`` or
+            ``"hours"``. Defaults to ``"hours"``.
+        save_predictions (bool): Whether to save the prediction DataFrame as CSV.
+            Defaults to ``True``.
+        save_plot (bool): Whether to save the forecast probability plot.
+            Defaults to ``True``.
+        n_jobs (int | None): Parallel workers for feature extraction during
+            forecasting. ``None`` inherits from ``ForecastModel.n_jobs``.
+            Defaults to ``None``.
+        overwrite (bool): Whether to overwrite existing forecast output files.
+            Defaults to ``False``.
+        verbose (bool): Enable verbose logging. Defaults to ``False``.
     """
 
     start_date: str = ""
