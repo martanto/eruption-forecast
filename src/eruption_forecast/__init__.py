@@ -29,6 +29,7 @@ from importlib.metadata import version
 
 logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
+from eruption_forecast.decorators import notify
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
@@ -66,4 +67,5 @@ __all__ = [
     "LabelData",
     "TremorData",
     "PipelineConfig",
+    "notify",
 ]

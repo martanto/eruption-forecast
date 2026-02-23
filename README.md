@@ -64,6 +64,8 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
   - [Import Examples](#import-examples)
 - [Output Directory Structure](#output-directory-structure)
 - [Configuration](#configuration)
+  - [Decorators](#decorators)
+    - [notify — Telegram Notifications](#notify--telegram-notifications)
   - [Pipeline Configuration — Save & Replay](#pipeline-configuration--save--replay)
   - [Logging](#logging)
 - [Requirements](#requirements)
@@ -84,6 +86,7 @@ A comprehensive Python package for volcanic eruption forecasting using seismic d
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Logging**: Built-in logging with loguru for debugging and monitoring
+- **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion; credentials loaded from `.env` via python-dotenv
 - **Professional Documentation**: 100% Google-style docstrings with explicit types, comprehensive examples, and detailed API documentation
 - **Modular Architecture**: Clean separation of concerns with focused utility modules (array operations, time windows, date validation, DataFrame ops, ML utilities, path resolution, text formatting)
 
@@ -1995,6 +1998,131 @@ predictions/
 
 ---
 
+## Decorators
+
+The `decorators` package provides utilities for wrapping functions with cross-cutting behaviour such as timing, parameter persistence, and remote notifications.
+
+### notify — Telegram Notifications
+
+`notify` sends a structured Telegram message when the decorated function finishes (success) or raises an exception (error). Useful for long-running pipeline steps such as tremor calculation or multi-seed training.
+
+#### Setup
+
+1. Copy `.env.example` to `.env` and fill in your credentials:
+
+```
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_CHAT_ID=your_chat_id_here
+```
+
+2. Obtain a bot token from [@BotFather](https://t.me/BotFather) and your chat ID from [@userinfobot](https://t.me/userinfobot).
+
+#### Basic Usage
+
+```python
+from eruption_forecast.decorators import notify
+
+# Credentials read automatically from .env
+@notify(name="Training Run")
+def train_model():
+    ...
+
+# Or pass credentials explicitly
+@notify(bot_token="TOKEN", chat_id="CHAT_ID", name="Training Run")
+def train_model():
+    ...
+```
+
+#### Message Format
+
+**Success:**
+```
+🖥 Host:
+`DESKTOP-ABC`
+
+📋 Task:
+`train_model`
+
+🕐 Time:
+`2026-02-23 14:05:00`
+
+✅ Status:
+finished successfully.
+
+💬 Message:
+Function completed without errors.
+
+⏱ Elapsed:
+`00h 02m 35s`
+```
+
+**Error:**
+```
+🖥 Host:
+`DESKTOP-ABC`
+
+📋 Task:
+`train_model`
+
+🕐 Time:
+`2026-02-23 14:05:12`
+
+❌ Status:
+raised `ValueError`
+
+💬 Message:
+`Something went wrong`
+
+⏱ Elapsed:
+`00h 00m 12s`
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `bot_token` | `str \| None` | `None` | Telegram bot token. Falls back to `TELEGRAM_BOT_TOKEN` env var |
+| `chat_id` | `str \| int \| None` | `None` | Telegram chat ID. Falls back to `TELEGRAM_CHAT_ID` env var |
+| `name` | `str \| None` | `None` | Display name in messages. Defaults to `func.__name__` |
+| `on_success` | `bool` | `True` | Send notification on successful completion |
+| `on_error` | `bool` | `True` | Send notification when an exception is raised |
+| `include_elapsed` | `bool` | `True` | Include elapsed time in the message |
+| `files` | `list[str \| Path] \| Callable \| None` | `None` | Files to attach after a success notification. May be a static list or a callable receiving the return value |
+
+#### File Attachments
+
+```python
+# Static list of files
+@notify(files=["output/plot.png", "output/metrics.csv"])
+def generate_report():
+    ...
+
+# Dynamic — receive the function's return value
+@notify(files=lambda result: [result["plot_path"]])
+def run_pipeline():
+    return {"plot_path": "output/forecast.png"}
+```
+
+PNG/JPG files are sent via `sendPhoto`; all other files via `sendDocument`.
+
+#### Suppressing Notifications
+
+```python
+# Only notify on error (skip success messages)
+@notify(on_success=False)
+def long_running_job():
+    ...
+
+# Only notify on success (skip error messages)
+@notify(on_error=False)
+def experimental_step():
+    ...
+```
+
+> **Note:** Exceptions are always re-raised after the error notification — `notify` never swallows errors. Network errors during notification are logged via loguru and never propagate.
+
+---
+
 ## Configuration
 
 ### Pipeline Configuration — Save & Replay
@@ -2242,6 +2370,7 @@ set_log_directory("/custom/logs")
 - matplotlib
 - seaborn
 - loguru
+- python-dotenv (Telegram notify decorator credential loading)
 
 ### Development Dependencies
 
@@ -2352,9 +2481,10 @@ This project uses:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-20 (4 new visualization features: SHAP, classifier comparison, seed stability, frequency band contribution)
+**Last Updated:** 2026-02-23 (Telegram notify decorator)
 
 **Recent Updates:**
+- **2026-02-23**: Added `notify` decorator — sends structured Telegram success/error messages with hostname, task name, timestamp, status, and elapsed time; supports file/photo attachments; credentials loaded from `.env` via python-dotenv
 - **2026-02-20**: Replaced `aggregate_evaluation_plots.py` and `utils/aggregate.py` with the new `MultiModelEvaluator` class — a single object for aggregate plots (`plot_all()`, `plot_roc()`, …) from a registry CSV and aggregate metrics (`get_aggregate_metrics()`, `save_aggregate_metrics()`) from per-seed JSON files; added `ModelEvaluator.save_metrics()` for per-seed JSON export; aggregate outputs now go to `figures/` (was `plots/`); `ModelEvaluator` and `MultiModelEvaluator` exported from top-level `eruption_forecast`
 - **2026-02-20**: Added 4 new visualization features — `plot_classifier_comparison` heatmap, `plot_shap_summary`/`plot_aggregate_shap_summary` (SHAP explainability, requires `shap>=0.46`), `plot_seed_stability` violin, `plot_frequency_band_contribution` bar chart; added `get_metrics_list()` to `MultiModelEvaluator`; `ModelEvaluator.plot_all()` now includes SHAP; `MultiModelEvaluator.plot_all()` now runs 10 plots
 - **2026-02-20**: Added per-seed `X_test`/`y_test` persistence in `train_and_evaluate()` (saved to `tests/` dir) and per-seed metrics JSON files (saved to `metrics/` dir); added 7 aggregate plot functions in `evaluation_plots.py`; all aggregate plots save both PNG and CSV data alongside the figure
