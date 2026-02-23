@@ -144,42 +144,49 @@ Raw Seismic Data (SDS / FDSN)
          │
          ▼
 ┌─────────────────────┐
-│   CalculateTremor   │  RSAM + DSAR + Shannon Entropy (10-min intervals)
+│   CalculateTremor   │  RSAM + DSAR → tremor.csv
 └─────────┬───────────┘
-          │  tremor.csv
+          │
           ▼
 ┌─────────────────────┐
-│    LabelBuilder     │  Binary labels (1 = eruption, 0 = normal)
+│    LabelBuilder     │  Binary labels → label_*.csv
 └─────────┬───────────┘
-          │  label_*.csv
+          │
           ▼
 ┌─────────────────────┐
-│ TremorMatrixBuilder │  Windowed tremor matrix aligned to labels
+│ TremorMatrixBuilder │  Windowed matrix → tremor_matrix_*.csv
 └─────────┬───────────┘
-          │  tremor_matrix_*.csv
+          │
           ▼
 ┌─────────────────────┐
-│   FeaturesBuilder   │  700+ tsfresh features per tremor column
+│   FeaturesBuilder   │  700+ features → all_extracted_features_*.csv
 └─────────┬───────────┘
-          │  all_extracted_features_*.csv
+          │
           ▼
-┌─────────────────────┐
-│   ModelTrainer      │  Multi-seed GridSearchCV training
-│  ┌───────────────┐  │
-│  │FeatureSelector│  │  tsfresh / RandomForest / combined
-│  └───────────────┘  │
-│  ┌───────────────┐  │
-│  │ClassifierModel│  │  10 classifiers, 3 CV strategies
-│  └───────────────┘  │
-└─────────┬───────────┘
-          │  trained_model_*.csv  +  *.pkl models
+┌─────────────────────────────────────────────┐
+│                 ModelTrainer                │
+│  ┌─────────────┐   ┌──────────────────────┐ │
+│  │FeatureSelect│   │   ClassifierModel    │ │
+│  │   or        │   │ (10 classifiers,     │ │
+│  │  combined   │   │  3 CV strategies)    │ │
+│  └─────────────┘   └──────────────────────┘ │
+│         ↓  train_and_evaluate()  ↓ train()  │
+│    80/20 split + metrics   Full dataset     │
+└─────────┬───────────────────────────────────┘
+          │  trained_model_*.csv  +  *.pkl
           ▼
-┌─────────────────────┐
-│   ModelPredictor    │  Evaluation or forecast on future data
-│  ┌───────────────┐  │
-│  │ModelEvaluator │  │  Metrics, plots, threshold analysis
-│  └───────────────┘  │
-└─────────────────────┘
+┌─────────────────────────────────────────────┐
+│               ModelPredictor                │
+│  ┌──────────────────────────────────────┐   │
+│  │ predict() / predict_best()           │   │
+│  │ (evaluation mode — requires labels)  │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │ predict_proba()                      │   │
+│  │ (forecast mode — no labels needed)   │   │
+│  └──────────────────────────────────────┘   │
+│  Single model or multi-model consensus      │
+└─────────────────────────────────────────────┘
 ```
 
 ## Installation
@@ -521,25 +528,26 @@ print(scores.head(10))
 Two training workflows are available depending on your evaluation strategy.
 
 ```
-train_and_evaluate() workflow:         train() workflow:
-
-Full Dataset                           Full Dataset
-     │                                      │
-     ▼                                      ▼
- 80/20 Split                          RandomUnderSampler
-     │                                 (full dataset)
-  ┌──┴──┐                                   │
-Train  Test                           Feature Selection
-  │     │                              (full dataset)
-RandomUnder                                 │
-Sampler                               GridSearchCV + CV
-  │                                         │
-Feature                               ┌─────┴──────┐
-Selection                          Save model  Save registry
-  │                                (.pkl)      (.csv)
-GridSearchCV + CV
-  │
-Evaluate on Test
+  train_and_evaluate()              train()
+  ─────────────────────            ─────────────────────
+  Full Dataset                     Full Dataset
+       │                                │
+       ▼                                ▼
+   80/20 Split                  RandomUnderSampler
+   (stratified)                  (full dataset)
+  ┌────┴────┐                          │
+Train     Test                  Feature Selection
+  │         │                    (full dataset)
+RandomUnder │                          │
+Sampler     │                    GridSearchCV
+  │         │                     + CV folds
+Feature     │                          │
+Selection   │                   ┌──────┴──────┐
+  │         │               model.pkl   registry.csv
+GridSearchCV│
+ + CV folds │
+  │         │
+Evaluate ◄──┘
   │
 Save model + metrics
 ```
@@ -644,7 +652,8 @@ without dropping down to `ModelTrainer`.
 | `number_of_significant_features` | `int` | `20` | Top-N features retained per seed and aggregated across seeds |
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |
 | `overwrite` | `bool` | `False` | Re-run even if output files already exist |
-| `n_jobs` | `int` | `1` | Parallel workers for multi-seed dispatch |
+| `n_jobs` | `int` | `1` | Parallel seed workers (outer loop). Pass `-1` to use all available cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
+| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension |
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 

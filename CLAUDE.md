@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-20_
+_Last updated: 2026-02-23_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -192,6 +192,7 @@ label_builder = LabelBuilder(
 **Key classes:**
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
   - `fit(with_evaluation=True)`: Dispatches to `train_and_evaluate()` or `train()` based on flag
+  - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count`. Uses `joblib.Parallel(backend="loky")` for nested-parallelism safety.
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`

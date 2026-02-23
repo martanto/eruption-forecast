@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-23 (Remove window_size from ForecastModel.forecast())
+**Last Updated:** 2026-02-23 (ModelTrainer parallelism overhaul)
 
 ## ⚠️ Important Notice
 
@@ -47,6 +47,7 @@ This software includes comprehensive disclaimers emphasizing its research-only p
 31. [ModelEvaluator Refactor + MultiModelEvaluator](#modelevaluator-refactor--multimodelevaluator-2026-02-20)
 32. [CalculateTremor.update() + Fix calculate() NaN Fallback](#calculatetremorUpdate--fix-calculate-nan-fallback-2026-02-20)
 33. [Multi-Classifier Support in ForecastModel.train()](#multi-classifier-support-in-forecastmodeltrain-2026-02-23)
+34. [ModelTrainer Parallelism Overhaul](#modeltrainer-parallelism-overhaul-2026-02-23)
 ---
 
 ## Package Overview
@@ -2900,3 +2901,38 @@ appropriate), Args, Returns, and Raises sections.
 - **`ForecastConfig`** (`pipeline_config.py`) — removed `window_size` field and its docstring entry. The config no longer serialises or deserialises `window_size` for the forecast stage.
 - **`forecast_model.py`** — removed `window_size=self.window_size` from the `ForecastConfig(...)` constructor call.
 - **`README.md`** — removed `window_size` from all `ForecastModel.forecast()` call examples (Quick Start, Advanced Usage, multi-classifier, resume-from-model, and manual `ForecastConfig` examples) and from the saved YAML example. `ModelPredictor.predict_proba()` examples are unchanged — that method still accepts `window_size` directly.
+
+---
+
+## ModelTrainer Parallelism Overhaul (2026-02-23)
+
+### Motivation
+
+The previous implementation used `multiprocessing.Pool.starmap` for dispatching training seeds in parallel, which caused two problems:
+1. `GridSearchCV` was hardcoded to `n_jobs=1` to avoid deadlocks — wasting available cores.
+2. `FeatureSelector` was initialised with `n_jobs=1` — tsfresh ran single-threaded per seed.
+3. Intel's scikit-learn extension (sklearnex) rejected the threading backend that joblib selected for inner calls.
+
+### Changes
+
+- **`model_trainer.py`**:
+  - Replaced `from multiprocessing import Pool` with `from joblib import Parallel, delayed`.
+  - `_run_jobs()` now uses `Parallel(n_jobs=self.n_jobs, backend="loky")` — the `loky` backend supports nested parallelism without deadlocks.
+  - Added `grid_search_n_jobs: int = 1` parameter — controls inner `GridSearchCV` and `FeatureSelector` parallelism per worker.
+  - `FeatureSelector` is now initialised with `n_jobs=grid_search_n_jobs` (not `n_jobs`) to avoid over-subscription.
+  - `_setup_grid_search()` wraps `grid_search.fit()` in `joblib.parallel_backend("loky")` to force the loky backend for inner calls — fixes the `'Threading' parallel backend is not supported` error from sklearnex.
+  - `validate()` enforces `n_jobs × grid_search_n_jobs ≤ os.cpu_count()` at construction time. Both `-1` (all cores) and positive integers are accepted; `-1` is resolved to `cpu_count` for the check.
+- **`README.md`** — added `grid_search_n_jobs` to the ModelTrainer constructor parameters table with description of the CPU budget constraint.
+
+### Usage
+
+```python
+# 14 cores: 14 seeds in parallel, 1 core per GridSearchCV (recommended for RF/XGB)
+ModelTrainer(..., n_jobs=14, grid_search_n_jobs=1)
+
+# 14 cores: 7 seeds in parallel, 2 cores per GridSearchCV
+ModelTrainer(..., n_jobs=7, grid_search_n_jobs=2)
+
+# Use all available cores automatically
+ModelTrainer(..., n_jobs=-1, grid_search_n_jobs=1)
+```
