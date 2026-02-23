@@ -19,6 +19,7 @@ from sklearn.model_selection import (
 )
 
 from eruption_forecast.logger import logger
+from eruption_forecast.model.constants import DEFAULT_GRID_PARAMS
 from eruption_forecast.utils.formatting import slugify_class_name
 
 
@@ -253,6 +254,10 @@ class ClassifierModel:
     def slug_name(self) -> str:
         """Get the slugified classifier name.
 
+        Converts the underlying classifier class name to lowercase kebab-case
+        by delegating to ``slugify_class_name``.  Useful for building
+        filesystem-safe output paths.
+
         Returns:
             str: Slugified version of the classifier class name (lowercase with hyphens).
 
@@ -266,6 +271,10 @@ class ClassifierModel:
     @property
     def slug_cv_name(self) -> str:
         """Get the slugified cross-validation strategy name.
+
+        Converts the CV splitter class name to lowercase kebab-case by
+        delegating to ``slugify_class_name``.  Useful for building
+        filesystem-safe output paths.
 
         Returns:
             str: Slugified version of the CV class name (lowercase with hyphens).
@@ -304,104 +313,51 @@ class ClassifierModel:
             return self._grid
 
         if self.classifier == "svm" or isinstance(self._model, SVC):
-            return {
-                "C": [0.001, 0.01, 0.1, 1, 10],
-                "kernel": ["poly", "rbf", "sigmoid"],
-                "degree": [2, 3, 4, 5],
-                "decision_function_shape": ["ovo", "ovr"],
-            }
+            return DEFAULT_GRID_PARAMS["svm"]
 
         if self.classifier == "knn" or isinstance(self._model, KNeighborsClassifier):
-            return {
-                "n_neighbors": [3, 6, 12, 24],
-                "weights": ["uniform", "distance"],
-                "p": [1, 2, 3],
-            }
+            return DEFAULT_GRID_PARAMS["knn"]
 
         if self.classifier == "dt" or isinstance(self._model, DecisionTreeClassifier):
-            return {
-                "max_depth": [3, 5, 7],
-                "criterion": ["gini", "entropy"],
-                "max_features": ["sqrt", "log2", None],
-            }
+            return DEFAULT_GRID_PARAMS["dt"]
+
+        if self.classifier == "lite-rf":
+            return DEFAULT_GRID_PARAMS["lite-rf"]
 
         if self.classifier == "rf" or isinstance(self._model, RandomForestClassifier):
-            return {
-                "n_estimators": [50, 100, 200],
-                "max_depth": [3, 5, 7],
-                "criterion": ["gini", "entropy"],
-                "max_features": ["sqrt", "log2", None],
-                "min_samples_split": [2, 5, 10],
-                "min_samples_leaf": [1, 2, 4],
-            }
+            return DEFAULT_GRID_PARAMS["rf"]
 
         if self.classifier == "gb" or isinstance(
             self._model, GradientBoostingClassifier
         ):
-            return {
-                "n_estimators": [50, 100, 200],
-                "max_depth": [3, 5, 7],
-                "learning_rate": [0.01, 0.1, 0.2],
-                "subsample": [0.8, 1.0],
-                "min_samples_split": [2, 5],
-                "min_samples_leaf": [1, 2],
-            }
+            return DEFAULT_GRID_PARAMS["gb"]
 
         if self.classifier == "xgb" or isinstance(self._model, XGBClassifier):
-            return {
-                "n_estimators": [100, 200, 300],
-                "max_depth": [3, 5, 7],
-                "learning_rate": [0.01, 0.1, 0.2],
-                "subsample": [0.8, 1.0],
-                "colsample_bytree": [0.8, 1.0],
-                "min_child_weight": [1, 3],
-                "scale_pos_weight": [1, 5, 10, 15],
-            }
+            return DEFAULT_GRID_PARAMS["xgb"]
 
         if self.classifier == "nn" or isinstance(self._model, MLPClassifier):
-            return {
-                "activation": ["identity", "logistic", "tanh", "relu"],
-                "hidden_layer_sizes": [(50,), (100,), (100, 50), (100, 100)],
-                "learning_rate_init": [0.001, 0.01],
-            }
+            return DEFAULT_GRID_PARAMS["nn"]
 
         if self.classifier == "nb" or isinstance(self._model, GaussianNB):
-            return {"var_smoothing": [1.0]}
+            return DEFAULT_GRID_PARAMS["nb"]
 
         if self.classifier == "lr" or isinstance(self._model, LogisticRegression):
-            return {
-                "penalty": ["l2", "l1", "elasticnet"],
-                "C": [0.001, 0.01, 0.1, 1, 10],
-                "solver": ["lbfgs", "saga"],
-                "l1_ratio": [0.15, 0.5, 0.85],
-            }
+            return DEFAULT_GRID_PARAMS["lr"]
 
         if self.classifier == "voting" or isinstance(self._model, VotingClassifier):
             # Grid for VotingClassifier ensemble
             # Parameters are prefixed with estimator name (e.g., rf__, gb__, etc.)
-            return {
-                "rf__n_estimators": [100, 200],
-                "rf__max_depth": [10, None],
-                "xgb__n_estimators": [50, 100],
-                "xgb__learning_rate": [0.05, 0.1],
-                "xgb__max_depth": [5, 7],
-            }
-
-        if self.classifier == "lite-rf" or isinstance(
-            self._model, RandomForestClassifier
-        ):
-            return {
-                "n_estimators": [10, 30, 100],
-                "max_depth": [3, 5, 7],
-                "criterion": ["gini", "entropy"],
-                "max_features": ["sqrt", "log2", None],
-            }
+            return DEFAULT_GRID_PARAMS["voting"]
 
         raise ValueError(f"Unknown classifier: {self.classifier}")
 
     @grid.setter
     def grid(self, grid: dict[str, Any]):
         """Set a custom hyperparameter grid, overriding the default.
+
+        Stores the provided grid in ``_grid`` so that subsequent calls to
+        ``self.grid`` return the custom values instead of the defaults.  Pass
+        ``None`` to ``_grid`` directly to revert to the default grid.
 
         Args:
             grid (dict[str, Any]): Custom hyperparameter grid for GridSearchCV.
@@ -549,6 +505,10 @@ class ClassifierModel:
     ):
         """Set a custom classifier instance, overriding the default.
 
+        Stores the estimator in ``_model`` so that subsequent calls to
+        ``self.model`` return the custom instance instead of constructing a new
+        default one.
+
         Args:
             model (SVC | KNeighborsClassifier | DecisionTreeClassifier |
                 RandomForestClassifier | GradientBoostingClassifier | XGBClassifier |
@@ -568,6 +528,9 @@ class ClassifierModel:
     def name(self) -> str:
         """Get the classifier class name.
 
+        Returns ``type(self.model).__name__``, prefixed with ``"Lite"`` when
+        the ``"lite-rf"`` classifier shorthand is active.
+
         Returns:
             str: The name of the classifier class (e.g., "RandomForestClassifier").
 
@@ -584,6 +547,10 @@ class ClassifierModel:
     @property
     def model_and_grid(self) -> tuple:
         """Get a (model, grid) tuple for use with GridSearchCV.
+
+        Convenience accessor that bundles ``self.model`` and ``self.grid`` into
+        a single tuple, allowing it to be unpacked directly into
+        ``GridSearchCV(*clf.model_and_grid, cv=...)``.
 
         Returns:
             tuple: A 2-tuple containing (classifier_instance, hyperparameter_grid).

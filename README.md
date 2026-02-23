@@ -261,7 +261,6 @@ fm.calculate(
 ).forecast(
     start_date="2025-07-28",         # Forecast period (future data)
     end_date="2025-08-04",
-    window_size=2,
     window_step=10,                  # 10-minute windows for real-time forecasting
     window_step_unit="minutes",
 )
@@ -1160,7 +1159,6 @@ model.calculate(
 ).forecast(
     start_date="2025-07-28",         # Future forecast period
     end_date="2025-08-04",
-    window_size=2,
     window_step=10,
     window_step_unit="minutes",
 )
@@ -1252,7 +1250,6 @@ print(model.trained_models)
 model.forecast(
     start_date="2025-07-28",
     end_date="2025-08-04",
-    window_size=2,
     window_step=10,
     window_step_unit="minutes",
 )
@@ -2066,7 +2063,6 @@ train:
 forecast:
   start_date: '2025-03-23'
   end_date: '2025-03-30'
-  window_size: 1
   window_step: 12
   window_step_unit: hours
 ```
@@ -2102,7 +2098,6 @@ fm = ForecastModel.load_model("output/VG.OJN.00.EHZ/forecast_model.pkl")
 fm.forecast(
     start_date="2025-04-01",
     end_date="2025-04-07",
-    window_size=1,
     window_step=12,
     window_step_unit="hours",
 )
@@ -2136,7 +2131,7 @@ config = PipelineConfig(
     train=TrainConfig(classifier="xgb", cv_strategy="stratified", total_seed=500),
     forecast=ForecastConfig(
         start_date="2025-03-23", end_date="2025-03-30",
-        window_size=1, window_step=12, window_step_unit="hours",
+        window_step=12, window_step_unit="hours",
     ),
 )
 

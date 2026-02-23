@@ -3,7 +3,7 @@
 **Project:** eruption-forecast — Volcanic Eruption Forecasting using Seismic Data Analysis
 **Repository:** D:\Projects\eruption-forecast
 **Branch:** `copilot/fix-all-docstrings`
-**Last Updated:** 2026-02-23 (Multi-classifier support in ForecastModel.train())
+**Last Updated:** 2026-02-23 (Remove window_size from ForecastModel.forecast())
 
 ## ⚠️ Important Notice
 
@@ -2889,3 +2889,14 @@ appropriate), Args, Returns, and Raises sections.
 
 - `uv run ruff check --fix src/` — all checks passed
 - `uvx ty check src/` — all checks passed
+
+---
+
+## Remove window_size from ForecastModel.forecast() (2026-02-23)
+
+### Changes
+
+- **`ForecastModel.forecast()`** (`forecast_model.py`) — removed `window_size` parameter; the method now uses `self.window_size` (set at `ForecastModel.__init__`) internally when calling `ModelPredictor.predict_proba()`.
+- **`ForecastConfig`** (`pipeline_config.py`) — removed `window_size` field and its docstring entry. The config no longer serialises or deserialises `window_size` for the forecast stage.
+- **`forecast_model.py`** — removed `window_size=self.window_size` from the `ForecastConfig(...)` constructor call.
+- **`README.md`** — removed `window_size` from all `ForecastModel.forecast()` call examples (Quick Start, Advanced Usage, multi-classifier, resume-from-model, and manual `ForecastConfig` examples) and from the saved YAML example. `ModelPredictor.predict_proba()` examples are unchanged — that method still accepts `window_size` directly.
