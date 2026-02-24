@@ -7,7 +7,7 @@ per classifier, and produces side-by-side comparison plots and a ranking table.
 
 import os
 import json
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import numpy as np
 import pandas as pd
@@ -569,12 +569,15 @@ class ClassifierComparator:
         clf_name = list(self._evaluators.keys())[row]
 
         if vals:
-            parts = ax.violinplot(
-                [vals],
-                positions=[1],
-                showmeans=False,
-                showmedians=True,
-                showextrema=True,
+            parts = cast(
+                dict[str, Any],
+                ax.violinplot(
+                    [vals],
+                    positions=[1],
+                    showmeans=False,
+                    showmedians=True,
+                    showextrema=True,
+                ),
             )
             parts["bodies"][0].set_facecolor(color)
             parts["bodies"][0].set_alpha(0.55)
