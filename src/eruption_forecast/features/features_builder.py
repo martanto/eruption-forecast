@@ -421,8 +421,21 @@ class FeaturesBuilder:
                 index=y[ID_COLUMN].values,
             )
 
-            # Extract Relevant Features
-            extracted_features = extract_relevant_features(df, y_series, **extract_params)
+            df = df[df["id"].isin(y_series.index)]
+
+            # Ensure tremor unified IDs has the sama ID with y_series
+            length_unique_id = len(df["id"].unique())
+            if len(y_series.index) != length_unique_id:
+                error_message = (
+                    "IDs in tremor matrix unified is not the samw with ID from labels."
+                )
+                logger.error(error_message)
+                raise ValueError(error_message)
+
+            # Extract features
+            extracted_features = extract_relevant_features(
+                df, y_series, **extract_params
+            )
         else:
             extracted_features = tsfresh_extract_features(
                 df,
