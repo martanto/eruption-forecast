@@ -70,7 +70,103 @@ def _escape_md(text: str) -> str:
     return "".join(f"\\{ch}" if ch in reserved else ch for ch in text)
 
 
-def _send_telegram_message(token: str, chat_id: str | int, text: str) -> None:
+def _error_message(
+    hostname: str,
+    display_name: str,
+    timestamp: str,
+    exc: Exception,
+    elapsed: float | None = None,
+) -> str:
+    """Build a MarkdownV2-formatted error notification message.
+
+    Assembles the standard error notification body used when the decorated
+    function raises an exception. Optionally appends an elapsed-time line
+    when ``elapsed`` is provided.
+
+    Args:
+        hostname (str): Machine hostname shown in the Host field.
+        display_name (str): Task label shown in the Task field.
+        timestamp (str): Pre-formatted timestamp string for the Time field.
+        exc (Exception): The exception that was raised.
+        elapsed (float | None): Elapsed seconds to append, or None to omit. Defaults to None.
+
+    Returns:
+        str: Complete MarkdownV2 message string, truncated to 4096 characters.
+    """
+    lines = [
+        "🖥 *Host:*",
+        f"`{_escape_md(hostname)}`",
+        "",
+        "📋 *Task:*",
+        f"`{_escape_md(display_name)}`",
+        "",
+        "🕐 *Time:*",
+        f"`{timestamp}`",
+        "",
+        "❌ *Status:*",
+        f"raised `{_escape_md(type(exc).__name__)}`",
+        "",
+        "💬 *Message:*",
+        f"`{_escape_md(str(exc))}`",
+    ]
+    if elapsed is not None:
+        lines += [
+            "",
+            "⏱ *Elapsed:*",
+            f"`{_escape_md(_format_elapsed(elapsed))}`",
+        ]
+    return _truncate("\n".join(lines))
+
+
+def _success_message(
+    hostname: str,
+    display_name: str,
+    timestamp: str,
+    elapsed: float | None = None,
+) -> str:
+    """Build a MarkdownV2-formatted success notification message.
+
+    Assembles the standard success notification body used when the decorated
+    function returns normally. Optionally appends an elapsed-time line
+    when ``elapsed`` is provided.
+
+    Args:
+        hostname (str): Machine hostname shown in the Host field.
+        display_name (str): Task label shown in the Task field.
+        timestamp (str): Pre-formatted timestamp string for the Time field.
+        elapsed (float | None): Elapsed seconds to append, or None to omit. Defaults to None.
+
+    Returns:
+        str: Complete MarkdownV2 message string, truncated to 4096 characters.
+    """
+    lines = [
+        "🖥 *Host:*",
+        f"`{_escape_md(hostname)}`",
+        "",
+        "📋 *Task:*",
+        f"`{_escape_md(display_name)}`",
+        "",
+        "🕐 *Time:*",
+        f"`{timestamp}`",
+        "",
+        "✅ *Status:*",
+        "finished successfully\\.",
+        "",
+        "💬 *Message:*",
+        "Function completed without errors\\.",
+    ]
+    if elapsed is not None:
+        lines += [
+            "",
+            "⏱ *Elapsed:*",
+            f"`{_escape_md(_format_elapsed(elapsed))}`",
+        ]
+    return _truncate("\n".join(lines))
+
+
+def _send_telegram_message(
+    token: str, chat_id: str | int, text: str, timeout: float = 10.0
+) -> None:
     """Send a text message to a Telegram chat via the Bot API.
 
     Posts the given text to the specified Telegram chat using the sendMessage
@@ -81,6 +177,7 @@ def _send_telegram_message(token: str, chat_id: str | int, text: str) -> None:
         token (str): Telegram bot token obtained from BotFather.
         chat_id (str | int): Telegram chat ID or username to send the message to.
         text (str): The message body to send (max 4096 characters).
+        timeout (float): Socket timeout in seconds for the HTTP request. Defaults to 10.0.
     """
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = json.dumps(
@@ -90,14 +187,14 @@ def _send_telegram_message(token: str, chat_id: str | int, text: str) -> None:
         url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=10):
+        with urllib.request.urlopen(req, timeout=timeout):
             pass
     except urllib.error.URLError as exc:
         logger.warning(f"Telegram notification failed: {exc}")
 
 
 def _send_telegram_file(
-    token: str, chat_id: str | int, path: Path, caption: str = ""
+    token: str, chat_id: str | int, path: Path, caption: str = "", timeout: float = 30.0
 ) -> None:
     """Send a single file or photo to a Telegram chat via the Bot API.
 
@@ -110,6 +207,7 @@ def _send_telegram_file(
         chat_id (str | int): Target chat ID or username.
         path (Path): Local filesystem path to the file to upload.
         caption (str): Optional caption to attach to the file. Defaults to "".
+        timeout (float): Socket timeout in seconds for the HTTP request. Defaults to 30.0.
     """
     if not path.exists():
         logger.warning(f"Telegram notify: file not found, skipping: {path}")
@@ -165,18 +263,19 @@ def _send_telegram_file(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=30):
+        with urllib.request.urlopen(req, timeout=timeout):
             pass
     except urllib.error.URLError as exc:
         logger.warning(f"Telegram file send failed for {path.name}: {exc}")
 
 
 def notify(
-    bot_token: str | None = None,
-    chat_id: str | int | None = None,
     name: str | None = None,
     on_success: bool = True,
     on_error: bool = True,
+    timeout: float = 10.0,
+    bot_token: str | None = None,
+    chat_id: str | int | None = None,
     include_elapsed: bool = True,
     files: list[str | Path] | Callable[[Any], list[str | Path]] | None = None,
 ):
@@ -192,16 +291,18 @@ def notify(
     ``TELEGRAM_CHAT_ID`` (populated via a ``.env`` file using python-dotenv).
 
     Args:
-        bot_token (str | None): Telegram bot token. Falls back to the
-            ``TELEGRAM_BOT_TOKEN`` environment variable. Defaults to None.
-        chat_id (str | int | None): Telegram chat ID or username. Falls back
-            to the ``TELEGRAM_CHAT_ID`` environment variable. Defaults to None.
         name (str | None): Display name used in messages. Defaults to the
             decorated function's ``__name__``.
         on_success (bool): Whether to send a notification on successful
             completion. Defaults to True.
         on_error (bool): Whether to send a notification when an exception is
             raised. Defaults to True.
+        timeout (float): Socket timeout in seconds passed to the Telegram HTTP
+            requests. Defaults to 10.0.
+        bot_token (str | None): Telegram bot token. Falls back to the
+            ``TELEGRAM_BOT_TOKEN`` environment variable. Defaults to None.
+        chat_id (str | int | None): Telegram chat ID or username. Falls back
+            to the ``TELEGRAM_CHAT_ID`` environment variable. Defaults to None.
         include_elapsed (bool): Whether to append elapsed time to messages.
             Defaults to True.
         files (list[str | Path] | Callable[[Any], list[str | Path]] | None):
@@ -215,6 +316,7 @@ def notify(
     Raises:
         ValueError: If ``bot_token`` or ``chat_id`` cannot be resolved from
             arguments or environment variables at decoration time.
+        ValueError: If ``bot_token`` or ``chat_id`` contains whitespace.
 
     Examples:
         >>> @notify(bot_token="TOKEN", chat_id="123", name="Training")
@@ -238,9 +340,18 @@ def notify(
         raise ValueError(
             "notify: bot_token not provided and TELEGRAM_BOT_TOKEN not set in environment."
         )
+    if any(c.isspace() for c in resolved_token):
+        raise ValueError(
+            f"notify: bot_token contains whitespace — got {resolved_token!r}. "
+            "Ensure TELEGRAM_BOT_TOKEN is set to the raw token from BotFather."
+        )
     if not resolved_chat:
         raise ValueError(
             "notify: chat_id not provided and TELEGRAM_CHAT_ID not set in environment."
+        )
+    if isinstance(resolved_chat, str) and any(c.isspace() for c in resolved_chat):
+        raise ValueError(
+            f"notify: chat_id contains whitespace — got {resolved_chat!r}."
         )
 
     hostname = socket.gethostname()
@@ -274,32 +385,15 @@ def notify(
             except Exception as exc:
                 elapsed = time.perf_counter() - start
                 if on_error:
-                    lines = [
-                        "🖥 *Host:*",
-                        f"`{_escape_md(hostname)}`",
-                        "",
-                        "📋 *Task:*",
-                        f"`{_escape_md(display_name)}`",
-                        "",
-                        "🕐 *Time:*",
-                        f"`{timestamp}`",
-                        "",
-                        "❌ *Status:*",
-                        f"raised `{_escape_md(type(exc).__name__)}`",
-                        "",
-                        "💬 *Message:*",
-                        f"`{_escape_md(str(exc))}`",
-                    ]
-                    if include_elapsed:
-                        lines += [
-                            "",
-                            "⏱ *Elapsed:*",
-                            f"`{_escape_md(_format_elapsed(elapsed))}`",
-                        ]
+                    msg = _error_message(
+                        hostname,
+                        display_name,
+                        timestamp,
+                        exc,
+                        elapsed if include_elapsed else None,
+                    )
                     try:
-                        _send_telegram_message(
-                            resolved_token, resolved_chat, _truncate("\n".join(lines))
-                        )
+                        _send_telegram_message(resolved_token, resolved_chat, msg, timeout)
                     except Exception as notify_exc:
                         logger.warning(
                             f"Failed to send error notification: {notify_exc}"
@@ -308,32 +402,14 @@ def notify(
 
             elapsed = time.perf_counter() - start
             if on_success:
-                lines = [
-                    "🖥 *Host:*",
-                    f"`{_escape_md(hostname)}`",
-                    "",
-                    "📋 *Task:*",
-                    f"`{_escape_md(display_name)}`",
-                    "",
-                    "🕐 *Time:*",
-                    f"`{timestamp}`",
-                    "",
-                    "✅ *Status:*",
-                    "finished successfully\\.",
-                    "",
-                    "💬 *Message:*",
-                    "Function completed without errors\\.",
-                ]
-                if include_elapsed:
-                    lines += [
-                        "",
-                        "⏱ *Elapsed:*",
-                        f"`{_escape_md(_format_elapsed(elapsed))}`",
-                    ]
+                msg = _success_message(
+                    hostname,
+                    display_name,
+                    timestamp,
+                    elapsed if include_elapsed else None,
+                )
                 try:
-                    _send_telegram_message(
-                        resolved_token, resolved_chat, _truncate("\n".join(lines))
-                    )
+                    _send_telegram_message(resolved_token, resolved_chat, msg, timeout)
                 except Exception as notify_exc:
                     logger.warning(f"Failed to send success notification: {notify_exc}")
 
@@ -344,7 +420,9 @@ def notify(
                             files(result) if callable(files) else files
                         )
                         for fp in resolved_files:
-                            _send_telegram_file(resolved_token, resolved_chat, Path(fp))
+                            _send_telegram_file(
+                                resolved_token, resolved_chat, Path(fp), timeout=timeout
+                            )
                     except Exception as file_exc:
                         logger.warning(f"Failed to send attached files: {file_exc}")
 
@@ -360,6 +438,8 @@ __all__ = [
     "_format_elapsed",
     "_truncate",
     "_escape_md",
+    "_error_message",
+    "_success_message",
     "_send_telegram_message",
     "_send_telegram_file",
 ]
