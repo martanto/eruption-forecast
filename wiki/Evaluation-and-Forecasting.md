@@ -1,9 +1,10 @@
 # Evaluation and Forecasting
 
-This page covers how to evaluate trained models and run inference on new seismic data. Three classes are involved:
+This page covers how to evaluate trained models and run inference on new seismic data. Four classes are involved:
 
 - **`ModelEvaluator`** — evaluates a single trained model (one seed) against a held-out test set.
 - **`MultiModelEvaluator`** — aggregates metrics and plots across all seeds produced by `train_and_evaluate()`.
+- **`ClassifierComparator`** — compares multiple classifiers side-by-side with ranking tables and comparison plots.
 - **`ModelPredictor`** — runs inference using models trained by `ModelTrainer.train()`, in either evaluation or forecast mode.
 
 ---
@@ -218,6 +219,120 @@ path = evaluator.save_aggregate_metrics()
 
 # Or specify an explicit output path
 path = evaluator.save_aggregate_metrics("my_summary.csv")
+```
+
+---
+
+## ClassifierComparator — Side-by-Side Comparison
+
+`ClassifierComparator` accepts a mapping of classifier names to trained-model registry CSV paths, builds one `MultiModelEvaluator` per classifier, and generates cross-classifier comparison plots and a ranking table.
+
+### Constructor
+
+```python
+from eruption_forecast.model import ClassifierComparator
+
+comparator = ClassifierComparator(
+    classifiers={
+        "rf":  "output/.../trainings/model-with-evaluation/rf/stratified/trained_model_rf_...csv",
+        "xgb": "output/.../trainings/model-with-evaluation/xgb/stratified/trained_model_xgb_...csv",
+        "gb":  "output/.../trainings/model-with-evaluation/gb/stratified/trained_model_gb_...csv",
+    },
+    output_dir="output/comparison",   # optional — defaults to cwd/output/comparison
+    metrics=["f1_score", "roc_auc"],  # optional — defaults to all DEFAULT_METRICS
+)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `classifiers` | `dict[str, str]` | required | Classifier name → trained-model registry CSV path |
+| `output_dir` | `str \| None` | `None` | Root output directory; defaults to `cwd/output/comparison/` |
+| `metrics` | `str \| list[str] \| None` | `None` | Metrics for plots and ranking; `None` uses all `DEFAULT_METRICS` |
+
+`DEFAULT_METRICS`: `f1_score`, `roc_auc`, `pr_auc`, `balanced_accuracy`, `precision`, `recall`, `specificity`, `sensitivity`.
+
+Each CSV path must exist on disk. A `FileNotFoundError` is raised otherwise. The companion `metrics/` directory (sibling to each registry CSV) is detected automatically for per-seed JSON metrics.
+
+Alternatively, load classifiers from a JSON file using the `from_json` classmethod:
+
+```python
+# trained_models.json — {"ClassifierName": "/path/to/trained_model_*.csv", ...}
+comparator = ClassifierComparator.from_json(
+    "output/VG.OJN.00.EHZ/trained_models.json",
+    output_dir="output/comparison",
+    metrics=["f1_score", "roc_auc"],
+)
+```
+
+### Metrics table
+
+```python
+# Wide DataFrame: one row per classifier, columns like f1_score_mean / f1_score_std
+table = comparator.get_metrics_table()
+print(table[["f1_score_mean", "f1_score_std", "roc_auc_mean"]])
+```
+
+### Ranking
+
+Ranks classifiers by a single metric (default: `recall`) and saves one CSV.
+
+```python
+# Sorted descending by mean recall; saved to metrics/ranking_recall.csv
+ranking = comparator.get_ranking()
+
+# Custom metric
+ranking = comparator.get_ranking(metric="roc_auc", by="mean")
+print(ranking.head())
+```
+
+### Comparison plots
+
+Each plot method returns a `dict[str, plt.Figure]` keyed by metric name. When more than one metric is requested, an additional `"all"` key contains a combined subplot grid (max 4 columns per row).
+
+| Method | Returns | Saved filenames |
+|--------|---------|-----------------|
+| `plot_metric_bar(metrics)` | `dict[str, Figure]` | `metric_bar_{metric}.png` per metric + `metric_bar_all.png` |
+| `plot_seed_stability(metrics)` | `dict[str, Figure]` | `seed_stability_{metric}.png` per metric + `seed_stability_all.png` |
+| `plot_comparison_grid(metrics)` | `Figure` | `comparison_grid.png` |
+| `plot_roc()` | `Figure` | `comparison_roc.png` |
+| `plot_all()` | `dict[str, Any]` | all of the above |
+
+```python
+# Individual plot methods
+figs_bar = comparator.plot_metric_bar(metrics=["f1_score", "roc_auc"])
+# figs_bar == {"f1_score": Figure, "roc_auc": Figure, "all": Figure}
+
+figs_violin = comparator.plot_seed_stability(metrics=["f1_score", "roc_auc"])
+# figs_violin == {"f1_score": Figure, "roc_auc": Figure, "all": Figure}
+
+# All plots at once
+results = comparator.plot_all(dpi=150)
+# results == {
+#     "metric_bar":      dict[str, Figure],   # one per metric + "all"
+#     "seed_stability":  dict[str, Figure],   # one per metric + "all"
+#     "comparison_grid": Figure,
+#     "roc":             Figure,
+#     "ranking":         DataFrame,           # ranked by recall
+# }
+```
+
+Figures are saved to `{output_dir}/figures/` and the ranking CSV to `{output_dir}/metrics/`.
+
+### Output structure
+
+```
+output/comparison/
+├── figures/
+│   ├── metric_bar_f1_score.png
+│   ├── metric_bar_roc_auc.png
+│   ├── metric_bar_all.png
+│   ├── seed_stability_f1_score.png
+│   ├── seed_stability_roc_auc.png
+│   ├── seed_stability_all.png
+│   ├── comparison_grid.png
+│   └── comparison_roc.png
+└── metrics/
+    └── ranking_recall.csv
 ```
 
 ---

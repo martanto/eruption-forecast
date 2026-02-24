@@ -148,30 +148,64 @@ figs = ev.plot_all(dpi=150, show_individual=True)
 
 ---
 
-## Classifier Comparison Heatmap
+## Classifier Comparison Plots (`ClassifierComparator`)
 
-Compare metrics across multiple classifiers. Each cell shows `mean ± std`; rows sorted by mean F1 descending.
+`ClassifierComparator` provides four ready-made comparison plots across multiple classifiers.
 
 ```python
-from eruption_forecast import MultiModelEvaluator
-from eruption_forecast.plots import plot_classifier_comparison
+from eruption_forecast.model import ClassifierComparator
 
+# From a dict
 base = "output/trainings/model-with-evaluation"
-metrics_by_clf = {}
-for clf in ["xgb", "rf", "gb"]:
-    ev = MultiModelEvaluator(
-        metrics_dir=f"{base}/{clf}-classifier/stratified-shuffle-split/metrics"
-    )
-    metrics_by_clf[clf] = ev.get_metrics_list()
-
-fig, summary_df = plot_classifier_comparison(
-    metrics_by_classifier=metrics_by_clf,
-    metrics_to_show=["balanced_accuracy", "f1_score", "precision", "recall", "roc_auc", "pr_auc"],
-    figsize=(12, 5),
-    dpi=150,
+comparator = ClassifierComparator(
+    classifiers={
+        "rf":  f"{base}/rf/stratified/trained_model_rf_...csv",
+        "xgb": f"{base}/xgb/stratified/trained_model_xgb_...csv",
+        "gb":  f"{base}/gb/stratified/trained_model_gb_...csv",
+    },
+    output_dir="output/comparison",
+    metrics=["f1_score", "roc_auc", "recall"],  # or None for all DEFAULT_METRICS
 )
-fig.savefig("classifier_comparison.png", bbox_inches="tight")
+
+# From a JSON file  {"ClassifierName": "/path/to/trained_model_*.csv", ...}
+comparator = ClassifierComparator.from_json(
+    "output/VG.OJN.00.EHZ/trained_models.json",
+    output_dir="output/comparison",
+    metrics=["f1_score", "roc_auc", "recall"],
+)
+
+# Bar chart per metric (mean ± std) — plus a combined "all" overview figure
+figs_bar = comparator.plot_metric_bar()
+# {"f1_score": Figure, "roc_auc": Figure, "recall": Figure, "all": Figure}
+
+# Violin + strip of per-seed distributions per metric — plus combined "all" figure
+figs_violin = comparator.plot_seed_stability()
+# {"f1_score": Figure, "roc_auc": Figure, "recall": Figure, "all": Figure}
+
+# Grid of subplots: rows = classifiers, columns = metrics
+fig_grid = comparator.plot_comparison_grid()
+
+# Overlaid mean ROC curves with ± std bands
+fig_roc = comparator.plot_roc()
+
+# All plots + ranking in one call
+results = comparator.plot_all()
+# results["metric_bar"]      → dict[str, Figure]
+# results["seed_stability"]  → dict[str, Figure]
+# results["comparison_grid"] → Figure
+# results["roc"]             → Figure
+# results["ranking"]         → DataFrame (ranked by recall)
 ```
+
+Output files are written to `output/comparison/figures/` and the ranking CSV to
+`output/comparison/metrics/ranking_recall.csv`.
+
+| Plot method | Saved files |
+|-------------|-------------|
+| `plot_metric_bar()` | `metric_bar_{metric}.png` per metric + `metric_bar_all.png` |
+| `plot_seed_stability()` | `seed_stability_{metric}.png` per metric + `seed_stability_all.png` |
+| `plot_comparison_grid()` | `comparison_grid.png` |
+| `plot_roc()` | `comparison_roc.png` |
 
 ---
 

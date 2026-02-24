@@ -226,6 +226,54 @@ ev = MultiModelEvaluator(
 
 ---
 
+## ClassifierComparator
+
+Compare multiple classifiers side-by-side with ranking tables and comparison plots.
+
+```python
+from eruption_forecast.model import ClassifierComparator
+```
+
+### Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `classifiers` | `dict[str, str]` | required | Mapping of classifier name → trained-model registry CSV path |
+| `output_dir` | `str \| None` | `None` | Root output directory (defaults to `cwd/output/comparison/`) |
+| `metrics` | `str \| list[str] \| None` | `None` | Metrics for plots; `None` uses all `DEFAULT_METRICS` |
+
+```python
+# From a dict
+comparator = ClassifierComparator(
+    classifiers={
+        "rf":  "output/.../trained_model_rf_...csv",
+        "xgb": "output/.../trained_model_xgb_...csv",
+    },
+    metrics=["f1_score", "roc_auc"],  # or None for all DEFAULT_METRICS
+)
+
+# From a JSON file  {name: csv_path, ...}
+comparator = ClassifierComparator.from_json(
+    "output/VG.OJN.00.EHZ/trained_models.json",
+    metrics=["f1_score", "roc_auc"],
+)
+```
+
+### Key Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `ClassifierComparator.from_json(json_path, output_dir, metrics)` | `Self` | Load classifiers from a JSON file and construct instance |
+| `get_metrics_table()` | `pd.DataFrame` | Aggregate metrics for all classifiers (one row per classifier) |
+| `get_ranking(metric, by)` | `pd.DataFrame` | Sorted ranking with rank column; default metric `"recall"`; saved to `metrics/ranking_{metric}.csv` |
+| `plot_metric_bar(metrics, save, filename, dpi)` | `dict[str, Figure]` | Bar chart per metric (mean ± std) + `"all"` overview; saved to `figures/metric_bar_{metric}.png` + `metric_bar_all.png` |
+| `plot_seed_stability(metrics, save, filename, dpi)` | `dict[str, Figure]` | Violin + strip per metric + `"all"` overview; saved to `figures/seed_stability_{metric}.png` + `seed_stability_all.png` |
+| `plot_comparison_grid(metrics, save, filename, dpi)` | `Figure` | Grid of subplots (rows = classifiers, cols = metrics); saved to `figures/comparison_grid.png` |
+| `plot_roc(save, filename, dpi, show_individual)` | `Figure` | Overlaid mean ROC curves with ± std bands; saved to `figures/comparison_roc.png` |
+| `plot_all(dpi)` | `dict[str, Any]` | All plots + ranking; keys: `metric_bar`, `seed_stability`, `comparison_grid`, `roc`, `ranking` |
+
+---
+
 ## FeatureSelector
 
 ```python
