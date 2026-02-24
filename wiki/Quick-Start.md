@@ -93,7 +93,7 @@ fm.calculate(
 | `calculate()` | Reads SDS/FDSN waveforms, computes RSAM, DSAR, and Shannon Entropy per frequency band | `tremor/tremor_*.csv` |
 | `build_label()` | Slides windows over the date range, labels windows near eruptions as positive | `label_*.csv` |
 | `extract_features()` | Aligns tremor to label windows, runs tsfresh, selects top features | `features/all_extracted_features_*.csv` |
-| `train()` | Resamples for class balance, runs GridSearchCV per seed, saves each model | `trainings/model-only/.../` |
+| `train()` | Resamples for class balance, runs GridSearchCV per seed, saves each model | `trainings/predictions/.../` |
 | `forecast()` | Extracts features from future tremor, loads all 500 models, outputs probability per window | `forecast/predictions.csv` |
 
 ---

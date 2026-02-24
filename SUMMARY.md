@@ -420,7 +420,7 @@ Three selection strategies available in `eruption_forecast.features.FeatureSelec
 
 | Date | Category | Changes |
 |------|----------|---------|
-| 2026-02-15 | **Output directory restructure + docstring fixes** | Restructured ModelTrainer output into model-with-evaluation/ and model-only/ by classifier-slug/cv-slug. Added get_classifier_properties(), update_directories(). Added with_evaluation/grid_params to ForecastModel.train(). Added slugify_class_name() to utils.py. Fixed get_metrics() param rename. Fixed docstring typos. |
+| 2026-02-15 | **Output directory restructure + docstring fixes** | Restructured ModelTrainer output into evaluations/ and predictions/ by classifier-slug/cv-slug. Added get_classifier_properties(), update_directories(). Added with_evaluation/grid_params to ForecastModel.train(). Added slugify_class_name() to utils.py. Fixed get_metrics() param rename. Fixed docstring typos. |
 | 2026-02-13 | **README overhaul** | Rewrote README from scratch: added XGBoost classifier section, detailed hyperparameter grids with collapsible blocks, corrected output directory structure (classifier/{ClassName}/{cv_strategy}/models\|metrics), added `fit()` + `ModelPredictor` workflow, `optimize_threshold()` usage, and comprehensive A-to-Z step-by-step guide. Updated SUMMARY.md classifier count (9 → 10) and VotingClassifier composition (now RF + XGBoost). |
 | 2026-02-13 | **Imbalance-aware improvements** | Fixed `_train()` skip-logic bug (spurious `or not save_features` check). Expanded RF/NN/LR grids; added `scale_pos_weight=[1,5,10,15]` to XGB grid; removed hardcoded `scale_pos_weight=1`. Added `class_weight`/`n_jobs` params to `ClassifierModel`. Added `optimize_threshold()`, `plot_threshold_analysis()`, `plot_feature_importance()`, `plot_calibration()`, `plot_prediction_distribution()` to `ModelEvaluator`; `get_metrics()` now includes optimal-threshold fields. |
 | 2026-02-12 | **Simplify ModelEvaluator** | Rewrote from scratch: removed Protocol classes, X_train/y_train, all export_* methods, cross_validate, learning curve, feature importances, and as_dataframe flag. Kept core: `__init__`, `from_files()`, `get_metrics()`, `summary()`, three plot methods, `plot_all()`. ModelPredictor: dropped `save_reports` param. |
@@ -640,7 +640,7 @@ Restructured `ModelTrainer` output directories and updated `ForecastModel.train(
 
 | Component | Change |
 |-----------|--------|
-| `ModelTrainer` output | Reorganised into `model-with-evaluation/` and `model-only/` subdirectories, each further split by `{classifier-slug}/{cv-slug}/` |
+| `ModelTrainer` output | Reorganised into `evaluations/` and `predictions/` subdirectories, each further split by `{classifier-slug}/{cv-slug}/` |
 | `ModelTrainer` | Added `get_classifier_properties()` — returns classifier name, slug, and ID; added `update_directories()` — recalculates all output paths after classifier changes |
 | `ForecastModel.train()` | Added `with_evaluation: bool` parameter (dispatches to `train_and_evaluate()` or `train()`); added `grid_params` parameter for custom hyperparameter overrides |
 | `utils.py` | Added `slugify_class_name()` — converts PascalCase class names to kebab-case slugs (e.g. `XGBClassifier` → `xgb-classifier`) |
@@ -651,7 +651,7 @@ Restructured `ModelTrainer` output directories and updated `ForecastModel.train(
 
 ```
 trainings/
-├── model-with-evaluation/      ← train_and_evaluate()
+├── evaluations/      ← train_and_evaluate()
 │   └── {classifier-slug}/      e.g. xgb-classifier
 │       └── {cv-slug}/          e.g. stratified-shuffle-split
 │           ├── features/
@@ -661,7 +661,7 @@ trainings/
 │           ├── all_metrics_{suffix}.csv
 │           └── metrics_summary_{suffix}.csv
 │
-└── model-only/                 ← train()
+└── predictions/                 ← train()
     └── {classifier-slug}/
         └── {cv-slug}/
             ├── features/
@@ -2950,7 +2950,7 @@ Full audit and alignment of `README.md` YAML examples against `pipeline_config.p
 
 **`README.md`**
 - Added `lite-rf` classifier row to Section 7 Supported Classifiers table (same as `rf` but smaller hyperparameter grid)
-- Rewrote Output Directory Structure to match actual code paths: `tmp/` → `daily/`, added `tremor/figures/`, moved `tests/` inside `features/`, expanded `model-only/` substructure, renamed `top_20_` → `top_{n}_`
+- Rewrote Output Directory Structure to match actual code paths: `tmp/` → `daily/`, added `tremor/figures/`, moved `tests/` inside `features/`, expanded `predictions/` substructure, renamed `top_20_` → `top_{n}_`
 - Expanded all 6 YAML config blocks to show complete field lists with inline comments
 
 **`src/eruption_forecast/config/pipeline_config.py`**

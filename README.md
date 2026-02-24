@@ -371,9 +371,9 @@ from eruption_forecast.model import ClassifierComparator
 # From a dict
 comparator = ClassifierComparator(
     classifiers={
-        "rf":  "output/.../trainings/model-with-evaluation/rf/stratified/trained_model_rf_...csv",
-        "xgb": "output/.../trainings/model-with-evaluation/xgb/stratified/trained_model_xgb_...csv",
-        "gb":  "output/.../trainings/model-with-evaluation/gb/stratified/trained_model_gb_...csv",
+        "rf":  "output/.../trainings/evaluations/rf/stratified/trained_model_rf_...csv",
+        "xgb": "output/.../trainings/evaluations/xgb/stratified/trained_model_xgb_...csv",
+        "gb":  "output/.../trainings/evaluations/gb/stratified/trained_model_gb_...csv",
     },
     metrics=["f1_score", "roc_auc", "recall"],  # or None for all DEFAULT_METRICS
 )
@@ -455,8 +455,8 @@ output/
     ├── tremor/          # Merged tremor CSVs + daily plots
     ├── features/        # Extracted features + aligned labels
     └── trainings/
-        ├── model-with-evaluation/   # Output of train_and_evaluate()
-        └── model-only/              # Output of train()
+        ├── evaluations/   # Output of train_and_evaluate()
+        └── predictions/              # Output of train()
 ```
 
 > Full directory tree with all sub-paths: [docs/output-structure.md](docs/output-structure.md)

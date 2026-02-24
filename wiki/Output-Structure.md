@@ -33,7 +33,7 @@ output/
     │
     ├── trainings/
     │   │
-    │   ├── model-with-evaluation/            # Output of train_and_evaluate()
+    │   ├── evaluations/            # Output of train_and_evaluate()
     │   │   └── {classifier-slug}/            # e.g., random-forest-classifier
     │   │       └── {cv-slug}/                # e.g., stratified-shuffle-split
     │   │           ├── features/
@@ -71,7 +71,7 @@ output/
     │   │           ├── all_metrics_{suffix}.csv      # All per-seed metrics
     │   │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
     │   │
-    │   └── model-only/                       # Output of train()
+    │   └── predictions/                       # Output of train()
     │       └── {classifier-slug}/
     │           └── {cv-slug}/
     │               ├── features/

@@ -255,7 +255,7 @@ class ModelTrainer:
             root_dir,
             os.path.join("output"),
         )
-        output_dir = os.path.join(output_dir, "trainings", "model-with-evaluation")
+        output_dir = os.path.join(output_dir, "trainings", "evaluations")
 
         # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
         classifier_dir = os.path.join(
@@ -473,7 +473,7 @@ class ModelTrainer:
         self.output_dir = resolve_output_dir(
             output_dir,
             root_dir,
-            os.path.join("output", "trainings", "model-with-evaluation"),
+            os.path.join("output", "trainings", "evaluations"),
         )
 
         # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
@@ -1313,7 +1313,7 @@ class ModelTrainer:
 
         # Since we are not using evaluation, we change the folder name from
         # ``model-with-evaluation`` to ``model-only``
-        output_dir = self.output_dir.replace("model-with-evaluation", "model-only")
+        output_dir = self.output_dir.replace("evaluations", "predictions")
 
         # Update current directories with new output directory
         self.update_directories(output_dir=output_dir)
