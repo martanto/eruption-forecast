@@ -371,16 +371,16 @@ from eruption_forecast.model import ClassifierComparator
 # From a dict
 comparator = ClassifierComparator(
     classifiers={
-        "rf":  "output/.../trainings/evaluations/rf/stratified/trained_model_rf_...csv",
+        "rf": "output/.../trainings/evaluations/rf/stratified/trained_model_rf_...csv",
         "xgb": "output/.../trainings/evaluations/xgb/stratified/trained_model_xgb_...csv",
-        "gb":  "output/.../trainings/evaluations/gb/stratified/trained_model_gb_...csv",
+        "gb": "output/.../trainings/evaluations/gb/stratified/trained_model_gb_...csv",
     },
     metrics=["f1_score", "roc_auc", "recall"],  # or None for all DEFAULT_METRICS
 )
 
 # Or from a JSON file  {"ClassifierName": "/path/to/trained_model_*.csv", ...}
 comparator = ClassifierComparator.from_json(
-    "output/VG.OJN.00.EHZ/trained_models.json",
+    "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
     metrics=["f1_score", "roc_auc", "recall"],
 )
 

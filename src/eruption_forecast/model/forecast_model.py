@@ -1091,7 +1091,7 @@ class ForecastModel:
         grid_search_n_jobs: int = 1,
         overwrite: bool = False,
         verbose: bool = False,
-    ) -> Self:
+    ) -> tuple[str, str]:
         """Train a single classifier and append results to instance state.
 
         Creates a ``ModelTrainer`` for the given classifier, optionally overrides
@@ -1126,7 +1126,7 @@ class ForecastModel:
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
 
         Returns:
-            Self: ForecastModel instance for method chaining.
+            tuple[str, str]: Classifier name and trained model CSV filepath
         """
         train_model = ModelTrainer(
             extracted_features_csv=features_csv,
@@ -1161,10 +1161,7 @@ class ForecastModel:
             }
         )
 
-        # Use in forecast()
-        self.trained_models[classifier_name] = trained_model_csv
-
-        return self
+        return classifier_name, trained_model_csv
 
     def train(
         self,
@@ -1233,7 +1230,7 @@ class ForecastModel:
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
             save_model (bool, optional): If True, serialises the full ``ForecastModel``
-                instance to ``{station_dir}/forecast_model.pkl`` via ``save_model()``.
+                instance to ``{station_dir}/trainings/{evaluations/predictions_dir}/forecast_model.pkl`` via ``save_model()``.
                 Defaults to True.
 
         Returns:
@@ -1306,8 +1303,9 @@ class ForecastModel:
         }
 
         # Train multi classifiers
+        trained_models: dict[str, str] = {}
         for _classifier in classifiers:
-            self._train_per_classifier(
+            classifier_name, trained_model_csv = self._train_per_classifier(
                 classifier=_classifier,
                 cv_strategy=cv_strategy,
                 features_csv=features_csv,
@@ -1322,11 +1320,25 @@ class ForecastModel:
                 overwrite=overwrite or self.overwrite,
                 verbose=verbose or self.verbose,
             )
+            trained_models[classifier_name] = trained_model_csv
 
-        # Save trained models csv
-        trained_models_filepath = os.path.join(self.station_dir, "trained_models.json")
+        prefix = "evaluations" if with_evaluation else "predictions"
+
+        # `<cwd>/output/<station_dir>/trainings/<prefix>
+        trainings_dir = os.path.join(output_dir, "trainings", prefix)
+        os.makedirs(trainings_dir, exist_ok=True)
+
+        # Save trained models JSON
+        # Example format:
+        # {
+        #     "RandomForestClassifier": "/path/to/trained_model_rf.csv",
+        #     "XGBClassifier": "/path/to/trained_model_xgb.csv"
+        # }
+        trained_models_filepath = os.path.join(
+            trainings_dir, f"{prefix}_trained_models.json"
+        )
         with open(trained_models_filepath, "w") as f:
-            json.dump(self.trained_models, f, indent=4)
+            json.dump(trained_models, f, indent=4)
 
         self._config.train = TrainConfig(
             classifiers=classifiers,
@@ -1346,11 +1358,13 @@ class ForecastModel:
             verbose=verbose,
         )
 
+        self.trained_models = trained_models
+
         if save_model:
-            self.save_config(os.path.join(self.station_dir, "config_train.yaml"))
+            self.save_config(os.path.join(trainings_dir, f"{prefix}_config.yaml"))
 
             self.save_model(
-                path=os.path.join(self.station_dir, "forecast_model_train.pkl")
+                path=os.path.join(trainings_dir, f"{prefix}_forecast_model.pkl")
             )
 
         return self
@@ -1364,6 +1378,7 @@ class ForecastModel:
         save_predictions: bool = True,
         save_plot: bool = True,
         output_dir: str | None = None,
+        trained_models: dict[str, str] | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
         verbose: bool = False,
@@ -1386,6 +1401,8 @@ class ForecastModel:
                 Defaults to True.
             output_dir (str | None, optional): Directory for forecast output files.
                 Defaults to ``self.station_dir``.
+            trained_models (dict[str, str] | None, optional): A dict mapping classifier names to their registry
+                CSV paths for multi-model consensus mode. Defaults to ``None``.
             n_jobs (int | None, optional): Parallel workers for feature extraction.
                 Defaults to None (uses ``self.n_jobs``).
             overwrite (bool, optional): If True, overwrites existing output files.
@@ -1399,6 +1416,13 @@ class ForecastModel:
         output_dir = output_dir or self.station_dir
         overwrite = overwrite or self.overwrite
         n_jobs = n_jobs or self.n_jobs
+        trained_models = trained_models or self.trained_models
+
+        if trained_models is None or len(trained_models) == 0:
+            raise ValueError(
+                "Trained models are not provided. Run train() method first or provide trained_models parameter."
+                "Example: ForecastModel(...).forecast(trained_models={'rf': 'path to trained model CSV'}"
+            )
 
         if verbose:
             logger.info("Starting Prediction...")
@@ -1406,7 +1430,7 @@ class ForecastModel:
         model_predictor = ModelPredictor(
             start_date=start_date,
             end_date=end_date,
-            trained_models=self.trained_models,
+            trained_models=trained_models,
             output_dir=output_dir,
             n_jobs=n_jobs,
             verbose=verbose,

@@ -169,7 +169,7 @@ comparator = ClassifierComparator(
 
 # From a JSON file  {"ClassifierName": "/path/to/trained_model_*.csv", ...}
 comparator = ClassifierComparator.from_json(
-    "output/VG.OJN.00.EHZ/trained_models.json",
+    "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
     output_dir="output/comparison",
     metrics=["f1_score", "roc_auc", "recall"],
 )
