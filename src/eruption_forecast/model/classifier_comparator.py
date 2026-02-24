@@ -273,6 +273,338 @@ class ClassifierComparator:
             return [metrics]
         return list(metrics)
 
+    def _build_legend_patches(
+        self,
+        clf_names: list[str],
+        clf_colors: list[str],
+    ) -> list[mpatches.Patch]:
+        """Build a list of legend patch handles for the classifier colour palette.
+
+        Produces one ``mpatches.Patch`` per classifier, used as handles in
+        ``fig.legend()`` calls so that classifier identity can be read from
+        the legend rather than x-axis tick labels.
+
+        Args:
+            clf_names (list[str]): Ordered classifier names.
+            clf_colors (list[str]): Ordered hex colour strings aligned with
+                ``clf_names``.
+
+        Returns:
+            list[mpatches.Patch]: One patch per classifier in the same order
+                as ``clf_names``.
+        """
+        return [
+            mpatches.Patch(facecolor=clf_colors[i], label=name)
+            for i, name in enumerate(clf_names)
+        ]
+
+    def _attach_legend(
+        self,
+        fig: plt.Figure,
+        handles: list[mpatches.Patch],
+        ncol: int,
+        bbox_to_anchor: tuple[float, float],
+    ) -> None:
+        """Attach a classifier legend to the bottom of a figure.
+
+        Places ``fig.legend()`` at the lower centre of the figure using a
+        consistent style: no frame, 7 pt font, horizontally laid out patches.
+
+        Args:
+            fig (plt.Figure): Figure to attach the legend to.
+            handles (list[mpatches.Patch]): Legend patch handles.
+            ncol (int): Number of columns in the legend layout.
+            bbox_to_anchor (tuple[float, float]): ``(x, y)`` anchor for the
+                legend in figure coordinates.
+        """
+        fig.legend(
+            handles=handles,
+            loc="lower center",
+            ncol=ncol,
+            fontsize=7,
+            frameon=False,
+            bbox_to_anchor=bbox_to_anchor,
+        )
+
+    def _build_combined_bar_figure(
+        self,
+        metrics_list: list[str],
+        table: pd.DataFrame,
+        clf_names: list[str],
+        clf_colors: list[str],
+        legend_handles: list[mpatches.Patch],
+        save: bool,
+        dpi: int,
+    ) -> plt.Figure:
+        """Build the combined overview bar figure for all metrics.
+
+        Lays out all metrics in a grid of subplots (max 4 columns), calls
+        ``_draw_metric_bars`` for each cell, hides any unused axes in the
+        last row, attaches the classifier legend at the bottom, and optionally
+        saves the figure as ``metric_bar_all.png``.
+
+        Args:
+            metrics_list (list[str]): Ordered list of metric names to include.
+            table (pd.DataFrame): Aggregate metrics table from
+                ``get_metrics_table()``.
+            clf_names (list[str]): Ordered classifier names.
+            clf_colors (list[str]): Ordered hex colour strings aligned with
+                ``clf_names``.
+            legend_handles (list[mpatches.Patch]): Pre-built legend patches.
+            save (bool): Whether to save the figure to disk.
+            dpi (int): Resolution in dots per inch.
+
+        Returns:
+            plt.Figure: The combined overview figure.
+        """
+        n_clf = len(clf_names)
+        n_cols = min(4, len(metrics_list))
+        n_rows = int(np.ceil(len(metrics_list) / n_cols))
+
+        with apply_nature_style():
+            fig_all, axes_all = plt.subplots(
+                n_rows,
+                n_cols,
+                figsize=(n_cols * max(2.5, n_clf * 0.65), n_rows * 3.2),
+                squeeze=False,
+            )
+
+            for i, m in enumerate(metrics_list):
+                row, col = divmod(i, n_cols)
+                ax = axes_all[row][col]
+                mean_col = f"{m}_mean"
+                std_col = f"{m}_std"
+                means = table[mean_col].to_numpy()
+                stds = (
+                    table[std_col].to_numpy()
+                    if std_col in table.columns
+                    else np.zeros(len(means))
+                )
+                self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
+
+            # Hide any unused axes in the last row.
+            for j in range(len(metrics_list), n_rows * n_cols):
+                row, col = divmod(j, n_cols)
+                axes_all[row][col].set_visible(False)
+
+        self._attach_legend(fig_all, legend_handles, len(clf_names), (0.5, -0.02))
+        fig_all.tight_layout()
+
+        if save:
+            self._save_figure(fig_all, "metric_bar_all.png", dpi)
+
+        plt.close(fig_all)
+        return fig_all
+
+    def _build_combined_stability_figure(
+        self,
+        metrics_list: list[str],
+        clf_names: list[str],
+        clf_colors: list[str],
+        all_records: dict[str, list[dict]],
+        legend_patches: list[mpatches.Patch],
+        save: bool,
+        dpi: int,
+    ) -> plt.Figure:
+        """Build the combined overview stability figure for all metrics.
+
+        Lays out all metrics in a grid of subplots (max 4 columns), calls
+        ``_draw_stability_violin`` for each cell, hides any unused axes, attaches
+        the classifier legend at the bottom, and optionally saves the figure as
+        ``seed_stability_all.png``.
+
+        Args:
+            metrics_list (list[str]): Ordered list of metric names to include.
+            clf_names (list[str]): Ordered classifier names.
+            clf_colors (list[str]): Ordered hex colour strings aligned with
+                ``clf_names``.
+            all_records (dict[str, list[dict]]): Per-seed metric dicts keyed by
+                classifier name.
+            legend_patches (list[mpatches.Patch]): Pre-built legend patches.
+            save (bool): Whether to save the figure to disk.
+            dpi (int): Resolution in dots per inch.
+
+        Returns:
+            plt.Figure: The combined overview figure.
+        """
+        n_cols = min(4, len(metrics_list))
+        n_rows = int(np.ceil(len(metrics_list) / n_cols))
+        rng_all = np.random.default_rng(42)
+
+        with apply_nature_style():
+            fig_all, axes_all = plt.subplots(
+                n_rows,
+                n_cols,
+                figsize=(n_cols * max(2.5, len(clf_names) * 0.85), n_rows * 3.2),
+                squeeze=False,
+            )
+
+            for i, m in enumerate(metrics_list):
+                row, col = divmod(i, n_cols)
+                self._draw_stability_violin(
+                    axes_all[row][col], clf_names, clf_colors, all_records, m, rng_all
+                )
+
+            for j in range(len(metrics_list), n_rows * n_cols):
+                row, col = divmod(j, n_cols)
+                axes_all[row][col].set_visible(False)
+
+        self._attach_legend(fig_all, legend_patches, len(clf_names), (0.5, -0.02))
+        fig_all.tight_layout()
+
+        if save:
+            self._save_figure(fig_all, "seed_stability_all.png", dpi)
+
+        plt.close(fig_all)
+        return fig_all
+
+    def _compute_classifier_roc(
+        self,
+        evaluator: MultiModelEvaluator,
+        name: str,
+        mean_fpr: np.ndarray,
+        color: str,
+        ax: plt.Axes,
+        show_individual: bool,
+    ) -> tuple[np.ndarray, np.ndarray, float] | None:
+        """Compute and draw the mean ROC curve for one classifier.
+
+        Iterates over every seed in the classifier's registry, computes per-seed
+        ROC data, optionally draws individual seed curves as thin dashed lines,
+        then plots the interpolated mean curve with a shaded std-deviation band.
+        Returns None if no valid seed data was found.
+
+        Args:
+            evaluator (MultiModelEvaluator): Evaluator for the classifier.
+            name (str): Classifier name used for the legend label and warnings.
+            mean_fpr (np.ndarray): Common FPR grid onto which TPR values are
+                interpolated before averaging.
+            color (str): Hex colour string for this classifier's curves.
+            ax (plt.Axes): Axes to draw on.
+            show_individual (bool): Whether to draw per-seed curves as thin
+                dashed lines.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, float] | None: A
+                ``(mean_tpr, std_tpr, mean_auc)`` triple if at least one seed
+                was successfully processed, or ``None`` if the registry had no
+                usable data.
+        """
+        registry = evaluator._require_registry()
+        tprs: list[np.ndarray] = []
+        aucs: list[float] = []
+
+        for _, row in registry.iterrows():
+            try:
+                _, _X_test, y_true, y_proba = evaluator._load_seed_data(row)
+                fpr, tpr, _ = roc_curve(y_true, y_proba)
+                auc_val = roc_auc_score(y_true, y_proba)
+                aucs.append(auc_val)
+                tprs.append(np.interp(mean_fpr, fpr, tpr))
+
+                if show_individual:
+                    ax.plot(
+                        fpr,
+                        tpr,
+                        color=color,
+                        alpha=0.15,
+                        linewidth=0.6,
+                        linestyle="--",
+                    )
+            except (OSError, ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+
+        if not tprs:
+            return None
+
+        mean_tpr = np.mean(tprs, axis=0)
+        std_tpr = np.std(tprs, axis=0)
+        mean_auc = float(np.mean(aucs))
+
+        ax.plot(
+            mean_fpr,
+            mean_tpr,
+            color=color,
+            linewidth=1.5,
+            label=f"{name} (AUC={mean_auc:.3f})",
+        )
+        ax.fill_between(
+            mean_fpr,
+            np.clip(mean_tpr - std_tpr, 0, 1),
+            np.clip(mean_tpr + std_tpr, 0, 1),
+            alpha=0.12,
+            color=color,
+        )
+
+        return mean_tpr, std_tpr, mean_auc
+
+    def _draw_grid_cell(
+        self,
+        ax: plt.Axes,
+        vals: list[float],
+        color: str,
+        row: int,
+        col: int,
+        metric: str,
+        rng: np.random.Generator,
+    ) -> None:
+        """Draw a violin + strip plot for one (classifier, metric) grid cell.
+
+        Renders a violin body with a jittered scatter overlay when ``vals`` is
+        non-empty.  Sets the column header title on the first row and the
+        classifier name as y-axis label on the first column.  Hides x-axis ticks
+        and configures spines via ``configure_spine``.
+
+        Args:
+            ax (plt.Axes): Axes for this grid cell.
+            vals (list[float]): Per-seed metric values for the cell.
+            color (str): Hex colour string for violin and scatter points.
+            row (int): Zero-based row index in the grid (used for title
+                placement on the first row).
+            col (int): Zero-based column index in the grid (used for y-label
+                placement on the first column).
+            metric (str): Metric name; used as column header on row 0.
+            rng (np.random.Generator): Random number generator for jitter.
+        """
+        clf_name = list(self._evaluators.keys())[row]
+
+        if vals:
+            parts = ax.violinplot(
+                [vals],
+                positions=[1],
+                showmeans=False,
+                showmedians=True,
+                showextrema=True,
+            )
+            parts["bodies"][0].set_facecolor(color)
+            parts["bodies"][0].set_alpha(0.55)
+
+            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+            ax.scatter(
+                np.ones(len(vals)) + jitter,
+                vals,
+                color=color,
+                s=6,
+                alpha=0.6,
+                zorder=3,
+                linewidths=0,
+            )
+
+        # Column header: metric name on first row only.
+        if row == 0:
+            ax.set_title(metric.replace("_", " ").title(), fontsize=8, pad=4)
+
+        # Row header: classifier name as y-label on first column only.
+        if col == 0:
+            ax.set_ylabel(clf_name, fontsize=8)
+        else:
+            ax.set_ylabel("")
+
+        ax.set_xticks([])
+        ax.tick_params(axis="y", labelsize=7)
+
+        configure_spine(ax)
+
     # ------------------------------------------------------------------
     # Metrics table and ranking
     # ------------------------------------------------------------------
@@ -406,10 +738,7 @@ class ClassifierComparator:
         clf_colors = self._color_cycle()
         n_clf = len(clf_names)
 
-        legend_handles = [
-            mpatches.Patch(facecolor=clf_colors[i], label=name)
-            for i, name in enumerate(clf_names)
-        ]
+        legend_handles = self._build_legend_patches(clf_names, clf_colors)
 
         figures: dict[str, plt.Figure] = {}
 
@@ -428,14 +757,7 @@ class ClassifierComparator:
                 fig, ax = plt.subplots(figsize=(max(3.5, n_clf * 0.7), 3.5))
                 self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
 
-            fig.legend(
-                handles=legend_handles,
-                loc="lower center",
-                ncol=len(clf_names),
-                fontsize=7,
-                frameon=False,
-                bbox_to_anchor=(0.5, -0.08),
-            )
+            self._attach_legend(fig, legend_handles, len(clf_names), (0.5, -0.08))
             fig.tight_layout()
 
             if save:
@@ -447,50 +769,9 @@ class ClassifierComparator:
 
         # Combined overview figure — all metrics in a single subplot grid.
         if len(metrics_list) > 1:
-            n_cols = min(4, len(metrics_list))
-            n_rows = int(np.ceil(len(metrics_list) / n_cols))
-
-            with apply_nature_style():
-                fig_all, axes_all = plt.subplots(
-                    n_rows,
-                    n_cols,
-                    figsize=(n_cols * max(2.5, n_clf * 0.65), n_rows * 3.2),
-                    squeeze=False,
-                )
-
-                for i, m in enumerate(metrics_list):
-                    row, col = divmod(i, n_cols)
-                    ax = axes_all[row][col]
-                    mean_col = f"{m}_mean"
-                    std_col = f"{m}_std"
-                    means = table[mean_col].to_numpy()
-                    stds = (
-                        table[std_col].to_numpy()
-                        if std_col in table.columns
-                        else np.zeros(len(means))
-                    )
-                    self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
-
-                # Hide any unused axes in the last row.
-                for j in range(len(metrics_list), n_rows * n_cols):
-                    row, col = divmod(j, n_cols)
-                    axes_all[row][col].set_visible(False)
-
-            fig_all.legend(
-                handles=legend_handles,
-                loc="lower center",
-                ncol=len(clf_names),
-                fontsize=7,
-                frameon=False,
-                bbox_to_anchor=(0.5, -0.02),
+            figures["all"] = self._build_combined_bar_figure(
+                metrics_list, table, clf_names, clf_colors, legend_handles, save, dpi
             )
-            fig_all.tight_layout()
-
-            if save:
-                self._save_figure(fig_all, "metric_bar_all.png", dpi)
-
-            plt.close(fig_all)
-            figures["all"] = fig_all
 
         return figures
 
@@ -595,10 +876,7 @@ class ClassifierComparator:
             for name, evaluator in self._evaluators.items()
         }
 
-        legend_patches = [
-            mpatches.Patch(facecolor=clf_colors[i], label=name)
-            for i, name in enumerate(clf_names)
-        ]
+        legend_patches = self._build_legend_patches(clf_names, clf_colors)
 
         figures: dict[str, plt.Figure] = {}
         rng = np.random.default_rng(42)
@@ -608,14 +886,7 @@ class ClassifierComparator:
                 fig, ax = plt.subplots(figsize=(max(3.5, len(clf_names) * 0.9), 3.5))
                 self._draw_stability_violin(ax, clf_names, clf_colors, all_records, m, rng)
 
-            fig.legend(
-                handles=legend_patches,
-                loc="lower center",
-                ncol=len(clf_names),
-                fontsize=7,
-                frameon=False,
-                bbox_to_anchor=(0.5, -0.08),
-            )
+            self._attach_legend(fig, legend_patches, len(clf_names), (0.5, -0.08))
             fig.tight_layout()
 
             if save:
@@ -627,43 +898,9 @@ class ClassifierComparator:
 
         # Combined overview figure — all metrics in a single subplot grid.
         if len(metrics_list) > 1:
-            n_cols = min(4, len(metrics_list))
-            n_rows = int(np.ceil(len(metrics_list) / n_cols))
-            rng_all = np.random.default_rng(42)
-
-            with apply_nature_style():
-                fig_all, axes_all = plt.subplots(
-                    n_rows,
-                    n_cols,
-                    figsize=(n_cols * max(2.5, len(clf_names) * 0.85), n_rows * 3.2),
-                    squeeze=False,
-                )
-
-                for i, m in enumerate(metrics_list):
-                    row, col = divmod(i, n_cols)
-                    self._draw_stability_violin(
-                        axes_all[row][col], clf_names, clf_colors, all_records, m, rng_all
-                    )
-
-                for j in range(len(metrics_list), n_rows * n_cols):
-                    row, col = divmod(j, n_cols)
-                    axes_all[row][col].set_visible(False)
-
-            fig_all.legend(
-                handles=legend_patches,
-                loc="lower center",
-                ncol=len(clf_names),
-                fontsize=7,
-                frameon=False,
-                bbox_to_anchor=(0.5, -0.02),
+            figures["all"] = self._build_combined_stability_figure(
+                metrics_list, clf_names, clf_colors, all_records, legend_patches, save, dpi
             )
-            fig_all.tight_layout()
-
-            if save:
-                self._save_figure(fig_all, "seed_stability_all.png", dpi)
-
-            plt.close(fig_all)
-            figures["all"] = fig_all
 
         return figures
 
@@ -783,50 +1020,8 @@ class ClassifierComparator:
             )
 
             for i, (name, evaluator) in enumerate(self._evaluators.items()):
-                registry = evaluator._require_registry()
-                tprs: list[np.ndarray] = []
-                aucs: list[float] = []
-
-                for _, row in registry.iterrows():
-                    try:
-                        _, X_test, y_true, y_proba = evaluator._load_seed_data(row)
-                        fpr, tpr, _ = roc_curve(y_true, y_proba)
-                        auc_val = roc_auc_score(y_true, y_proba)
-                        aucs.append(auc_val)
-                        tprs.append(np.interp(mean_fpr, fpr, tpr))
-
-                        if show_individual:
-                            ax.plot(
-                                fpr,
-                                tpr,
-                                color=colors[i],
-                                alpha=0.15,
-                                linewidth=0.6,
-                                linestyle="--",
-                            )
-                    except (OSError, ValueError, KeyError):
-                        logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
-
-                if not tprs:
-                    continue
-
-                mean_tpr = np.mean(tprs, axis=0)
-                std_tpr = np.std(tprs, axis=0)
-                mean_auc = float(np.mean(aucs))
-
-                ax.plot(
-                    mean_fpr,
-                    mean_tpr,
-                    color=colors[i],
-                    linewidth=1.5,
-                    label=f"{name} (AUC={mean_auc:.3f})",
-                )
-                ax.fill_between(
-                    mean_fpr,
-                    np.clip(mean_tpr - std_tpr, 0, 1),
-                    np.clip(mean_tpr + std_tpr, 0, 1),
-                    alpha=0.12,
-                    color=colors[i],
+                self._compute_classifier_roc(
+                    evaluator, name, mean_fpr, colors[i], ax, show_individual
                 )
 
             ax.set_xlabel("False Positive Rate")
@@ -912,43 +1107,7 @@ class ClassifierComparator:
                 for col, m in enumerate(metrics_list):
                     ax = axes[row][col]
                     vals = [r[m] for r in records if m in r]
-
-                    if vals:
-                        parts = ax.violinplot(
-                            [vals],
-                            positions=[1],
-                            showmeans=False,
-                            showmedians=True,
-                            showextrema=True,
-                        )
-                        parts["bodies"][0].set_facecolor(color)
-                        parts["bodies"][0].set_alpha(0.55)
-
-                        jitter = rng.uniform(-0.08, 0.08, size=len(vals))
-                        ax.scatter(
-                            np.ones(len(vals)) + jitter,
-                            vals,
-                            color=color,
-                            s=6,
-                            alpha=0.6,
-                            zorder=3,
-                            linewidths=0,
-                        )
-
-                    # Column header: metric name on first row only.
-                    if row == 0:
-                        ax.set_title(m.replace("_", " ").title(), fontsize=8, pad=4)
-
-                    # Row header: classifier name as y-label on first column only.
-                    if col == 0:
-                        ax.set_ylabel(clf_name, fontsize=8)
-                    else:
-                        ax.set_ylabel("")
-
-                    ax.set_xticks([])
-                    ax.tick_params(axis="y", labelsize=7)
-
-                    configure_spine(ax)
+                    self._draw_grid_cell(ax, vals, color, row, col, m, rng)
 
             fig.suptitle("Classifier × Metric Comparison", fontsize=9, y=1.01)
             fig.tight_layout()
