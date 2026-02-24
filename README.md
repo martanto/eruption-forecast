@@ -59,7 +59,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Feature Extraction**: Extract 700+ time-series features using tsfresh for machine learning
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
-- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, classifier comparison heatmaps, seed stability violin plots, and frequency band contribution charts
+- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, and frequency band contribution charts via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
@@ -360,6 +360,42 @@ fm.train(
 )
 ```
 
+### Compare multiple classifiers side-by-side
+
+After training several classifiers with `train_and_evaluate()`, use `ClassifierComparator`
+to rank them and produce comparison plots:
+
+```python
+from eruption_forecast.model import ClassifierComparator
+
+# From a dict
+comparator = ClassifierComparator(
+    classifiers={
+        "rf":  "output/.../trainings/model-with-evaluation/rf/stratified/trained_model_rf_...csv",
+        "xgb": "output/.../trainings/model-with-evaluation/xgb/stratified/trained_model_xgb_...csv",
+        "gb":  "output/.../trainings/model-with-evaluation/gb/stratified/trained_model_gb_...csv",
+    },
+    metrics=["f1_score", "roc_auc", "recall"],  # or None for all DEFAULT_METRICS
+)
+
+# Or from a JSON file  {"ClassifierName": "/path/to/trained_model_*.csv", ...}
+comparator = ClassifierComparator.from_json(
+    "output/VG.OJN.00.EHZ/trained_models.json",
+    metrics=["f1_score", "roc_auc", "recall"],
+)
+
+# Ranked by recall (default), saved to metrics/ranking_recall.csv
+ranking = comparator.get_ranking()
+
+# All plots — saved to figures/
+results = comparator.plot_all()
+# results["metric_bar"]      → dict[str, Figure]  (one per metric + "all" overview)
+# results["seed_stability"]  → dict[str, Figure]  (one per metric + "all" overview)
+# results["comparison_grid"] → Figure
+# results["roc"]             → Figure
+# results["ranking"]         → DataFrame
+```
+
 ### Save and replay pipeline configuration
 
 ```python
@@ -519,4 +555,4 @@ If you use this package in your research, please cite:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-02-24
