@@ -8,6 +8,7 @@ Classes:
     ModelTrainer: Trains models with multi-seed cross-validation.
     ModelEvaluator: Evaluates a single fitted model with metrics and plots.
     MultiModelEvaluator: Aggregates metrics and plots across multiple seeds.
+    ClassifierComparator: Compares multiple classifiers side-by-side.
     ModelPredictor: Runs inference in evaluation or forecast mode.
     ForecastModel: Orchestrates the complete forecasting pipeline.
 """
@@ -24,10 +25,12 @@ except ImportError:
     pass
 
 from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
 
 __all__ = [
+    "ClassifierComparator",
     "ModelEvaluator",
     "MultiModelEvaluator",
 ]
