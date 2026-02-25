@@ -25,6 +25,7 @@ from eruption_forecast.config.constants import (
     PLOT_SEPARATOR_LENGTH,
 )
 from eruption_forecast.plots.shap_plots import plot_shap_summary as _shap
+from eruption_forecast.utils.formatting import slugify_class_name
 from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve as _plot_roc_styled,
@@ -99,6 +100,7 @@ class ModelEvaluator:
         selected_features: list[str] | None = None,
         random_state: int | None = None,
         root_dir: str | None = None,
+        cv_name: str = "cv",
         verbose: bool = False,
     ) -> None:
         """Initialize the ModelEvaluator with a fitted model and test data.
@@ -123,6 +125,9 @@ class ModelEvaluator:
                 Defaults to None.
             root_dir (str | None, optional): Anchor directory for relative path
                 resolution. Defaults to None.
+            cv_name (str, optional): CV strategy class name used to build the default
+                output path when ``output_dir`` is None (e.g. ``"StratifiedKFold"``).
+                The name is slugified to ``stratified-k-fold``. Defaults to ``"cv"``.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
         """
         if isinstance(model, GridSearchCV):
@@ -131,9 +136,17 @@ class ModelEvaluator:
         if selected_features is not None:
             X_test = X_test[selected_features]
 
-        output_dir = resolve_output_dir(
-            output_dir, root_dir, os.path.join("output", "evaluations")
-        )
+        if output_dir is None:
+            clf_slug = slugify_class_name(model_name)
+            cv_slug = slugify_class_name(cv_name)
+            default_subpath = os.path.join(
+                "output", "trainings", "evaluations", clf_slug, cv_slug
+            )
+            output_dir = resolve_output_dir(None, root_dir, default_subpath)
+        else:
+            output_dir = resolve_output_dir(
+                output_dir, root_dir, os.path.join("output", "trainings", "evaluations")
+            )
         metrics_dir = os.path.join(output_dir, "metrics")
         figures_dir = os.path.join(output_dir, "figures")
 
