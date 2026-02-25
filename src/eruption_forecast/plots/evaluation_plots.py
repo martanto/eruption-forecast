@@ -37,6 +37,7 @@ from sklearn.calibration import calibration_curve
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
+    nature_figure,
     configure_spine,
     apply_nature_style,
 )
@@ -87,8 +88,7 @@ def plot_confusion_matrix(
     labels = ["Not Erupted", "Erupted"]
     fmt = ".2f" if normalize else "d"
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize)
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
         sns.heatmap(
             cm,
             annot=True,
@@ -142,8 +142,7 @@ def plot_roc_curve(
     fpr, tpr, _ = roc_curve(y_true, y_proba)
     auc = roc_auc_score(y_true, y_proba)
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize)
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
 
         # Plot ROC curve
         ax.plot(
@@ -212,8 +211,7 @@ def plot_precision_recall_curve(
     precision, recall, _ = precision_recall_curve(y_true, y_proba)
     ap = average_precision_score(y_true, y_proba)
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize)
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
 
         # Plot PR curve
         ax.plot(
@@ -295,8 +293,7 @@ def plot_threshold_analysis(
     optimal_idx = np.argmax(metrics["f1"])
     optimal_threshold = thresholds[optimal_idx]
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize)
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
 
         # Plot metrics with distinct colors from Okabe-Ito palette
         ax.plot(
@@ -430,7 +427,7 @@ def plot_feature_importance(
     figheight = max(4, top_n * 0.35)
 
     with apply_nature_style():
-        fig, ax = plt.subplots(figsize=(8, figheight))
+        fig, ax = plt.subplots(figsize=(8, figheight), dpi=dpi)
 
         bars = ax.barh(
             range(top_n),
@@ -503,8 +500,7 @@ def plot_calibration(
         y_true, y_proba, n_bins=n_bins, strategy="uniform"
     )
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize)
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
 
         # Plot calibration curve
         ax.plot(
@@ -580,8 +576,7 @@ def plot_prediction_distribution(
     # when predicted probabilities cluster in a narrow range.
     bins = max(1, min(20, len(np.unique(proba_0)), len(np.unique(proba_1))))
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize)
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
 
         # Plot histograms for each class
         ax.hist(
