@@ -6,7 +6,7 @@ model predictions and feature contributions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import shap
 import numpy as np
@@ -105,7 +105,7 @@ def plot_shap_summary(
     return fig
 
 
-def _extract_shap_array(shap_output: object) -> np.ndarray:
+def _extract_shap_array(shap_output: Any) -> np.ndarray:
     """Extract a 2-D SHAP value array from a SHAP Explanation object or ndarray.
 
     Handles both raw ``np.ndarray`` returns and ``shap.Explanation`` objects.
@@ -113,7 +113,7 @@ def _extract_shap_array(shap_output: object) -> np.ndarray:
     — the positive-class slice ``[:, :, 1]`` is taken automatically.
 
     Args:
-        shap_output (object): Return value of ``shap.Explainer.__call__``,
+        shap_output (Any): Return value of ``shap.Explainer.__call__``,
             either a ``shap.Explanation`` object or a plain ``np.ndarray``.
 
     Returns:
@@ -123,7 +123,7 @@ def _extract_shap_array(shap_output: object) -> np.ndarray:
     if isinstance(shap_output, np.ndarray):
         raw = shap_output
     elif hasattr(shap_output, "values"):
-        raw = shap_output.values  # noqa: PD011
+        raw = np.asarray(shap_output.values)  # noqa: PD011
     else:
         raw = np.array(shap_output)
 
