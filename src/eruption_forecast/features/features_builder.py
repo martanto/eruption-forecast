@@ -684,9 +684,11 @@ class FeaturesBuilder:
         # Get params for features extraction
         extract_params = self._prepare_extraction_parameters(exclude_features)
 
-        # Setup extraction directory
-        extract_features_dir = os.path.join(self.output_dir, "extracted")
+        # Setup extraction directory — mode-specific subdir prevents train/forecast collisions
+        mode = "train" if not self.label_df.empty else "forecast"
+        extract_features_dir = os.path.join(self.output_dir, "extracted", mode)
         os.makedirs(extract_features_dir, exist_ok=True)
+
         _prefix_filename = (
             f"relevant_features_{dates_str}"
             if use_relevant_features
