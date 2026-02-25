@@ -58,6 +58,9 @@ The high-level `ForecastModel` class chains all stages with a single fluent API.
 ```
 eruption-forecast/
 ├── src/eruption_forecast/   # Package source
+│   ├── data_container.py    # BaseDataContainer — shared ABC for data wrappers
+│   ├── sources/             # SeismicDataSource ABC + SDS/FDSN adapters
+│   └── ...                  # tremor/, label/, features/, model/, utils/, plots/
 ├── docs/                    # Detailed reference documentation
 ├── wiki/                    # This wiki (GitHub Wiki pages)
 ├── tests/                   # Unit tests

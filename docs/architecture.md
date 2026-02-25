@@ -16,6 +16,7 @@
 ```
 eruption-forecast/
 ├── src/eruption_forecast/
+│   ├── data_container.py    # BaseDataContainer — shared ABC for TremorData & LabelData
 │   ├── tremor/              # Seismic tremor processing
 │   │   ├── calculate_tremor.py
 │   │   ├── rsam.py          # Real Seismic Amplitude Measurement
@@ -37,6 +38,7 @@ eruption-forecast/
 │   │   ├── multi_model_evaluator.py # Multi-seed aggregate evaluation
 │   │   └── classifier_model.py
 │   ├── sources/             # Seismic data source adapters
+│   │   ├── base.py          # SeismicDataSource — abstract base class
 │   │   ├── sds.py           # SDS (SeisComP Data Structure) reader
 │   │   └── fdsn.py          # FDSN web service client with local caching
 │   ├── plots/               # Visualization utilities
@@ -44,9 +46,10 @@ eruption-forecast/
 │   ├── utils/               # Focused utility modules
 │   │   ├── array.py         # Array operations, outlier detection
 │   │   ├── window.py        # Time window operations
-│   │   ├── date_utils.py    # Date/time validation & conversion
-│   │   ├── dataframe.py     # DataFrame validation & ops
-│   │   ├── ml.py            # ML utilities (sampling, metrics)
+│   │   ├── date_utils.py    # Date/time conversion and filename parsing
+│   │   ├── dataframe.py     # DataFrame helpers
+│   │   ├── ml.py            # ML utilities (resampling, feature loading)
+│   │   ├── validation.py    # Centralised validation (dates, random state, columns, sampling)
 │   │   ├── pathutils.py     # Path resolution
 │   │   └── formatting.py    # Text formatting
 │   └── decorators/          # Function decorators
@@ -56,6 +59,7 @@ eruption-forecast/
 ## Design Principles
 
 - **Single Responsibility**: Each module has one clear purpose
+- **DRY (Don't Repeat Yourself)**: Shared behaviour extracted into base classes (`BaseDataContainer`, `SeismicDataSource`) and shared utilities (`validate_random_state`, `load_labels_from_csv`)
 - **Explicit Imports**: No hidden re-exports (e.g., `from eruption_forecast.utils.date_utils import to_datetime`)
 - **Minimal Dependencies**: Each utils module imports only what it needs
 - **Clean Architecture**: Reduced coupling, easier testing and maintenance
@@ -69,7 +73,7 @@ Raw Seismic Data (SDS / FDSN)
          │
          ▼
 ┌─────────────────────┐
-│   CalculateTremor   │  RSAM + DSAR → tremor.csv
+│   CalculateTremor   │  RSAM + DSAR + Entropy → tremor.csv
 └─────────┬───────────┘
           │
           ▼
@@ -217,8 +221,9 @@ calculate = CalculateTremor(
 
 ### 6. Data Classes
 
-- **`TremorData`**: Wraps tremor CSV; provides start/end dates, validates sampling rate
-- **`LabelData`**: Wraps label CSV; parses parameters from filename
+- **`BaseDataContainer`** (`data_container.py`): Abstract base class declaring the `start_date_str`, `end_date_str`, and `data` interface shared by all CSV-backed data wrappers.
+- **`TremorData`** (`tremor/tremor_data.py`): Inherits from `BaseDataContainer`; wraps tremor CSV, validates sampling rate.
+- **`LabelData`** (`label/label_data.py`): Inherits from `BaseDataContainer`; parses all parameters from the label filename via the module-level `parse_label_filename()` helper.
 
 Both use `@cached_property` for efficient attribute access.
 
@@ -228,15 +233,17 @@ Both use `@cached_property` for efficient attribute access.
 |--------|----------|
 | `window.py` | `construct_windows()`, `calculate_window_metrics()` |
 | `array.py` | `detect_maximum_outlier()`, `remove_outliers()` — Z-score based |
-| `date_utils.py` | `to_datetime()`, `validate_date_ranges()`, `validate_window_step()` |
-| `ml.py` | `random_under_sampler()`, `get_significant_features()` |
+| `date_utils.py` | `to_datetime()`, `normalize_dates()`, `parse_label_filename()` |
+| `ml.py` | `random_under_sampler()`, `get_significant_features()`, `load_labels_from_csv()` |
+| `validation.py` | `validate_random_state()`, `validate_date_ranges()`, `validate_window_step()`, `validate_columns()`, `check_sampling_consistency()` |
 | `pathutils.py` | `resolve_output_dir()` — resolves paths relative to `root_dir` |
-| `dataframe.py` | DataFrame validation utilities |
+| `dataframe.py` | DataFrame shape/column validation helpers |
 | `formatting.py` | Text formatting utilities |
 
 ### 8. Data Source Adapters (`src/eruption_forecast/sources/`)
 
-- **`SDS`** (`sds.py`): Reads SeisComP Data Structure files directly from a local archive
-- **`FDSN`** (`fdsn.py`): Downloads from any FDSN web service with transparent local SDS caching
+- **`SeismicDataSource`** (`sources/base.py`): Abstract base class declaring the `get(date)` interface and `_make_log_prefix(date)` helper shared by all adapters.
+- **`SDS`** (`sds.py`): Reads SeisComP Data Structure files directly from a local archive. Inherits from `SeismicDataSource`.
+- **`FDSN`** (`fdsn.py`): Downloads from any FDSN web service with transparent local SDS caching. Inherits from `SeismicDataSource`.
   - `download_dir` is created automatically if absent
   - Downloaded files are cached as SDS miniSEED so subsequent runs skip the network

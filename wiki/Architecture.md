@@ -4,6 +4,7 @@
 
 ```
 src/eruption_forecast/
+├── data_container.py      # BaseDataContainer — shared ABC for TremorData & LabelData
 ├── tremor/              # Seismic tremor processing
 │   ├── calculate_tremor.py    # CalculateTremor — main orchestrator
 │   ├── rsam.py                # Real Seismic Amplitude Measurement
@@ -25,6 +26,7 @@ src/eruption_forecast/
 │   ├── multi_model_evaluator.py  # MultiModelEvaluator — aggregate evaluation
 │   └── classifier_model.py   # ClassifierModel — classifier + grid management
 ├── sources/             # Seismic data source adapters
+│   ├── base.py                # SeismicDataSource — abstract base class
 │   ├── sds.py                 # SDS reader (SeisComP Data Structure)
 │   └── fdsn.py                # FDSN web service client with local caching
 ├── config/              # Pipeline configuration
@@ -37,9 +39,10 @@ src/eruption_forecast/
 ├── utils/               # Focused utility modules
 │   ├── array.py               # Z-score outlier detection
 │   ├── window.py              # Sliding window construction
-│   ├── date_utils.py          # Date validation and conversion
-│   ├── dataframe.py           # DataFrame validation
+│   ├── date_utils.py          # Date conversion and filename parsing
+│   ├── dataframe.py           # DataFrame helpers
 │   ├── ml.py                  # Resampling and feature utilities
+│   ├── validation.py          # Centralised validation (dates, random state, columns, sampling)
 │   ├── pathutils.py           # Path resolution relative to root_dir
 │   └── formatting.py          # Text formatting
 └── decorators/          # Function decorators
@@ -53,6 +56,7 @@ src/eruption_forecast/
 | Principle | What it means in practice |
 |-----------|--------------------------|
 | **Single Responsibility** | Each module has one purpose — `rsam.py` only computes RSAM, `date_utils.py` only handles dates |
+| **DRY (Don't Repeat Yourself)** | Shared behaviour extracted into base classes (`BaseDataContainer`, `SeismicDataSource`) and utilities (`validate_random_state`, `load_labels_from_csv`) |
 | **Explicit Imports** | No hidden re-exports; import exactly what you need: `from eruption_forecast.utils.date_utils import to_datetime` |
 | **Minimal Dependencies** | Each utility module imports only its own direct dependencies |
 | **Fluent API** | All pipeline classes support method chaining via `return self` |
@@ -83,6 +87,19 @@ MultiModelEvaluator
 
 ---
 
+## Base Classes
+
+Two abstract base classes establish shared contracts:
+
+| Class | Module | Purpose |
+|-------|--------|---------|
+| `BaseDataContainer` | `data_container.py` | Abstract interface (`start_date_str`, `end_date_str`, `data`) shared by `TremorData` and `LabelData` |
+| `SeismicDataSource` | `sources/base.py` | Abstract interface (`get(date)`) and shared `_make_log_prefix(date)` helper for `SDS` and `FDSN` |
+
+These classes are exported from the package root (`from eruption_forecast import BaseDataContainer`) and from `eruption_forecast.sources` respectively.
+
+---
+
 ## Pipeline Data Flow
 
 | Stage | Input | Output |
@@ -102,8 +119,9 @@ MultiModelEvaluator
 |--------|--------------|
 | `utils/array.py` | `detect_maximum_outlier()`, `remove_outliers()` — Z-score based |
 | `utils/window.py` | `construct_windows()`, `calculate_window_metrics()` |
-| `utils/date_utils.py` | `to_datetime()`, `validate_date_ranges()`, `validate_window_step()` |
-| `utils/ml.py` | `random_under_sampler()`, `get_significant_features()` |
+| `utils/date_utils.py` | `to_datetime()`, `normalize_dates()`, `parse_label_filename()` |
+| `utils/ml.py` | `random_under_sampler()`, `get_significant_features()`, `load_labels_from_csv()` |
+| `utils/validation.py` | `validate_random_state()`, `validate_date_ranges()`, `validate_window_step()`, `validate_columns()`, `check_sampling_consistency()` |
 | `utils/pathutils.py` | `resolve_output_dir()` — resolves relative paths against `root_dir` |
 | `utils/dataframe.py` | DataFrame shape/column validation helpers |
 | `utils/formatting.py` | Human-readable text formatting (elapsed time, file sizes, etc.) |
