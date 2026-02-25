@@ -20,7 +20,7 @@ from eruption_forecast.utils.array import (
     chunk_daily_data,
     remove_maximum_outlier,
 )
-from eruption_forecast.utils.date_utils import (
+from eruption_forecast.utils.validation import (
     validate_date_ranges,
     validate_window_step,
 )
@@ -182,13 +182,13 @@ def calculate_window_metrics(
         # Initialize metric_value to np.nan
         metric_value = np.nan
 
-        minimum_sample_acquired = True
+        has_sufficient_samples = True
         if isinstance(window_data, np.ma.MaskedArray):
             valid_samples = window_data.count()
             valid_samples_ratio = valid_samples / len(window_data)
-            minimum_sample_acquired = valid_samples_ratio >= minimum_completion_ratio
+            has_sufficient_samples = valid_samples_ratio >= minimum_completion_ratio
 
-        if not minimum_sample_acquired:
+        if not has_sufficient_samples:
             metric_value = np.nan
 
         elif len(window_data) == 1:
@@ -251,9 +251,9 @@ def construct_windows(
     window_step, window_step_unit = validate_window_step(window_step, window_step_unit)
     start_date, end_date, n_days = validate_date_ranges(start_date, end_date)
 
-    maximum_window_step = n_days * 24
-    if window_step_unit == "minutes":
-        maximum_window_step = n_days * 60 * 24
+    maximum_window_step = (
+        n_days * 60 * 24 if window_step_unit == "minutes" else n_days * 24
+    )
 
     if window_step > maximum_window_step:
         raise ValueError(
@@ -265,9 +265,11 @@ def construct_windows(
     start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = end_date.replace(hour=23, minute=59, second=59)
 
-    freq = timedelta(hours=window_step)
-    if window_step_unit == "minutes":
-        freq = timedelta(minutes=window_step)
+    freq = (
+        timedelta(minutes=window_step)
+        if window_step_unit == "minutes"
+        else timedelta(hours=window_step)
+    )
 
     dates = pd.date_range(
         start=start_date,

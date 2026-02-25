@@ -9,7 +9,7 @@ from joblib import Parallel, delayed
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import random_under_sampler
+from eruption_forecast.utils.ml import load_labels_from_csv, random_under_sampler
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
@@ -17,9 +17,6 @@ from eruption_forecast.config.constants import (
     DEFAULT_N_SIGNIFICANT_FEATURES,
 )
 from eruption_forecast.features.constants import (
-    ID_COLUMN,
-    ERUPTED_COLUMN,
-    DATETIME_COLUMN,
     SIGNIFICANT_FEATURES_FILENAME,
 )
 from eruption_forecast.plots.feature_plots import (
@@ -227,13 +224,7 @@ class ModelTrainer:
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
-
-        df_labels = pd.read_csv(label_features_csv)
-        if ID_COLUMN in df_labels.columns:
-            df_labels = df_labels.set_index(ID_COLUMN)
-        if DATETIME_COLUMN in df_labels.columns:
-            df_labels = df_labels.drop(DATETIME_COLUMN, axis=1)
-        df_labels = df_labels[ERUPTED_COLUMN]
+        df_labels = load_labels_from_csv(label_features_csv)
 
         classifier_model: ClassifierModel = ClassifierModel(
             classifier=classifier,
@@ -541,17 +532,19 @@ class ModelTrainer:
         """Create required output directories for training results.
 
         Creates the main output directory and subdirectories for storing
-        significant features CSVs and trained models. Called at the start
-        of ``train_and_evaluate()`` and ``update_directories()``.
+        significant features CSVs, trained models, metrics, and test splits.
+        Called at the start of ``train_and_evaluate()``, ``train()``, and
+        ``update_directories()``.
 
         Example:
             >>> trainer = ModelTrainer(...)
             >>> trainer.create_directories()
-            >>> # Creates: output_dir/, significant_features/, models/
         """
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.significant_features_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
+        os.makedirs(self.metrics_dir, exist_ok=True)
+        os.makedirs(self.tests_dir, exist_ok=True)
         os.makedirs(self.figures_dir, exist_ok=True)
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
@@ -589,12 +582,12 @@ class ModelTrainer:
                 f"No significant features CSV file inside directory {self.significant_features_dir}"
             )
 
-        df = pd.concat(
+        combined_features_df = pd.concat(
             [pd.read_csv(file) for file in self.significant_features_csvs],
             ignore_index=True,
         )
 
-        if df.empty:
+        if combined_features_df.empty:
             raise ValueError("No data found inside csv files.")
 
         filename = (
@@ -602,7 +595,9 @@ class ModelTrainer:
             if self.prefix_filename
             else SIGNIFICANT_FEATURES_FILENAME
         )
-        df.to_csv(os.path.join(self.features_dir, f"{filename}.csv"), index=False)
+        combined_features_df.to_csv(
+            os.path.join(self.features_dir, f"{filename}.csv"), index=False
+        )
 
         # Save number_of_significant_features
         if (
@@ -615,25 +610,25 @@ class ModelTrainer:
                 else f"top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
             )
 
-            df = (
-                df.groupby(by="features")
+            combined_features_df = (
+                combined_features_df.groupby(by="features")
                 .count()
                 .sort_values(by="p_values", ascending=False)
             )
-            df.index.name = "features"
-            df.to_csv(
+            combined_features_df.index.name = "features"
+            combined_features_df.to_csv(
                 os.path.join(self.features_dir, f"{filename}.csv"),
                 index=True,
             )
 
             if plot:
                 _plot_significant_features(
-                    df=df.reset_index(),
+                    df=combined_features_df.reset_index(),
                     filepath=os.path.join(self.features_dir, filename),
                     overwrite=True,
                 )
 
-        return df
+        return combined_features_df
 
     @logger.catch(level="ERROR")
     def select_features(
@@ -897,17 +892,184 @@ class ModelTrainer:
         )
         filename = f"trained_model_{suffix}.csv"
 
-        df = pd.DataFrame(records).set_index("random_state")
-        if df.empty:
+        registry_df = pd.DataFrame(records).set_index("random_state")
+        if registry_df.empty:
             raise ValueError("No significant features or trained models found.")
 
         csv = os.path.join(self.classifier_dir, filename)
-        df.to_csv(csv, index=True)
+        registry_df.to_csv(csv, index=True)
 
-        self.df = df
+        self.df = registry_df
         self.csv = csv
 
         return suffix
+
+    def _split_and_resample(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        random_state: int,
+        X_test_filepath: str,
+        y_test_filepath: str,
+        sampling_strategy: str | float = 0.75,
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+        """Steps 1-2: stratified train/test split then RandomUnderSampler on train.
+
+        Saves the held-out test split to disk for later aggregate evaluation.
+
+        Args:
+            X (pd.DataFrame): Full feature matrix.
+            y (pd.Series): Full label series.
+            random_state (int): Random seed for both split and sampler.
+            X_test_filepath (str): Path to save held-out X_test CSV.
+            y_test_filepath (str): Path to save held-out y_test CSV.
+            sampling_strategy (str | float, optional): Under-sampling ratio.
+                Defaults to 0.75.
+
+        Returns:
+            tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]: A 4-tuple of
+                (X_train_resampled, X_test, y_train_resampled, y_test) where
+                X_train_resampled and y_train_resampled are under-sampled training
+                data and X_test / y_test are the held-out test split.
+        """
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=TRAIN_TEST_SPLIT,
+            random_state=random_state,
+            stratify=y,
+        )
+        X_test.to_csv(X_test_filepath)
+        y_test.to_csv(y_test_filepath)
+
+        X_train_resampled, y_train_resampled = random_under_sampler(
+            features=X_train,
+            labels=y_train,
+            sampling_strategy=sampling_strategy,
+            random_state=random_state,
+        )
+        return X_train_resampled, X_test, y_train_resampled, y_test
+
+    def _select_features_for_seed(
+        self,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        random_state: int,
+        significant_filepath: str,
+        all_features_filepath: str | None = None,
+        all_figures_filepath: str | None = None,
+    ) -> tuple | None:
+        """Step 3: feature selection on the resampled training data.
+
+        Delegates to :meth:`select_features` and returns its result unchanged.
+
+        Args:
+            X_train (pd.DataFrame): Resampled training features.
+            y_train (pd.Series): Resampled training labels.
+            random_state (int): Random seed for feature selector.
+            significant_filepath (str): Path to save top-N features CSV.
+            all_features_filepath (str | None, optional): Path to save all features.
+            all_figures_filepath (str | None, optional): Path to save feature plots.
+
+        Returns:
+            tuple | None: Result from :meth:`select_features`, or None if no
+                features survived selection.
+        """
+        return self.select_features(
+            features=X_train,
+            labels=y_train,
+            random_state=random_state,
+            significant_filepath=significant_filepath,
+            all_features_filepath=all_features_filepath,
+            all_figures_filepath=all_figures_filepath,
+        )
+
+    def _cv_train_evaluate(
+        self,
+        y_train: pd.Series,
+        X_test: pd.DataFrame,
+        y_test: pd.Series,
+        selected_features: tuple,
+        random_state: int,
+        model_filepath: str,
+        metrics_filepath: str,
+    ) -> dict[str, Any]:
+        """Steps 4-5: GridSearchCV training then evaluation on the held-out test set.
+
+        Fits the configured classifier via GridSearchCV on the selected training
+        features, saves the best model to disk, evaluates it on the held-out test
+        set, and writes per-seed metrics JSON.
+
+        Args:
+            y_train (pd.Series): Resampled training labels.
+            X_test (pd.DataFrame): Held-out test features (pre-selection).
+            y_test (pd.Series): Held-out test labels.
+            selected_features (tuple): Return value of :meth:`select_features`
+                containing (df_selected, top_features, all_features, n_features).
+            random_state (int): Random seed used for the classifier.
+            model_filepath (str): Path to save the trained model pickle.
+            metrics_filepath (str): Path to save the per-seed metrics JSON.
+
+        Returns:
+            dict[str, Any]: Metrics dictionary produced by ModelEvaluator.
+        """
+        features_train_resampled_selected, top_selected_features, _, _ = (
+            selected_features
+        )
+        top_n_features = top_selected_features.index.tolist()
+        X_test_selected = X_test[top_n_features]
+
+        clf, grid_search, best_model = self._setup_grid_search(
+            random_state,
+            features_train_resampled_selected,
+            y_train,
+            top_n_features,
+        )
+
+        joblib.dump(best_model, model_filepath)
+        if self.verbose:
+            logger.info(f"{random_state:05d}: Model at {model_filepath}")
+
+        model_evaluator = ModelEvaluator(
+            random_state=random_state,
+            model=grid_search,
+            X_test=X_test_selected,
+            y_test=y_test,
+            model_name=self.classifier_name,
+            output_dir=self.classifier_dir,
+            selected_features=top_n_features,
+        )
+
+        grid_params = grid_search.best_params_
+        metrics: dict[str, Any] = model_evaluator.get_metrics()
+        best_params = {f"best_params_{k}": v for k, v in grid_params.items()}
+        metrics.update(
+            {
+                "cv_strategy": clf.cv_strategy,
+                "random_state": random_state,
+                "best_cv_score": grid_search.best_score_,
+                **best_params,
+            }
+        )
+
+        with open(metrics_filepath, "w") as f:
+            json.dump(metrics, f, indent=4)
+
+        try:
+            model_evaluator.plot_all(dpi=150)
+        except Exception as e:
+            logger.warning(
+                f"Seed {random_state:05d}: plot_all() failed and plots were skipped. "
+                f"Reason: {e}"
+            )
+
+        if self.verbose:
+            logger.info(f"{random_state:05d}: Metrics at {metrics_filepath}")
+            logger.info(
+                f"Seed {random_state:05d} - Test Balanced Accuracy: {metrics['balanced_accuracy']:.4f}"
+            )
+
+        return metrics
 
     def _run_train_and_evaluate(
         self,
@@ -918,12 +1080,10 @@ class ModelTrainer:
     ) -> tuple[int, str, str, dict, str, str] | None:
         """Train feature selection and classifier model for a single random seed.
 
-        Performs:
-        1. Train/test split (80/20, stratified)
-        2. Random under-sampling on training set only
-        3. Feature selection on training set only
-        4. Classifier training with GridSearchCV (using configured classifier type)
-        5. Evaluation on held-out test set
+        Orchestrates the per-seed pipeline by calling the three helper methods:
+        1–2. :meth:`_split_and_resample` — train/test split + RandomUnderSampler
+        3.   :meth:`_select_features_for_seed` — tsfresh/RF feature selection
+        4–5. :meth:`_cv_train_evaluate` — GridSearchCV training + test evaluation
 
         Args:
             random_state (int): Base random state value.
@@ -958,108 +1118,39 @@ class ModelTrainer:
 
         logger.info(f"Training Seed: {random_state:05d}")
 
-        # ========== STEP 1: Train/Test Split ==========
-        # X_train, X_test, y_train, y_test
-        features_train, features_test, labels_train, labels_test = train_test_split(
-            self.df_features,
-            self.df_labels,
-            test_size=TRAIN_TEST_SPLIT,
+        # ========== STEPS 1-2: Train/Test Split + Resample ==========
+        X_train_resampled, X_test, y_train_resampled, y_test = self._split_and_resample(
+            X=self.df_features,
+            y=self.df_labels,
             random_state=random_state,
-            stratify=self.df_labels,
-        )
-
-        # Save held-out test splits for aggregate evaluation
-        features_test.to_csv(X_test_filepath)
-        labels_test.to_csv(y_test_filepath)
-
-        # ========== STEP 2: Resample ONLY Training Data ==========
-        features_train_resampled, labels_train_resampled = random_under_sampler(
-            features=features_train,
-            labels=labels_train,
+            X_test_filepath=X_test_filepath,
+            y_test_filepath=y_test_filepath,
             sampling_strategy=sampling_strategy,
-            random_state=random_state,
         )
 
-        # ========== STEP 3: Feature Selection ONLY on Training Data ==========
-        result = self.select_features(
-            features=features_train_resampled,
-            labels=labels_train_resampled,
+        # ========== STEP 3: Feature Selection ==========
+        result = self._select_features_for_seed(
+            X_train=X_train_resampled,
+            y_train=y_train_resampled,
             random_state=random_state,
             significant_filepath=significant_filepath,
             all_features_filepath=all_features_filepath if save_features else None,
             all_figures_filepath=all_figures_filepath if plot_features else None,
         )
 
-        if result is None:  # Feature selection returned nothing; skip this seed
-            return None  # Signal caller to skip: no features, no model
+        if result is None:
+            return None
 
-        (
-            features_train_resampled_selected,
-            top_selected_features,
-            _selected_features,
-            _n_features,
-        ) = result
-
-        # ========== STEP 4: Cross-Validation with Dynamic Classifier ==========
-        top_n_features = top_selected_features.index.tolist()
-        features_test_selected = features_test[top_n_features]
-
-        clf, grid_search, best_model = self._setup_grid_search(
-            random_state,
-            features_train_resampled_selected,
-            labels_train_resampled,
-            top_n_features,
-        )
-
-        # ========== STEP 5: Save Outputs ==========
-        # Save model
-        joblib.dump(best_model, model_filepath)
-
-        if self.verbose:
-            logger.info(f"{random_state:05d}: Model at {model_filepath}")
-
-        # Get metrics evaluations
-        model_evaluator = ModelEvaluator(
+        # ========== STEPS 4-5: CV Training + Evaluation ==========
+        metrics = self._cv_train_evaluate(
+            y_train=y_train_resampled,
+            X_test=X_test,
+            y_test=y_test,
+            selected_features=result,
             random_state=random_state,
-            model=grid_search,
-            X_test=features_test_selected,
-            y_test=labels_test,
-            model_name=self.classifier_name,
-            output_dir=self.classifier_dir,
-            selected_features=top_n_features,
+            model_filepath=model_filepath,
+            metrics_filepath=metrics_filepath,
         )
-
-        # Get metrics evaluations
-        grid_params = grid_search.best_params_
-        metrics: dict[str, Any] = model_evaluator.get_metrics()
-        best_params = {f"best_params_{k}": v for k, v in grid_params.items()}
-        metrics.update(
-            {
-                "cv_strategy": clf.cv_strategy,
-                "random_state": random_state,
-                "best_cv_score": grid_search.best_score_,
-                **best_params,
-            }
-        )
-
-        # Save metrics evaluations
-        with open(metrics_filepath, "w") as f:
-            json.dump(metrics, f, indent=4)
-
-        # Plot evaluation (after metrics are safely written)
-        try:
-            model_evaluator.plot_all(dpi=150)
-        except Exception as e:
-            logger.warning(
-                f"Seed {random_state:05d}: plot_all() failed and plots were skipped. "
-                f"Reason: {e}"
-            )
-
-        if self.verbose:
-            logger.info(f"{random_state:05d}: Metrics at {metrics_filepath}")
-            logger.info(
-                f"Seed {random_state:05d} - Test Balanced Accuracy: {metrics['balanced_accuracy']:.4f}"
-            )
 
         return (
             random_state,
@@ -1104,8 +1195,6 @@ class ModelTrainer:
             ... )
         """
         self.create_directories()
-        os.makedirs(self.tests_dir, exist_ok=True)
-        os.makedirs(self.metrics_dir, exist_ok=True)
 
         if save_all_features:
             os.makedirs(self.all_features_dir, exist_ok=True)

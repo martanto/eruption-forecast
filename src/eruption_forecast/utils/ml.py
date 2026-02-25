@@ -18,6 +18,38 @@ from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 
 
+def load_labels_from_csv(label_features_csv: str) -> pd.Series:
+    """Load a label CSV and return a Series indexed by window ID.
+
+    Reads the aligned label CSV produced by FeaturesBuilder, sets the
+    ``id`` column as the index, drops the ``datetime`` column if present,
+    and returns the ``is_erupted`` column as a Series.
+
+    Args:
+        label_features_csv (str): Path to the label CSV file. Must contain
+            an ``id`` column and an ``is_erupted`` column.
+
+    Returns:
+        pd.Series: Binary eruption labels indexed by window ID.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+
+    Examples:
+        >>> labels = load_labels_from_csv("output/features/label_features.csv")
+        >>> print(labels.value_counts())
+        0    450
+        1     50
+        Name: is_erupted, dtype: int64
+    """
+    df = pd.read_csv(label_features_csv)
+    if "id" in df.columns:
+        df = df.set_index("id")
+    if "datetime" in df.columns:
+        df = df.drop("datetime", axis=1)
+    return df["is_erupted"]
+
+
 def random_under_sampler(
     features: pd.DataFrame,
     labels: pd.Series,
@@ -329,7 +361,7 @@ def compute_model_probabilities(
     prediction: np.ndarray = (mean_probability >= threshold).astype(int)
 
     votes_for_eruption: np.ndarray = (probabilities_eruption_matrix >= 0.5).sum(axis=1)
-    n_seeds = probabilities_eruption_matrix.shape[0]
+    n_seeds = probabilities_eruption_matrix.shape[1]
     majority_votes = np.where(
         prediction == 1, votes_for_eruption, n_seeds - votes_for_eruption
     )

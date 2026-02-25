@@ -5,6 +5,7 @@ from functools import cached_property
 import pandas as pd
 
 from eruption_forecast.logger import logger
+from eruption_forecast.data_container import BaseDataContainer
 from eruption_forecast.label.constants import (
     DATE_FORMAT,
     LABEL_PREFIX,
@@ -14,15 +15,18 @@ from eruption_forecast.label.constants import (
     EXAMPLE_LABEL_FILENAME,
     VALID_WINDOW_STEP_UNITS,
 )
-from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.utils.date_utils import parse_label_filename
 
 
-class LabelData:
+class LabelData(BaseDataContainer):
     """Wrapper class for loading and parsing label CSV files.
 
     This class handles loading pre-built label CSV files and extracts metadata
     from the standardized filename format. Use this class to load existing labels
     for model training or evaluation without rebuilding them.
+
+    Inherits from :class:`BaseDataContainer`, providing `csv_path`, `start_date_str`,
+    `end_date_str`, and `data` as part of the shared data-container interface.
 
     The filename must follow the format:
         label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}.csv
@@ -36,13 +40,14 @@ class LabelData:
         window_step (int): Window step size (e.g., 12 for 12 hours).
         window_unit (str): Unit of window step ('hours' or 'minutes').
         day_to_forecast (int): Days before eruption to start labeling as positive.
-        kwargs (dict): Dictionary of all extracted parameters.
         df (pd.DataFrame): Cached label DataFrame with datetime index and columns
             'id' (int) and 'is_erupted' (0 or 1).
+        data (pd.DataFrame): Alias for :attr:`df` — satisfies the
+            :class:`BaseDataContainer` interface.
         filename (str): Basename of the label CSV file with extension.
         basename (str): Filename without extension.
         filetype (str): File extension without the dot.
-        parameters (dict): Dictionary of all extracted parameters (same as kwargs).
+        parameters (dict): Dictionary of all extracted parameters.
 
     Examples:
         >>> # Load existing label file
@@ -93,38 +98,38 @@ class LabelData:
                 ...
             ValueError: Label file not found at nonexistent.csv
         """
+        super().__init__(csv_path=label_csv)
         self.label_csv = label_csv
 
         self.validate()
 
-        (
-            prefix,
-            start_date_str,
-            end_date_str,
-            window_step_and_unit,
-            day_to_forecast,
-        ) = self.basename.split("_")
+        parsed = parse_label_filename(self.basename)
 
-        start_date = to_datetime(start_date_str)
-        end_date = to_datetime(end_date_str)
-        window_step_parts: list[str] = window_step_and_unit.split("-")
+        self.start_date: datetime = parsed["start_date"]
+        self.end_date: datetime = parsed["end_date"]
+        self._start_date_str: str = parsed["start_date_str"]
+        self._end_date_str: str = parsed["end_date_str"]
+        self.window_step: int = parsed["window_step"]
+        self.window_unit: str = parsed["window_step_unit"]
+        self.day_to_forecast: int = parsed["day_to_forecast"]
 
-        self.start_date: datetime = start_date
-        self.end_date: datetime = end_date
-        self.start_date_str: str = start_date_str
-        self.end_date_str: str = end_date_str
-        self.window_step: int = int(window_step_parts[1])
-        self.window_unit: str = window_step_parts[2]
-        self.day_to_forecast: int = int(day_to_forecast.split("-")[1])
-        self.kwargs = {
-            "start_date": self.start_date,
-            "end_date": self.end_date,
-            "start_date_str": self.start_date_str,
-            "end_date_str": self.end_date_str,
-            "window_step": self.window_step,
-            "window_unit": self.window_unit,
-            "day_to_forecast": self.day_to_forecast,
-        }
+    @property
+    def start_date_str(self) -> str:
+        """Return the start date as an ISO-format string.
+
+        Returns:
+            str: Start date in ``"YYYY-MM-DD"`` format.
+        """
+        return self._start_date_str
+
+    @property
+    def end_date_str(self) -> str:
+        """Return the end date as an ISO-format string.
+
+        Returns:
+            str: End date in ``"YYYY-MM-DD"`` format.
+        """
+        return self._end_date_str
 
     def validate(self) -> None:
         """Validate label filename format and all components.
@@ -281,6 +286,9 @@ class LabelData:
     def filename(self) -> str:
         """Extract the filename from the full path.
 
+        Derives the basename (with extension) from :attr:`label_csv` using
+        ``os.path.basename``.
+
         Returns:
             str: Basename of the label CSV file including extension.
 
@@ -295,6 +303,9 @@ class LabelData:
     def basename(self) -> str:
         """Extract the basename without file extension.
 
+        Strips the ``.csv`` extension from :attr:`filename` using
+        ``os.path.splitext``.
+
         Returns:
             str: Filename without the .csv extension.
 
@@ -307,7 +318,10 @@ class LabelData:
 
     @cached_property
     def filetype(self) -> str:
-        """Extract the file extension.
+        """Extract the file extension without the leading dot.
+
+        Derived from :attr:`filename` using ``os.path.splitext``, with the
+        leading dot stripped (e.g., ``".csv"`` → ``"csv"``).
 
         Returns:
             str: File extension without the leading dot (e.g., 'csv').
@@ -322,6 +336,9 @@ class LabelData:
     @cached_property
     def parameters(self) -> dict[str, str | datetime | int]:
         """Extract all parameters from the label filename.
+
+        Assembles the parsed attributes (set during ``__init__``) into a single
+        dictionary for convenient downstream access.
 
         Returns:
             dict[str, str | datetime | int]: Dictionary containing all parsed parameters:
@@ -356,3 +373,12 @@ class LabelData:
         }
 
         return parameters
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """Alias for :attr:`df` — satisfies the :class:`BaseDataContainer` interface.
+
+        Returns:
+            pd.DataFrame: The label DataFrame.
+        """
+        return self.df

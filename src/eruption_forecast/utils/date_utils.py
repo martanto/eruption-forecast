@@ -1,10 +1,10 @@
-"""Date and time validation and conversion utilities.
+"""Date and time conversion and normalization utilities.
 
-This module provides functions for date validation, conversion, normalization,
-and window step validation. Ensures consistent date handling across the package.
+This module provides functions for date conversion, normalization, sorting,
+and filename parsing. Validation of date ranges and window steps has been
+moved to :mod:`eruption_forecast.utils.validation`.
 """
 
-from typing import Literal
 from datetime import datetime
 
 import pandas as pd
@@ -44,90 +44,6 @@ def to_datetime(date: str | datetime, variable_name: str | None = None) -> datet
         raise ValueError(  # noqa: B904
             f"{variable_name} value {date} is not in valid YYYY-MM-DD format."
         )
-
-
-def validate_date_ranges(
-    start_date: str | datetime, end_date: str | datetime
-) -> tuple[datetime, datetime, int]:
-    """Validate date range and ensure start_date is before end_date.
-
-    Converts date strings to datetime objects and validates that start_date
-    comes before end_date. Returns the validated dates and duration in days.
-
-    Args:
-        start_date (str | datetime): Start date in YYYY-MM-DD format or datetime object.
-        end_date (str | datetime): End date in YYYY-MM-DD format or datetime object.
-
-    Returns:
-        tuple[datetime, datetime, int]: Tuple containing:
-            - start_date (datetime): Validated start date.
-            - end_date (datetime): Validated end date.
-            - n_days (int): Total number of days between start and end (end - start).
-
-    Raises:
-        ValueError: If start_date >= end_date.
-
-    Examples:
-        >>> start, end, days = validate_date_ranges("2025-01-01", "2025-01-10")
-        >>> print(days)
-        9
-    """
-    if isinstance(start_date, str):
-        start_date = to_datetime(start_date)
-    if isinstance(end_date, str):
-        end_date = to_datetime(end_date)
-
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
-
-    if start_date >= end_date:
-        raise ValueError(
-            f"Start date ({start_date_str}) should be less than end date ({end_date_str})"
-        )
-
-    n_days: int = int((end_date - start_date).days)
-
-    return start_date, end_date, n_days
-
-
-def validate_window_step(
-    window_step: int,
-    window_step_unit: Literal["minutes", "hours"],
-) -> tuple[int, Literal["minutes", "hours"]]:
-    """Validate window step and step unit.
-
-    Ensures window_step is an integer and window_step_unit is either "minutes"
-    or "hours". Used to validate sliding window parameters before construction.
-
-    Args:
-        window_step (int): Step size between consecutive windows (must be positive integer).
-        window_step_unit (Literal["minutes", "hours"]): Unit of window step.
-
-    Returns:
-        tuple[int, Literal["minutes", "hours"]]: Validated window step and unit.
-
-    Raises:
-        TypeError: If window_step is not an integer or window_step_unit is not a string.
-        ValueError: If window_step_unit is not "minutes" or "hours".
-
-    Examples:
-        >>> validate_window_step(6, "hours")
-        (6, 'hours')
-        >>> validate_window_step(30, "minutes")
-        (30, 'minutes')
-    """
-    if not isinstance(window_step, int):
-        raise TypeError(f"window_step must be an integer. Your value is {window_step}")
-    if not isinstance(window_step_unit, str):
-        raise TypeError(
-            f"window_step_unit must be a string. Your value is {window_step_unit}"
-        )
-    if window_step_unit not in ["minutes", "hours"]:
-        raise ValueError(
-            f"window_step_unit must be 'minutes' or 'hours'. Your value is {window_step_unit}"
-        )
-
-    return window_step, window_step_unit
 
 
 def sort_dates(dates: list[str]) -> list[str]:
@@ -185,6 +101,117 @@ def normalize_dates(
     end_date_str = end_date.strftime("%Y-%m-%d")
 
     return start_date, end_date, start_date_str, end_date_str
+
+
+def parse_label_filename(basename: str) -> dict:
+    """Parse label parameters from a label file basename (without extension).
+
+    Extracts all structured parameters encoded in the standardised label filename
+    format: ``label_{start}_{end}_step-{X}-{unit}_dtf-{X}``.
+
+    Args:
+        basename (str): Filename without the ``.csv`` extension, e.g.
+            ``"label_2020-01-01_2020-12-31_step-12-hours_dtf-2"``.
+
+    Returns:
+        dict: Parsed parameters with keys:
+            - ``start_date`` (datetime): Parsed start date.
+            - ``end_date`` (datetime): Parsed end date.
+            - ``start_date_str`` (str): Start date string in ``"YYYY-MM-DD"`` format.
+            - ``end_date_str`` (str): End date string in ``"YYYY-MM-DD"`` format.
+            - ``window_step`` (int): Window step numeric value.
+            - ``window_step_unit`` (str): Window step unit (``"hours"`` or ``"minutes"``).
+            - ``day_to_forecast`` (int): Days before eruption for positive label.
+
+    Raises:
+        ValueError: If ``basename`` does not match the expected
+            ``label_{start}_{end}_step-{X}-{unit}_dtf-{X}`` format, including
+            wrong number of underscore-separated parts, missing ``step-`` or
+            ``dtf-`` prefixes, non-integer step or day values, or an unrecognised
+            window step unit.
+
+    Examples:
+        >>> params = parse_label_filename("label_2020-01-01_2020-12-31_step-12-hours_dtf-2")
+        >>> params["window_step"]
+        12
+        >>> params["window_step_unit"]
+        'hours'
+        >>> params["day_to_forecast"]
+        2
+    """
+    _EXPECTED_FORMAT = "label_{start}_{end}_step-{X}-{unit}_dtf-{X}"
+    _VALID_UNITS = ("minutes", "hours")
+
+    parts = basename.split("_")
+    if len(parts) != 5:
+        raise ValueError(
+            f"Label filename has {len(parts)} underscore-separated part(s); "
+            f"expected 5. Got: '{basename}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    _, start_date_str, end_date_str, window_step_and_unit, day_to_forecast_part = parts
+
+    if not window_step_and_unit.startswith("step-"):
+        raise ValueError(
+            f"Window step segment must start with 'step-'. "
+            f"Got: '{window_step_and_unit}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    if not day_to_forecast_part.startswith("dtf-"):
+        raise ValueError(
+            f"Day-to-forecast segment must start with 'dtf-'. "
+            f"Got: '{day_to_forecast_part}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    window_step_parts = window_step_and_unit.split("-")
+    if len(window_step_parts) != 3:
+        raise ValueError(
+            f"Window step segment must have format 'step-{{int}}-{{unit}}'. "
+            f"Got: '{window_step_and_unit}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    try:
+        window_step = int(window_step_parts[1])
+    except ValueError:
+        raise ValueError(
+            f"Window step value must be an integer. "
+            f"Got: '{window_step_parts[1]}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    window_step_unit = window_step_parts[2]
+    if window_step_unit not in _VALID_UNITS:
+        raise ValueError(
+            f"Window step unit must be one of {_VALID_UNITS}. "
+            f"Got: '{window_step_unit}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    dtf_parts = day_to_forecast_part.split("-")
+    if len(dtf_parts) != 2:
+        raise ValueError(
+            f"Day-to-forecast segment must have format 'dtf-{{int}}'. "
+            f"Got: '{day_to_forecast_part}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    try:
+        day_to_forecast = int(dtf_parts[1])
+    except ValueError:
+        raise ValueError(
+            f"Day-to-forecast value must be an integer. "
+            f"Got: '{dtf_parts[1]}'. Expected format: {_EXPECTED_FORMAT}"
+        )
+
+    start_date = to_datetime(start_date_str)
+    end_date = to_datetime(end_date_str)
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "start_date_str": start_date_str,
+        "end_date_str": end_date_str,
+        "window_step": window_step,
+        "window_step_unit": window_step_unit,
+        "day_to_forecast": day_to_forecast,
+    }
 
 
 def label_id_to_datetime(
