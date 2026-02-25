@@ -16,6 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.plots.shap_plots import plot_aggregate_shap_summary
 from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
 from eruption_forecast.plots.evaluation_plots import (
@@ -55,7 +56,7 @@ class MultiModelEvaluator:
             CSVs. If None, resolved in priority order: (1) when
             ``trained_model_csv`` is given →
             ``<trained_model_csv_dir>/figures/`` (e.g.
-            ``output/{station_dir}/trainings/model-with-evaluation/{classifier}/{cv}/figures/``);
+            ``output/{station_dir}/trainings/evaluations/{classifier}/{cv}/figures/``);
             (2) when ``metrics_dir`` is given →
             ``<parent_of_metrics_dir>/figures/``; (3) fallback →
             ``<cwd>/output/evaluation/figures/``. Defaults to None.
@@ -80,6 +81,7 @@ class MultiModelEvaluator:
         metrics_dir: str | None = None,
         metrics_files: list[str] | None = None,
         trained_model_csv: str | None = None,
+        root_dir: str | None = None,
         output_dir: str | None = None,
     ) -> None:
         """Initialize the MultiModelEvaluator with one or more metrics sources.
@@ -112,20 +114,8 @@ class MultiModelEvaluator:
         self._metrics_files = metrics_files
         self._trained_model_csv = trained_model_csv
 
-        # Resolve output directory
-        if output_dir is not None:
-            self.output_dir = output_dir
-        elif trained_model_csv is not None:
-            self.output_dir = os.path.join(
-                os.path.dirname(trained_model_csv), "figures"
-            )
-        elif metrics_dir is not None:
-            self.output_dir = os.path.join(os.path.dirname(metrics_dir), "figures")
-        else:
-            # metrics_files provided without a directory hint — fall back to cwd/output/figures
-            self.output_dir = os.path.join(
-                os.getcwd(), "output", "evaluation", "figures"
-            )
+        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output"))
+        self.output_dir = os.path.join(output_dir, "evaluations", "aggregate")
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -151,8 +141,9 @@ class MultiModelEvaluator:
             return paths
         raise ValueError("No metrics source: provide metrics_files or metrics_dir.")
 
+    @staticmethod
     def _load_seed_data(
-        self, row: pd.Series
+        row: pd.Series,
     ) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
         """Load model, filtered test features, true labels, and probabilities for one seed.
 
@@ -717,7 +708,7 @@ class MultiModelEvaluator:
         }
 
     # ------------------------------------------------------------------
-    # New visualizations: SHAP, seed stability, frequency band, classifier comparison
+    # New visualizations: SHAP, seed stability, frequency band
     # ------------------------------------------------------------------
 
     def get_metrics_list(self) -> list[dict[str, Any]]:
@@ -882,7 +873,7 @@ class MultiModelEvaluator:
             per_seed_features.append(features)
 
         fig, data = plot_frequency_band_contribution(
-            feature_names=per_seed_features,  # type: ignore[arg-type]
+            feature_names=per_seed_features,
             dpi=dpi,
         )
         self._save_outputs(

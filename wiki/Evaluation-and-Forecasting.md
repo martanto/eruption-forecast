@@ -26,8 +26,10 @@ evaluator = ModelEvaluator(
     model=trained_model,
     X_test=X_test,
     y_test=y_test,
-    model_name="xgb_42",
-    output_dir="output/eval",
+    model_name="XGBClassifier",
+    cv_name="StratifiedKFold",
+    # output_dir is optional: defaults to
+    # output/trainings/evaluations/xgb-classifier/stratified-k-fold/
 )
 ```
 
@@ -40,9 +42,19 @@ evaluator = ModelEvaluator.from_files(
     y_test="output/features/label_features.csv",
     selected_features=["feat_a", "feat_b"],  # optional: restrict to a feature subset
     model_name="xgb_42",
-    output_dir="output/eval",
+    output_dir="output/eval",  # explicit path overrides the default
 )
 ```
+
+**Default output path** — when `output_dir` is omitted, `ModelEvaluator` auto-constructs the path from `model_name` and `cv_name`:
+
+| `model_name` | `cv_name` | Resolved `output_dir` |
+|---|---|---|
+| `"model"` (default) | `"cv"` (default) | `<cwd>/output/trainings/evaluations/model/cv/` |
+| `"RandomForestClassifier"` | `"StratifiedKFold"` | `<cwd>/output/trainings/evaluations/random-forest-classifier/stratified-k-fold/` |
+| `"XGBClassifier"` | `"ShuffleSplit"` | `<cwd>/output/trainings/evaluations/xgb-classifier/shuffle-split/` |
+
+Both names are passed through `slugify_class_name()` — `CamelCase` → `kebab-case`. This convention matches the directory structure produced by `ModelTrainer.train_and_evaluate()`.
 
 Once created, inspect the model with:
 

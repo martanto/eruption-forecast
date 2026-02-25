@@ -182,7 +182,7 @@ class ClassifierComparator:
 
         Examples:
             >>> comparator = ClassifierComparator.from_json(
-            ...     "output/VG.OJN.00.EHZ/trained_models.json",
+            ...     "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
             ...     metrics=["f1_score", "roc_auc"],
             ... )
         """
@@ -887,7 +887,9 @@ class ClassifierComparator:
         for idx, m in enumerate(metrics_list):
             with apply_nature_style():
                 fig, ax = plt.subplots(figsize=(max(3.5, len(clf_names) * 0.9), 3.5))
-                self._draw_stability_violin(ax, clf_names, clf_colors, all_records, m, rng)
+                self._draw_stability_violin(
+                    ax, clf_names, clf_colors, all_records, m, rng
+                )
 
             self._attach_legend(fig, legend_patches, len(clf_names), (0.5, -0.08))
             fig.tight_layout()
@@ -902,7 +904,13 @@ class ClassifierComparator:
         # Combined overview figure — all metrics in a single subplot grid.
         if len(metrics_list) > 1:
             figures["all"] = self._build_combined_stability_figure(
-                metrics_list, clf_names, clf_colors, all_records, legend_patches, save, dpi
+                metrics_list,
+                clf_names,
+                clf_colors,
+                all_records,
+                legend_patches,
+                save,
+                dpi,
             )
 
         return figures

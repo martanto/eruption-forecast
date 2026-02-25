@@ -207,6 +207,7 @@ calculate = CalculateTremor(
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
+  - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
 - `MultiModelEvaluator`: Aggregate evaluation across all seeds (`multi_model_evaluator.py`)
   - Methods: `plot_all()`, `plot_roc()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
 - `ModelPredictor`: Runs inference in evaluation or forecast mode (`model_predictor.py`)

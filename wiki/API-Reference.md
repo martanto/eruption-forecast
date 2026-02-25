@@ -169,6 +169,21 @@ Single-seed evaluation.
 from eruption_forecast import ModelEvaluator
 ```
 
+### Constructor Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model` | `BaseEstimator \| GridSearchCV` | — | Fitted sklearn estimator |
+| `X_test` | `pd.DataFrame` | — | Test feature DataFrame |
+| `y_test` | `pd.Series` | — | True test labels |
+| `model_name` | `str` | `"model"` | Identifier used in filenames and plot titles |
+| `output_dir` | `str \| None` | `None` | Output directory; when `None`, auto-constructed as `output/trainings/evaluations/{clf-slug}/{cv-slug}/` |
+| `cv_name` | `str` | `"cv"` | CV strategy name slugified into the default output path (e.g. `"StratifiedKFold"` → `stratified-k-fold`) |
+| `selected_features` | `list[str] \| None` | `None` | Filter `X_test` to these columns before predicting |
+| `random_state` | `int \| None` | `None` | Seed for filename prefix |
+| `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir` |
+| `verbose` | `bool` | `False` | Emit progress log messages |
+
 ### Key Methods
 
 | Method | Description |
