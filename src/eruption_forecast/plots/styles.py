@@ -210,6 +210,39 @@ def apply_nature_style():
         mpl.rcParams.update(original_params)
 
 
+@contextmanager
+def nature_figure(
+    figsize: tuple[float, float] = (10, 6),
+    dpi: int | None = None,
+):
+    """Context manager that creates a Nature-style figure.
+
+    Applies :func:`apply_nature_style` and creates a ``(fig, ax)`` pair with the
+    requested dimensions.  The figure is yielded to the caller for plotting and
+    is *not* automatically closed so that the caller can return or save it.
+
+    Args:
+        figsize (tuple[float, float], optional): Figure width and height in inches.
+            Defaults to ``(10, 6)``.
+        dpi (int | None, optional): Figure resolution.  If None, matplotlib's
+            default DPI is used. Defaults to None.
+
+    Yields:
+        tuple[plt.Figure, plt.Axes]: The created figure and primary axes.
+
+    Examples:
+        >>> with nature_figure(figsize=(6, 5)) as (fig, ax):
+        ...     ax.plot([1, 2, 3], [1, 4, 9])
+        ...     fig.savefig("output.png")
+    """
+    kw: dict = {"figsize": figsize}
+    if dpi is not None:
+        kw["dpi"] = dpi
+    with apply_nature_style():
+        fig, ax = plt.subplots(**kw)
+        yield fig, ax
+
+
 def get_color(
     name: str,
     palette: Literal["nature", "okabe_ito"] = "nature",

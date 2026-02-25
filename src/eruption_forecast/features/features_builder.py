@@ -12,9 +12,9 @@ from tsfresh.utilities.dataframe_functions import impute
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import (
     concat_features as utils_concat_features,
-    validate_columns,
 )
 from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.validation import validate_columns
 from eruption_forecast.features.constants import (
     ID_COLUMN,
     ERUPTED_COLUMN,

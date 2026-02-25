@@ -7,9 +7,10 @@ from obspy.clients.fdsn.header import FDSNException
 
 from eruption_forecast.logger import logger
 from eruption_forecast.sources.sds import SDS
+from eruption_forecast.sources.base import SeismicDataSource
 
 
-class FDSN:
+class FDSN(SeismicDataSource):
     """Retrieve seismic data from an FDSN web service.
 
     FDSN (International Federation of Digital Seismograph Networks) provides
@@ -143,7 +144,7 @@ class FDSN:
         if not isinstance(date, datetime):
             raise TypeError("Date must be a datetime object")
 
-        date_str = date.strftime("%Y-%m-%d")
+        prefix = self.SDS._make_log_prefix(date)
 
         start_date = date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = date.replace(hour=23, minute=59, second=59, microsecond=59)
@@ -170,13 +171,13 @@ class FDSN:
             if len(stream) == 0:
                 if self.verbose:
                     logger.info(
-                        f"{date_str} :: {self.nslc} Waveforms retrieved. No trace(s) found."
+                        f"{prefix} Waveforms retrieved. No trace(s) found."
                     )
                 return Stream()
 
             if self.verbose:
                 logger.info(
-                    f"{date_str} :: {self.nslc} Waveforms retrieved. Trace(s) found: {len(stream)}"
+                    f"{prefix} Waveforms retrieved. Trace(s) found: {len(stream)}"
                 )
 
             self.SDS.save(stream, date)
@@ -184,5 +185,5 @@ class FDSN:
 
         except FDSNException as e:
             if self.debug:
-                logger.error(f"{date_str} :: {self.nslc} Download failed. Error: {e}")
+                logger.error(f"{prefix} Download failed. Error: {e}")
             return stream

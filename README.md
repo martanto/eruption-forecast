@@ -70,6 +70,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 ```
 eruption-forecast/
 ├── src/eruption_forecast/
+│   ├── data_container.py    # BaseDataContainer — shared ABC for TremorData & LabelData
 │   ├── tremor/              # Seismic tremor processing
 │   ├── label/               # Training label generation
 │   ├── features/            # Feature extraction & selection
@@ -555,4 +556,4 @@ If you use this package in your research, please cite:
 
 **Version:** 0.2.1
 **Status:** Active Development
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-25

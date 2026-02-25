@@ -11,15 +11,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import compute_model_probabilities
+from eruption_forecast.utils.ml import load_labels_from_csv, compute_model_probabilities
 from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
-from eruption_forecast.features.constants import (
-    ID_COLUMN,
-    ERUPTED_COLUMN,
-    DATETIME_COLUMN,
-)
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.features.features_builder import FeaturesBuilder
@@ -303,13 +298,7 @@ class ModelPredictor:
         """
         features_df = pd.read_csv(future_features_csv, index_col=0)
 
-        _df = pd.read_csv(future_labels_csv)
-        if ID_COLUMN in _df.columns:
-            _df = _df.set_index(ID_COLUMN)
-        if DATETIME_COLUMN in _df.columns:
-            _df = _df.drop(DATETIME_COLUMN, axis=1)
-
-        labels_df = _df[ERUPTED_COLUMN]
+        labels_df = load_labels_from_csv(future_labels_csv)
 
         if labels_df.empty:
             raise RuntimeError(

@@ -5,8 +5,8 @@ from datetime import timedelta
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.dataframe import validate_columns
 from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.validation import validate_columns
 from eruption_forecast.features.constants import (
     ID_COLUMN,
     ERUPTED_COLUMN,

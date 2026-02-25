@@ -4,21 +4,28 @@ from functools import cached_property
 
 import pandas as pd
 
-from eruption_forecast.utils.dataframe import check_sampling_consistency
+from eruption_forecast.data_container import BaseDataContainer
+from eruption_forecast.utils.validation import check_sampling_consistency
 
 
-class TremorData:
+class TremorData(BaseDataContainer):
     """Container for tremor time-series data.
 
     Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR) and exposes
     convenience properties for common metadata. Data can be supplied
     directly as a DataFrame or loaded from a CSV file.
 
+    Inherits from :class:`BaseDataContainer`, providing `csv_path`, `start_date_str`,
+    `end_date_str`, and `data` as part of the shared data-container interface.
+
     Attributes:
-        csv (str | None): Path to the source CSV file, set by
-            :meth:`from_csv`. Defaults to None.
+        csv_path (str): Path to the source CSV file, set by
+            :meth:`from_csv`. Empty string until data is loaded.
         verbose (bool): If True, emit informational log messages.
         debug (bool): If True, emit debug-level log messages.
+        _df (pd.DataFrame): The underlying internal tremor DataFrame.
+        data (pd.DataFrame): Alias for :attr:`df` satisfying the
+            :class:`BaseDataContainer` interface.
 
     Args:
         df (pd.DataFrame | None): Pre-loaded tremor DataFrame
@@ -44,7 +51,7 @@ class TremorData:
         """Initialize the TremorData container with an optional DataFrame.
 
         Stores the provided DataFrame (or an empty one when df is None),
-        initialises csv to None, and configures logging flags.
+        initialises ``csv_path`` to an empty string, and configures logging flags.
 
         Args:
             df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame with
@@ -54,9 +61,9 @@ class TremorData:
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
+        super().__init__(csv_path="")
         self.verbose = verbose
         self.debug = debug
-        self.csv: str | None = None
         self.df = df if df is not None else pd.DataFrame()
 
     def __repr__(self) -> str:
@@ -66,7 +73,7 @@ class TremorData:
             str: A string showing the CSV path, DataFrame shape, and logging flags.
         """
         return (
-            f"{self.__class__.__name__}(csv={self.csv}, df={self.df.shape}, "
+            f"{self.__class__.__name__}(csv_path={self.csv_path}, df={self.df.shape}, "
             f"verbose={self.verbose}, debug={self.debug})"
         )
 
@@ -75,7 +82,7 @@ class TremorData:
 
         Reads the CSV, parses the ``datetime`` column as the index, and
         sorts the index in ascending order. The CSV path is stored in
-        ``self.csv`` for later reference.
+        ``self.csv_path`` for later reference.
 
         Args:
             tremor_csv (str): Absolute or relative path to the tremor CSV
@@ -99,7 +106,7 @@ class TremorData:
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df = df.sort_index()
         self._df = df
-        self.csv = tremor_csv
+        self.csv_path = tremor_csv
         return df
 
     @property
@@ -183,6 +190,15 @@ class TremorData:
             int: Integer number of days between start and end date.
         """
         return int((self.end_date - self.start_date).days)
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """Alias for :attr:`df` — satisfies the :class:`BaseDataContainer` interface.
+
+        Returns:
+            pd.DataFrame: The tremor DataFrame.
+        """
+        return self.df
 
     def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
         """Check temporal sampling consistency of the tremor data.

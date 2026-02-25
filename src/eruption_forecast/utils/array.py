@@ -18,10 +18,12 @@ def detect_anomalies_zscore(data: np.ndarray, threshold=3.5) -> NDArray[np.bool_
         data (np.ndarray): Array of numerical data.
         threshold (float, optional): Z-score threshold. Defaults to 3.5.
 
-    Returns
+    Returns:
+        NDArray[np.bool_]: Boolean mask array of same length as ``data``.
+            True indicates an anomaly at that position.
     """
     # Compute on non-NaN values only
-    valid = data[~np.isnan(data)]
+    valid = _filter_nans(data)
     median = np.median(valid)
 
     # Median Absolute Deviation
@@ -64,6 +66,21 @@ def mask_zero_values(data: np.ndarray) -> np.ndarray:
 
     non_zero_mask = data != 0.0
     return data[non_zero_mask]
+
+
+def _filter_nans(data: np.ndarray) -> np.ndarray:
+    """Remove NaN values from an array.
+
+    Args:
+        data (np.ndarray): Input array that may contain NaN values.
+
+    Returns:
+        np.ndarray: Array with all NaN values removed.
+
+    Note:
+        Used internally by ``detect_maximum_outlier`` and ``remove_outliers``.
+    """
+    return data[~np.isnan(data)]
 
 
 def detect_maximum_outlier(
@@ -110,7 +127,7 @@ def detect_maximum_outlier(
 
     # Handle NaN values
     if np.any(np.isnan(data)):
-        data = data[~np.isnan(data)]
+        data = _filter_nans(data)
         if len(data) == 0:
             return False, np.nan, np.nan
 
@@ -244,7 +261,7 @@ def remove_outliers(
 
     # Handle NaN values
     if np.any(np.isnan(data)):
-        data = data[~np.isnan(data)]
+        data = _filter_nans(data)
         if len(data) == 0:
             return np.array([])
 
