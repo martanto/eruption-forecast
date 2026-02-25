@@ -133,15 +133,12 @@ class DSAR:
                 absolute_value=True,
             )
 
-        first_dsar: pd.Series = first_stream
-        second_dsar: pd.Series = second_stream
-
-        self.first_dsar = first_dsar
-        self.second_dsar: pd.Series[float] = pd.Series(second_dsar)
+        self.first_dsar = first_stream
+        self.second_dsar = second_stream
 
         # Calculate DSAR ratio
         # Pandas handles division of Series with same index automatically
-        series: pd.Series[float] = first_dsar / second_dsar
+        series: pd.Series[float] = first_stream / second_stream
 
         if value_multiplier != 1.0:
             series: pd.Series[float] = series.apply(lambda x: x * value_multiplier)
