@@ -141,6 +141,7 @@ class FeatureSelector:
         self.importance_scores_: pd.Series = pd.Series(dtype=float)
         self.n_features_tsfresh: int = 0
         self.n_features_rf: int = 0
+        self.n_features: int = 0
         self.feature_names_: list[str] = []
 
         # ------------------------------------------------------------------
@@ -232,7 +233,13 @@ class FeatureSelector:
         )
 
         self.n_features_tsfresh = X_filtered.shape[1]
+        self.n_features = self.n_features_tsfresh
         self.p_values_ = p_values
+
+        if self.n_features_tsfresh == 0:
+            logger.warning(
+                f"{self.random_state:05d}: Features reduced to 0 from {X.shape[1]}"
+            )
 
         if self.verbose:
             logger.info(
@@ -340,6 +347,7 @@ class FeatureSelector:
         importance_scores.index.name = "features"
 
         self.n_features_rf = X_selected.shape[1]
+        self.n_features = self.n_features_rf
         self.importance_scores_ = importance_scores
 
         if self.verbose:
