@@ -197,6 +197,7 @@ label_builder = LabelBuilder(
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
+  - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
 - `ModelPredictor`: Runs inference in evaluation or forecast mode (`model_predictor.py`)
   - `predict()` / `predict_best()`: Requires labels (evaluation mode)
   - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
