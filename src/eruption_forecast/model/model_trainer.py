@@ -644,7 +644,7 @@ class ModelTrainer:
         random_state: int = 42,
         all_features_filepath: str | None = None,
         all_figures_filepath: str | None = None,
-    ) -> tuple[pd.DataFrame, pd.Series, pd.Series, int]:
+    ) -> tuple[pd.DataFrame, pd.Series, pd.Series, int] | None:
         """Select the most predictive features from a resampled training set.
 
         Uses tsfresh statistical significance testing with FDR control
@@ -661,6 +661,7 @@ class ModelTrainer:
         Returns:
             tuple[pd.DataFrame, pd.Series, pd.Series, int]: Selected features dataframe,
                 top (n) features, all selected features, (n) features
+            None: If features reduced to zero after selection.
         """
         selector = self.FeatureSelector.set_random_state(random_state)
         number_of_significant_features = self.number_of_significant_features
@@ -670,7 +671,11 @@ class ModelTrainer:
             features, labels, top_n=number_of_significant_features
         )
 
-        # Series indexed by feature name; values are p-values sorted by significance.
+        if selector.n_features == 0:
+            logger.warning(f"{random_state:05d}: Skip training model.")
+            return None
+
+        # Series indexed by feature name; values are p-values or importance score sorted by it's value.
         all_selected_features = selector.selected_features_
 
         # Handle if columns in df_selected_features has less than number_of_significant_features
@@ -910,7 +915,7 @@ class ModelTrainer:
         sampling_strategy: str | float = 0.75,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[int, str, str, dict, str, str]:
+    ) -> tuple[int, str, str, dict, str, str] | None:
         """Train feature selection and classifier model for a single random seed.
 
         Performs:
@@ -931,6 +936,7 @@ class ModelTrainer:
             tuple[int, str, str, dict, str, str]: Random state value, path to significant
                 features CSV, trained model filepath, metrics dictionary, path to held-out
                 X_test CSV, and path to held-out y_test CSV.
+            None: When features reduced to zero.
         """
         if self.debug:
             logger.debug(
@@ -975,12 +981,7 @@ class ModelTrainer:
         )
 
         # ========== STEP 3: Feature Selection ONLY on Training Data ==========
-        (
-            features_train_resampled_selected,
-            top_selected_features,
-            _selected_features,
-            _n_features,
-        ) = self.select_features(
+        result = self.select_features(
             features=features_train_resampled,
             labels=labels_train_resampled,
             random_state=random_state,
@@ -988,6 +989,16 @@ class ModelTrainer:
             all_features_filepath=all_features_filepath if save_features else None,
             all_figures_filepath=all_figures_filepath if plot_features else None,
         )
+
+        if result is None:  # Feature selection returned nothing; skip this seed
+            return None  # Signal caller to skip: no features, no model
+
+        (
+            features_train_resampled_selected,
+            top_selected_features,
+            _selected_features,
+            _n_features,
+        ) = result
 
         # ========== STEP 4: Cross-Validation with Dynamic Classifier ==========
         top_n_features = top_selected_features.index.tolist()
@@ -1018,7 +1029,7 @@ class ModelTrainer:
             selected_features=top_n_features,
         )
 
-        # Save metrics evaluations
+        # Get metrics evaluations
         grid_params = grid_search.best_params_
         metrics: dict[str, Any] = model_evaluator.get_metrics()
         best_params = {f"best_params_{k}": v for k, v in grid_params.items()}
@@ -1031,6 +1042,7 @@ class ModelTrainer:
             }
         )
 
+        # Save metrics evaluations
         with open(metrics_filepath, "w") as f:
             json.dump(metrics, f, indent=4)
 
@@ -1146,14 +1158,17 @@ class ModelTrainer:
                     )
                 )
 
-        for (
-            _random_state,
-            significant_features_csv,
-            trained_model_filepath,
-            metrics,
-            X_test_filepath,
-            y_test_filepath,
-        ) in self._run_jobs(self._run_train_and_evaluate, pending_jobs):
+        for result in self._run_jobs(self._run_train_and_evaluate, pending_jobs):
+            if result is None:  # Feature selection returned nothing; skip this seed
+                continue  # Move on to the next seed without training
+            (
+                _random_state,
+                significant_features_csv,
+                trained_model_filepath,
+                metrics,
+                X_test_filepath,
+                y_test_filepath,
+            ) = result
             self.significant_features_csvs.append(significant_features_csv)
             significant_features_and_trained_models.append(
                 {
@@ -1189,7 +1204,7 @@ class ModelTrainer:
         sampling_strategy: str | float = 0.75,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[int, str, str]:
+    ) -> tuple[int, str, str] | None:
         """Train on the full dataset (no train/test split) for a single random seed.
 
         Performs:
@@ -1208,6 +1223,7 @@ class ModelTrainer:
         Returns:
             tuple[int, str, str]: Random state value, path to significant features CSV,
                 and trained model filepath.
+            None: When features reduced to zero.
 
         Example:
             >>> trainer = ModelTrainer(...)
@@ -1238,12 +1254,7 @@ class ModelTrainer:
         )
 
         # ========== STEP 2: Feature Selection on Resampled Data ==========
-        (
-            features_resampled_selected,
-            top_selected_features,
-            _selected_features,
-            _n_features,
-        ) = self.select_features(
+        result = self.select_features(
             features=features_resampled,
             labels=labels_resampled,
             random_state=random_state,
@@ -1251,6 +1262,16 @@ class ModelTrainer:
             all_features_filepath=all_features_filepath if save_features else None,
             all_figures_filepath=all_figures_filepath if plot_features else None,
         )
+
+        if result is None:  # Feature selection returned nothing; skip this seed
+            return None  # Signal caller to skip: no features, no model
+
+        (
+            features_resampled_selected,
+            top_selected_features,
+            _selected_features,
+            _n_features,
+        ) = result
 
         # ========== STEP 3: Cross-Validation with Dynamic Classifier ==========
         logger.info(f"Fitting Seed: {random_state:05d}")
@@ -1366,11 +1387,14 @@ class ModelTrainer:
                     )
                 )
 
-        for (
-            _random_state,
-            significant_features_csv,
-            trained_model_filepath,
-        ) in self._run_jobs(self._run_train, pending_jobs):
+        for result in self._run_jobs(self._run_train, pending_jobs):
+            if result is None:  # Feature selection returned nothing; skip this seed
+                continue  # Move on to the next seed without training
+            (
+                _random_state,
+                significant_features_csv,
+                trained_model_filepath,
+            ) = result
             self.significant_features_csvs.append(significant_features_csv)
             significant_features_and_trained_models.append(
                 {
