@@ -7,13 +7,12 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.dataframe import validate_columns
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import (
     to_datetime,
     normalize_dates,
-    validate_date_ranges,
 )
+from eruption_forecast.utils.validation import validate_columns, validate_date_ranges
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.model_trainer import ModelTrainer

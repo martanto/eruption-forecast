@@ -7,6 +7,7 @@ from sklearn.inspection import permutation_importance
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import get_significant_features
+from eruption_forecast.utils.validation import validate_random_state
 
 
 class FeatureSelector:
@@ -156,9 +157,6 @@ class FeatureSelector:
 
         Raises:
             ValueError: If n_jobs is less than 1.
-
-        Returns:
-            None
         """
         if self.n_jobs < 1:
             raise ValueError(f"n_jobs must be >= 1. Your value is {self.n_jobs}")
@@ -186,8 +184,7 @@ class FeatureSelector:
             >>> selector.set_random_state(123)
             >>> selector.fit(X_train, y_train)
         """
-        if random_state < 0:
-            raise ValueError(f"random_state must be >= 0. Your value is {random_state}")
+        validate_random_state(random_state)
         self.random_state = random_state
         return self
 

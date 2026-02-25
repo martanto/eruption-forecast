@@ -1,4 +1,4 @@
-from typing import Any, Self, Literal
+from typing import Any, Self, Literal, ClassVar
 
 from xgboost import XGBClassifier
 from sklearn.svm import SVC
@@ -21,6 +21,7 @@ from sklearn.model_selection import (
 from eruption_forecast.logger import logger
 from eruption_forecast.model.constants import DEFAULT_GRID_PARAMS
 from eruption_forecast.utils.formatting import slugify_class_name
+from eruption_forecast.utils.validation import validate_random_state
 
 
 class ClassifierModel:
@@ -104,6 +105,9 @@ class ClassifierModel:
         ...     {"C": [0.1, 1, 10]}
         ... )
     """
+
+    # Maps classifier key → hyperparameter grid; used by the ``grid`` property.
+    _GRID_REGISTRY: ClassVar[dict[str, dict[str, Any]]] = DEFAULT_GRID_PARAMS
 
     def __init__(
         self,
@@ -189,8 +193,7 @@ class ClassifierModel:
             >>> clf.set_random_state(42)
             >>> model, grid = clf.model_and_grid
         """
-        if random_state < 0:
-            raise ValueError(f"random_state must be >= 0. Your value is {random_state}")
+        validate_random_state(random_state)
         self.random_state = random_state
         return self
 
@@ -312,42 +315,8 @@ class ClassifierModel:
         if self._grid is not None:
             return self._grid
 
-        if self.classifier == "svm" or isinstance(self._model, SVC):
-            return DEFAULT_GRID_PARAMS["svm"]
-
-        if self.classifier == "knn" or isinstance(self._model, KNeighborsClassifier):
-            return DEFAULT_GRID_PARAMS["knn"]
-
-        if self.classifier == "dt" or isinstance(self._model, DecisionTreeClassifier):
-            return DEFAULT_GRID_PARAMS["dt"]
-
-        if self.classifier == "lite-rf":
-            return DEFAULT_GRID_PARAMS["lite-rf"]
-
-        if self.classifier == "rf" or isinstance(self._model, RandomForestClassifier):
-            return DEFAULT_GRID_PARAMS["rf"]
-
-        if self.classifier == "gb" or isinstance(
-            self._model, GradientBoostingClassifier
-        ):
-            return DEFAULT_GRID_PARAMS["gb"]
-
-        if self.classifier == "xgb" or isinstance(self._model, XGBClassifier):
-            return DEFAULT_GRID_PARAMS["xgb"]
-
-        if self.classifier == "nn" or isinstance(self._model, MLPClassifier):
-            return DEFAULT_GRID_PARAMS["nn"]
-
-        if self.classifier == "nb" or isinstance(self._model, GaussianNB):
-            return DEFAULT_GRID_PARAMS["nb"]
-
-        if self.classifier == "lr" or isinstance(self._model, LogisticRegression):
-            return DEFAULT_GRID_PARAMS["lr"]
-
-        if self.classifier == "voting" or isinstance(self._model, VotingClassifier):
-            # Grid for VotingClassifier ensemble
-            # Parameters are prefixed with estimator name (e.g., rf__, gb__, etc.)
-            return DEFAULT_GRID_PARAMS["voting"]
+        if self.classifier in self._GRID_REGISTRY:
+            return self._GRID_REGISTRY[self.classifier]
 
         raise ValueError(f"Unknown classifier: {self.classifier}")
 
@@ -413,62 +382,81 @@ class ClassifierModel:
         if self._model is not None:
             return self._model
 
-        _cw = self.class_weight if self.class_weight is not None else "balanced"
+        return self._build_model()
 
-        if self.classifier == "svm":
-            return SVC(
-                class_weight=_cw,
+    def _build_model(
+        self,
+    ) -> (
+        SVC
+        | KNeighborsClassifier
+        | DecisionTreeClassifier
+        | RandomForestClassifier
+        | GradientBoostingClassifier
+        | XGBClassifier
+        | MLPClassifier
+        | GaussianNB
+        | LogisticRegression
+        | VotingClassifier
+    ):
+        """Construct and return a new classifier instance based on self.classifier.
+
+        Called by the ``model`` property when no custom model has been set.
+        Uses a dictionary of callables keyed by classifier name to eliminate
+        repetitive if-elif chains.
+
+        Returns:
+            SVC | KNeighborsClassifier | DecisionTreeClassifier | RandomForestClassifier |
+            GradientBoostingClassifier | XGBClassifier | MLPClassifier | GaussianNB |
+            LogisticRegression | VotingClassifier: A freshly constructed classifier
+            instance configured with the current random_state, class_weight, and n_jobs.
+
+        Raises:
+            ValueError: If self.classifier is not a recognised key.
+        """
+        _class_weight = self.class_weight if self.class_weight is not None else "balanced"
+
+        # Factory dict mapping classifier key → zero-argument callable that constructs the estimator.
+        _model_registry: dict[str, Any] = {
+            "svm": lambda: SVC(
+                class_weight=_class_weight,
                 random_state=self.random_state,
                 probability=True,
-            )
-
-        if self.classifier == "knn":
-            return KNeighborsClassifier()
-
-        if self.classifier == "dt":
-            return DecisionTreeClassifier(
-                class_weight=_cw, random_state=self.random_state
-            )
-
-        if self.classifier == "rf" or self.classifier == "lite-rf":
-            return RandomForestClassifier(
-                class_weight=_cw,
+            ),
+            "knn": lambda: KNeighborsClassifier(),
+            "dt": lambda: DecisionTreeClassifier(
+                class_weight=_class_weight, random_state=self.random_state
+            ),
+            "rf": lambda: RandomForestClassifier(
+                class_weight=_class_weight,
                 random_state=self.random_state,
                 n_jobs=self.n_jobs,
-            )
-
-        if self.classifier == "gb":
-            return GradientBoostingClassifier(random_state=self.random_state)
-
-        if self.classifier == "xgb":
-            return XGBClassifier(
+            ),
+            "lite-rf": lambda: RandomForestClassifier(
+                class_weight=_class_weight,
+                random_state=self.random_state,
+                n_jobs=self.n_jobs,
+            ),
+            "gb": lambda: GradientBoostingClassifier(random_state=self.random_state),
+            "xgb": lambda: XGBClassifier(
                 eval_metric="logloss",
                 random_state=self.random_state,
                 n_jobs=self.n_jobs,
-            )
-
-        if self.classifier == "nn":
-            return MLPClassifier(alpha=1, max_iter=1000, random_state=self.random_state)
-
-        if self.classifier == "nb":
-            return GaussianNB()
-
-        if self.classifier == "lr":
-            return LogisticRegression(
-                class_weight=_cw,
+            ),
+            "nn": lambda: MLPClassifier(
+                alpha=1, max_iter=1000, random_state=self.random_state
+            ),
+            "nb": lambda: GaussianNB(),
+            "lr": lambda: LogisticRegression(
+                class_weight=_class_weight,
                 random_state=self.random_state,
                 max_iter=1000,
-            )
-
-        if self.classifier == "voting":
-            # Ensemble VotingClassifier combining top-performing classifiers
-            # Uses soft voting for probability-based predictions
-            return VotingClassifier(
+            ),
+            "voting": lambda: VotingClassifier(
                 estimators=[
                     (
                         "rf",
                         RandomForestClassifier(
-                            class_weight=_cw,
+                            class_weight=_class_weight,
                             random_state=self.random_state,
                             n_jobs=self.n_jobs,
                         ),
@@ -483,9 +471,13 @@ class ClassifierModel:
                     ),
                 ],
                 voting="soft",
-            )
+            ),
+        }
 
-        raise ValueError(f"Unknown classifier: {self.classifier}")
+        if self.classifier not in _model_registry:
+            raise ValueError(f"Unknown classifier: {self.classifier}")
+
+        return _model_registry[self.classifier]()
 
     @model.setter
     def model(
