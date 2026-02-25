@@ -2,6 +2,10 @@ import os
 from typing import Literal
 from datetime import datetime, timedelta
 
+import matplotlib
+
+
+matplotlib.use("Agg")  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
