@@ -28,11 +28,11 @@ warnings.filterwarnings("ignore")
 RUN_CALCULATE = True
 RUN_BUILD_LABEL = True
 RUN_EXTRACT_FEATURES = True
-RUN_TRAIN = True            # with_evaluation=True → 80/20 split + metrics
-RUN_FORECAST = True         # predict_proba on future window
-RUN_EVALUATE_PER_MODEL = True   # MultiModelEvaluator aggregate plots per classifier
-RUN_COMPARE_MODELS = True       # ClassifierComparator cross-classifier plots
-SAVE_CONFIG = True              # save pipeline parameters to YAML after all stages
+RUN_TRAIN = True  # with_evaluation=True → 80/20 split + metrics
+RUN_FORECAST = True  # predict_proba on future window
+RUN_EVALUATE_PER_MODEL = True  # MultiModelEvaluator aggregate plots per classifier
+RUN_COMPARE_MODELS = True  # ClassifierComparator cross-classifier plots
+SAVE_CONFIG = True  # save pipeline parameters to YAML after all stages
 
 # ---------------------------------------------------------------------------
 # Common configuration
@@ -74,11 +74,11 @@ CALCULATE_KWARGS: dict[str, Any] = {
     "remove_outlier_method": "maximum",
 }
 
-# Used when RUN_TRAIN with with_evaluation=False — shorter end_date leaves
-# room for the forecast window defined in FORECAST_KWARGS.
-BUILD_LABEL_TRAIN_KWARGS: dict[str, Any] = {
+# Used when RUN_TRAIN with with_evaluation=True — full date range covers all
+# eruption events so the 80/20 test split includes every labelled period.
+BUILD_LABEL_EVALUATE_KWARGS: dict[str, Any] = {
     "start_date": "2025-01-01",
-    "end_date": "2025-07-27",
+    "end_date": "2025-08-24",
     "day_to_forecast": 2,
     "window_step": 6,
     "window_step_unit": "hours",
@@ -86,11 +86,11 @@ BUILD_LABEL_TRAIN_KWARGS: dict[str, Any] = {
     "verbose": True,
 }
 
-# Used when RUN_TRAIN with with_evaluation=True — full date range covers all
-# eruption events so the 80/20 test split includes every labelled period.
-BUILD_LABEL_EVALUATE_KWARGS: dict[str, Any] = {
+# Used when RUN_TRAIN with with_evaluation=False — shorter end_date leaves
+# room for the forecast window defined in FORECAST_KWARGS.
+BUILD_LABEL_FORECAST_KWARGS: dict[str, Any] = {
     "start_date": "2025-01-01",
-    "end_date": "2025-08-24",
+    "end_date": "2025-07-27",
     "day_to_forecast": 2,
     "window_step": 6,
     "window_step_unit": "hours",
@@ -115,7 +115,6 @@ EXTRACT_FEATURES_KWARGS: dict[str, Any] = {
 }
 
 TRAIN_KWARGS: dict[str, Any] = {
-    "with_evaluation": True,
     "classifier": ["lite-rf", "rf"],
     "cv_strategy": "stratified",
     "random_state": 0,
@@ -178,92 +177,76 @@ def main() -> None:
         print("[workflow] Skipping Stage 1: calculate tremor")
 
     # -----------------------------------------------------------------------
-    # Stage 2: Build labels
+    # Stage 2: Build labels, extract featuresm and train/forecast
     # Use the full date range when training with evaluation (80/20 split),
     # or the shorter range when training without evaluation to leave headroom
     # for the forecast window.
     # -----------------------------------------------------------------------
-    if RUN_BUILD_LABEL:
-        with_evaluation: bool = bool(TRAIN_KWARGS.get("with_evaluation", False))
-        build_label_kwargs = (
-            BUILD_LABEL_EVALUATE_KWARGS if with_evaluation else BUILD_LABEL_TRAIN_KWARGS
-        )
-        fm.build_label(**build_label_kwargs)
-    else:
-        print("[workflow] Skipping Stage 2: build label")
+    for mode in ["train", "forecast"]:
+        if mode == "train":
+            fm.build_label(**BUILD_LABEL_EVALUATE_KWARGS).extract_features(
+                **EXTRACT_FEATURES_KWARGS
+            ).train(with_evaluation=True, **TRAIN_KWARGS)
 
-    # -----------------------------------------------------------------------
-    # Stage 3: Extract features
-    # -----------------------------------------------------------------------
-    if RUN_EXTRACT_FEATURES:
-        fm.extract_features(**EXTRACT_FEATURES_KWARGS)
-    else:
-        print("[workflow] Skipping Stage 3: extract features")
+            # -----------------------------------------------------------------------
+            # Stage 3: Evaluate per model (MultiModelEvaluator)
+            # -----------------------------------------------------------------------
+            if RUN_EVALUATE_PER_MODEL:
+                if not fm.trained_models:
+                    print(
+                        "[workflow] Skipping Stage 2: no trained_models available. "
+                        "Run Stage 2 first or load a ForecastModel with trained_models set."
+                    )
+                else:
+                    for name, csv_path in fm.trained_models.items():
+                        print(f"[workflow] Stage 3: evaluating '{name}'")
+                        csv_dir = os.path.dirname(os.path.abspath(csv_path))
+                        metrics_dir: str | None = os.path.join(csv_dir, "metrics")
+                        if not os.path.isdir(metrics_dir):
+                            metrics_dir = None
 
-    # -----------------------------------------------------------------------
-    # Stage 4: Train (with evaluation — 80/20 split + per-seed metrics JSON)
-    # -----------------------------------------------------------------------
-    if RUN_TRAIN:
-        fm.train(**TRAIN_KWARGS)
-    else:
-        print("[workflow] Skipping Stage 4: train")
+                        evaluator = MultiModelEvaluator(
+                            trained_model_csv=csv_path,
+                            metrics_dir=metrics_dir,
+                        )
+                        if metrics_dir is not None:
+                            evaluator.get_aggregate_metrics()
+                        evaluator.plot_all()
+            else:
+                print("[workflow] Skipping Stage 3: evaluate per model")
 
-    # -----------------------------------------------------------------------
-    # Stage 5: Forecast (predict_proba on future window)
-    # -----------------------------------------------------------------------
-    if RUN_FORECAST:
-        fm.forecast(**FORECAST_KWARGS)
-    else:
-        print("[workflow] Skipping Stage 5: forecast")
+            # -----------------------------------------------------------------------
+            # Stage 4: Compare models (ClassifierComparator)
+            # -----------------------------------------------------------------------
+            if RUN_COMPARE_MODELS:
+                if len(fm.trained_models) < 2:
+                    print(
+                        "[workflow] Skipping Stage 4: comparison requires at least 2 classifiers "
+                        f"(found {len(fm.trained_models)})."
+                    )
+                else:
+                    print("[workflow] Stage 4: comparing classifiers")
+                    comparator = ClassifierComparator(
+                        classifiers=fm.trained_models,
+                        output_dir=fm.station_dir,
+                    )
+                    comparator.plot_all()
+            else:
+                print("[workflow] Skipping Stage 4: compare models")
 
-    # -----------------------------------------------------------------------
-    # Stage 6: Evaluate per model (MultiModelEvaluator)
-    # -----------------------------------------------------------------------
-    if RUN_EVALUATE_PER_MODEL:
-        if not fm.trained_models:
-            print(
-                "[workflow] Skipping Stage 6: no trained_models available. "
-                "Run Stage 4 first or load a ForecastModel with trained_models set."
-            )
+        elif mode == "forecast":
+            # -----------------------------------------------------------------------
+            # Stage 5: Forecast (predict_proba on future window)
+            # -----------------------------------------------------------------------
+            fm.build_label(**BUILD_LABEL_FORECAST_KWARGS).extract_features(
+                **EXTRACT_FEATURES_KWARGS
+            ).train(with_evaluation=False, **TRAIN_KWARGS).forecast(**FORECAST_KWARGS)
+
         else:
-            for name, csv_path in fm.trained_models.items():
-                print(f"[workflow] Stage 6: evaluating '{name}'")
-                csv_dir = os.path.dirname(os.path.abspath(csv_path))
-                metrics_dir: str | None = os.path.join(csv_dir, "metrics")
-                if not os.path.isdir(metrics_dir):
-                    metrics_dir = None
-
-                evaluator = MultiModelEvaluator(
-                    trained_model_csv=csv_path,
-                    metrics_dir=metrics_dir,
-                )
-                if metrics_dir is not None:
-                    evaluator.get_aggregate_metrics()
-                evaluator.plot_all()
-    else:
-        print("[workflow] Skipping Stage 6: evaluate per model")
+            raise ValueError("[workflow] Unknown mode")
 
     # -----------------------------------------------------------------------
-    # Stage 7: Compare models (ClassifierComparator)
-    # -----------------------------------------------------------------------
-    if RUN_COMPARE_MODELS:
-        if len(fm.trained_models) < 2:
-            print(
-                "[workflow] Skipping Stage 7: comparison requires at least 2 classifiers "
-                f"(found {len(fm.trained_models)})."
-            )
-        else:
-            print("[workflow] Stage 7: comparing classifiers")
-            comparator = ClassifierComparator(
-                classifiers=fm.trained_models,
-                output_dir=fm.station_dir,
-            )
-            comparator.plot_all()
-    else:
-        print("[workflow] Skipping Stage 7: compare models")
-
-    # -----------------------------------------------------------------------
-    # Stage 8: Save config (pipeline parameters → YAML)
+    # Stage 6: Save config (pipeline parameters → YAML)
     # -----------------------------------------------------------------------
     if SAVE_CONFIG:
         config_path = os.path.join(fm.station_dir, "config_workflow.yaml")
