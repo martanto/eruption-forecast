@@ -26,10 +26,6 @@ warnings.filterwarnings("ignore")
 # ---------------------------------------------------------------------------
 
 RUN_CALCULATE = True
-RUN_BUILD_LABEL = True
-RUN_EXTRACT_FEATURES = True
-RUN_TRAIN = True  # with_evaluation=True → 80/20 split + metrics
-RUN_FORECAST = True  # predict_proba on future window
 RUN_EVALUATE_PER_MODEL = True  # MultiModelEvaluator aggregate plots per classifier
 RUN_COMPARE_MODELS = True  # ClassifierComparator cross-classifier plots
 SAVE_CONFIG = True  # save pipeline parameters to YAML after all stages
@@ -74,7 +70,7 @@ CALCULATE_KWARGS: dict[str, Any] = {
     "remove_outlier_method": "maximum",
 }
 
-# Used when RUN_TRAIN with with_evaluation=True — full date range covers all
+# Used when with_evaluation=True — full date range covers all
 # eruption events so the 80/20 test split includes every labelled period.
 BUILD_LABEL_EVALUATE_KWARGS: dict[str, Any] = {
     "start_date": "2025-01-01",
@@ -86,7 +82,7 @@ BUILD_LABEL_EVALUATE_KWARGS: dict[str, Any] = {
     "verbose": True,
 }
 
-# Used when RUN_TRAIN with with_evaluation=False — shorter end_date leaves
+# Used when with with_evaluation=False — shorter end_date leaves
 # room for the forecast window defined in FORECAST_KWARGS.
 BUILD_LABEL_FORECAST_KWARGS: dict[str, Any] = {
     "start_date": "2025-01-01",
