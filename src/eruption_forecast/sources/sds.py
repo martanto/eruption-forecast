@@ -7,15 +7,18 @@ import numpy as np
 from obspy import Trace, Stream, ObsPyReadingError, read
 
 from eruption_forecast.logger import logger
+from eruption_forecast.sources.base import SeismicDataSource
 
 
-class SDS:
+class SDS(SeismicDataSource):
     """SeisComP Data Structure (SDS) reader for seismic data.
 
     Implements the SDS directory structure for reading miniSEED files.
     SDS structure: {sds_dir}/{year}/{network}/{station}/{channel}.D/{nslc}.D.{year}.{julian_day}
 
     More information: https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
+
+    Inherits from :class:`SeismicDataSource`.
 
     Args:
         sds_dir (str): Root path to SDS directory.
@@ -122,8 +125,7 @@ class SDS:
                 is empty or an error occurred while writing.
         """
 
-        date_str = date.strftime("%Y-%m-%d")
-        prefix = f"{date_str} :: {self.nslc}"
+        prefix = self._make_log_prefix(date)
 
         # Return None if stream contains zero traces.
         if len(stream) == 0:
