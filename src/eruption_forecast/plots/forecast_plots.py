@@ -74,7 +74,7 @@ def plot_forecast(
 
     with apply_nature_style():
         fig, (ax1, ax2) = plt.subplots(
-            2, 1, figsize=figsize, sharex=True, gridspec_kw={"hspace": 0.1}
+            2, 1, figsize=figsize, dpi=dpi, sharex=True, gridspec_kw={"hspace": 0.1}
         )
 
         # ===== Top Panel: Eruption Probability =====
