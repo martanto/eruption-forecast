@@ -14,6 +14,7 @@ import numpy as np
 import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.base import BaseEstimator
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import resolve_output_dir
@@ -52,6 +53,8 @@ class MultiModelEvaluator:
         trained_model_csv (str | None, optional): Path to the model registry CSV
             produced by ``ModelTrainer.train_and_evaluate()``. Required for
             plot methods. Defaults to None.
+        root_dir (str | None, optional): Root directory used to anchor
+            output_dir resolution. Defaults to None.
         output_dir (str | None, optional): Directory for saved figures and
             CSVs. If None, resolved in priority order: (1) when
             ``trained_model_csv`` is given →
@@ -98,6 +101,8 @@ class MultiModelEvaluator:
             trained_model_csv (str | None, optional): Path to a trained model registry
                 CSV produced by ModelTrainer. Used for aggregate plot generation.
                 Defaults to None.
+            root_dir (str | None, optional): Root directory used to anchor output_dir
+                resolution. See class-level docs for resolution priority. Defaults to None.
             output_dir (str | None, optional): Directory for saving evaluation outputs.
                 When None, resolved from the provided source path. Defaults to None.
 
@@ -144,12 +149,12 @@ class MultiModelEvaluator:
     @staticmethod
     def _load_seed_data(
         row: pd.Series,
-    ) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[BaseEstimator, pd.DataFrame, np.ndarray, np.ndarray]:
         """Load model, filtered test features, true labels, and probabilities for one seed.
 
         Reads the trained model, X_test, y_test, and significant-features
         list from paths stored in a registry row, then runs ``predict_proba``
-        to produce probability estimates.
+        (or ``decision_function`` as fallback) to produce probability estimates.
 
         Args:
             row (pd.Series): A single row from the model registry DataFrame
@@ -158,10 +163,10 @@ class MultiModelEvaluator:
                 ``significant_features_csv``.
 
         Returns:
-            tuple[Any, np.ndarray, np.ndarray, np.ndarray]: A 4-tuple of
+            tuple[BaseEstimator, pd.DataFrame, np.ndarray, np.ndarray]: A 4-tuple of
                 ``(model, X_test_filtered, y_true, y_proba)`` where
-                ``X_test_filtered`` contains only the significant features
-                selected for this seed.
+                ``X_test_filtered`` is a DataFrame containing only the
+                significant features selected for this seed.
         """
         model = joblib.load(row["trained_model_filepath"])
         X_test = pd.read_csv(row["X_test_filepath"], index_col=0)
@@ -172,8 +177,16 @@ class MultiModelEvaluator:
         ).index.tolist()
         X_test_filtered = X_test[sig_features]
 
-        proba: np.ndarray = model.predict_proba(X_test_filtered)[:, 1]
-        return model, X_test_filtered.to_numpy(), y_true, proba
+        if hasattr(model, "predict_proba"):
+            proba: np.ndarray = model.predict_proba(X_test_filtered)[:, 1]
+        elif hasattr(model, "decision_function"):
+            proba = model.decision_function(X_test_filtered)
+        else:
+            raise AttributeError(
+                f"{type(model).__name__} has neither predict_proba nor decision_function."
+            )
+
+        return model, X_test_filtered, y_true, proba
 
     def _require_registry(self) -> pd.DataFrame:
         """Load and return the model registry CSV, raising if unavailable.
@@ -189,7 +202,10 @@ class MultiModelEvaluator:
                 "trained_model_csv is required for plot methods. "
                 "Provide it when constructing MultiModelEvaluator."
             )
-        return pd.read_csv(self._trained_model_csv, index_col=0)
+        df = pd.read_csv(self._trained_model_csv, index_col=0)
+        if df.empty:
+            raise ValueError("Registry CSV is empty; no seeds to process.")
+        return df
 
     def _save_outputs(
         self,
@@ -212,16 +228,43 @@ class MultiModelEvaluator:
             dpi (int): Figure resolution in dots per inch.
             save (bool): When False, nothing is written.
         """
-        os.makedirs(self.output_dir, exist_ok=True)
         fig_path = os.path.join(self.output_dir, fig_filename)
         if save:
+            os.makedirs(self.output_dir, exist_ok=True)
             fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved aggregate plot: {fig_path}")
             if data is not None and data_filename is not None:
                 data_path = os.path.join(self.output_dir, data_filename)
                 data.to_csv(data_path)
                 logger.info(f"Saved aggregate data: {data_path}")
-        plt.close(fig)
+            plt.close(fig)
+
+    def _collect_predictions(
+        self,
+    ) -> tuple[list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]]:
+        """Load models, X_tests, y_trues, and y_probas from all registry seeds.
+
+        Iterates over every row in the model registry, loads the fitted model,
+        filtered test features, true labels, and predicted probabilities via
+        ``_load_seed_data``, and returns them as four parallel lists.
+
+        Returns:
+            tuple[list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]]:
+                A 4-tuple of ``(models, x_tests, y_trues, y_probas)`` where each
+                list has one entry per registry seed.
+        """
+        registry = self._require_registry()
+        models: list[BaseEstimator] = []
+        x_tests: list[pd.DataFrame] = []
+        y_trues: list[np.ndarray] = []
+        y_probas: list[np.ndarray] = []
+        for _, row in registry.iterrows():
+            model, X_test, y_true, y_proba = self._load_seed_data(row)
+            models.append(model)
+            x_tests.append(X_test)
+            y_trues.append(y_true)
+            y_probas.append(y_proba)
+        return models, x_tests, y_trues, y_probas
 
     # ------------------------------------------------------------------
     # Aggregate metrics (from JSON files)
@@ -323,13 +366,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate ROC curve.
         """
-        registry = self._require_registry()
-        y_trues: list[np.ndarray] = []
-        y_probas: list[np.ndarray] = []
-        for _, row in registry.iterrows():
-            _, _, y_true, y_proba = self._load_seed_data(row)
-            y_trues.append(y_true)
-            y_probas.append(y_proba)
+        _, _, y_trues, y_probas = self._collect_predictions()
 
         fig, data = _plot_roc_styled(
             y_trues=y_trues,
@@ -373,13 +410,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate PR curve.
         """
-        registry = self._require_registry()
-        y_trues: list[np.ndarray] = []
-        y_probas: list[np.ndarray] = []
-        for _, row in registry.iterrows():
-            _, _, y_true, y_proba = self._load_seed_data(row)
-            y_trues.append(y_true)
-            y_probas.append(y_proba)
+        _, _, y_trues, y_probas = self._collect_predictions()
 
         fig, data = _plot_pr_styled(
             y_trues=y_trues,
@@ -423,13 +454,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate calibration curve.
         """
-        registry = self._require_registry()
-        y_trues: list[np.ndarray] = []
-        y_probas: list[np.ndarray] = []
-        for _, row in registry.iterrows():
-            _, _, y_true, y_proba = self._load_seed_data(row)
-            y_trues.append(y_true)
-            y_probas.append(y_proba)
+        _, _, y_trues, y_probas = self._collect_predictions()
 
         fig, data = _plot_cal_styled(
             y_trues=y_trues,
@@ -471,13 +496,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with aggregate KDE distributions.
         """
-        registry = self._require_registry()
-        y_trues: list[np.ndarray] = []
-        y_probas: list[np.ndarray] = []
-        for _, row in registry.iterrows():
-            _, _, y_true, y_proba = self._load_seed_data(row)
-            y_trues.append(y_true)
-            y_probas.append(y_proba)
+        _, _, y_trues, y_probas = self._collect_predictions()
 
         fig, data = _plot_pred_dist_styled(
             y_trues=y_trues,
@@ -520,13 +539,10 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate confusion matrix.
         """
-        registry = self._require_registry()
-        y_trues: list[np.ndarray] = []
-        y_preds: list[np.ndarray] = []
-        for _, row in registry.iterrows():
-            model, X_test, y_true, _ = self._load_seed_data(row)
-            y_preds.append(model.predict(X_test))
-            y_trues.append(y_true)
+        models, x_tests, y_trues, _ = self._collect_predictions()
+        y_preds: list[np.ndarray] = [
+            model.predict(X_test) for model, X_test in zip(models, x_tests, strict=True)
+        ]
 
         fig, data = _plot_cm_styled(
             y_trues=y_trues,
@@ -570,13 +586,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate threshold analysis.
         """
-        registry = self._require_registry()
-        y_trues: list[np.ndarray] = []
-        y_probas: list[np.ndarray] = []
-        for _, row in registry.iterrows():
-            _, _, y_true, y_proba = self._load_seed_data(row)
-            y_trues.append(y_true)
-            y_probas.append(y_proba)
+        _, _, y_trues, y_probas = self._collect_predictions()
 
         fig, data = _plot_threshold_styled(
             y_trues=y_trues,
@@ -623,7 +633,7 @@ class MultiModelEvaluator:
                 ``feature_importances_``.
         """
         registry = self._require_registry()
-        models: list[Any] = []
+        models: list[BaseEstimator] = []
         feature_names: list[str] = []
         for _, row in registry.iterrows():
             model, _, _, _ = self._load_seed_data(row)
@@ -632,6 +642,10 @@ class MultiModelEvaluator:
                 feature_names = pd.read_csv(
                     row["significant_features_csv"], index_col=0
                 ).index.tolist()
+
+        if not feature_names:
+            logger.warning("No feature names found; skipping feature importance plot.")
+            return None
 
         result = _plot_fi_styled(
             models=models,
@@ -680,7 +694,9 @@ class MultiModelEvaluator:
             dict[str, plt.Figure | None]: Mapping of plot name to figure.
                 Keys: ``"roc_curve"``, ``"pr_curve"``, ``"calibration"``,
                 ``"prediction_distribution"``, ``"confusion_matrix"``,
-                ``"threshold_analysis"``, ``"feature_importance"``.
+                ``"threshold_analysis"``, ``"feature_importance"``,
+                ``"shap_summary"``, ``"seed_stability"``,
+                ``"frequency_band_contribution"``.
                 Values are None when a plot cannot be generated (e.g.,
                 feature importance for models without ``feature_importances_``).
 
@@ -765,24 +781,16 @@ class MultiModelEvaluator:
         Examples:
             >>> fig = evaluator.plot_shap_summary(max_display=15)
         """
-        registry = self._require_registry()
-        models: list[Any] = []
-        x_tests: list[Any] = []
-        feature_names: list[str] = []
-
-        for _, row in registry.iterrows():
-            model, X_test, _, _ = self._load_seed_data(row)
-            models.append(model)
-            x_tests.append(X_test)
-            if not feature_names:
-                feature_names = pd.read_csv(
-                    row["significant_features_csv"], index_col=0
-                ).index.tolist()
+        models, x_tests, _, _ = self._collect_predictions()
+        # Each seed may select different features; collect names per seed.
+        per_seed_feature_names: list[list[str]] = [
+            X_test.columns.tolist() for X_test in x_tests
+        ]
 
         fig, data = plot_aggregate_shap_summary(
             models=models,
             X_tests=x_tests,
-            feature_names=feature_names,
+            feature_names=per_seed_feature_names,
             max_display=max_display,
             dpi=dpi,
         )
@@ -823,6 +831,11 @@ class MultiModelEvaluator:
         Examples:
             >>> fig = evaluator.plot_seed_stability(metric="balanced_accuracy")
         """
+        if self._metrics_files is None and self._metrics_dir is None:
+            raise ValueError(
+                "plot_seed_stability requires JSON metrics files. "
+                "Provide metrics_dir or metrics_files when constructing MultiModelEvaluator."
+            )
         records = self.get_metrics_list()
 
         # Use model_name from first record as classifier label, fall back to "model"
