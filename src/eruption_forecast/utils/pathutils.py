@@ -84,7 +84,7 @@ def build_model_directories(
         ...     mode="with-evaluation"
         ... )
         >>> print(dirs['base'])
-        /path/to/output/trainings/model-with-evaluation/random-forest-classifier/stratified-k-fold
+        /path/to/output/trainings/evaluations/random-forest-classifier/stratified-k-fold
     """
     mode_dir = f"model-{mode}"
     base_dir = os.path.join(root_dir, "trainings", mode_dir, classifier_slug, cv_slug)
@@ -92,7 +92,9 @@ def build_model_directories(
     directories = {
         "base": base_dir,
         "features": os.path.join(base_dir, "features"),
-        "significant_features": os.path.join(base_dir, "features", "significant_features"),
+        "significant_features": os.path.join(
+            base_dir, "features", "significant_features"
+        ),
         "models": os.path.join(base_dir, "models"),
     }
 
@@ -105,4 +107,3 @@ def build_model_directories(
         os.makedirs(dir_path, exist_ok=True)
 
     return directories
-

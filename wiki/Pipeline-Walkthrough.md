@@ -465,8 +465,8 @@ predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
     trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
-        "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "rf":  "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
     output_dir="output/predictions",
 )

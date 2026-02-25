@@ -33,9 +33,12 @@ output/
     │
     ├── trainings/
     │   │
-    │   ├── model-with-evaluation/            # Output of train_and_evaluate()
-    │   │   └── {classifier-slug}/            # e.g., random-forest-classifier
-    │   │       └── {cv-slug}/                # e.g., stratified-shuffle-split
+    │   ├── evaluations/            # Output of train(with_evaluation=True)
+    │   │   ├── evaluations_trained_models.json   # {ClassifierName: trained_model_*.csv} registry
+    │   │   ├── evaluations_config.yaml           # Pipeline config snapshot (written by save_model)
+    │   │   ├── evaluations_forecast_model.pkl    # Serialised ForecastModel (written by save_model)
+    │   │   └── {classifier-slug}/                # e.g., random-forest-classifier
+    │   │       └── {cv-slug}/                    # e.g., stratified-shuffle-split
     │   │           ├── features/
     │   │           │   ├── significant_features/     # Per-seed top-N features
     │   │           │   │   ├── 00000.csv
@@ -71,7 +74,10 @@ output/
     │   │           ├── all_metrics_{suffix}.csv      # All per-seed metrics
     │   │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
     │   │
-    │   └── model-only/                       # Output of train()
+    │   └── predictions/                       # Output of train(with_evaluation=False)
+    │       ├── predictions_trained_models.json   # {ClassifierName: trained_model_*.csv} registry
+    │       ├── predictions_config.yaml           # Pipeline config snapshot (written by save_model)
+    │       ├── predictions_forecast_model.pkl    # Serialised ForecastModel (written by save_model)
     │       └── {classifier-slug}/
     │           └── {cv-slug}/
     │               ├── features/
@@ -92,8 +98,8 @@ output/
     │   └── figures/
     │       └── eruption_forecast.png
     │
-    ├── config.yaml                           # Saved pipeline config (written by save_config())
-    └── forecast_model.pkl                    # Serialised ForecastModel (written by save_model())
+    ├── config_forecast.yaml                  # Pipeline config snapshot (written by forecast())
+    └── forecast_model.pkl                    # Serialised ForecastModel (default path for save_model())
 ```
 
 ---

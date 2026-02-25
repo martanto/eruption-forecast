@@ -141,7 +141,7 @@ After training multiple classifiers with `with_evaluation=True`, compare their a
 ```python
 import pandas as pd
 
-base = "output/trainings/model-with-evaluation"
+base = "output/trainings/evaluations"
 suffix = "rs-0_ts-500_top-20"
 classifiers = {
     "rf":  f"{base}/random-forest-classifier/stratified-shuffle-split/all_metrics_RandomForestClassifier-StratifiedShuffleSplit_{suffix}.csv",

@@ -34,6 +34,10 @@ Example:
 from typing import Any, Literal
 from contextlib import contextmanager
 
+import matplotlib
+
+
+matplotlib.use("Agg")  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from cycler import cycler

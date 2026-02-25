@@ -123,7 +123,7 @@ Requires `train_and_evaluate()` output — loads test data per seed and aggregat
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
 ev = MultiModelEvaluator(
     trained_model_csv=f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 )
@@ -156,7 +156,7 @@ figs = ev.plot_all(dpi=150, show_individual=True)
 from eruption_forecast.model import ClassifierComparator
 
 # From a dict
-base = "output/trainings/model-with-evaluation"
+base = "output/trainings/evaluations"
 comparator = ClassifierComparator(
     classifiers={
         "rf":  f"{base}/rf/stratified/trained_model_rf_...csv",
@@ -169,7 +169,7 @@ comparator = ClassifierComparator(
 
 # From a JSON file  {"ClassifierName": "/path/to/trained_model_*.csv", ...}
 comparator = ClassifierComparator.from_json(
-    "output/VG.OJN.00.EHZ/trained_models.json",
+    "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
     output_dir="output/comparison",
     metrics=["f1_score", "roc_auc", "recall"],
 )

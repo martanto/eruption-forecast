@@ -135,7 +135,7 @@ Three construction modes are available:
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
 trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 
 # Mode 1: registry CSV only — enables aggregate plots
@@ -234,9 +234,9 @@ from eruption_forecast.model import ClassifierComparator
 
 comparator = ClassifierComparator(
     classifiers={
-        "rf":  "output/.../trainings/model-with-evaluation/rf/stratified/trained_model_rf_...csv",
-        "xgb": "output/.../trainings/model-with-evaluation/xgb/stratified/trained_model_xgb_...csv",
-        "gb":  "output/.../trainings/model-with-evaluation/gb/stratified/trained_model_gb_...csv",
+        "rf":  "output/.../trainings/evaluations/rf/stratified/trained_model_rf_...csv",
+        "xgb": "output/.../trainings/evaluations/xgb/stratified/trained_model_xgb_...csv",
+        "gb":  "output/.../trainings/evaluations/gb/stratified/trained_model_gb_...csv",
     },
     output_dir="output/comparison",   # optional — defaults to cwd/output/comparison
     metrics=["f1_score", "roc_auc"],  # optional — defaults to all DEFAULT_METRICS
@@ -256,9 +256,9 @@ Each CSV path must exist on disk. A `FileNotFoundError` is raised otherwise. The
 Alternatively, load classifiers from a JSON file using the `from_json` classmethod:
 
 ```python
-# trained_models.json — {"ClassifierName": "/path/to/trained_model_*.csv", ...}
+# evaluations_trained_models.json — {"ClassifierName": "/path/to/trained_model_*.csv", ...}
 comparator = ClassifierComparator.from_json(
-    "output/VG.OJN.00.EHZ/trained_models.json",
+    "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
     output_dir="output/comparison",
     metrics=["f1_score", "roc_auc"],
 )
@@ -432,8 +432,8 @@ predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
     trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/model-only/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
-        "xgb": "output/VG.OJN.00.EHZ/trainings/model-only/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "rf":  "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
     output_dir="output/predictions",
 )

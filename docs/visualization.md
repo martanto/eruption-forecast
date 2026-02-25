@@ -168,7 +168,7 @@ All plots are saved to `output_dir` with publication-quality styling.
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/model-with-evaluation/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
 trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 
 # Plots from registry CSV
@@ -190,7 +190,7 @@ Compare performance metrics across multiple classifiers in a single viridis heat
 from eruption_forecast import MultiModelEvaluator
 from eruption_forecast.plots import plot_classifier_comparison
 
-base = "output/trainings/model-with-evaluation"
+base = "output/trainings/evaluations"
 
 # Load metrics from each classifier's evaluator
 metrics_by_clf = {}
@@ -321,7 +321,7 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 predictor = ModelPredictor(
     start_date="2025-03-23",
     end_date="2025-03-30",
-    trained_models="output/trainings/model-only/random-forest-classifier/stratified-k-fold/trained_model_*.csv",
+    trained_models="output/trainings/predictions/random-forest-classifier/stratified-k-fold/trained_model_*.csv",
     output_dir="output/forecast",
 )
 
