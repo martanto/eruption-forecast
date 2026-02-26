@@ -32,7 +32,7 @@ def plot_shap_summary(
     max_display: int = 20,
     title: str | None = None,
     dpi: int = 150,
-) -> plt.Figure:
+) -> tuple[plt.Figure, shap.Explanation]:
     """Plot a SHAP beeswarm summary for a single fitted model.
 
     Renders a beeswarm dot plot showing both direction and magnitude of
@@ -53,12 +53,13 @@ def plot_shap_summary(
             to 150.
 
     Returns:
-        plt.Figure: Matplotlib figure with the SHAP beeswarm plot.
+        tuple[plt.Figure, shap.Explanation]: Matplotlib figure with the SHAP
+        beeswarm plot and the SHAP Explanation object used to produce it.
 
     Examples:
         >>> from sklearn.ensemble import RandomForestClassifier
         >>> rf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
-        >>> fig = plot_shap_summary(rf, X_test)
+        >>> fig, explanation = plot_shap_summary(rf, X_test)
         >>> fig.savefig("shap_summary.png")
     """
     if selected_features is not None:
@@ -70,14 +71,14 @@ def plot_shap_summary(
     # The masker is built from X itself (all rows as background).
     # shap.Explainer(model) without a masker raises "not callable" for some
     # model types, so the masker is always passed explicitly here.
-    shap_values = _compute_shap_explanation(model, X)
+    shap_explanation = _compute_shap_explanation(model, X)
 
     with apply_nature_style():
         # shap.plots.beeswarm always draws on the current figure; capture it
         # immediately after the call rather than diffing figure numbers, which
         # is fragile when other threads or callbacks create figures concurrently.
         shap.plots.beeswarm(
-            shap_values,
+            shap_explanation,
             max_display=max_display,
             s=32,  # Default 16
             show=False,
@@ -87,7 +88,7 @@ def plot_shap_summary(
         fig.set_dpi(dpi)
         fig.suptitle(title or "SHAP Summary Plot", y=1.02)
 
-    return fig
+    return fig, shap_explanation
 
 
 def _compute_shap_explanation(
@@ -187,6 +188,7 @@ def plot_aggregate_shap_summary(
     max_display: int = 20,
     title: str | None = None,
     dpi: int = 150,
+    explanations: list[shap.Explanation | None] | None = None,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Plot mean absolute SHAP values aggregated across multiple seeds.
 
@@ -217,6 +219,10 @@ def plot_aggregate_shap_summary(
             "Aggregate SHAP Feature Importance". Defaults to None.
         dpi (int, optional): Figure resolution in dots per inch. Defaults
             to 150.
+        explanations (list[shap.Explanation | None] | None, optional):
+            Pre-computed SHAP Explanation objects, one per seed. When a
+            slot is not None the cached values are used directly instead of
+            recomputing. Defaults to None (all seeds are computed on the fly).
 
     Returns:
         tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
@@ -259,9 +265,15 @@ def plot_aggregate_shap_summary(
 
     all_abs_shap: list[np.ndarray] = []
 
-    for model, X, seed_names in zip(models, X_tests, per_seed_names, strict=True):
+    for i, (model, X, seed_names) in enumerate(
+        zip(models, X_tests, per_seed_names, strict=True)
+    ):
+        cached = explanations[i] if explanations is not None else None
         try:
-            vals = _compute_shap_values(model, X)
+            if cached is not None:
+                vals = np.asarray(cached.values)  # noqa: PD011
+            else:
+                vals = _compute_shap_values(model, X)
             seed_abs_mean = np.abs(vals).mean(axis=0)  # (n_seed_features,)
 
             # Map seed values into the union feature space
@@ -272,7 +284,7 @@ def plot_aggregate_shap_summary(
 
             all_abs_shap.append(row)
         except Exception as e:
-            logger.warning(f"Skipping seed in SHAP aggregation: {e}")
+            logger.warning(f"Skipping seed {i} in SHAP aggregation: {e}")
 
     if not all_abs_shap:
         raise ValueError("No seeds produced valid SHAP values.")

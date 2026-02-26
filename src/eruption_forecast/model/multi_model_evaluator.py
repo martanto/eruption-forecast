@@ -10,6 +10,7 @@ import glob
 import json
 from typing import Any
 
+import shap
 import numpy as np
 import joblib
 import pandas as pd
@@ -18,7 +19,10 @@ from sklearn.base import BaseEstimator
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import resolve_output_dir
-from eruption_forecast.plots.shap_plots import plot_aggregate_shap_summary
+from eruption_forecast.plots.shap_plots import (
+    _compute_shap_explanation,
+    plot_aggregate_shap_summary,
+)
 from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
 from eruption_forecast.plots.evaluation_plots import (
     plot_seed_stability,
@@ -765,6 +769,50 @@ class MultiModelEvaluator:
                 records.append(json.load(f))
         return records
 
+    def _collect_shap_explanations(
+        self,
+        models: list[BaseEstimator],
+        x_tests: list[pd.DataFrame],
+    ) -> list[shap.Explanation | None]:
+        """Load per-seed SHAP explanations from disk, recomputing when absent.
+
+        Iterates the registry rows in order, attempting to load each seed's
+        cached SHAP Explanation object from the path recorded in the
+        ``shap_explanation_filepath`` column. Falls back to computing the
+        explanation on the fly when the file is missing or unreadable. Seeds
+        whose computation also fails are represented as ``None`` and will be
+        skipped by ``plot_aggregate_shap_summary``.
+
+        Args:
+            models (list[BaseEstimator]): Fitted models in registry order.
+            x_tests (list[pd.DataFrame]): Corresponding test feature DataFrames.
+
+        Returns:
+            list[shap.Explanation | None]: One entry per seed. Each entry is
+            either a ``shap.Explanation`` or ``None`` when unavailable.
+        """
+        registry = self._require_registry()
+        col_exists = "shap_explanation_filepath" in registry.columns
+        explanations: list[shap.Explanation | None] = []
+
+        for (_, row), model, X in zip(registry.iterrows(), models, x_tests, strict=False):
+            filepath = row.get("shap_explanation_filepath") if col_exists else None
+            if filepath and os.path.isfile(str(filepath)):
+                try:
+                    explanations.append(joblib.load(filepath))
+                    continue
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load SHAP explanation from {filepath}: {e}"
+                    )
+            try:
+                explanations.append(_compute_shap_explanation(model, X))
+            except Exception as e:
+                logger.warning(f"SHAP computation failed for seed: {e}")
+                explanations.append(None)
+
+        return explanations
+
     def plot_shap_summary(
         self,
         max_display: int = 20,
@@ -774,9 +822,10 @@ class MultiModelEvaluator:
     ) -> plt.Figure:
         """Plot aggregate mean |SHAP| values across all seeds.
 
-        Loads every seed's model and test set from the registry, computes
-        SHAP values per seed, then plots the mean absolute SHAP per feature
-        as a bar chart with ±1 std error bars.
+        Loads every seed's model and test set from the registry, loads cached
+        SHAP Explanation objects from disk (recomputing only when missing),
+        then plots the mean absolute SHAP per feature as a bar chart with
+        ±1 std error bars.
 
         Args:
             max_display (int, optional): Number of top features to show,
@@ -798,12 +847,15 @@ class MultiModelEvaluator:
             X_test.columns.tolist() for X_test in x_tests
         ]
 
+        explanations = self._collect_shap_explanations(models, x_tests)
+
         fig, data = plot_aggregate_shap_summary(
             models=models,
             X_tests=x_tests,
             feature_names=per_seed_feature_names,
             max_display=max_display,
             dpi=dpi,
+            explanations=explanations,
         )
         self._save_outputs(
             fig,
