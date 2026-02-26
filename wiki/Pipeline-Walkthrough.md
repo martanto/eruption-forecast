@@ -578,3 +578,69 @@ fm.load_tremor_data(
 ```
 
 See `main.py` in the repository root for a complete working example.
+
+---
+
+## Optional Stage — Merge Seed Models
+
+After training 500 seeds, each estimator and its feature list live in separate files on disk. Calling `merge_models()` collapses them all into a single `SeedEnsemble` pkl, removing the per-seed I/O overhead at prediction time.
+
+```
+  500 × models/00000.pkl
+  500 × features/significant_features/00000.csv
+           │
+           ▼  trainer.merge_models()
+           │
+  merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
+  (SeedEnsemble — one object, one file)
+```
+
+```python
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+
+# Merge right after training
+merged_path = trainer.merge_models()
+
+# Load and predict
+ensemble = SeedEnsemble.load(merged_path)
+
+mean_p, std, confidence, prediction = ensemble.predict_with_uncertainty(
+    features_df,
+    threshold=0.7,
+)
+print(f"Mean P(eruption):    {mean_p.mean():.4f}")
+print(f"Mean confidence:     {confidence.mean():.4f}")
+print(f"Eruption windows:    {prediction.sum()}")
+
+# sklearn-compatible interface
+proba = ensemble.predict_proba(features_df)   # (n_windows, 2)
+```
+
+**Multiple classifiers** can be bundled into one file:
+
+```python
+bundle_path = trainer.merge_classifier_models(
+    {"rf": rf_trainer.csv, "xgb": xgb_trainer.csv}
+)
+```
+
+Pass a merged pkl directly to `ModelPredictor` — `.pkl` vs `.csv` is detected automatically:
+
+```python
+from eruption_forecast.model.model_predictor import ModelPredictor
+
+predictor = ModelPredictor(
+    start_date="2025-07-28",
+    end_date="2025-08-04",
+    trained_models=merged_path,   # or bundle_path for multi-classifier
+)
+df_forecast = predictor.predict_proba(
+    tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_*.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
+```
+
+For full details see [Training Workflows](Training-Workflows) and [Evaluation and Forecasting](Evaluation-and-Forecasting).

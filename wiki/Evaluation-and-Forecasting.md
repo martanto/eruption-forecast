@@ -368,7 +368,7 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 |-----------|------|---------|-------------|
 | `start_date` | `str \| datetime` | — | Start of the prediction period (format: YYYY-MM-DD) |
 | `end_date` | `str \| datetime` | — | End of the prediction period (format: YYYY-MM-DD) |
-| `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path or a `{name: path}` dict for multi-model consensus |
+| `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path, a merged `SeedEnsemble` `.pkl` path, a multi-classifier bundle `.pkl` path, or a `{name: path}` dict for multi-model consensus |
 | `overwrite` | `bool` | `False` | Overwrite existing output files |
 | `n_jobs` | `int` | `1` | Number of parallel jobs for feature extraction |
 | `output_dir` | `str \| None` | `None` | Output directory; defaults to `<root_dir>/output/predictions` |
@@ -434,6 +434,51 @@ df_forecast = predictor.predict_proba(
 ```
 
 Results are saved to `predictions.csv` in `output_dir`. When `plot=True`, an eruption forecast plot is saved to `figures/eruption_forecast.png`.
+
+### Using a merged SeedEnsemble pkl
+
+Instead of passing a CSV registry (which loads 500 `.pkl` files on every call), pass a merged `.pkl` produced by `ModelTrainer.merge_models()` or `merge_seed_models()`. `ModelPredictor` detects the file type automatically.
+
+**Single merged classifier:**
+
+```python
+predictor = ModelPredictor(
+    start_date="2025-03-16",
+    end_date="2025-03-28",
+    trained_models="output/.../merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl",
+    output_dir="output/predictions",
+)
+
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
+```
+
+**Multi-classifier bundle** (all ensembles in one file):
+
+```python
+predictor = ModelPredictor(
+    start_date="2025-03-16",
+    end_date="2025-03-28",
+    trained_models="output/.../trainings/merged_classifiers_rf_xgb_rs-0_ts-500_top-20.pkl",
+)
+df_forecast = predictor.predict_proba(...)
+```
+
+You can also use `SeedEnsemble` directly without going through `ModelPredictor`:
+
+```python
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+
+ensemble = SeedEnsemble.load("merged_model_*.pkl")
+mean_p, std, conf, pred = ensemble.predict_with_uncertainty(features_df)
+# or sklearn-style:
+proba = ensemble.predict_proba(features_df)   # (n_samples, 2)
+```
 
 ### Multi-model consensus
 

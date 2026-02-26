@@ -164,6 +164,35 @@ trainer = ModelTrainer(..., feature_selection_method="combined")
 fm.set_feature_selection_method("combined").train(...)
 ```
 
+## Merging Seed Models
+
+After training completes, all 500 seed models can be bundled into a single `.pkl` file. This eliminates the per-seed file I/O at prediction time and produces a `SeedEnsemble` that is sklearn-compatible.
+
+```
+  500 × model.pkl  +  500 × significant_features.csv
+           │
+           ▼  trainer.merge_models()
+           │
+    merged_model_{suffix}.pkl
+    (SeedEnsemble — all estimators + feature lists in one object)
+```
+
+```python
+# After trainer.train() completes:
+merged_path = trainer.merge_models()
+# → .../merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
+
+# Multi-classifier bundle
+bundle_path = trainer.merge_classifier_models(
+    {"rf": rf_trainer.csv, "xgb": xgb_trainer.csv}
+)
+# → .../trainings/merged_classifiers_{suffix}.pkl
+```
+
+The merged `.pkl` can be passed directly to `ModelPredictor.predict_proba()` instead of a CSV registry path — no other changes needed.
+
+See [Evaluation and Forecasting](Evaluation-and-Forecasting) for how `ModelPredictor` handles merged files.
+
 ## Parallelism
 
 - `n_jobs` — outer loop: parallel seed workers (each seed is an independent job)

@@ -65,6 +65,7 @@ output/
         │           │   ├── aggregate_feature_importance.csv
         │           │   └── aggregate_metrics.csv        # from save_aggregate_metrics()
         │           ├── trained_model_{suffix}.csv    # Registry of all trained models
+        │           ├── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
         │           ├── all_metrics_{suffix}.csv      # All seed metrics
         │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
         │
@@ -86,7 +87,8 @@ output/
                     ├── models/
                     │   ├── 00000.pkl
                     │   └── ...
-                    └── trained_model_{suffix}.csv    # Registry of all trained models
+                    ├── trained_model_{suffix}.csv    # Registry used by ModelPredictor
+                    └── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
 ```
 
 **ModelPredictor output** (`output_dir/predictions/`):
