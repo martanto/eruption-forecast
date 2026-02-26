@@ -111,6 +111,7 @@ def plot_roc_curve(
     y_proba: np.ndarray,
     title: str | None = None,
     figsize: tuple[float, float] = (6, 5),
+    label_classifier: str | None = None,
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot ROC curve with AUC annotation and Nature/Science styling.
@@ -127,6 +128,7 @@ def plot_roc_curve(
             Defaults to None.
         figsize (tuple[float, float], optional): Figure size as (width, height)
             in inches. Defaults to (6, 5).
+        label_classifier (str | None, optional): Label for legend. Defaults to None.
         dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
 
     Returns:
@@ -160,7 +162,7 @@ def plot_roc_curve(
             color=NATURE_COLORS["gray"],
             linestyle="--",
             linewidth=1.5,
-            label="Random Classifier",
+            label=label_classifier or "Random Classifier",
             alpha=0.7,
         )
 
@@ -629,6 +631,7 @@ def plot_aggregate_roc_curve(
     show_individual: bool = True,
     title: str | None = None,
     figsize: tuple[float, float] = (6, 5),
+    label_classifier: str | None = None,
     dpi: int = 150,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Plot aggregate ROC curves across multiple seeds with a mean ± std band.
@@ -648,6 +651,7 @@ def plot_aggregate_roc_curve(
             "Aggregate ROC Curve".
         figsize (tuple[float, float], optional): Figure size in inches.
             Defaults to (6, 5).
+        label_classifier (str | None, optional): Label for legend. Defaults to None.
         dpi (int, optional): Figure resolution. Defaults to 150.
 
     Returns:
@@ -711,7 +715,7 @@ def plot_aggregate_roc_curve(
             color=NATURE_COLORS["gray"],
             linestyle="--",
             linewidth=1.5,
-            label="Random Classifier",
+            label=label_classifier or "Random Classifier",
             alpha=0.7,
         )
 
@@ -885,7 +889,7 @@ def plot_aggregate_calibration(
             markersize=5,
             linewidth=2.0,
             color=OKABE_ITO[4],
-            label=f"Mean Model (n={len(y_probas)} seeds)",
+            label=f"Mean Model",
         )
         ax.fill_between(
             prob_grid,

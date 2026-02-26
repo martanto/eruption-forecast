@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-23 (added config.example.yaml sync rule)_
+_Last updated: 2026-02-25 (added SeedEnsemble; updated utils/ml.py entries)_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -32,7 +32,7 @@ Testing is not mandatory, but if needed, you can use the following test data:
 
 - **Input directory (SDS format):** `D:\Data\OJN`
 - **Start date:** `2025-03-16`
-- **End date:** `2025-03-22`
+- **End date:** `2025-03-28`
 - **Eruption date:** `2025-03-20`
 
 See `main.py` for a complete usage example of the pipeline.
@@ -193,7 +193,13 @@ label_builder = LabelBuilder(
 **Key classes:**
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
   - `fit(with_evaluation=True)`: Dispatches to `train_and_evaluate()` or `train()` based on flag
+  - `merge_models(output_path)`: Bundle all seed models → `SeedEnsemble` `.pkl`
+  - `merge_classifier_models(trained_models, output_path)`: Bundle multiple classifier registries → multi-classifier `.pkl`
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count`. Uses `joblib.Parallel(backend="loky")` for nested-parallelism safety.
+- `SeedEnsemble`: Bundles all seed models for one classifier (`seed_ensemble.py`); sklearn-compatible (`BaseEstimator` + `ClassifierMixin`)
+  - `from_registry(registry_csv)`: Load from registry CSV
+  - `predict_proba(X)` → `(n_samples, 2)`; `predict_with_uncertainty(X)` → `(mean, std, conf, pred)`
+  - `save(path)` / `load(path)`: joblib serialisation
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
@@ -225,7 +231,7 @@ Both use `@cached_property` for efficient attribute access.
 - **`window.py`**: `construct_windows()`, `calculate_window_metrics()`
 - **`array.py`**: `detect_maximum_outlier()`, `remove_outliers()` — Z-score based outlier detection
 - **`date_utils.py`**: `to_datetime()`, `validate_date_ranges()`, `validate_window_step()`
-- **`ml.py`**: `random_under_sampler()`, `get_significant_features()`
+- **`ml.py`**: `random_under_sampler()`, `get_significant_features()`, `merge_seed_models()`, `merge_all_classifiers()`
 - **`pathutils.py`**: `resolve_output_dir()` — resolves paths relative to `root_dir`
 - **`dataframe.py`**: DataFrame validation utilities
 - **`formatting.py`**: Text formatting utilities

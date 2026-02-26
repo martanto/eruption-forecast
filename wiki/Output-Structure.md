@@ -71,6 +71,7 @@ output/
     │   │           │   ├── aggregate_feature_importance.png / .csv
     │   │           │   └── aggregate_metrics.csv
     │   │           ├── trained_model_{suffix}.csv    # Registry of all trained models
+    │   │           ├── merged_model_{suffix}.pkl     # SeedEnsemble (all seeds merged — optional)
     │   │           ├── all_metrics_{suffix}.csv      # All per-seed metrics
     │   │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
     │   │
@@ -91,7 +92,10 @@ output/
     │               ├── models/
     │               │   ├── 00000.pkl
     │               │   └── ...
-    │               └── trained_model_{suffix}.csv    # Registry used by ModelPredictor
+    │               ├── trained_model_{suffix}.csv    # Registry used by ModelPredictor
+    │               └── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
+    │
+    ├── trainings/merged_classifiers_{suffix}.pkl   # Multi-classifier bundle (optional — call merge_classifier_models())
     │
     ├── forecast/
     │   ├── predictions.csv                   # Forecast output (predict_proba)

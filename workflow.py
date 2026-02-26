@@ -119,7 +119,7 @@ TRAIN_KWARGS: dict[str, Any] = {
     "sampling_strategy": 0.75,
     "save_all_features": True,
     "plot_significant_features": True,
-    "n_jobs": 4,
+    "n_jobs": 10,
     "grid_search_n_jobs": 2,
     "overwrite": False,
     "verbose": True,
@@ -139,7 +139,7 @@ FORECAST_KWARGS: dict[str, Any] = {
 
 
 @timer("Workflow")
-@notify("Laptop - Workflow")
+@notify("Primer - Workflow")
 def main() -> None:
     """Run the full eruption-forecast research workflow.
 
@@ -160,7 +160,7 @@ def main() -> None:
     """
     fm = ForecastModel(
         overwrite=False,
-        n_jobs=4,
+        n_jobs=18,
         **PARAMS,
     )
 
@@ -198,15 +198,20 @@ def main() -> None:
                         print(f"[workflow] Stage 3: evaluating '{name}'")
                         csv_dir = os.path.dirname(os.path.abspath(csv_path))
                         metrics_dir: str | None = os.path.join(csv_dir, "metrics")
+
                         if not os.path.isdir(metrics_dir):
                             metrics_dir = None
 
                         evaluator = MultiModelEvaluator(
                             trained_model_csv=csv_path,
                             metrics_dir=metrics_dir,
+                            classifier_name=name,
+                            output_dir=csv_dir,
                         )
+
                         if metrics_dir is not None:
                             evaluator.get_aggregate_metrics()
+
                         evaluator.plot_all()
             else:
                 print("[workflow] Skipping Stage 3: evaluate per model")

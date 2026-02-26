@@ -61,6 +61,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, and frequency band contribution charts via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
+- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `SeedEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables sklearn-compatible `predict_proba()` / `predict()` calls directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
 - **Modular Architecture**: Clean separation of concerns with focused utility modules
@@ -121,6 +122,9 @@ Raw Seismic Data (SDS / FDSN)
 │    80/20 split + metrics   Full dataset     │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
+          │
+          │  (optional) trainer.merge_models()
+          │  → merged_model_*.pkl  (SeedEnsemble)
           ▼
 ┌─────────────────────────────────────────────┐
 │               ModelPredictor                │
@@ -132,7 +136,8 @@ Raw Seismic Data (SDS / FDSN)
 │  │ predict_proba()                      │   │
 │  │ (forecast mode — no labels needed)   │   │
 │  └──────────────────────────────────────┘   │
-│  Single model or multi-model consensus      │
+│  Single model, merged pkl, or multi-model   │
+│  consensus                                  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -397,6 +402,36 @@ results = comparator.plot_all()
 # results["ranking"]         → DataFrame
 ```
 
+### Merge 500 seed models into one file
+
+After training, collapse all seed models into a single `.pkl` to remove per-seed I/O overhead:
+
+```python
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
+
+# Single classifier
+merged_path = trainer.merge_models()
+# → .../merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
+
+# Load and predict directly
+ensemble = SeedEnsemble.load(merged_path)
+mean_p, std, conf, pred = ensemble.predict_with_uncertainty(features_df)
+
+# sklearn-compatible interface
+proba = ensemble.predict_proba(features_df)   # shape (n_samples, 2)
+
+# Multi-classifier bundle
+bundle_path = trainer.merge_classifier_models({"rf": rf_csv, "xgb": xgb_csv})
+
+# Pass merged pkl directly to ModelPredictor
+predictor = ModelPredictor(
+    start_date="2025-07-28", end_date="2025-08-04",
+    trained_models=merged_path,    # single merged pkl
+    # or: trained_models=bundle_path  (multi-classifier bundle)
+)
+```
+
 ### Save and replay pipeline configuration
 
 ```python
@@ -554,6 +589,6 @@ If you use this package in your research, please cite:
 
 ---
 
-**Version:** 0.2.1
+**Version:** 0.2.2
 **Status:** Active Development
 **Last Updated:** 2026-02-25

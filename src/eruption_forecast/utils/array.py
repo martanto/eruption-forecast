@@ -5,10 +5,118 @@ using z-score methods. Supports removing zero values, detecting maximum outliers
 and filtering all outliers from numpy arrays.
 """
 
+from typing import Any
+
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 
 from eruption_forecast.logger import logger
+from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
+
+
+def predict_proba_from_estimator(
+    model: Any,
+    X: pd.DataFrame,
+    identifier: str | int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Call ``predict_proba`` or ``decision_function`` on a fitted estimator.
+
+    Abstracts away the two common sklearn output conventions — probabilistic
+    classifiers (``predict_proba``) and margin-based classifiers
+    (``decision_function``) — into a single interface.  The ``ndim`` of the
+    ``predict_proba`` output is validated to guard against estimators that
+    erroneously return a 1-D array instead of the expected ``(n_samples, 2)``
+    shape.
+
+    For the ``decision_function`` case the raw scores are converted to
+    probabilities via the logistic sigmoid, and a ``(n_samples, 2)`` scores
+    array is reconstructed so both return values always have the same shape.
+
+    Args:
+        model (Any): Fitted sklearn-compatible estimator.
+        X (pd.DataFrame): Feature subset to predict on.
+        identifier (str | int | None, optional): Label used in error messages
+            to identify the model (e.g. the random state or file path).
+            Defaults to ``None``.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: A 2-tuple:
+
+            - ``eruption_proba`` (np.ndarray): 1-D array of shape
+              ``(n_samples,)`` with P(eruption).
+            - ``scores`` (np.ndarray): 2-D array of shape ``(n_samples, 2)``
+              with columns ``[P(non-eruption), P(eruption)]``.
+
+    Raises:
+        ValueError: If ``predict_proba`` returns a 1-D array.
+        RuntimeError: If the estimator supports neither ``predict_proba``
+            nor ``decision_function``.
+    """
+    identifier = str(identifier) if identifier is not None else "model"
+
+    if hasattr(model, "predict_proba"):
+        scores: np.ndarray = model.predict_proba(X)
+        if scores.ndim == 1:
+            raise ValueError(
+                f"Probability scores for {identifier} have 1 dimension; "
+                "expected 2 dimensions [P(non-eruption), P(eruption)]."
+            )
+        eruption_proba: np.ndarray = scores[:, 1]
+    elif hasattr(model, "decision_function"):
+        raw: np.ndarray = model.decision_function(X)
+        eruption_proba = 1.0 / (1.0 + np.exp(-raw))
+        scores = np.column_stack([1.0 - eruption_proba, eruption_proba])
+    else:
+        raise RuntimeError(
+            f"{identifier} supports neither predict_proba nor decision_function."
+        )
+
+    return eruption_proba, scores
+
+
+def aggregate_seed_probabilities(
+    seed_proba_matrix: np.ndarray,
+    threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Aggregate a seed probability matrix into summary statistics.
+
+    Computes the mean probability, standard deviation (uncertainty), confidence,
+    and binary prediction from a matrix of per-seed eruption probabilities.
+    Confidence is defined as the fraction of seeds that voted with the majority
+    decision — values range from 0.5 (split vote) to 1.0 (unanimous).
+
+    This is the shared aggregation kernel used by both
+    :meth:`SeedEnsemble.predict_with_uncertainty` and
+    :func:`eruption_forecast.utils.ml.compute_model_probabilities`.
+
+    Args:
+        seed_proba_matrix (np.ndarray): Array of shape (n_samples, n_seeds)
+            containing per-seed P(eruption) values.
+        threshold (float, optional): Probability threshold for eruption
+            classification. Defaults to ``ERUPTION_PROBABILITY_THRESHOLD``.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D arrays
+            of shape (n_samples,):
+
+            - ``mean_probability``: Mean P(eruption) across seeds.
+            - ``std``: Standard deviation of P(eruption) across seeds.
+            - ``confidence``: Fraction of seeds voting with the majority (0.5–1.0).
+            - ``prediction``: Binary predictions (0 or 1) based on ``threshold``.
+    """
+    mean_probability: np.ndarray = seed_proba_matrix.mean(axis=1)
+    std: np.ndarray = seed_proba_matrix.std(axis=1)
+    prediction: np.ndarray = (mean_probability >= threshold).astype(int)
+
+    votes_for_eruption: np.ndarray = (seed_proba_matrix >= 0.5).sum(axis=1)
+    n_seeds = seed_proba_matrix.shape[1]
+    majority_votes = np.where(
+        prediction == 1, votes_for_eruption, n_seeds - votes_for_eruption
+    )
+    confidence: np.ndarray = majority_votes / n_seeds
+
+    return mean_probability, std, confidence, prediction
 
 
 def detect_anomalies_zscore(data: np.ndarray, threshold=3.5) -> NDArray[np.bool_]:

@@ -8,6 +8,7 @@
 - [Design Principles](#design-principles)
 - [Pipeline Overview](#pipeline-overview)
 - [Component Details](#component-details)
+  - [Model Class Relationships](#51-model-class-relationships)
 
 ---
 
@@ -144,6 +145,8 @@ Raw Seismic Data (SDS / FDSN)
 
 **Workflow:**
 ```python
+from eruption_forecast.tremor.calculate_tremor import CalculateTremor
+
 # From SDS archive
 calculate = CalculateTremor(
     station="OJN",
@@ -218,6 +221,88 @@ calculate = CalculateTremor(
   - `predict()` / `predict_best()`: Requires labels (evaluation mode)
   - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
 - `PipelineConfig`: Serialisable pipeline configuration (`src/eruption_forecast/config/pipeline_config.py`)
+
+### 5.1 Model Class Relationships
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                         TRAINING PHASE                                              │
+│                                                                                                     │
+│   ┌──────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│   │                              ModelTrainer  (one classifier)                                  │  │
+│   │                                                                                              │  │
+│   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
+│   │           │                                                   │                              │  │
+│   │   train_and_evaluate()                                     train()                           │  │
+│   │   80/20 split → resample                            full dataset → resample                  │  │
+│   │   → feature select → CV                              → feature select → CV                   │  │
+│   │   → eval on test set                                    (no evaluation)                      │  │
+│   └───────────────────┬──────────────────────────────────────────────────────────────────────────┘  │
+│                       │ produces (per seed)                                                         │
+│                       ▼                                                                             │
+│          ┌────────────────────────┐                                                                 │
+│          │  trained_model_*.pkl   │   metrics/*.json   features/*.csv   registry.csv                │
+│          └────────────┬───────────┘                                                                 │
+│                       │                                                                             │
+│          ┌────────────┴─────────────────────────────────────────────┐                               │
+│          │ .merge_models()                                          │ .merge_classifier_models()    │
+│          ▼                                                          ▼                               │
+└──────────┼──────────────────────────────────────────────────────────────────────────────────────────┘  
+           │                                                          │
+           ▼                                                          ▼
+┌─────────────────────────────┐                       ┌───────────────────────────────────────────────┐
+│        SeedEnsemble         │                       │              ClassifierEnsemble               │
+│  (all seeds, 1 classifier)  │◄───────────────────── │  (multiple SeedEnsembles, N classifiers)      │
+│                             │  contains 1..N seeds  │                                               │
+│  .predict_proba(X)          │                       │  .from_seed_ensembles(dict)                   │
+│    → (n_samples, 2)         │                       │  .from_registry_dict(dict)                    │
+│                             │                       │                                               │
+│  .predict_with_uncertainty  │                       │  .predict_proba(X) → consensus (n_samples, 2) │
+│    → (mean, std, conf, pred)│                       │                                               │
+│                             │                       │  .predict_with_uncertainty(X)                 │
+│  .save() / .load()          │                       │    → (mean, std, conf, pred, per_clf_dict)    │
+└─────────────────────────────┘                       │                                               │
+                                                      │  .classifiers  .__getitem__  .__len__         │
+                                                      │  .save() / .load()                            │
+                                                      └───────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                        EVALUATION PHASE                                             │
+│                                                                                                     │
+│  ┌──────────────────────────┐    ┌────────────────────────────────┐    ┌────────────────────────┐   │
+│  │      ModelEvaluator      │    │      MultiModelEvaluator       │    │  ClassifierComparator  │   │
+│  │  (1 fitted model/seed)   │    │  (all seeds, 1 classifier)     │    │  (N classifiers)       │   │
+│  │                          │    │                                │    │                        │   │
+│  │  .get_metrics()          │    │  .get_aggregate_metrics()      │    │  .get_ranking_table()  │   │
+│  │  .summary()              │    │  .save_aggregate_metrics()     │    │  .save_ranking_table() │   │
+│  │  .plot_all()   (8 plots) │    │  .plot_all()    (10 plots)     │    │  .plot_all()           │   │
+│  │  .from_files()           │    │  ───────────────────────────   │    │  ────────────────────  │   │
+│  │  ─────────────────────── │    │  reads: metrics/*.json         │    │  wraps N instances of  │   │
+│  │  inputs:                 │    │         registry.csv           │    │  MultiModelEvaluator   │   │
+│  │    fitted model          │    │                                │    │  (one per classifier)  │   │
+│  │    X_test, y_test        │    │  outputs:                      │    │                        │   │
+│  │    selected_features     │    │    aggregate_metrics.csv       │    │  outputs:              │   │
+│  │                          │    │    aggregate_*.png/.csv        │    │    ranking_table.csv   │   │
+│  │  called internally by    │    │    seed_stability_*.png        │    │    comparison plots    │   │
+│  │  ModelTrainer per seed   │    │    freq_band_contribution.png  │    │                        │   │
+│  └──────────────────────────┘    └────────────────────────────────┘    └────────────────────────┘   │
+│               ▲                                  ▲                                  ▲               │
+│               │                                  │                                  │               │
+│         called per seed                 reads per-seed metrics                reads per-clf         │
+│         during training                     & registry CSV                  metrics/registries      │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+  SCOPE SUMMARY
+  ─────────────────────────────────────────────────────────────────────────────
+  ModelEvaluator        → 1 model,  1 seed,   1 classifier    (micro)
+  MultiModelEvaluator   → N models, N seeds,  1 classifier    (per-classifier)
+  ClassifierComparator  → N models, N seeds,  N classifiers   (cross-classifier)
+  SeedEnsemble          → N seeds,  1 classifier              (inference)
+  ClassifierEnsemble    → N seeds,  N classifiers             (inference, consensus)
+  ─────────────────────────────────────────────────────────────────────────────
+```
 
 ### 6. Data Classes
 

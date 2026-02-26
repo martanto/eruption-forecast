@@ -98,7 +98,7 @@ class LabelData(BaseDataContainer):
                 ...
             ValueError: Label file not found at nonexistent.csv
         """
-        super().__init__(csv_path=label_csv)
+        super().__init__(csv=label_csv)
         self.label_csv = label_csv
 
         self.validate()

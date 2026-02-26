@@ -100,6 +100,58 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()`; `False` → `train()` |
 | `**kwargs` | — | — | Forwarded to the dispatched method |
 
+### Merge Methods
+
+| Method | Description |
+|--------|-------------|
+| `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: same directory as the registry CSV, named `merged_model_{suffix}.pkl`. Requires training to have been run first (`self.csv` must be set). |
+| `merge_classifier_models(trained_models, output_path=None)` | Bundle multiple classifier registry CSVs into one `dict[str, SeedEnsemble]` `.pkl`. Accepts `{"rf": "path/to/rf.csv", "xgb": "path/to/xgb.csv"}`. |
+
+---
+
+## SeedEnsemble
+
+Bundles all seed models for a single classifier into one serialisable object. Subclasses `sklearn.base.BaseEstimator` and `ClassifierMixin`.
+
+```python
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+# or
+from eruption_forecast.model import SeedEnsemble
+```
+
+### Construction
+
+```python
+# Build from a trained-model registry CSV
+ensemble = SeedEnsemble.from_registry("path/to/trained_model_*.csv")
+
+# Load a previously saved ensemble
+ensemble = SeedEnsemble.load("path/to/merged_model_*.pkl")
+```
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `SeedEnsemble.from_registry(registry_csv)` | `SeedEnsemble` | Load all seeds from a registry CSV into memory |
+| `SeedEnsemble.load(path)` | `SeedEnsemble` | Restore from a `.pkl` file written by `save()` |
+| `predict_proba(X)` | `np.ndarray (n, 2)` | sklearn-compatible class probabilities — column 0: P(non-eruption), column 1: mean P(eruption) across seeds |
+| `predict(X)` | `np.ndarray (n,)` | Binary predictions using 0.5 threshold on mean P(eruption) |
+| `predict_with_uncertainty(X, threshold)` | `tuple[ndarray × 4]` | `(mean_probability, std, confidence, prediction)` — richer output than `predict_proba()` |
+| `save(path)` | `None` | Serialise with joblib to a single `.pkl` |
+| `len(ensemble)` | `int` | Number of seeds in the bundle |
+
+### Standalone merge functions
+
+```python
+from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
+```
+
+| Function | Description |
+|----------|-------------|
+| `merge_seed_models(registry_csv, output_path=None)` | One classifier → one `SeedEnsemble` `.pkl`. Default name: `merged_model_{suffix}.pkl` alongside the registry CSV. |
+| `merge_all_classifiers(trained_models, output_path=None)` | Multiple classifiers → one `dict[str, SeedEnsemble]` `.pkl`. `trained_models` is `{"rf": "rf_registry.csv", ...}`. Default name: `merged_classifiers_{suffix}.pkl` in the `trainings/` root. |
+
 ---
 
 ## ModelPredictor
@@ -116,7 +168,7 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 |-----------|------|---------|-------------|
 | `start_date` | `str \| datetime` | — | Start of prediction period |
 | `end_date` | `str \| datetime` | — | End of prediction period |
-| `trained_models` | `str \| dict[str, str]` | — | Single registry CSV path or `{name: path}` dict for multi-model consensus |
+| `trained_models` | `str \| dict[str, str]` | — | Single registry CSV path, path to a merged `.pkl` (`SeedEnsemble` or `dict[str, SeedEnsemble]`), or `{name: path}` dict for multi-model consensus |
 | `overwrite` | `bool` | `False` | Overwrite existing output files |
 | `n_jobs` | `int` | `1` | Parallel jobs |
 | `output_dir` | `str \| None` | `None` | Output directory |

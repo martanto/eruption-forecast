@@ -24,13 +24,17 @@ try:
 except ImportError:
     pass
 
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
 
 __all__ = [
     "ClassifierComparator",
+    "ClassifierEnsemble",
     "ModelEvaluator",
     "MultiModelEvaluator",
+    "SeedEnsemble",
 ]

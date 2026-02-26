@@ -791,3 +791,116 @@ print(f"F1 Score:           {best_seed['f1_score']:.4f}")
 sig_features = pd.read_csv(f"{base}/features/significant_features.csv")
 print(sig_features.head(10))
 ```
+
+### 13. Merge Seed Models into One File
+
+After training 500 seeds, each seed's estimator and its significant-feature list live in separate files. Merging them into a single `SeedEnsemble` pkl eliminates all per-seed I/O at prediction time and gives you a standard sklearn estimator you can use directly.
+
+#### Option A — via ModelTrainer (recommended after training)
+
+```python
+# trainer is the ModelTrainer returned by ForecastModel.train() or constructed directly
+merged_path = trainer.merge_models()
+# Default output: alongside the registry CSV
+# → output/VG.OJN.00.EHZ/trainings/predictions/
+#     random-forest-classifier/stratified-k-fold/
+#     merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
+
+print(f"Merged ensemble saved to: {merged_path}")
+```
+
+Custom output path:
+
+```python
+merged_path = trainer.merge_models(
+    output_path="output/deploy/rf_ensemble.pkl"
+)
+```
+
+#### Option B — standalone function
+
+```python
+from eruption_forecast.utils.ml import merge_seed_models
+
+merged_path = merge_seed_models(
+    registry_csv="output/.../trained_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.csv"
+)
+```
+
+#### Option C — multi-classifier bundle
+
+Bundle all classifiers into one file for one-shot loading with `ModelPredictor`:
+
+```python
+from eruption_forecast.utils.ml import merge_all_classifiers
+
+bundle_path = merge_all_classifiers(
+    trained_models={
+        "rf":  "output/.../predictions/random-forest-classifier/stratified-k-fold/trained_model_*.csv",
+        "xgb": "output/.../predictions/xgb-classifier/stratified-k-fold/trained_model_*.csv",
+    }
+)
+# Default output: output/.../trainings/merged_classifiers_*.pkl
+```
+
+Or via `ModelTrainer`:
+
+```python
+bundle_path = trainer.merge_classifier_models(
+    trained_models={"rf": rf_trainer.csv, "xgb": xgb_trainer.csv}
+)
+```
+
+#### Using SeedEnsemble directly
+
+```python
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+
+ensemble = SeedEnsemble.load(merged_path)
+print(ensemble)
+# SeedEnsemble(classifier_name='RandomForestClassifier',
+#              cv_strategy='unknown', n_seeds=500)
+
+# Full uncertainty output — mirrors compute_model_probabilities()
+mean_p, std, confidence, prediction = ensemble.predict_with_uncertainty(
+    features_df,
+    threshold=0.7,   # default: ERUPTION_PROBABILITY_THRESHOLD
+)
+print(f"Mean P(eruption): {mean_p.mean():.4f}")
+print(f"Eruption windows: {prediction.sum()}")
+
+# sklearn-compatible output — useful for cross_val_score, Pipeline, etc.
+proba = ensemble.predict_proba(features_df)   # shape (n_windows, 2)
+labels = ensemble.predict(features_df)        # shape (n_windows,)
+```
+
+#### Passing a merged pkl to ModelPredictor
+
+`ModelPredictor` detects `.pkl` vs `.csv` automatically — no API change needed:
+
+```python
+from eruption_forecast.model.model_predictor import ModelPredictor
+
+# Single merged classifier
+predictor = ModelPredictor(
+    start_date="2025-07-28",
+    end_date="2025-08-04",
+    trained_models=merged_path,   # path ending in .pkl
+)
+
+# Multi-classifier bundle
+predictor = ModelPredictor(
+    start_date="2025-07-28",
+    end_date="2025-08-04",
+    trained_models=bundle_path,   # dict[str, SeedEnsemble] inside
+)
+
+df_forecast = predictor.predict_proba(
+    tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    plot=True,
+)
+print(df_forecast[["model_eruption_probability", "model_uncertainty"]].head())
+```

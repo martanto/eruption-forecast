@@ -84,6 +84,7 @@ class MultiModelEvaluator:
         metrics_dir: str | None = None,
         metrics_files: list[str] | None = None,
         trained_model_csv: str | None = None,
+        classifier_name: str = "model",
         root_dir: str | None = None,
         output_dir: str | None = None,
     ) -> None:
@@ -101,6 +102,8 @@ class MultiModelEvaluator:
             trained_model_csv (str | None, optional): Path to a trained model registry
                 CSV produced by ModelTrainer. Used for aggregate plot generation.
                 Defaults to None.
+            classifier_name (str). CLassifier name to bes used as prefix filename.
+                Defaults to "model".
             root_dir (str | None, optional): Root directory used to anchor output_dir
                 resolution. See class-level docs for resolution priority. Defaults to None.
             output_dir (str | None, optional): Directory for saving evaluation outputs.
@@ -115,12 +118,13 @@ class MultiModelEvaluator:
                 "At least one of metrics_dir, metrics_files, or trained_model_csv must be provided."
             )
 
+        self.classifier_name = classifier_name
         self._metrics_dir = metrics_dir
         self._metrics_files = metrics_files
         self._trained_model_csv = trained_model_csv
 
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output"))
-        self.output_dir = os.path.join(output_dir, "evaluations", "aggregate")
+        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "evaluations"))
+        self.output_dir = os.path.join(output_dir, "aggregate")
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -202,9 +206,12 @@ class MultiModelEvaluator:
                 "trained_model_csv is required for plot methods. "
                 "Provide it when constructing MultiModelEvaluator."
             )
+
         df = pd.read_csv(self._trained_model_csv, index_col=0)
+
         if df.empty:
             raise ValueError("Registry CSV is empty; no seeds to process.")
+
         return df
 
     def _save_outputs(
@@ -241,7 +248,9 @@ class MultiModelEvaluator:
 
     def _collect_predictions(
         self,
-    ) -> tuple[list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]]:
+    ) -> tuple[
+        list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]
+    ]:
         """Load models, X_tests, y_trues, and y_probas from all registry seeds.
 
         Iterates over every row in the model registry, loads the fitted model,
@@ -373,13 +382,14 @@ class MultiModelEvaluator:
             y_probas=y_probas,
             show_individual=show_individual,
             title=title,
+            label_classifier=self.classifier_name,
             dpi=dpi,
         )
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_roc_curve.png",
-            "aggregate_roc_curve.csv",
+            filename or f"{self.classifier_name}_aggregate_roc_curve.png",
+            f"{self.classifier_name}_aggregate_roc_curve.csv",
             dpi,
             save,
         )
@@ -422,8 +432,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_pr_curve.png",
-            "aggregate_pr_curve.csv",
+            filename or f"{self.classifier_name}_aggregate_pr_curve.png",
+            f"{self.classifier_name}_aggregate_pr_curve.csv",
             dpi,
             save,
         )
@@ -466,8 +476,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_calibration.png",
-            "aggregate_calibration.csv",
+            filename or f"{self.classifier_name}_aggregate_calibration.png",
+            f"{self.classifier_name}_aggregate_calibration.csv",
             dpi,
             save,
         )
@@ -507,8 +517,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_prediction_distribution.png",
-            "aggregate_prediction_distribution.csv",
+            filename or f"{self.classifier_name}_aggregate_prediction_distribution.png",
+            f"{self.classifier_name}_aggregate_prediction_distribution.csv",
             dpi,
             save,
         )
@@ -551,11 +561,12 @@ class MultiModelEvaluator:
             title=title,
             dpi=dpi,
         )
+
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_confusion_matrix.png",
-            "aggregate_confusion_matrix.csv",
+            filename or f"{self.classifier_name}_aggregate_confusion_matrix.png",
+            f"{self.classifier_name}_aggregate_confusion_matrix.csv",
             dpi,
             save,
         )
@@ -598,8 +609,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_threshold_analysis.png",
-            "aggregate_threshold_analysis.csv",
+            filename or f"{self.classifier_name}_aggregate_threshold_analysis.png",
+            f"{self.classifier_name}_aggregate_threshold_analysis.csv",
             dpi,
             save,
         )
@@ -665,8 +676,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_feature_importance.png",
-            "aggregate_feature_importance.csv",
+            filename or f"{self.classifier_name}_aggregate_feature_importance.png",
+            f"{self.classifier_name}_aggregate_feature_importance.csv",
             dpi,
             save,
         )
@@ -797,8 +808,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "aggregate_shap_summary.png",
-            "aggregate_shap_summary.csv",
+            filename or f"{self.classifier_name}_aggregate_shap_summary.png",
+            f"{self.classifier_name}_aggregate_shap_summary.csv",
             dpi,
             save,
         )
