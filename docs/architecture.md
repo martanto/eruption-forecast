@@ -121,6 +121,89 @@ Raw Seismic Data (SDS / FDSN)
 
 ---
 
+## Research Workflow (`workflow.py`)
+
+`workflow.py` is the top-level research script. It runs the full pipeline in two
+parallel branches (train-with-evaluation and train-for-forecast), guarded by
+boolean stage flags so any completed stage can be skipped on re-runs.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           workflow.py  —  Stage Flow                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  [RUN_CALCULATE]
+       │
+       ▼
+┌─────────────────┐
+│  Stage 1        │  CalculateTremor
+│  calculate()    │  SDS → RSAM / DSAR / Entropy → tremor_*.csv
+│                 │  dates: 2025-01-01 → 2025-08-24
+└────────┬────────┘
+         │
+         │  for mode in ["train", "forecast"]:
+         │
+         ├───────────────────────────────────────────────────────────────────┐
+         │                                                                   │
+         │  mode = "train"                          mode = "forecast"        │
+         │                                                                   │
+         ▼                                                                   ▼
+┌─────────────────┐                                            ┌─────────────────┐
+│  build_label()  │  2025-01-01 → 2025-08-24                   │  build_label()  │  2025-01-01 → 2025-07-27
+│                 │  window_step=6h, dtf=2                     │                 │  window_step=6h, dtf=2
+│                 │  (full range — test split sees             │                 │  (shorter — leaves
+│                 │   all eruption events)                     │                 │   forecast headroom)
+└────────┬────────┘                                            └────────┬────────┘
+         │                                                              │
+         ▼                                                              ▼
+┌─────────────────┐                                            ┌─────────────────┐
+│  extract_       │  FeaturesBuilder                           │  extract_       │  FeaturesBuilder
+│  features()     │  rsam_f2/f3/f4, dsar_f3-f4                │  features()     │  (same kwargs)
+│                 │  700+ tsfresh features → CSV               │                 │
+└────────┬────────┘                                            └────────┬────────┘
+         │                                                              │
+         ▼                                                              ▼
+┌─────────────────┐                                            ┌─────────────────┐
+│  train()        │  ModelTrainer                              │  train()        │  ModelTrainer
+│  with_eval=True │  classifiers: lite-rf, rf                  │  with_eval=False│  (same classifiers)
+│                 │  cv: stratified, seeds: 100                │                 │  cv: stratified, seeds: 100
+│                 │  80/20 split → metrics JSON per seed        │                 │  full dataset → no metrics
+│                 │  → trainings/evaluations/…                 │                 │  → trainings/predictions/…
+└────────┬────────┘                                            └────────┬────────┘
+         │                                                              │
+         │  [RUN_EVALUATE_PER_MODEL]                                    ▼
+         ▼                                                     ┌─────────────────┐
+┌─────────────────┐                                            │  forecast()     │  ModelPredictor
+│  MultiModel     │  per-classifier aggregate plots            │                 │  predict_proba
+│  Evaluator      │  ROC, PR, calibration, confusion,          │                 │  2025-07-28 → 2025-08-20
+│  (loop per clf) │  SHAP beeswarm, seed stability, …          │                 │  → predictions.csv
+└────────┬────────┘                                            └─────────────────┘
+         │
+         │  [RUN_COMPARE_MODELS]  (requires ≥ 2 classifiers)
+         ▼
+┌─────────────────┐
+│  Classifier     │  cross-classifier metric bar,
+│  Comparator     │  seed stability, ROC overlay,
+│                 │  comparison grid → ranking CSV
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  save_config()  │  [SAVE_CONFIG]  → config_workflow.yaml
+└─────────────────┘
+
+
+  Stage flags (module-level booleans):
+  ┌──────────────────────────┬────────────────────────────────────────────┐
+  │ RUN_CALCULATE            │ Stage 1 — tremor calculation               │
+  │ RUN_EVALUATE_PER_MODEL   │ MultiModelEvaluator plots per classifier   │
+  │ RUN_COMPARE_MODELS       │ ClassifierComparator cross-classifier plots │
+  │ SAVE_CONFIG              │ Persist pipeline YAML                      │
+  └──────────────────────────┴────────────────────────────────────────────┘
+```
+
+---
+
 ## Component Details
 
 ### 1. Tremor Calculation (`src/eruption_forecast/tremor/`)
