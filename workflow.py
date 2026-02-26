@@ -119,7 +119,7 @@ TRAIN_KWARGS: dict[str, Any] = {
     "sampling_strategy": 0.75,
     "save_all_features": True,
     "plot_significant_features": True,
-    "n_jobs": 4,
+    "n_jobs": 10,
     "grid_search_n_jobs": 2,
     "overwrite": False,
     "verbose": True,
@@ -139,7 +139,7 @@ FORECAST_KWARGS: dict[str, Any] = {
 
 
 @timer("Workflow")
-@notify("Laptop - Workflow")
+@notify("Primer - Workflow")
 def main() -> None:
     """Run the full eruption-forecast research workflow.
 
@@ -160,7 +160,7 @@ def main() -> None:
     """
     fm = ForecastModel(
         overwrite=False,
-        n_jobs=4,
+        n_jobs=18,
         **PARAMS,
     )
 
@@ -205,7 +205,8 @@ def main() -> None:
                         evaluator = MultiModelEvaluator(
                             trained_model_csv=csv_path,
                             metrics_dir=metrics_dir,
-                            output_dir=fm.station_dir,
+                            classifier_name=name,
+                            output_dir=csv_dir,
                         )
 
                         if metrics_dir is not None:

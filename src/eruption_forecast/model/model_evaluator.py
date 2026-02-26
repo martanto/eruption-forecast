@@ -533,6 +533,7 @@ class ModelEvaluator:
             y_proba=self._y_proba,
             title=f"ROC Curve — {self.model_name}",
             figsize=(6, 5),
+            label_classifier=self.model_name,
             dpi=dpi,
         )
 
