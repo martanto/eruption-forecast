@@ -251,12 +251,20 @@ class ModelTrainer:
             root_dir,
             os.path.join("output"),
         )
-        output_dir = os.path.join(output_dir, "trainings", "evaluations")
 
         # Classifier training dir: ``<output_dir>/<classifier_slug_name>/<classifier_slug_cv_name>``
+        _output_dir = os.path.join(output_dir, "trainings", "evaluations")
         classifier_dir = os.path.join(
-            output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
+            _output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
         )
+
+        # Features directory under station_dir
+        # ``<station_dir>/features``
+        feature_root_dir = os.path.join(output_dir, "features")
+
+        # Per-seed test data dir: ``<feature_root_dir>/tests``
+        # Sharing all extracted features tests
+        tests_dir = os.path.join(feature_root_dir, "tests")
 
         # Classifier training model dir: ``<classifier_dir>/models``
         models_dir = os.path.join(classifier_dir, "models")
@@ -273,9 +281,6 @@ class ModelTrainer:
         # Significant features dir: ``<features_dir>/significant_features``
         significant_features_dir = os.path.join(features_dir, "significant_features")
 
-        # Per-seed test data dir: ``<features_dir>/tests``
-        tests_dir = os.path.join(features_dir, "tests")
-
         # Plot significant features dir: ``<features_dir>/figures/significant``
         figures_dir = os.path.join(features_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
@@ -285,7 +290,7 @@ class ModelTrainer:
         # ------------------------------------------------------------------
         self.df_features = df_features
         self.df_labels = df_labels
-        self.output_dir = output_dir
+        self.output_dir = _output_dir
         self.n_jobs = n_jobs
         self.grid_search_n_jobs = grid_search_n_jobs
         self.prefix_filename = prefix_filename
@@ -497,9 +502,6 @@ class ModelTrainer:
         # Plot significant features dir: ``<features_dir>/figures/significant``
         self.figures_dir = os.path.join(self.features_dir, "figures")
         self.significant_figures_dir = os.path.join(self.figures_dir, "significant")
-
-        # Per-seed test data dir: ``<features_dir>/tests``
-        self.tests_dir = os.path.join(self.features_dir, "tests")
 
         self.create_directories()
 
@@ -1144,8 +1146,12 @@ class ModelTrainer:
         # X_test_filepath and y_test_filepath will be used as an input
         # for selected_features_path parameter in ModelEvaluator.from_files(...) method
         _, top_selected_features, _, _ = result
-        X_test[top_selected_features.index.tolist()].to_csv(X_test_filepath)
-        y_test.to_csv(y_test_filepath)
+
+        if not os.path.exists(X_test_filepath):
+            X_test[top_selected_features.index.tolist()].to_csv(X_test_filepath)
+
+        if not os.path.exists(y_test_filepath):
+            y_test.to_csv(y_test_filepath)
 
         # ========== STEPS 4-5: CV Training + Evaluation ==========
         metrics = self._cv_train_evaluate(
