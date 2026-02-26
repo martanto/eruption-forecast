@@ -67,7 +67,7 @@ def plot_shap_summary(
     # The masker is built from X itself (all rows as background).
     # shap.Explainer(model) without a masker raises "not callable" for some
     # model types, so the masker is always passed explicitly here.
-    shap_explanation = _compute_shap_explanation(model, X)
+    shap_explanation = compute_shap_explanation(model, X)
 
     with apply_nature_style():
         # shap.plots.beeswarm always draws on the current figure; capture it
@@ -87,7 +87,7 @@ def plot_shap_summary(
     return fig, shap_explanation
 
 
-def _compute_shap_explanation(
+def compute_shap_explanation(
     model: Any,
     X: pd.DataFrame,
     feature_names: list[str] | None = None,
@@ -133,7 +133,7 @@ def _compute_shap_explanation(
 def _compute_shap_values(model: Any, X: pd.DataFrame) -> np.ndarray:
     """Compute a 2-D SHAP value array for the positive class.
 
-    Delegates to ``_compute_shap_explanation`` and extracts the raw values
+    Delegates to ``compute_shap_explanation`` and extracts the raw values
     array. Returns a plain ``np.ndarray`` of shape ``(n_samples, n_features)``
     suitable for numerical aggregation.
 
@@ -145,7 +145,7 @@ def _compute_shap_values(model: Any, X: pd.DataFrame) -> np.ndarray:
         np.ndarray: 2-D array of shape ``(n_samples, n_features)`` containing
         SHAP values for the positive class.
     """
-    explanation = _compute_shap_explanation(model, X)
+    explanation = compute_shap_explanation(model, X)
     return np.asarray(explanation.values)  # noqa: PD011
 
 
@@ -316,7 +316,7 @@ def plot_aggregate_shap_summary(
             seed_explanations.append(cached)
         else:
             try:
-                seed_explanations.append(_compute_shap_explanation(model, X))
+                seed_explanations.append(compute_shap_explanation(model, X))
             except Exception as e:
                 logger.warning(f"Skipping seed {i} in SHAP beeswarm aggregation: {e}")
                 seed_explanations.append(None)
