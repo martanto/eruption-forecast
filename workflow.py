@@ -198,15 +198,19 @@ def main() -> None:
                         print(f"[workflow] Stage 3: evaluating '{name}'")
                         csv_dir = os.path.dirname(os.path.abspath(csv_path))
                         metrics_dir: str | None = os.path.join(csv_dir, "metrics")
+
                         if not os.path.isdir(metrics_dir):
                             metrics_dir = None
 
                         evaluator = MultiModelEvaluator(
                             trained_model_csv=csv_path,
                             metrics_dir=metrics_dir,
+                            output_dir=fm.station_dir,
                         )
+
                         if metrics_dir is not None:
                             evaluator.get_aggregate_metrics()
+
                         evaluator.plot_all()
             else:
                 print("[workflow] Skipping Stage 3: evaluate per model")
