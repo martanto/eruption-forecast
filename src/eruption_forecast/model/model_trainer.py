@@ -9,7 +9,12 @@ from joblib import Parallel, delayed
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import load_labels_from_csv, random_under_sampler
+from eruption_forecast.utils.ml import (
+    merge_seed_models,
+    load_labels_from_csv,
+    random_under_sampler,
+    merge_all_classifiers,
+)
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
@@ -687,6 +692,8 @@ class ModelTrainer:
         )
 
         # Save TOP-N significant features
+        # significant_filepath Will be used in ModelEvaluator.from_files(...) method
+        # as selected_features_path paramater
         top_selected_features.to_csv(significant_filepath, index=True)
 
         # Save all SELECTED features if requested
@@ -904,13 +911,11 @@ class ModelTrainer:
 
         return suffix
 
+    @staticmethod
     def _split_and_resample(
-        self,
         X: pd.DataFrame,
         y: pd.Series,
         random_state: int,
-        X_test_filepath: str,
-        y_test_filepath: str,
         sampling_strategy: str | float = 0.75,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """Steps 1-2: stratified train/test split then RandomUnderSampler on train.
@@ -921,8 +926,6 @@ class ModelTrainer:
             X (pd.DataFrame): Full feature matrix.
             y (pd.Series): Full label series.
             random_state (int): Random seed for both split and sampler.
-            X_test_filepath (str): Path to save held-out X_test CSV.
-            y_test_filepath (str): Path to save held-out y_test CSV.
             sampling_strategy (str | float, optional): Under-sampling ratio.
                 Defaults to 0.75.
 
@@ -939,8 +942,6 @@ class ModelTrainer:
             random_state=random_state,
             stratify=y,
         )
-        X_test.to_csv(X_test_filepath)
-        y_test.to_csv(y_test_filepath)
 
         X_train_resampled, y_train_resampled = random_under_sampler(
             features=X_train,
@@ -1119,19 +1120,17 @@ class ModelTrainer:
         logger.info(f"Training Seed: {random_state:05d}")
 
         # ========== STEPS 1-2: Train/Test Split + Resample ==========
-        X_train_resampled, X_test, y_train_resampled, y_test = self._split_and_resample(
+        X_train, X_test, y_train, y_test = self._split_and_resample(
             X=self.df_features,
             y=self.df_labels,
             random_state=random_state,
-            X_test_filepath=X_test_filepath,
-            y_test_filepath=y_test_filepath,
             sampling_strategy=sampling_strategy,
         )
 
         # ========== STEP 3: Feature Selection ==========
         result = self._select_features_for_seed(
-            X_train=X_train_resampled,
-            y_train=y_train_resampled,
+            X_train=X_train,
+            y_train=y_train,
             random_state=random_state,
             significant_filepath=significant_filepath,
             all_features_filepath=all_features_filepath if save_features else None,
@@ -1141,9 +1140,16 @@ class ModelTrainer:
         if result is None:
             return None
 
+        # Save only the significant-feature columns.
+        # X_test_filepath and y_test_filepath will be used as an input
+        # for selected_features_path parameter in ModelEvaluator.from_files(...) method
+        _, top_selected_features, _, _ = result
+        X_test[top_selected_features.index.tolist()].to_csv(X_test_filepath)
+        y_test.to_csv(y_test_filepath)
+
         # ========== STEPS 4-5: CV Training + Evaluation ==========
         metrics = self._cv_train_evaluate(
-            y_train=y_train_resampled,
+            y_train=y_train,
             X_test=X_test,
             y_test=y_test,
             selected_features=result,
@@ -1574,3 +1580,54 @@ class ModelTrainer:
         if self.verbose:
             logger.info(f"Summary metrics saved to: {summary_filepath}")
             logger.info(f"All metrics saved to: {all_metrics_filepath}")
+
+    def merge_models(self, output_path: str | None = None) -> str:
+        """Merge all seed models for this classifier into a single SeedEnsemble pkl.
+
+        Convenience wrapper around
+        :func:`eruption_forecast.utils.ml.merge_seed_models` that uses
+        ``self.csv`` as the registry CSV.  The registry CSV must exist (i.e.
+        ``train()`` or ``train_and_evaluate()`` must have been called first).
+
+        Args:
+            output_path (str | None, optional): Destination path for the merged
+                ``.pkl`` file.  If ``None``, the file is placed alongside the
+                registry CSV as ``merged_model_{suffix}.pkl``.
+                Defaults to ``None``.
+
+        Returns:
+            str: Absolute path to the saved merged ``.pkl`` file.
+
+        Raises:
+            RuntimeError: If no registry CSV is available (training not yet run).
+        """
+        if self.csv is None:
+            raise RuntimeError(
+                "No model registry CSV found. Run train() or "
+                "train_and_evaluate() before calling merge_models()."
+            )
+        return merge_seed_models(self.csv, output_path=output_path)
+
+    @staticmethod
+    def merge_classifier_models(
+        trained_models: dict[str, str],
+        output_path: str | None = None,
+    ) -> str:
+        """Merge multiple classifier registry CSVs into one combined pkl.
+
+        Convenience wrapper around
+        :func:`eruption_forecast.utils.ml.merge_all_classifiers`.  Use this
+        after training multiple classifiers to bundle their ensembles into a
+        single file for ``ModelPredictor``.
+
+        Args:
+            trained_models (dict[str, str]): Mapping of classifier name to
+                the path of its trained-model registry CSV.
+            output_path (str | None, optional): Destination path for the
+                combined ``.pkl`` file.  If ``None``, a default path is derived
+                from the first registry CSV.  Defaults to ``None``.
+
+        Returns:
+            str: Absolute path to the saved combined ``.pkl`` file.
+        """
+        return merge_all_classifiers(trained_models, output_path=output_path)

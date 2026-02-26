@@ -27,31 +27,24 @@ if TYPE_CHECKING:
 
 def plot_shap_summary(
     model: BaseEstimator,
-    X: np.ndarray | pd.DataFrame,
-    feature_names: list[str] | None = None,
+    X: pd.DataFrame,
+    selected_features: list[str] | None = None,
     max_display: int = 20,
     title: str | None = None,
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot a SHAP beeswarm summary for a single fitted model.
 
-    Uses ``shap.Explainer`` to auto-select the best explainer (TreeExplainer
-    for tree models, LinearExplainer for linear models, etc.), then renders
-    a beeswarm dot plot showing both direction and magnitude of feature
-    contributions for the top ``max_display`` features.
-
-    When ``X`` is a plain ``np.ndarray`` and ``feature_names`` is provided,
-    ``X`` is wrapped in a ``pd.DataFrame`` so that SHAP axis labels are
-    populated correctly.
+    Renders a beeswarm dot plot showing both direction and magnitude of
+    feature contributions for the top ``max_display`` features. Feature names
+    are read directly from ``X.columns``.
 
     Args:
         model (BaseEstimator): Fitted scikit-learn estimator to explain.
-        X (np.ndarray | pd.DataFrame): Feature matrix used to compute SHAP
-            values. Should be the test set or a representative sample.
-        feature_names (list[str] | None, optional): Feature names for the
-            axis labels. Applied when ``X`` is a plain ``np.ndarray``; ignored
-            when ``X`` is already a ``DataFrame`` (column names are used
-            directly). Defaults to None.
+        X (pd.DataFrame): Feature matrix used to compute SHAP values.
+            Should be the test set or a representative sample.
+        selected_features (list[str] | None, optional): If provided, restrict
+            SHAP computation to these columns only. Defaults to None.
         max_display (int, optional): Maximum number of features to display,
             sorted by mean |SHAP| descending. Defaults to 20.
         title (str | None, optional): Plot title. If None, uses
@@ -65,27 +58,19 @@ def plot_shap_summary(
     Examples:
         >>> from sklearn.ensemble import RandomForestClassifier
         >>> rf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
-        >>> fig = plot_shap_summary(rf, X_test, feature_names=X_test.columns.tolist())
+        >>> fig = plot_shap_summary(rf, X_test)
         >>> fig.savefig("shap_summary.png")
     """
-    # Wrap ndarray with feature names so SHAP labels axes correctly.
-    if feature_names is not None and not isinstance(X, pd.DataFrame):
-        X = pd.DataFrame(X, columns=feature_names)
+    if selected_features is not None:
+        X = X[selected_features]
 
-    # Do not pass X as background masker — shap.Explainer(model, X) fails when
-    # matplotlib rcParams have been customised (shap 0.49 bug). TreeExplainer
-    # does not require background data; X is still used as the evaluation set.
-    explainer = shap.Explainer(model)
-    try:
-        shap_values = explainer(X)
-    except Exception as e:
-        logger.warning(f"SHAP summary plot: {e}")
-        shap_values = explainer(X, check_additivity=False)
-
-    # For binary classifiers shap_values may have shape (n, features, 2);
-    # take the positive-class slice via Explanation indexing.
-    if hasattr(shap_values, "values") and shap_values.values.ndim == 3:  # noqa: PD011
-        shap_values = shap_values[:, :, 1]
+    # Use predict_proba + Independent masker so shap.Explainer works for any
+    # classifier, including XGBClassifier with XGBoost ≥ 3.x where
+    # shap.TreeExplainer fails with a string-to-float conversion error.
+    # The masker is built from X itself (all rows as background).
+    # shap.Explainer(model) without a masker raises "not callable" for some
+    # model types, so the masker is always passed explicitly here.
+    shap_values = _compute_shap_explanation(model, X)
 
     with apply_nature_style():
         # shap.plots.beeswarm always draws on the current figure; capture it
@@ -103,6 +88,68 @@ def plot_shap_summary(
         fig.suptitle(title or "SHAP Summary Plot", y=1.02)
 
     return fig
+
+
+def _compute_shap_explanation(
+    model: Any,
+    X: pd.DataFrame,
+    feature_names: list[str] | None = None,
+) -> shap.Explanation:
+    """Compute a SHAP ``Explanation`` object for the positive class.
+
+    Uses ``shap.Explainer(model.predict_proba, masker)`` with an
+    ``Independent`` masker built from ``X``. This path works for any
+    scikit-learn compatible classifier, including ``XGBClassifier`` with
+    XGBoost ≥ 3.x where ``shap.TreeExplainer`` fails with a string-to-float
+    conversion error, and avoids the "not callable" error raised by
+    ``shap.Explainer(model)`` when no masker is supplied.
+
+    For binary classifiers the explainer returns shape ``(n, features, 2)``;
+    the positive-class slice ``[:, :, 1]`` is taken automatically.
+
+    Args:
+        model (Any): A fitted scikit-learn compatible estimator with a
+            ``predict_proba`` method.
+        X (pd.DataFrame): Feature matrix used as both background masker and
+            evaluation set.
+        feature_names (list[str] | None, optional): Column names used when
+            ``X`` is not a DataFrame. Defaults to None.
+
+    Returns:
+        shap.Explanation: SHAP Explanation object with shape
+        ``(n_samples, n_features)`` for the positive class.
+    """
+    cols = list(X.columns) if isinstance(X, pd.DataFrame) else feature_names
+    masker = shap.maskers.Independent(X, max_samples=len(X))
+    explainer = shap.Explainer(model.predict_proba, masker)
+    shap_output = explainer(X)
+    # Binary classifier: shape (n, features, 2) — take positive-class slice.
+    if shap_output.values.ndim == 3:  # noqa: PD011
+        return shap.Explanation(
+            values=shap_output.values[:, :, 1],  # noqa: PD011
+            data=shap_output.data,
+            feature_names=cols,
+        )
+    return shap_output
+
+
+def _compute_shap_values(model: Any, X: pd.DataFrame) -> np.ndarray:
+    """Compute a 2-D SHAP value array for the positive class.
+
+    Delegates to ``_compute_shap_explanation`` and extracts the raw values
+    array. Returns a plain ``np.ndarray`` of shape ``(n_samples, n_features)``
+    suitable for numerical aggregation.
+
+    Args:
+        model (Any): A fitted scikit-learn compatible estimator.
+        X (pd.DataFrame): Feature matrix used to compute SHAP values.
+
+    Returns:
+        np.ndarray: 2-D array of shape ``(n_samples, n_features)`` containing
+        SHAP values for the positive class.
+    """
+    explanation = _compute_shap_explanation(model, X)
+    return np.asarray(explanation.values)  # noqa: PD011
 
 
 def _extract_shap_array(shap_output: Any) -> np.ndarray:
@@ -214,15 +261,7 @@ def plot_aggregate_shap_summary(
 
     for model, X, seed_names in zip(models, X_tests, per_seed_names, strict=True):
         try:
-            # Do not pass X as background masker — see note in plot_shap_summary.
-            explainer = shap.Explainer(model)
-            try:
-                shap_output = explainer(X)
-            except Exception as e:
-                logger.warning(f"SHAP aggregate summary plot: {e}")
-                shap_output = explainer(X, check_additivity=False)
-
-            vals = _extract_shap_array(shap_output)
+            vals = _compute_shap_values(model, X)
             seed_abs_mean = np.abs(vals).mean(axis=0)  # (n_seed_features,)
 
             # Map seed values into the union feature space

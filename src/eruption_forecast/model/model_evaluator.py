@@ -24,7 +24,7 @@ from eruption_forecast.config.constants import (
     THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
 )
-from eruption_forecast.plots.shap_plots import plot_shap_summary as _shap
+from eruption_forecast.plots.shap_plots import plot_shap_summary as _plot_shap_summary
 from eruption_forecast.utils.formatting import slugify_class_name
 from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
@@ -199,7 +199,7 @@ class ModelEvaluator:
         model_path: str,
         X_test: pd.DataFrame | str,
         y_test: pd.Series | str,
-        selected_features: list[str] | None = None,
+        selected_features_path: str | None = None,
         model_name: str = "model",
         output_dir: str | None = None,
     ) -> Self:
@@ -212,8 +212,10 @@ class ModelEvaluator:
             model_path (str): Path to a joblib-saved model file (.pkl).
             X_test (pd.DataFrame | str): Test features DataFrame or path to CSV file.
             y_test (pd.Series | str): True test labels Series or path to CSV file.
-            selected_features (list[str] | None, optional): If provided, filter
-                X_test to these columns. Defaults to None.
+            selected_features_path (str | None, optional): Path to the significant
+                features CSV saved by ModelTrainer (index column contains feature
+                names). If provided, X_test is filtered to those columns before
+                evaluation. Defaults to None.
             model_name (str, optional): Name identifier for the model.
                 Defaults to "model".
             output_dir (str | None, optional): Directory for saved plots.
@@ -230,6 +232,7 @@ class ModelEvaluator:
             ...     model_path="models/xgb_00042.pkl",
             ...     X_test="data/X_test.csv",
             ...     y_test="data/y_test.csv",
+            ...     selected_features_path="data/significant_features_00042.csv",
             ...     model_name="xgb_seed_42",
             ... )
             >>> print(evaluator.summary())
@@ -240,6 +243,12 @@ class ModelEvaluator:
             X_test = pd.read_csv(X_test, index_col=0)
         if isinstance(y_test, str):
             y_test = pd.read_csv(y_test, index_col=0).iloc[:, 0]
+
+        selected_features: list[str] | None = None
+        if selected_features_path is not None:
+            selected_features = (
+                pd.read_csv(selected_features_path, index_col=0).index.tolist()
+            )
 
         return cls(model, X_test, y_test, model_name, output_dir, selected_features)
 
@@ -912,10 +921,9 @@ class ModelEvaluator:
             >>> fig.savefig("custom_shap.png")
         """
 
-        fig = _shap(
+        fig = _plot_shap_summary(
             model=self.model,
             X=self.X_test,
-            feature_names=list(self.X_test.columns),
             max_display=max_display,
             title=f"SHAP Summary — {self.model_name}",
             dpi=dpi,
@@ -958,6 +966,6 @@ class ModelEvaluator:
             "threshold_analysis": self.plot_threshold_analysis(dpi=dpi),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
-            "shap_summary": self.plot_shap_summary(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
+            "shap_summary": self.plot_shap_summary(dpi=dpi),
         }

@@ -16,6 +16,8 @@ from imblearn.under_sampling import RandomUnderSampler
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
 
 def load_labels_from_csv(label_features_csv: str) -> pd.Series:
@@ -368,3 +370,102 @@ def compute_model_probabilities(
     confidence: np.ndarray = majority_votes / n_seeds
 
     return mean_probability, std_proba, confidence, prediction
+
+
+def merge_seed_models(
+    registry_csv: str,
+    output_path: str | None = None,
+) -> str:
+    """Load all seed models from a registry CSV and bundle into one SeedEnsemble pkl.
+
+    Reads the trained-model registry CSV produced by ``ModelTrainer``, loads
+    every seed estimator and its significant-feature list into memory, and
+    serialises the resulting :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`
+    to a single ``.pkl`` file.  This eliminates the per-seed I/O overhead at
+    prediction time.
+
+    Args:
+        registry_csv (str): Path to the trained-model registry CSV (the
+            ``trained_model_{suffix}.csv`` file written by ``ModelTrainer``).
+        output_path (str | None, optional): Destination path for the merged
+            ``.pkl`` file.  If ``None``, the file is written to the same
+            directory as ``registry_csv`` with the name
+            ``merged_model_{suffix}.pkl``, where ``{suffix}`` is derived from
+            the registry CSV filename.  Defaults to ``None``.
+
+    Returns:
+        str: Absolute path to the saved merged ``.pkl`` file.
+
+    Raises:
+        FileNotFoundError: If ``registry_csv`` does not exist.
+    """
+    if output_path is None:
+        registry_dir = os.path.dirname(os.path.abspath(registry_csv))
+        basename = os.path.splitext(os.path.basename(registry_csv))[0]
+        # Replace "trained_model_" prefix with "merged_model_"
+        if basename.startswith("trained_model_"):
+            merged_basename = "merged_model_" + basename[len("trained_model_"):]
+        else:
+            merged_basename = f"merged_{basename}"
+        output_path = os.path.join(registry_dir, f"{merged_basename}.pkl")
+
+    ensemble = SeedEnsemble.from_registry(registry_csv)
+    ensemble.save(output_path)
+    return output_path
+
+
+def merge_all_classifiers(
+    trained_models: dict[str, str],
+    output_path: str | None = None,
+) -> str:
+    """Merge multiple classifier registry CSVs into a single multi-classifier pkl.
+
+    Calls :func:`merge_seed_models` for each classifier, bundles the resulting
+    :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble` objects into a
+    plain ``dict[str, SeedEnsemble]``, and serialises the dict to one ``.pkl``
+    file.  ``ModelPredictor`` detects this dict type automatically when the path
+    is passed as the ``trained_models`` parameter.
+
+    Args:
+        trained_models (dict[str, str]): Mapping of classifier name to the path
+            of its trained-model registry CSV (e.g.
+            ``{"rf": "path/to/rf_registry.csv", "xgb": "path/to/xgb_registry.csv"}``).
+        output_path (str | None, optional): Destination path for the combined
+            ``.pkl`` file.  If ``None``, the file is placed one directory above
+            the first registry CSV (i.e. in the ``trainings/`` root) and named
+            ``merged_classifiers_{suffix}.pkl``, where ``{suffix}`` is derived
+            from the first registry CSV filename.  Defaults to ``None``.
+
+    Returns:
+        str: Absolute path to the saved combined ``.pkl`` file.
+
+    Raises:
+        ValueError: If ``trained_models`` is empty.
+        FileNotFoundError: If any registry CSV does not exist.
+    """
+    if not trained_models:
+        raise ValueError("trained_models must not be empty.")
+
+    if output_path is None:
+        first_csv = next(iter(trained_models.values()))
+        # Go one level up from the classifier dir to the trainings root
+        trainings_dir = os.path.dirname(
+            os.path.dirname(os.path.abspath(first_csv))
+        )
+        basename = os.path.splitext(os.path.basename(first_csv))[0]
+        if basename.startswith("trained_model_"):
+            suffix = basename[len("trained_model_"):]
+        else:
+            suffix = basename
+        output_path = os.path.join(
+            trainings_dir, f"merged_classifiers_{suffix}.pkl"
+        )
+
+    ensembles: dict[str, SeedEnsemble] = {}
+    for name, csv_path in trained_models.items():
+        logger.info(f"[merge_all_classifiers] Merging classifier: {name}")
+        ensembles[name] = SeedEnsemble.from_registry(csv_path)
+
+    classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(ensembles)
+    classifier_ensemble.save(output_path)
+    return output_path
