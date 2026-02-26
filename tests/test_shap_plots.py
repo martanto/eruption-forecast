@@ -4,6 +4,7 @@ Covers:
 - ``_extract_shap_array``: shape handling for 2D/3D ndarrays and Explanation objects.
 - ``plot_aggregate_shap_summary``: identical and mixed feature sets, zero-filling,
   per-seed failure skipping, strict-zip mismatch, and ValueError on total failure.
+- ``_build_aggregate_explanation``: zero-padding, None-skipping, feature-name preservation.
 - ``MultiModelEvaluator._load_seed_data``: DataFrame return type, proba/decision-function
   branching, AttributeError on unsupported models, feature filtering.
 - ``ModelEvaluator.plot_shap_summary``: smoke test for Figure return and title.
@@ -36,7 +37,6 @@ import shap
 from eruption_forecast.plots.shap_plots import (
     _build_aggregate_explanation,
     _extract_shap_array,
-    plot_aggregate_shap_beeswarm,
     plot_aggregate_shap_summary,
 )
 
@@ -202,7 +202,7 @@ class TestPlotAggregateShapSummary:
         m1, X1 = self._make_rf(cols)
         m2, X2 = self._make_rf(cols)
 
-        fig, df = plot_aggregate_shap_summary(
+        fig, exp = plot_aggregate_shap_summary(
             models=[m1, m2],
             X_tests=[X1, X2],
             feature_names=cols,
@@ -210,20 +210,19 @@ class TestPlotAggregateShapSummary:
         )
 
         assert isinstance(fig, plt.Figure)
-        assert isinstance(df, pd.DataFrame)
-        assert list(df.columns) == ["feature", "mean_shap", "std_shap"]
-        assert len(df) == 5
-        assert (df["mean_shap"] >= 0).all()
+        assert isinstance(exp, shap.Explanation)
+        assert exp.values.shape[1] == 5
+        assert exp.feature_names == cols
 
     def test_different_feature_sets_union_length(self):
-        """Mixed per-seed feature sets produce a union-sized result DataFrame."""
+        """Mixed per-seed feature sets produce a union-sized explanation."""
         seed1_cols = ["feat_0", "feat_1", "feat_2"]
         seed2_cols = ["feat_2", "feat_3", "feat_4"]
 
         m1, X1 = self._make_rf(seed1_cols)
         m2, X2 = self._make_rf(seed2_cols)
 
-        fig, df = plot_aggregate_shap_summary(
+        fig, exp = plot_aggregate_shap_summary(
             models=[m1, m2],
             X_tests=[X1, X2],
             feature_names=[seed1_cols, seed2_cols],
@@ -231,36 +230,33 @@ class TestPlotAggregateShapSummary:
         )
 
         # Union: feat_0..feat_4 → 5 features
-        assert len(df) == 5
-        assert set(df["feature"]) == {"feat_0", "feat_1", "feat_2", "feat_3", "feat_4"}
+        assert exp.values.shape[1] == 5
+        assert set(exp.feature_names) == {"feat_0", "feat_1", "feat_2", "feat_3", "feat_4"}
 
     def test_different_feature_sets_shared_feature_mean(self):
-        """Feature present in both seeds has a mean from both; exclusive features use one seed."""
+        """Feature present in both seeds appears in the merged explanation."""
         seed1_cols = ["a", "b", "c"]
         seed2_cols = ["c", "d", "e"]
 
         m1, X1 = self._make_rf(seed1_cols)
         m2, X2 = self._make_rf(seed2_cols)
 
-        _, df = plot_aggregate_shap_summary(
+        _, exp = plot_aggregate_shap_summary(
             models=[m1, m2],
             X_tests=[X1, X2],
             feature_names=[seed1_cols, seed2_cols],
         )
 
-        # "a" and "b" only appear in seed 1 — seed 2 contributes 0,
-        # so std_shap is the std of (seed1_value, 0), which is > 0 unless seed1_value == 0.
-        # "c" appears in both — verify it exists in the output.
-        assert "c" in df["feature"].values
-        assert "a" in df["feature"].values
-        assert "d" in df["feature"].values
+        assert "c" in exp.feature_names
+        assert "a" in exp.feature_names
+        assert "d" in exp.feature_names
 
     def test_raises_value_error_when_all_seeds_fail(self):
         """ValueError is raised when no seed produces valid SHAP values."""
         dummy = object()
         X = pd.DataFrame({"f0": [1.0, 2.0]})
 
-        with pytest.raises(ValueError, match="No seeds produced valid SHAP values"):
+        with pytest.raises(ValueError, match="No valid seeds"):
             plot_aggregate_shap_summary(
                 models=[dummy, dummy],
                 X_tests=[X, X],
@@ -275,14 +271,14 @@ class TestPlotAggregateShapSummary:
         X_dummy = pd.DataFrame({"feat_0": [1.0]})
 
         # Seed 2 will fail; seed 1 should still produce a result.
-        fig, df = plot_aggregate_shap_summary(
+        fig, exp = plot_aggregate_shap_summary(
             models=[m1, dummy],
             X_tests=[X1, X_dummy],
             feature_names=[cols, ["feat_0"]],
         )
 
         assert isinstance(fig, plt.Figure)
-        assert len(df) >= 1
+        assert isinstance(exp, shap.Explanation)
 
     def test_strict_zip_mismatched_lengths_raises(self):
         """Mismatched models and X_tests raise ValueError (strict=True zip)."""
@@ -295,37 +291,6 @@ class TestPlotAggregateShapSummary:
                 X_tests=[X1, X1],  # One extra X_test
                 feature_names=[cols, cols],
             )
-
-    def test_result_dataframe_sorted_descending(self):
-        """Returned DataFrame is sorted by mean_shap descending."""
-        cols = [f"feat_{i}" for i in range(4)]
-        m1, X1 = self._make_rf(cols)
-        m2, X2 = self._make_rf(cols)
-
-        _, df = plot_aggregate_shap_summary(
-            models=[m1, m2],
-            X_tests=[X1, X2],
-            feature_names=cols,
-        )
-
-        assert df["mean_shap"].is_monotonic_decreasing
-
-    def test_max_display_limits_bar_count(self, rf_and_data):
-        """max_display caps the number of bars shown (not the returned DataFrame rows)."""
-        rf, X_test, _ = rf_and_data
-        cols = X_test.columns.tolist()  # 6 features
-
-        fig, df = plot_aggregate_shap_summary(
-            models=[rf],
-            X_tests=[X_test],
-            feature_names=[cols],
-            max_display=3,
-        )
-
-        # DataFrame always returns all features; max_display only affects the plot axes.
-        assert len(df) == 6
-        ax = fig.axes[0]
-        assert len(ax.get_yticks()) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -398,133 +363,7 @@ class TestBuildAggregateExplanation:
 
 
 # ---------------------------------------------------------------------------
-# Class 4: plot_aggregate_shap_beeswarm
-# ---------------------------------------------------------------------------
-
-
-class TestPlotAggregateShapBeeswarm:
-    """Tests for plot_aggregate_shap_beeswarm."""
-
-    @pytest.fixture(autouse=True)
-    def setup(self, mock_shap):
-        """Apply SHAP mock and close figures around every test."""
-        yield
-        plt.close("all")
-
-    def _make_rf(self, feature_cols: list[str]) -> tuple[RandomForestClassifier, pd.DataFrame]:
-        """Return a fitted RF and test DataFrame for the given feature columns."""
-        n = len(feature_cols)
-        X, y = make_classification(
-            n_samples=50,
-            n_features=n,
-            n_informative=max(1, n - 1),
-            n_redundant=0,
-            n_repeated=0,
-            n_classes=2,
-            n_clusters_per_class=1,
-            random_state=0,
-        )
-        X_df = pd.DataFrame(X, columns=feature_cols)
-        rf = RandomForestClassifier(n_estimators=3, random_state=0)
-        rf.fit(X_df, y)
-        return rf, X_df
-
-    def test_returns_figure_and_explanation(self):
-        """Function returns (plt.Figure, shap.Explanation) tuple."""
-        cols = [f"feat_{i}" for i in range(4)]
-        m, X = self._make_rf(cols)
-        fig, exp = plot_aggregate_shap_beeswarm(
-            models=[m],
-            X_tests=[X],
-            feature_names=cols,
-        )
-        assert isinstance(fig, plt.Figure)
-        assert isinstance(exp, shap.Explanation)
-
-    def test_flat_feature_names_broadcast(self):
-        """Flat feature_names list is broadcast to all seeds."""
-        cols = [f"feat_{i}" for i in range(3)]
-        m1, X1 = self._make_rf(cols)
-        m2, X2 = self._make_rf(cols)
-        fig, exp = plot_aggregate_shap_beeswarm(
-            models=[m1, m2],
-            X_tests=[X1, X2],
-            feature_names=cols,
-        )
-        assert exp.feature_names == cols
-
-    def test_different_feature_sets_union(self):
-        """Mixed per-seed feature sets produce union-sized explanation."""
-        seed1_cols = ["a", "b", "c"]
-        seed2_cols = ["c", "d", "e"]
-        m1, X1 = self._make_rf(seed1_cols)
-        m2, X2 = self._make_rf(seed2_cols)
-        fig, exp = plot_aggregate_shap_beeswarm(
-            models=[m1, m2],
-            X_tests=[X1, X2],
-            feature_names=[seed1_cols, seed2_cols],
-        )
-        assert exp.values.shape[1] == 5
-        assert set(exp.feature_names) == {"a", "b", "c", "d", "e"}
-
-    def test_per_seed_failure_skipped(self):
-        """A failing seed is skipped; function completes with remaining seeds."""
-        cols = ["feat_0", "feat_1"]
-        m, X = self._make_rf(cols)
-        dummy = object()
-        X_dummy = pd.DataFrame({"feat_0": [1.0]})
-        fig, exp = plot_aggregate_shap_beeswarm(
-            models=[m, dummy],
-            X_tests=[X, X_dummy],
-            feature_names=[cols, ["feat_0"]],
-        )
-        assert isinstance(fig, plt.Figure)
-
-    def test_all_seeds_fail_raises_value_error(self):
-        """ValueError raised when all seeds fail SHAP computation."""
-        dummy = object()
-        X = pd.DataFrame({"f0": [1.0, 2.0]})
-        with pytest.raises(ValueError):
-            plot_aggregate_shap_beeswarm(
-                models=[dummy, dummy],
-                X_tests=[X, X],
-                feature_names=[["f0"], ["f0"]],
-            )
-
-    def test_mismatched_lengths_raise_value_error(self):
-        """Mismatched models and X_tests raise ValueError."""
-        cols = ["f0", "f1"]
-        m, X = self._make_rf(cols)
-        with pytest.raises(ValueError):
-            plot_aggregate_shap_beeswarm(
-                models=[m],
-                X_tests=[X, X],
-                feature_names=[cols, cols],
-            )
-
-    def test_cached_explanations_used(self):
-        """Pre-computed explanations are used directly without calling the model."""
-        cols = ["a", "b"]
-        m, X = self._make_rf(cols)
-        rng = np.random.default_rng(1)
-        cached_exp = shap.Explanation(
-            values=rng.random((len(X), 2)),
-            data=X.values,
-            feature_names=cols,
-        )
-        fig, exp = plot_aggregate_shap_beeswarm(
-            models=[m],
-            X_tests=[X],
-            feature_names=[cols],
-            explanations=[cached_exp],
-        )
-        assert isinstance(fig, plt.Figure)
-        # Explanation values should match the cached input
-        assert exp.values.shape == (len(X), 2)
-
-
-# ---------------------------------------------------------------------------
-# Class 5: MultiModelEvaluator._load_seed_data
+# Class 4: MultiModelEvaluator._load_seed_data
 # ---------------------------------------------------------------------------
 
 
@@ -654,7 +493,7 @@ class TestLoadSeedData:
 
 
 # ---------------------------------------------------------------------------
-# Class 6: ModelEvaluator.plot_shap_summary (smoke tests)
+# Class 5: ModelEvaluator.plot_shap_summary (smoke tests)
 # ---------------------------------------------------------------------------
 
 

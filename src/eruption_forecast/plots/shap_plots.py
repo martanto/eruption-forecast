@@ -130,25 +130,6 @@ def compute_shap_explanation(
     return shap_output
 
 
-def _compute_shap_values(model: Any, X: pd.DataFrame) -> np.ndarray:
-    """Compute a 2-D SHAP value array for the positive class.
-
-    Delegates to ``compute_shap_explanation`` and extracts the raw values
-    array. Returns a plain ``np.ndarray`` of shape ``(n_samples, n_features)``
-    suitable for numerical aggregation.
-
-    Args:
-        model (Any): A fitted scikit-learn compatible estimator.
-        X (pd.DataFrame): Feature matrix used to compute SHAP values.
-
-    Returns:
-        np.ndarray: 2-D array of shape ``(n_samples, n_features)`` containing
-        SHAP values for the positive class.
-    """
-    explanation = compute_shap_explanation(model, X)
-    return np.asarray(explanation.values)  # noqa: PD011
-
-
 def _extract_shap_array(shap_output: Any) -> np.ndarray:
     """Extract a 2-D SHAP value array from a SHAP Explanation object or ndarray.
 
@@ -282,7 +263,7 @@ def plot_aggregate_shap_summary(
             in length, or if no seeds produced valid SHAP values.
 
     Examples:
-        >>> fig, agg_exp = plot_aggregate_shap_beeswarm(
+        >>> fig, agg_exp = plot_aggregate_shap_summary(
         ...     models=trained_models,
         ...     X_tests=test_sets,
         ...     feature_names=per_seed_feature_names,
