@@ -31,8 +31,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
+import shap
+
 from eruption_forecast.plots.shap_plots import (
+    _build_aggregate_explanation,
     _extract_shap_array,
+    plot_aggregate_shap_beeswarm,
     plot_aggregate_shap_summary,
 )
 
@@ -58,7 +62,9 @@ class _FakeExplainer:
 
     def __call__(self, X, check_additivity: bool = True):
         """Return a SimpleNamespace Explanation with 2-D SHAP values."""
-        if not hasattr(self._model, "predict"):
+        # _compute_shap_explanation passes model.predict_proba (a bound method),
+        # so check callable() rather than hasattr(model, "predict").
+        if not callable(self._model):
             raise TypeError(
                 "The passed model is not callable and cannot be analyzed directly "
                 f"with the given masker! Model: {self._model!r}"
@@ -323,7 +329,202 @@ class TestPlotAggregateShapSummary:
 
 
 # ---------------------------------------------------------------------------
-# Class 3: MultiModelEvaluator._load_seed_data
+# Class 3: _build_aggregate_explanation
+# ---------------------------------------------------------------------------
+
+
+class TestBuildAggregateExplanation:
+    """Tests for the _build_aggregate_explanation helper."""
+
+    def _make_explanation(self, n_samples: int, features: list[str]) -> shap.Explanation:
+        """Return a simple shap.Explanation with deterministic values."""
+        rng = np.random.default_rng(0)
+        n = len(features)
+        vals = rng.random((n_samples, n))
+        data = rng.random((n_samples, n))
+        return shap.Explanation(values=vals, data=data, feature_names=features)
+
+    def test_single_seed_passthrough(self):
+        """Single seed with exact union set produces explanation without zero-padding."""
+        feats = ["a", "b", "c"]
+        exp = self._make_explanation(10, feats)
+        result = _build_aggregate_explanation([exp], [feats], feats)
+        assert result.values.shape == (10, 3)
+        assert result.feature_names == feats
+
+    def test_two_seeds_concatenated_sample_axis(self):
+        """Two seeds with the same features concatenate along the sample axis."""
+        feats = ["a", "b"]
+        exp1 = self._make_explanation(5, feats)
+        exp2 = self._make_explanation(7, feats)
+        result = _build_aggregate_explanation([exp1, exp2], [feats, feats], feats)
+        assert result.values.shape == (12, 2)
+
+    def test_different_feature_sets_zero_padding(self):
+        """Features absent in a seed are zero-padded to the union space."""
+        seed1_feats = ["a", "b"]
+        seed2_feats = ["b", "c"]
+        all_feats = ["a", "b", "c"]
+        exp1 = self._make_explanation(4, seed1_feats)
+        exp2 = self._make_explanation(4, seed2_feats)
+
+        result = _build_aggregate_explanation(
+            [exp1, exp2], [seed1_feats, seed2_feats], all_feats
+        )
+        assert result.values.shape == (8, 3)
+        # Samples from seed1 have zero for feature "c" (index 2)
+        assert np.all(result.values[:4, 2] == 0.0)
+        # Samples from seed2 have zero for feature "a" (index 0)
+        assert np.all(result.values[4:, 0] == 0.0)
+
+    def test_none_seeds_skipped(self):
+        """None explanations are skipped; only valid seeds contribute."""
+        feats = ["x", "y"]
+        exp = self._make_explanation(3, feats)
+        result = _build_aggregate_explanation([None, exp], [feats, feats], feats)
+        assert result.values.shape == (3, 2)
+
+    def test_all_none_raises_value_error(self):
+        """ValueError raised when all explanations are None."""
+        with pytest.raises(ValueError, match="No valid seeds"):
+            _build_aggregate_explanation([None, None], [["a"], ["a"]], ["a"])
+
+    def test_feature_names_preserved(self):
+        """Returned Explanation carries the union feature names."""
+        feats = ["f0", "f1"]
+        exp = self._make_explanation(5, feats)
+        result = _build_aggregate_explanation([exp], [feats], feats)
+        assert result.feature_names == feats
+
+
+# ---------------------------------------------------------------------------
+# Class 4: plot_aggregate_shap_beeswarm
+# ---------------------------------------------------------------------------
+
+
+class TestPlotAggregateShapBeeswarm:
+    """Tests for plot_aggregate_shap_beeswarm."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, mock_shap):
+        """Apply SHAP mock and close figures around every test."""
+        yield
+        plt.close("all")
+
+    def _make_rf(self, feature_cols: list[str]) -> tuple[RandomForestClassifier, pd.DataFrame]:
+        """Return a fitted RF and test DataFrame for the given feature columns."""
+        n = len(feature_cols)
+        X, y = make_classification(
+            n_samples=50,
+            n_features=n,
+            n_informative=max(1, n - 1),
+            n_redundant=0,
+            n_repeated=0,
+            n_classes=2,
+            n_clusters_per_class=1,
+            random_state=0,
+        )
+        X_df = pd.DataFrame(X, columns=feature_cols)
+        rf = RandomForestClassifier(n_estimators=3, random_state=0)
+        rf.fit(X_df, y)
+        return rf, X_df
+
+    def test_returns_figure_and_explanation(self):
+        """Function returns (plt.Figure, shap.Explanation) tuple."""
+        cols = [f"feat_{i}" for i in range(4)]
+        m, X = self._make_rf(cols)
+        fig, exp = plot_aggregate_shap_beeswarm(
+            models=[m],
+            X_tests=[X],
+            feature_names=cols,
+        )
+        assert isinstance(fig, plt.Figure)
+        assert isinstance(exp, shap.Explanation)
+
+    def test_flat_feature_names_broadcast(self):
+        """Flat feature_names list is broadcast to all seeds."""
+        cols = [f"feat_{i}" for i in range(3)]
+        m1, X1 = self._make_rf(cols)
+        m2, X2 = self._make_rf(cols)
+        fig, exp = plot_aggregate_shap_beeswarm(
+            models=[m1, m2],
+            X_tests=[X1, X2],
+            feature_names=cols,
+        )
+        assert exp.feature_names == cols
+
+    def test_different_feature_sets_union(self):
+        """Mixed per-seed feature sets produce union-sized explanation."""
+        seed1_cols = ["a", "b", "c"]
+        seed2_cols = ["c", "d", "e"]
+        m1, X1 = self._make_rf(seed1_cols)
+        m2, X2 = self._make_rf(seed2_cols)
+        fig, exp = plot_aggregate_shap_beeswarm(
+            models=[m1, m2],
+            X_tests=[X1, X2],
+            feature_names=[seed1_cols, seed2_cols],
+        )
+        assert exp.values.shape[1] == 5
+        assert set(exp.feature_names) == {"a", "b", "c", "d", "e"}
+
+    def test_per_seed_failure_skipped(self):
+        """A failing seed is skipped; function completes with remaining seeds."""
+        cols = ["feat_0", "feat_1"]
+        m, X = self._make_rf(cols)
+        dummy = object()
+        X_dummy = pd.DataFrame({"feat_0": [1.0]})
+        fig, exp = plot_aggregate_shap_beeswarm(
+            models=[m, dummy],
+            X_tests=[X, X_dummy],
+            feature_names=[cols, ["feat_0"]],
+        )
+        assert isinstance(fig, plt.Figure)
+
+    def test_all_seeds_fail_raises_value_error(self):
+        """ValueError raised when all seeds fail SHAP computation."""
+        dummy = object()
+        X = pd.DataFrame({"f0": [1.0, 2.0]})
+        with pytest.raises(ValueError):
+            plot_aggregate_shap_beeswarm(
+                models=[dummy, dummy],
+                X_tests=[X, X],
+                feature_names=[["f0"], ["f0"]],
+            )
+
+    def test_mismatched_lengths_raise_value_error(self):
+        """Mismatched models and X_tests raise ValueError."""
+        cols = ["f0", "f1"]
+        m, X = self._make_rf(cols)
+        with pytest.raises(ValueError):
+            plot_aggregate_shap_beeswarm(
+                models=[m],
+                X_tests=[X, X],
+                feature_names=[cols, cols],
+            )
+
+    def test_cached_explanations_used(self):
+        """Pre-computed explanations are used directly without calling the model."""
+        cols = ["a", "b"]
+        m, X = self._make_rf(cols)
+        rng = np.random.default_rng(1)
+        cached_exp = shap.Explanation(
+            values=rng.random((len(X), 2)),
+            data=X.values,
+            feature_names=cols,
+        )
+        fig, exp = plot_aggregate_shap_beeswarm(
+            models=[m],
+            X_tests=[X],
+            feature_names=[cols],
+            explanations=[cached_exp],
+        )
+        assert isinstance(fig, plt.Figure)
+        # Explanation values should match the cached input
+        assert exp.values.shape == (len(X), 2)
+
+
+# ---------------------------------------------------------------------------
+# Class 5: MultiModelEvaluator._load_seed_data
 # ---------------------------------------------------------------------------
 
 
@@ -453,7 +654,7 @@ class TestLoadSeedData:
 
 
 # ---------------------------------------------------------------------------
-# Class 4: ModelEvaluator.plot_shap_summary (smoke tests)
+# Class 6: ModelEvaluator.plot_shap_summary (smoke tests)
 # ---------------------------------------------------------------------------
 
 

@@ -889,7 +889,7 @@ def plot_aggregate_calibration(
             markersize=5,
             linewidth=2.0,
             color=OKABE_ITO[4],
-            label=f"Mean Model",
+            label="Mean Model",
         )
         ax.fill_between(
             prob_grid,

@@ -258,14 +258,6 @@ class ModelTrainer:
             _output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
         )
 
-        # Features directory under station_dir
-        # ``<station_dir>/features``
-        feature_root_dir = os.path.join(output_dir, "features")
-
-        # Per-seed test data dir: ``<feature_root_dir>/tests``
-        # Sharing all extracted features tests
-        tests_dir = os.path.join(feature_root_dir, "tests")
-
         # Classifier training model dir: ``<classifier_dir>/models``
         models_dir = os.path.join(classifier_dir, "models")
 
@@ -284,6 +276,9 @@ class ModelTrainer:
         # Plot significant features dir: ``<features_dir>/figures/significant``
         figures_dir = os.path.join(features_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
+
+        # Per-seed test data dir: ``<features_dir>/tests``
+        tests_dir = os.path.join(features_dir, "tests")
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -751,7 +746,7 @@ class ModelTrainer:
     def _generate_filepaths(
         self,
         random_state: int,
-    ) -> tuple[str, str, str, str, str, str, str, str, bool]:
+    ) -> tuple[str, str, str, str, str, str, str, str, str, bool]:
         """Generate filepaths based on random seed.
 
         Args:
@@ -764,6 +759,7 @@ class ModelTrainer:
             str: All features figures filepath
             str: Model filepath
             str: Metrics filepath
+            str: SHAP explanation cache filepath
             str: X_test filepath (held-out features for this seed)
             str: y_test filepath (held-out labels for this seed)
             bool: Whether all required output files already exist and can be skipped
@@ -782,6 +778,9 @@ class ModelTrainer:
         )
         model_filepath = os.path.join(self.models_dir, f"{filename}.pkl")
         metrics_filepath = os.path.join(self.metrics_dir, f"{filename}.json")
+        shap_explanation_filepath = os.path.join(
+            self.metrics_dir, "shap", f"{random_state:05d}.pkl"
+        )
         X_test_filepath = os.path.join(self.tests_dir, f"{filename}_X_test.csv")
         y_test_filepath = os.path.join(self.tests_dir, f"{filename}_y_test.csv")
 
@@ -805,6 +804,7 @@ class ModelTrainer:
             all_figures_filepath,
             model_filepath,
             metrics_filepath,
+            shap_explanation_filepath,
             X_test_filepath,
             y_test_filepath,
             can_skip,
@@ -996,6 +996,7 @@ class ModelTrainer:
         random_state: int,
         model_filepath: str,
         metrics_filepath: str,
+        shap_explanation_filepath: str | None = None,
     ) -> dict[str, Any]:
         """Steps 4-5: GridSearchCV training then evaluation on the held-out test set.
 
@@ -1041,6 +1042,7 @@ class ModelTrainer:
             model_name=self.classifier_name,
             output_dir=self.classifier_dir,
             selected_features=top_n_features,
+            shap_explanation_filepath=shap_explanation_filepath,
         )
 
         grid_params = grid_search.best_params_
@@ -1080,7 +1082,7 @@ class ModelTrainer:
         sampling_strategy: str | float = 0.75,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[int, str, str, dict, str, str] | None:
+    ) -> tuple[int, str, str, dict, str, str, str] | None:
         """Train feature selection and classifier model for a single random seed.
 
         Orchestrates the per-seed pipeline by calling the three helper methods:
@@ -1096,9 +1098,11 @@ class ModelTrainer:
             plot_features (bool, optional): Generate feature plots. Defaults to False.
 
         Returns:
-            tuple[int, str, str, dict, str, str]: Random state value, path to significant
-                features CSV, trained model filepath, metrics dictionary, path to held-out
-                X_test CSV, and path to held-out y_test CSV.
+            tuple[int, str, str, dict, str, str, str]: Random state value, path to
+                significant features CSV, trained model filepath, metrics dictionary,
+                path to held-out X_test CSV, path to held-out y_test CSV, and path to
+                the SHAP explanation cache file (may not exist yet if plotting was
+                skipped or failed).
             None: When features reduced to zero.
         """
         if self.debug:
@@ -1114,6 +1118,7 @@ class ModelTrainer:
             all_figures_filepath,
             model_filepath,
             metrics_filepath,
+            shap_explanation_filepath,
             X_test_filepath,
             y_test_filepath,
             _,
@@ -1162,6 +1167,7 @@ class ModelTrainer:
             random_state=random_state,
             model_filepath=model_filepath,
             metrics_filepath=metrics_filepath,
+            shap_explanation_filepath=shap_explanation_filepath,
         )
 
         return (
@@ -1171,6 +1177,7 @@ class ModelTrainer:
             metrics,
             X_test_filepath,
             y_test_filepath,
+            shap_explanation_filepath,
         )
 
     def train_and_evaluate(
@@ -1229,6 +1236,7 @@ class ModelTrainer:
                 _,
                 _model_filepath,
                 _metrics_filepath,
+                _shap_explanation_filepath,
                 _X_test_filepath,
                 _y_test_filepath,
                 _can_skip,
@@ -1246,6 +1254,7 @@ class ModelTrainer:
                         "trained_model_filepath": _model_filepath,
                         "X_test_filepath": _X_test_filepath,
                         "y_test_filepath": _y_test_filepath,
+                        "shap_explanation_filepath": _shap_explanation_filepath,
                     }
                 )
                 all_metrics.append(metrics)
@@ -1269,6 +1278,7 @@ class ModelTrainer:
                 metrics,
                 X_test_filepath,
                 y_test_filepath,
+                shap_explanation_filepath,
             ) = result
             self.significant_features_csvs.append(significant_features_csv)
             significant_features_and_trained_models.append(
@@ -1278,6 +1288,7 @@ class ModelTrainer:
                     "trained_model_filepath": trained_model_filepath,
                     "X_test_filepath": X_test_filepath,
                     "y_test_filepath": y_test_filepath,
+                    "shap_explanation_filepath": shap_explanation_filepath,
                 }
             )
             all_metrics.append(metrics)
@@ -1340,6 +1351,7 @@ class ModelTrainer:
             all_features_filepath,
             all_figures_filepath,
             model_filepath,
+            _,
             _,
             _,
             _,
@@ -1458,6 +1470,7 @@ class ModelTrainer:
                 _,
                 _,
                 _model_filepath,
+                _,
                 _,
                 _,
                 _,

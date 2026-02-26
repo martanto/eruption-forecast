@@ -102,6 +102,7 @@ class ModelEvaluator:
         root_dir: str | None = None,
         cv_name: str = "cv",
         verbose: bool = False,
+        shap_explanation_filepath: str | None = None,
     ) -> None:
         """Initialize the ModelEvaluator with a fitted model and test data.
 
@@ -129,6 +130,9 @@ class ModelEvaluator:
                 output path when ``output_dir`` is None (e.g. ``"StratifiedKFold"``).
                 The name is slugified to ``stratified-k-fold``. Defaults to ``"cv"``.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
+            shap_explanation_filepath (str | None, optional): Path where the SHAP
+                Explanation object should be saved after ``plot_shap_summary()`` is
+                called. When None the explanation is not persisted. Defaults to None.
         """
         if isinstance(model, GridSearchCV):
             model = model.best_estimator_
@@ -158,6 +162,7 @@ class ModelEvaluator:
         self.metrics_dir = metrics_dir
         self.figures_dir = figures_dir
         self.verbose = verbose
+        self._shap_explanation_filepath = shap_explanation_filepath
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -254,7 +259,13 @@ class ModelEvaluator:
             ).index.tolist()
 
         return cls(
-            model, X_test, y_test, model_name, output_dir, selected_features, random_state
+            model,
+            X_test,
+            y_test,
+            model_name,
+            output_dir,
+            selected_features,
+            random_state,
         )
 
     def _save_plot(
@@ -927,13 +938,18 @@ class ModelEvaluator:
             >>> fig.savefig("custom_shap.png")
         """
 
-        fig = _plot_shap_summary(
+        fig, explanation = _plot_shap_summary(
             model=self.model,
             X=self.X_test,
             max_display=max_display,
             title=f"SHAP Summary — {self.model_name}",
             dpi=dpi,
         )
+
+        if self._shap_explanation_filepath:
+            os.makedirs(os.path.dirname(self._shap_explanation_filepath), exist_ok=True)
+            joblib.dump(explanation, self._shap_explanation_filepath)
+
         self._save_plot(
             fig,
             save,

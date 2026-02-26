@@ -106,7 +106,7 @@ class TremorData(BaseDataContainer):
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df = df.sort_index()
         self._df = df
-        self.csv_path = tremor_csv
+        self.csv = tremor_csv
         return df
 
     @property
