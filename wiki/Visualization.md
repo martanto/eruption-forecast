@@ -225,7 +225,7 @@ evaluator = ModelEvaluator.from_files(
 )
 fig = evaluator.plot_shap_summary(max_display=20)
 
-# Aggregate mean |SHAP| bar chart across seeds
+# Aggregate SHAP beeswarm across seeds
 ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
 fig = ev.plot_shap_summary(max_display=20)
 ```

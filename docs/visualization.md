@@ -106,7 +106,7 @@ The `ModelEvaluator` class provides 7 evaluation plot types for single-seed and 
 - `evaluator.plot_confusion_matrix()` — summed confusion matrix
 - `evaluator.plot_threshold_analysis()` — mean metrics vs threshold ± std
 - `evaluator.plot_feature_importance()` — mean importance ± std error bars
-- `evaluator.plot_shap_summary()` — mean |SHAP| bar chart across seeds
+- `evaluator.plot_shap_summary()` — beeswarm showing feature contributions across seeds
 - `evaluator.plot_seed_stability()` — violin plot of a metric across seeds
 - `evaluator.plot_frequency_band_contribution()` — feature counts per seismic band
 
@@ -230,22 +230,22 @@ evaluator = ModelEvaluator.from_files(
 fig = evaluator.plot_shap_summary(max_display=20)
 fig.savefig("shap_single.png", bbox_inches="tight")
 
-# Aggregate mean |SHAP| bar chart across all seeds
+# Aggregate SHAP beeswarm across all seeds
 ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
 fig = ev.plot_shap_summary(max_display=20)  # saves automatically
 
 # Low-level standalone functions
 from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
 
-fig = plot_shap_summary(model, X_test, feature_names=features, max_display=15)
+fig, explanation = plot_shap_summary(model, X_test, feature_names=features, max_display=15)
 
-fig, df = plot_aggregate_shap_summary(
+fig, agg_exp = plot_aggregate_shap_summary(
     models=trained_models,
     X_tests=x_test_list,
     feature_names=feature_names,
     max_display=20,
 )
-# df has columns: feature, mean_shap, std_shap
+# agg_exp is a shap.Explanation with shape (total_samples, n_union_features)
 ```
 
 ### Seed Stability Plot
