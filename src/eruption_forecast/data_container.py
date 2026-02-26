@@ -13,20 +13,20 @@ class BaseDataContainer(ABC):
     DataFrame accessor.
 
     Args:
-        csv_path (str): Path to the source CSV file.
+        csv (str): Path to the source CSV file.
 
     Attributes:
-        csv_path (str): Path to the source CSV file.
+        csv (str): Path to the source CSV file.
     """
 
-    def __init__(self, csv_path: str = "") -> None:
+    def __init__(self, csv: str = "") -> None:
         """Store the CSV path.
 
         Args:
-            csv_path (str, optional): Path to the source CSV file.
+            csv (str, optional): Path to the source CSV file.
                 Defaults to empty string for subclasses that set it later.
         """
-        self.csv_path = csv_path
+        self.csv = csv
 
     @property
     @abstractmethod

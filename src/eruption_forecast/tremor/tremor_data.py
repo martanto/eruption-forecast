@@ -61,7 +61,7 @@ class TremorData(BaseDataContainer):
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
-        super().__init__(csv_path="")
+        super().__init__(csv="")
         self.verbose = verbose
         self.debug = debug
         self.df = df if df is not None else pd.DataFrame()
