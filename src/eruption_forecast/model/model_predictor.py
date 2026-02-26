@@ -1,11 +1,16 @@
 import os
-from typing import Literal
+from typing import Literal, cast
 from datetime import datetime, timedelta
 
+import joblib
 import matplotlib
 
+from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 
-matplotlib.use("Agg")  # Must be called before pyplot import — non-interactive backend safe for worker threads
+
+matplotlib.use(
+    "Agg"
+)  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,8 +21,10 @@ from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
@@ -150,8 +157,12 @@ class ModelPredictor:
             end_date (str | datetime): End of the prediction window in "YYYY-MM-DD"
                 format or as a datetime. Time is normalised to 23:59:59.
             trained_models (str | dict[str, str]): Path to a single trained model
-                registry CSV, or a dict mapping classifier names to their registry
-                CSV paths for multi-model consensus mode.
+                registry CSV or merged ``.pkl`` file; or a dict mapping classifier
+                names to their registry CSV paths or per-classifier ``.pkl`` paths
+                for multi-model consensus mode. Accepted ``.pkl`` types are
+                ``ClassifierEnsemble`` (all classifiers bundled), ``SeedEnsemble``
+                (single classifier), and plain ``dict[str, SeedEnsemble]``
+                (backward-compatible, auto-wrapped into ``ClassifierEnsemble``).
             overwrite (bool, optional): Re-compute cached intermediate files.
                 Defaults to False.
             n_jobs (int, optional): Number of parallel jobs for feature extraction.
@@ -240,17 +251,60 @@ class ModelPredictor:
         self.labels_df: pd.DataFrame | pd.Series | None = None
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
 
-        # Backward-compat alias for single-model usage
-        # Normalize to dict[name, df_models]
+        # Normalize trained_models to one of two internal representations:
+        #   - dict[str, pd.DataFrame]   for CSV-based registry (existing path)
+        #   - dict[str, SeedEnsemble]   for merged .pkl files (new path)
+        self._classifier_ensemble: ClassifierEnsemble | None = None
         if isinstance(trained_models, str):
-            self.trained_models: dict[str, pd.DataFrame] = {
-                "model": pd.read_csv(trained_models, index_col=0)
-            }
-        else:
-            self.trained_models = {
-                model_name: pd.read_csv(path, index_col=0)
-                for model_name, path in trained_models.items()
-            }
+            if trained_models.endswith(".pkl"):
+                loaded = joblib.load(trained_models)
+                if isinstance(loaded, ClassifierEnsemble):
+                    # New multi-classifier merged pkl
+                    self._classifier_ensemble: ClassifierEnsemble = loaded
+                    self.trained_models: dict[str, pd.DataFrame | SeedEnsemble] = dict(
+                        loaded.ensembles.items()
+                    )
+                elif isinstance(loaded, SeedEnsemble):
+                    # Single-classifier merged pkl
+                    self.trained_models = {"model": loaded}
+                elif isinstance(loaded, dict):
+                    # Backward-compat: plain dict[str, SeedEnsemble] pkl — auto-wrap
+                    self._classifier_ensemble: ClassifierEnsemble = (
+                        ClassifierEnsemble.from_seed_ensembles(loaded)
+                    )
+                    self.trained_models = loaded
+                else:
+                    raise ValueError(f"Unrecognised object type in pkl: {type(loaded)}")
+            else:
+                self.trained_models = {
+                    "model": pd.read_csv(trained_models, index_col=0)
+                }
+        elif isinstance(trained_models, dict):
+            first_val = next(iter(trained_models.values()))
+            if isinstance(first_val, str) and first_val.endswith(".pkl"):
+                # Values are paths to per-classifier merged pkl files
+                self.trained_models = {}
+                for model_name, path in trained_models.items():
+                    loaded = joblib.load(path)
+                    if isinstance(loaded, SeedEnsemble):
+                        self.trained_models[model_name] = loaded
+                    elif isinstance(loaded, dict):
+                        # Unlikely but handle gracefully
+                        self.trained_models.update(loaded)
+                    else:
+                        raise ValueError(
+                            f"Unrecognised object type in {path}: {type(loaded)}"
+                        )
+            elif isinstance(first_val, str):
+                # Values are paths to CSV registry files
+                self.trained_models = {
+                    model_name: pd.read_csv(path, index_col=0)
+                    for model_name, path in trained_models.items()
+                }
+            else:
+                raise ValueError(
+                    f"Unrecognised trained_models value type: {type(first_val)}"
+                )
 
         self._multi_model: bool = len(self.trained_models) > 1
 
@@ -272,7 +326,7 @@ class ModelPredictor:
     def predict(
         self, future_features_csv: str, future_labels_csv: str, plot: bool = False
     ) -> pd.DataFrame:
-        """Evaluate every trained model on LABELLED future data.
+        """Evaluate every trained model on LABELLED data.
 
         Iterates over all classifiers and all seeds within each classifier,
         computing evaluation metrics for each (classifier, seed) pair.
@@ -316,37 +370,27 @@ class ModelPredictor:
             model_output_dir = os.path.join(self.output_dir, model_name)
             os.makedirs(model_output_dir, exist_ok=True)
 
-            for random_state, row in df_models.iterrows():
-                significant_features_csv: str = row["significant_features_csv"]
-                model_filepath: str = row["trained_model_filepath"]
-                seed_model_name = f"{model_name}_seed_{random_state:05d}"
-
-                df_sig = pd.read_csv(significant_features_csv, index_col=0)
-                feature_names: list[str] = df_sig.index.tolist()
-
-                seed_output_dir = os.path.join(model_output_dir, seed_model_name)
-
-                evaluator = ModelEvaluator.from_files(
-                    model_path=model_filepath,
-                    X_test=features_df,
-                    y_test=labels_df,
-                    selected_features=feature_names,
-                    model_name=seed_model_name,
-                    output_dir=seed_output_dir if plot else model_output_dir,
+            if isinstance(df_models, SeedEnsemble):
+                self._evaluate_seed_ensemble(
+                    df_models,
+                    model_name,
+                    model_output_dir,
+                    features_df,
+                    labels_df,
+                    plot,
+                    all_metrics,
+                    evaluators,
                 )
-
-                metrics = evaluator.get_metrics()
-                assert isinstance(metrics, dict)
-                metrics["classifier"] = seed_model_name
-                metrics["random_state"] = random_state
-                all_metrics.append(metrics)
-                evaluators.append(evaluator)
-
-                if plot:
-                    evaluator.plot_all()
-
-                logger.info(
-                    f"  Seed {random_state:05d} — recall: {metrics['recall']:.4f}"
+            else:
+                self._evaluate_registry(
+                    df_models,
+                    model_name,
+                    model_output_dir,
+                    features_df,
+                    labels_df,
+                    plot,
+                    all_metrics,
+                    evaluators,
                 )
 
         self.predict_log_metrics_summary(all_metrics)
@@ -359,6 +403,232 @@ class ModelPredictor:
             index=False,
         )
         return df_result
+
+    @staticmethod
+    def _collect_seed_result(
+        evaluator: ModelEvaluator,
+        seed_model_name: str,
+        random_state: int,
+        plot: bool,
+        all_metrics: list[dict],
+        evaluators: list[ModelEvaluator],
+    ) -> None:
+        """Collect metrics and evaluator for one seed after inference.
+
+        Calls ``get_metrics()`` on the evaluator, stamps ``classifier`` and
+        ``random_state`` into the metrics dict, appends to the running lists,
+        optionally triggers plotting, and emits a one-line recall log.
+
+        Args:
+            evaluator (ModelEvaluator): Fitted evaluator for this seed.
+            seed_model_name (str): Full seed identifier (e.g. ``"rf_seed_00042"``).
+            random_state (int): Integer seed used to train this model.
+            plot (bool): Whether to call ``evaluator.plot_all()``.
+            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
+            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
+        """
+        metrics = evaluator.get_metrics()
+        assert isinstance(metrics, dict)
+        metrics["classifier"] = seed_model_name
+        metrics["random_state"] = random_state
+        all_metrics.append(metrics)
+        evaluators.append(evaluator)
+
+        if plot:
+            evaluator.plot_all()
+
+        logger.info(f"  Seed {random_state:05d} — recall: {metrics['recall']:.4f}")
+
+    @staticmethod
+    def _build_seed_evaluator(
+        model: object,
+        features_df: pd.DataFrame,
+        labels_df: pd.Series,
+        selected_features: list[str] | str,
+        seed_model_name: str,
+        random_state: int,
+        output_dir: str,
+    ) -> ModelEvaluator:
+        """Build a ModelEvaluator for a single seed from either in-memory or file-based sources.
+
+        Dispatches to ``ModelEvaluator.__init__`` when ``model`` is a fitted
+        estimator object (``SeedEnsemble`` path), or to
+        ``ModelEvaluator.from_files`` when ``model`` is a file path string
+        (registry CSV path).
+
+        Args:
+            model (object): A fitted scikit-learn estimator, or a path string
+                to a serialised model ``.pkl`` file.
+            features_df (pd.DataFrame): Future feature matrix.
+            labels_df (pd.Series): True labels aligned with ``features_df``.
+            selected_features (list[str] | str): Feature names list (in-memory
+                path) or path to the significant-features CSV (file path).
+            seed_model_name (str): Full seed identifier (e.g. ``"rf_seed_00042"``).
+            random_state (int): Integer seed used to train this model.
+            output_dir (str): Directory for evaluation outputs.
+
+        Raises:
+            TypeError: If model type is not ``str`` or ``BaseEstimator | GridSearchCV``,
+                or selected_features type is not ``str`` or ``list```
+
+        Returns:
+            ModelEvaluator: Constructed and ready-to-query evaluator.
+        """
+        if isinstance(model, str) and isinstance(selected_features, str):
+            return ModelEvaluator.from_files(
+                model_path=model,
+                X_test=features_df,
+                y_test=labels_df,
+                selected_features_path=selected_features,
+                model_name=seed_model_name,
+                random_state=random_state,
+                output_dir=output_dir,
+            )
+
+        if isinstance(selected_features, list):
+            return ModelEvaluator(
+                model=model,  # type: ignore[arg-type]
+                X_test=features_df,
+                y_test=labels_df,
+                selected_features=selected_features,
+                model_name=seed_model_name,
+                random_state=random_state,
+                output_dir=output_dir,
+            )
+
+        raise TypeError("Type error for model or selected_features.")
+
+    def _evaluate_single_seed(
+        self,
+        model_name: str,
+        model_output_dir: str,
+        random_state: int,
+        model: object,
+        selected_features: list[str] | str,
+        features_df: pd.DataFrame,
+        labels_df: pd.Series,
+        plot: bool,
+        all_metrics: list[dict],
+        evaluators: list[ModelEvaluator],
+    ) -> None:
+        """Evaluate one seed model and accumulate results.
+
+        Derives the seed name and output directory from ``model_name`` and
+        ``random_state``, constructs a ``ModelEvaluator`` via
+        :meth:`_build_seed_evaluator`, then delegates collection to
+        :meth:`_collect_seed_result`.
+
+        Args:
+            model_name (str): Classifier identifier used for output paths and labels.
+            model_output_dir (str): Root output directory for this classifier.
+            random_state (int): Integer seed used to train this model.
+            model (object): A fitted scikit-learn estimator or a path string to a ``.pkl`` file.
+            selected_features (list[str] | str): Feature names list or path to the
+                significant-features CSV.
+            features_df (pd.DataFrame): Future feature matrix.
+            labels_df (pd.Series): True labels aligned with ``features_df``.
+            plot (bool): Whether to save per-seed evaluation plots.
+            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
+            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
+        """
+        seed_model_name = f"{model_name}_seed_{random_state:05d}"
+        seed_output_dir = os.path.join(model_output_dir, seed_model_name)
+
+        evaluator = self._build_seed_evaluator(
+            model=model,
+            features_df=features_df,
+            labels_df=labels_df,
+            selected_features=selected_features,
+            seed_model_name=seed_model_name,
+            random_state=random_state,
+            output_dir=seed_output_dir if plot else model_output_dir,
+        )
+
+        self._collect_seed_result(
+            evaluator, seed_model_name, random_state, plot, all_metrics, evaluators
+        )
+
+    def _evaluate_seed_ensemble(
+        self,
+        seed_ensemble: SeedEnsemble,
+        model_name: str,
+        model_output_dir: str,
+        features_df: pd.DataFrame,
+        labels_df: pd.Series,
+        plot: bool,
+        all_metrics: list[dict],
+        evaluators: list[ModelEvaluator],
+    ) -> None:
+        """Evaluate every seed in a SeedEnsemble on labelled data.
+
+        Iterates ``seed_ensemble.seeds`` and delegates each seed to
+        :meth:`_evaluate_single_seed`.
+
+        Args:
+            seed_ensemble (SeedEnsemble): Ensemble whose seeds to evaluate.
+            model_name (str): Classifier identifier used for output paths and labels.
+            model_output_dir (str): Root output directory for this classifier.
+            features_df (pd.DataFrame): Future feature matrix.
+            labels_df (pd.Series): True labels aligned with ``features_df``.
+            plot (bool): Whether to save per-seed evaluation plots.
+            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
+            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
+        """
+        for seed in seed_ensemble.seeds:
+            self._evaluate_single_seed(
+                model_name=model_name,
+                model_output_dir=model_output_dir,
+                random_state=seed["random_state"],
+                model=seed["model"],
+                selected_features=seed["feature_names"],
+                features_df=features_df,
+                labels_df=labels_df,
+                plot=plot,
+                all_metrics=all_metrics,
+                evaluators=evaluators,
+            )
+
+    def _evaluate_registry(
+        self,
+        df_models: pd.DataFrame,
+        model_name: str,
+        model_output_dir: str,
+        features_df: pd.DataFrame,
+        labels_df: pd.Series,
+        plot: bool,
+        all_metrics: list[dict],
+        evaluators: list[ModelEvaluator],
+    ) -> None:
+        """Evaluate every seed in a CSV registry on labelled data.
+
+        Iterates rows of the trained-model registry DataFrame and delegates
+        each seed to :meth:`_evaluate_single_seed`.
+
+        Args:
+            df_models (pd.DataFrame): Registry DataFrame with ``random_state``
+                as index and columns ``significant_features_csv`` and
+                ``trained_model_filepath``.
+            model_name (str): Classifier identifier used for output paths and labels.
+            model_output_dir (str): Root output directory for this classifier.
+            features_df (pd.DataFrame): Future feature matrix.
+            labels_df (pd.Series): True labels aligned with ``features_df``.
+            plot (bool): Whether to save per-seed evaluation plots.
+            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
+            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
+        """
+        for random_state, row in df_models.iterrows():
+            self._evaluate_single_seed(
+                model_name=model_name,
+                model_output_dir=model_output_dir,
+                random_state=cast(int, random_state),
+                model=row["trained_model_filepath"],
+                selected_features=row["significant_features_csv"],
+                features_df=features_df,
+                labels_df=labels_df,
+                plot=plot,
+                all_metrics=all_metrics,
+                evaluators=evaluators,
+            )
 
     def predict_best(
         self,
@@ -689,6 +959,7 @@ class ModelPredictor:
         window_step_unit: Literal["minutes", "hours"],
         use_relevant_features: bool = True,
         select_tremor_columns: list[str] | None = None,
+        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
         save_predictions: bool = True,
         plot: bool = True,
     ) -> pd.DataFrame:
@@ -722,6 +993,8 @@ class ModelPredictor:
             window_step_unit (Literal["minutes", "hours"]): Window step unit to use.
             use_relevant_features (bool, optional): Whether to use relevant features. Defaults to True.
             select_tremor_columns (list[str] | None): List of tremor columns to use. Defaults to None.
+            threshold (float, optional): Probability threshold for eruption classification.
+                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.7.
             save_predictions (bool, optional): Save predictions result. Defaults to True.
             plot (bool, optional): Save a probability time-series plot.
                 Defaults to True.
@@ -745,52 +1018,24 @@ class ModelPredictor:
         model_mean_probabilities: dict[str, np.ndarray] = {}
         result_dir = os.path.join(self.output_dir, "results")
 
-        for model_name, df_models in self.trained_models.items():
-            logger.info(f"Forecasting with classifier: {model_name}")
-
-            model_output_dir = os.path.join(result_dir, model_name)
-            os.makedirs(model_output_dir, exist_ok=True)
-
-            mean_probability, std_probability, confidence, prediction = (
-                compute_model_probabilities(
-                    df_models=df_models,
-                    features_df=features_df,
-                    classifier_name=model_name,
-                    output_dir=model_output_dir,
-                    save_predictions=save_predictions,
-                    overwrite=self.overwrite,
+        if isinstance(self._classifier_ensemble, ClassifierEnsemble):
+            consensus_mean, consensus_std, consensus_conf, consensus_pred = (
+                self._forecast_with_classifier_ensemble(
+                    features_df, cols, model_mean_probabilities
                 )
             )
-
-            model_mean_probabilities[model_name] = mean_probability
-
-            cols[f"{model_name}_eruption_probability"] = mean_probability
-            cols[f"{model_name}_uncertainty"] = std_probability
-            cols[f"{model_name}_confidence"] = confidence
-            cols[f"{model_name}_prediction"] = prediction
-
-            logger.info(
-                f"  {model_name} — mean P(eruption): {mean_probability.mean():.4f}, "
-                f"mean confidence: {confidence.mean():.4f}"
+        else:
+            self._forecast_with_trained_models(
+                features_df=features_df,
+                result_dir=result_dir,
+                threshold=threshold,
+                save_predictions=save_predictions,
+                cols=cols,
+                model_mean_probabilities=model_mean_probabilities,
             )
-
-        # Consensus across classifiers
-        all_model_means = np.stack(list(model_mean_probabilities.values()), axis=0)
-        consensus_mean: np.ndarray = all_model_means.mean(axis=0)
-        consensus_std: np.ndarray = all_model_means.std(axis=0)
-        consensus_pred: np.ndarray = (consensus_mean >= 0.5).astype(int)
-
-        # Consensus confidence: fraction of classifiers agreeing with majority
-        n_classifiers = all_model_means.shape[0]
-        clf_preds = np.stack(
-            [cols[f"{n}_prediction"] for n in self.trained_models], axis=0
-        )
-        votes_with_majority = np.where(
-            consensus_pred == 1,
-            (clf_preds == 1).sum(axis=0),
-            (clf_preds == 0).sum(axis=0),
-        )
-        consensus_conf: np.ndarray = votes_with_majority / n_classifiers
+            consensus_mean, consensus_std, consensus_conf, consensus_pred = (
+                self._compute_consensus(cols, model_mean_probabilities)
+            )
 
         cols["consensus_eruption_probability"] = consensus_mean
         cols["consensus_uncertainty"] = consensus_std
@@ -813,6 +1058,222 @@ class ModelPredictor:
 
         self.df = df_forecast
         return df_forecast
+
+    @staticmethod
+    def _store_classifier_proba(
+        model_name: str,
+        mean: np.ndarray,
+        std: np.ndarray,
+        confidence: np.ndarray,
+        prediction: np.ndarray,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+    ) -> None:
+        """Store per-classifier probability arrays and log a one-line summary.
+
+        Writes the four per-classifier result columns into ``cols``, records
+        the mean probability array in ``model_mean_probabilities``, and emits
+        a log line with mean eruption probability and mean confidence.
+
+        Args:
+            model_name (str): Classifier identifier used as column prefix.
+            mean (np.ndarray): Mean eruption probability per window.
+            std (np.ndarray): Standard deviation of probability across seeds.
+            confidence (np.ndarray): Fraction of seeds agreeing with the majority vote.
+            prediction (np.ndarray): Binary prediction per window (0 or 1).
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable accumulator
+                for cross-classifier consensus computation.
+        """
+        model_mean_probabilities[model_name] = mean
+        cols[f"{model_name}_eruption_probability"] = mean
+        cols[f"{model_name}_uncertainty"] = std
+        cols[f"{model_name}_confidence"] = confidence
+        cols[f"{model_name}_prediction"] = prediction
+        logger.info(
+            f"  {model_name} — mean P(eruption): {mean.mean():.4f}, "
+            f"mean confidence: {confidence.mean():.4f}"
+        )
+
+    def _forecast_with_classifier_ensemble(
+        self,
+        features_df: pd.DataFrame,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Delegate inference and consensus to a ClassifierEnsemble.
+
+        Calls ``ClassifierEnsemble.predict_with_uncertainty`` for the fast
+        path where all classifiers are bundled in a single object, then
+        populates ``cols`` and ``model_mean_probabilities`` via
+        :meth:`_store_classifier_proba`.
+
+        Args:
+            features_df (pd.DataFrame): Future feature matrix.
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable
+                accumulator for cross-classifier consensus computation.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
+            ``(consensus_mean, consensus_std, consensus_conf, consensus_pred)``.
+        """
+        assert self._classifier_ensemble is not None
+        consensus_mean, consensus_std, consensus_conf, consensus_pred, per_clf = (
+            self._classifier_ensemble.predict_with_uncertainty(
+                features_df, threshold=0.5
+            )
+        )
+        for model_name, clf_result in per_clf.items():
+            self._store_classifier_proba(
+                model_name=model_name,
+                mean=clf_result["mean"],
+                std=clf_result["std"],
+                confidence=clf_result["confidence"],
+                prediction=clf_result["prediction"],
+                cols=cols,
+                model_mean_probabilities=model_mean_probabilities,
+            )
+        return consensus_mean, consensus_std, consensus_conf, consensus_pred
+
+    def _forecast_single_classifier(
+        self,
+        model_name: str,
+        df_models: pd.DataFrame | SeedEnsemble,
+        features_df: pd.DataFrame,
+        result_dir: str,
+        threshold: float,
+        save_predictions: bool,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+    ) -> None:
+        """Run inference for a single classifier and store results.
+
+        Dispatches to ``SeedEnsemble.predict_with_uncertainty`` for
+        in-memory models or to :func:`compute_model_probabilities` for
+        CSV-registry-based models, then calls :meth:`_store_classifier_proba`.
+
+        Args:
+            model_name (str): Classifier identifier used for logging and output paths.
+            df_models (pd.DataFrame | SeedEnsemble): Either a ``SeedEnsemble``
+                or a registry ``DataFrame`` with model file paths.
+            features_df (pd.DataFrame): Future feature matrix.
+            result_dir (str): Root directory for per-classifier result output.
+            threshold (float): Probability threshold for binary prediction.
+            save_predictions (bool): Whether to persist per-seed predictions to disk.
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable
+                accumulator for cross-classifier consensus computation.
+        """
+        logger.info(f"Forecasting with classifier: {model_name}")
+
+        model_output_dir = os.path.join(result_dir, model_name)
+        os.makedirs(model_output_dir, exist_ok=True)
+
+        if isinstance(df_models, SeedEnsemble):
+            mean_probability, std_probability, confidence, prediction = (
+                df_models.predict_with_uncertainty(features_df, threshold)
+            )
+        else:
+            mean_probability, std_probability, confidence, prediction = (
+                compute_model_probabilities(
+                    df_models=df_models,
+                    features_df=features_df,
+                    classifier_name=model_name,
+                    output_dir=model_output_dir,
+                    save_predictions=save_predictions,
+                    overwrite=self.overwrite,
+                )
+            )
+
+        self._store_classifier_proba(
+            model_name=model_name,
+            mean=mean_probability,
+            std=std_probability,
+            confidence=confidence,
+            prediction=prediction,
+            cols=cols,
+            model_mean_probabilities=model_mean_probabilities,
+        )
+
+    def _forecast_with_trained_models(
+        self,
+        features_df: pd.DataFrame,
+        result_dir: str,
+        threshold: float,
+        save_predictions: bool,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+    ) -> None:
+        """Iterate over all registered classifiers and run per-classifier inference.
+
+        Calls :meth:`_forecast_single_classifier` for each entry in
+        ``self.trained_models``.
+
+        Args:
+            features_df (pd.DataFrame): Future feature matrix.
+            result_dir (str): Root directory for per-classifier result output.
+            threshold (float): Probability threshold for binary prediction.
+            save_predictions (bool): Whether to persist per-seed predictions to disk.
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable
+                accumulator for cross-classifier consensus computation.
+        """
+        for model_name, df_models in self.trained_models.items():
+            self._forecast_single_classifier(
+                model_name=model_name,
+                df_models=df_models,
+                features_df=features_df,
+                result_dir=result_dir,
+                threshold=threshold,
+                save_predictions=save_predictions,
+                cols=cols,
+                model_mean_probabilities=model_mean_probabilities,
+            )
+
+    def _compute_consensus(
+        self,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Compute cross-classifier consensus probability, uncertainty, confidence, and prediction.
+
+        Averages per-classifier mean probabilities to form the consensus
+        probability, derives uncertainty as the standard deviation across
+        classifiers, and computes confidence as the fraction of classifiers
+        whose binary prediction agrees with the majority vote.
+
+        Args:
+            cols (dict[str, np.ndarray]): Column accumulator containing
+                ``{name}_prediction`` arrays for each registered classifier.
+            model_mean_probabilities (dict[str, np.ndarray]): Mean eruption
+                probability array per classifier.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
+            ``(consensus_mean, consensus_std, consensus_conf, consensus_pred)``.
+        """
+        all_model_means = np.stack(list(model_mean_probabilities.values()), axis=0)
+        consensus_mean = all_model_means.mean(axis=0)
+        consensus_std = all_model_means.std(axis=0)
+        consensus_pred = (consensus_mean >= 0.5).astype(int)
+
+        # Fraction of classifiers agreeing with the majority vote
+        n_classifiers = all_model_means.shape[0]
+        clf_preds = np.stack(
+            [cols[f"{n}_prediction"] for n in self.trained_models], axis=0
+        )
+        votes_with_majority = np.where(
+            consensus_pred == 1,
+            (clf_preds == 1).sum(axis=0),
+            (clf_preds == 0).sum(axis=0),
+        )
+        consensus_conf = votes_with_majority / n_classifiers
+        return consensus_mean, consensus_std, consensus_conf, consensus_pred
 
     def _log_forecast_summary(
         self,

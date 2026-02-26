@@ -154,7 +154,6 @@ class ModelEvaluator:
         self.X_test = X_test
         self.y_test = y_test
         self.model_name = model_name
-        self.random_state = random_state
         self.output_dir = output_dir
         self.metrics_dir = metrics_dir
         self.figures_dir = figures_dir
@@ -202,6 +201,7 @@ class ModelEvaluator:
         selected_features_path: str | None = None,
         model_name: str = "model",
         output_dir: str | None = None,
+        random_state: int | None = None,
     ) -> Self:
         """Load model and data from files and construct a ModelEvaluator.
 
@@ -220,6 +220,8 @@ class ModelEvaluator:
                 Defaults to "model".
             output_dir (str | None, optional): Directory for saved plots.
                 Defaults to None.
+            random_state (int | None, optional): Seed used to derive a filename
+                prefix. Defaults to None.
 
         Returns:
             ModelEvaluator: Configured evaluator instance ready for metrics and plots.
@@ -234,6 +236,7 @@ class ModelEvaluator:
             ...     y_test="data/y_test.csv",
             ...     selected_features_path="data/significant_features_00042.csv",
             ...     model_name="xgb_seed_42",
+            ...     random_state=42,
             ... )
             >>> print(evaluator.summary())
         """
@@ -246,11 +249,13 @@ class ModelEvaluator:
 
         selected_features: list[str] | None = None
         if selected_features_path is not None:
-            selected_features = (
-                pd.read_csv(selected_features_path, index_col=0).index.tolist()
-            )
+            selected_features = pd.read_csv(
+                selected_features_path, index_col=0
+            ).index.tolist()
 
-        return cls(model, X_test, y_test, model_name, output_dir, selected_features)
+        return cls(
+            model, X_test, y_test, model_name, output_dir, selected_features, random_state
+        )
 
     def _save_plot(
         self,

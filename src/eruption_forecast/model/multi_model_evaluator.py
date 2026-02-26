@@ -202,9 +202,12 @@ class MultiModelEvaluator:
                 "trained_model_csv is required for plot methods. "
                 "Provide it when constructing MultiModelEvaluator."
             )
+
         df = pd.read_csv(self._trained_model_csv, index_col=0)
+
         if df.empty:
             raise ValueError("Registry CSV is empty; no seeds to process.")
+
         return df
 
     def _save_outputs(
@@ -241,7 +244,9 @@ class MultiModelEvaluator:
 
     def _collect_predictions(
         self,
-    ) -> tuple[list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]]:
+    ) -> tuple[
+        list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]
+    ]:
         """Load models, X_tests, y_trues, and y_probas from all registry seeds.
 
         Iterates over every row in the model registry, loads the fitted model,
@@ -551,6 +556,7 @@ class MultiModelEvaluator:
             title=title,
             dpi=dpi,
         )
+
         self._save_outputs(
             fig,
             data,

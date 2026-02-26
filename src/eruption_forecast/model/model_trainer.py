@@ -1606,6 +1606,9 @@ class ModelTrainer:
                 "No model registry CSV found. Run train() or "
                 "train_and_evaluate() before calling merge_models()."
             )
+
+        output_path = output_path or self.output_dir
+
         return merge_seed_models(self.csv, output_path=output_path)
 
     @staticmethod

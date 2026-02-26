@@ -14,6 +14,10 @@ from tsfresh.transformers import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.array import (
+    aggregate_seed_probabilities,
+    predict_proba_from_estimator,
+)
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
@@ -216,44 +220,14 @@ def compute_seed_eruption_probability(
     model = joblib.load(model_filepath)
 
     # Select features dataframe with top-n significant features
-    X = features_df[feature_names]
+    X: pd.DataFrame = features_df[feature_names]
 
-    if hasattr(model, "predict_proba"):
-        # probabilities_scores has shape (n_rows, n_windows). Where n_window will reflect
-        # the number of the classifiications. In this case n_windows is 2 which indicates
-        # 0 as nnn-eruption, and 1 as an eruption.
-        probabilities_scores: np.ndarray = model.predict_proba(X)
+    probabilities_eruption, probabilities_scores = predict_proba_from_estimator(
+        model, X, identifier=random_state
+    )
 
-        if probabilities_scores.ndim == 1:
-            raise ValueError(
-                f"Your probability for seed {random_state} scores only has 1 dimensions. "
-                f"It should have 2 dimensions which consists of `0` (non-eruption) and `1` (eruption)."
-            )
-
-        # Select column 1 as eruption probabilities representative. Column 0 is non-eruption.
-        probabilities_eruption: np.ndarray = probabilities_scores[:, 1]
-
-        if debug:
-            logger.debug(f"{random_state:05d} :: predict_probe was used")
-            logger.debug(
-                f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
-            )
-
-    elif hasattr(model, "decision_function"):
-        probabilities_scores: np.ndarray = model.decision_function(X)
-        probabilities_eruption: np.ndarray = 1.0 / (1.0 + np.exp(-probabilities_scores))
-
-        if debug:
-            logger.debug(f"{random_state:05d} :: decision_function was used")
-            logger.debug(
-                f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
-            )
-
-    else:
-        raise RuntimeError(
-            f"Model at {model_filepath} supports neither "
-            "predict_proba nor decision_function."
-        )
+    if debug:
+        logger.debug(f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}")
 
     if save and not overwrite:
         os.makedirs(output_dir, exist_ok=True)
@@ -358,18 +332,7 @@ def compute_model_probabilities(
         seed_eruption_probabilities, axis=1
     )  # (n_windows, n_seeds)
 
-    mean_probability: np.ndarray = probabilities_eruption_matrix.mean(axis=1)
-    std_proba: np.ndarray = probabilities_eruption_matrix.std(axis=1)
-    prediction: np.ndarray = (mean_probability >= threshold).astype(int)
-
-    votes_for_eruption: np.ndarray = (probabilities_eruption_matrix >= 0.5).sum(axis=1)
-    n_seeds = probabilities_eruption_matrix.shape[1]
-    majority_votes = np.where(
-        prediction == 1, votes_for_eruption, n_seeds - votes_for_eruption
-    )
-    confidence: np.ndarray = majority_votes / n_seeds
-
-    return mean_probability, std_proba, confidence, prediction
+    return aggregate_seed_probabilities(probabilities_eruption_matrix, threshold=threshold)
 
 
 def merge_seed_models(
