@@ -25,6 +25,7 @@ from eruption_forecast.plots.styles import (
 from eruption_forecast.plots.shap_plots import (
     plot_shap_summary,
     plot_aggregate_shap_summary,
+    plot_aggregate_shap_beeswarm,
 )
 
 # Tremor plotting
@@ -85,6 +86,7 @@ __all__ = [
     # SHAP plots
     "plot_shap_summary",
     "plot_aggregate_shap_summary",
+    "plot_aggregate_shap_beeswarm",
     # Forecast plotting
     "plot_forecast",
     "plot_forecast_with_events",

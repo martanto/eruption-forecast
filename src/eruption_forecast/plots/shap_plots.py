@@ -14,11 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
-from eruption_forecast.plots.styles import (
-    OKABE_ITO,
-    configure_spine,
-    apply_nature_style,
-)
+from eruption_forecast.plots.styles import apply_nature_style
 
 
 if TYPE_CHECKING:
@@ -121,7 +117,7 @@ def _compute_shap_explanation(
         ``(n_samples, n_features)`` for the positive class.
     """
     cols = list(X.columns) if isinstance(X, pd.DataFrame) else feature_names
-    masker = shap.maskers.Independent(X, max_samples=len(X))
+    masker = shap.maskers.Independent(X, max_samples=len(X))  # ty:ignore[possibly-missing-attribute]
     explainer = shap.Explainer(model.predict_proba, masker)
     shap_output = explainer(X)
     # Binary classifier: shape (n, features, 2) — take positive-class slice.
@@ -181,6 +177,69 @@ def _extract_shap_array(shap_output: Any) -> np.ndarray:
     return raw
 
 
+def _build_aggregate_explanation(
+    explanations: list[shap.Explanation | None],
+    per_seed_names: list[list[str]],
+    all_names: list[str],
+) -> shap.Explanation:
+    """Build a merged SHAP Explanation by zero-padding seeds to the union feature space.
+
+    Each non-None explanation is zero-padded from its per-seed feature set to
+    the full union feature space, then all valid seeds are concatenated along
+    the sample axis into a single ``shap.Explanation`` object ready for
+    ``shap.plots.beeswarm``.
+
+    Args:
+        explanations (list[shap.Explanation | None]): Per-seed Explanation
+            objects; ``None`` entries are skipped.
+        per_seed_names (list[list[str]]): Feature name lists, one per seed,
+            aligned with ``explanations``.
+        all_names (list[str]): Ordered union of all feature names (the target
+            feature space for zero-padding).
+
+    Returns:
+        shap.Explanation: Merged Explanation with shape
+        ``(total_samples, n_union_features)`` and ``feature_names=all_names``.
+
+    Raises:
+        ValueError: If no valid (non-None) explanations are provided.
+    """
+    n_features = len(all_names)
+    feat_idx: dict[str, int] = {name: i for i, name in enumerate(all_names)}
+
+    all_values: list[np.ndarray] = []
+    all_data: list[np.ndarray] = []
+
+    for exp, seed_names in zip(explanations, per_seed_names, strict=True):
+        if exp is None:
+            continue
+        vals = np.asarray(exp.values)  # noqa: PD011
+        raw_data = getattr(exp, "data", None)
+        data = np.asarray(raw_data) if raw_data is not None else np.zeros_like(vals)
+        n_samples = vals.shape[0]
+
+        padded_vals = np.zeros((n_samples, n_features))
+        padded_data = np.zeros((n_samples, n_features))
+        for j, name in enumerate(seed_names):
+            if name in feat_idx:
+                padded_vals[:, feat_idx[name]] = vals[:, j]
+                padded_data[:, feat_idx[name]] = data[:, j]
+
+        all_values.append(padded_vals)
+        all_data.append(padded_data)
+
+    if not all_values:
+        raise ValueError("No valid seeds to build aggregate explanation.")
+
+    merged_values = np.concatenate(all_values, axis=0)
+    merged_data = np.concatenate(all_data, axis=0)
+    return shap.Explanation(
+        values=merged_values,
+        data=merged_data,
+        feature_names=all_names,
+    )
+
+
 def plot_aggregate_shap_summary(
     models: list[BaseEstimator],
     X_tests: list[pd.DataFrame],
@@ -189,59 +248,47 @@ def plot_aggregate_shap_summary(
     title: str | None = None,
     dpi: int = 150,
     explanations: list[shap.Explanation | None] | None = None,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot mean absolute SHAP values aggregated across multiple seeds.
+) -> tuple[plt.Figure, shap.Explanation]:
+    """Plot a beeswarm of SHAP values aggregated across multiple seeds.
 
-    Computes per-seed mean |SHAP| vectors, aligns them to the union of all
-    seed feature sets (filling absent features with zero), then plots the
-    mean ± std across seeds as a horizontal bar chart. Seeds whose SHAP
-    computation fails are skipped with a warning.
-
-    When all seeds share an identical feature set (``feature_names`` is a
-    flat ``list[str]``), the behaviour is equivalent to the original
-    implementation. When seeds use different significant-feature subsets
-    (``feature_names`` is a ``list[list[str]]``), missing features are
-    treated as zero importance for that seed.
+    Gathers raw SHAP values from all seeds, zero-pads each seed's values to
+    the union feature space, concatenates them, and renders a single
+    ``shap.plots.beeswarm`` that shows both magnitude and direction of feature
+    contributions. Seeds whose SHAP computation fails are skipped with a warning.
 
     Args:
-        models (list[BaseEstimator]): List of fitted estimators, one per
-            random seed.
+        models (list[BaseEstimator]): List of fitted estimators, one per seed.
         X_tests (list[pd.DataFrame]): Corresponding test feature DataFrames,
-            one per seed. Each DataFrame's columns must match the
-            corresponding entry in ``feature_names``.
+            one per seed.
         feature_names (list[list[str]] | list[str]): Either a flat list of
             feature names shared by all seeds, or a list of per-seed feature
-            name lists. Lengths must match ``models`` and ``X_tests`` when
-            nested.
-        max_display (int, optional): Number of top features to show in
-            the bar chart, sorted by mean |SHAP| descending. Defaults to 20.
+            name lists.
+        max_display (int, optional): Maximum number of features to display,
+            sorted by mean |SHAP| descending. Defaults to 20.
         title (str | None, optional): Plot title. If None, uses
-            "Aggregate SHAP Feature Importance". Defaults to None.
+            "Aggregate SHAP Beeswarm". Defaults to None.
         dpi (int, optional): Figure resolution in dots per inch. Defaults
             to 150.
         explanations (list[shap.Explanation | None] | None, optional):
-            Pre-computed SHAP Explanation objects, one per seed. When a
-            slot is not None the cached values are used directly instead of
-            recomputing. Defaults to None (all seeds are computed on the fly).
+            Pre-computed SHAP Explanation objects, one per seed. When a slot
+            is not None the cached values are used directly. Defaults to None.
 
     Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
-            with columns ``feature``, ``mean_shap``, ``std_shap`` sorted
-            by descending ``mean_shap`` (all features, not just top-N).
+        tuple[plt.Figure, shap.Explanation]: Matplotlib figure with the
+        beeswarm plot and the merged ``shap.Explanation`` used to produce it.
 
     Raises:
         ValueError: If ``models``, ``X_tests``, and ``feature_names`` differ
             in length, or if no seeds produced valid SHAP values.
 
     Examples:
-        >>> fig, df = plot_aggregate_shap_summary(
+        >>> fig, agg_exp = plot_aggregate_shap_beeswarm(
         ...     models=trained_models,
         ...     X_tests=test_sets,
         ...     feature_names=per_seed_feature_names,
         ...     max_display=15,
         ... )
-        >>> fig.savefig("aggregate_shap.png")
-        >>> df.head()
+        >>> fig.savefig("aggregate_shap_beeswarm.png")
     """
     # Normalise feature_names to per-seed lists
     per_seed_names: list[list[str]]
@@ -260,77 +307,29 @@ def plot_aggregate_shap_summary(
     all_names: list[str] = list(
         dict.fromkeys(name for names in per_seed_names for name in names)
     )
-    n_features = len(all_names)
-    feat_idx: dict[str, int] = {name: i for i, name in enumerate(all_names)}
 
-    all_abs_shap: list[np.ndarray] = []
-
-    for i, (model, X, seed_names) in enumerate(
-        zip(models, X_tests, per_seed_names, strict=True)
-    ):
+    # Compute or collect per-seed explanations
+    seed_explanations: list[shap.Explanation | None] = []
+    for i, (model, X) in enumerate(zip(models, X_tests, strict=True)):
         cached = explanations[i] if explanations is not None else None
-        try:
-            if cached is not None:
-                vals = np.asarray(cached.values)  # noqa: PD011
-            else:
-                vals = _compute_shap_values(model, X)
-            seed_abs_mean = np.abs(vals).mean(axis=0)  # (n_seed_features,)
+        if cached is not None:
+            seed_explanations.append(cached)
+        else:
+            try:
+                seed_explanations.append(_compute_shap_explanation(model, X))
+            except Exception as e:
+                logger.warning(f"Skipping seed {i} in SHAP beeswarm aggregation: {e}")
+                seed_explanations.append(None)
 
-            # Map seed values into the union feature space
-            row = np.zeros(n_features)
-            for j, name in enumerate(seed_names):
-                if name in feat_idx:
-                    row[feat_idx[name]] = seed_abs_mean[j]
-
-            all_abs_shap.append(row)
-        except Exception as e:
-            logger.warning(f"Skipping seed {i} in SHAP aggregation: {e}")
-
-    if not all_abs_shap:
-        raise ValueError("No seeds produced valid SHAP values.")
-
-    stacked = np.stack(all_abs_shap, axis=0)  # (n_valid_seeds, n_features)
-    mean_shap = stacked.mean(axis=0)
-    std_shap = stacked.std(axis=0)
-
-    # Sort by mean descending
-    sorted_idx = np.argsort(mean_shap)[::-1]
-    top_idx = sorted_idx[:max_display]
-
-    # Reverse so the highest-ranked feature appears at the top of the chart
-    # (matplotlib barh plots from bottom to top by default).
-    display_idx = top_idx[::-1]
-    display_features = [all_names[i] for i in display_idx]
-    display_mean = mean_shap[display_idx]
-    display_std = std_shap[display_idx]
-
-    figheight = max(4, max_display * 0.35)
+    agg_explanation = _build_aggregate_explanation(
+        seed_explanations, per_seed_names, all_names
+    )
 
     with apply_nature_style():
-        fig, ax = plt.subplots(figsize=(8, figheight), dpi=dpi)
+        shap.plots.beeswarm(agg_explanation, max_display=max_display, show=False)
+        fig = plt.gcf()
+        fig.set_size_inches(20, max(8, max_display * 0.5))
+        fig.set_dpi(dpi)
+        fig.suptitle(title or "Aggregate SHAP Beeswarm", y=1.02)
 
-        ax.barh(
-            range(len(display_features)),
-            display_mean,
-            xerr=display_std,
-            color=OKABE_ITO[4],
-            alpha=0.8,
-            error_kw={"ecolor": "gray", "capsize": 3, "linewidth": 1.0},
-        )
-        ax.set_yticks(range(len(display_features)))
-        ax.set_yticklabels(display_features)
-
-        configure_spine(ax)
-        ax.set_xlabel("Mean |SHAP value| ± Std")
-        ax.set_ylabel("Feature")
-        ax.set_title(title or "Aggregate SHAP Feature Importance")
-
-    # Return all features sorted by descending mean
-    data = pd.DataFrame(
-        {
-            "feature": [all_names[i] for i in sorted_idx],
-            "mean_shap": mean_shap[sorted_idx],
-            "std_shap": std_shap[sorted_idx],
-        }
-    )
-    return fig, data
+    return fig, agg_explanation
