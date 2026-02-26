@@ -20,7 +20,7 @@ from sklearn.base import BaseEstimator
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.plots.shap_plots import (
-    _compute_shap_explanation,
+    compute_shap_explanation,
     plot_aggregate_shap_summary,
 )
 from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
@@ -245,9 +245,17 @@ class MultiModelEvaluator:
             fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved aggregate plot: {fig_path}")
             if data is not None and data_filename is not None:
-                data_path = os.path.join(self.output_dir, data_filename)
-                data.to_csv(data_path)
-                logger.info(f"Saved aggregate data: {data_path}")
+                if isinstance(data, shap.Explanation):
+                    data_filename = data_filename.replace(".csv", ".pkl")
+                    data_path = os.path.join(self.output_dir, data_filename)
+                    joblib.dump(data, data_path)
+                    logger.info(f"Saved aggregate data: {data_path}")
+                elif isinstance(data, pd.DataFrame):
+                    data_path = os.path.join(self.output_dir, data_filename)
+                    data.to_csv(data_path)
+                    logger.info(f"Saved aggregate data: {data_path}")
+                else:
+                    logger.warning(f"Cannot save aggregate data. Data type is {type(data)}.")
             plt.close(fig)
 
     def _collect_predictions(
@@ -806,7 +814,7 @@ class MultiModelEvaluator:
                         f"Failed to load SHAP explanation from {filepath}: {e}"
                     )
             try:
-                explanations.append(_compute_shap_explanation(model, X))
+                explanations.append(compute_shap_explanation(model, X))
             except Exception as e:
                 logger.warning(f"SHAP computation failed for seed: {e}")
                 explanations.append(None)

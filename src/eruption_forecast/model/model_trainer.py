@@ -258,14 +258,6 @@ class ModelTrainer:
             _output_dir, self.classifier_slug_name, self.classifier_slug_cv_name
         )
 
-        # Features directory under station_dir
-        # ``<station_dir>/features``
-        feature_root_dir = os.path.join(output_dir, "features")
-
-        # Per-seed test data dir: ``<feature_root_dir>/tests``
-        # Sharing all extracted features tests
-        tests_dir = os.path.join(feature_root_dir, "tests")
-
         # Classifier training model dir: ``<classifier_dir>/models``
         models_dir = os.path.join(classifier_dir, "models")
 
@@ -284,6 +276,9 @@ class ModelTrainer:
         # Plot significant features dir: ``<features_dir>/figures/significant``
         figures_dir = os.path.join(features_dir, "figures")
         significant_figures_dir = os.path.join(figures_dir, "significant")
+
+        # Per-seed test data dir: ``<features_dir>/tests``
+        tests_dir = os.path.join(features_dir, "tests")
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties

@@ -1377,7 +1377,6 @@ class ForecastModel:
         save_predictions: bool = True,
         save_plot: bool = True,
         output_dir: str | None = None,
-        trained_models: dict[str, str] | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
         verbose: bool = False,
@@ -1400,8 +1399,6 @@ class ForecastModel:
                 Defaults to True.
             output_dir (str | None, optional): Directory for forecast output files.
                 Defaults to ``self.station_dir``.
-            trained_models (dict[str, str] | None, optional): A dict mapping classifier names to their registry
-                CSV paths for multi-model consensus mode. Defaults to ``None``.
             n_jobs (int | None, optional): Parallel workers for feature extraction.
                 Defaults to None (uses ``self.n_jobs``).
             overwrite (bool, optional): If True, overwrites existing output files.
@@ -1415,7 +1412,7 @@ class ForecastModel:
         output_dir = output_dir or self.station_dir
         overwrite = overwrite or self.overwrite
         n_jobs = n_jobs or self.n_jobs
-        trained_models = trained_models or self.trained_models
+        trained_models = self.trained_models
 
         if trained_models is None or len(trained_models) == 0:
             raise ValueError(
@@ -1425,6 +1422,7 @@ class ForecastModel:
 
         if verbose:
             logger.info("Starting Prediction...")
+            logger.info(f"Total trained models: {len(trained_models)}")
 
         model_predictor = ModelPredictor(
             start_date=start_date,
