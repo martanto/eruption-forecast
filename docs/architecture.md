@@ -158,7 +158,7 @@ boolean stage flags so any completed stage can be skipped on re-runs.
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
 │  extract_       │  FeaturesBuilder                           │  extract_       │  FeaturesBuilder
-│  features()     │  rsam_f2/f3/f4, dsar_f3-f4                │  features()     │  (same kwargs)
+│  features()     │  rsam_f2/f3/f4, dsar_f3-f4                 │  features()     │  (same kwargs)
 │                 │  700+ tsfresh features → CSV               │                 │
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
@@ -166,8 +166,8 @@ boolean stage flags so any completed stage can be skipped on re-runs.
 ┌─────────────────┐                                            ┌─────────────────┐
 │  train()        │  ModelTrainer                              │  train()        │  ModelTrainer
 │  with_eval=True │  classifiers: lite-rf, rf                  │  with_eval=False│  (same classifiers)
-│                 │  cv: stratified, seeds: 100                │                 │  cv: stratified, seeds: 100
-│                 │  80/20 split → metrics JSON per seed        │                 │  full dataset → no metrics
+│                 │  cv: stratified, seeds: 500                │                 │  cv: stratified, seeds: 500
+│                 │  80/20 split → metrics JSON per seed       │                 │  full dataset → no metrics
 │                 │  → trainings/evaluations/…                 │                 │  → trainings/predictions/…
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
@@ -194,12 +194,12 @@ boolean stage flags so any completed stage can be skipped on re-runs.
 
 
   Stage flags (module-level booleans):
-  ┌──────────────────────────┬────────────────────────────────────────────┐
-  │ RUN_CALCULATE            │ Stage 1 — tremor calculation               │
-  │ RUN_EVALUATE_PER_MODEL   │ MultiModelEvaluator plots per classifier   │
+  ┌──────────────────────────┬─────────────────────────────────────────────┐
+  │ RUN_CALCULATE            │ Stage 1 — tremor calculation                │
+  │ RUN_EVALUATE_PER_MODEL   │ MultiModelEvaluator plots per classifier    │
   │ RUN_COMPARE_MODELS       │ ClassifierComparator cross-classifier plots │
-  │ SAVE_CONFIG              │ Persist pipeline YAML                      │
-  └──────────────────────────┴────────────────────────────────────────────┘
+  │ SAVE_CONFIG              │ Persist pipeline YAML                       │
+  └──────────────────────────┴─────────────────────────────────────────────┘
 ```
 
 ---
