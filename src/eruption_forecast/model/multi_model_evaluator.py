@@ -231,7 +231,7 @@ class MultiModelEvaluator:
 
         Args:
             fig (plt.Figure): The figure to save.
-            data (pd.DataFrame | None): Aggregate data to save as CSV.
+            data (pd.DataFrame | shap.Explanation | None): Aggregate data to save.
                 Skipped when None or when ``data_filename`` is None.
             fig_filename (str): PNG filename for the figure.
             data_filename (str | None): CSV filename for the data.
@@ -828,12 +828,12 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure:
-        """Plot aggregate mean |SHAP| values across all seeds.
+        """Plot a beeswarm of SHAP values aggregated across all seeds.
 
         Loads every seed's model and test set from the registry, loads cached
         SHAP Explanation objects from disk (recomputing only when missing),
-        then plots the mean absolute SHAP per feature as a bar chart with
-        ±1 std error bars.
+        then renders a beeswarm showing direction and magnitude of feature
+        contributions across all seeds.
 
         Args:
             max_display (int, optional): Number of top features to show,
@@ -844,7 +844,7 @@ class MultiModelEvaluator:
             dpi (int, optional): Figure resolution. Defaults to 150.
 
         Returns:
-            plt.Figure: Matplotlib figure with the aggregate SHAP bar chart.
+            plt.Figure: Matplotlib figure with the aggregate SHAP beeswarm plot.
 
         Examples:
             >>> fig = evaluator.plot_shap_summary(max_display=15)

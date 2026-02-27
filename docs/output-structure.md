@@ -63,6 +63,8 @@ output/
         │           │   ├── aggregate_threshold_analysis.csv
         │           │   ├── aggregate_feature_importance.png
         │           │   ├── aggregate_feature_importance.csv
+        │           │   ├── aggregate_shap_summary.png
+        │           │   ├── aggregate_shap_summary.pkl   # shap.Explanation (joblib)
         │           │   └── aggregate_metrics.csv        # from save_aggregate_metrics()
         │           ├── trained_model_{suffix}.csv    # Registry of all trained models
         │           ├── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())

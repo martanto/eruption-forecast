@@ -284,7 +284,7 @@ ev = MultiModelEvaluator(
 | `plot_confusion_matrix()` | `trained_model_csv` | Summed confusion matrix |
 | `plot_threshold_analysis()` | `trained_model_csv` | Mean metrics vs threshold ± std |
 | `plot_feature_importance()` | `trained_model_csv` | Mean importance ± std error bars |
-| `plot_shap_summary()` | `trained_model_csv` | Mean \|SHAP\| bar chart |
+| `plot_shap_summary()` | `trained_model_csv` | Aggregate SHAP beeswarm across seeds |
 | `plot_seed_stability()` | `trained_model_csv` | Violin plot of a metric across seeds |
 | `plot_frequency_band_contribution()` | `trained_model_csv` | Feature counts per seismic band |
 | `get_aggregate_metrics()` | `metrics_dir` | DataFrame: metric × mean/std/min/max |

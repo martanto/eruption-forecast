@@ -195,7 +195,7 @@ Individual plot methods (each accepts `save=True`, `filename=None`, `dpi=150`, a
 | `plot_confusion_matrix(normalize=None)` | Summed confusion matrix across all seeds |
 | `plot_threshold_analysis(show_individual=True)` | Mean metric curves vs. threshold with ±1 std bands |
 | `plot_feature_importance(top_n=20)` | Mean importance per feature with ±1 std error bars |
-| `plot_shap_summary(max_display=20)` | Mean absolute SHAP bar chart across seeds — requires `shap>=0.46` |
+| `plot_shap_summary(max_display=20)` | Aggregate SHAP beeswarm showing feature contributions across seeds — requires `shap>=0.46` |
 | `plot_seed_stability(metric="f1_score")` | Violin plot of a chosen metric across seeds |
 | `plot_frequency_band_contribution()` | Feature counts per seismic frequency band |
 
