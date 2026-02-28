@@ -180,6 +180,7 @@ class ModelTrainer:
             "tsfresh", "random_forest", "combined"
         ] = "tsfresh",
         overwrite: bool = False,
+        plot_shap: bool = False,
         n_jobs: int = 1,
         grid_search_n_jobs: int = 1,
         verbose: bool = False,
@@ -294,6 +295,7 @@ class ModelTrainer:
         self.cv_splits = cv_splits
         self.number_of_significant_features: int = number_of_significant_features
         self.feature_selection_method = feature_selection_method
+        self.plot_shap = plot_shap
         self.overwrite = overwrite
         self.verbose = verbose
         self.debug = debug
@@ -1041,6 +1043,7 @@ class ModelTrainer:
             y_test=y_test,
             model_name=self.classifier_name,
             output_dir=self.classifier_dir,
+            plot_shap=self.plot_shap,
             selected_features=top_n_features,
             shap_explanation_filepath=shap_explanation_filepath,
         )

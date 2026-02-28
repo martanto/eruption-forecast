@@ -34,6 +34,7 @@ from sklearn.metrics import (
 from sklearn.ensemble import VotingClassifier
 from sklearn.calibration import calibration_curve
 
+from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -145,7 +146,6 @@ def plot_roc_curve(
     auc = roc_auc_score(y_true, y_proba)
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-
         # Plot ROC curve
         ax.plot(
             fpr,
@@ -214,7 +214,6 @@ def plot_precision_recall_curve(
     ap = average_precision_score(y_true, y_proba)
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-
         # Plot PR curve
         ax.plot(
             recall,
@@ -256,7 +255,7 @@ def plot_threshold_analysis(
     """Plot precision, recall, F1, and balanced accuracy vs. decision threshold.
 
     Creates a multi-metric threshold analysis plot showing how classification metrics
-    vary across decision thresholds from 0 to 1. Marks default threshold (0.5) and
+    vary across decision thresholds from 0 to 1. Marks default threshold ``ERUPTION_PROBABILITY_THRESHOLD`` and
     optimal F1 threshold with vertical lines.
 
     Args:
@@ -296,7 +295,6 @@ def plot_threshold_analysis(
     optimal_threshold = thresholds[optimal_idx]
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-
         # Plot metrics with distinct colors from Okabe-Ito palette
         ax.plot(
             thresholds,
@@ -327,13 +325,13 @@ def plot_threshold_analysis(
             linewidth=2.0,
         )
 
-        # Mark default threshold (0.5)
+        # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.7)
         ax.axvline(
-            0.5,
+            ERUPTION_PROBABILITY_THRESHOLD,
             color=NATURE_COLORS["gray"],
             linestyle=":",
             linewidth=1.5,
-            label="Default (0.5)",
+            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
             alpha=0.7,
         )
 
@@ -503,7 +501,6 @@ def plot_calibration(
     )
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-
         # Plot calibration curve
         ax.plot(
             mean_predicted_value,
@@ -548,7 +545,7 @@ def plot_prediction_distribution(
 
     Creates overlapping histograms showing the distribution of predicted probabilities
     for each true class. Well-separated distributions indicate good model discrimination.
-    Includes vertical line at 0.5 decision threshold.
+    Includes vertical line at ``ERUPTION_PROBABILITY_THRESHOLD``.
 
     Args:
         y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
@@ -579,7 +576,6 @@ def plot_prediction_distribution(
     bins = max(1, min(20, len(np.unique(proba_0)), len(np.unique(proba_1))))
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-
         # Plot histograms for each class
         ax.hist(
             proba_0,
@@ -600,13 +596,13 @@ def plot_prediction_distribution(
             linewidth=0.5,
         )
 
-        # Mark 0.5 threshold
+        # Mark ERUPTION_PROBABILITY_THRESHOLD
         ax.axvline(
-            0.5,
+            ERUPTION_PROBABILITY_THRESHOLD,
             color=NATURE_COLORS["gray"],
             linestyle="--",
             linewidth=1.5,
-            label="Threshold (0.5)",
+            label=f"Threshold ({ERUPTION_PROBABILITY_THRESHOLD})",
             alpha=0.7,
         )
 
@@ -995,11 +991,11 @@ def plot_aggregate_prediction_distribution(
             label=f"Erupted (n={len(proba_1)})",
         )
         ax.axvline(
-            0.5,
+            ERUPTION_PROBABILITY_THRESHOLD,
             color=NATURE_COLORS["gray"],
             linestyle="--",
             linewidth=1.5,
-            label="Threshold (0.5)",
+            label=f"Threshold ({ERUPTION_PROBABILITY_THRESHOLD})",
             alpha=0.7,
         )
 
@@ -1216,11 +1212,11 @@ def plot_aggregate_threshold_analysis(
             )
 
         ax.axvline(
-            0.5,
+            ERUPTION_PROBABILITY_THRESHOLD,
             color=NATURE_COLORS["gray"],
             linestyle=":",
             linewidth=1.5,
-            label="Default (0.5)",
+            label=r"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
             alpha=0.7,
         )
 

@@ -89,6 +89,7 @@ class MultiModelEvaluator:
         metrics_files: list[str] | None = None,
         trained_model_csv: str | None = None,
         classifier_name: str = "model",
+        plot_shap: bool = False,
         root_dir: str | None = None,
         output_dir: str | None = None,
     ) -> None:
@@ -123,11 +124,14 @@ class MultiModelEvaluator:
             )
 
         self.classifier_name = classifier_name
+        self.plot_shap = plot_shap
         self._metrics_dir = metrics_dir
         self._metrics_files = metrics_files
         self._trained_model_csv = trained_model_csv
 
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "evaluations"))
+        output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "evaluations")
+        )
         self.output_dir = os.path.join(output_dir, "aggregate")
 
     # ------------------------------------------------------------------
@@ -221,7 +225,7 @@ class MultiModelEvaluator:
     def _save_outputs(
         self,
         fig: plt.Figure,
-        data: pd.DataFrame | None,
+        data: pd.DataFrame | shap.Explanation | None,
         fig_filename: str,
         data_filename: str | None,
         dpi: int,
@@ -255,7 +259,9 @@ class MultiModelEvaluator:
                     data.to_csv(data_path)
                     logger.info(f"Saved aggregate data: {data_path}")
                 else:
-                    logger.warning(f"Cannot save aggregate data. Data type is {type(data)}.")
+                    logger.warning(
+                        f"Cannot save aggregate data. Data type is {type(data)}."
+                    )
             plt.close(fig)
 
     def _collect_predictions(
@@ -739,11 +745,11 @@ class MultiModelEvaluator:
                 dpi=dpi, show_individual=show_individual
             ),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
-            "shap_summary": self.plot_shap_summary(dpi=dpi),
             "seed_stability": self.plot_seed_stability(dpi=dpi),
             "frequency_band_contribution": self.plot_frequency_band_contribution(
                 dpi=dpi
             ),
+            "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
         }
 
     # ------------------------------------------------------------------
@@ -803,7 +809,9 @@ class MultiModelEvaluator:
         col_exists = "shap_explanation_filepath" in registry.columns
         explanations: list[shap.Explanation | None] = []
 
-        for (_, row), model, X in zip(registry.iterrows(), models, x_tests, strict=False):
+        for (_, row), model, X in zip(
+            registry.iterrows(), models, x_tests, strict=False
+        ):
             filepath = row.get("shap_explanation_filepath") if col_exists else None
             if filepath and os.path.isfile(str(filepath)):
                 try:

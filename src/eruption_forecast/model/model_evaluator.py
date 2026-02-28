@@ -100,6 +100,7 @@ class ModelEvaluator:
         selected_features: list[str] | None = None,
         random_state: int | None = None,
         root_dir: str | None = None,
+        plot_shap: bool = False,
         cv_name: str = "cv",
         verbose: bool = False,
         shap_explanation_filepath: str | None = None,
@@ -161,6 +162,7 @@ class ModelEvaluator:
         self.output_dir = output_dir
         self.metrics_dir = metrics_dir
         self.figures_dir = figures_dir
+        self.plot_shap = plot_shap
         self.top_n = len(selected_features) if selected_features is not None else 20
         self.verbose = verbose
         self._shap_explanation_filepath = shap_explanation_filepath
@@ -961,9 +963,7 @@ class ModelEvaluator:
         )
         return fig
 
-    def plot_all(
-        self, dpi: int = 150, plot_shap: bool = False
-    ) -> dict[str, plt.Figure | None]:
+    def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
         """Generate and save all evaluation plots.
 
         Runs every individual plot method and collects the resulting figures.
@@ -994,5 +994,5 @@ class ModelEvaluator:
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
-            "shap_summary": self.plot_shap_summary(dpi=dpi) if plot_shap else None,
+            "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
         }
