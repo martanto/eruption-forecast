@@ -1578,7 +1578,7 @@ def plot_seed_stability(
         # Mark mean per classifier
         for i, clf in enumerate(order):
             mean_val = long_df.loc[long_df["classifier"] == clf, "value"].mean()
-            ax.hlines(mean_val, i - 0.3, i + 0.3, colors="white", linewidths=2.0)
+            ax.hlines(mean_val, i - 0.3, i + 0.3, colors="white", linewidths=1.0)
 
         configure_spine(ax)
         ax.set_xlabel("Classifier")

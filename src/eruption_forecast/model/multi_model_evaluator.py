@@ -187,7 +187,14 @@ class MultiModelEvaluator:
         sig_features = pd.read_csv(
             row["significant_features_csv"], index_col=0
         ).index.tolist()
-        X_test_filtered = X_test[sig_features]
+
+        # Checking if X_test_filtered columns has all significant features
+        try:
+            X_test_filtered = X_test[sig_features]
+        except KeyError as e:
+            raise KeyError(
+                f"{e}. significant_features_csv: {row['significant_features_csv']}"
+            )
 
         if hasattr(model, "predict_proba"):
             proba: np.ndarray = model.predict_proba(X_test_filtered)[:, 1]
@@ -885,11 +892,10 @@ class MultiModelEvaluator:
 
     def plot_seed_stability(
         self,
-        metric: str = "f1_score",
         save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
-    ) -> plt.Figure:
+    ) -> None:
         """Plot seed stability violin for this single-classifier evaluator.
 
         Shows the distribution of ``metric`` across random seeds as a violin
@@ -897,15 +903,10 @@ class MultiModelEvaluator:
         to have been provided at construction.
 
         Args:
-            metric (str, optional): Metric key to plot. Must be present in
-                each seed's JSON metrics file. Defaults to ``"f1_score"``.
             save (bool, optional): Whether to save the figure. Defaults to True.
             filename (str | None, optional): Override figure filename.
                 Defaults to ``"seed_stability_{metric}.png"``.
             dpi (int, optional): Figure resolution. Defaults to 150.
-
-        Returns:
-            plt.Figure: Matplotlib figure with the seed stability violin.
 
         Examples:
             >>> fig = evaluator.plot_seed_stability(metric="balanced_accuracy")
@@ -921,14 +922,31 @@ class MultiModelEvaluator:
         clf_name = records[0].get("model_name", "model") if records else "model"
         metrics_by_clf = {clf_name: records}
 
-        fig, data = plot_seed_stability(
-            metrics_by_classifier=metrics_by_clf,
-            metric=metric,
-            dpi=dpi,
-        )
-        default_fn = f"seed_stability_{metric}.png"
-        self._save_outputs(fig, data, filename or default_fn, None, dpi, save)
-        return fig
+        metrics: list[str] = [
+            "f1_score",
+            "roc_auc",
+            "pr_auc",
+            "balanced_accuracy",
+            "precision",
+            "recall",
+            "specificity",
+            "sensitivity",
+        ]
+
+        for metric in metrics:
+            fig, data = plot_seed_stability(
+                metrics_by_classifier=metrics_by_clf,
+                figsize=(2, 4),
+                metric=metric,
+                dpi=dpi,
+            )
+            fig_filename = f"{self.classifier_name}_seed_stability_{metric}.png"
+            data_filename = f"{self.classifier_name}_seed_stability_{metric}.csv"
+            self._save_outputs(
+                fig, data, filename or fig_filename, data_filename, dpi, save
+            )
+
+        return None
 
     def plot_frequency_band_contribution(
         self,
