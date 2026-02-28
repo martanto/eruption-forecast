@@ -88,6 +88,10 @@ def plot_significant_features(
         ...     title="Top Feature Importances",
         ... )
     """
+    number_of_features = (
+        number_of_features if len(df.columns) >= number_of_features else top_features
+    )
+
     if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
         return None
 
