@@ -30,6 +30,7 @@ from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve as _plot_roc_styled,
     plot_calibration as _plot_cal_styled,
+    plot_learning_curve as _plot_lc_styled,
     plot_confusion_matrix as _plot_cm_styled,
     plot_feature_importance as _plot_fi_styled,
     plot_threshold_analysis as _plot_threshold_styled,
@@ -104,6 +105,7 @@ class ModelEvaluator:
         cv_name: str = "cv",
         verbose: bool = False,
         shap_explanation_filepath: str | None = None,
+        learning_curve_path: str | None = None,
     ) -> None:
         """Initialize the ModelEvaluator with a fitted model and test data.
 
@@ -134,6 +136,10 @@ class ModelEvaluator:
             shap_explanation_filepath (str | None, optional): Path where the SHAP
                 Explanation object should be saved after ``plot_shap_summary()`` is
                 called. When None the explanation is not persisted. Defaults to None.
+            learning_curve_path (str | None, optional): Path to the per-seed
+                learning-curve JSON produced by ``ModelTrainer.compute_learning_curve``.
+                When provided, ``plot_all()`` renders and saves the learning curve
+                plot automatically. Defaults to None.
         """
         if isinstance(model, GridSearchCV):
             model = model.best_estimator_
@@ -166,6 +172,7 @@ class ModelEvaluator:
         self.top_n = len(selected_features) if selected_features is not None else 20
         self.verbose = verbose
         self._shap_explanation_filepath = shap_explanation_filepath
+        self._learning_curve_path = learning_curve_path
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -963,6 +970,45 @@ class ModelEvaluator:
         )
         return fig
 
+    def plot_learning_curve(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot the per-seed learning curve from the JSON saved during training.
+
+        Reads the learning-curve JSON written by
+        ``ModelTrainer.compute_learning_curve`` and renders train vs. validation
+        balanced-accuracy curves with ±1 std shaded bands.
+
+        Args:
+            save (bool, optional): If True, save the figure to
+                ``figures_dir/learning_curve/``. Defaults to True.
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"{prefix}_learning_curve.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if
+                ``learning_curve_path`` was not set or the file does not exist.
+        """
+        if self._learning_curve_path is None or not os.path.isfile(
+            self._learning_curve_path
+        ):
+            return None
+
+        plot_filepath = self._get_plot_filepath("learning_curve", filename=filename)
+        fig, _ = _plot_lc_styled(
+            json_filepath=self._learning_curve_path,
+            plot_filepath=plot_filepath,
+            overwrite=save,
+            dpi=dpi,
+        )
+        self._save_plot(fig, save, filepath=plot_filepath, dpi=dpi)
+        return fig
+
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
         """Generate and save all evaluation plots.
 
@@ -978,9 +1024,10 @@ class ModelEvaluator:
             object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
             ``"pr_curve"``, ``"threshold_analysis"``,
             ``"feature_importance"``, ``"calibration"``,
-            ``"prediction_distribution"``, ``"shap_summary"``. Values are
-            None when a plot could not be generated (e.g. probabilities
-            unavailable).
+            ``"prediction_distribution"``, ``"shap_summary"``,
+            ``"learning_curve"``. Values are None when a plot could not be
+            generated (e.g. probabilities unavailable or no learning-curve
+            JSON supplied).
 
         Examples:
             >>> figs = evaluator.plot_all(dpi=200)
@@ -994,5 +1041,6 @@ class ModelEvaluator:
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
+            # "learning_curve": self.plot_learning_curve(dpi=dpi),
             "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
         }

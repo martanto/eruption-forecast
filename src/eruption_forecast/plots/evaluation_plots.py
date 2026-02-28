@@ -13,6 +13,8 @@ This module provides publication-quality visualizations for ML model evaluation:
 All plots follow Nature/Science journal standards with consistent styling.
 """
 
+import os
+import json
 from typing import Any
 
 import numpy as np
@@ -1485,6 +1487,188 @@ def plot_classifier_comparison(
 
     return fig, summary_df
 
+
+def plot_learning_curve(
+    json_filepath: str,
+    plot_filepath: str,
+    overwrite: bool = False,
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Load a learning-curve JSON and render it as a train vs. validation plot.
+
+    Reads the per-seed JSON file produced by ``ModelTrainer.compute_learning_curve``,
+    then renders train and validation balanced-accuracy scores as a function of
+    training-set size with ±1 std shaded bands around each line.
+
+    Args:
+        json_filepath (str): Path to the learning-curve JSON file containing
+            keys ``train_sizes``, ``train_scores_mean``, ``train_scores_std``,
+            ``test_scores_mean``, ``test_scores_std``.
+        plot_filepath (str): Destination path for the saved PNG file.
+        overwrite (bool, optional): When False, skip saving if the PNG already
+            exists. Defaults to False.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame with
+            columns ``train_sizes``, ``train_scores_mean``, ``train_scores_std``,
+            ``test_scores_mean``, ``test_scores_std``.
+    """
+    with open(json_filepath) as f:
+        data = json.load(f)
+
+    train_sizes = np.array(data["train_sizes"])
+    train_mean = np.array(data["train_scores_mean"])
+    train_std = np.array(data["train_scores_std"])
+    test_mean = np.array(data["test_scores_mean"])
+    test_std = np.array(data["test_scores_std"])
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=(6, 5), dpi=dpi)
+
+        ax.plot(train_sizes, train_mean, color=OKABE_ITO[0], linewidth=2.0, label="Train")
+        ax.fill_between(
+            train_sizes,
+            train_mean - train_std,
+            train_mean + train_std,
+            alpha=0.2,
+            color=OKABE_ITO[0],
+        )
+
+        ax.plot(
+            train_sizes,
+            test_mean,
+            color=OKABE_ITO[1],
+            linewidth=2.0,
+            linestyle="--",
+            label="Validation",
+        )
+        ax.fill_between(
+            train_sizes,
+            test_mean - test_std,
+            test_mean + test_std,
+            alpha=0.2,
+            color=OKABE_ITO[1],
+        )
+
+        ax.set_xlabel("Training set size")
+        ax.set_ylabel("Balanced accuracy")
+        ax.set_title("Learning Curve")
+        ax.legend(frameon=False, fontsize=8)
+        configure_spine(ax)
+
+    df = pd.DataFrame(
+        {
+            "train_sizes": train_sizes,
+            "train_scores_mean": train_mean,
+            "train_scores_std": train_std,
+            "test_scores_mean": test_mean,
+            "test_scores_std": test_std,
+        }
+    )
+
+    if overwrite or not os.path.isfile(plot_filepath):
+        os.makedirs(os.path.dirname(plot_filepath), exist_ok=True)
+        fig.savefig(plot_filepath, dpi=dpi, bbox_inches="tight")
+
+    return fig, df
+
+
+def plot_aggregate_learning_curve(
+    all_data: list[dict],
+    filepath: str,
+    overwrite: bool = False,
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot aggregate learning curves across multiple seeds with mean ± std bands.
+
+    Interpolates each seed's learning curve onto a shared training-size grid,
+    then plots mean train and validation balanced-accuracy lines with ±1 std
+    shaded bands.
+
+    Args:
+        all_data (list[dict]): List of per-seed dicts, each with keys
+            ``train_sizes``, ``train_scores_mean``, ``train_scores_std``,
+            ``test_scores_mean``, ``test_scores_std``.
+        filepath (str): Destination path for the saved PNG file.
+        overwrite (bool, optional): When False, skip saving if the file already
+            exists. Defaults to False.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame with
+            columns ``train_sizes``, ``mean_train``, ``std_train``, ``mean_val``,
+            ``std_val``.
+    """
+    # Build shared grid from the largest train_sizes array
+    max_sizes = max(len(d["train_sizes"]) for d in all_data)
+    size_grid = np.linspace(
+        max(d["train_sizes"][0] for d in all_data),
+        min(d["train_sizes"][-1] for d in all_data),
+        max_sizes,
+    )
+
+    train_interps: list[np.ndarray] = []
+    test_interps: list[np.ndarray] = []
+
+    for d in all_data:
+        sizes = np.array(d["train_sizes"])
+        train_interps.append(np.interp(size_grid, sizes, d["train_scores_mean"]))
+        test_interps.append(np.interp(size_grid, sizes, d["test_scores_mean"]))
+
+    mean_train = np.mean(train_interps, axis=0)
+    std_train = np.std(train_interps, axis=0)
+    mean_test = np.mean(test_interps, axis=0)
+    std_test = np.std(test_interps, axis=0)
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=(6, 5), dpi=dpi)
+
+        ax.plot(size_grid, mean_train, color=OKABE_ITO[0], linewidth=2.0, label="Train")
+        ax.fill_between(
+            size_grid,
+            mean_train - std_train,
+            mean_train + std_train,
+            alpha=0.2,
+            color=OKABE_ITO[0],
+        )
+
+        ax.plot(
+            size_grid,
+            mean_test,
+            color=OKABE_ITO[1],
+            linewidth=2.0,
+            linestyle="--",
+            label="Validation",
+        )
+        ax.fill_between(
+            size_grid,
+            mean_test - std_test,
+            mean_test + std_test,
+            alpha=0.2,
+            color=OKABE_ITO[1],
+        )
+
+        ax.set_xlabel("Training set size")
+        ax.set_ylabel("Balanced accuracy")
+        ax.set_title("Aggregate Learning Curve")
+        ax.legend(frameon=False, fontsize=8)
+        configure_spine(ax)
+
+    df = pd.DataFrame(
+        {
+            "train_sizes": size_grid,
+            "mean_train": mean_train,
+            "std_train": std_train,
+            "mean_val": mean_test,
+            "std_val": std_test,
+        }
+    )
+
+    if overwrite or not os.path.isfile(filepath):
+        fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
+
+    return fig, df
 
 def plot_seed_stability(
     metrics_by_classifier: dict[str, list[dict[str, Any]]],

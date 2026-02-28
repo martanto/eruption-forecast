@@ -1,12 +1,19 @@
 import os
 import json
+import warnings
 from typing import Any, Self, Literal
 from collections.abc import Callable
 
+import numpy as np
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    learning_curve,
+    train_test_split,
+)
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
@@ -748,7 +755,7 @@ class ModelTrainer:
     def _generate_filepaths(
         self,
         random_state: int,
-    ) -> tuple[str, str, str, str, str, str, str, str, str, bool]:
+    ) -> tuple[str, str, str, str, str, str, str, str, str, str, bool]:
         """Generate filepaths based on random seed.
 
         Args:
@@ -764,6 +771,7 @@ class ModelTrainer:
             str: SHAP explanation cache filepath
             str: X_test filepath (held-out features for this seed)
             str: y_test filepath (held-out labels for this seed)
+            str: Learning curve JSON filepath
             bool: Whether all required output files already exist and can be skipped
         """
         filename = (
@@ -785,6 +793,9 @@ class ModelTrainer:
         )
         X_test_filepath = os.path.join(self.tests_dir, f"{filename}_X_test.csv")
         y_test_filepath = os.path.join(self.tests_dir, f"{filename}_y_test.csv")
+        learning_curve_path = os.path.join(
+            self.metrics_dir, "learning_curve", f"{filename}.json"
+        )
 
         can_skip = not self.overwrite and all(
             os.path.isfile(p)
@@ -809,6 +820,7 @@ class ModelTrainer:
             shap_explanation_filepath,
             X_test_filepath,
             y_test_filepath,
+            learning_curve_path,
             can_skip,
         )
 
@@ -989,6 +1001,80 @@ class ModelTrainer:
             all_figures_filepath=all_figures_filepath,
         )
 
+    def compute_learning_curve(
+        self,
+        estimator: Any,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        random_state: int,
+        filepath: str,
+    ) -> dict:
+        """Compute a learning curve and save the result as JSON.
+
+        Evaluates ``estimator`` at ten linearly spaced training-set fractions
+        (0.1 → 1.0) using the configured CV splitter and ``balanced_accuracy``
+        scoring.  Mean and standard deviation of train and validation scores are
+        computed across CV folds and written to ``filepath``.
+
+        Args:
+            estimator (Any): Fitted or unfitted sklearn-compatible estimator.
+            X_train (pd.DataFrame): Training features (post-selection).
+            y_train (pd.Series): Training labels.
+            random_state (int): Random seed used to configure the CV splitter.
+            filepath (str): Destination path for the JSON output file.
+
+        Returns:
+            dict: Dict with keys ``random_state``, ``train_sizes``,
+                ``train_scores_mean``, ``train_scores_std``,
+                ``test_scores_mean``, ``test_scores_std``.
+        """
+        # StratifiedKFold ensures every fold contains both classes, preventing
+        # the single-label warning that occurs when small train_sizes + class
+        # imbalance leave only one class in a fold.
+        cv = StratifiedKFold(
+            n_splits=self.cv_splits, shuffle=True, random_state=random_state
+        )
+
+        # Force n_jobs=1: already inside a loky parallel worker (outer seed loop).
+        # Suppress the single-label UserWarning: at very small training-size
+        # fractions (≤20%) the model may predict only one class, causing
+        # balanced_accuracy_score to warn about a single label in y_pred.
+        # This is expected behaviour for tiny subsets and does not affect the
+        # aggregate curve once scores are averaged across all CV folds.
+        #
+        # The warning is expected — when a model trains on 10–20% of
+        # already-undersampled data, it sometimes collapses to
+        # predicting one class.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="A single label was found",
+                category=UserWarning,
+            )
+            train_sizes_abs, train_scores, test_scores = learning_curve(
+                estimator=estimator,
+                X=X_train,
+                y=y_train,
+                cv=cv,
+                scoring="balanced_accuracy",
+                train_sizes=np.linspace(0.1, 1.0, 10),
+                n_jobs=1,
+            )
+
+        data = {
+            "random_state": random_state,
+            "train_sizes": train_sizes_abs.tolist(),
+            "train_scores_mean": train_scores.mean(axis=1).tolist(),
+            "train_scores_std": train_scores.std(axis=1).tolist(),
+            "test_scores_mean": test_scores.mean(axis=1).tolist(),
+            "test_scores_std": test_scores.std(axis=1).tolist(),
+        }
+
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=4)
+        return data
+
     def _cv_train_evaluate(
         self,
         y_train: pd.Series,
@@ -998,6 +1084,7 @@ class ModelTrainer:
         random_state: int,
         model_filepath: str,
         metrics_filepath: str,
+        learning_curve_path: str,
         shap_explanation_filepath: str | None = None,
     ) -> dict[str, Any]:
         """Steps 4-5: GridSearchCV training then evaluation on the held-out test set.
@@ -1015,6 +1102,9 @@ class ModelTrainer:
             random_state (int): Random seed used for the classifier.
             model_filepath (str): Path to save the trained model pickle.
             metrics_filepath (str): Path to save the per-seed metrics JSON.
+            learning_curve_path (str): Path to save the per-seed learning curve JSON.
+            shap_explanation_filepath (str | None, optional): Path for the SHAP
+                explanation cache. Defaults to None.
 
         Returns:
             dict[str, Any]: Metrics dictionary produced by ModelEvaluator.
@@ -1036,6 +1126,20 @@ class ModelTrainer:
         if self.verbose:
             logger.info(f"{random_state:05d}: Model at {model_filepath}")
 
+        try:
+            self.compute_learning_curve(
+                estimator=best_model,
+                X_train=features_train_resampled_selected[top_n_features],
+                y_train=y_train,
+                random_state=random_state,
+                filepath=learning_curve_path,
+            )
+        except Exception as e:
+            logger.warning(
+                f"Seed {random_state:05d}: learning curve computation failed. Reason: {e}"
+            )
+            learning_curve_path: str | None = None
+
         model_evaluator = ModelEvaluator(
             random_state=random_state,
             model=grid_search,
@@ -1046,6 +1150,7 @@ class ModelTrainer:
             plot_shap=self.plot_shap,
             selected_features=top_n_features,
             shap_explanation_filepath=shap_explanation_filepath,
+            learning_curve_path=learning_curve_path,
         )
 
         grid_params = grid_search.best_params_
@@ -1124,6 +1229,7 @@ class ModelTrainer:
             shap_explanation_filepath,
             X_test_filepath,
             y_test_filepath,
+            learning_curve_path,
             _,
         ) = self._generate_filepaths(random_state=random_state)
 
@@ -1166,6 +1272,7 @@ class ModelTrainer:
             random_state=random_state,
             model_filepath=model_filepath,
             metrics_filepath=metrics_filepath,
+            learning_curve_path=learning_curve_path,
             shap_explanation_filepath=shap_explanation_filepath,
         )
 
@@ -1238,6 +1345,7 @@ class ModelTrainer:
                 _shap_explanation_filepath,
                 _X_test_filepath,
                 _y_test_filepath,
+                _,
                 _can_skip,
             ) = self._generate_filepaths(_random_state)
 
@@ -1350,6 +1458,7 @@ class ModelTrainer:
             all_features_filepath,
             all_figures_filepath,
             model_filepath,
+            _,
             _,
             _,
             _,
@@ -1469,6 +1578,7 @@ class ModelTrainer:
                 _,
                 _,
                 _model_filepath,
+                _,
                 _,
                 _,
                 _,

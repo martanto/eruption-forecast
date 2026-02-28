@@ -28,6 +28,7 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_seed_stability,
     plot_aggregate_roc_curve as _plot_roc_styled,
     plot_aggregate_calibration as _plot_cal_styled,
+    plot_aggregate_learning_curve as _plot_agg_lc_styled,
     plot_aggregate_confusion_matrix as _plot_cm_styled,
     plot_aggregate_feature_importance as _plot_fi_styled,
     plot_aggregate_threshold_analysis as _plot_threshold_styled,
@@ -708,11 +709,68 @@ class MultiModelEvaluator:
         )
         return fig
 
+    def plot_learning_curve(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> tuple[plt.Figure, pd.DataFrame] | None:
+        """Plot an aggregate learning curve across all seeds.
+
+        Loads per-seed learning-curve JSON files from
+        ``{metrics_dir}/learning_curve/*.json``, interpolates them onto a
+        shared training-size grid, and plots mean ± std bands for train and
+        validation balanced accuracy.
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename.
+                Defaults to ``"aggregate_learning_curve.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            tuple[plt.Figure, pd.DataFrame] | None: Figure and summary DataFrame,
+                or None if no learning-curve JSON files are found.
+
+        Examples:
+            >>> result = evaluator.plot_learning_curve()
+        """
+        if self._metrics_dir is None:
+            logger.warning("plot_learning_curve requires metrics_dir; skipping.")
+            return None
+
+        lc_dir = os.path.join(self._metrics_dir, "learning_curve")
+        json_paths = sorted(glob.glob(os.path.join(lc_dir, "*.json")))
+        if not json_paths:
+            logger.warning(f"No learning-curve JSON files found in {lc_dir}; skipping.")
+            return None
+
+        all_data: list[dict] = []
+        for p in json_paths:
+            with open(p) as f:
+                all_data.append(json.load(f))
+
+        fig_path = os.path.join(
+            self.output_dir, filename or "aggregate_learning_curve.png"
+        )
+        fig, df = _plot_agg_lc_styled(
+            all_data=all_data,
+            filepath=fig_path,
+            overwrite=save,
+            dpi=dpi,
+        )
+        if save:
+            os.makedirs(self.output_dir, exist_ok=True)
+            logger.info(f"Saved aggregate learning curve: {fig_path}")
+            df.to_csv(fig_path.replace(".png", ".csv"))
+            plt.close(fig)
+        return fig, df
+
     def plot_all(
         self,
         dpi: int = 150,
         show_individual: bool = True,
-    ) -> dict[str, plt.Figure | None]:
+    ) -> dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None]:
         """Generate and save all aggregate evaluation plots.
 
         Runs every individual ``plot_*`` method and collects the resulting
@@ -732,7 +790,7 @@ class MultiModelEvaluator:
                 ``"prediction_distribution"``, ``"confusion_matrix"``,
                 ``"threshold_analysis"``, ``"feature_importance"``,
                 ``"shap_summary"``, ``"seed_stability"``,
-                ``"frequency_band_contribution"``.
+                ``"frequency_band_contribution"``, ``"learning_curve"``.
                 Values are None when a plot cannot be generated (e.g.,
                 feature importance for models without ``feature_importances_``).
 
@@ -756,6 +814,7 @@ class MultiModelEvaluator:
             "frequency_band_contribution": self.plot_frequency_band_contribution(
                 dpi=dpi
             ),
+            "learning_curve": self.plot_learning_curve(dpi=dpi),
             "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
         }
 
