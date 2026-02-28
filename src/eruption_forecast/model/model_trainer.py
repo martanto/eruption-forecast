@@ -1154,12 +1154,8 @@ class ModelTrainer:
         # X_test_filepath and y_test_filepath will be used as an input
         # for selected_features_path parameter in ModelEvaluator.from_files(...) method
         _, top_selected_features, _, _ = result
-
-        if not os.path.exists(X_test_filepath):
-            X_test[top_selected_features.index.tolist()].to_csv(X_test_filepath)
-
-        if not os.path.exists(y_test_filepath):
-            y_test.to_csv(y_test_filepath)
+        X_test[top_selected_features.index.tolist()].to_csv(X_test_filepath)
+        y_test.to_csv(y_test_filepath)
 
         # ========== STEPS 4-5: CV Training + Evaluation ==========
         metrics = self._cv_train_evaluate(
