@@ -21,9 +21,10 @@ from eruption_forecast.utils.array import (
     predict_proba_from_estimator,
 )
 from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.model.base_ensemble import BaseEnsemble
 
 
-class SeedEnsemble(BaseEstimator, ClassifierMixin):
+class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     """Bundle of seed models for a single classifier type.
 
     Wraps all trained estimators produced by ``ModelTrainer`` for one
@@ -243,39 +244,17 @@ class SeedEnsemble(BaseEstimator, ClassifierMixin):
     # Serialisation
     # ------------------------------------------------------------------
 
-    def save(self, path: str) -> None:
-        """Dump the ensemble to a single ``.pkl`` file via joblib.
-
-        The entire object — including all seed estimators and feature lists —
-        is serialised with ``joblib.dump``.  Reload with :meth:`load`.
-
-        Args:
-            path (str): Destination file path (should end with ``.pkl``).
-        """
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        joblib.dump(self, path)
-        logger.info(f"[SeedEnsemble] Saved to: {path}")
-
     @classmethod
-    def load(cls, path: str) -> "SeedEnsemble":
-        """Load a previously saved SeedEnsemble from a ``.pkl`` file.
-
-        Restores the full ensemble from a file written by :meth:`save`.
+    def _load_log_msg(cls, obj: "SeedEnsemble") -> str:  # type: ignore[override]
+        """Return a seed-count suffix for the load log message.
 
         Args:
-            path (str): Path to the ``.pkl`` file.
+            obj (SeedEnsemble): The just-loaded SeedEnsemble instance.
 
         Returns:
-            SeedEnsemble: The restored ensemble.
-
-        Raises:
-            FileNotFoundError: If ``path`` does not exist.
+            str: Human-readable seed count string.
         """
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"SeedEnsemble file not found: {path}")
-        ensemble: SeedEnsemble = joblib.load(path)
-        logger.info(f"[SeedEnsemble] Loaded {len(ensemble.seeds)} seeds from: {path}")
-        return ensemble
+        return f"{len(obj.seeds)} seeds"
 
     # ------------------------------------------------------------------
     # Dunder helpers
