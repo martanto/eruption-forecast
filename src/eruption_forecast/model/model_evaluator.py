@@ -18,11 +18,12 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.config.constants import (
     PLOT_DPI,
     THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
+    LEARNING_CURVE_SCORINGS,
 )
 from eruption_forecast.plots.shap_plots import plot_shap_summary as _plot_shap_summary
 from eruption_forecast.utils.formatting import slugify_class_name
@@ -30,10 +31,10 @@ from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve as _plot_roc_styled,
     plot_calibration as _plot_cal_styled,
-    plot_learning_curve as _plot_lc_styled,
     plot_confusion_matrix as _plot_cm_styled,
     plot_feature_importance as _plot_fi_styled,
     plot_threshold_analysis as _plot_threshold_styled,
+    plot_learning_curve_grid as _plot_lc_grid,
     plot_precision_recall_curve as _plot_pr_styled,
     plot_prediction_distribution as _plot_pred_dist_styled,
 )
@@ -174,7 +175,7 @@ class ModelEvaluator:
         self._shap_explanation_filepath = shap_explanation_filepath
         self._learning_curve_path = learning_curve_path
 
-        os.makedirs(self.output_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
 
         self._prefix = (
             f"{random_state:05d}" if random_state is not None else f"{model_name}"
@@ -307,7 +308,7 @@ class ModelEvaluator:
         plt.close(fig)
 
     def _get_proba(self) -> np.ndarray | None:
-        """Retrieve predicted probabilities or decision scores for the test set.
+        """Retrieve predicted eruption probabilities or decision scores for the test set.
 
         Tries ``predict_proba`` first (returns the positive-class column),
         then falls back to ``decision_function``. Returns None when neither
@@ -318,8 +319,8 @@ class ModelEvaluator:
             decision scores, or None if the model does not support either.
         """
         if hasattr(self.model, "predict_proba"):
-            proba: np.ndarray = self.model.predict_proba(self.X_test)  # type: ignore[union-attr]
-            return proba[:, 1] if proba.ndim > 1 else proba
+            y_scores: np.ndarray = self.model.predict_proba(self.X_test)  # type: ignore[union-attr]
+            return y_scores[:, 1] if y_scores.ndim > 1 else y_scores
         if hasattr(self.model, "decision_function"):
             return self.model.decision_function(self.X_test)  # type: ignore[union-attr]
         return None
@@ -474,7 +475,7 @@ class ModelEvaluator:
             str: Absolute path to the output plot file.
         """
         plot_dir = os.path.join(self.figures_dir, plot_type)
-        os.makedirs(plot_dir, exist_ok=True)
+        ensure_dir(plot_dir)
 
         default_filepath = os.path.join(
             plot_dir, filename or f"{self._prefix}_{plot_type}.png"
@@ -888,7 +889,7 @@ class ModelEvaluator:
             >>> saved_path = evaluator.save_metrics(path="results/my_metrics.json")
         """
         if path is None:
-            os.makedirs(self.metrics_dir, exist_ok=True)
+            ensure_dir(self.metrics_dir)
             path = os.path.join(self.metrics_dir, f"{self.model_name}_metrics.json")
 
         metrics = self.get_metrics()
@@ -959,7 +960,7 @@ class ModelEvaluator:
         )
 
         if self._shap_explanation_filepath:
-            os.makedirs(os.path.dirname(self._shap_explanation_filepath), exist_ok=True)
+            ensure_dir(os.path.dirname(self._shap_explanation_filepath))
             joblib.dump(explanation, self._shap_explanation_filepath)
 
         self._save_plot(
@@ -973,36 +974,37 @@ class ModelEvaluator:
     def plot_learning_curve(
         self,
         save: bool = True,
-        filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
-        """Plot the per-seed learning curve from the JSON saved during training.
+        """Plot per-seed learning curves for all scoring metrics in one figure.
 
         Reads the learning-curve JSON written by
-        ``ModelTrainer.compute_learning_curve`` and renders train vs. validation
-        balanced-accuracy curves with ±1 std shaded bands.
+        ``ModelTrainer._compute_all_learning_curves`` and renders a single
+        figure with one subplot per scoring metric (balanced accuracy, recall,
+        weighted F1), each showing train vs. validation lines with ±1 std
+        shaded bands.
 
         Args:
             save (bool, optional): If True, save the figure to
                 ``figures_dir/learning_curve/``. Defaults to True.
-            filename (str | None, optional): Output filename. If None,
-                defaults to ``"{prefix}_learning_curve.png"``.
-                Defaults to None.
             dpi (int, optional): Figure resolution. Defaults to 150.
 
         Returns:
-            plt.Figure | None: Matplotlib figure, or None if
-                ``learning_curve_path`` was not set or the file does not exist.
+            plt.Figure | None: Single figure with all scoring subplots, or
+                None if ``learning_curve_path`` was not set or the file does
+                not exist.
         """
         if self._learning_curve_path is None or not os.path.isfile(
             self._learning_curve_path
         ):
             return None
 
+        filename = f"{self._prefix}_learning_curve.png"
         plot_filepath = self._get_plot_filepath("learning_curve", filename=filename)
-        fig, _ = _plot_lc_styled(
+        fig = _plot_lc_grid(
             json_filepath=self._learning_curve_path,
             plot_filepath=plot_filepath,
+            scorings=LEARNING_CURVE_SCORINGS,
             overwrite=save,
             dpi=dpi,
         )
@@ -1041,6 +1043,6 @@ class ModelEvaluator:
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
-            # "learning_curve": self.plot_learning_curve(dpi=dpi),
+            "learning_curve": self.plot_learning_curve(dpi=dpi),
             "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
         }

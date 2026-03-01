@@ -8,6 +8,7 @@ from obspy.clients.fdsn.header import FDSNException
 from eruption_forecast.logger import logger
 from eruption_forecast.sources.sds import SDS
 from eruption_forecast.sources.base import SeismicDataSource
+from eruption_forecast.utils.pathutils import ensure_dir
 
 
 class FDSN(SeismicDataSource):
@@ -93,7 +94,7 @@ class FDSN(SeismicDataSource):
 
         # Ensure the cache directory exists before SDS is initialised,
         # because SDS.__init__ raises FileNotFoundError if the directory is absent.
-        os.makedirs(download_dir, exist_ok=True)
+        ensure_dir(download_dir)
 
         self.station = station
         self.channel = channel

@@ -8,6 +8,7 @@ from obspy import Trace, Stream, ObsPyReadingError, read
 
 from eruption_forecast.logger import logger
 from eruption_forecast.sources.base import SeismicDataSource
+from eruption_forecast.utils.pathutils import ensure_dir
 
 
 class SDS(SeismicDataSource):
@@ -143,7 +144,7 @@ class SDS(SeismicDataSource):
         filepath = self.get_filepath(date)
 
         try:
-            os.makedirs(data_dir, exist_ok=True)
+            ensure_dir(data_dir)
             stream.write(filepath, format="MSEED")
 
             logger.info(f"{prefix}. Saved to: {filepath}")

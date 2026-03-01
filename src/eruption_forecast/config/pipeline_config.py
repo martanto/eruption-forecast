@@ -13,6 +13,8 @@ from dataclasses import field, asdict, fields, dataclass
 
 import yaml
 
+from eruption_forecast.utils.pathutils import ensure_dir
+
 
 @dataclass
 class _ConfigBase:
@@ -386,7 +388,7 @@ class PipelineConfig(_ConfigBase):
         Returns:
             str: The path where the file was written.
         """
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        ensure_dir(os.path.dirname(os.path.abspath(path)))
         self.saved_at = datetime.now().isoformat(timespec="seconds")
         data = self.to_dict()
 

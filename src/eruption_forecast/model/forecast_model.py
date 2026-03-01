@@ -7,7 +7,7 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import (
     to_datetime,
     normalize_dates,
@@ -706,9 +706,9 @@ class ForecastModel:
             >>> model.create_directories()  # Called in __init__
             >>> # Creates: output/, output/VG.OJN.00.EHZ/, output/VG.OJN.00.EHZ/features/
         """
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.station_dir, exist_ok=True)
-        os.makedirs(self.features_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
+        ensure_dir(self.station_dir)
+        ensure_dir(self.features_dir)
 
     def load_tremor_data(self, tremor_csv: str) -> Self:
         """Load pre-calculated tremor data from CSV file.
@@ -898,7 +898,7 @@ class ForecastModel:
             Self: ForecastModel instance for method chaining.
         """
         output_dir = output_dir or self.features_dir
-        os.makedirs(output_dir, exist_ok=True)
+        ensure_dir(output_dir)
 
         tremor_matrix_builder = TremorMatrixBuilder(
             tremor_df=self.tremor_data,
@@ -995,7 +995,7 @@ class ForecastModel:
         debug = debug or self.debug
 
         output_dir = output_dir or self.station_dir
-        os.makedirs(output_dir, exist_ok=True)
+        ensure_dir(output_dir)
 
         # Validate inputs
         validate_date_ranges(train_start_date, train_end_date)
@@ -1325,7 +1325,7 @@ class ForecastModel:
 
         # `<cwd>/output/<station_dir>/trainings/<prefix>
         trainings_dir = os.path.join(output_dir, "trainings", prefix)
-        os.makedirs(trainings_dir, exist_ok=True)
+        ensure_dir(trainings_dir)
 
         # Save trained models JSON
         # Example format:

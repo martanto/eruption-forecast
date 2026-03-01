@@ -13,7 +13,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import (
     concat_features as utils_concat_features,
 )
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.validation import validate_columns
 from eruption_forecast.features.constants import (
     ID_COLUMN,
@@ -687,7 +687,7 @@ class FeaturesBuilder:
         # Setup extraction directory — mode-specific subdir prevents train/forecast collisions
         mode = "train" if not self.label_df.empty else "forecast"
         extract_features_dir = os.path.join(self.output_dir, "extracted", mode)
-        os.makedirs(extract_features_dir, exist_ok=True)
+        ensure_dir(extract_features_dir)
 
         _prefix_filename = (
             f"relevant_features_{dates_str}"

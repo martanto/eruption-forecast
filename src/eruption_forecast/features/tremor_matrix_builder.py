@@ -5,7 +5,7 @@ from datetime import timedelta
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.validation import validate_columns
 from eruption_forecast.features.constants import (
     ID_COLUMN,
@@ -230,7 +230,7 @@ class TremorMatrixBuilder:
             >>> builder = TremorMatrixBuilder(...)
             >>> builder.create_directories()  # Called automatically in __init__
         """
-        os.makedirs(self.output_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
 
     def save_matrix_per_method(self, tremor_df: pd.DataFrame) -> Self:
         """Save each tremor metric column as a separate CSV file.
@@ -257,7 +257,7 @@ class TremorMatrixBuilder:
         tremor_matrix_per_method_dir = os.path.join(
             self.output_dir, "tremor_matrix_per_method"
         )
-        os.makedirs(tremor_matrix_per_method_dir, exist_ok=True)
+        ensure_dir(tremor_matrix_per_method_dir)
 
         # Skip ID and datetime columns
         for column in tremor_df.columns.tolist():
@@ -333,7 +333,7 @@ class TremorMatrixBuilder:
         tremor_matrices: list[pd.DataFrame] = []
 
         if save_tremor_matrix_per_id:
-            os.makedirs(self.matrix_tmp_dir, exist_ok=True)
+            ensure_dir(self.matrix_tmp_dir)
 
         # Check if filtered_label_df have "is_erupted" column
         # Added with None value if not exists.

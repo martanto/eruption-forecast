@@ -19,7 +19,7 @@ from sklearn.base import BaseEstimator
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import predict_proba_from_estimator
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.plots.shap_plots import (
     compute_shap_explanation,
     plot_aggregate_shap_summary,
@@ -247,7 +247,7 @@ class MultiModelEvaluator:
         """
         fig_path = os.path.join(self.output_dir, fig_filename)
         if save:
-            os.makedirs(self.output_dir, exist_ok=True)
+            ensure_dir(self.output_dir)
             fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved aggregate plot: {fig_path}")
             if data is not None and data_filename is not None:
@@ -359,7 +359,7 @@ class MultiModelEvaluator:
             >>> path = evaluator.save_aggregate_metrics()
             >>> path = evaluator.save_aggregate_metrics("my_summary.csv")
         """
-        os.makedirs(self.output_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
         df = self.get_aggregate_metrics()
         path = os.path.join(self.output_dir, filename)
         df.to_csv(path)
@@ -754,7 +754,7 @@ class MultiModelEvaluator:
             dpi=dpi,
         )
         if save:
-            os.makedirs(self.output_dir, exist_ok=True)
+            ensure_dir(self.output_dir)
             logger.info(f"Saved aggregate learning curve: {fig_path}")
             df.to_csv(fig_path.replace(".png", ".csv"))
             plt.close(fig)
