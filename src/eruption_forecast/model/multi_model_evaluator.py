@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.array import predict_proba_from_estimator
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.plots.shap_plots import (
     compute_shap_explanation,
@@ -197,14 +198,7 @@ class MultiModelEvaluator:
                 f"{e}. significant_features_csv: {row['significant_features_csv']}"
             )
 
-        if hasattr(model, "predict_proba"):
-            proba: np.ndarray = model.predict_proba(X_test_filtered)[:, 1]
-        elif hasattr(model, "decision_function"):
-            proba = model.decision_function(X_test_filtered)
-        else:
-            raise AttributeError(
-                f"{type(model).__name__} has neither predict_proba nor decision_function."
-            )
+        proba, _ = predict_proba_from_estimator(model, X_test_filtered)
 
         return model, X_test_filtered, y_true, proba
 
