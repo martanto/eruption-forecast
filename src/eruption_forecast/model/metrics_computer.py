@@ -18,7 +18,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 
-from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
+from eruption_forecast.utils.ml import compute_threshold_metrics
 
 
 class MetricsComputer:
@@ -117,27 +117,17 @@ class MetricsComputer:
                 - recall_at_optimal: Recall at optimal threshold
                 - precision_at_optimal: Precision at optimal threshold
         """
-        thresholds = np.linspace(0.0, 1.0, THRESHOLD_RESOLUTION)
-        f1_scores = []
-        recalls = []
-        precisions = []
-
-        for threshold in thresholds:
-            y_pred_thresh = (self.y_proba >= threshold).astype(int)
-            f1 = f1_score(self.y_true, y_pred_thresh, zero_division=0)
-            recall = recall_score(self.y_true, y_pred_thresh, zero_division=0)
-            precision = precision_score(self.y_true, y_pred_thresh, zero_division=0)
-
-            f1_scores.append(f1)
-            recalls.append(recall)
-            precisions.append(precision)
+        thresholds, metrics = compute_threshold_metrics(self.y_true, self.y_proba)
 
         # Find optimal threshold
-        optimal_idx = np.argmax(f1_scores)
+        optimal_idx = np.argmax(metrics["f1"])
 
         return {
             "optimal_threshold": float(thresholds[optimal_idx]),
-            "f1_at_optimal": float(f1_scores[optimal_idx]),
-            "recall_at_optimal": float(recalls[optimal_idx]),
-            "precision_at_optimal": float(precisions[optimal_idx]),
+            "f1_at_optimal": float(metrics["f1"][optimal_idx]),
+            "recall_at_optimal": float(metrics["recall"][optimal_idx]),
+            "precision_at_optimal": float(metrics["precision"][optimal_idx]),
+            "balanced_accuracy_at_optimal": float(
+                metrics["balanced_accuracy"][optimal_idx]
+            ),
         }

@@ -8,6 +8,7 @@ import numpy as np
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
+from sklearn.metrics import f1_score, make_scorer, recall_score
 from sklearn.model_selection import (
     GridSearchCV,
     StratifiedKFold,
@@ -22,10 +23,11 @@ from eruption_forecast.utils.ml import (
     random_under_sampler,
     merge_all_classifiers,
 )
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
     DEFAULT_CV_SPLITS,
+    LEARNING_CURVE_SCORINGS,
     DEFAULT_N_SIGNIFICANT_FEATURES,
 )
 from eruption_forecast.features.constants import (
@@ -37,6 +39,51 @@ from eruption_forecast.plots.feature_plots import (
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
+
+
+def _safe_recall(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute recall, returning 0.0 when class 1 is absent from y_true.
+
+    Guards against sklearn's pos_label validation error that fires before
+    zero_division is considered — common in small CV folds with class imbalance.
+
+    Args:
+        y_true (np.ndarray): True binary labels.
+        y_pred (np.ndarray): Predicted binary labels.
+
+    Returns:
+        float: Recall score, or 0.0 if class 1 is not present in y_true.
+    """
+    if 1 not in y_true:
+        return 0.0
+    return recall_score(y_true, y_pred, zero_division=0)
+
+
+def _safe_f1_weighted(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute weighted F1, returning 0.0 when only one class is present in y_true.
+
+    Guards against degenerate CV folds where the training slice contains only
+    one class after random under-sampling at small training sizes.
+
+    Args:
+        y_true (np.ndarray): True binary labels.
+        y_pred (np.ndarray): Predicted binary labels.
+
+    Returns:
+        float: Weighted F1 score, or 0.0 if fewer than two classes are present.
+    """
+    if len(np.unique(y_true)) < 2:
+        return 0.0
+    return f1_score(y_true, y_pred, average="weighted", zero_division=0)
+
+
+# Module-level callables are picklable by loky workers (unlike lambdas or
+# make_scorer objects built inside __init__).
+_LEARNING_CURVE_SCORER_MAP: dict[str, str | Any] = {
+    "balanced_accuracy": "balanced_accuracy",
+    "recall": make_scorer(_safe_recall),
+    "f1_weighted": make_scorer(_safe_f1_weighted),
+}
 
 
 class ModelTrainer:
@@ -438,11 +485,11 @@ class ModelTrainer:
         """
         classifier_model = classifier_model or self.ClassifierModel
 
-        classifier_name = classifier_model.name
-        classifier_slug_name = classifier_model.slug_name
-        classifier_cv_name = classifier_model.cv_name
+        classifier_name: str = classifier_model.name
+        classifier_slug_name: str = classifier_model.slug_name
+        classifier_cv_name: str = classifier_model.cv_name
 
-        classifier_slug_cv_name = classifier_model.slug_cv_name
+        classifier_slug_cv_name: str = classifier_model.slug_cv_name
         classifier_id = f"{classifier_name}-{classifier_cv_name}"
 
         return (
@@ -551,12 +598,12 @@ class ModelTrainer:
             >>> trainer = ModelTrainer(...)
             >>> trainer.create_directories()
         """
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.significant_features_dir, exist_ok=True)
-        os.makedirs(self.models_dir, exist_ok=True)
-        os.makedirs(self.metrics_dir, exist_ok=True)
-        os.makedirs(self.tests_dir, exist_ok=True)
-        os.makedirs(self.figures_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
+        ensure_dir(self.significant_features_dir)
+        ensure_dir(self.models_dir)
+        ensure_dir(self.metrics_dir)
+        ensure_dir(self.tests_dir)
+        ensure_dir(self.figures_dir)
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
@@ -842,7 +889,10 @@ class ModelTrainer:
         Returns:
             tuple: Configured classifier, fitted GridSearchCV, best estimator.
         """
-        clf = self.ClassifierModel.set_random_state(random_state=random_state)
+        clf: ClassifierModel = self.ClassifierModel.set_random_state(
+            random_state=random_state
+        )
+
         grid_search = GridSearchCV(
             estimator=clf.model,
             param_grid=clf.grid,
@@ -1007,26 +1057,26 @@ class ModelTrainer:
         X_train: pd.DataFrame,
         y_train: pd.Series,
         random_state: int,
-        filepath: str,
+        scoring: str = "balanced_accuracy",
     ) -> dict:
-        """Compute a learning curve and save the result as JSON.
+        """Compute a learning curve for a single scoring metric.
 
         Evaluates ``estimator`` at ten linearly spaced training-set fractions
-        (0.1 → 1.0) using the configured CV splitter and ``balanced_accuracy``
-        scoring.  Mean and standard deviation of train and validation scores are
-        computed across CV folds and written to ``filepath``.
+        (0.1 → 1.0) using the configured CV splitter and the given ``scoring``
+        string.  Mean and standard deviation of train and validation scores are
+        computed across CV folds and returned as a dict (no file I/O).
 
         Args:
             estimator (Any): Fitted or unfitted sklearn-compatible estimator.
             X_train (pd.DataFrame): Training features (post-selection).
             y_train (pd.Series): Training labels.
             random_state (int): Random seed used to configure the CV splitter.
-            filepath (str): Destination path for the JSON output file.
+            scoring (str, optional): Sklearn scoring string. Defaults to
+                ``"balanced_accuracy"``.
 
         Returns:
-            dict: Dict with keys ``random_state``, ``train_sizes``,
-                ``train_scores_mean``, ``train_scores_std``,
-                ``test_scores_mean``, ``test_scores_std``.
+            dict: Dict with keys ``train_sizes``, ``train_scores_mean``,
+                ``train_scores_std``, ``test_scores_mean``, ``test_scores_std``.
         """
         # StratifiedKFold ensures every fold contains both classes, preventing
         # the single-label warning that occurs when small train_sizes + class
@@ -1056,13 +1106,12 @@ class ModelTrainer:
                 X=X_train,
                 y=y_train,
                 cv=cv,
-                scoring="balanced_accuracy",
+                scoring=_LEARNING_CURVE_SCORER_MAP.get(scoring, scoring),
                 train_sizes=np.linspace(0.1, 1.0, 10),
                 n_jobs=1,
             )
 
-        data = {
-            "random_state": random_state,
+        return {
             "train_sizes": train_sizes_abs.tolist(),
             "train_scores_mean": train_scores.mean(axis=1).tolist(),
             "train_scores_std": train_scores.std(axis=1).tolist(),
@@ -1070,7 +1119,48 @@ class ModelTrainer:
             "test_scores_std": test_scores.std(axis=1).tolist(),
         }
 
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    def _compute_all_learning_curves(
+        self,
+        estimator: Any,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        random_state: int,
+        filepath: str,
+    ) -> dict:
+        """Compute learning curves for all configured scoring metrics and save as JSON.
+
+        Iterates over ``LEARNING_CURVE_SCORINGS``, calls
+        :meth:`compute_learning_curve` for each scoring string, collects
+        per-metric results under a ``"metrics"`` key, and writes a single JSON
+        file.  ``train_sizes`` is shared across all metrics.
+
+        Args:
+            estimator (Any): Fitted or unfitted sklearn-compatible estimator.
+            X_train (pd.DataFrame): Training features (post-selection).
+            y_train (pd.Series): Training labels.
+            random_state (int): Random seed used to configure the CV splitter.
+            filepath (str): Destination path for the JSON output file.
+
+        Returns:
+            dict: Dict with keys ``random_state``, ``train_sizes``, and
+                ``metrics`` (a nested dict keyed by scoring name).
+        """
+        metrics: dict[str, dict] = {}
+        train_sizes = None
+        for scoring in LEARNING_CURVE_SCORINGS:
+            result = self.compute_learning_curve(
+                estimator, X_train, y_train, random_state, scoring=scoring
+            )
+            train_sizes = result["train_sizes"]
+            metrics[scoring] = {k: v for k, v in result.items() if k != "train_sizes"}
+
+        data = {
+            "random_state": random_state,
+            "train_sizes": train_sizes,
+            "metrics": metrics,
+        }
+
+        ensure_dir(os.path.dirname(filepath))
         with open(filepath, "w") as f:
             json.dump(data, f, indent=4)
         return data
@@ -1127,7 +1217,7 @@ class ModelTrainer:
             logger.info(f"{random_state:05d}: Model at {model_filepath}")
 
         try:
-            self.compute_learning_curve(
+            self._compute_all_learning_curves(
                 estimator=best_model,
                 X_train=features_train_resampled_selected[top_n_features],
                 y_train=y_train,
@@ -1140,6 +1230,7 @@ class ModelTrainer:
             )
             learning_curve_path: str | None = None
 
+        # Evaluating model
         model_evaluator = ModelEvaluator(
             random_state=random_state,
             model=grid_search,
@@ -1153,8 +1244,9 @@ class ModelTrainer:
             learning_curve_path=learning_curve_path,
         )
 
-        grid_params = grid_search.best_params_
         metrics: dict[str, Any] = model_evaluator.get_metrics()
+
+        grid_params = grid_search.best_params_
         best_params = {f"best_params_{k}": v for k, v in grid_params.items()}
         metrics.update(
             {
@@ -1322,10 +1414,10 @@ class ModelTrainer:
         self.create_directories()
 
         if save_all_features:
-            os.makedirs(self.all_features_dir, exist_ok=True)
+            ensure_dir(self.all_features_dir)
 
         if plot_significant_features:
-            os.makedirs(self.significant_figures_dir, exist_ok=True)
+            ensure_dir(self.significant_figures_dir)
 
         # Accumulate results across all seeds before aggregating
         all_metrics = []
@@ -1561,10 +1653,10 @@ class ModelTrainer:
         self.update_directories(output_dir=output_dir)
 
         if save_all_features:
-            os.makedirs(self.all_features_dir, exist_ok=True)
+            ensure_dir(self.all_features_dir)
 
         if plot_significant_features:
-            os.makedirs(self.significant_figures_dir, exist_ok=True)
+            ensure_dir(self.significant_figures_dir)
 
         significant_features_and_trained_models = []
 
@@ -1672,7 +1764,7 @@ class ModelTrainer:
             >>> trainer.train_and_evaluate(total_seed=100)
             >>> # Creates: all_metrics_{suffix}.csv and metrics_summary_{suffix}.csv
         """
-        os.makedirs(self.metrics_dir, exist_ok=True)
+        ensure_dir(self.metrics_dir)
 
         df_metrics = pd.DataFrame(all_metrics)
 

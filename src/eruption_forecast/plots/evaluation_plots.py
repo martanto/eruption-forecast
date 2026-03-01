@@ -37,6 +37,7 @@ from sklearn.ensemble import VotingClassifier
 from sklearn.calibration import calibration_curve
 
 from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.utils.ml import compute_threshold_metrics
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -44,6 +45,7 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
+from eruption_forecast.utils.pathutils import ensure_dir
 
 
 def plot_confusion_matrix(
@@ -282,15 +284,7 @@ def plot_threshold_analysis(
         >>> fig = plot_threshold_analysis(y_true, y_proba)
         >>> fig.savefig("threshold_analysis.png")
     """
-    thresholds = np.linspace(0, 1, 101)
-    metrics = {"precision": [], "recall": [], "f1": [], "balanced_accuracy": []}
-
-    for t in thresholds:
-        y_pred_t = (y_proba >= t).astype(int)
-        metrics["precision"].append(precision_score(y_true, y_pred_t, zero_division=0))
-        metrics["recall"].append(recall_score(y_true, y_pred_t, zero_division=0))
-        metrics["f1"].append(f1_score(y_true, y_pred_t, zero_division=0))
-        metrics["balanced_accuracy"].append(balanced_accuracy_score(y_true, y_pred_t))
+    thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
 
     # Find optimal threshold (max F1)
     optimal_idx = np.argmax(metrics["f1"])
@@ -1433,20 +1427,20 @@ def plot_classifier_comparison(
     classifiers = list(metrics_by_classifier.keys())
 
     # Sort classifiers by mean F1
-    def _mean_f1(clf: str) -> float:
+    def _mean_f1(classifier: str) -> float:
         """Return the mean F1 score for a classifier from the summary DataFrame.
 
         Used as a sort key to order classifiers by descending mean F1 score.
         Returns 0.0 when the classifier has no F1 entry in the summary.
 
         Args:
-            clf (str): Classifier name as it appears in the summary_df index.
+            classifier (str): Classifier name as it appears in the summary_df index.
 
         Returns:
             float: Mean F1 score, or 0.0 if the entry is missing.
         """
         try:
-            return float(summary_df.loc[(clf, "f1_score"), "mean"])
+            return float(summary_df.loc[(classifier, "f1_score"), "mean"])
         except KeyError:
             return 0.0
 
@@ -1491,20 +1485,26 @@ def plot_classifier_comparison(
 def plot_learning_curve(
     json_filepath: str,
     plot_filepath: str,
+    scoring: str = "balanced_accuracy",
     overwrite: bool = False,
     dpi: int = 150,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Load a learning-curve JSON and render it as a train vs. validation plot.
 
-    Reads the per-seed JSON file produced by ``ModelTrainer.compute_learning_curve``,
-    then renders train and validation balanced-accuracy scores as a function of
+    Reads the per-seed JSON file produced by
+    ``ModelTrainer._compute_all_learning_curves``, then renders train and
+    validation scores for the requested ``scoring`` metric as a function of
     training-set size with ±1 std shaded bands around each line.
 
+    Backward-compatible: if the JSON uses the old flat format (no ``"metrics"``
+    key), it falls back to reading the top-level score keys directly.
+
     Args:
-        json_filepath (str): Path to the learning-curve JSON file containing
-            keys ``train_sizes``, ``train_scores_mean``, ``train_scores_std``,
-            ``test_scores_mean``, ``test_scores_std``.
+        json_filepath (str): Path to the learning-curve JSON file.
         plot_filepath (str): Destination path for the saved PNG file.
+        scoring (str, optional): Scoring metric to plot. Must be one of the
+            keys in the ``"metrics"`` dict. Defaults to
+            ``"balanced_accuracy"``.
         overwrite (bool, optional): When False, skip saving if the PNG already
             exists. Defaults to False.
         dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
@@ -1518,15 +1518,26 @@ def plot_learning_curve(
         data = json.load(f)
 
     train_sizes = np.array(data["train_sizes"])
-    train_mean = np.array(data["train_scores_mean"])
-    train_std = np.array(data["train_scores_std"])
-    test_mean = np.array(data["test_scores_mean"])
-    test_std = np.array(data["test_scores_std"])
+
+    # Support both new multi-metric format and legacy flat format.
+    if "metrics" in data:
+        scores = data["metrics"][scoring]
+    else:
+        scores = data
+
+    train_mean = np.array(scores["train_scores_mean"])
+    train_std = np.array(scores["train_scores_std"])
+    test_mean = np.array(scores["test_scores_mean"])
+    test_std = np.array(scores["test_scores_std"])
+
+    ylabel = scoring.replace("_", " ").title()
 
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=(6, 5), dpi=dpi)
 
-        ax.plot(train_sizes, train_mean, color=OKABE_ITO[0], linewidth=2.0, label="Train")
+        ax.plot(
+            train_sizes, train_mean, color=OKABE_ITO[0], linewidth=2.0, label="Train"
+        )
         ax.fill_between(
             train_sizes,
             train_mean - train_std,
@@ -1552,7 +1563,7 @@ def plot_learning_curve(
         )
 
         ax.set_xlabel("Training set size")
-        ax.set_ylabel("Balanced accuracy")
+        ax.set_ylabel(ylabel)
         ax.set_title("Learning Curve")
         ax.legend(frameon=False, fontsize=8)
         configure_spine(ax)
@@ -1568,7 +1579,7 @@ def plot_learning_curve(
     )
 
     if overwrite or not os.path.isfile(plot_filepath):
-        os.makedirs(os.path.dirname(plot_filepath), exist_ok=True)
+        ensure_dir(os.path.dirname(plot_filepath))
         fig.savefig(plot_filepath, dpi=dpi, bbox_inches="tight")
 
     return fig, df
@@ -1577,20 +1588,26 @@ def plot_learning_curve(
 def plot_aggregate_learning_curve(
     all_data: list[dict],
     filepath: str,
+    scoring: str = "balanced_accuracy",
     overwrite: bool = False,
     dpi: int = 150,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Plot aggregate learning curves across multiple seeds with mean ± std bands.
 
     Interpolates each seed's learning curve onto a shared training-size grid,
-    then plots mean train and validation balanced-accuracy lines with ±1 std
-    shaded bands.
+    then plots mean train and validation score lines with ±1 std shaded bands.
+
+    Backward-compatible: if dicts use the old flat format (no ``"metrics"``
+    key), it falls back to reading the top-level score keys directly.
 
     Args:
-        all_data (list[dict]): List of per-seed dicts, each with keys
-            ``train_sizes``, ``train_scores_mean``, ``train_scores_std``,
-            ``test_scores_mean``, ``test_scores_std``.
+        all_data (list[dict]): List of per-seed dicts in the new multi-metric
+            format (keys: ``train_sizes``, ``metrics``) or the legacy flat
+            format (keys: ``train_sizes``, ``train_scores_mean``, etc.).
         filepath (str): Destination path for the saved PNG file.
+        scoring (str, optional): Scoring metric to plot. Must be one of the
+            keys in each seed's ``"metrics"`` dict. Defaults to
+            ``"balanced_accuracy"``.
         overwrite (bool, optional): When False, skip saving if the file already
             exists. Defaults to False.
         dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
@@ -1613,13 +1630,17 @@ def plot_aggregate_learning_curve(
 
     for d in all_data:
         sizes = np.array(d["train_sizes"])
-        train_interps.append(np.interp(size_grid, sizes, d["train_scores_mean"]))
-        test_interps.append(np.interp(size_grid, sizes, d["test_scores_mean"]))
+        # Support both new multi-metric format and legacy flat format.
+        scores = d["metrics"][scoring] if "metrics" in d else d
+        train_interps.append(np.interp(size_grid, sizes, scores["train_scores_mean"]))
+        test_interps.append(np.interp(size_grid, sizes, scores["test_scores_mean"]))
 
     mean_train = np.mean(train_interps, axis=0)
     std_train = np.std(train_interps, axis=0)
     mean_test = np.mean(test_interps, axis=0)
     std_test = np.std(test_interps, axis=0)
+
+    ylabel = scoring.replace("_", " ").title()
 
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=(6, 5), dpi=dpi)
@@ -1650,7 +1671,7 @@ def plot_aggregate_learning_curve(
         )
 
         ax.set_xlabel("Training set size")
-        ax.set_ylabel("Balanced accuracy")
+        ax.set_ylabel(ylabel)
         ax.set_title("Aggregate Learning Curve")
         ax.legend(frameon=False, fontsize=8)
         configure_spine(ax)
@@ -1669,6 +1690,101 @@ def plot_aggregate_learning_curve(
         fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
 
     return fig, df
+
+
+def plot_learning_curve_grid(
+    json_filepath: str,
+    plot_filepath: str,
+    scorings: list[str],
+    overwrite: bool = False,
+    dpi: int = 150,
+) -> plt.Figure:
+    """Plot all scoring metrics as side-by-side subplots in a single figure.
+
+    Reads the multi-metric learning-curve JSON produced by
+    ``ModelTrainer._compute_all_learning_curves`` and renders one subplot per
+    scoring metric, each with train and validation lines and ±1 std shaded
+    bands.
+
+    Backward-compatible: if the JSON uses the old flat format (no ``"metrics"``
+    key), only one subplot is rendered using the top-level score keys.
+
+    Args:
+        json_filepath (str): Path to the learning-curve JSON file.
+        plot_filepath (str): Destination path for the saved PNG file.
+        scorings (list[str]): Ordered list of scoring keys to plot
+            (e.g. ``["balanced_accuracy", "recall", "f1_weighted"]``).
+        overwrite (bool, optional): When False, skip saving if the file already
+            exists. Defaults to False.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+
+    Returns:
+        plt.Figure: Matplotlib figure containing one subplot per scoring metric.
+    """
+    with open(json_filepath) as f:
+        data = json.load(f)
+
+    train_sizes = np.array(data["train_sizes"])
+    n = len(scorings)
+
+    with apply_nature_style():
+        fig, axes = plt.subplots(
+            1, n, figsize=(5 * n, 5), dpi=dpi, layout="constrained"
+        )
+        if n == 1:
+            axes = [axes]
+
+        for ax, scoring in zip(axes, scorings, strict=True):
+            scores = data["metrics"][scoring] if "metrics" in data else data
+
+            train_mean = np.array(scores["train_scores_mean"])
+            train_std = np.array(scores["train_scores_std"])
+            test_mean = np.array(scores["test_scores_mean"])
+            test_std = np.array(scores["test_scores_std"])
+            ylabel = scoring.replace("_", " ").title()
+
+            ax.plot(
+                train_sizes,
+                train_mean,
+                color=OKABE_ITO[0],
+                linewidth=2.0,
+                label="Train",
+            )
+            ax.fill_between(
+                train_sizes,
+                train_mean - train_std,
+                train_mean + train_std,
+                alpha=0.2,
+                color=OKABE_ITO[0],
+            )
+            ax.plot(
+                train_sizes,
+                test_mean,
+                color=OKABE_ITO[1],
+                linewidth=2.0,
+                linestyle="--",
+                label="Validation",
+            )
+            ax.fill_between(
+                train_sizes,
+                test_mean - test_std,
+                test_mean + test_std,
+                alpha=0.2,
+                color=OKABE_ITO[1],
+            )
+
+            ax.set_xlabel("Training set size")
+            ax.set_ylabel(ylabel)
+            ax.set_title(f"Learning Curve — {ylabel}")
+            ax.legend(frameon=False, fontsize=8)
+            configure_spine(ax)
+
+    if overwrite or not os.path.isfile(plot_filepath):
+        ensure_dir(os.path.dirname(plot_filepath))
+        fig.savefig(plot_filepath, dpi=dpi, bbox_inches="tight")
+
+    return fig
+
 
 def plot_seed_stability(
     metrics_by_classifier: dict[str, list[dict[str, Any]]],
