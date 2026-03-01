@@ -168,6 +168,8 @@ fm.set_feature_selection_method("combined").train(...)
 
 After training completes, all 500 seed models can be bundled into a single `.pkl` file. This eliminates the per-seed file I/O at prediction time and produces a `SeedEnsemble` that is sklearn-compatible.
 
+`SeedEnsemble` and `ClassifierEnsemble` both inherit from `BaseEnsemble`, which provides the `save()` / `load()` persistence logic. You never need to call joblib directly.
+
 ```
   500 × model.pkl  +  500 × significant_features.csv
            │
@@ -175,6 +177,11 @@ After training completes, all 500 seed models can be bundled into a single `.pkl
            │
     merged_model_{suffix}.pkl
     (SeedEnsemble — all estimators + feature lists in one object)
+           │
+           ▼  trainer.merge_classifier_models({"rf": ..., "xgb": ...})
+           │
+    merged_classifiers_{suffix}.pkl
+    (ClassifierEnsemble — one SeedEnsemble per classifier)
 ```
 
 ```python
@@ -187,9 +194,16 @@ bundle_path = trainer.merge_classifier_models(
     {"rf": rf_trainer.csv, "xgb": xgb_trainer.csv}
 )
 # → .../trainings/merged_classifiers_{suffix}.pkl
+
+# Load and use directly (no ModelPredictor needed):
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+
+ensemble = SeedEnsemble.load(merged_path)
+mean_p, std, conf, pred = ensemble.predict_with_uncertainty(features_df)
+proba = ensemble.predict_proba(features_df)  # (n_samples, 2)
 ```
 
-The merged `.pkl` can be passed directly to `ModelPredictor.predict_proba()` instead of a CSV registry path — no other changes needed.
+The merged `.pkl` can also be passed directly to `ModelPredictor.predict_proba()` instead of a CSV registry path — no other changes needed.
 
 See [Evaluation and Forecasting](Evaluation-and-Forecasting) for how `ModelPredictor` handles merged files.
 

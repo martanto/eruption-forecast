@@ -37,7 +37,10 @@ eruption-forecast/
 │   │   ├── model_predictor.py
 │   │   ├── model_evaluator.py       # Single-seed evaluation
 │   │   ├── multi_model_evaluator.py # Multi-seed aggregate evaluation
-│   │   └── classifier_model.py
+│   │   ├── classifier_model.py
+│   │   ├── base_ensemble.py         # Shared save/load mixin
+│   │   ├── seed_ensemble.py         # All seeds, 1 classifier
+│   │   └── classifier_ensemble.py   # All seeds, N classifiers
 │   ├── sources/             # Seismic data source adapters
 │   │   ├── base.py          # SeismicDataSource — abstract base class
 │   │   ├── sds.py           # SDS (SeisComP Data Structure) reader
@@ -121,84 +124,73 @@ Raw Seismic Data (SDS / FDSN)
 
 ---
 
-## Research Workflow (`workflow.py`)
+## Research Workflow (`main.py`)
 
-`workflow.py` is the top-level research script. It runs the full pipeline in two
-parallel branches (train-with-evaluation and train-for-forecast), guarded by
-boolean stage flags so any completed stage can be skipped on re-runs.
+`main.py` is the top-level research script. It runs the full pipeline in two
+sequential branches — train-with-evaluation and train-for-prediction — both
+operating on the same `ForecastModel` instance.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           workflow.py  —  Stage Flow                        │
+│                             main.py  —  Stage Flow                          │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-  [RUN_CALCULATE]
+  fm = ForecastModel(root_dir, station, channel, …, n_jobs=6)
        │
        ▼
 ┌─────────────────┐
-│  Stage 1        │  CalculateTremor
-│  calculate()    │  SDS → RSAM / DSAR / Entropy → tremor_*.csv
-│                 │  dates: 2025-01-01 → 2025-08-24
+│  fm.calculate() │  CalculateTremor
+│                 │  SDS → RSAM / DSAR / Entropy → tremor_*.csv
+│                 │  dates: 2025-01-01 → 2025-12-31
 └────────┬────────┘
          │
-         │  for mode in ["train", "forecast"]:
-         │
-         ├───────────────────────────────────────────────────────────────────┐
-         │                                                                   │
-         │  mode = "train"                          mode = "forecast"        │
-         │                                                                   │
-         ▼                                                                   ▼
+         ├──────────────────────────────────────────────────────────────────┐
+         │                                                                  │
+         │  train_and_evaluate(fm)                    predict(fm)           │
+         │                                                                  │
+         ▼                                                                  ▼
 ┌─────────────────┐                                            ┌─────────────────┐
-│  build_label()  │  2025-01-01 → 2025-08-24                   │  build_label()  │  2025-01-01 → 2025-07-27
+│  build_label()  │  2025-01-01 → 2025-08-24                   │  build_label()  │  2025-07-28 → 2025-08-20
 │                 │  window_step=6h, dtf=2                     │                 │  window_step=6h, dtf=2
-│                 │  (full range — test split sees             │                 │  (shorter — leaves
-│                 │   all eruption events)                     │                 │   forecast headroom)
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
-│  extract_       │  FeaturesBuilder                           │  extract_       │  FeaturesBuilder
-│  features()     │  rsam_f2/f3/f4, dsar_f3-f4                 │  features()     │  (same kwargs)
+│ extract_        │  FeaturesBuilder                           │ extract_        │  FeaturesBuilder
+│ features()      │  rsam_f2/f3/f4, dsar_f3-f4                 │ features()      │  (same kwargs)
 │                 │  700+ tsfresh features → CSV               │                 │
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
 │  train()        │  ModelTrainer                              │  train()        │  ModelTrainer
-│  with_eval=True │  classifiers: lite-rf, rf                  │  with_eval=False│  (same classifiers)
+│  with_eval=True │  classifiers: lite-rf, rf, gb, xgb         │  with_eval=False│  (same classifiers)
 │                 │  cv: stratified, seeds: 500                │                 │  cv: stratified, seeds: 500
 │                 │  80/20 split → metrics JSON per seed       │                 │  full dataset → no metrics
-│                 │  → trainings/evaluations/…                 │                 │  → trainings/predictions/…
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
-         │  [RUN_EVALUATE_PER_MODEL]                                    ▼
-         ▼                                                     ┌─────────────────┐
-┌─────────────────┐                                            │  forecast()     │  ModelPredictor
-│  MultiModel     │  per-classifier aggregate plots            │                 │  predict_proba
-│  Evaluator      │  ROC, PR, calibration, confusion,          │                 │  2025-07-28 → 2025-08-20
-│  (loop per clf) │  SHAP beeswarm, seed stability, …          │                 │  → predictions.csv
+         ▼                                                              ▼
+┌─────────────────┐                                            ┌─────────────────┐
+│ MultiModel      │  per-classifier aggregate plots            │  forecast()     │  ModelPredictor
+│ Evaluator       │  ROC, PR, calibration, confusion,          │                 │  predict_proba
+│ (loop per clf)  │  SHAP, seed stability, …                   │                 │  2025-07-28 → 2025-08-20
 └────────┬────────┘                                            └─────────────────┘
          │
-         │  [RUN_COMPARE_MODELS]  (requires ≥ 2 classifiers)
          ▼
 ┌─────────────────┐
-│  Classifier     │  cross-classifier metric bar,
-│  Comparator     │  seed stability, ROC overlay,
-│                 │  comparison grid → ranking CSV
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  save_config()  │  [SAVE_CONFIG]  → config_workflow.yaml
+│ Classifier      │  cross-classifier comparison
+│ Comparator      │  metric bar, ROC overlay,
+│ (≥ 2 clf)       │  ranking CSV
 └─────────────────┘
 
 
-  Stage flags (module-level booleans):
+  Runtime flags (top-level constants in main.py):
   ┌──────────────────────────┬─────────────────────────────────────────────┐
-  │ RUN_CALCULATE            │ Stage 1 — tremor calculation                │
-  │ RUN_EVALUATE_PER_MODEL   │ MultiModelEvaluator plots per classifier    │
-  │ RUN_COMPARE_MODELS       │ ClassifierComparator cross-classifier plots │
-  │ SAVE_CONFIG              │ Persist pipeline YAML                       │
+  │ DEBUG                    │ Read from .env; reduces seeds to 10,        │
+  │                          │ classifiers to [lite-rf, rf]                │
+  │ N_JOBS                   │ 6 (outer parallelism)                       │
+  │ TRAINING_SEEDS           │ 500 (or 10 in DEBUG mode)                   │
+  │ CLASSIFIER               │ ["lite-rf", "rf", "gb", "xgb"]              │
   └──────────────────────────┴─────────────────────────────────────────────┘
 ```
 
@@ -294,6 +286,10 @@ calculate = CalculateTremor(
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
   - `fit(with_evaluation=True)`: Dispatches to `train_and_evaluate()` or `train()` based on flag
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers
+- `BaseEnsemble`: Shared persistence mixin (`base_ensemble.py`)
+  - `save(path)`: Joblib-dumps the ensemble to `.pkl`, creating parent directories
+  - `load(path)` (classmethod): Restores instance from `.pkl`; raises `FileNotFoundError` if absent
+  - Inherited by both `SeedEnsemble` and `ClassifierEnsemble` — no duplicated boilerplate
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
@@ -336,6 +332,7 @@ calculate = CalculateTremor(
 ┌─────────────────────────────┐                       ┌───────────────────────────────────────────────┐
 │        SeedEnsemble         │                       │              ClassifierEnsemble               │
 │  (all seeds, 1 classifier)  │◄───────────────────── │  (multiple SeedEnsembles, N classifiers)      │
+│  inherits BaseEnsemble      │                       │  inherits BaseEnsemble                        │
 │                             │  contains 1..N seeds  │                                               │
 │  .predict_proba(X)          │                       │  .from_seed_ensembles(dict)                   │
 │    → (n_samples, 2)         │                       │  .from_registry_dict(dict)                    │

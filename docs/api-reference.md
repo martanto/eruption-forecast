@@ -115,12 +115,68 @@ Trains on the **entire current/present dataset** across multiple seeds — no in
 | `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
 | `**kwargs` | — | — | Forwarded to `train_and_evaluate()` or `train()` (same parameters as those methods) |
 
+### `compute_learning_curve()` Parameters
+
+Computes a scikit-learn learning curve for a single seed and saves the result as a JSON file. Called internally by `train_and_evaluate()` and `train()`.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `X` | `pd.DataFrame` | — | Feature matrix |
+| `y` | `pd.Series` | — | Target labels |
+| `classifier_model` | `ClassifierModel` | — | Fitted classifier whose estimator is evaluated |
+| `scoring` | `str \| list[str]` | `LEARNING_CURVE_SCORINGS` | Scoring metric(s) — a single string or list of strings. Each metric is a key in the output JSON. |
+
+**Returns:** `dict` mapping each scoring metric name to `{"train_sizes", "train_scores", "test_scores"}`.
+
+```python
+from eruption_forecast.model.model_trainer import ModelTrainer
+from eruption_forecast.config.constants import LEARNING_CURVE_SCORINGS
+
+# LEARNING_CURVE_SCORINGS = ["balanced_accuracy", "f1_weighted"]
+
+trainer = ModelTrainer(
+    extracted_features_csv="features.csv",
+    label_features_csv="labels.csv",
+)
+
+# Called internally — but can be invoked directly:
+lc = trainer.compute_learning_curve(X, y, classifier_model, scoring=LEARNING_CURVE_SCORINGS)
+# lc == {"balanced_accuracy": {...}, "f1_weighted": {...}}
+```
+
 ### Merge Methods
 
 | Method | Description |
 |--------|-------------|
 | `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: alongside the registry CSV as `merged_model_{suffix}.pkl`. Must call `train()` or `train_and_evaluate()` first. |
 | `merge_classifier_models(trained_models, output_path=None)` | Bundle multiple classifier registry CSVs into one `dict[str, SeedEnsemble]` `.pkl`. Accepts `{"rf": "path/to/rf.csv", "xgb": "path/to/xgb.csv"}`. |
+
+---
+
+## BaseEnsemble
+
+Shared persistence mixin inherited by `SeedEnsemble` and `ClassifierEnsemble`.
+
+```python
+from eruption_forecast.model.base_ensemble import BaseEnsemble
+```
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `save(path)` | `None` | Joblib-dumps the ensemble to `.pkl`; creates missing parent directories automatically |
+| `BaseEnsemble.load(path)` (classmethod) | `BaseEnsemble` | Restores instance from `.pkl`; raises `FileNotFoundError` if the file does not exist |
+
+```python
+from eruption_forecast.model.seed_ensemble import SeedEnsemble
+
+ensemble = SeedEnsemble.from_registry("path/to/trained_model_*.csv")
+ensemble.save("output/merged.pkl")
+
+# Reload later
+ensemble = SeedEnsemble.load("output/merged.pkl")
+```
 
 ---
 

@@ -131,7 +131,8 @@ ev = MultiModelEvaluator(
 figs = ev.plot_all(dpi=150, show_individual=True)
 # Keys: roc_curve, pr_curve, calibration, prediction_distribution,
 #       confusion_matrix, threshold_analysis, feature_importance,
-#       shap_summary, seed_stability, frequency_band_contribution
+#       shap_summary, seed_stability, frequency_band_contribution,
+#       learning_curve
 ```
 
 ### Aggregation Strategy
@@ -285,6 +286,71 @@ fig, df = plot_frequency_band_contribution(feature_names=features)
 
 ---
 
+## Learning Curve Plots
+
+Visualize how model performance scales with training-set size. Useful for diagnosing underfitting / overfitting and confirming that more data is beneficial.
+
+Each seed's learning curve is stored as a JSON file with one key per scoring metric:
+
+```json
+{
+  "balanced_accuracy": {
+    "train_sizes": [50, 100, 200, 400],
+    "train_scores": [[0.72, 0.73], [0.78, 0.79], ...],
+    "test_scores":  [[0.65, 0.66], [0.70, 0.71], ...]
+  },
+  "f1_weighted": { ... }
+}
+```
+
+The old flat single-metric format is still accepted for backward compatibility.
+
+### Single-seed (`ModelEvaluator`)
+
+```python
+from eruption_forecast import ModelEvaluator
+
+evaluator = ModelEvaluator.from_files(
+    model_path="output/.../models/00042.pkl",
+    X_test="output/.../tests/00042_X_test.csv",
+    y_test="output/.../tests/00042_y_test.csv",
+    learning_curve_path="output/.../learning_curves/00042_lc.json",
+    model_name="xgb_seed_42",
+    output_dir="output/eval",
+)
+
+# One subplot per scoring metric
+fig = evaluator.plot_learning_curve(dpi=150)
+```
+
+### Aggregate across seeds (`MultiModelEvaluator`)
+
+```python
+from eruption_forecast import MultiModelEvaluator
+
+ev = MultiModelEvaluator(
+    trained_model_csv="output/.../trained_model_registry.csv"
+)
+
+# Bold mean line + ±1 std band per metric
+fig = ev.plot_learning_curve(dpi=150)
+```
+
+### Standalone (`plot_learning_curve_grid`)
+
+```python
+from eruption_forecast.plots.evaluation_plots import plot_learning_curve_grid
+
+fig = plot_learning_curve_grid(
+    json_filepath="output/.../learning_curve_seed042.json",
+    output_dir="output/figures",
+    scorings=["balanced_accuracy", "f1_weighted"],
+    dpi=150,
+)
+```
+
+---
+
 ## Forecast Visualization
 
 `ModelPredictor.predict_proba(plot=True)` automatically generates an eruption probability time-series plot saved to `figures/eruption_forecast.png`.
@@ -320,6 +386,11 @@ from eruption_forecast.plots.feature_plots import (
 )
 from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
 from eruption_forecast.plots import plot_classifier_comparison, plot_seed_stability
+from eruption_forecast.plots.evaluation_plots import (
+    plot_learning_curve,
+    plot_aggregate_learning_curve,
+    plot_learning_curve_grid,
+)
 
 # Top-level shortcuts
 from eruption_forecast import ModelEvaluator, MultiModelEvaluator
