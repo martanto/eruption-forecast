@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 import joblib
 import matplotlib
 
-from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
-
 
 matplotlib.use(
     "Agg"
@@ -15,6 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import load_labels_from_csv, compute_model_probabilities
 from eruption_forecast.utils.window import construct_windows
