@@ -59,9 +59,9 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Feature Extraction**: Extract 700+ time-series features using tsfresh for machine learning
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
-- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, and frequency band contribution charts via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
+- **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, frequency band contribution charts, and **learning curve plots** (`plot_learning_curve_grid`) via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
-- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `SeedEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables sklearn-compatible `predict_proba()` / `predict()` calls directly on the ensemble
+- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables sklearn-compatible `predict_proba()` / `predict()` calls directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
 - **Modular Architecture**: Clean separation of concerns with focused utility modules
@@ -591,4 +591,4 @@ If you use this package in your research, please cite:
 
 **Version:** 0.2.2
 **Status:** Active Development
-**Last Updated:** 2026-02-25
+**Last Updated:** 2026-03-01

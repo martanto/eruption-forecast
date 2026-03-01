@@ -512,7 +512,7 @@ def plot_frequency_band_contribution(
     if is_multi_seed:
         # Build count DataFrame per seed then aggregate
         seed_counts: list[pd.Series] = []
-        for seed_features in feature_names:  # type: ignore[union-attr]
+        for seed_features in feature_names:
             prefixes = [_extract_band_prefix(f) for f in seed_features]
             counts = pd.Series(prefixes).value_counts()
             seed_counts.append(counts)
@@ -558,7 +558,7 @@ def plot_frequency_band_contribution(
                 Patch(facecolor=OKABE_ITO[0], alpha=0.8, label="DSAR"),
             ]
             ax.legend(handles=legend_handles, frameon=False)
-            plt.tight_layout()
+            fig.set_layout_engine("tight")
 
         data = pd.DataFrame(
             {
@@ -601,7 +601,7 @@ def plot_frequency_band_contribution(
                 Patch(facecolor=OKABE_ITO[0], alpha=0.8, label="DSAR"),
             ]
             ax.legend(handles=legend_handles, frameon=False)
-            plt.tight_layout()
+            fig.set_layout_engine("tight")
 
         data = pd.DataFrame({"band": order, "count": counts[order].to_numpy()})
 

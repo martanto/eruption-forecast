@@ -8,7 +8,7 @@ version = "0.1.0"
 authors = [
     {name = "Martanto", email = "martanto@live.com"},
 ]
-description = "Eruptipn forecast modelling"
+description = "Eruption forecast modelling"
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["eruption", "forecast", "volcano", "volcanology", "seismic"]

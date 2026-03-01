@@ -13,6 +13,8 @@ from dataclasses import field, asdict, fields, dataclass
 
 import yaml
 
+from eruption_forecast.utils.pathutils import ensure_dir
+
 
 @dataclass
 class _ConfigBase:
@@ -260,6 +262,10 @@ class TrainConfig(_ConfigBase):
         overwrite (bool): Whether to overwrite existing training output files.
             Defaults to ``False``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
+        plot_shap (bool): Whether to generate SHAP explanation plots per seed.
+            Defaults to ``False``.
+        save_model (bool): Whether to serialise the ``ForecastModel`` instance
+            to disk after training completes. Defaults to ``True``.
     """
 
     classifiers: list[str] = field(default_factory=lambda: ["rf"])
@@ -275,6 +281,8 @@ class TrainConfig(_ConfigBase):
     grid_search_n_jobs: int = 1
     overwrite: bool = False
     verbose: bool = False
+    plot_shap: bool = False
+    save_model: bool = True
 
 
 @dataclass
@@ -386,7 +394,7 @@ class PipelineConfig(_ConfigBase):
         Returns:
             str: The path where the file was written.
         """
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        ensure_dir(os.path.dirname(os.path.abspath(path)))
         self.saved_at = datetime.now().isoformat(timespec="seconds")
         data = self.to_dict()
 

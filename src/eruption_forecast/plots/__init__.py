@@ -47,6 +47,7 @@ from eruption_forecast.plots.forecast_plots import (
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve,
     plot_calibration,
+    plot_learning_curve,
     plot_seed_stability,
     plot_confusion_matrix,
     plot_feature_importance,
@@ -54,6 +55,7 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_classifier_comparison,
     plot_precision_recall_curve,
     plot_prediction_distribution,
+    plot_aggregate_learning_curve,
 )
 
 
@@ -82,6 +84,8 @@ __all__ = [
     "plot_prediction_distribution",
     "plot_classifier_comparison",
     "plot_seed_stability",
+    "plot_learning_curve",
+    "plot_aggregate_learning_curve",
     # SHAP plots
     "plot_shap_summary",
     "plot_aggregate_shap_summary",

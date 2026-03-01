@@ -23,13 +23,14 @@ import sys
 
 from loguru import logger
 
+from eruption_forecast.utils.pathutils import ensure_dir
+
 
 # Init default handler
 logger.remove()
 
 # Define default log directory
-DEFAULT_LOG_DIR = os.path.join(os.getcwd(), "logs")
-os.makedirs(DEFAULT_LOG_DIR, exist_ok=True)
+DEFAULT_LOG_DIR = ensure_dir(os.path.join(os.getcwd(), "logs"))
 
 # Add console handler with custom format
 logger.add(
@@ -151,8 +152,7 @@ def set_log_directory(log_dir: str) -> None:
         >>> set_log_directory("/var/log/eruption_forecast")  # Use absolute path
     """
     global DEFAULT_LOG_DIR
-    DEFAULT_LOG_DIR = os.path.abspath(log_dir)
-    os.makedirs(DEFAULT_LOG_DIR, exist_ok=True)
+    DEFAULT_LOG_DIR = ensure_dir(os.path.abspath(log_dir))
 
     # Reconfigure with new directory
     logger.remove()

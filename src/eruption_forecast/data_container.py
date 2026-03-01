@@ -1,6 +1,8 @@
 """Abstract base class for CSV-backed data containers."""
 
+import os
 from abc import ABC, abstractmethod
+from functools import cached_property
 
 import pandas as pd
 
@@ -27,6 +29,42 @@ class BaseDataContainer(ABC):
                 Defaults to empty string for subclasses that set it later.
         """
         self.csv = csv
+
+    @cached_property
+    def filename(self) -> str:
+        """Extract the filename from the full CSV path.
+
+        Derives the basename (with extension) from :attr:`csv` using
+        ``os.path.basename``.
+
+        Returns:
+            str: Basename of the CSV file including extension.
+        """
+        return os.path.basename(self.csv)
+
+    @cached_property
+    def basename(self) -> str:
+        """Extract the filename without file extension.
+
+        Strips the extension from :attr:`filename` using
+        ``os.path.splitext``.
+
+        Returns:
+            str: Filename without the extension.
+        """
+        return os.path.splitext(self.filename)[0]
+
+    @cached_property
+    def filetype(self) -> str:
+        """Extract the file extension without the leading dot.
+
+        Derived from :attr:`filename` using ``os.path.splitext``, with the
+        leading dot stripped (e.g., ``".csv"`` → ``"csv"``).
+
+        Returns:
+            str: File extension without the leading dot (e.g., 'csv').
+        """
+        return os.path.splitext(self.filename)[1].lstrip(".")
 
     @property
     @abstractmethod

@@ -10,6 +10,20 @@ are tuned for imbalanced volcanic-eruption datasets.
 from typing import Any
 
 
+CLASSIFIERS: list[str] = [
+    "svm",
+    "knn",
+    "dt",
+    "rf",
+    "gb",
+    "xgb",
+    "nn",
+    "nb",
+    "lr",
+    "voting",
+    "lite-rf",
+]
+
 DEFAULT_GRID_PARAMS: dict[str, dict[str, Any]] = {
     "svm": {
         "C": [0.001, 0.01, 0.1, 1, 10],

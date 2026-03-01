@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-02-25 (added SeedEnsemble; updated utils/ml.py entries)_
+_Last updated: 2026-03-01 (added BaseEnsemble; learning curve support; ensure_dir; load_label_csv)_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -196,10 +196,13 @@ label_builder = LabelBuilder(
   - `merge_models(output_path)`: Bundle all seed models → `SeedEnsemble` `.pkl`
   - `merge_classifier_models(trained_models, output_path)`: Bundle multiple classifier registries → multi-classifier `.pkl`
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count`. Uses `joblib.Parallel(backend="loky")` for nested-parallelism safety.
-- `SeedEnsemble`: Bundles all seed models for one classifier (`seed_ensemble.py`); sklearn-compatible (`BaseEstimator` + `ClassifierMixin`)
+- `BaseEnsemble`: Shared save/load mixin (`base_ensemble.py`); inherited by `SeedEnsemble` and `ClassifierEnsemble`
+  - `save(path)`: Joblib-dumps the ensemble to `.pkl`; creates missing directories automatically
+  - `load(path)` (classmethod): Restores from `.pkl`; raises `FileNotFoundError` if missing
+  - Example: `ensemble.save("output/merged.pkl")` / `SeedEnsemble.load("output/merged.pkl")`
+- `SeedEnsemble`: Bundles all seed models for one classifier (`seed_ensemble.py`); sklearn-compatible (`BaseEstimator` + `ClassifierMixin`); inherits `save`/`load` from `BaseEnsemble`
   - `from_registry(registry_csv)`: Load from registry CSV
   - `predict_proba(X)` → `(n_samples, 2)`; `predict_with_uncertainty(X)` → `(mean, std, conf, pred)`
-  - `save(path)` / `load(path)`: joblib serialisation
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
@@ -232,8 +235,8 @@ Both use `@cached_property` for efficient attribute access.
 - **`array.py`**: `detect_maximum_outlier()`, `remove_outliers()` — Z-score based outlier detection
 - **`date_utils.py`**: `to_datetime()`, `validate_date_ranges()`, `validate_window_step()`
 - **`ml.py`**: `random_under_sampler()`, `get_significant_features()`, `merge_seed_models()`, `merge_all_classifiers()`
-- **`pathutils.py`**: `resolve_output_dir()` — resolves paths relative to `root_dir`
-- **`dataframe.py`**: DataFrame validation utilities
+- **`pathutils.py`**: `resolve_output_dir()` — resolves paths relative to `root_dir`; `ensure_dir()` — canonical dir-creation helper (replaces bare `os.makedirs`)
+- **`dataframe.py`**: DataFrame validation utilities; `load_label_csv(path)` — loads label CSV with datetime index
 - **`formatting.py`**: Text formatting utilities
 
 ## Important Patterns

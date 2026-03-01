@@ -17,7 +17,7 @@ from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.dataframe import remove_anomalies
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
 from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
@@ -488,7 +488,7 @@ class CalculateTremor:
                 logger.info(f"Cleaning up daily dir: {self.daily_dir}")
             shutil.rmtree(self.daily_dir)
 
-        os.makedirs(self.daily_dir, exist_ok=True)
+        ensure_dir(self.daily_dir)
         return self
 
     def create_directories(self) -> None:
@@ -501,13 +501,13 @@ class CalculateTremor:
             >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
             >>> tremor.create_directories()
         """
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.station_dir, exist_ok=True)
-        os.makedirs(self.tremor_dir, exist_ok=True)
-        os.makedirs(self.daily_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
+        ensure_dir(self.station_dir)
+        ensure_dir(self.tremor_dir)
+        ensure_dir(self.daily_dir)
 
         if self.plot_daily:
-            os.makedirs(self.figures_dir, exist_ok=True)
+            ensure_dir(self.figures_dir)
 
     def validate(self) -> None:
         """Validate input parameters and create directories.
@@ -1162,7 +1162,7 @@ class CalculateTremor:
         tremor_dir = (
             daily_dir.replace("daily", "") if tremor_dir is None else tremor_dir
         )
-        os.makedirs(tremor_dir, exist_ok=True)
+        ensure_dir(tremor_dir)
 
         df = pd.concat(
             [

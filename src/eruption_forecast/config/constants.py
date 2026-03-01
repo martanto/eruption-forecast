@@ -25,6 +25,9 @@ ERUPTION_PROBABILITY_THRESHOLD: float = 0.7
 THRESHOLD_RESOLUTION: int = 101
 """Number of threshold points to evaluate (for ROC/PR curves)."""
 
+LEARNING_CURVE_SCORINGS: list[str] = ["balanced_accuracy", "f1_weighted"]
+"""Scoring metrics computed for every learning curve during training."""
+
 # Plotting Constants
 PLOT_DPI: int = 300
 """Default DPI for saving plot figures."""

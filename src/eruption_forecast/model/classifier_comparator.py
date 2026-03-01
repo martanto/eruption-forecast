@@ -21,6 +21,7 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
+from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
 
@@ -215,7 +216,7 @@ class ClassifierComparator:
             filename (str): PNG filename (without path).
             dpi (int): Resolution in dots per inch.
         """
-        os.makedirs(self.figures_dir, exist_ok=True)
+        ensure_dir(self.figures_dir)
         path = os.path.join(self.figures_dir, filename)
         fig.savefig(path, dpi=dpi, bbox_inches="tight")
         logger.info(f"Saved comparison figure: {path}")
@@ -388,7 +389,7 @@ class ClassifierComparator:
                 axes_all[row][col].set_visible(False)
 
         self._attach_legend(fig_all, legend_handles, len(clf_names), (0.5, -0.02))
-        fig_all.tight_layout()
+        fig_all.set_layout_engine("tight")
 
         if save:
             self._save_figure(fig_all, "metric_bar_all.png", dpi)
@@ -450,7 +451,7 @@ class ClassifierComparator:
                 axes_all[row][col].set_visible(False)
 
         self._attach_legend(fig_all, legend_patches, len(clf_names), (0.5, -0.02))
-        fig_all.tight_layout()
+        fig_all.set_layout_engine("tight")
 
         if save:
             self._save_figure(fig_all, "seed_stability_all.png", dpi)
@@ -686,7 +687,7 @@ class ClassifierComparator:
         ranked = table.sort_values(col, ascending=False).copy()
         ranked.insert(0, "rank", range(1, len(ranked) + 1))
 
-        os.makedirs(self.metrics_dir, exist_ok=True)
+        ensure_dir(self.metrics_dir)
         csv_path = os.path.join(self.metrics_dir, f"ranking_{metric}.csv")
         ranked.to_csv(csv_path)
         logger.info(f"Saved ranking table: {csv_path}")
@@ -761,7 +762,7 @@ class ClassifierComparator:
                 self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
 
             self._attach_legend(fig, legend_handles, len(clf_names), (0.5, -0.08))
-            fig.tight_layout()
+            fig.set_layout_engine("tight")
 
             if save:
                 fname = filename if idx == 0 and filename else f"metric_bar_{m}.png"
@@ -892,7 +893,7 @@ class ClassifierComparator:
                 )
 
             self._attach_legend(fig, legend_patches, len(clf_names), (0.5, -0.08))
-            fig.tight_layout()
+            fig.set_layout_engine("tight")
 
             if save:
                 fname = filename if idx == 0 and filename else f"seed_stability_{m}.png"
@@ -1121,7 +1122,7 @@ class ClassifierComparator:
                     self._draw_grid_cell(ax, vals, color, row, col, m, rng)
 
             fig.suptitle("Classifier × Metric Comparison", fontsize=9, y=1.01)
-            fig.tight_layout()
+            fig.set_layout_engine("tight")
 
         if save:
             fname = filename or "comparison_grid.png"

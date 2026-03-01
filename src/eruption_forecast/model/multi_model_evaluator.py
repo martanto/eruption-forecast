@@ -18,7 +18,8 @@ import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.array import predict_proba_from_estimator
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.plots.shap_plots import (
     compute_shap_explanation,
     plot_aggregate_shap_summary,
@@ -28,6 +29,7 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_seed_stability,
     plot_aggregate_roc_curve as _plot_roc_styled,
     plot_aggregate_calibration as _plot_cal_styled,
+    plot_aggregate_learning_curve as _plot_agg_lc_styled,
     plot_aggregate_confusion_matrix as _plot_cm_styled,
     plot_aggregate_feature_importance as _plot_fi_styled,
     plot_aggregate_threshold_analysis as _plot_threshold_styled,
@@ -89,6 +91,7 @@ class MultiModelEvaluator:
         metrics_files: list[str] | None = None,
         trained_model_csv: str | None = None,
         classifier_name: str = "model",
+        plot_shap: bool = False,
         root_dir: str | None = None,
         output_dir: str | None = None,
     ) -> None:
@@ -123,11 +126,14 @@ class MultiModelEvaluator:
             )
 
         self.classifier_name = classifier_name
+        self.plot_shap = plot_shap
         self._metrics_dir = metrics_dir
         self._metrics_files = metrics_files
         self._trained_model_csv = trained_model_csv
 
-        output_dir = resolve_output_dir(output_dir, root_dir, os.path.join("output", "evaluations"))
+        output_dir = resolve_output_dir(
+            output_dir, root_dir, os.path.join("output", "evaluations")
+        )
         self.output_dir = os.path.join(output_dir, "aggregate")
 
     # ------------------------------------------------------------------
@@ -183,16 +189,16 @@ class MultiModelEvaluator:
         sig_features = pd.read_csv(
             row["significant_features_csv"], index_col=0
         ).index.tolist()
-        X_test_filtered = X_test[sig_features]
 
-        if hasattr(model, "predict_proba"):
-            proba: np.ndarray = model.predict_proba(X_test_filtered)[:, 1]
-        elif hasattr(model, "decision_function"):
-            proba = model.decision_function(X_test_filtered)
-        else:
-            raise AttributeError(
-                f"{type(model).__name__} has neither predict_proba nor decision_function."
+        # Checking if X_test_filtered columns has all significant features
+        try:
+            X_test_filtered = X_test[sig_features]
+        except KeyError as e:
+            raise KeyError(
+                f"{e}. significant_features_csv: {row['significant_features_csv']}"
             )
+
+        proba, _ = predict_proba_from_estimator(model, X_test_filtered)
 
         return model, X_test_filtered, y_true, proba
 
@@ -221,7 +227,7 @@ class MultiModelEvaluator:
     def _save_outputs(
         self,
         fig: plt.Figure,
-        data: pd.DataFrame | None,
+        data: pd.DataFrame | shap.Explanation | None,
         fig_filename: str,
         data_filename: str | None,
         dpi: int,
@@ -241,7 +247,7 @@ class MultiModelEvaluator:
         """
         fig_path = os.path.join(self.output_dir, fig_filename)
         if save:
-            os.makedirs(self.output_dir, exist_ok=True)
+            ensure_dir(self.output_dir)
             fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
             logger.info(f"Saved aggregate plot: {fig_path}")
             if data is not None and data_filename is not None:
@@ -255,7 +261,9 @@ class MultiModelEvaluator:
                     data.to_csv(data_path)
                     logger.info(f"Saved aggregate data: {data_path}")
                 else:
-                    logger.warning(f"Cannot save aggregate data. Data type is {type(data)}.")
+                    logger.warning(
+                        f"Cannot save aggregate data. Data type is {type(data)}."
+                    )
             plt.close(fig)
 
     def _collect_predictions(
@@ -351,7 +359,7 @@ class MultiModelEvaluator:
             >>> path = evaluator.save_aggregate_metrics()
             >>> path = evaluator.save_aggregate_metrics("my_summary.csv")
         """
-        os.makedirs(self.output_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
         df = self.get_aggregate_metrics()
         path = os.path.join(self.output_dir, filename)
         df.to_csv(path)
@@ -695,11 +703,68 @@ class MultiModelEvaluator:
         )
         return fig
 
+    def plot_learning_curve(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> tuple[plt.Figure, pd.DataFrame] | None:
+        """Plot an aggregate learning curve across all seeds.
+
+        Loads per-seed learning-curve JSON files from
+        ``{metrics_dir}/learning_curve/*.json``, interpolates them onto a
+        shared training-size grid, and plots mean ± std bands for train and
+        validation balanced accuracy.
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename.
+                Defaults to ``"aggregate_learning_curve.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            tuple[plt.Figure, pd.DataFrame] | None: Figure and summary DataFrame,
+                or None if no learning-curve JSON files are found.
+
+        Examples:
+            >>> result = evaluator.plot_learning_curve()
+        """
+        if self._metrics_dir is None:
+            logger.warning("plot_learning_curve requires metrics_dir; skipping.")
+            return None
+
+        lc_dir = os.path.join(self._metrics_dir, "learning_curve")
+        json_paths = sorted(glob.glob(os.path.join(lc_dir, "*.json")))
+        if not json_paths:
+            logger.warning(f"No learning-curve JSON files found in {lc_dir}; skipping.")
+            return None
+
+        all_data: list[dict] = []
+        for p in json_paths:
+            with open(p) as f:
+                all_data.append(json.load(f))
+
+        fig_path = os.path.join(
+            self.output_dir, filename or "aggregate_learning_curve.png"
+        )
+        fig, df = _plot_agg_lc_styled(
+            all_data=all_data,
+            filepath=fig_path,
+            overwrite=save,
+            dpi=dpi,
+        )
+        if save:
+            ensure_dir(self.output_dir)
+            logger.info(f"Saved aggregate learning curve: {fig_path}")
+            df.to_csv(fig_path.replace(".png", ".csv"))
+            plt.close(fig)
+        return fig, df
+
     def plot_all(
         self,
         dpi: int = 150,
         show_individual: bool = True,
-    ) -> dict[str, plt.Figure | None]:
+    ) -> dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None]:
         """Generate and save all aggregate evaluation plots.
 
         Runs every individual ``plot_*`` method and collects the resulting
@@ -719,7 +784,7 @@ class MultiModelEvaluator:
                 ``"prediction_distribution"``, ``"confusion_matrix"``,
                 ``"threshold_analysis"``, ``"feature_importance"``,
                 ``"shap_summary"``, ``"seed_stability"``,
-                ``"frequency_band_contribution"``.
+                ``"frequency_band_contribution"``, ``"learning_curve"``.
                 Values are None when a plot cannot be generated (e.g.,
                 feature importance for models without ``feature_importances_``).
 
@@ -739,11 +804,12 @@ class MultiModelEvaluator:
                 dpi=dpi, show_individual=show_individual
             ),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
-            "shap_summary": self.plot_shap_summary(dpi=dpi),
             "seed_stability": self.plot_seed_stability(dpi=dpi),
             "frequency_band_contribution": self.plot_frequency_band_contribution(
                 dpi=dpi
             ),
+            "learning_curve": self.plot_learning_curve(dpi=dpi),
+            "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
         }
 
     # ------------------------------------------------------------------
@@ -803,7 +869,9 @@ class MultiModelEvaluator:
         col_exists = "shap_explanation_filepath" in registry.columns
         explanations: list[shap.Explanation | None] = []
 
-        for (_, row), model, X in zip(registry.iterrows(), models, x_tests, strict=False):
+        for (_, row), model, X in zip(
+            registry.iterrows(), models, x_tests, strict=False
+        ):
             filepath = row.get("shap_explanation_filepath") if col_exists else None
             if filepath and os.path.isfile(str(filepath)):
                 try:
@@ -877,11 +945,10 @@ class MultiModelEvaluator:
 
     def plot_seed_stability(
         self,
-        metric: str = "f1_score",
         save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
-    ) -> plt.Figure:
+    ) -> None:
         """Plot seed stability violin for this single-classifier evaluator.
 
         Shows the distribution of ``metric`` across random seeds as a violin
@@ -889,15 +956,10 @@ class MultiModelEvaluator:
         to have been provided at construction.
 
         Args:
-            metric (str, optional): Metric key to plot. Must be present in
-                each seed's JSON metrics file. Defaults to ``"f1_score"``.
             save (bool, optional): Whether to save the figure. Defaults to True.
             filename (str | None, optional): Override figure filename.
                 Defaults to ``"seed_stability_{metric}.png"``.
             dpi (int, optional): Figure resolution. Defaults to 150.
-
-        Returns:
-            plt.Figure: Matplotlib figure with the seed stability violin.
 
         Examples:
             >>> fig = evaluator.plot_seed_stability(metric="balanced_accuracy")
@@ -913,14 +975,31 @@ class MultiModelEvaluator:
         clf_name = records[0].get("model_name", "model") if records else "model"
         metrics_by_clf = {clf_name: records}
 
-        fig, data = plot_seed_stability(
-            metrics_by_classifier=metrics_by_clf,
-            metric=metric,
-            dpi=dpi,
-        )
-        default_fn = f"seed_stability_{metric}.png"
-        self._save_outputs(fig, data, filename or default_fn, None, dpi, save)
-        return fig
+        metrics: list[str] = [
+            "f1_score",
+            "roc_auc",
+            "pr_auc",
+            "balanced_accuracy",
+            "precision",
+            "recall",
+            "specificity",
+            "sensitivity",
+        ]
+
+        for metric in metrics:
+            fig, data = plot_seed_stability(
+                metrics_by_classifier=metrics_by_clf,
+                figsize=(2, 4),
+                metric=metric,
+                dpi=dpi,
+            )
+            fig_filename = f"{self.classifier_name}_seed_stability_{metric}.png"
+            data_filename = f"{self.classifier_name}_seed_stability_{metric}.csv"
+            self._save_outputs(
+                fig, data, filename or fig_filename, data_filename, dpi, save
+            )
+
+        return None
 
     def plot_frequency_band_contribution(
         self,

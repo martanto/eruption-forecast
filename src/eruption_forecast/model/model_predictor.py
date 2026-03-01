@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 import joblib
 import matplotlib
 
-from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
-
 
 matplotlib.use(
     "Agg"
@@ -15,10 +13,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import load_labels_from_csv, compute_model_probabilities
 from eruption_forecast.utils.window import construct_windows
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
@@ -199,7 +198,7 @@ class ModelPredictor:
         extracted_dir = os.path.join(features_dir, "extracted")
         figures_dir = os.path.join(output_dir, "figures")
 
-        os.makedirs(figures_dir, exist_ok=True)
+        ensure_dir(figures_dir)
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -368,7 +367,7 @@ class ModelPredictor:
             logger.info(f"Evaluating classifier: {model_name}")
 
             model_output_dir = os.path.join(self.output_dir, model_name)
-            os.makedirs(model_output_dir, exist_ok=True)
+            ensure_dir(model_output_dir)
 
             if isinstance(df_models, SeedEnsemble):
                 self._evaluate_seed_ensemble(
@@ -705,7 +704,7 @@ class ModelPredictor:
         self.window_step_unit = window_step_unit
         filename = f"{self.basename}_ws-{window_step}-{window_step_unit}"
 
-        os.makedirs(self.features_dir, exist_ok=True)
+        ensure_dir(self.features_dir)
         futures_labels_filepath = os.path.join(
             self.features_dir,
             f"future_labels_{filename}.csv",
@@ -770,7 +769,7 @@ class ModelPredictor:
                 "Parameter labels_df not provided. Please run build_future_labels() first."
             )
 
-        os.makedirs(self.tremor_dir, exist_ok=True)
+        ensure_dir(self.tremor_dir)
         tremor_matrix_filename = (
             f"tremor_matrix_unified_{self.basename}_ws-{window_size}.csv"
         )
@@ -828,7 +827,7 @@ class ModelPredictor:
             ValueError: If ``self.tremor_matrix_df`` is None (i.e.
                 :meth:`build_tremor_matrix` has not been called yet).
         """
-        os.makedirs(self.extracted_dir, exist_ok=True)
+        ensure_dir(self.extracted_dir)
 
         if self.tremor_matrix_df is None:
             raise ValueError(
@@ -1171,7 +1170,7 @@ class ModelPredictor:
         logger.info(f"Forecasting with classifier: {model_name}")
 
         model_output_dir = os.path.join(result_dir, model_name)
-        os.makedirs(model_output_dir, exist_ok=True)
+        ensure_dir(model_output_dir)
 
         if isinstance(df_models, SeedEnsemble):
             mean_probability, std_probability, confidence, prediction = (

@@ -6,19 +6,18 @@ the cross-classifier consensus logic previously inline in
 ``ModelPredictor.predict_proba()``.
 """
 
-import os
 
 import numpy as np
-import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 from eruption_forecast.logger import logger
 from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.model.base_ensemble import BaseEnsemble
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 
 
-class ClassifierEnsemble(BaseEstimator, ClassifierMixin):
+class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     """Bundle of SeedEnsemble objects for multiple classifier types.
 
     Wraps one :class:`SeedEnsemble` per classifier into a single serialisable
@@ -219,42 +218,17 @@ class ClassifierEnsemble(BaseEstimator, ClassifierMixin):
     # Persistence
     # ------------------------------------------------------------------
 
-    def save(self, path: str) -> None:
-        """Dump the ensemble to a single ``.pkl`` file via joblib.
-
-        Serialises the entire object — including all nested ``SeedEnsemble``
-        instances and their seed models — with ``joblib.dump``.  Reload with
-        :meth:`load`.
-
-        Args:
-            path (str): Destination file path (should end with ``.pkl``).
-        """
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        joblib.dump(self, path)
-        logger.info(f"[ClassifierEnsemble] Saved to: {path}")
-
     @classmethod
-    def load(cls, path: str) -> "ClassifierEnsemble":
-        """Load a previously saved ClassifierEnsemble from a ``.pkl`` file.
-
-        Restores the full ensemble from a file written by :meth:`save`.
+    def _load_log_msg(cls, obj: "ClassifierEnsemble") -> str:  # type: ignore[override]
+        """Return a classifier-count suffix for the load log message.
 
         Args:
-            path (str): Path to the ``.pkl`` file.
+            obj (ClassifierEnsemble): The just-loaded ClassifierEnsemble instance.
 
         Returns:
-            ClassifierEnsemble: The restored ensemble.
-
-        Raises:
-            FileNotFoundError: If ``path`` does not exist.
+            str: Human-readable classifier count string.
         """
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"ClassifierEnsemble file not found: {path}")
-        obj: ClassifierEnsemble = joblib.load(path)
-        logger.info(
-            f"[ClassifierEnsemble] Loaded {len(obj)} classifier(s) from: {path}"
-        )
-        return obj
+        return f"{len(obj)} classifier(s)"
 
     # ------------------------------------------------------------------
     # Introspection

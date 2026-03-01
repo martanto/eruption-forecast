@@ -1,11 +1,51 @@
 """File path resolution utilities.
 
 This module provides utilities for resolving output directory paths relative
-to a root anchor directory.
+to a root anchor directory, creating directories, and loading JSON files.
 """
 
 import os
-from typing import Literal
+import json
+from typing import Any, Literal
+
+
+def ensure_dir(path: str) -> str:
+    """Create a directory (and any missing parents) if it does not already exist.
+
+    A thin, named wrapper around ``os.makedirs(path, exist_ok=True)`` that
+    returns the path so callers can chain it inline.
+
+    Args:
+        path (str): Directory path to create.
+
+    Returns:
+        str: The same ``path`` that was passed in.
+    """
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def load_json(path: str) -> Any:
+    """Load and parse a JSON file.
+
+    Opens ``path`` in text mode, parses its contents with ``json.load``, and
+    returns the resulting Python object.  Raises ``FileNotFoundError`` if the
+    file is absent so callers get a clear error instead of a generic
+    ``OSError``.
+
+    Args:
+        path (str): Path to the JSON file to read.
+
+    Returns:
+        Any: Parsed JSON content (dict, list, str, int, float, bool, or None).
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist.
+    """
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"JSON file not found: {path}")
+    with open(path) as f:
+        return json.load(f)
 
 
 def resolve_output_dir(
@@ -104,6 +144,6 @@ def build_model_directories(
 
     # Create all directories
     for dir_path in directories.values():
-        os.makedirs(dir_path, exist_ok=True)
+        ensure_dir(dir_path)
 
     return directories

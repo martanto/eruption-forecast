@@ -309,6 +309,77 @@ fig, df = plot_frequency_band_contribution(feature_names=per_seed)
 # df has columns: band, mean_count, std_count
 ```
 
+### Learning Curve Plots
+
+Visualize how model performance scales with training set size. Learning curves help diagnose underfitting and overfitting and confirm that adding more data is beneficial.
+
+#### Multi-Metric Format
+
+Each seed's learning curve is stored as a JSON file with one entry per scoring metric:
+
+```json
+{
+  "balanced_accuracy": {
+    "train_sizes": [50, 100, 200, 400],
+    "train_scores": [[0.72, 0.73], [0.78, 0.79], ...],
+    "test_scores":  [[0.65, 0.66], [0.70, 0.71], ...]
+  },
+  "f1_weighted": {
+    "train_sizes": [...],
+    "train_scores": [...],
+    "test_scores":  [...]
+  }
+}
+```
+
+The old single-metric flat format (`{"train_sizes": [...], "train_scores": [...], "test_scores": [...]}`) is still supported for backward compatibility.
+
+#### plot_learning_curve_grid()
+
+Render one subplot per scoring metric from a multi-metric learning curve JSON.
+
+```python
+from eruption_forecast.plots.evaluation_plots import plot_learning_curve_grid
+
+fig = plot_learning_curve_grid(
+    json_filepath="output/.../learning_curve_seed042.json",
+    output_dir="output/figures",
+    scorings=["balanced_accuracy", "f1_weighted"],
+    dpi=150,
+)
+```
+
+#### Single-Seed via ModelEvaluator
+
+```python
+from eruption_forecast import ModelEvaluator
+
+evaluator = ModelEvaluator.from_files(
+    model_path="output/.../models/00042.pkl",
+    X_test="output/.../tests/00042_X_test.csv",
+    y_test="output/.../tests/00042_y_test.csv",
+    learning_curve_path="output/.../learning_curves/00042_lc.json",
+    model_name="xgb_seed_42",
+    output_dir="output/eval",
+)
+
+# Renders one subplot per scoring metric
+fig = evaluator.plot_learning_curve(dpi=150)
+```
+
+#### Multi-Seed Aggregate via MultiModelEvaluator
+
+```python
+from eruption_forecast import MultiModelEvaluator
+
+evaluator = MultiModelEvaluator(
+    trained_model_csv="output/.../trained_model_registry.csv"
+)
+
+# Aggregates across all seeds: bold mean line + ±1 std band per metric
+fig = evaluator.plot_learning_curve(dpi=150)
+```
+
 ### Forecast Visualization
 
 #### Plotting with ModelPredictor

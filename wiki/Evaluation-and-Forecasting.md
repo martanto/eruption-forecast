@@ -120,6 +120,7 @@ Individual plot methods:
 | `plot_calibration()` | Predicted probability vs. actual fraction of positives |
 | `plot_prediction_distribution()` | KDE of predicted probabilities by true class |
 | `plot_shap_summary(max_display=20)` | SHAP beeswarm plot — requires `shap>=0.46` |
+| `plot_learning_curve(dpi=150)` | Train vs. validation score curves per scoring metric; requires `learning_curve_path` set at construction |
 
 ### Saving metrics to JSON
 
@@ -178,7 +179,7 @@ evaluator = MultiModelEvaluator(
 
 ### Aggregate plots
 
-`plot_all()` runs all 10 aggregate plots at once and saves them to `{output_dir}/figures/`:
+`plot_all()` runs all 11 aggregate plots at once and saves them to `{output_dir}/figures/`:
 
 ```python
 figs = evaluator.plot_all(dpi=150, show_individual=True)
@@ -198,6 +199,7 @@ Individual plot methods (each accepts `save=True`, `filename=None`, `dpi=150`, a
 | `plot_shap_summary(max_display=20)` | Aggregate SHAP beeswarm showing feature contributions across seeds — requires `shap>=0.46` |
 | `plot_seed_stability(metric="f1_score")` | Violin plot of a chosen metric across seeds |
 | `plot_frequency_band_contribution()` | Feature counts per seismic frequency band |
+| `plot_learning_curve(dpi=150)` | Aggregate train vs. validation score curves across seeds; ±1 std band per metric |
 
 **Aggregation strategy per plot:**
 

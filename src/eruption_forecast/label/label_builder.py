@@ -11,7 +11,7 @@ from eruption_forecast.label.constants import (
     MIN_DATE_RANGE_DAYS,
     VALID_WINDOW_STEP_UNITS,
 )
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.utils.date_utils import (
     sort_dates,
@@ -668,8 +668,8 @@ class LabelBuilder:
             >>> builder.create_directories()
             >>> # Directories created: output_dir/ and output_dir/labels/
         """
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.label_dir, exist_ok=True)
+        ensure_dir(self.output_dir)
+        ensure_dir(self.label_dir)
 
     def validate_eruption_dates(self) -> None:
         """Ensure at least one eruption exists between start and end dates.

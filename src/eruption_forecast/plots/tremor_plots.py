@@ -15,6 +15,7 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
+from eruption_forecast.utils.pathutils import ensure_dir
 
 
 def plot_tremor(
@@ -90,7 +91,7 @@ def plot_tremor(
 
     # Save plot to figure directory
     figure_dir = figure_dir or os.path.join(os.getcwd(), "figures")
-    os.makedirs(figure_dir, exist_ok=True)
+    ensure_dir(figure_dir)
 
     filename = filename or default_filename
     filepath = os.path.join(figure_dir, f"{filename}.png")

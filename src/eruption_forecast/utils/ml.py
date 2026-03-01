@@ -10,6 +10,12 @@ from typing import cast
 import numpy as np
 import joblib
 import pandas as pd
+from sklearn.metrics import (
+    f1_score,
+    recall_score,
+    precision_score,
+    balanced_accuracy_score,
+)
 from tsfresh.transformers import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
 
@@ -18,18 +24,65 @@ from eruption_forecast.utils.array import (
     aggregate_seed_probabilities,
     predict_proba_from_estimator,
 )
-from eruption_forecast.utils.dataframe import to_series
-from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.utils.dataframe import to_series, load_label_csv
+from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.config.constants import (
+    THRESHOLD_RESOLUTION,
+    ERUPTION_PROBABILITY_THRESHOLD,
+)
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+
+
+def compute_threshold_metrics(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    resolution: int = THRESHOLD_RESOLUTION,
+) -> tuple[np.ndarray, dict[str, list[float]]]:
+    """Sweep decision thresholds and compute classification metrics at each step.
+
+    Iterates over ``resolution`` evenly-spaced thresholds from 0.0 to 1.0,
+    binarises ``y_proba`` at each step, and records precision, recall, F1,
+    and balanced accuracy. This is the single source of truth for threshold
+    analysis used by both ``MetricsComputer`` and ``plot_threshold_analysis``.
+
+    Args:
+        y_true (np.ndarray): Ground-truth binary labels (0 or 1).
+        y_proba (np.ndarray): Predicted probabilities for the positive class.
+        resolution (int, optional): Number of threshold steps. Defaults to
+            ``THRESHOLD_RESOLUTION``.
+
+    Returns:
+        tuple[np.ndarray, dict[str, list[float]]]: A 2-tuple of:
+            - thresholds: 1-D array of length ``resolution`` from 0.0 to 1.0.
+            - metrics_dict: dict with keys ``"precision"``, ``"recall"``,
+              ``"f1"``, and ``"balanced_accuracy"``, each a list of floats.
+    """
+    thresholds = np.linspace(0.0, 1.0, resolution)
+    metrics: dict[str, list[float]] = {
+        "precision": [],
+        "recall": [],
+        "f1": [],
+        "balanced_accuracy": [],
+    }
+    for threshold in thresholds:
+        y_pred_thresh = (y_proba >= threshold).astype(int)
+        metrics["f1"].append(f1_score(y_true, y_pred_thresh, zero_division=0))
+        metrics["recall"].append(recall_score(y_true, y_pred_thresh, zero_division=0))
+        metrics["precision"].append(
+            precision_score(y_true, y_pred_thresh, zero_division=0)
+        )
+        metrics["balanced_accuracy"].append(
+            balanced_accuracy_score(y_true, y_pred_thresh)
+        )
+    return thresholds, metrics
 
 
 def load_labels_from_csv(label_features_csv: str) -> pd.Series:
     """Load a label CSV and return a Series indexed by window ID.
 
-    Reads the aligned label CSV produced by FeaturesBuilder, sets the
-    ``id`` column as the index, drops the ``datetime`` column if present,
-    and returns the ``is_erupted`` column as a Series.
+    Delegates to :func:`eruption_forecast.utils.dataframe.load_label_csv`.
+    Kept here for backward compatibility with existing call sites.
 
     Args:
         label_features_csv (str): Path to the label CSV file. Must contain
@@ -40,20 +93,8 @@ def load_labels_from_csv(label_features_csv: str) -> pd.Series:
 
     Raises:
         FileNotFoundError: If the file does not exist.
-
-    Examples:
-        >>> labels = load_labels_from_csv("output/features/label_features.csv")
-        >>> print(labels.value_counts())
-        0    450
-        1     50
-        Name: is_erupted, dtype: int64
     """
-    df = pd.read_csv(label_features_csv)
-    if "id" in df.columns:
-        df = df.set_index("id")
-    if "datetime" in df.columns:
-        df = df.drop("datetime", axis=1)
-    return df["is_erupted"]
+    return load_label_csv(label_features_csv)
 
 
 def random_under_sampler(
@@ -230,7 +271,7 @@ def compute_seed_eruption_probability(
         logger.debug(f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}")
 
     if save and not overwrite:
-        os.makedirs(output_dir, exist_ok=True)
+        ensure_dir(output_dir)
         probabilities_df = pd.DataFrame(
             probabilities_scores, columns=["p_non_eruption", "p_eruption"]
         )
@@ -335,6 +376,27 @@ def compute_model_probabilities(
     return aggregate_seed_probabilities(probabilities_eruption_matrix, threshold=threshold)
 
 
+def _extract_trained_model_suffix(csv_path: str) -> str:
+    """Extract the suffix portion from a trained-model registry CSV filename.
+
+    Strips the ``trained_model_`` prefix (if present) from the basename of
+    ``csv_path`` and returns the remainder as a plain string.  Used by
+    :func:`merge_seed_models` and :func:`merge_all_classifiers` to derive
+    output filenames without duplicating the stripping logic.
+
+    Args:
+        csv_path (str): Path to a trained-model registry CSV file.
+
+    Returns:
+        str: The suffix after ``"trained_model_"``, or the full basename
+            (without extension) if the prefix is absent.
+    """
+    basename = os.path.splitext(os.path.basename(csv_path))[0]
+    if basename.startswith("trained_model_"):
+        return basename[len("trained_model_"):]
+    return basename
+
+
 def merge_seed_models(
     registry_csv: str,
     output_path: str | None = None,
@@ -364,13 +426,8 @@ def merge_seed_models(
     """
     if output_path is None:
         registry_dir = os.path.dirname(os.path.abspath(registry_csv))
-        basename = os.path.splitext(os.path.basename(registry_csv))[0]
-        # Replace "trained_model_" prefix with "merged_model_"
-        if basename.startswith("trained_model_"):
-            merged_basename = "merged_model_" + basename[len("trained_model_"):]
-        else:
-            merged_basename = f"merged_{basename}"
-        output_path = os.path.join(registry_dir, f"{merged_basename}.pkl")
+        suffix = _extract_trained_model_suffix(registry_csv)
+        output_path = os.path.join(registry_dir, f"merged_model_{suffix}.pkl")
 
     ensemble = SeedEnsemble.from_registry(registry_csv)
     ensemble.save(output_path)
@@ -412,17 +469,9 @@ def merge_all_classifiers(
     if output_path is None:
         first_csv = next(iter(trained_models.values()))
         # Go one level up from the classifier dir to the trainings root
-        trainings_dir = os.path.dirname(
-            os.path.dirname(os.path.abspath(first_csv))
-        )
-        basename = os.path.splitext(os.path.basename(first_csv))[0]
-        if basename.startswith("trained_model_"):
-            suffix = basename[len("trained_model_"):]
-        else:
-            suffix = basename
-        output_path = os.path.join(
-            trainings_dir, f"merged_classifiers_{suffix}.pkl"
-        )
+        trainings_dir = os.path.dirname(os.path.dirname(os.path.abspath(first_csv)))
+        suffix = _extract_trained_model_suffix(first_csv)
+        output_path = os.path.join(trainings_dir, f"merged_classifiers_{suffix}.pkl")
 
     ensembles: dict[str, SeedEnsemble] = {}
     for name, csv_path in trained_models.items():
