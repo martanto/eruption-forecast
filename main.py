@@ -82,6 +82,7 @@ TRAINING_PARAMETERS: dict[str, Any] = {
     "n_jobs": 4,
     "grid_search_n_jobs": 1,
     "overwrite": False,
+    "shap_plot": False,  # SHAP Explanation plot
     "verbose": True,
 }
 

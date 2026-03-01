@@ -76,6 +76,8 @@ train:
   grid_search_n_jobs: 1     # Inner GridSearchCV workers (n_jobs × grid_search_n_jobs ≤ cpu_count)
   overwrite: false
   verbose: false
+  plot_shap: false          # Generate SHAP explanation plots per seed
+  save_model: true          # Serialise ForecastModel instance after training completes
 
 forecast:
   start_date: '2025-03-23' # Forecast period start date

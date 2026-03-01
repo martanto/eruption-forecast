@@ -7,6 +7,7 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
+from eruption_forecast.model.constants import CLASSIFIERS
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import (
     to_datetime,
@@ -275,6 +276,7 @@ class ForecastModel:
         # ------------------------------------------------------------------
         # Will be set after train() called
         # ------------------------------------------------------------------
+        self._plot_shap = False
         self.trainers: list[dict[str, Any]] = []
         self.trained_models: dict[str, str] = {}
 
@@ -1136,6 +1138,7 @@ class ForecastModel:
             number_of_significant_features=number_of_significant_features,
             feature_selection_method=self.feature_selection_method,
             overwrite=overwrite,
+            plot_shap=self._plot_shap,
             n_jobs=n_jobs,
             grid_search_n_jobs=grid_search_n_jobs,
             verbose=verbose,
@@ -1178,6 +1181,7 @@ class ForecastModel:
         output_dir: str | None = None,
         n_jobs: int | None = None,
         grid_search_n_jobs: int = 1,
+        plot_shap: bool = False,
         overwrite: bool = False,
         verbose: bool = False,
         save_model: bool = True,
@@ -1226,6 +1230,7 @@ class ForecastModel:
                 backend handles nested parallelism without deadlocks. Combine with
                 ``n_jobs`` to control the total CPU budget:
                 ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
+            plot_shap (bool, optioonal): Plot SHAP explanation value. Defaults to False.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
             save_model (bool, optional): If True, serialises the full ``ForecastModel``
@@ -1235,20 +1240,6 @@ class ForecastModel:
         Returns:
             Self: ForecastModel instance for method chaining.
         """
-        CLASSIFIERS: list[str] = [
-            "svm",
-            "knn",
-            "dt",
-            "rf",
-            "gb",
-            "xgb",
-            "nn",
-            "nb",
-            "lr",
-            "voting",
-            "lite-rf",
-        ]
-
         if isinstance(classifier, str):
             classifiers: list[str] = list(classifier.split(","))
         elif isinstance(classifier, list):
@@ -1302,6 +1293,7 @@ class ForecastModel:
         }
 
         # Train multi classifiers
+        self._plot_shap = plot_shap
         trained_models: dict[str, str] = {}
         for _classifier in classifiers:
             classifier_name, trained_model_csv = self._train_per_classifier(
@@ -1355,6 +1347,8 @@ class ForecastModel:
             grid_search_n_jobs=grid_search_n_jobs,
             overwrite=overwrite,
             verbose=verbose,
+            plot_shap=plot_shap,
+            save_model=save_model,
         )
 
         self.trained_models = trained_models
