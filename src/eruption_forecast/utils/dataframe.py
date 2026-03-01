@@ -117,6 +117,38 @@ def to_series(
     return series
 
 
+def load_label_csv(label_features_csv: str) -> pd.Series:
+    """Load a label CSV and return a Series indexed by window ID.
+
+    Reads the aligned label CSV produced by ``FeaturesBuilder``, sets the
+    ``id`` column as the index, drops the ``datetime`` column if present,
+    and returns the ``is_erupted`` column as a Series.
+
+    Args:
+        label_features_csv (str): Path to the label CSV file. Must contain
+            an ``id`` column and an ``is_erupted`` column.
+
+    Returns:
+        pd.Series: Binary eruption labels indexed by window ID.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+
+    Examples:
+        >>> labels = load_label_csv("output/features/label_features.csv")
+        >>> print(labels.value_counts())
+        0    450
+        1     50
+        Name: is_erupted, dtype: int64
+    """
+    df = pd.read_csv(label_features_csv)
+    if "id" in df.columns:
+        df = df.set_index("id")
+    if "datetime" in df.columns:
+        df = df.drop("datetime", axis=1)
+    return df["is_erupted"]
+
+
 def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFrame]:
     """Concatenate feature CSVs into one DataFrame and save.
 
