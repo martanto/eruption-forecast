@@ -262,6 +262,10 @@ class TrainConfig(_ConfigBase):
         overwrite (bool): Whether to overwrite existing training output files.
             Defaults to ``False``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
+        plot_shap (bool): Whether to generate SHAP explanation plots per seed.
+            Defaults to ``False``.
+        save_model (bool): Whether to serialise the ``ForecastModel`` instance
+            to disk after training completes. Defaults to ``True``.
     """
 
     classifiers: list[str] = field(default_factory=lambda: ["rf"])
@@ -277,6 +281,8 @@ class TrainConfig(_ConfigBase):
     grid_search_n_jobs: int = 1
     overwrite: bool = False
     verbose: bool = False
+    plot_shap: bool = False
+    save_model: bool = True
 
 
 @dataclass
