@@ -283,57 +283,6 @@ class LabelData(BaseDataContainer):
         return df
 
     @cached_property
-    def filename(self) -> str:
-        """Extract the filename from the full path.
-
-        Derives the basename (with extension) from :attr:`label_csv` using
-        ``os.path.basename``.
-
-        Returns:
-            str: Basename of the label CSV file including extension.
-
-        Examples:
-            >>> label_data = LabelData("/path/to/label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
-            >>> label_data.filename
-            'label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv'
-        """
-        return os.path.basename(self.label_csv)
-
-    @cached_property
-    def basename(self) -> str:
-        """Extract the basename without file extension.
-
-        Strips the ``.csv`` extension from :attr:`filename` using
-        ``os.path.splitext``.
-
-        Returns:
-            str: Filename without the .csv extension.
-
-        Examples:
-            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
-            >>> label_data.basename
-            'label_2020-01-01_2020-12-31_step-12-hours_dtf-2'
-        """
-        return os.path.splitext(self.filename)[0]
-
-    @cached_property
-    def filetype(self) -> str:
-        """Extract the file extension without the leading dot.
-
-        Derived from :attr:`filename` using ``os.path.splitext``, with the
-        leading dot stripped (e.g., ``".csv"`` → ``"csv"``).
-
-        Returns:
-            str: File extension without the leading dot (e.g., 'csv').
-
-        Examples:
-            >>> label_data = LabelData("label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
-            >>> label_data.filetype
-            'csv'
-        """
-        return os.path.splitext(self.filename)[1].lstrip(".")
-
-    @cached_property
     def parameters(self) -> dict[str, str | datetime | int]:
         """Extract all parameters from the label filename.
 
