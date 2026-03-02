@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from obspy import Trace, Stream
 from numpy.typing import NDArray
 
 from eruption_forecast.logger import logger
@@ -174,6 +175,57 @@ def mask_zero_values(data: np.ndarray) -> np.ndarray:
 
     non_zero_mask = data != 0.0
     return data[non_zero_mask]
+
+
+def get_completeness(stream_or_trace: Stream | Trace) -> float:
+    """Check daily data completeness.
+
+    Args:
+        stream_or_trace (Stream | Trace): Stream or trace object.
+
+    Returns:
+        float: Daily data completeness.
+    """
+    if isinstance(stream_or_trace, Stream):
+        stream_or_trace = stream_or_trace.merge(fill_value=np.nan)
+        trace: Trace = stream_or_trace[0]
+    elif isinstance(stream_or_trace, Trace):
+        trace: Trace = stream_or_trace
+    else:
+        raise TypeError("Input must be a Stream or Trace")
+
+    sampling_rate = trace.stats.sampling_rate
+    total_samples = sampling_rate * 60 * 60 * 24
+    n_samples = count_valid_values(trace.data)
+    return float(n_samples / total_samples)
+
+
+def count_valid_values(data: np.ndarray) -> int:
+    """Count elements that are neither zero nor NaN.
+
+    Counts the number of valid samples in an array by excluding both
+    zero values (which typically indicate dead or missing seismic channels)
+    and NaN values (which indicate gaps or padding).
+
+    Args:
+        data (np.ndarray): Input array of numerical data.
+
+    Returns:
+        int: Number of elements that are not zero and not NaN.
+
+    Raises:
+        TypeError: If input is not a numpy array.
+
+    Examples:
+        >>> count_valid_values(np.array([1.0, 0.0, np.nan, 2.0]))
+        2
+        >>> count_valid_values(np.array([0.0, np.nan]))
+        0
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input must be a numpy array")
+
+    return int(np.sum((data != 0.0) & ~np.isnan(data)))
 
 
 def _filter_nans(data: np.ndarray) -> np.ndarray:
@@ -374,8 +426,8 @@ def remove_outliers(
             return np.array([])
 
     # Calculate mean and standard deviation
-    mean = np.mean(data)
-    std = np.std(data)
+    mean = np.nanmean(data)
+    std = np.nanstd(data)
 
     # If all values are identical, no outliers exist
     if std == 0:
@@ -395,75 +447,3 @@ def remove_outliers(
         return outliers
 
     return filtered_data
-
-
-def chunk_daily_data(
-    data: np.ndarray,
-    sampling_rate: float,
-    window_min: int = 10,
-    window_overlap: float | None = None,
-    mask_zero_value: bool = True,
-    debug: bool = False,
-) -> np.ndarray | np.ma.MaskedArray:
-    """Chunk a daily time series into fixed-size windows.
-
-    Splits a 1-D seismic data array into consecutive windows of equal length.
-    Incomplete trailing windows are zero-padded with NaN before slicing.
-    When ``mask_zero_value=True``, zero samples (indicating dead channels or
-    missing data) and NaN values are masked so downstream metrics ignore them.
-
-    Args:
-        data (np.ndarray): 1-D array of daily seismic amplitude data.
-        sampling_rate (float): Sampling rate in Hz.
-        window_min (int, optional): Window duration in minutes. Defaults to 10.
-        window_overlap (float, optional): Overlap between consecutive windows as a
-            percentage in [0, 100). If None, non-overlapping windows are used.
-            Defaults to None.
-        mask_zero_value (bool, optional): If True, mask zero and NaN samples.
-            Zeros in seismic data typically indicate dead or missing samples.
-            Defaults to True.
-        debug (bool, optional): Debug mode. Defaults to False.
-
-    Returns:
-        np.ndarray | np.ma.MaskedArray: Array of shape (n_windows, samples_per_window).
-            Returns a masked array when ``mask_zero_value=True``, otherwise a plain
-            float64 ndarray.
-
-    Raises:
-        ValueError: If ``window_overlap`` is not in range [0, 100).
-    """
-    window_samples = int(sampling_rate * 60 * window_min)
-    samples_per_day = 24 * 60 * 60 * sampling_rate
-
-    if window_overlap is None:
-        step_samples = window_samples
-    else:
-        if not (0.0 <= window_overlap < 100.0):
-            raise ValueError("window_overlap must be in range [0, 100)")
-        step_samples = int(window_samples * (1 - window_overlap / 100.0))
-
-    n_windows = (int(samples_per_day) - window_samples) // step_samples + 1
-
-    # Pad data so the last incomplete window is filled with NaN
-    difference_samples = int(samples_per_day) - len(data)
-    if difference_samples != 0:
-        data = np.concatenate([data, np.full(difference_samples, np.nan)])
-
-    if debug:
-        if len(data) != 144:
-            raise ValueError(f"n_windows should be 144, but got {len(data)}")
-
-    chunks = np.array(
-        [
-            data[i * step_samples : i * step_samples + window_samples]
-            for i in range(n_windows)
-        ],
-        dtype=float,
-    )
-
-    # Mask zeros (dead samples) and NaN (gaps + padding)
-    if mask_zero_value:
-        mask = (chunks == 0) | np.isnan(chunks)
-        return np.ma.MaskedArray(chunks, mask=mask)
-
-    return chunks

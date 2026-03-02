@@ -117,7 +117,7 @@ class DSAR:
             first_stream = calculate_window_metrics(
                 trace=trace,
                 window_duration_minutes=window_duration_minutes,
-                metric_function=np.mean,
+                metric_function=np.nanmean,
                 remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=minimum_completion_ratio,
                 absolute_value=True,
@@ -127,7 +127,7 @@ class DSAR:
             second_stream = calculate_window_metrics(
                 trace=trace,
                 window_duration_minutes=window_duration_minutes,
-                metric_function=np.mean,
+                metric_function=np.nanmean,
                 remove_outlier_method=self.remove_outlier_method,
                 minimum_completion_ratio=minimum_completion_ratio,
                 absolute_value=True,
