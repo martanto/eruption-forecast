@@ -172,6 +172,10 @@ class BuildLabelConfig(_ConfigBase):
             ``None`` uses ``ForecastModel.end_date``. Defaults to ``None``.
         tremor_columns (list[str] | None): Subset of tremor columns to retain
             for labeling. ``None`` keeps all columns. Defaults to ``None``.
+        builder (str): Label builder type — ``"standard"`` or ``"dynamic"``.
+            Defaults to ``"standard"``.
+        days_before_eruption (int | None): Days before each eruption to start
+            its window. Required when ``builder="dynamic"``. Defaults to ``None``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
         debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
@@ -183,6 +187,8 @@ class BuildLabelConfig(_ConfigBase):
     start_date: str | None = None
     end_date: str | None = None
     tremor_columns: list[str] | None = None
+    builder: str = "standard"
+    days_before_eruption: int | None = None
     verbose: bool = False
     debug: bool = False
 
