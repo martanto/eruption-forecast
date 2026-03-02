@@ -115,7 +115,7 @@ class RSAM:
     def calculate(
         self,
         window_duration_minutes: int = 10,
-        metric_function: Callable[[np.ndarray], float] = np.mean,
+        metric_function: Callable[[np.ndarray], float] = np.nanmean,
         value_multiplier: float = 1.0,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         minimum_completion_ratio: float = 0.3,
