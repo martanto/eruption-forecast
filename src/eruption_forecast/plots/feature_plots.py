@@ -7,7 +7,9 @@ from multiprocessing import Pool
 
 import pandas as pd
 import matplotlib.pyplot as plt
+from cycler import V
 from matplotlib.patches import Patch
+from jedi.inference.base_value import Value
 
 from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import (
@@ -21,7 +23,7 @@ from eruption_forecast.plots.styles import (
 def plot_significant_features(
     df: pd.DataFrame,
     filepath: str,
-    number_of_features: int = 50,
+    number_of_features: int = 30,
     top_features: int = 20,
     title: str | None = None,
     figsize: tuple[float, float] = (4, 12),
@@ -89,7 +91,7 @@ def plot_significant_features(
         ... )
     """
     number_of_features = (
-        number_of_features if len(df.columns) >= number_of_features else top_features
+        number_of_features if len(df.index) >= number_of_features else top_features
     )
 
     if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
@@ -163,19 +165,19 @@ def plot_significant_features(
         ax.set_ylim(-0.5, number_of_features - 0.5)
 
         # Add value labels for top features (optional, for clarity)
-        if number_of_features <= 30:  # Only for smaller plots
-            for i, (_idx, row) in enumerate(df.iterrows()):
-                if i >= (number_of_features - top_features):
-                    value = row[values_column]
-                    ax.text(
-                        value,
-                        i,
-                        f"  {value:.3f}",
-                        va="center",
-                        ha="left",
-                        fontsize=7,
-                        color=NATURE_COLORS["blue"],
-                    )
+        # if number_of_features <= 20:  # Only for smaller plots
+        #     for i, (_idx, row) in enumerate(df.iterrows()):
+        #         if i >= (number_of_features - top_features):
+        #             value = row[values_column]
+        #             ax.text(
+        #                 value,
+        #                 i,
+        #                 f"  {value:.3f}",
+        #                 va="center",
+        #                 ha="left",
+        #                 fontsize=7,
+        #                 color=NATURE_COLORS["blue"],
+        #             )
 
         # Note: tight_layout() is not called here because savefig.bbox='tight'
         # (configured in styles.py) handles layout automatically and is more
