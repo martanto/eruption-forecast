@@ -19,7 +19,7 @@ DEFAULT_SAMPLING_STRATEGY: float = 0.75
 """Default RandomUnderSampler strategy (ratio of minority to majority class)."""
 
 # Prediction Constants
-ERUPTION_PROBABILITY_THRESHOLD: float = 0.7
+ERUPTION_PROBABILITY_THRESHOLD: float = 0.5
 """Threshold for classifying eruption probability as positive."""
 
 THRESHOLD_RESOLUTION: int = 101

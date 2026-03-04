@@ -86,11 +86,11 @@ TRAINING_PARAMETERS: dict[str, Any] = {
     "verbose": True,
 }
 
-PREDICTION_START_DATE = "2025-07-28"
-PREDICTION_END_DATE = "2025-08-20"
+TRAINING_PREDICTION_START_DATE = "2025-01-01"
+TRAINING_PREDICTION_END_DATE = "2025-07-27"
 PREDICTION_PARAMETERS: dict[str, Any] = {
-    "start_date": PREDICTION_START_DATE,
-    "end_date": PREDICTION_END_DATE,
+    "start_date": "2025-07-28",
+    "end_date": "2025-08-20",
     "window_step": 10,
     "window_step_unit": "minutes",
 }
@@ -148,8 +148,8 @@ def train_and_evaluate(forecast_model: ForecastModel) -> None:
 
 def predict(forecast_model: ForecastModel) -> None:
     forecast_model.build_label(
-        start_date=PREDICTION_START_DATE,
-        end_date=PREDICTION_END_DATE,
+        start_date=TRAINING_PREDICTION_START_DATE,
+        end_date=TRAINING_PREDICTION_END_DATE,
         **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
         with_evaluation=False, **TRAINING_PARAMETERS
