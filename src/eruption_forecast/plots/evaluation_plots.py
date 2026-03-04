@@ -321,7 +321,7 @@ def plot_threshold_analysis(
             linewidth=2.0,
         )
 
-        # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.7)
+        # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.5)
         ax.axvline(
             ERUPTION_PROBABILITY_THRESHOLD,
             color=NATURE_COLORS["gray"],

@@ -1041,14 +1041,14 @@ class ForecastModel:
                 )
             label_builder = DynamicLabelBuilder(
                 days_before_eruption=days_before_eruption,
-                **label_kwargs,
+                **label_kwargs,  # ty:ignore[invalid-argument-type]
             ).build()
         else:
             validate_date_ranges(train_start_date, train_end_date)
             label_builder = LabelBuilder(
                 start_date=to_datetime(train_start_date),
                 end_date=to_datetime(train_end_date),
-                **label_kwargs,
+                **label_kwargs,  # ty:ignore[invalid-argument-type]
             ).build()
 
         # Prepare tremor data
@@ -1405,6 +1405,7 @@ class ForecastModel:
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         save_predictions: bool = True,
+        threshold: float = 0.5,
         save_plot: bool = True,
         output_dir: str | None = None,
         n_jobs: int | None = None,
@@ -1425,6 +1426,8 @@ class ForecastModel:
             window_step_unit (Literal["minutes", "hours"]): Unit of window step.
             save_predictions (bool, optional): If True, saves the prediction DataFrame
                 to a CSV file. Defaults to True.
+            threshold (float, optional): Threshold for classifying eruption
+                probability as positive. Defaults to 0.5.
             save_plot (bool, optional): If True, saves the forecast probability plot.
                 Defaults to True.
             output_dir (str | None, optional): Directory for forecast output files.
@@ -1470,6 +1473,7 @@ class ForecastModel:
             window_step=window_step,
             window_step_unit=window_step_unit,
             select_tremor_columns=self.select_tremor_columns,
+            threshold=threshold,
             save_predictions=save_predictions,
             plot=save_plot,
         )
@@ -1483,6 +1487,7 @@ class ForecastModel:
             window_step=window_step,
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,
+            threshold=threshold,
             save_plot=save_plot,
             n_jobs=n_jobs,
             overwrite=overwrite,

@@ -189,7 +189,9 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         result = np.column_stack([1.0 - mean_eruption, mean_eruption])
         return result
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(
+        self, X: pd.DataFrame, threshold: float = ERUPTION_PROBABILITY_THRESHOLD
+    ) -> np.ndarray:
         """Return binary predictions using ``ERUPTION_PROBABILITY_THRESHOLD`` on mean probability.
 
         Applies ``ERUPTION_PROBABILITY_THRESHOLD`` to the mean P(eruption) returned by
@@ -197,14 +199,14 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
+            threshold (float, optional): Probability threshold for eruption classification.
+                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
 
         Returns:
             np.ndarray: 1-D integer array of shape ``(n_samples,)`` with values
                 0 (non-eruption) or 1 (eruption).
         """
-        return (self.predict_proba(X)[:, 1] >= ERUPTION_PROBABILITY_THRESHOLD).astype(
-            int
-        )
+        return (self.predict_proba(X)[:, 1] >= threshold).astype(int)
 
     def predict_with_uncertainty(
         self,
@@ -220,7 +222,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
             threshold (float, optional): Probability threshold for eruption classification.
-                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.7.
+                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
 
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D
