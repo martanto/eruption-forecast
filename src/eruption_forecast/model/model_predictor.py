@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import joblib
 import matplotlib
 
+from eruption_forecast.utils.formatting import slugify
+
 
 matplotlib.use(
     "Agg"
@@ -138,6 +140,7 @@ class ModelPredictor:
         end_date: str | datetime,
         trained_models: str | dict[str, str],
         overwrite: bool = False,
+        model_name: str = "model",
         n_jobs: int = 1,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -164,6 +167,8 @@ class ModelPredictor:
                 (backward-compatible, auto-wrapped into ``ClassifierEnsemble``).
             overwrite (bool, optional): Re-compute cached intermediate files.
                 Defaults to False.
+            model_name (str, optional): Model name related to trained models.
+                Defaults to "model".
             n_jobs (int, optional): Number of parallel jobs for feature extraction.
                 Defaults to 1.
             output_dir (str | None, optional): Root directory for prediction outputs.
@@ -250,6 +255,9 @@ class ModelPredictor:
         self.labels_df: pd.DataFrame | pd.Series | None = None
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
 
+        model_name = slugify(model_name).lower()
+        self.model_name = model_name
+
         # Normalize trained_models to one of two internal representations:
         #   - dict[str, pd.DataFrame]   for CSV-based registry (existing path)
         #   - dict[str, SeedEnsemble]   for merged .pkl files (new path)
@@ -265,7 +273,7 @@ class ModelPredictor:
                     )
                 elif isinstance(loaded, SeedEnsemble):
                     # Single-classifier merged pkl
-                    self.trained_models = {"model": loaded}
+                    self.trained_models = {model_name: loaded}
                 elif isinstance(loaded, dict):
                     # Backward-compat: plain dict[str, SeedEnsemble] pkl — auto-wrap
                     self._classifier_ensemble: ClassifierEnsemble = (
@@ -276,7 +284,7 @@ class ModelPredictor:
                     raise ValueError(f"Unrecognised object type in pkl: {type(loaded)}")
             else:
                 self.trained_models = {
-                    "model": pd.read_csv(trained_models, index_col=0)
+                    model_name: pd.read_csv(trained_models, index_col=0)
                 }
         elif isinstance(trained_models, dict):
             first_val = next(iter(trained_models.values()))
@@ -296,6 +304,7 @@ class ModelPredictor:
                         )
             elif isinstance(first_val, str):
                 # Values are paths to CSV registry files
+                logger.info("Models prediction using CSV.")
                 self.trained_models = {
                     model_name: pd.read_csv(path, index_col=0)
                     for model_name, path in trained_models.items()
@@ -578,7 +587,7 @@ class ModelPredictor:
                 model_name=model_name,
                 model_output_dir=model_output_dir,
                 random_state=seed["random_state"],
-                model=seed["model"],
+                model=seed[self.model_name],
                 selected_features=seed["feature_names"],
                 features_df=features_df,
                 labels_df=labels_df,
@@ -993,7 +1002,7 @@ class ModelPredictor:
             use_relevant_features (bool, optional): Whether to use relevant features. Defaults to True.
             select_tremor_columns (list[str] | None): List of tremor columns to use. Defaults to None.
             threshold (float, optional): Probability threshold for eruption classification.
-                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.7.
+                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
             save_predictions (bool, optional): Save predictions result. Defaults to True.
             plot (bool, optional): Save a probability time-series plot.
                 Defaults to True.
@@ -1020,7 +1029,10 @@ class ModelPredictor:
         if isinstance(self._classifier_ensemble, ClassifierEnsemble):
             consensus_mean, consensus_std, consensus_conf, consensus_pred = (
                 self._forecast_with_classifier_ensemble(
-                    features_df, cols, model_mean_probabilities
+                    features_df,
+                    cols,
+                    model_mean_probabilities,
+                    threshold=threshold,
                 )
             )
         else:
@@ -1100,6 +1112,7 @@ class ModelPredictor:
         features_df: pd.DataFrame,
         cols: dict[str, np.ndarray],
         model_mean_probabilities: dict[str, np.ndarray],
+        threshold: float,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Delegate inference and consensus to a ClassifierEnsemble.
 
@@ -1114,6 +1127,8 @@ class ModelPredictor:
                 forecast DataFrame.
             model_mean_probabilities (dict[str, np.ndarray]): Mutable
                 accumulator for cross-classifier consensus computation.
+            threshold (float, optional): Threshold for classifying eruption
+                probability as positive.
 
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
@@ -1122,7 +1137,7 @@ class ModelPredictor:
         assert self._classifier_ensemble is not None
         consensus_mean, consensus_std, consensus_conf, consensus_pred, per_clf = (
             self._classifier_ensemble.predict_with_uncertainty(
-                features_df, threshold=0.5
+                features_df, threshold=threshold
             )
         )
         for model_name, clf_result in per_clf.items():
@@ -1351,6 +1366,11 @@ class ModelPredictor:
         summary_path = os.path.join(self.output_dir, "all_metrics_summary.csv")
         df.describe().T.to_csv(summary_path)
         logger.info(f"Metrics summary saved to: {summary_path}")
+
+    def _plot_forecast_new(
+        self, df: pd.DataFrame, model_mean_probabilities: dict[str, np.ndarray]
+    ) -> None:
+        return None
 
     def _plot_forecast(
         self,
