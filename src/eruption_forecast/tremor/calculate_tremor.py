@@ -27,7 +27,7 @@ from eruption_forecast.config.constants import (
 )
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
-from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
+from eruption_forecast.tremor.shannon_entropy import ShannonEntropy
 
 
 class CalculateTremor:
@@ -1123,7 +1123,7 @@ class CalculateTremor:
         stream_copy = stream.copy()
 
         df[column_name] = (
-            ShanonEntropy(
+            ShannonEntropy(
                 stream=stream_copy,
                 verbose=self.verbose,
                 debug=self.debug,

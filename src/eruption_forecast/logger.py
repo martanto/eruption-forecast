@@ -7,8 +7,8 @@ error-only log files for better debugging and monitoring.
 
 The logger configuration includes:
 - Console output with colored formatting
-- Daily rotating general log files (retained for 3 days)
-- Daily rotating error-only log files (retained for 3 days)
+- Daily rotating general log files (retained for 30 days)
+- Daily rotating error-only log files (retained for 90 days)
 - Thread-safe logging with queue-based handlers
 - Automatic log compression (zip format)
 
@@ -26,41 +26,69 @@ from loguru import logger
 from eruption_forecast.utils.pathutils import ensure_dir
 
 
+# Retention periods for log files.
+_GENERAL_LOG_RETENTION = "30 days"
+_ERROR_LOG_RETENTION = "90 days"
+
+# File log format shared across all file handlers.
+_FILE_FORMAT = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+
+# Console format with colour codes.
+_CONSOLE_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+)
+
 # Init default handler
 logger.remove()
 
 # Define default log directory
 DEFAULT_LOG_DIR = ensure_dir(os.path.join(os.getcwd(), "logs"))
 
-# Add console handler with custom format
-logger.add(
-    sys.stderr,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    level="INFO",
-    colorize=True,
-)
 
-# Add file handler with rotation
-logger.add(
-    os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
-    rotation="00:00",  # Rotate at midnight
-    retention="3 days",  # Keep logs for 30 days
-    compression="zip",  # Compress rotated logs
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="INFO",  # File logs everything including DEBUG
-    enqueue=True,  # Thread-safe logging
-)
+def _configure_handlers(log_dir: str, console_level: str = "INFO") -> None:
+    """Remove all existing handlers and re-add console + file handlers.
 
-# Add error-specific log file
-logger.add(
-    os.path.join(DEFAULT_LOG_DIR, "errors_{time:YYYY-MM-DD}.log"),
-    rotation="00:00",
-    retention="3 days",  # Keep error logs longer
-    compression="zip",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="ERROR",  # Only errors and above
-    enqueue=True,
-)
+    Centralises handler configuration so that module-level setup, set_log_level(),
+    and set_log_directory() all use the same retention periods and formats.
+
+    Args:
+        log_dir (str): Directory path for log file output.
+        console_level (str, optional): Log level for the console handler.
+            Defaults to "INFO".
+    """
+    logger.remove()
+
+    logger.add(
+        sys.stderr,
+        format=_CONSOLE_FORMAT,
+        level=console_level.upper(),
+        colorize=True,
+    )
+
+    logger.add(
+        os.path.join(log_dir, "forecast_{time:YYYY-MM-DD}.log"),
+        rotation="00:00",
+        retention=_GENERAL_LOG_RETENTION,
+        compression="zip",
+        format=_FILE_FORMAT,
+        level="DEBUG",
+        enqueue=True,
+    )
+
+    logger.add(
+        os.path.join(log_dir, "errors_{time:YYYY-MM-DD}.log"),
+        rotation="00:00",
+        retention=_ERROR_LOG_RETENTION,
+        compression="zip",
+        format=_FILE_FORMAT,
+        level="ERROR",
+        enqueue=True,
+    )
+
+
+# Initial handler setup at import time.
+_configure_handlers(DEFAULT_LOG_DIR)
 
 
 def get_logger():
@@ -100,36 +128,7 @@ def set_log_level(level: str) -> None:
         >>> set_log_level("DEBUG")  # Show all debug messages in console
         >>> set_log_level("WARNING")  # Only show warnings and errors in console
     """
-    logger.remove()  # Remove all handlers
-
-    # Re-add console handler with new level
-    logger.add(
-        sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-        level=level.upper(),
-        colorize=True,
-    )
-
-    # Re-add file handlers (keep their original levels)
-    logger.add(
-        os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
-        rotation="00:00",
-        retention="30 days",
-        compression="zip",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        level="DEBUG",
-        enqueue=True,
-    )
-
-    logger.add(
-        os.path.join(DEFAULT_LOG_DIR, "errors_{time:YYYY-MM-DD}.log"),
-        rotation="00:00",
-        retention="90 days",
-        compression="zip",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        level="ERROR",
-        enqueue=True,
-    )
+    _configure_handlers(DEFAULT_LOG_DIR, console_level=level)
 
 
 def set_log_directory(log_dir: str) -> None:
@@ -153,35 +152,5 @@ def set_log_directory(log_dir: str) -> None:
     """
     global DEFAULT_LOG_DIR
     DEFAULT_LOG_DIR = ensure_dir(os.path.abspath(log_dir))
-
-    # Reconfigure with new directory
-    logger.remove()
-
-    logger.add(
-        sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-        level="INFO",
-        colorize=True,
-    )
-
-    logger.add(
-        os.path.join(DEFAULT_LOG_DIR, "forecast_{time:YYYY-MM-DD}.log"),
-        rotation="00:00",
-        retention="30 days",
-        compression="zip",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        level="DEBUG",
-        enqueue=True,
-    )
-
-    logger.add(
-        os.path.join(DEFAULT_LOG_DIR, "errors_{time:YYYY-MM-DD}.log"),
-        rotation="00:00",
-        retention="90 days",
-        compression="zip",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        level="ERROR",
-        enqueue=True,
-    )
-
+    _configure_handlers(DEFAULT_LOG_DIR)
     logger.info(f"Log directory changed to: {DEFAULT_LOG_DIR}")

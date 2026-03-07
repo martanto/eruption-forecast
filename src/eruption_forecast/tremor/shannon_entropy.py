@@ -11,7 +11,7 @@ from eruption_forecast.config.constants import (
 )
 
 
-class ShanonEntropy:
+class ShannonEntropy:
     """Calculate Shannon entropy from a seismic stream.
 
     Computes Shannon entropy from seismic waveform data by applying a bandpass
@@ -34,11 +34,11 @@ class ShanonEntropy:
     Examples:
         >>> from obspy import read
         >>> stream = read("seismic_data.mseed")
-        >>> entropy = ShanonEntropy(stream).filter(1.0, 16.0).calculate()
+        >>> entropy = ShannonEntropy(stream).filter(1.0, 16.0).calculate()
     """
 
     def __init__(self, stream: Stream, verbose: bool = False, debug: bool = False):
-        """Initialize ShanonEntropy from an ObsPy Stream.
+        """Initialize ShannonEntropy from an ObsPy Stream.
 
         Extracts the first trace from the stream and sets default filter bounds
         of 1–16 Hz.
@@ -69,7 +69,7 @@ class ShanonEntropy:
             freqmax (float): Maximum frequency of data to be filtered.
 
         Returns:
-            Self: ShanonEntropy instance for method chaining.
+            Self: ShannonEntropy instance for method chaining.
 
         Raises:
             ValueError: If freqmin is greater than or equal to freqmax.

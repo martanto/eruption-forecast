@@ -56,33 +56,19 @@ class RSAM:
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
-        # ------------------------------------------------------------------
-        # Set DEFAULT parameter
-        # ------------------------------------------------------------------
         trace: Trace = stream[0]
         start_datetime: datetime = trace.stats.starttime.datetime
 
-        # ------------------------------------------------------------------
-        # Set DEFAULT properties
-        # ------------------------------------------------------------------
         self.trace = trace
         self.start_datetime = start_datetime
         self.verbose = verbose
         self.debug = debug
-
-        # ------------------------------------------------------------------
-        # Set ADDITIONAL properties (derived values)
-        # ------------------------------------------------------------------
         self.start_datetime_str = start_datetime.strftime("%Y-%m-%d")
 
-        # ------------------------------------------------------------------
-        # Will be set after apply_filter() method called
-        # ------------------------------------------------------------------
+        # Will be set after apply_filter() is called.
         self.is_filtered = False
 
-        # ------------------------------------------------------------------
-        # Will be set after calculate() method called
-        # ------------------------------------------------------------------
+        # Will be set after calculate() is called.
         self.series: pd.Series = pd.Series(dtype=float)
 
     def apply_filter(self, freq_min: float, freq_max: float) -> Self:
