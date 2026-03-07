@@ -18,6 +18,7 @@ from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.dataframe import remove_anomalies
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.config.constants import CALCULATE_METHODS
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
 from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
@@ -218,7 +219,7 @@ class CalculateTremor:
         self.location = location or "00"
 
         # TODO: Add kurtosis
-        self.methods: list[str] = methods or ["rsam", "dsar", "entropy"]
+        self.methods: list[str] = methods or CALCULATE_METHODS
         self.output_dir: str = output_dir
         self.station_dir: str = station_dir
         self.forecast_dir: str = forecast_dir
@@ -534,14 +535,13 @@ class CalculateTremor:
                 f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
             )
 
-        valid_methods = ["rsam", "dsar", "entropy"]
         if not isinstance(self.methods, list):
             raise ValueError(f"Methods must be a list. Your value: {self.methods}")
 
         for method in self.methods:
-            if method not in valid_methods:
+            if method not in CALCULATE_METHODS:
                 raise ValueError(
-                    f"Method '{method}' not found. Choose between: {valid_methods}"
+                    f"Method '{method}' not found. Choose between: {CALCULATE_METHODS}"
                 )
 
         self.create_directories()

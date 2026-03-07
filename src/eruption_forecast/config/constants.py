@@ -5,6 +5,9 @@ This module contains all hardcoded values used throughout the package to ensure
 consistency and ease of maintenance.
 """
 
+# Calculating methods
+CALCULATE_METHODS = ["rsam", "dsar", "entropy"]
+
 # Model Training Constants
 TRAIN_TEST_SPLIT: float = 0.2
 """Train/test split ratio for model evaluation (default: 80/20 split)."""
