@@ -16,7 +16,7 @@ ROOT_DIR = r"D:\Projects\eruption-forecast"
 SDS_DIR = r"D:\Data\OJN"
 N_JOBS = 6
 CLASSIFIER = ["lite-rf", "rf"] if DEBUG else ["lite-rf", "rf", "gb", "xgb"]
-TRAINING_SEEDS = 10 if DEBUG else 500
+TRAINING_SEEDS = 5 if DEBUG else 500
 
 ERUPTION_DATES = [
     "2025-03-20",
@@ -110,8 +110,9 @@ def train_and_evaluate(forecast_model: ForecastModel) -> None:
             "Run Stage 2 first or load a ForecastModel with trained_models set."
         )
     else:
+        print("[workflow] Stage 3: Evaluating")
         for name, csv_path in forecast_model.trained_models.items():
-            print(f"[workflow] Stage 3: evaluating '{name}'")
+            print(f"    [workflow] Evaluating '{name}'")
             csv_dir = os.path.dirname(os.path.abspath(csv_path))
             metrics_dir: str | None = os.path.join(csv_dir, "metrics")
 
