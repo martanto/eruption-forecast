@@ -37,3 +37,4 @@ tests/output/
 /test*.py
 /test_*.py
 /.github/
+output*
