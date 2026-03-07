@@ -5,6 +5,10 @@ import pandas as pd
 from obspy import Trace, Stream
 
 from eruption_forecast.utils.window import calculate_window_metrics
+from eruption_forecast.config.constants import (
+    DEFAULT_WINDOW_DURATION_MINUTES,
+    DEFAULT_MINIMUM_COMPLETION_RATIO,
+)
 
 
 class DSAR:
@@ -74,9 +78,9 @@ class DSAR:
         self,
         first_stream: Stream | pd.Series,
         second_stream: Stream | pd.Series,
-        window_duration_minutes: int = 10,
+        window_duration_minutes: int = DEFAULT_WINDOW_DURATION_MINUTES,
         value_multiplier: float = 1.0,
-        minimum_completion_ratio: float = 0.3,
+        minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
         interpolate: bool = True,
     ) -> pd.Series:
         """Calculate Displacement Seismic Amplitude Ratio (DSAR).

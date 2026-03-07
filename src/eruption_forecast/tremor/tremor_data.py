@@ -5,6 +5,7 @@ from functools import cached_property
 import pandas as pd
 
 from eruption_forecast.data_container import BaseDataContainer
+from eruption_forecast.config.constants import DEFAULT_SAMPLING_FREQUENCY
 from eruption_forecast.utils.validation import check_sampling_consistency
 
 
@@ -226,6 +227,6 @@ class TremorData(BaseDataContainer):
         """
         return check_sampling_consistency(
             df=self.df,
-            expected_freq="10min",
+            expected_freq=DEFAULT_SAMPLING_FREQUENCY,
             verbose=self.verbose,
         )

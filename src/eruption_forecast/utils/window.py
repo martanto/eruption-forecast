@@ -19,6 +19,10 @@ from eruption_forecast.utils.array import (
     remove_outliers,
     remove_maximum_outlier,
 )
+from eruption_forecast.config.constants import (
+    DEFAULT_WINDOW_DURATION_MINUTES,
+    DEFAULT_MINIMUM_COMPLETION_RATIO,
+)
 from eruption_forecast.utils.validation import (
     validate_date_ranges,
     validate_window_step,
@@ -27,7 +31,7 @@ from eruption_forecast.utils.validation import (
 
 def get_windows_information(
     trace: Trace,
-    window_duration_minutes: int = 10,
+    window_duration_minutes: int = DEFAULT_WINDOW_DURATION_MINUTES,
 ) -> dict[str, int | float]:
     """Get window and sample information from an ObsPy Trace.
 
@@ -201,11 +205,11 @@ def chunk_daily_data(
 
 def calculate_window_metrics(
     trace: Trace,
-    window_duration_minutes: int = 10,
+    window_duration_minutes: int = DEFAULT_WINDOW_DURATION_MINUTES,
     metric_function: Callable[[np.ndarray], float] = np.nanmean,
     remove_outlier_method: Literal["maximum", "all"] | None = None,
     mask_zero_value: bool = False,
-    minimum_completion_ratio: float = 0.3,
+    minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
     absolute_value: bool = False,
     window_overlap: float | None = None,
     value_multiplier: float = 1.0,

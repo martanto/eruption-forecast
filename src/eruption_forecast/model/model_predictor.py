@@ -5,12 +5,11 @@ from datetime import datetime, timedelta
 import joblib
 import matplotlib
 
+from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 from eruption_forecast.utils.formatting import slugify
 
 
-matplotlib.use(
-    "Agg"
-)  # Must be called before pyplot import — non-interactive backend safe for worker threads
+matplotlib.use(MATPLOTLIB_BACKEND)  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

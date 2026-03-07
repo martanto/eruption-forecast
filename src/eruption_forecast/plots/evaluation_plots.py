@@ -36,7 +36,7 @@ from sklearn.metrics import (
 from sklearn.ensemble import VotingClassifier
 from sklearn.calibration import calibration_curve
 
-from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.config import CLASS_LABELS, ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.utils.ml import compute_threshold_metrics
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
@@ -90,7 +90,7 @@ def plot_confusion_matrix(
         >>> fig = plot_confusion_matrix(y_true, y_pred, normalize="true")
     """
     cm = confusion_matrix(y_true, y_pred, normalize=normalize)
-    labels = ["Not Erupted", "Erupted"]
+    labels = CLASS_LABELS
     fmt = ".2f" if normalize else "d"
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
@@ -1053,7 +1053,7 @@ def plot_aggregate_confusion_matrix(
     for y_true, y_pred in zip(y_trues, y_preds, strict=False):
         cm_sum += confusion_matrix(y_true, y_pred)
 
-    labels = ["Not Erupted", "Erupted"]
+    labels = CLASS_LABELS
 
     if normalize == "true":
         cm_display = cm_sum.astype(float) / cm_sum.sum(axis=1, keepdims=True)

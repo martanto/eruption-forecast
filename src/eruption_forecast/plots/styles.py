@@ -36,8 +36,10 @@ from contextlib import contextmanager
 
 import matplotlib
 
+from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 
-matplotlib.use("Agg")  # Must be called before pyplot import — non-interactive backend safe for worker threads
+
+matplotlib.use(MATPLOTLIB_BACKEND)  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from cycler import cycler

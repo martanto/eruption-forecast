@@ -18,7 +18,13 @@ from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.dataframe import remove_anomalies
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
-from eruption_forecast.config.constants import CALCULATE_METHODS
+from eruption_forecast.config.constants import (
+    CALCULATE_METHODS,
+    BANDPASS_FILTER_CORNERS,
+    DEFAULT_FREQUENCY_BANDS,
+    DEFAULT_SAMPLING_FREQUENCY,
+    DEFAULT_MINIMUM_COMPLETION_RATIO,
+)
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
 from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
@@ -145,7 +151,7 @@ class CalculateTremor:
         save_plot: bool = False,
         overwrite_plot: bool = False,
         filename_prefix: str | None = None,
-        minimum_completion_ratio: float = 0.3,
+        minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
@@ -247,13 +253,7 @@ class CalculateTremor:
         self.end_date_str: str = end_date.strftime("%Y-%m-%d")
         self.start_date_utc_datetime = UTCDateTime(self.start_date)
         self.end_date_utc_datetime = UTCDateTime(self.end_date)
-        self.freq_bands: list[tuple[float, float]] = [
-            (0.01, 0.1),
-            (0.1, 2),
-            (2, 5),
-            (4.5, 8),
-            (8, 16),
-        ]
+        self.freq_bands: list[tuple[float, float]] = list(DEFAULT_FREQUENCY_BANDS)
         self.figures_dir = figures_dir
         self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
@@ -884,7 +884,7 @@ class CalculateTremor:
             datetime_index = pd.date_range(
                 start=date,
                 end=date + timedelta(days=1),
-                freq="10min",
+                freq=DEFAULT_SAMPLING_FREQUENCY,
                 inclusive="left",
             )
             columns = self._expected_columns()
@@ -892,7 +892,7 @@ class CalculateTremor:
 
         # Build tremor DataFrame index
         datetime_index = pd.date_range(
-            start=date, end=date + timedelta(days=1), freq="10min", inclusive="left"
+            start=date, end=date + timedelta(days=1), freq=DEFAULT_SAMPLING_FREQUENCY, inclusive="left"
         )
 
         # Init tremor DataFrame without tremor values
@@ -982,7 +982,7 @@ class CalculateTremor:
                 "bandpass",
                 freqmin=freq_band[0],
                 freqmax=freq_band[1],
-                corners=4,
+                corners=BANDPASS_FILTER_CORNERS,
             )
 
             # Extract amplitude series with outlier removal

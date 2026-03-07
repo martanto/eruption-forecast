@@ -4,6 +4,11 @@ import pandas as pd
 from obspy import Trace, Stream
 
 from eruption_forecast.utils.window import shannon_entropy, calculate_window_metrics
+from eruption_forecast.config.constants import (
+    BANDPASS_FILTER_CORNERS,
+    DEFAULT_WINDOW_DURATION_MINUTES,
+    DEFAULT_MINIMUM_COMPLETION_RATIO,
+)
 
 
 class ShanonEntropy:
@@ -81,9 +86,9 @@ class ShanonEntropy:
 
     def calculate(
         self,
-        window_duration_minutes: int = 10,
+        window_duration_minutes: int = DEFAULT_WINDOW_DURATION_MINUTES,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
-        minimum_completion_ratio: float = 0.3,
+        minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
         window_overlap: float | None = None,
         interpolate: bool = True,
     ) -> pd.Series:
@@ -113,7 +118,7 @@ class ShanonEntropy:
                 ``window_duration_minutes`` intervals.
         """
         trace: Trace = self.trace.copy()
-        trace.filter("bandpass", freqmin=self.freqmin, freqmax=self.freqmax, corners=4)
+        trace.filter("bandpass", freqmin=self.freqmin, freqmax=self.freqmax, corners=BANDPASS_FILTER_CORNERS)
 
         series = calculate_window_metrics(
             trace=trace,
