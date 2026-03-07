@@ -37,32 +37,25 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     Attributes:
         classifier_name (str): Human-readable classifier name (e.g.
             "RandomForestClassifier").
-        cv_strategy (str): CV strategy slug used during training (e.g.
-            "StratifiedShuffleSplit").
         seeds (list[dict]): List of seed records.  Each record is a dict with
             keys ``random_state`` (int), ``model`` (fitted estimator), and
             ``feature_names`` (list[str]).
 
     Args:
         classifier_name (str): Human-readable classifier name.
-        cv_strategy (str): CV strategy slug.
     """
 
-    def __init__(self, classifier_name: str, cv_strategy: str) -> None:
+    def __init__(self, classifier_name: str) -> None:
         """Initialise an empty SeedEnsemble for the given classifier.
 
         Creates an empty container ready to have seeds added via
-        :meth:`from_registry`.  ``classifier_name`` and ``cv_strategy`` are
-        stored as metadata and used in log messages.
+        :meth:`from_registry`.
 
         Args:
             classifier_name (str): Human-readable classifier name (e.g.
                 "RandomForestClassifier").
-            cv_strategy (str): CV strategy slug used during training (e.g.
-                "StratifiedShuffleSplit").
         """
         self.classifier_name = classifier_name
-        self.cv_strategy = cv_strategy
         self.seeds: list[dict] = []
 
     # ------------------------------------------------------------------
@@ -95,11 +88,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         df = pd.read_csv(registry_csv, index_col=0)
 
-        # Infer metadata from the first row's model file path via joblib peek —
-        # fall back to generic labels if the model has no class name attribute.
         classifier_name = "unknown"
-        cv_strategy = "unknown"
-
         seeds: list[dict] = []
 
         for random_state, row in df.iterrows():
@@ -113,7 +102,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             # Try to extract metadata from the first seed
             if classifier_name == "unknown":
                 classifier_name = type(model).__name__
-                # cv_strategy stays "unknown" unless we find a better source
 
             seeds.append(
                 {
@@ -128,7 +116,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 f"{len(feature_names)} features"
             )
 
-        ensemble = cls(classifier_name=classifier_name, cv_strategy=cv_strategy)
+        ensemble = cls(classifier_name=classifier_name)
         ensemble.seeds = seeds
         logger.info(f"[SeedEnsemble] Loaded {len(seeds)} seeds for {classifier_name}")
         return ensemble
@@ -282,11 +270,9 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 ``BaseEstimator``.  Not applied here.  Defaults to 700.
 
         Returns:
-            str: Representation including classifier name, CV strategy, and
-                seed count.
+            str: Representation including classifier name and seed count.
         """
         return (
             f"SeedEnsemble(classifier_name={self.classifier_name!r}, "
-            f"cv_strategy={self.cv_strategy!r}, "
             f"n_seeds={len(self.seeds)})"
         )
