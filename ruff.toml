@@ -5,15 +5,17 @@ target-version = "py311"
 line-length = 88
 cache-dir = "./.cache/ruff"
 extend-exclude = [
+    ".venv",
     ".cache",
     "*.md",
     ".claude",
-    "output",
+    "output*",
     "*.ipynb",
     "logs",
     "*.log",
     "tests",
     "test*",
+    "changelogs"
 ]
 
 [lint]
@@ -48,7 +50,7 @@ convention = "google"
 [lint.per-file-ignores]
 "__init__.py" = ["F401"] # Unused imports
 "tests/*" = ["PLR2004", "S101"] # Magic values and asserts are fine in tests
-"scripts/*" = ["T201"]        # Allow print in scripts
+"scripts/*" = ["T201"] # Allow print in scripts
 
 [lint.isort]
 length-sort = true
