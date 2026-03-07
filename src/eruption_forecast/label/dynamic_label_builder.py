@@ -45,6 +45,7 @@ class DynamicLabelBuilder(LabelBuilder):
         output_dir: str | None = None,
         root_dir: str | None = None,
         prefix_filename: str | None = None,
+        overwrite: bool = False,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -65,6 +66,7 @@ class DynamicLabelBuilder(LabelBuilder):
                 relative output_dir paths. Defaults to None.
             prefix_filename (str | None, optional): Custom prefix for the output
                 filename. Defaults to ``"label"``.
+            overwrite (bool, optional): Overwrite existing output files. Defaults to False.
             verbose (bool, optional): Enable informational logging. Defaults to False.
             debug (bool, optional): Enable debug-level logging. Defaults to False.
 
@@ -112,6 +114,7 @@ class DynamicLabelBuilder(LabelBuilder):
             f"_dtf-{day_to_forecast}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
+        self.overwrite = overwrite
 
     @property
     def _eruption_dates(self) -> list[datetime]:
@@ -181,7 +184,7 @@ class DynamicLabelBuilder(LabelBuilder):
 
         file_exists = os.path.isfile(self.csv)
 
-        if file_exists:
+        if file_exists and not self.overwrite:
             if self.verbose:
                 logger.info(f"Loading existing labels from {self.csv}")
             _df = self.from_csv(self.csv)
@@ -197,6 +200,7 @@ class DynamicLabelBuilder(LabelBuilder):
             start_date, end_eruption = label_date
 
             # Initialise per-eruption window DataFrame.
+            # Initiate ``is_erupted`` column value to 0 (no eruption).
             df = self.initiate_label(start_date=start_date, end_date=end_eruption)
 
             start_eruption = end_eruption - timedelta(days=self.day_to_forecast)
