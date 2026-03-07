@@ -21,7 +21,7 @@ from eruption_forecast.plots.styles import (
 def plot_significant_features(
     df: pd.DataFrame,
     filepath: str,
-    number_of_features: int = 50,
+    number_of_features: int = 30,
     top_features: int = 20,
     title: str | None = None,
     figsize: tuple[float, float] = (4, 12),
@@ -89,7 +89,7 @@ def plot_significant_features(
         ... )
     """
     number_of_features = (
-        number_of_features if len(df.columns) >= number_of_features else top_features
+        number_of_features if len(df.index) >= number_of_features else top_features
     )
 
     if (filepath is not None) and (not overwrite) and os.path.isfile(filepath):
@@ -163,19 +163,19 @@ def plot_significant_features(
         ax.set_ylim(-0.5, number_of_features - 0.5)
 
         # Add value labels for top features (optional, for clarity)
-        if number_of_features <= 30:  # Only for smaller plots
-            for i, (_idx, row) in enumerate(df.iterrows()):
-                if i >= (number_of_features - top_features):
-                    value = row[values_column]
-                    ax.text(
-                        value,
-                        i,
-                        f"  {value:.3f}",
-                        va="center",
-                        ha="left",
-                        fontsize=7,
-                        color=NATURE_COLORS["blue"],
-                    )
+        # if number_of_features <= 20:  # Only for smaller plots
+        #     for i, (_idx, row) in enumerate(df.iterrows()):
+        #         if i >= (number_of_features - top_features):
+        #             value = row[values_column]
+        #             ax.text(
+        #                 value,
+        #                 i,
+        #                 f"  {value:.3f}",
+        #                 va="center",
+        #                 ha="left",
+        #                 fontsize=7,
+        #                 color=NATURE_COLORS["blue"],
+        #             )
 
         # Note: tight_layout() is not called here because savefig.bbox='tight'
         # (configured in styles.py) handles layout automatically and is more
@@ -444,7 +444,14 @@ def replot_significant_features(
 # Frequency band contribution plot
 # ---------------------------------------------------------------------------
 
-_BAND_PREFIX_RE = re.compile(r"^((?:rsam|dsar)_[^_]+)")
+_BAND_PREFIX_RE = re.compile(r"^((?:rsam|dsar|entropy)_[^_]+)")
+
+# Color map: each calculate method → Okabe-Ito color (matches tremor_plots.py)
+_METHOD_COLORS: dict[str, str] = {
+    "rsam": OKABE_ITO[4],     # Blue
+    "dsar": OKABE_ITO[0],     # Orange
+    "entropy": OKABE_ITO[6],  # Reddish purple
+}
 
 
 def _extract_band_prefix(feature_name: str) -> str:
@@ -478,8 +485,9 @@ def plot_frequency_band_contribution(
     ``feature_names`` is a list of lists (multi-seed), computes mean ± std
     count per band across seeds.
 
-    RSAM bands are coloured blue and DSAR bands are coloured orange to make
-    the contribution of each measurement type immediately apparent.
+    RSAM bands are coloured blue, DSAR bands orange, and entropy bands
+    reddish-purple to make the contribution of each measurement type
+    immediately apparent.
 
     Args:
         feature_names (list[str] | list[list[str]]): Either a flat list of
@@ -532,7 +540,10 @@ def plot_frequency_band_contribution(
         display_std = display_std.iloc[::-1]
 
         bar_colors = [
-            OKABE_ITO[4] if b.startswith("rsam") else OKABE_ITO[0]
+            next(
+                (color for method, color in _METHOD_COLORS.items() if b.startswith(method)),
+                OKABE_ITO[-1],  # Fallback for unknown prefix
+            )
             for b in display_bands
         ]
 
@@ -554,8 +565,8 @@ def plot_frequency_band_contribution(
             ax.set_title(title or "Feature Count by Frequency Band")
             # Legend
             legend_handles = [
-                Patch(facecolor=OKABE_ITO[4], alpha=0.8, label="RSAM"),
-                Patch(facecolor=OKABE_ITO[0], alpha=0.8, label="DSAR"),
+                Patch(facecolor=color, alpha=0.8, label=method.upper())
+                for method, color in _METHOD_COLORS.items()
             ]
             ax.legend(handles=legend_handles, frameon=False)
             fig.set_layout_engine("tight")
@@ -578,7 +589,10 @@ def plot_frequency_band_contribution(
         display_counts = counts.iloc[::-1]
 
         bar_colors = [
-            OKABE_ITO[4] if b.startswith("rsam") else OKABE_ITO[0]
+            next(
+                (color for method, color in _METHOD_COLORS.items() if b.startswith(method)),
+                OKABE_ITO[-1],  # Fallback for unknown prefix
+            )
             for b in display_bands
         ]
 
@@ -597,8 +611,8 @@ def plot_frequency_band_contribution(
             ax.set_ylabel("Frequency Band")
             ax.set_title(title or "Feature Count by Frequency Band")
             legend_handles = [
-                Patch(facecolor=OKABE_ITO[4], alpha=0.8, label="RSAM"),
-                Patch(facecolor=OKABE_ITO[0], alpha=0.8, label="DSAR"),
+                Patch(facecolor=color, alpha=0.8, label=method.upper())
+                for method, color in _METHOD_COLORS.items()
             ]
             ax.legend(handles=legend_handles, frameon=False)
             fig.set_layout_engine("tight")

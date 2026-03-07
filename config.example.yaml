@@ -46,6 +46,8 @@ build_label:
   start_date: null          # Override label start date (null = model.start_date)
   end_date: null            # Override label end date (null = model.end_date)
   tremor_columns: null      # Subset of tremor columns to include (null = all)
+  builder: standard         # Label builder type: 'standard' or 'dynamic'
+  days_before_eruption: null  # Days before eruption window (required when builder='dynamic')
   verbose: false
   debug: false
 

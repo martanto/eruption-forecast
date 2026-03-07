@@ -8,6 +8,11 @@ from obspy import Trace, Stream
 from loguru import logger
 
 from eruption_forecast.utils.window import calculate_window_metrics
+from eruption_forecast.config.constants import (
+    BANDPASS_FILTER_CORNERS,
+    DEFAULT_WINDOW_DURATION_MINUTES,
+    DEFAULT_MINIMUM_COMPLETION_RATIO,
+)
 
 
 class RSAM:
@@ -99,7 +104,7 @@ class RSAM:
             >>> print(rsam.is_filtered)  # True
         """
         self.trace = self.trace.filter(
-            "bandpass", freqmin=freq_min, freqmax=freq_max, corners=4
+            "bandpass", freqmin=freq_min, freqmax=freq_max, corners=BANDPASS_FILTER_CORNERS
         )
 
         # Set is_filtered to True
@@ -114,11 +119,11 @@ class RSAM:
 
     def calculate(
         self,
-        window_duration_minutes: int = 10,
-        metric_function: Callable[[np.ndarray], float] = np.mean,
+        window_duration_minutes: int = DEFAULT_WINDOW_DURATION_MINUTES,
+        metric_function: Callable[[np.ndarray], float] = np.nanmean,
         value_multiplier: float = 1.0,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
-        minimum_completion_ratio: float = 0.3,
+        minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
         interpolate: bool = True,
     ) -> pd.Series:
         """Calculate RSAM metrics over sliding time windows.

@@ -29,6 +29,7 @@ from eruption_forecast.config.pipeline_config import (
 )
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
@@ -965,6 +966,8 @@ class ForecastModel:
         end_date: str | datetime | None = None,
         output_dir: str | None = None,
         tremor_columns: list[str] | None = None,
+        builder: Literal["standard", "dynamic"] = "standard",
+        days_before_eruption: int | None = None,
         verbose: bool | None = None,
         debug: bool | None = None,
     ) -> Self:
@@ -974,20 +977,35 @@ class ForecastModel:
         Each window is labeled as erupted (1) or not erupted (0) based on
         eruption dates and forecast horizon.
 
+        Two builder modes are supported:
+
+        - ``"standard"``: one global window spanning ``start_date`` to ``end_date``.
+        - ``"dynamic"``: one window per eruption, each spanning
+          ``days_before_eruption`` days before the event.
+
         Args:
             window_step (int): Window step size.
             window_step_unit (Literal["minutes", "hours"]): Unit of window step.
             day_to_forecast (int): Day to forecast in days.
             eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
-            start_date (str, optional): Override self.start_date.
-            end_date (str, optional): Override self.end_date.
+            start_date (str, optional): Override self.start_date. Used only when
+                ``builder="standard"``.
+            end_date (str, optional): Override self.end_date. Used only when
+                ``builder="standard"``.
             output_dir (Optional[str], optional): Output directory. Defaults to None.
             tremor_columns (Optional[list[str]], optional): Columns to select. Defaults to None.
+            builder (Literal["standard", "dynamic"]): Label builder type. Defaults to
+                ``"standard"``.
+            days_before_eruption (int | None): Days before each eruption to start its
+                window. Required when ``builder="dynamic"``. Defaults to None.
             verbose (bool | None, optional): If True, enables verbose logging. Defaults to None.
             debug (bool | None, optional): If True, enables debug mode. Defaults to None.
 
         Returns:
             Self: ForecastModel instance for method chaining.
+
+        Raises:
+            ValueError: If ``builder="dynamic"`` and ``days_before_eruption`` is None.
         """
         # Setup parameters
         tremor_data = self.tremor_data
@@ -1000,22 +1018,38 @@ class ForecastModel:
         ensure_dir(output_dir)
 
         # Validate inputs
-        validate_date_ranges(train_start_date, train_end_date)
         self._validate_tremor_for_labeling(tremor_data, tremor_columns)
 
+        # Shared kwargs for both builders
+        label_kwargs = {
+            "window_step": window_step,
+            "window_step_unit": window_step_unit,
+            "day_to_forecast": day_to_forecast,
+            "eruption_dates": eruption_dates,
+            "volcano_id": self.volcano_id,
+            "output_dir": output_dir,
+            "root_dir": self.root_dir,
+            "verbose": verbose,
+            "debug": debug,
+        }
+
         # Build labels
-        label_builder = LabelBuilder(
-            start_date=to_datetime(train_start_date),
-            end_date=to_datetime(train_end_date),
-            window_step=window_step,
-            window_step_unit=window_step_unit,
-            day_to_forecast=day_to_forecast,
-            eruption_dates=eruption_dates,
-            volcano_id=self.volcano_id,
-            output_dir=output_dir,
-            verbose=verbose,
-            debug=debug,
-        ).build()
+        if builder == "dynamic":
+            if days_before_eruption is None:
+                raise ValueError(
+                    "days_before_eruption is required when builder='dynamic'."
+                )
+            label_builder = DynamicLabelBuilder(
+                days_before_eruption=days_before_eruption,
+                **label_kwargs,  # ty:ignore[invalid-argument-type]
+            ).build()
+        else:
+            validate_date_ranges(train_start_date, train_end_date)
+            label_builder = LabelBuilder(
+                start_date=to_datetime(train_start_date),
+                end_date=to_datetime(train_end_date),
+                **label_kwargs,  # ty:ignore[invalid-argument-type]
+            ).build()
 
         # Prepare tremor data
         df_tremor = self._prepare_tremor_for_labeling(tremor_columns)
@@ -1048,6 +1082,8 @@ class ForecastModel:
             start_date=str(train_start_date) if start_date is not None else None,
             end_date=str(train_end_date) if end_date is not None else None,
             tremor_columns=tremor_columns,
+            builder=builder,
+            days_before_eruption=days_before_eruption,
             verbose=bool(verbose),
             debug=bool(debug),
         )
@@ -1369,6 +1405,7 @@ class ForecastModel:
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         save_predictions: bool = True,
+        threshold: float = 0.5,
         save_plot: bool = True,
         output_dir: str | None = None,
         n_jobs: int | None = None,
@@ -1389,6 +1426,8 @@ class ForecastModel:
             window_step_unit (Literal["minutes", "hours"]): Unit of window step.
             save_predictions (bool, optional): If True, saves the prediction DataFrame
                 to a CSV file. Defaults to True.
+            threshold (float, optional): Threshold for classifying eruption
+                probability as positive. Defaults to 0.5.
             save_plot (bool, optional): If True, saves the forecast probability plot.
                 Defaults to True.
             output_dir (str | None, optional): Directory for forecast output files.
@@ -1434,6 +1473,7 @@ class ForecastModel:
             window_step=window_step,
             window_step_unit=window_step_unit,
             select_tremor_columns=self.select_tremor_columns,
+            threshold=threshold,
             save_predictions=save_predictions,
             plot=save_plot,
         )
@@ -1447,6 +1487,7 @@ class ForecastModel:
             window_step=window_step,
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,
+            threshold=threshold,
             save_plot=save_plot,
             n_jobs=n_jobs,
             overwrite=overwrite,

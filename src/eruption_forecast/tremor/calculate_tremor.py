@@ -18,6 +18,13 @@ from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.dataframe import remove_anomalies
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.config.constants import (
+    CALCULATE_METHODS,
+    BANDPASS_FILTER_CORNERS,
+    DEFAULT_FREQUENCY_BANDS,
+    DEFAULT_SAMPLING_FREQUENCY,
+    DEFAULT_MINIMUM_COMPLETION_RATIO,
+)
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.plots.tremor_plots import plot_tremor
 from eruption_forecast.tremor.shannon_entropy import ShanonEntropy
@@ -144,6 +151,7 @@ class CalculateTremor:
         save_plot: bool = False,
         overwrite_plot: bool = False,
         filename_prefix: str | None = None,
+        minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
@@ -217,13 +225,14 @@ class CalculateTremor:
         self.location = location or "00"
 
         # TODO: Add kurtosis
-        self.methods: list[str] = methods or ["rsam", "dsar", "entropy"]
+        self.methods: list[str] = methods or CALCULATE_METHODS
         self.output_dir: str = output_dir
         self.station_dir: str = station_dir
         self.forecast_dir: str = forecast_dir
         self.tremor_dir: str = tremor_dir
         self.overwrite = overwrite
         self.filename_prefix = filename_prefix
+        self.minimum_completion_ratio = minimum_completion_ratio
         self.n_jobs = n_jobs
         self.remove_outlier_method = remove_outlier_method
         self.interpolate = interpolate
@@ -239,17 +248,12 @@ class CalculateTremor:
         # Set ADDITIONAL properties (derived values)
         # ------------------------------------------------------------------
         self.df: pd.DataFrame = pd.DataFrame()
+        self.df_non_interpolated: pd.DataFrame = pd.DataFrame()
         self.start_date_str: str = start_date.strftime("%Y-%m-%d")
         self.end_date_str: str = end_date.strftime("%Y-%m-%d")
         self.start_date_utc_datetime = UTCDateTime(self.start_date)
         self.end_date_utc_datetime = UTCDateTime(self.end_date)
-        self.freq_bands: list[tuple[float, float]] = [
-            (0.01, 0.1),
-            (0.1, 2),
-            (2, 5),
-            (4.5, 8),
-            (8, 16),
-        ]
+        self.freq_bands: list[tuple[float, float]] = list(DEFAULT_FREQUENCY_BANDS)
         self.figures_dir = figures_dir
         self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
@@ -531,14 +535,13 @@ class CalculateTremor:
                 f"Start date {self.start_date_str} must be before end date {self.end_date_str}"
             )
 
-        valid_methods = ["rsam", "dsar", "entropy"]
         if not isinstance(self.methods, list):
             raise ValueError(f"Methods must be a list. Your value: {self.methods}")
 
         for method in self.methods:
-            if method not in valid_methods:
+            if method not in CALCULATE_METHODS:
                 raise ValueError(
-                    f"Method '{method}' not found. Choose between: {valid_methods}"
+                    f"Method '{method}' not found. Choose between: {CALCULATE_METHODS}"
                 )
 
         self.create_directories()
@@ -704,6 +707,8 @@ class CalculateTremor:
         csv_non_interpolated = os.path.join(self.tremor_dir, non_interpolated_filename)
         df.to_csv(csv_non_interpolated, index=True)
 
+        self.df_non_interpolated = df
+
         # Update filename with latest datetime index from df.
         # Set _filename directly (not via the property setter) to avoid the
         # property re-adding the "tremor_" prefix and producing a double prefix.
@@ -780,6 +785,18 @@ class CalculateTremor:
         # Remove anomalies and interpolate NaN values
         if self.remove_tremor_anomalies:
             df = remove_anomalies(df, threshold=300, inplace=False, debug=self.debug)
+
+        # Skip days whose post-removal data falls below the minimum completion
+        # ratio. Completeness is the fraction of rows that are not entirely NaN
+        # out of the expected 144 daily rows (10-minute intervals).
+        expected_rows = 144
+        completeness = (expected_rows - df.isna().all(axis=1).sum()) / expected_rows
+        if completeness < self.minimum_completion_ratio:
+            logger.info(
+                f"{date_str} :: Skipped — completeness {completeness:.1%} "
+                f"< {self.minimum_completion_ratio:.1%}"
+            )
+            return None
 
         # Save daily tremor data
         df.to_csv(daily_file, index=True, index_label="datetime")
@@ -859,6 +876,7 @@ class CalculateTremor:
             >>> print(df.head())
         """
         stream = self.get_stream(date)
+        date_str = date.strftime("%Y-%m-%d")
 
         # Return NaN-filled DataFrame with correct shape when no data is available.
         # Using 144 rows guarantees consistent shape for downstream processing.
@@ -866,17 +884,15 @@ class CalculateTremor:
             datetime_index = pd.date_range(
                 start=date,
                 end=date + timedelta(days=1),
-                freq="10min",
+                freq=DEFAULT_SAMPLING_FREQUENCY,
                 inclusive="left",
             )
             columns = self._expected_columns()
             return pd.DataFrame(index=datetime_index, columns=columns, dtype=float)
 
-        date_str = date.strftime("%Y-%m-%d")
-
         # Build tremor DataFrame index
         datetime_index = pd.date_range(
-            start=date, end=date + timedelta(days=1), freq="10min", inclusive="left"
+            start=date, end=date + timedelta(days=1), freq=DEFAULT_SAMPLING_FREQUENCY, inclusive="left"
         )
 
         # Init tremor DataFrame without tremor values
@@ -966,16 +982,15 @@ class CalculateTremor:
                 "bandpass",
                 freqmin=freq_band[0],
                 freqmax=freq_band[1],
-                corners=4,
+                corners=BANDPASS_FILTER_CORNERS,
             )
 
             # Extract amplitude series with outlier removal
             current_series = calculate_window_metrics(
                 trace=filtered_stream[0],
                 window_duration_minutes=10,
-                metric_function=np.mean,
+                metric_function=np.nanmean,
                 remove_outlier_method=self.remove_outlier_method,
-                minimum_completion_ratio=0.3,
                 absolute_value=True,
                 value_multiplier=1.0,  # Don't multiply yet, do it once on ratio
             )
@@ -1066,7 +1081,7 @@ class CalculateTremor:
                 .calculate(
                     value_multiplier=self.value_multiplier or 1.0,
                     remove_outlier_method=self.remove_outlier_method,
-                    interpolate=False,
+                    interpolate=self.interpolate,
                 )
                 .to_numpy()
             )

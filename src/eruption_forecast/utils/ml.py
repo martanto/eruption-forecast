@@ -18,6 +18,7 @@ from sklearn.metrics import (
 )
 from tsfresh.transformers import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
+from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
@@ -268,7 +269,9 @@ def compute_seed_eruption_probability(
     )
 
     if debug:
-        logger.debug(f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}")
+        logger.debug(
+            f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
+        )
 
     if save and not overwrite:
         ensure_dir(output_dir)
@@ -315,7 +318,7 @@ def compute_model_probabilities(
             trained model files. Defaults to "trained_model_filepath".
         classifier_name (str, optional): Classifier name for logging. Defaults to "model".
         threshold (float, optional): Minimum mean probability threshold to classify as
-            eruption (0.0-1.0). Defaults to 0.7.
+            eruption (0.0-1.0). Defaults to 0.5.
         number_of_seeds (int | None, optional): Maximum number of seeds to use. If None,
             uses all seeds. Defaults to None.
         output_dir (str | None, optional): Directory to save per-seed predictions.
@@ -373,7 +376,9 @@ def compute_model_probabilities(
         seed_eruption_probabilities, axis=1
     )  # (n_windows, n_seeds)
 
-    return aggregate_seed_probabilities(probabilities_eruption_matrix, threshold=threshold)
+    return aggregate_seed_probabilities(
+        probabilities_eruption_matrix, threshold=threshold
+    )
 
 
 def _extract_trained_model_suffix(csv_path: str) -> str:
@@ -393,13 +398,14 @@ def _extract_trained_model_suffix(csv_path: str) -> str:
     """
     basename = os.path.splitext(os.path.basename(csv_path))[0]
     if basename.startswith("trained_model_"):
-        return basename[len("trained_model_"):]
+        return basename[len("trained_model_") :]
     return basename
 
 
 def merge_seed_models(
     registry_csv: str,
     output_path: str | None = None,
+    output_dir: str | None = None,
 ) -> str:
     """Load all seed models from a registry CSV and bundle into one SeedEnsemble pkl.
 
@@ -424,13 +430,21 @@ def merge_seed_models(
     Raises:
         FileNotFoundError: If ``registry_csv`` does not exist.
     """
+    output_dir = (
+        output_dir
+        if output_dir is not None
+        else os.path.dirname(os.path.abspath(registry_csv))
+    )
+
     if output_path is None:
-        registry_dir = os.path.dirname(os.path.abspath(registry_csv))
         suffix = _extract_trained_model_suffix(registry_csv)
-        output_path = os.path.join(registry_dir, f"merged_model_{suffix}.pkl")
+        output_path = os.path.join(output_dir, f"merged_model_{suffix}.pkl")
 
     ensemble = SeedEnsemble.from_registry(registry_csv)
     ensemble.save(output_path)
+
+    logger.info(f"Saved merged seed model to: {output_path}")
+
     return output_path
 
 
@@ -480,4 +494,22 @@ def merge_all_classifiers(
 
     classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(ensembles)
     classifier_ensemble.save(output_path)
+
+    logger.info(f"Saved merged classifier model to: {output_path}")
+
     return output_path
+
+
+def get_default_features() -> list[str]:
+    """Get default features extraction
+
+    https://tsfresh.readthedocs.io/en/latest/text/list_of_features.html
+
+    Returns:
+        list[str]: List of default features extracted
+    """
+    default_fc_parameters = ComprehensiveFCParameters()
+    default_fc_parameters_keys = default_fc_parameters.data
+    keys: list[str] = list(default_fc_parameters_keys.keys())
+    keys.sort()
+    return keys

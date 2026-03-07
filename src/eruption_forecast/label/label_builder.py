@@ -18,6 +18,7 @@ from eruption_forecast.utils.date_utils import (
     to_datetime,
     normalize_dates,
 )
+from eruption_forecast.utils.formatting import slugify
 
 
 class LabelBuilder:
@@ -704,7 +705,9 @@ class LabelBuilder:
                 f"Your eruption_dates: {self.eruption_dates}"
             )
 
-    def initiate_label(self) -> pd.DataFrame:
+    def initiate_label(
+        self, start_date: datetime | None = None, end_date: datetime | None = None
+    ) -> pd.DataFrame:
         """Initialize label DataFrame with all labels set to 0 (not erupted).
 
         Creates sliding time windows using construct_windows() based on the
@@ -725,9 +728,12 @@ class LabelBuilder:
             >>> print(isinstance(df.index, pd.DatetimeIndex))
             True
         """
+        start_date = start_date or self.start_date
+        end_date = end_date or self.end_date
+
         df = construct_windows(
-            start_date=self.start_date,
-            end_date=self.end_date,
+            start_date=start_date,
+            end_date=end_date,
             window_step=self.window_step,
             window_step_unit=self.window_step_unit,
         )
@@ -752,7 +758,8 @@ class LabelBuilder:
             >>> # 0,VOLCANO_001,2020-06-15
             >>> # 1,VOLCANO_001,2020-09-20
         """
-        filename = os.path.join(self.label_dir, "eruption_dates.csv")
+        volcano_id = slugify(self.volcano_id)
+        filename = os.path.join(self.label_dir, f"eruption_dates_{volcano_id}.csv")
 
         df = pd.DataFrame(self.eruption_dates, columns=["eruption_date"])
         df.index.name = "id"

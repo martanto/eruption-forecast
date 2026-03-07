@@ -172,6 +172,10 @@ class BuildLabelConfig(_ConfigBase):
             ``None`` uses ``ForecastModel.end_date``. Defaults to ``None``.
         tremor_columns (list[str] | None): Subset of tremor columns to retain
             for labeling. ``None`` keeps all columns. Defaults to ``None``.
+        builder (str): Label builder type — ``"standard"`` or ``"dynamic"``.
+            Defaults to ``"standard"``.
+        days_before_eruption (int | None): Days before each eruption to start
+            its window. Required when ``builder="dynamic"``. Defaults to ``None``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
         debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
@@ -183,6 +187,8 @@ class BuildLabelConfig(_ConfigBase):
     start_date: str | None = None
     end_date: str | None = None
     tremor_columns: list[str] | None = None
+    builder: str = "standard"
+    days_before_eruption: int | None = None
     verbose: bool = False
     debug: bool = False
 
@@ -303,6 +309,8 @@ class ForecastConfig(_ConfigBase):
             ``"hours"``. Defaults to ``"hours"``.
         save_predictions (bool): Whether to save the prediction DataFrame as CSV.
             Defaults to ``True``.
+        threshold (float, optional): Threshold for classifying eruption
+            probability as positive. Defaults to ``0.5``.
         save_plot (bool): Whether to save the forecast probability plot.
             Defaults to ``True``.
         n_jobs (int | None): Parallel workers for feature extraction during
@@ -318,6 +326,7 @@ class ForecastConfig(_ConfigBase):
     window_step: int = 12
     window_step_unit: str = "hours"
     save_predictions: bool = True
+    threshold: float = 0.5
     save_plot: bool = True
     n_jobs: int | None = None
     overwrite: bool = False

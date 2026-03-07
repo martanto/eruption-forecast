@@ -8,7 +8,10 @@ CSV — and generates ensemble-level statistics and plots.
 import os
 import glob
 import json
+import warnings
+import functools
 from typing import Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import shap
 import numpy as np
@@ -94,6 +97,7 @@ class MultiModelEvaluator:
         plot_shap: bool = False,
         root_dir: str | None = None,
         output_dir: str | None = None,
+        verbose: bool = False,
     ) -> None:
         """Initialize the MultiModelEvaluator with one or more metrics sources.
 
@@ -115,6 +119,7 @@ class MultiModelEvaluator:
                 resolution. See class-level docs for resolution priority. Defaults to None.
             output_dir (str | None, optional): Directory for saving evaluation outputs.
                 When None, resolved from the provided source path. Defaults to None.
+            verbose (bool, optional): Emit progress log messages. Defaults to False.
 
         Raises:
             ValueError: If none of metrics_dir, metrics_files, or trained_model_csv
@@ -135,6 +140,7 @@ class MultiModelEvaluator:
             output_dir, root_dir, os.path.join("output", "evaluations")
         )
         self.output_dir = os.path.join(output_dir, "aggregate")
+        self.verbose = verbose
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -266,16 +272,20 @@ class MultiModelEvaluator:
                     )
             plt.close(fig)
 
-    def _collect_predictions(
+    @functools.cached_property
+    def _predictions(
         self,
     ) -> tuple[
         list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]
     ]:
-        """Load models, X_tests, y_trues, and y_probas from all registry seeds.
+        """Load and cache models, X_tests, y_trues, and y_probas from all registry seeds.
 
         Iterates over every row in the model registry, loads the fitted model,
         filtered test features, true labels, and predicted probabilities via
         ``_load_seed_data``, and returns them as four parallel lists.
+
+        The result is cached on the instance after the first call so that
+        subsequent plot methods do not repeat the expensive disk I/O.
 
         Returns:
             tuple[list[BaseEstimator], list[pd.DataFrame], list[np.ndarray], list[np.ndarray]]:
@@ -318,6 +328,9 @@ class MultiModelEvaluator:
             >>> df = evaluator.get_aggregate_metrics()
             >>> print(df.loc["f1_score"])
         """
+        if self.verbose:
+            logger.info(f"Get classifier aggregate metrics for {self.classifier_name}")
+
         paths = self._resolve_metrics_files()
         if not paths:
             raise ValueError("No JSON metrics files found.")
@@ -395,7 +408,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate ROC curve.
         """
-        _, _, y_trues, y_probas = self._collect_predictions()
+        _, _, y_trues, y_probas = self._predictions
 
         fig, data = _plot_roc_styled(
             y_trues=y_trues,
@@ -440,7 +453,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate PR curve.
         """
-        _, _, y_trues, y_probas = self._collect_predictions()
+        _, _, y_trues, y_probas = self._predictions
 
         fig, data = _plot_pr_styled(
             y_trues=y_trues,
@@ -484,7 +497,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate calibration curve.
         """
-        _, _, y_trues, y_probas = self._collect_predictions()
+        _, _, y_trues, y_probas = self._predictions
 
         fig, data = _plot_cal_styled(
             y_trues=y_trues,
@@ -526,7 +539,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with aggregate KDE distributions.
         """
-        _, _, y_trues, y_probas = self._collect_predictions()
+        _, _, y_trues, y_probas = self._predictions
 
         fig, data = _plot_pred_dist_styled(
             y_trues=y_trues,
@@ -569,7 +582,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate confusion matrix.
         """
-        models, x_tests, y_trues, _ = self._collect_predictions()
+        models, x_tests, y_trues, _ = self._predictions
         y_preds: list[np.ndarray] = [
             model.predict(X_test) for model, X_test in zip(models, x_tests, strict=True)
         ]
@@ -617,7 +630,7 @@ class MultiModelEvaluator:
         Returns:
             plt.Figure: Matplotlib figure with the aggregate threshold analysis.
         """
-        _, _, y_trues, y_probas = self._collect_predictions()
+        _, _, y_trues, y_probas = self._predictions
 
         fig, data = _plot_threshold_styled(
             y_trues=y_trues,
@@ -792,25 +805,57 @@ class MultiModelEvaluator:
             >>> figs = evaluator.plot_all(dpi=200)
             >>> figs["roc_curve"].savefig("custom_roc.png")
         """
-        return {
-            "roc_curve": self.plot_roc(dpi=dpi, show_individual=show_individual),
-            "pr_curve": self.plot_precision_recall(
+        # Pre-warm the prediction cache once on the main thread before spawning
+        # workers, so all plot methods share a single round of disk I/O.
+        if self._trained_model_csv is not None:
+            _ = self._predictions
+
+        plot_tasks: dict[str, Any] = {
+            "roc_curve": lambda: self.plot_roc(
                 dpi=dpi, show_individual=show_individual
             ),
-            "calibration": self.plot_calibration(dpi=dpi),
-            "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
-            "confusion_matrix": self.plot_confusion_matrix(dpi=dpi),
-            "threshold_analysis": self.plot_threshold_analysis(
+            "pr_curve": lambda: self.plot_precision_recall(
                 dpi=dpi, show_individual=show_individual
             ),
-            "feature_importance": self.plot_feature_importance(dpi=dpi),
-            "seed_stability": self.plot_seed_stability(dpi=dpi),
-            "frequency_band_contribution": self.plot_frequency_band_contribution(
+            "calibration": lambda: self.plot_calibration(dpi=dpi),
+            "prediction_distribution": lambda: self.plot_prediction_distribution(
                 dpi=dpi
             ),
-            "learning_curve": self.plot_learning_curve(dpi=dpi),
-            "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
+            "confusion_matrix": lambda: self.plot_confusion_matrix(dpi=dpi),
+            "threshold_analysis": lambda: self.plot_threshold_analysis(
+                dpi=dpi, show_individual=show_individual
+            ),
+            "feature_importance": lambda: self.plot_feature_importance(dpi=dpi),
+            "seed_stability": lambda: self.plot_seed_stability(dpi=dpi),
+            "frequency_band_contribution": lambda: (
+                self.plot_frequency_band_contribution(dpi=dpi)
+            ),
+            "learning_curve": lambda: self.plot_learning_curve(dpi=dpi),
+            "shap_summary": (
+                lambda: self.plot_shap_summary(dpi=dpi) if self.plot_shap else None
+            ),
         }
+
+        results: dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None] = {}
+        with warnings.catch_warnings():
+            # sklearnex (Intel Extension for scikit-learn) does not support the
+            # threading parallel backend and emits a UserWarning when called from
+            # a thread pool. The fallback behaviour is correct, so suppress it.
+            warnings.filterwarnings(
+                "ignore",
+                message=".*Threading.*parallel backend.*not supported.*",
+                category=UserWarning,
+            )
+            with ThreadPoolExecutor() as executor:
+                futures = {executor.submit(fn): name for name, fn in plot_tasks.items()}
+                for future in as_completed(futures):
+                    name = futures[future]
+                    try:
+                        results[name] = future.result()
+                    except Exception as exc:
+                        logger.warning(f"Plot {name!r} failed: {exc}")
+                        results[name] = None
+        return results
 
     # ------------------------------------------------------------------
     # New visualizations: SHAP, seed stability, frequency band
@@ -917,7 +962,7 @@ class MultiModelEvaluator:
         Examples:
             >>> fig = evaluator.plot_shap_summary(max_display=15)
         """
-        models, x_tests, _, _ = self._collect_predictions()
+        models, x_tests, _, _ = self._predictions
         # Each seed may select different features; collect names per seed.
         per_seed_feature_names: list[list[str]] = [
             X_test.columns.tolist() for X_test in x_tests

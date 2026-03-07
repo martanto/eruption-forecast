@@ -36,3 +36,33 @@ def slugify_class_name(class_name: str) -> str:
     s = re.sub("([A-Z]+)([A-Z][a-z])", r"\1-\2", s)
 
     return s.lower()
+
+
+def slugify(text: str, hyphen: str = "-") -> str:
+    """Convert arbitrary text into a safe filename slug.
+
+    Lowercases the input, replaces whitespace and underscores with the chosen
+    separator, strips non-alphanumeric characters (except the separator), and
+    collapses consecutive separators into one.
+
+    Args:
+        text (str): Text to slugify.
+        hyphen (str): Separator character to use. Defaults to ``"-"``.
+
+    Returns:
+        str: Slugified filename-safe string.
+
+    Examples:
+        >>> slugify("Hello World")
+        'hello-world'
+        >>> slugify("Hello World", hyphen="_")
+        'hello_world'
+        >>> slugify("  Multiple   Spaces  ")
+        'multiple-spaces'
+    """
+    s = text.lower()
+    s = re.sub(r"[\s_]+", hyphen, s)
+    escaped = re.escape(hyphen)
+    s = re.sub(rf"[^a-z0-9{escaped}]", "", s)
+    s = re.sub(rf"{escaped}+", hyphen, s)
+    return s.strip(hyphen)

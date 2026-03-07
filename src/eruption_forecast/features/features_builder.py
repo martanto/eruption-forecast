@@ -554,8 +554,9 @@ class FeaturesBuilder:
 
         return dates_str, label_df
 
+    @staticmethod
     def _prepare_prediction_mode(
-        self, tremor_matrix_df: pd.DataFrame
+        tremor_matrix_df: pd.DataFrame,
     ) -> tuple[str, pd.DataFrame]:
         """Compute date range from tremor datetimes for prediction mode (no labels).
 

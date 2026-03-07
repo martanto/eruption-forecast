@@ -11,6 +11,7 @@ from datetime import datetime
 import pandas as pd
 
 from eruption_forecast.logger import logger
+from eruption_forecast.config.constants import DEFAULT_SAMPLING_FREQUENCY
 from eruption_forecast.utils.date_utils import to_datetime
 
 
@@ -117,7 +118,7 @@ def validate_window_step(
 
 def check_sampling_consistency(
     df: pd.DataFrame,
-    expected_freq: str = "10min",
+    expected_freq: str = DEFAULT_SAMPLING_FREQUENCY,
     tolerance: str = "1min",
     verbose: bool = False,
 ) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:

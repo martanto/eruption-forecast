@@ -12,8 +12,9 @@ src/eruption_forecast/
 │   ├── shannon_entropy.py     # Shannon Entropy metric
 │   └── tremor_data.py         # TremorData — wraps tremor CSV
 ├── label/               # Training label generation
-│   ├── label_builder.py       # LabelBuilder — sliding window labelling
-│   └── label_data.py          # LabelData — wraps label CSV
+│   ├── label_builder.py           # LabelBuilder — global sliding window labelling
+│   ├── dynamic_label_builder.py   # DynamicLabelBuilder — per-eruption windows
+│   └── label_data.py              # LabelData — wraps label CSV
 ├── features/            # Feature extraction & selection
 │   ├── features_builder.py    # FeaturesBuilder — tsfresh extraction
 │   ├── feature_selector.py    # FeatureSelector — 3-method selection
@@ -250,8 +251,43 @@ calculate = CalculateTremor(
 - Uses `day_to_forecast` to look ahead N days before eruptions
 - Label filenames follow: `label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv`
 
+**`DynamicLabelBuilder`** (extends `LabelBuilder`) generates one window per eruption:
+- Each window spans `days_before_eruption` days ending on the eruption date
+- Handles overlapping eruptions: when a secondary eruption's `day_to_forecast` period falls inside another eruption's window, both positive regions are marked (a warning is logged)
+- All per-eruption windows are concatenated into one DataFrame with globally unique IDs
+
+```
+LabelBuilder — one global window over the full date range
+─────────────────────────────────────────────────────────────────────
+ start_date                                              end_date
+ │                                                           │
+ ├──────────────────────── window ───────────────────────────┤
+ │           0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 E               │
+ │                               ↑           ↑               │
+ │                           dtf start   eruption            │
+ └───────────────────────────────────────────────────────────┘
+
+DynamicLabelBuilder — one window per eruption, overlaps handled
+─────────────────────────────────────────────────────────────────────
+ Eruption A  (2025-03-20)        Eruption B  (2025-03-23)
+ ┌───────────────────────────┐   ┌───────────────────────────┐
+ │ days_before_eruption = 10 │   │ days_before_eruption = 10 │
+ │                           │   │                           │
+ │ 0  0  0  0  0  0  1  1  E │   │ 0  1  1  1  1  1  1  1  E │
+ │                   ↑       │   │    ↑           ↑          │
+ │                dtf start  │   │ overlap from  dtf start   │
+ │                (Mar 18)   │   │ Eruption A    (Mar 20)    │
+ └───────────────────────────┘   └───────────────────────────┘
+                                   ↑ secondary overlap → warning logged
+   dtf = days to forecast
+   E = eruption date (is_erupted = 1)
+   1 = positive label within day_to_forecast window
+   0 = negative label
+```
+
 **Key classes:**
-- `LabelBuilder`: Creates labeled windows (`label_builder.py`)
+- `LabelBuilder`: Creates labeled windows over a global date range (`label_builder.py`)
+- `DynamicLabelBuilder`: Per-eruption windows with overlap handling (`dynamic_label_builder.py`)
 - `LabelData`: Loads label CSV and parses parameters from filename (`label_data.py`)
 
 ### 3. Tremor Matrix Building (`src/eruption_forecast/features/`)
