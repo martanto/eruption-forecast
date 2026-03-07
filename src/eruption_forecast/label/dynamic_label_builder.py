@@ -148,6 +148,65 @@ class DynamicLabelBuilder(LabelBuilder):
 
         return label_dates
 
+    def _mark_eruption_labels(
+        self,
+        df: pd.DataFrame,
+        window_start: datetime,
+        window_end: datetime,
+        current_eruption_date: datetime,
+    ) -> pd.DataFrame:
+        """Mark positive labels for all eruptions overlapping a window.
+
+        Iterates all eruption dates and marks ``is_erupted = 1`` for every
+        eruption whose ``day_to_forecast`` period overlaps the given window.
+        Each eruption is projected into the window's year range so that
+        cross-year recurring eruptions are correctly detected. Feb 29 on
+        non-leap years is silently skipped. When a secondary (non-owning)
+        eruption contributes positive labels, a warning is emitted.
+
+        Args:
+            df (pd.DataFrame): Label DataFrame with ``is_erupted`` column.
+            window_start (datetime): Inclusive start of the label window.
+            window_end (datetime): End of the label window (time set to 23:59:59
+                internally).
+            current_eruption_date (datetime): The eruption that owns this window;
+                used to detect and warn about secondary overlaps.
+
+        Returns:
+            pd.DataFrame: Updated DataFrame with ``is_erupted`` set for all
+                overlapping positive periods.
+        """
+        window_end_ts = window_end.replace(hour=23, minute=59, second=59)
+        for eruption_date in self._eruption_dates:
+            projected = None
+            for year in range(window_start.year, window_end_ts.year + 1):
+                try:
+                    candidate = eruption_date.replace(year=year)
+                except ValueError:
+                    continue
+                if window_start <= candidate <= window_end_ts:
+                    projected = candidate
+                    break
+            if projected is None:
+                continue
+
+            if eruption_date != current_eruption_date:
+                logger.warning(
+                    f"Eruption on {eruption_date.date()} (projected to "
+                    f"{projected.date()}) also falls within window "
+                    f"[{window_start.date()} \u2013 {window_end.date()}] owned by "
+                    f"{current_eruption_date.date()}; marking overlapping positive labels."
+                )
+
+            pos_start = (projected - timedelta(days=self.day_to_forecast)).replace(
+                hour=0, minute=0, second=0
+            )
+            pos_end = projected.replace(hour=23, minute=59, second=59)
+            clamp_start = max(pos_start, window_start)
+            clamp_end = min(pos_end, window_end_ts)
+            df.loc[clamp_start:clamp_end, "is_erupted"] = 1
+        return df
+
     @logger.catch
     def build(self) -> Self:
         """Build per-eruption label windows and concatenate into one DataFrame.
@@ -203,8 +262,6 @@ class DynamicLabelBuilder(LabelBuilder):
             # Initiate ``is_erupted`` column value to 0 (no eruption).
             df = self.initiate_label(start_date=start_date, end_date=end_eruption)
 
-            start_eruption = end_eruption - timedelta(days=self.day_to_forecast)
-            start_eruption = start_eruption.replace(hour=0, minute=0, second=0)
             end_eruption_ts = end_eruption.replace(hour=23, minute=59, second=59)
 
             logger.info(
@@ -212,14 +269,14 @@ class DynamicLabelBuilder(LabelBuilder):
                 f"Total labels: {len(df)}"
             )
 
-            df.loc[start_eruption:end_eruption_ts, "is_erupted"] = 1
+            df = self._mark_eruption_labels(df, start_date, end_eruption, end_eruption)
 
             length_df = len(df)
             df["id"] = range(index * length_df, (index + 1) * length_df)
             df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
 
             eruption_key = end_eruption.strftime("%Y-%m-%d")
-            df_eruptions_dict[eruption_key] = df.loc[start_eruption:end_eruption_ts]
+            df_eruptions_dict[eruption_key] = df[df["is_erupted"] > 0]
 
             dfs.append(df)
 
