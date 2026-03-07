@@ -1408,6 +1408,7 @@ class ModelPredictor:
             figsize=(14, 8),
             sharex=True,
             gridspec_kw={"height_ratios": [1.2, 1]},
+            layout="constrained",
         )
 
         index = range(len(df)) if not hasattr(df.index, "to_pydatetime") else df.index
@@ -1546,8 +1547,6 @@ class ModelPredictor:
         ax2.spines["top"].set_visible(False)
         ax2.spines["right"].set_visible(False)
 
-        # Final layout and save
-        plt.tight_layout()
         path = os.path.join(self.figures_dir, f"eruption_forecast_{self.basename}.png")
         fig.savefig(
             path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none"
