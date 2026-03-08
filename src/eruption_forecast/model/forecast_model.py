@@ -921,6 +921,7 @@ class ForecastModel:
         features_builder = FeaturesBuilder(
             tremor_matrix_df=tremor_matrix_df,
             label_df=self.label_data,
+            label_features_basename=self.basename,
             output_dir=self.features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs or self.n_jobs,
@@ -1328,7 +1329,9 @@ class ForecastModel:
             "plot_significant_features": plot_significant_features,
         }
 
-        # Train multi classifiers
+        # Train multi classifiers — reset accumulated state from any prior train() call
+        self.trainers = []
+        self.trained_models = {}
         self._plot_shap = plot_shap
         trained_models: dict[str, str] = {}
         for _classifier in classifiers:
@@ -1625,4 +1628,51 @@ class ForecastModel:
         if config.forecast is not None:
             self.forecast(**config.forecast.to_dict())
 
+        return self
+
+    def generate_report(
+        self,
+        sections: list[str] | None = None,
+        output_dir: str | None = None,
+        fmt: str = "html",
+    ) -> Self:
+        """Generate an interactive HTML (or PDF) report for the current pipeline state.
+
+        Reads artifacts directly from this ``ForecastModel`` instance and builds a
+        :class:`~eruption_forecast.report.PipelineReport` containing whichever
+        sections have data available. The report is saved to disk and this method
+        returns ``self`` for method chaining.
+
+        Args:
+            sections (list[str] | None): Section names to include. If None, all
+                available sections are included. Valid values: ``"tremor"``,
+                ``"label"``, ``"features"``, ``"training"``, ``"prediction"``.
+                Defaults to None.
+            output_dir (str | None): Directory for the saved report files.
+                Defaults to ``{station_dir}/reports/``.
+            fmt (str): Output format — ``"html"`` or ``"pdf"`` (PDF requires
+                ``weasyprint``). Defaults to ``"html"``.
+
+        Returns:
+            Self: This ``ForecastModel`` instance, for method chaining.
+
+        Examples:
+            >>> fm.calculate(...).build_label(...).train(...).generate_report()
+            >>> fm.generate_report(sections=["tremor", "label"], output_dir="reports/")
+        """
+        from eruption_forecast.report.pipeline_report import PipelineReport
+
+        pipeline = PipelineReport.from_forecast_model(
+            self, sections=sections, output_dir=output_dir
+        )
+
+        if fmt == "html":
+            path = pipeline.save("pipeline_report.html")
+        elif fmt == "pdf":
+            html_path = pipeline.save("pipeline_report.html")
+            path = pipeline.to_pdf(html_path.replace(".html", ".pdf"))
+        else:
+            raise ValueError(f"Unsupported format '{fmt}'. Choose 'html' or 'pdf'.")
+
+        logger.info(f"Report saved to {path}")
         return self

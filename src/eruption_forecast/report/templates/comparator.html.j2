@@ -1,0 +1,55 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block meta_section %}
+  {{ super() }}
+  <span>Classifiers: <strong>{{ classifiers | join(", ") }}</strong></span>
+  <span>Metrics: <strong>{{ metrics | length }}</strong></span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Aggregate Comparison Table ──────────────────────────────────────────── #}
+<section class="section" id="comparison-table">
+  <div class="section-title">Aggregate Metrics Comparison (mean ± std)</div>
+  <table class="stats-table">
+    <thead>
+      <tr>
+        <th>Classifier</th>
+        <th>Seeds</th>
+        {% for m in metrics %}
+        <th>{{ m.upper().replace("_", " ") }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for clf in classifiers %}
+      <tr>
+        <td><span class="badge">{{ clf }}</span></td>
+        <td>{{ n_seeds_per_clf.get(clf, "—") }}</td>
+        {% for m in metrics %}
+        <td>{{ agg_data.get(clf, {}).get(m, "—") }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{# ── Grouped Bar Chart ───────────────────────────────────────────────────── #}
+<section class="section" id="comparison-chart">
+  <div class="section-title">Side-by-Side Metric Comparison</div>
+  <div class="plot-container" id="comparison-plot"></div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var cmp = {{ comparison_chart_json | safe }};
+  Plotly.newPlot('comparison-plot', cmp.data, cmp.layout, {responsive: true, displayModeBar: false});
+})();
+</script>
+{% endblock %}

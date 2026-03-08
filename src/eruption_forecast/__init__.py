@@ -29,6 +29,16 @@ from importlib.metadata import version
 
 logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
+from eruption_forecast.report import (
+    LabelReport,
+    TremorReport,
+    FeaturesReport,
+    PipelineReport,
+    TrainingReport,
+    ComparatorReport,
+    PredictionReport,
+    generate_report,
+)
 from eruption_forecast.decorators import notify
 from eruption_forecast.data_container import BaseDataContainer
 from eruption_forecast.label.label_data import LabelData
@@ -70,4 +80,12 @@ __all__ = [
     "PipelineConfig",
     "BaseDataContainer",
     "notify",
+    "generate_report",
+    "TremorReport",
+    "LabelReport",
+    "FeaturesReport",
+    "TrainingReport",
+    "ComparatorReport",
+    "PredictionReport",
+    "PipelineReport",
 ]

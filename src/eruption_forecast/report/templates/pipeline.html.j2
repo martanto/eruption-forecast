@@ -1,0 +1,72 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block meta_section %}{{ super() }}{% endblock %}
+
+{% block content %}
+
+{# ── Executive Summary ───────────────────────────────────────────────────── #}
+<section class="section" id="summary">
+  <div class="section-title">Executive Summary</div>
+  {% if summary_meta %}
+  <table class="metadata-table">
+    {% for key, val in summary_meta.items() %}
+    <tr><td>{{ key }}</td><td><span class="badge">{{ val }}</span></td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>No summary metadata available.</p>
+  {% endif %}
+</section>
+
+{# ── Pipeline Stage Availability ─────────────────────────────────────────── #}
+<section class="section" id="pipeline-stages">
+  <div class="section-title">Pipeline Stages</div>
+  <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+    <span class="badge {% if has_tremor %}badge-success{% endif %}">Tremor {{ '✓' if has_tremor else '—' }}</span>
+    <span class="badge {% if has_label %}badge-success{% endif %}">Labels {{ '✓' if has_label else '—' }}</span>
+    <span class="badge {% if has_features %}badge-success{% endif %}">Features {{ '✓' if has_features else '—' }}</span>
+    <span class="badge {% if has_training %}badge-success{% endif %}">Training {{ '✓' if has_training else '—' }}</span>
+    <span class="badge {% if has_prediction %}badge-success{% endif %}">Prediction {{ '✓' if has_prediction else '—' }}</span>
+  </div>
+</section>
+
+{# ── Section Iframes ─────────────────────────────────────────────────────── #}
+
+{% if has_tremor %}
+<section class="section" id="tremor">
+  <div class="section-title">Tremor Data</div>
+  <div class="embedded-report">{{ section_html.tremor | safe }}</div>
+</section>
+{% endif %}
+
+{% if has_label %}
+<section class="section" id="label">
+  <div class="section-title">Label Data</div>
+  <div class="embedded-report">{{ section_html.label | safe }}</div>
+</section>
+{% endif %}
+
+{% if has_features %}
+<section class="section" id="features">
+  <div class="section-title">Feature Extraction</div>
+  <div class="embedded-report">{{ section_html.features | safe }}</div>
+</section>
+{% endif %}
+
+{% for clf in training_html_list %}
+<section class="section" id="{{ clf.anchor }}">
+  <div class="section-title">Training — {{ clf.classifier_name }}</div>
+  <div class="embedded-report">{{ clf.html | safe }}</div>
+</section>
+{% endfor %}
+
+{% if has_prediction %}
+<section class="section" id="prediction">
+  <div class="section-title">Eruption Forecast</div>
+  <div class="embedded-report">{{ section_html.prediction | safe }}</div>
+</section>
+{% endif %}
+
+{% endblock %}

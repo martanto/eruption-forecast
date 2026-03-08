@@ -1,0 +1,83 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block meta_section %}
+  {{ super() }}
+  <span>Windows: <strong>{{ total_windows }}</strong></span>
+  <span>Eruption windows: <strong>{{ n_eruption }}</strong></span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Window Configuration ────────────────────────────────────────────────── #}
+<section class="section" id="window-config">
+  <div class="section-title">Window Configuration</div>
+  <table class="metadata-table">
+    <tr><td>Start date</td><td><span class="badge">{{ params.start_date_str }}</span></td></tr>
+    <tr><td>End date</td><td><span class="badge">{{ params.end_date_str }}</span></td></tr>
+    <tr><td>Window step</td><td><span class="badge">{{ params.window_step }} {{ params.window_unit }}</span></td></tr>
+    <tr><td>Day to forecast</td><td><span class="badge">{{ params.day_to_forecast }} day(s)</span></td></tr>
+  </table>
+</section>
+
+{# ── Class Distribution ──────────────────────────────────────────────────── #}
+<section class="section" id="class-distribution">
+  <div class="section-title">Class Distribution</div>
+  <div class="grid-2" style="align-items: start;">
+    <div>
+      <table class="stats-table">
+        <thead><tr><th>Class</th><th>Count</th><th>Proportion</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Non-eruption (0)</td>
+            <td>{{ n_non_eruption }}</td>
+            <td>{{ "%.1f" | format(n_non_eruption / total_windows * 100) }}%</td>
+          </tr>
+          <tr>
+            <td>Eruption (1)</td>
+            <td>{{ n_eruption }}</td>
+            <td>{{ "%.1f" | format(n_eruption / total_windows * 100) }}%</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr><td>Total</td><td>{{ total_windows }}</td><td>100%</td></tr>
+          <tr><td>Imbalance ratio</td><td colspan="2"><span class="badge badge-warn">{{ imbalance_ratio }}:1</span></td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="plot-container" id="dist-plot"></div>
+  </div>
+</section>
+
+{# ── Eruption Dates ──────────────────────────────────────────────────────── #}
+{% if eruption_dates %}
+<section class="section" id="eruption-dates">
+  <div class="section-title">Eruption Dates</div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    {% for d in eruption_dates %}
+    <span class="badge" style="background:#fee2e2;color:#991b1b;">{{ d }}</span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Label Timeline ──────────────────────────────────────────────────────── #}
+<section class="section" id="timeline">
+  <div class="section-title">Label Timeline</div>
+  <div class="plot-container" id="timeline-plot"></div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var dist = {{ distribution_chart_json | safe }};
+  Plotly.newPlot('dist-plot', dist.data, dist.layout, {responsive: true, displayModeBar: false});
+
+  var tl = {{ timeline_chart_json | safe }};
+  Plotly.newPlot('timeline-plot', tl.data, tl.layout, {responsive: true, displayModeBar: false});
+})();
+</script>
+{% endblock %}

@@ -116,6 +116,7 @@ class FeaturesBuilder:
         output_dir: str | None = None,
         label_df: pd.DataFrame | None = None,
         root_dir: str | None = None,
+        label_features_basename: str | None = None,
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
@@ -138,6 +139,8 @@ class FeaturesBuilder:
                 Defaults to None.
             root_dir (str | None, optional): Anchor directory for relative path resolution.
                 Defaults to None (uses os.getcwd()).
+            label_features_basename (str | None, optional): Basename for label features.
+                Defaults to None.
             overwrite (bool, optional): Re-extract even when output files exist.
                 Defaults to False.
             n_jobs (int, optional): Number of parallel jobs for tsfresh. Defaults to 1.
@@ -162,6 +165,7 @@ class FeaturesBuilder:
         self.tremor_matrix_df = tremor_matrix_df
         self.output_dir = output_dir
         self.label_df = label_df
+        self.label_features_basename = label_features_basename
         self.overwrite = overwrite
         self.n_jobs = n_jobs
         self.verbose = verbose
@@ -543,11 +547,13 @@ class FeaturesBuilder:
         label_df = self.label_df[self.label_df[ID_COLUMN].isin(self.unique_ids)]
         start_date_str = label_df.index[0].strftime("%Y-%m-%d")
         end_date_str = label_df.index[-1].strftime("%Y-%m-%d")
-        dates_str = f"{start_date_str}-{end_date_str}"
+        dates_str = f"{start_date_str}_{end_date_str}"
 
+        basename = self.label_features_basename or f"label_{dates_str}"
+        basename = basename.replace("label", "label-features")
         label_csv = os.path.join(
             self.output_dir,
-            f"label_features_{dates_str}.csv",
+            f"{basename}.csv",
         )
         label_df.to_csv(label_csv, index=True)
         self.label_features_csv = label_csv

@@ -29,7 +29,7 @@ Examples:
 """
 
 # Label filename format constants
-LABEL_PREFIX = "label_"
+LABEL_PREFIX = "label"
 LABEL_EXTENSION = ".csv"
 WINDOW_STEP_PREFIX = "step-"
 DAY_TO_FORECAST_PREFIX = "dtf-"

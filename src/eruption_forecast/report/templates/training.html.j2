@@ -1,0 +1,112 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block meta_section %}
+  {{ super() }}
+  <span>Classifier: <strong>{{ classifier_name }}</strong></span>
+  <span>Seeds: <strong>{{ n_seeds }}</strong></span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Aggregate Metrics ───────────────────────────────────────────────────── #}
+<section class="section" id="aggregate">
+  <div class="section-title">Aggregate Metrics (mean ± std across {{ n_seeds }} seeds)</div>
+  {% if aggregate_display %}
+  <table class="stats-table">
+    <thead>
+      <tr>
+        {% for item in aggregate_display %}
+        <th>{{ item.label }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        {% for item in aggregate_display %}
+        <td>{{ item.value }}</td>
+        {% endfor %}
+      </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <p>No metrics data found. Run training with <code>with_evaluation=True</code> to generate per-seed metrics.</p>
+  {% endif %}
+  {% if aggregate and not aggregate_display %}
+  <p>Metrics available but none matched the expected keys (balanced_accuracy, precision, recall, f1, roc_auc, pr_auc, threshold).</p>
+  {% endif %}
+</section>
+
+{# ── Seed Stability Chart ────────────────────────────────────────────────── #}
+<section class="section" id="stability-{{ report_id }}">
+  <div class="section-title">Metric Stability Across Seeds</div>
+  <div class="plot-container" id="stability-plot-{{ report_id }}"></div>
+</section>
+
+{# ── Threshold Analysis ──────────────────────────────────────────────────── #}
+<section class="section" id="threshold-{{ report_id }}">
+  <div class="section-title">Threshold Analysis</div>
+  <p>Average metric values at different classification thresholds.</p>
+  <div class="plot-container" id="threshold-plot-{{ report_id }}"></div>
+</section>
+
+{# ── Per-Seed Details ────────────────────────────────────────────────────── #}
+{% if seed_rows %}
+<section class="section" id="per-seed">
+  <div class="section-title">Per-Seed Results</div>
+  <details>
+    <summary>Show all {{ n_seeds }} seed results</summary>
+    <div class="details-body">
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>Seed</th>
+            {% for k in metric_keys %}
+            <th>{{ k.upper().replace("_", " ") }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in seed_rows %}
+          {% set i = loop.index0 %}
+          <tr class="{% if i == best_seed_idx %}highlight-row{% endif %}">
+            <td>{{ row.get("seed", i) }}{% if i == best_seed_idx %} ★{% endif %}</td>
+            {% for k in metric_keys %}
+            <td>
+              {% set val = row.get(k) %}
+              {% if val is none %}—
+              {% elif val is float or val is integer %}{{ "%.4f" | format(val) }}
+              {% else %}{{ val }}{% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Mean ± Std</td>
+            {% for k in metric_keys %}
+            <td>{{ aggregate.get(k, "—") }}</td>
+            {% endfor %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </details>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var stab = {{ stability_chart_json | safe }};
+  Plotly.newPlot('stability-plot-{{ report_id }}', stab.data, stab.layout, {responsive: true, displayModeBar: false});
+
+  var thr = {{ threshold_chart_json | safe }};
+  Plotly.newPlot('threshold-plot-{{ report_id }}', thr.data, thr.layout, {responsive: true, displayModeBar: false});
+})();
+</script>
+{% endblock %}
