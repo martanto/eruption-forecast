@@ -1,3 +1,4 @@
+import subprocess
 from typing import Any, Self, Literal, ClassVar
 
 from xgboost import XGBClassifier
@@ -384,6 +385,15 @@ class ClassifierModel:
 
         return self._build_model()
 
+    @staticmethod
+    def _get_xgb_device() -> str:
+        """Detect GPU availability."""
+        try:
+            subprocess.run(["nvidia-smi"], check=True, capture_output=True)
+            return "cuda"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return "cpu"
+
     def _build_model(
         self,
     ) -> (
@@ -413,7 +423,9 @@ class ClassifierModel:
         Raises:
             ValueError: If self.classifier is not a recognised key.
         """
-        _class_weight = self.class_weight if self.class_weight is not None else "balanced"
+        _class_weight = (
+            self.class_weight if self.class_weight is not None else "balanced"
+        )
 
         # Factory dict mapping classifier key → zero-argument callable that constructs the estimator.
         _model_registry: dict[str, Any] = {
@@ -438,6 +450,8 @@ class ClassifierModel:
             ),
             "gb": lambda: GradientBoostingClassifier(random_state=self.random_state),
             "xgb": lambda: XGBClassifier(
+                device=self._get_xgb_device(),
+                tree_method="hist",
                 eval_metric="logloss",
                 random_state=self.random_state,
                 n_jobs=self.n_jobs,
