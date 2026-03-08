@@ -1,0 +1,63 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block meta_section %}
+  {{ super() }}
+  <span>Total features: <strong>{{ total_features }}</strong></span>
+  {% if n_significant %}<span>Significant features: <strong>{{ n_significant }}</strong></span>{% endif %}
+  <span>Selection method: <strong>{{ selection_method }}</strong></span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Summary ─────────────────────────────────────────────────────────────── #}
+<section class="section" id="summary">
+  <div class="section-title">Feature Extraction Summary</div>
+  <table class="metadata-table">
+    <tr><td>Features CSV</td><td>{{ features_csv }}</td></tr>
+    <tr><td>Total extracted features</td><td><span class="badge">{{ total_features }}</span></td></tr>
+    {% if n_significant %}<tr><td>Significant features (post-selection)</td><td><span class="badge badge-success">{{ n_significant }}</span></td></tr>{% endif %}
+    {% if label_windows %}<tr><td>Label windows</td><td><span class="badge">{{ label_windows }}</span></td></tr>{% endif %}
+    <tr><td>Selection method</td><td><span class="badge">{{ selection_method }}</span></td></tr>
+    <tr><td>Top-N shown</td><td><span class="badge">{{ top_n }}</span></td></tr>
+  </table>
+</section>
+
+{# ── Top-N Features ──────────────────────────────────────────────────────── #}
+<section class="section" id="top-features">
+  <div class="section-title">Top {{ top_n }} Features by Seed Selection Count</div>
+  {% if n_significant %}
+  <p>Features ranked by how frequently they were selected across all training seeds.</p>
+  <div class="plot-container" id="top-features-plot"></div>
+  {% else %}
+  <p>No significant-features directory provided. Run training with feature selection to enable this chart.</p>
+  {% endif %}
+</section>
+
+{# ── Band Contribution ───────────────────────────────────────────────────── #}
+<section class="section" id="band-contribution">
+  <div class="section-title">Frequency Band Contribution</div>
+  {% if n_significant %}
+  <p>Grouped by tremor column prefix (e.g., <span class="badge">rsam_f0</span>, <span class="badge">dsar_f0-f1</span>).</p>
+  <div class="plot-container" id="band-plot"></div>
+  {% else %}
+  <p>Requires significant-features data from a completed training run.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  {% if n_significant %}
+  var top = {{ top_features_chart_json | safe }};
+  Plotly.newPlot('top-features-plot', top.data, top.layout, {responsive: true, displayModeBar: false});
+
+  var band = {{ band_contribution_chart_json | safe }};
+  Plotly.newPlot('band-plot', band.data, band.layout, {responsive: true, displayModeBar: false});
+  {% endif %}
+})();
+</script>
+{% endblock %}

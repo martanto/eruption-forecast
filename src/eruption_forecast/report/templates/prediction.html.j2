@@ -1,0 +1,53 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block meta_section %}
+  {{ super() }}
+  <span>Period: <strong>{{ start_date }}</strong> → <strong>{{ end_date }}</strong></span>
+  <span>Classifiers: <strong>{{ n_classifiers }}</strong></span>
+  <span>Threshold: <strong>{{ threshold }}</strong></span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Forecast Summary ────────────────────────────────────────────────────── #}
+<section class="section" id="forecast-summary">
+  <div class="section-title">Forecast Configuration</div>
+  <table class="metadata-table">
+    <tr><td>Forecast start</td><td><span class="badge">{{ start_date }}</span></td></tr>
+    <tr><td>Forecast end</td><td><span class="badge">{{ end_date }}</span></td></tr>
+    <tr><td>Classifiers</td><td>
+      {% for clf in classifiers %}<span class="badge">{{ clf }}</span> {% endfor %}
+    </td></tr>
+    <tr><td>Decision threshold</td><td><span class="badge">{{ threshold }}</span></td></tr>
+    {% if eruption_dates %}
+    <tr><td>Eruption event markers</td><td>
+      {% for d in eruption_dates %}<span class="badge" style="background:#fee2e2;color:#991b1b;">{{ d }}</span> {% endfor %}
+    </td></tr>
+    {% endif %}
+  </table>
+</section>
+
+{# ── Forecast Chart ──────────────────────────────────────────────────────── #}
+<section class="section" id="forecast-chart">
+  <div class="section-title">Eruption Probability Forecast</div>
+  <p>
+    Dashed lines show per-classifier probabilities; the solid black line is the
+    consensus (mean). The light-blue band shows ±1 standard deviation.
+    The red dashed horizontal line marks the decision threshold
+    (<span class="badge">{{ threshold }}</span>).
+  </p>
+  <div class="plot-container" id="forecast-plot"></div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var fc = {{ forecast_chart_json | safe }};
+  Plotly.newPlot('forecast-plot', fc.data, fc.layout, {responsive: true, displayModeBar: false});
+})();
+</script>
+{% endblock %}

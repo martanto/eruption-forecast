@@ -154,7 +154,7 @@ def predict(forecast_model: ForecastModel) -> None:
         **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
         with_evaluation=False, **TRAINING_PARAMETERS
-    ).forecast(**PREDICTION_PARAMETERS)
+    ).forecast(**PREDICTION_PARAMETERS).generate_report()
 
 
 @timer("Forecast Model")

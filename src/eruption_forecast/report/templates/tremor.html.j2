@@ -1,0 +1,186 @@
+{% extends "base.html.j2" %}
+
+{% block title_body %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .band-date-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .band-date-bar label {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+  .band-date-bar select {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    appearance: auto;
+  }
+  .band-date-bar select:focus {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 1px;
+  }
+  .band-block {
+    margin-bottom: 1.5rem;
+  }
+  .band-block h3 {
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+  }
+</style>
+{% endblock %}
+
+{% block meta_section %}
+  {{ super() }}
+  {% if station %}<span>Station: <strong>{{ station }}</strong></span>{% endif %}
+  <span>Period: <strong>{{ start_date }}</strong> → <strong>{{ end_date }}</strong></span>
+  <span>Columns: <strong>{{ n_columns }}</strong></span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Data Completeness ───────────────────────────────────────────────────── #}
+<section class="section" id="completeness">
+  <div class="section-title">Data Completeness</div>
+  <table class="metadata-table">
+    <tr><td>Total rows</td><td><span class="badge">{{ completeness.total_rows }}</span></td></tr>
+    <tr><td>Expected rows (10-min)</td><td><span class="badge">{{ completeness.expected_rows }}</span></td></tr>
+    <tr><td>Missing rows</td><td><span class="badge {% if completeness.missing_rows == 0 %}badge-success{% else %}badge-warn{% endif %}">{{ completeness.missing_rows }}</span></td></tr>
+    <tr><td>Completeness</td><td><span class="badge {% if completeness.completeness_pct >= 95 %}badge-success{% elif completeness.completeness_pct >= 80 %}badge-warn{% endif %}">{{ completeness.completeness_pct }}%</span></td></tr>
+    <tr><td>Detected gaps</td><td><span class="badge">{{ completeness.n_gaps }}</span></td></tr>
+  </table>
+
+  {% if completeness.gap_list %}
+  <details style="margin-top:1rem;">
+    <summary>Show gap details ({{ completeness.n_gaps }} gaps)</summary>
+    <div class="details-body">
+      <table class="stats-table">
+        <thead><tr><th>Gap start</th><th>Gap end</th><th>Duration (min)</th></tr></thead>
+        <tbody>
+          {% for gap in completeness.gap_list %}
+          <tr><td>{{ gap.start }}</td><td>{{ gap.end }}</td><td>{{ gap.duration_min }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+</section>
+
+{# ── Band Statistics ─────────────────────────────────────────────────────── #}
+<section class="section" id="band-stats">
+  <div class="section-title">Frequency Band Statistics</div>
+  <table class="stats-table">
+    <thead>
+      <tr>
+        <th>Column</th><th>Min</th><th>Max</th><th>Mean</th><th>Std</th><th>Null rows</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in band_stats %}
+      <tr>
+        <td><span class="badge">{{ row.column }}</span></td>
+        <td>{{ row.min }}</td>
+        <td>{{ row.max }}</td>
+        <td>{{ row.mean }}</td>
+        <td>{{ row.std }}</td>
+        <td>{{ row.null_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{# ── Overview Charts (one per frequency band) ────────────────────────────── #}
+<section class="section" id="overview-chart">
+  <div class="section-title">Full-Range Overview</div>
+  <p>One chart per frequency band over the complete analysis period. Use the range slider to zoom.</p>
+  {% for chart in overview_charts %}
+  <div class="band-block">
+    <h3>{{ chart.label }}</h3>
+    <div id="{{ chart.id }}"></div>
+  </div>
+  {% endfor %}
+</section>
+
+{# ── Daily Detail Charts (one per frequency band, HTML date selector) ────── #}
+<section class="section" id="daily-chart">
+  <div class="section-title">Daily Detail — Date Selector</div>
+  <p>Select a date to view full-resolution data for each frequency band.</p>
+
+  {% if daily_charts %}
+  <div class="band-date-bar">
+    <label for="global-date-select">Date</label>
+    <select id="global-date-select">
+      {% for date in daily_charts[0].dates %}
+      <option value="{{ date }}">{{ date }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  {% for chart in daily_charts %}
+  <div class="band-block">
+    <h3>{{ chart.label }}</h3>
+    <div id="{{ chart.id }}"></div>
+  </div>
+  {% endfor %}
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  // ── Overview plots ───────────────────────────────────────────────────────
+  {% for chart in overview_charts %}
+  (function() {
+    var c = {{ chart.json | safe }};
+    Plotly.newPlot('{{ chart.id }}', c.data, c.layout, {responsive: true, displayModeBar: false});
+  })();
+  {% endfor %}
+
+  // ── Daily detail plots ───────────────────────────────────────────────────
+  var dailyData = {
+    {% for chart in daily_charts %}
+    '{{ chart.id }}': {
+      series: {{ chart.series_json | safe }},
+      layout: {{ chart.layout_json | safe }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  };
+
+  function renderDaily(date) {
+    Object.keys(dailyData).forEach(function(id) {
+      var entry = dailyData[id];
+      var pt = entry.series[date] || {x: [], y: []};
+      var trace = {
+        type: 'scatter', mode: 'lines',
+        x: pt.x, y: pt.y,
+        line: {width: 1.5, color: '#1a3a5c'}
+      };
+      Plotly.react(id, [trace], entry.layout, {responsive: true, displayModeBar: false});
+    });
+  }
+
+  // Init with first date
+  var sel = document.getElementById('global-date-select');
+  if (sel) {
+    renderDaily(sel.value);
+    sel.addEventListener('change', function() { renderDaily(this.value); });
+  }
+})();
+</script>
+{% endblock %}
