@@ -1065,7 +1065,8 @@ class ForecastModel:
         self.basename = os.path.basename(label_builder.csv).split(".csv")[0]
 
         # Filter labels from start_date onwards
-        df_label = df_label.loc[self.start_date :]
+        if builder == "standart":
+            df_label = df_label.loc[self.start_date :]
 
         if df_label.empty:
             raise ValueError(f"Label from start date {self.start_date} is empty.")
