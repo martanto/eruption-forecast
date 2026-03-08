@@ -387,7 +387,7 @@ class ClassifierModel:
 
     @staticmethod
     def _get_xgb_device() -> str:
-        """Deetct GPU availability"""
+        """Detect GPU availability."""
         try:
             subprocess.run(["nvidia-smi"], check=True, capture_output=True)
             return "cuda"
