@@ -264,6 +264,7 @@ class ForecastModel:
         self.FeaturesBuilder: FeaturesBuilder | None = None
         self.features_df: pd.DataFrame = pd.DataFrame()
         self.features_csv: str | None = None
+        self.label_features_csv: str | None = None
         self.use_relevant_features: bool = False
         self.select_tremor_columns: list[str] | None = None
 
@@ -940,7 +941,7 @@ class ForecastModel:
         self.FeaturesBuilder = features_builder
         self.features_df = extracted_features_df
         self.features_csv = features_builder.csv
-        self.label_csv = features_builder.label_features_csv
+        self.label_features_csv = features_builder.label_features_csv
         self.use_relevant_features = use_relevant_features
         self.select_tremor_columns = select_tremor_columns
 
@@ -1311,12 +1312,12 @@ class ForecastModel:
                 logger.info("|- Relevant Features selected.")
             # Model evaluation only works if self.label_data is not empty
             if not self.label_data.empty and with_evaluation:
-                logger.info("|- Training model with evaluation.")
+                logger.info("|- Training model for evaluation.")
             if self.label_data.empty and with_evaluation:
                 logger.info("|- Label is empty. Model evaluation will be set to False.")
                 with_evaluation = False
             if not with_evaluation:
-                logger.info("|- Training model only. No evaluation.")
+                logger.info("|- Training for predcition.")
             logger.info("=" * 50)
 
         features_csv = extracted_features_csv or self.features_csv
@@ -1326,9 +1327,9 @@ class ForecastModel:
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
-        label_csv = self.label_csv
+        label_csv = self.label_features_csv
         if label_csv is None or not os.path.exists(label_csv):
-            error_msg = f"Label CSV not found: {label_csv}"
+            error_msg = f"Label features CSV not found: {label_csv}"
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
 
