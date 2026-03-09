@@ -26,8 +26,6 @@ def _valid_kwargs(output_dir: str) -> dict:
     return {
         "station": "OJN",
         "channel": "EHZ",
-        "start_date": "2020-01-01",
-        "end_date": "2020-01-10",
         "window_size": 1,
         "volcano_id": "VOLCANO_001",
         "network": "VG",
@@ -96,13 +94,11 @@ class TestForecastModelInit:
                 ForecastModel(**kwargs)
 
     def test_start_after_end_raises(self) -> None:
-        """ValueError when start_date is after end_date."""
+        """ValueError when start_date is after end_date (raised by calculate())."""
         with tempfile.TemporaryDirectory() as tmp:
-            kwargs = _valid_kwargs(tmp)
-            kwargs["start_date"] = "2020-06-01"
-            kwargs["end_date"] = "2020-01-01"
+            fm = ForecastModel(**_valid_kwargs(tmp))
             with pytest.raises(ValueError):
-                ForecastModel(**kwargs)
+                fm.calculate(start_date="2020-06-01", end_date="2020-01-01")
 
     def test_output_directories_created(self) -> None:
         """All three output directories exist after init."""
