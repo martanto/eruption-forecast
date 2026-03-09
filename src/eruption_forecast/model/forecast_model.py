@@ -27,6 +27,7 @@ from eruption_forecast.config.pipeline_config import (
     BuildLabelConfig,
     ExtractFeaturesConfig,
 )
+from eruption_forecast.report.pipeline_report import PipelineReport
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
@@ -51,8 +52,8 @@ class ForecastModel:
     Attributes:
         station (str): Seismic station code.
         channel (str): Seismic channel code.
-        start_date (datetime): Pipeline start date.
-        end_date (datetime): Pipeline end date.
+        start_date (datetime | None): Tremor calculation start date; set by ``calculate()``.
+        end_date (datetime | None): Tremor calculation end date; set by ``calculate()``.
         window_size (int): Window size in days for training data windows.
         volcano_id (str): Volcano identifier for output naming.
         network (str): Seismic network code.
@@ -100,12 +101,10 @@ class ForecastModel:
     Args:
         station (str): Seismic station code (e.g., "OJN").
         channel (str): Seismic channel code (e.g., "EHZ").
-        start_date (str | datetime): Start date in YYYY-MM-DD format.
-        end_date (str | datetime): End date in YYYY-MM-DD format.
         window_size (int): Window size in days for training data windows.
         volcano_id (str): Volcano identifier for output naming.
-        network (str, optional): Seismic network code. Defaults to "VG".
-        location (str, optional): Seismic location code. Defaults to "00".
+        network (str): Seismic network code (e.g., "VG").
+        location (str): Seismic location code (e.g., "00").
         output_dir (str | None, optional): Directory for output files. If None,
             defaults to ``root_dir/output``. Relative paths are resolved against
             ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None). Absolute
@@ -121,20 +120,25 @@ class ForecastModel:
         debug (bool, optional): If True, enables debug mode. Defaults to False.
 
     Raises:
-        ValueError: If start_date >= end_date or window_size < 1.
+        ValueError: If window_size < 1 or network/location are empty.
 
     Examples:
         >>> # Complete pipeline example
         >>> model = ForecastModel(
         ...     station="OJN",
         ...     channel="EHZ",
-        ...     start_date="2024-01-01",
-        ...     end_date="2024-06-30",
         ...     window_size=1,
         ...     volcano_id="LEWOTOBI",
+        ...     network="VG",
+        ...     location="00",
         ...     root_dir=r"D:\\Projects\\eruption-forecast",
         ... )
-        >>> model.calculate(source="sds", sds_dir="data/sds")
+        >>> model.calculate(
+        ...     start_date="2024-01-01",
+        ...     end_date="2024-06-30",
+        ...     source="sds",
+        ...     sds_dir="data/sds",
+        ... )
         >>> model.build_label(
         ...     window_step=12,
         ...     window_step_unit="hours",
@@ -152,12 +156,10 @@ class ForecastModel:
         self,
         station: str,
         channel: str,
-        start_date: str | datetime,
-        end_date: str | datetime,
+        network: str,
+        location: str,
         window_size: int,
         volcano_id: str,
-        network: str = "VG",
-        location: str = "00",
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
@@ -167,22 +169,19 @@ class ForecastModel:
     ) -> None:
         """Initialize the ForecastModel pipeline orchestrator.
 
-        Normalises dates, resolves all output directory paths, and initialises
-        lifecycle state attributes. No data is loaded or processed until the
-        pipeline stage methods (calculate, build_label, extract_features, train,
-        forecast) are called.
+        Resolves all output directory paths and initialises lifecycle state
+        attributes. Dates are not required at construction time — pass them to
+        ``calculate()`` when fetching tremor data. No data is loaded or
+        processed until the pipeline stage methods (calculate, build_label,
+        extract_features, train, forecast) are called.
 
         Args:
             station (str): Seismic station code (e.g., "OJN").
             channel (str): Channel code (e.g., "EHZ").
-            start_date (str | datetime): Start date for the analysis period in
-                "YYYY-MM-DD" format or as a datetime object.
-            end_date (str | datetime): End date for the analysis period in
-                "YYYY-MM-DD" format or as a datetime object.
+            network (str): Seismic network code (e.g., "VG").
+            location (str): Location code (e.g., "00").
             window_size (int): Window size in days used for matrix building and forecasting.
             volcano_id (str): Unique volcano identifier used for labelling.
-            network (str, optional): Seismic network code. Defaults to "VG".
-            location (str, optional): Location code. Defaults to "00".
             output_dir (str | None, optional): Base output directory. Defaults to None
                 (resolved from root_dir or os.getcwd()).
             root_dir (str | None, optional): Root project directory used to anchor
@@ -196,11 +195,6 @@ class ForecastModel:
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
-        start_date, end_date, start_date_str, end_date_str = normalize_dates(
-            start_date, end_date
-        )
-        network = network or "VG"
-        location = location or "00"
         root_dir = os.path.abspath(root_dir) if root_dir is not None else None
         nslc, output_dir, station_dir, features_dir = self._setup_directories(
             network, station, location, channel, output_dir, root_dir
@@ -211,8 +205,6 @@ class ForecastModel:
         # ------------------------------------------------------------------
         self.station = station
         self.channel = channel
-        self.start_date: datetime = start_date
-        self.end_date: datetime = end_date
         self.window_size: int = window_size
         self.volcano_id = volcano_id
         self.network = network
@@ -227,9 +219,11 @@ class ForecastModel:
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
         # ------------------------------------------------------------------
-        self.start_date_minus_window_size = start_date - timedelta(days=window_size)
-        self.start_date_str = start_date_str
-        self.end_date_str = end_date_str
+        self.start_date: datetime | None = None
+        self.end_date: datetime | None = None
+        self.start_date_minus_window_size: datetime | None = None
+        self.start_date_str: str | None = None
+        self.end_date_str: str | None = None
         self.nslc = nslc
         self.station_dir = station_dir
         self.features_dir = features_dir
@@ -295,8 +289,6 @@ class ForecastModel:
             model=ModelConfig(
                 station=station,
                 channel=channel,
-                start_date=start_date_str,
-                end_date=end_date_str,
                 window_size=window_size,
                 volcano_id=volcano_id,
                 network=network,
@@ -325,8 +317,6 @@ class ForecastModel:
             logger.info("⚠️ Forecast Model :: Debug mode is ON")
 
         if verbose:
-            logger.info(f"Start Date: {start_date_str}")
-            logger.info(f"End Date: {end_date_str}")
             logger.info(f"Volcano ID: {self.volcano_id}")
             logger.info(f"NSLC: {self.nslc}")
             logger.info(f"Output Dir: {self.output_dir}")
@@ -407,7 +397,7 @@ class ForecastModel:
             plot_daily (bool): Whether to plot daily results.
             save_plot (bool): Whether to save plots to disk.
             overwrite_plot (bool): Whether to overwrite existing plots.
-            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calciulated.
+            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calculated.
                 Using Z-score analysis to determine the anomalies. Defaults to False.
             n_jobs (int | None, optional): Number of jobs to run in parallel.
                 Isolated to this method only. If None, uses ``self.n_jobs``.
@@ -433,6 +423,11 @@ class ForecastModel:
         """
         verbose = verbose or self.verbose
         debug = debug or self.debug
+
+        if self.start_date_minus_window_size is None:
+            raise ValueError("self.start_date_minus_window_size cannot be None")
+        if self.end_date is None:
+            raise ValueError("self.end_date cannot be None")
 
         # Create CalculateTremor with explicit parameters for type safety
         calculate = CalculateTremor(
@@ -526,23 +521,26 @@ class ForecastModel:
             tremor_data (TremorData): Loaded tremor data wrapper with date range info.
         """
         # Adjust start date if earlier than tremor start
-        if self.start_date_minus_window_size < tremor_data.start_date:
+        if (
+            isinstance(self.start_date_minus_window_size, datetime)
+            and self.start_date_minus_window_size < tremor_data.start_date
+        ):
             self.start_date = tremor_data.start_date
             self.start_date_str = tremor_data.start_date_str
             if self.verbose:
                 logger.info(
                     f"start_date parameter: {self.start_date_minus_window_size} updated to "
-                    f"tremor start date: {tremor_data.start_date}"
+                    f"tremor start date: {self.start_date_str}"
                 )
 
         # Adjust end date if later than tremor end
-        if self.end_date > tremor_data.end_date:
+        if isinstance(self.end_date, datetime) and self.end_date > tremor_data.end_date:
             self.end_date = tremor_data.end_date
             self.end_date_str = tremor_data.end_date_str
             if self.verbose:
                 logger.info(
                     f"end_date parameter: {self.end_date} updated to "
-                    f"tremor end date: {tremor_data.end_date}"
+                    f"tremor end date: {self.end_date_str}"
                 )
 
     @staticmethod
@@ -667,14 +665,13 @@ class ForecastModel:
     def validate(self) -> None:
         """Validate initialization parameters.
 
-        Ensures that window_size is positive, date ranges are valid,
-        and required string parameters (station, channel, volcano_id)
-        are not empty.
+        Ensures that window_size is positive and required string parameters
+        (station, channel, volcano_id, network, location) are not empty.
+        Date range validation is deferred to ``calculate()``.
 
         Raises:
-            ValueError: If window_size is <= 0, date ranges are invalid
-                (start_date >= end_date), or required string parameters
-                (station, channel, volcano_id) are empty.
+            ValueError: If window_size is <= 0, or required string parameters
+                (station, channel, volcano_id, network, location) are empty.
 
         Example:
             >>> model = ForecastModel(...)
@@ -686,9 +683,6 @@ class ForecastModel:
                 f"window_size must be greater than 0. Got: {self.window_size}"
             )
 
-        # Validate date ranges
-        validate_date_ranges(self.start_date, self.end_date)
-
         # Validate strings are not empty
         if not self.station.strip():
             raise ValueError("station cannot be empty")
@@ -698,6 +692,15 @@ class ForecastModel:
 
         if not self.volcano_id.strip():
             raise ValueError("volcano_id cannot be empty")
+
+        if not self.network.strip():
+            raise ValueError("network cannot be empty")
+
+        if not self.location.strip():
+            raise ValueError("location cannot be empty")
+
+        if self.n_jobs <= 0:
+            raise ValueError(f"n_jobs must be greater than 0. Got: {self.n_jobs}")
 
     def create_directories(self) -> None:
         """Create required output directory structure.
@@ -727,7 +730,10 @@ class ForecastModel:
 
         Returns:
             Self: ForecastModel instance for method chaining.
-                Sets self.tremor_data, self.TremorData, and self.tremor_csv.
+                Sets ``self.tremor_data``, ``self.TremorData``, ``self.tremor_csv``,
+                ``self.start_date``, ``self.end_date``, ``self.start_date_str``,
+                ``self.end_date_str``, and ``self.start_date_minus_window_size``
+                from the loaded tremor DataFrame's datetime index.
 
         Example:
             >>> model = ForecastModel(
@@ -746,10 +752,21 @@ class ForecastModel:
         self.tremor_data = tremor_data.from_csv(tremor_csv)
         self.TremorData.csv = tremor_csv
         self.tremor_csv = tremor_csv
+
+        self.start_date = self.tremor_data.index[0].to_pydatetime()
+        self.end_date = self.tremor_data.index[-1].to_pydatetime()
+        self.start_date_str = self.start_date.strftime("%Y-%m-%d")
+        self.end_date_str = self.end_date.strftime("%Y-%m-%d")
+        self.start_date_minus_window_size = self.start_date - timedelta(
+            days=self.window_size
+        )
+
         return self
 
     def calculate(
         self,
+        start_date: str | datetime,
+        end_date: str | datetime,
         source: Literal["sds", "fdsn"] = "sds",
         methods: list[str] | None = None,
         filename_prefix: str | None = None,
@@ -775,12 +792,16 @@ class ForecastModel:
         the pipeline date range is clipped to the available data.
 
         Args:
+            start_date (str | datetime): Start date for the tremor calculation period
+                in "YYYY-MM-DD" format or as a datetime object.
+            end_date (str | datetime): End date for the tremor calculation period
+                in "YYYY-MM-DD" format or as a datetime object.
             source (Literal["sds", "fdsn"]): Seismic data source. Defaults to "sds".
             methods (list[str] | None): Calculation methods to apply. Defaults to None.
             filename_prefix (str | None): Prefix for generated filenames. Defaults to None.
             remove_outlier_method (Literal["all", "maximum"]): Outlier removal method.
                 Defaults to "maximum".
-            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calciulated.
+            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calculated.
                 Using Z-score analysis to determine the anomalies. Defaults to False.
             interpolate (bool): If True, interpolates gaps in the data. Defaults to True.
             value_multiplier (float | None): Scaling factor for seismic values. Defaults to None.
@@ -802,6 +823,19 @@ class ForecastModel:
         Returns:
             Self: ForecastModel instance for method chaining.
         """
+        # Normalise and store dates on self
+        _start, _end, _start_str, _end_str = normalize_dates(start_date, end_date)
+        validate_date_ranges(_start, _end)
+        self.start_date = _start
+        self.end_date = _end
+        self.start_date_str = _start_str
+        self.end_date_str = _end_str
+        self.start_date_minus_window_size = _start - timedelta(days=self.window_size)
+
+        if verbose or self.verbose:
+            logger.info(f"Start Date: {_start_str}")
+            logger.info(f"End Date: {_end_str}")
+
         # Setup CalculateTremor instance
         calculate = self._setup_calculate_tremor(
             methods=methods,
@@ -842,6 +876,8 @@ class ForecastModel:
         self.tremor_data = tremor_data.df.loc[self.start_date : self.end_date]
 
         self._config.calculate = CalculateConfig(
+            start_date=_start_str,
+            end_date=_end_str,
             source=source,
             sds_dir=sds_dir,
             methods=methods,
@@ -958,6 +994,75 @@ class ForecastModel:
 
         return self
 
+    @staticmethod
+    def _label_builder(
+        builder: Literal["standard", "dynamic"],
+        label_kwargs: dict[str, Any],
+        days_before_eruption: int | None = None,
+        train_start_date: str | datetime | None = None,
+        train_end_date: str | datetime | None = None,
+    ) -> LabelBuilder:
+        """Instantiate and build a label builder of the requested type.
+
+        Dispatches to either ``DynamicLabelBuilder`` (one window per eruption)
+        or ``LabelBuilder`` (one global window spanning the full date range)
+        based on the ``builder`` argument, then calls ``.build()`` and returns
+        the resulting instance.
+
+        Args:
+            builder (Literal["standard", "dynamic"]): Label builder variant.
+                ``"standard"`` uses a single global window; ``"dynamic"``
+                generates one window per eruption event.
+            label_kwargs (dict[str, Any]): Shared keyword arguments forwarded
+                to the builder constructor (e.g. window_step, eruption_dates).
+            days_before_eruption (int | None): Days before each eruption to
+                start its window. Required when ``builder="dynamic"``.
+                Defaults to None.
+            train_start_date (str | datetime | None): Label window start date.
+                Required when ``builder="standard"``. Defaults to None.
+            train_end_date (str | datetime | None): Label window end date.
+                Required when ``builder="standard"``. Defaults to None.
+
+        Returns:
+            LabelBuilder: A fully built label builder instance.
+
+        Raises:
+            ValueError: If ``builder="dynamic"`` and ``days_before_eruption``
+                is None, or if ``builder="standard"`` and either
+                ``train_start_date`` or ``train_end_date`` is None.
+        """
+        if builder == "dynamic":
+            if days_before_eruption is None:
+                raise ValueError(
+                    "days_before_eruption is required when builder='dynamic'."
+                )
+            label_builder = DynamicLabelBuilder(
+                days_before_eruption=days_before_eruption,
+                **label_kwargs,
+            ).build()
+
+            return label_builder
+
+        if train_start_date is None:
+            raise ValueError(
+                "start_date is required for builder='standard'. "
+                "Either call calculate() first or pass start_date explicitly."
+            )
+        if train_end_date is None:
+            raise ValueError(
+                "end_date is required for builder='standard'. "
+                "Either call calculate() first or pass end_date explicitly."
+            )
+
+        validate_date_ranges(train_start_date, train_end_date)
+        label_builder = LabelBuilder(
+            start_date=to_datetime(train_start_date),
+            end_date=to_datetime(train_end_date),
+            **label_kwargs,
+        ).build()
+
+        return label_builder
+
     def build_label(
         self,
         window_step: int,
@@ -1036,22 +1141,13 @@ class ForecastModel:
         }
 
         # Build labels
-        if builder == "dynamic":
-            if days_before_eruption is None:
-                raise ValueError(
-                    "days_before_eruption is required when builder='dynamic'."
-                )
-            label_builder = DynamicLabelBuilder(
-                days_before_eruption=days_before_eruption,
-                **label_kwargs,  # ty:ignore[invalid-argument-type]
-            ).build()
-        else:
-            validate_date_ranges(train_start_date, train_end_date)
-            label_builder = LabelBuilder(
-                start_date=to_datetime(train_start_date),
-                end_date=to_datetime(train_end_date),
-                **label_kwargs,  # ty:ignore[invalid-argument-type]
-            ).build()
+        label_builder = self._label_builder(
+            builder=builder,
+            label_kwargs=label_kwargs,
+            days_before_eruption=days_before_eruption,
+            train_start_date=train_start_date,
+            train_end_date=train_end_date,
+        )
 
         # Prepare tremor data
         df_tremor = self._prepare_tremor_for_labeling(tremor_columns)
@@ -1066,8 +1162,8 @@ class ForecastModel:
         self.basename = os.path.basename(label_builder.csv).split(".csv")[0]
 
         # Filter labels from start_date onwards
-        if builder == "standart":
-            df_label = df_label.loc[self.start_date :]
+        if builder == "standard" and train_start_date is not None:
+            df_label = df_label.loc[train_start_date :]
 
         if df_label.empty:
             raise ValueError(f"Label from start date {self.start_date} is empty.")
@@ -1277,7 +1373,7 @@ class ForecastModel:
                 backend handles nested parallelism without deadlocks. Combine with
                 ``n_jobs`` to control the total CPU budget:
                 ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
-            plot_shap (bool, optioonal): Plot SHAP explanation value. Defaults to False.
+            plot_shap (bool, optional): Plot SHAP explanation value. Defaults to False.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
             verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
             save_model (bool, optional): If True, serialises the full ``ForecastModel``
@@ -1317,7 +1413,7 @@ class ForecastModel:
                 logger.info("|- Label is empty. Model evaluation will be set to False.")
                 with_evaluation = False
             if not with_evaluation:
-                logger.info("|- Training for predcition.")
+                logger.info("|- Training for prediction.")
             logger.info("=" * 50)
 
         features_csv = extracted_features_csv or self.features_csv
@@ -1678,8 +1774,6 @@ class ForecastModel:
             >>> fm.calculate(...).build_label(...).train(...).generate_report()
             >>> fm.generate_report(sections=["tremor", "label"], output_dir="reports/")
         """
-        from eruption_forecast.report.pipeline_report import PipelineReport
-
         pipeline = PipelineReport.from_forecast_model(
             self, sections=sections, output_dir=output_dir
         )

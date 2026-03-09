@@ -6,12 +6,10 @@ version: '1.0'
 model:
   station: OJN             # Station code (e.g. OJN, MEPAS)
   channel: EHZ             # Channel code (e.g. EHZ, BHZ)
-  start_date: '2025-03-16' # Start date of the full dataset (YYYY-MM-DD)
-  end_date: '2025-03-22'   # End date of the full dataset (YYYY-MM-DD)
   window_size: 1            # Sliding window size in days
   volcano_id: MERAPI        # Volcano identifier used in label filenames
-  network: VG               # SEED network code
-  location: '00'            # SEED location code
+  network: VG               # SEED network code (required – no default)
+  location: '00'            # SEED location code (required – no default)
   output_dir: null          # Override default output directory (null = auto)
   root_dir: null            # Root directory anchor for relative output paths (null = cwd)
   overwrite: false          # Overwrite existing output files
@@ -20,6 +18,8 @@ model:
   debug: false
 
 calculate:
+  start_date: '2025-03-16'  # Start date for tremor calculation (YYYY-MM-DD)
+  end_date: '2025-03-22'    # End date for tremor calculation (YYYY-MM-DD)
   source: sds               # Data source: 'sds' or 'fdsn'
   sds_dir: D:/Data/OJN      # Path to SDS archive root (required when source='sds')
   methods: null             # Tremor methods to compute (null = all: rsam + dsar)
@@ -55,7 +55,7 @@ extract_features:
   select_tremor_columns:    # Tremor columns to use for feature extraction
     - rsam_f2
     - rsam_f3
-  save_tremor_matrix_per_method: false  # Save a separate tremor matrix per tremor column
+  save_tremor_matrix_per_method: true   # Save a separate tremor matrix per tremor column
   save_tremor_matrix_per_id: false      # Save a separate tremor matrix per window id
   exclude_features: null    # tsfresh feature names to exclude (null = none)
   use_relevant_features: false          # Use only statistically relevant features (tsfresh FDR)
@@ -89,6 +89,7 @@ forecast:
   window_step: 12           # Step between forecast windows
   window_step_unit: hours   # Unit for window_step: 'minutes' or 'hours'
   save_predictions: true    # Save prediction CSV to disk
+  threshold: 0.5            # Probability threshold for classifying a window as eruption
   save_plot: true           # Save forecast probability plot
   n_jobs: null              # Workers for feature extraction during forecast (null = model.n_jobs)
   overwrite: false

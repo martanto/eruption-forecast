@@ -9,6 +9,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.sources.sds import SDS
 from eruption_forecast.sources.base import SeismicDataSource
 from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.date_utils import normalize_dates
 
 
 class FDSN(SeismicDataSource):
@@ -147,8 +148,7 @@ class FDSN(SeismicDataSource):
 
         prefix = self.SDS._make_log_prefix(date)
 
-        start_date = date.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_date = date.replace(hour=23, minute=59, second=59, microsecond=59)
+        start_date, end_date, _, _ = normalize_dates(date, date)
         start_date_utc = UTCDateTime(start_date)
         end_date_utc = UTCDateTime(end_date)
 
@@ -171,9 +171,7 @@ class FDSN(SeismicDataSource):
 
             if len(stream) == 0:
                 if self.verbose:
-                    logger.info(
-                        f"{prefix} Waveforms retrieved. No trace(s) found."
-                    )
+                    logger.info(f"{prefix} Waveforms retrieved. No trace(s) found.")
                 return Stream()
 
             if self.verbose:

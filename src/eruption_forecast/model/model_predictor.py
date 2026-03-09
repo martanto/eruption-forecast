@@ -9,7 +9,9 @@ from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 from eruption_forecast.utils.formatting import slugify
 
 
-matplotlib.use(MATPLOTLIB_BACKEND)  # Must be called before pyplot import — non-interactive backend safe for worker threads
+matplotlib.use(
+    MATPLOTLIB_BACKEND
+)  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,7 +21,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import load_labels_from_csv, compute_model_probabilities
 from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
-from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.utils.date_utils import normalize_dates
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.model_evaluator import ModelEvaluator
@@ -184,10 +186,9 @@ class ModelPredictor:
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
-        start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
-        end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
-        start_date_str = start_date.strftime("%Y-%m-%d")
-        end_date_str = end_date.strftime("%Y-%m-%d")
+        start_date, end_date, start_date_str, end_date_str = normalize_dates(
+            start_date, end_date
+        )
 
         # Output training dir: ``<root_dir>/output/trainings``
         output_dir = resolve_output_dir(
