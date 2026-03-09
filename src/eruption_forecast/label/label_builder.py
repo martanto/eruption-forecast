@@ -506,17 +506,16 @@ class LabelBuilder:
                 # Move the start of eruption to number of day_to_forecast
                 start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
 
-                # Set start time of eruption to 00:00:00
-                start_eruption = start_eruption.replace(hour=0, minute=0, second=0)
-
-                # Set end time of eruption to at 23:59:59
-                end_eruption = day_of_eruption.replace(hour=23, minute=59, second=59)
+                # Set start time of eruption to 00:00:00 and end time of eruption to at 23:59:59
+                start_eruption, end_eruption, _start_eruption_str, end_eruption_str = (
+                    normalize_dates(start_eruption, day_of_eruption)
+                )
 
                 # Stop if eruption date is beyond the end date
                 if end_eruption > self.end_date:
                     if self.debug:
                         logger.debug(
-                            f"Eruption date {eruption} is beyond end date {self.end_date_str}, skipping"
+                            f"Eruption date {end_eruption_str} is beyond end date {self.end_date_str}, skipping"
                         )
                     continue
 
