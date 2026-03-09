@@ -69,7 +69,9 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection — `"tsfresh"`, `"random_forest"`, `"combined"` |
 | `overwrite` | `bool` | `False` | Re-run even if output already exists |
 | `n_jobs` | `int` | `1` | Outer parallel workers (one per seed). `-1` = all cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
-| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside `GridSearchCV` |
+| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside `GridSearchCV` and `FeatureSelector`. When `use_gpu=True` this is still used by `FeatureSelector` (CPU-only), but `GridSearchCV` is forced to `1` |
+| `use_gpu` | `bool` | `False` | Enable GPU acceleration for XGBoost via `device="cuda:<gpu_id>"`. Forces `n_jobs=1` and `GridSearchCV` `n_jobs=1` to prevent VRAM contention. Has no effect for non-XGBoost classifiers |
+| `gpu_id` | `int` | `0` | GPU device index when `use_gpu=True`. Use `0` for the first GPU, `1` for the second, etc. |
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 

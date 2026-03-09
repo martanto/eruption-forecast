@@ -77,7 +77,9 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |
 | `overwrite` | `bool` | `False` | Re-run even if output files already exist |
 | `n_jobs` | `int` | `1` | Parallel seed workers (outer loop). Pass `-1` to use all available cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
-| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension |
+| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call and `FeatureSelector` (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension. When `use_gpu=True`, `GridSearchCV` is forced to `1` but `FeatureSelector` keeps the configured value |
+| `use_gpu` | `bool` | `False` | Enable GPU acceleration for XGBoost via `device="cuda:<gpu_id>"`. Forces outer `n_jobs=1` and `GridSearchCV` inner `n_jobs=1` to prevent VRAM contention. No effect on non-XGBoost classifiers |
+| `gpu_id` | `int` | `0` | GPU device index when `use_gpu=True`. Use `0` for the first GPU, `1` for the second |
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 

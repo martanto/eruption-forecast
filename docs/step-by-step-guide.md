@@ -364,7 +364,9 @@ without dropping down to `ModelTrainer`.
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |
 | `overwrite` | `bool` | `False` | Re-run even if output files already exist |
 | `n_jobs` | `int` | `1` | Parallel seed workers (outer loop). Pass `-1` to use all available cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
-| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension |
+| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside each `GridSearchCV` call and `FeatureSelector` (inner loop). Uses `loky` backend — safe for Intel's scikit-learn extension. When `use_gpu=True`, `GridSearchCV` is forced to `n_jobs=1` but `FeatureSelector` keeps the configured value |
+| `use_gpu` | `bool` | `False` | Enable GPU acceleration for XGBoost via `device="cuda:<gpu_id>"`. Forces outer `n_jobs=1` and `GridSearchCV` inner `n_jobs=1` to prevent VRAM contention. Has no effect for non-XGBoost classifiers — emits a warning if set with `rf`, `gb`, `svm`, etc. |
+| `gpu_id` | `int` | `0` | GPU device index when `use_gpu=True`. Use `0` for the first GPU, `1` for the second |
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
@@ -401,14 +403,14 @@ without dropping down to `ModelTrainer`.
 |------------|-------------|---------------------|
 | `rf` | Random Forest (balanced, robust, default) | `class_weight="balanced"` |
 | `gb` | Gradient Boosting (handles imbalance natively) | None (natural) |
-| `xgb` | XGBoost (excellent for imbalanced data) | `scale_pos_weight` grid search |
+| `xgb` | XGBoost (excellent for imbalanced data, GPU-capable) | `scale_pos_weight` grid search |
 | `svm` | Support Vector Machine (high-dimensional) | `class_weight="balanced"` |
 | `lr` | Logistic Regression (interpretable, fast) | `class_weight="balanced"` |
 | `nn` | Neural Network MLP (complex patterns) | None |
 | `dt` | Decision Tree (interpretable baseline) | `class_weight="balanced"` |
 | `knn` | K-Nearest Neighbors (simple baseline) | None |
 | `nb` | Gaussian Naive Bayes (fast baseline) | None |
-| `voting` | Soft VotingClassifier (RF + XGBoost ensemble) | Combined |
+| `voting` | Soft VotingClassifier (RF + XGBoost ensemble, GPU-capable) | Combined |
 | `lite-rf` | Random Forest with a smaller grid for faster training | `class_weight="balanced"` |
 
 ### 8. Hyperparameter Grids
