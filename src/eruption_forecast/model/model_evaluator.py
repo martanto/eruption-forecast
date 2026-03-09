@@ -281,7 +281,7 @@ class ModelEvaluator:
 
     def _save_plot(
         self,
-        fig,
+        fig: plt.Figure,
         save: bool,
         filepath: str,
         dpi: int = PLOT_DPI,
