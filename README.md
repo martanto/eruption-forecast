@@ -4,13 +4,13 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-active%20development-orange)
 
-A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions based on seismic patterns.
+A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
 
-## ⚠️ Important Disclaimers
+## Important Disclaimers
 
 **This software is intended for research purposes only.**
 
-1. **Probabilistic Predictions**: This eruption forecast model provides probabilistic predictions of future volcanic activity, not deterministic guarantees. Predictions should be interpreted as likelihood estimates based on historical seismic patterns.
+1. **Probabilistic Predictions**: This eruption forecast model provides probabilistic predictions of future volcanic activity, NOT deterministic guarantees. Predictions should be interpreted as likelihood estimates based on historical seismic patterns.
 
 2. **No Guarantee of Accuracy**: This model is **not guaranteed to predict every future eruption**. Volcanic systems are complex and can exhibit unexpected behavior. False negatives (missed eruptions) and false positives (false alarms) are possible.
 
@@ -32,6 +32,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - [Installation](#installation)
 - [Data Sources](#data-sources)
 - [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
+- [Reports](#reports)
 - [Advanced Usage](#advanced-usage)
 - [Supported Classifiers](#supported-classifiers)
 - [Cross-Validation Strategies](#cross-validation-strategies)
@@ -63,6 +64,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables sklearn-compatible `predict_proba()` / `predict()` calls directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
+- **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function — no external dependencies except an optional `weasyprint` for PDF export
 - **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
 - **Modular Architecture**: Clean separation of concerns with focused utility modules
 
@@ -78,6 +80,7 @@ eruption-forecast/
 │   ├── model/               # ML model training & prediction
 │   ├── sources/             # SDS and FDSN data source adapters
 │   ├── plots/               # Visualization utilities
+│   ├── report/              # (beta) Interactive HTML report generation
 │   ├── utils/               # Focused utility modules
 │   └── decorators/          # Function decorators
 └── tests/                   # Unit tests
@@ -138,6 +141,15 @@ Raw Seismic Data (SDS / FDSN)
 │  └──────────────────────────────────────┘   │
 │  Single model, merged pkl, or multi-model   │
 │  consensus                                  │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────┐
+│              Report (optional)              │
+│   generate_report() / fm.generate_report()  │
+│   → self-contained HTML (Plotly, CDN JS)    │
+│   Tremor · Labels · Features · Training     │
+│   Comparator · Prediction · Pipeline        │
 └─────────────────────────────────────────────┘
 ```
 
@@ -179,7 +191,7 @@ SDS is a standardized directory and file layout used by [SeisComP](https://www.s
 **Example** for network `VG`, station `OJN`, channel `EHZ`, day 075 of 2025:
 
 ```
-/data/sds/
+/data/
 └── 2025/
     └── VG/
         └── OJN/
@@ -308,6 +320,103 @@ See `main.py` in the repository for the complete working example.
 
 ---
 
+## Reports (beta)
+
+The `report/` package generates self-contained, interactive HTML reports (powered by Plotly, loaded from CDN) for every pipeline stage. No image files are produced — each report is a single `.html` file you can open in any browser or share by email.
+
+### Integrated — chain after any pipeline stage
+
+```python
+fm.calculate(...).build_label(...).train(...).generate_report()
+# → output/VG.OJN.00.EHZ/reports/pipeline_report.html
+
+# Select specific sections only
+fm.generate_report(sections=["tremor", "label"])
+
+# Export to PDF (requires: uv add weasyprint)
+fm.generate_report(fmt="pdf")
+```
+
+### Standalone — from an existing output directory
+
+```python
+from eruption_forecast.report import generate_report
+
+path = generate_report("output/VG.OJN.00.EHZ")
+print(f"Report saved to {path}")
+
+# Specific sections
+path = generate_report("output/VG.OJN.00.EHZ", sections=["tremor", "training"])
+```
+
+### Individual section reports
+
+Each report class can be used directly for a focused view:
+
+```python
+from eruption_forecast.report import (
+    TremorReport,
+    LabelReport,
+    FeaturesReport,
+    TrainingReport,
+    ComparatorReport,
+    PredictionReport,
+    PipelineReport,
+)
+
+# Tremor: data completeness, band stats, full-range + daily detail chart
+path = TremorReport("output/.../tremor.csv", station="OJN").save()
+
+# Labels: window config, class distribution, eruption timeline
+path = LabelReport(
+    "output/.../label_2025-01-01_....csv",
+    eruption_dates=["2025-03-20", "2025-04-22"],
+).save()
+
+# Features: feature counts, top-N bar, band contribution
+path = FeaturesReport(
+    features_csv="output/.../all_extracted_features.csv",
+    significant_features_dir="output/.../significant_features/",
+    selection_method="combined",
+).save()
+
+# Training: per-seed <details>, aggregate mean±std, stability, threshold analysis
+path = TrainingReport(
+    metrics_dir="output/.../metrics/",
+    classifier_name="RandomForestClassifier",
+).save()
+
+# Classifier comparison: grouped bar + aggregate table
+from eruption_forecast.report import ComparatorReport
+path = ComparatorReport(
+    classifier_registry={
+        "rf":  "output/.../trainings/evaluations/rf/.../trained_model_rf.csv",
+        "xgb": "output/.../trainings/evaluations/xgb/.../trained_model_xgb.csv",
+    }
+).save()
+
+# Forecast probabilities: consensus line, uncertainty band, eruption markers
+path = PredictionReport(
+    prediction_df=fm.prediction_df,
+    eruption_dates=["2025-03-20"],
+    threshold=0.5,
+).save()
+```
+
+**What each report contains:**
+
+| Report | Charts | Tables |
+|--------|--------|--------|
+| `TremorReport` | Full-range overview, daily detail with date dropdown | Completeness, band stats |
+| `LabelReport` | Class distribution bar, eruption timeline | Window config, class counts |
+| `FeaturesReport` | Top-N features (horizontal bar), band contribution | Feature counts summary |
+| `TrainingReport` | Seed stability, threshold analysis | Per-seed rows + aggregate mean±std |
+| `ComparatorReport` | Grouped bar per metric × classifier | Aggregate metrics table |
+| `PredictionReport` | Probability lines + uncertainty band + eruption markers | Forecast config |
+| `PipelineReport` | All of the above + executive summary | Pipeline stage availability |
+
+---
+
 ## Advanced Usage
 
 ### Use FDSN instead of a local SDS archive
@@ -347,6 +456,38 @@ fm.train(
     total_seed=100,
 )
 ```
+
+### GPU acceleration for XGBoost
+
+XGBoost (`xgb`) and the voting ensemble (`voting`) support GPU training via `use_gpu=True`. Use `gpu_id` to select a specific device on multi-GPU machines.
+
+```python
+# Train on the first GPU (default)
+fm.train(
+    classifier="xgb",
+    cv_strategy="stratified",
+    total_seed=500,
+    use_gpu=True,          # enable CUDA
+    gpu_id=0,              # first GPU (default)
+)
+
+# Train on the second GPU
+fm.train(
+    classifier="xgb",
+    use_gpu=True,
+    gpu_id=1,              # second GPU
+)
+```
+
+**Parallelism rules when `use_gpu=True`:**
+
+| Parameter | Normal (CPU) | GPU (`use_gpu=True`) |
+|---|---|---|
+| `n_jobs` (outer seed workers) | Configurable | Forced to `1` — multiple seeds sharing one GPU causes VRAM contention |
+| `grid_search_n_jobs` in `GridSearchCV` | Configurable | Forced to `1` — parallel CV fold workers each try to use the GPU simultaneously |
+| `grid_search_n_jobs` in `FeatureSelector` | Configurable | **Unchanged** — feature selection is CPU-only (tsfresh/RandomForest) and is safe to parallelise |
+
+> `use_gpu=True` has no effect on non-XGBoost classifiers (`rf`, `gb`, `svm`, etc.). Passing it with those classifiers emits a warning and training proceeds on CPU as normal.
 
 ### Train multiple classifiers and run consensus forecast
 
@@ -458,14 +599,14 @@ fm3.forecast(start_date="2025-04-01", end_date="2025-04-07",
 |------------|-------------|---------------------|
 | `rf` | Random Forest (balanced, robust, default) | `class_weight="balanced"` |
 | `gb` | Gradient Boosting (handles imbalance natively) | None (natural) |
-| `xgb` | XGBoost (excellent for imbalanced data) | `scale_pos_weight` grid search |
+| `xgb` | XGBoost (excellent for imbalanced data, GPU-capable) | `scale_pos_weight` grid search |
 | `svm` | Support Vector Machine (high-dimensional) | `class_weight="balanced"` |
 | `lr` | Logistic Regression (interpretable, fast) | `class_weight="balanced"` |
 | `nn` | Neural Network MLP (complex patterns) | None |
 | `dt` | Decision Tree (interpretable baseline) | `class_weight="balanced"` |
 | `knn` | K-Nearest Neighbors (simple baseline) | None |
 | `nb` | Gaussian Naive Bayes (fast baseline) | None |
-| `voting` | Soft VotingClassifier (RF + XGBoost ensemble) | Combined |
+| `voting` | Soft VotingClassifier (RF + XGBoost ensemble, GPU-capable) | Combined |
 | `lite-rf` | Random Forest with a smaller grid for faster training | `class_weight="balanced"` |
 
 > Hyperparameter grids and overriding them: [docs/step-by-step-guide.md#8-hyperparameter-grids](docs/step-by-step-guide.md#8-hyperparameter-grids)
@@ -589,6 +730,6 @@ If you use this package in your research, please cite:
 
 ---
 
-**Version:** 0.2.2
+**Version:** 0.1.0
 **Status:** Active Development
-**Last Updated:** 2026-03-01
+**Last Updated:** 2026-03-09
