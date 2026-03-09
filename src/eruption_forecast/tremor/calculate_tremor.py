@@ -99,7 +99,7 @@ class CalculateTremor:
         remove_outlier_method (Literal["maximum", "all"]): Outlier removal strategy.
             "maximum" removes only the single maximum outlier; "all" removes all outliers.
             Defaults to "maximum".
-        remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calciulated.
+        remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calculated.
             Using Z-score analysis to determine the anomalies. Defaults to False.
         interpolate (bool): If True, interpolates gaps in the data. Defaults to False.
         value_multiplier (float | None): Scaling factor applied to seismic values.

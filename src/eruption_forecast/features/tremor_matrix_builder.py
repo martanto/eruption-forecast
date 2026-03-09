@@ -488,9 +488,19 @@ class TremorMatrixBuilder:
         if not self.overwrite and (os.path.isfile(tremor_matrix_csv)):
             if verbose:
                 logger.info(f"Tremor matrix {tremor_matrix_csv} already exists.")
-            self.df = pd.read_csv(tremor_matrix_csv)
-            self.csv = tremor_matrix_csv
-            return self
+            df = pd.read_csv(tremor_matrix_csv)
+            columns = df.columns.tolist()
+
+            # Ensure select_tremor_columns exists in tremor matrix column
+            if select_tremor_columns is None or all(
+                item in columns for item in select_tremor_columns
+            ):
+                self.df = df
+                self.csv = tremor_matrix_csv
+                return self
+
+            if verbose:
+                logger.warning("Cannot skip, because there is column(s) different.")
 
         if verbose:
             logger.info("Create tremor matrix which grouped by label ID.")

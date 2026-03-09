@@ -4,7 +4,6 @@ This module provides functions for creating time windows, extracting window
 information from seismic traces, and calculating window-based metrics for
 tremor analysis.
 """
-
 from typing import Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable
@@ -23,6 +22,7 @@ from eruption_forecast.config.constants import (
     DEFAULT_WINDOW_DURATION_MINUTES,
     DEFAULT_MINIMUM_COMPLETION_RATIO,
 )
+from eruption_forecast.utils.date_utils import normalize_dates
 from eruption_forecast.utils.validation import (
     validate_date_ranges,
     validate_window_step,
@@ -364,8 +364,7 @@ def construct_windows(
             f"window_step: {window_step}, maximum_window_step: {maximum_window_step}"
         )
 
-    start_date = start_date.replace(hour=0, minute=0, second=0)
-    end_date = end_date.replace(hour=23, minute=59, second=59)
+    start_date, end_date, _, _ = normalize_dates(start_date, end_date)
 
     freq = (
         timedelta(minutes=window_step)
