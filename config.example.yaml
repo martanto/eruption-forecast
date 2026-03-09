@@ -80,6 +80,7 @@ train:
   verbose: false
   plot_shap: false          # Generate SHAP explanation plots per seed
   save_model: true          # Serialise ForecastModel instance after training completes
+  use_gpu: false            # Enable GPU acceleration for XGBoost (forces n_jobs=1 to avoid VRAM contention)
 
 forecast:
   start_date: '2025-03-23' # Forecast period start date

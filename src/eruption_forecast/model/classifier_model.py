@@ -1,4 +1,3 @@
-import subprocess
 from typing import Any, Self, Literal, ClassVar
 
 from xgboost import XGBClassifier
@@ -122,6 +121,7 @@ class ClassifierModel:
         verbose: bool = False,
         class_weight: str | dict[int, float] | None = None,
         n_jobs: int = 1,
+        use_gpu: bool = False,
     ):
         """Initialize the ClassifierModel with a classifier type and cross-validation settings.
 
@@ -144,6 +144,10 @@ class ClassifierModel:
                 scheme passed to classifiers that support it. Defaults to None.
             n_jobs (int, optional): Number of parallel jobs for supported classifiers.
                 Defaults to 1.
+            use_gpu (bool, optional): Enable GPU acceleration for XGBoost via
+                ``device="cuda"``. Defaults to False (CPU only). Enable only when
+                training on a single large batch outside cross-validation loops,
+                as repeated CPU↔GPU transfers during CV can cause instability.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -156,6 +160,13 @@ class ClassifierModel:
         self.verbose = verbose
         self.class_weight = class_weight
         self.n_jobs = n_jobs
+        self.use_gpu = use_gpu
+
+        if use_gpu and classifier not in {"xgb", "voting"}:
+            logger.warning(
+                f"use_gpu=True has no effect for classifier '{classifier}'. "
+                "GPU acceleration is only supported for 'xgb' and 'voting'."
+            )
 
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
@@ -385,14 +396,17 @@ class ClassifierModel:
 
         return self._build_model()
 
-    @staticmethod
-    def _get_xgb_device() -> str:
-        """Detect GPU availability."""
-        try:
-            subprocess.run(["nvidia-smi"], check=True, capture_output=True)
-            return "cuda"
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return "cpu"
+    def _xgb_device(self) -> str:
+        """Return the XGBoost device string based on use_gpu.
+
+        Returns "cuda" only when use_gpu is True; otherwise returns "cpu".
+        GPU mode should be enabled only for single-batch training, not for
+        cross-validation loops where repeated CPU↔GPU transfers cause instability.
+
+        Returns:
+            str: "cuda" if use_gpu is True, otherwise "cpu".
+        """
+        return "cuda" if self.use_gpu else "cpu"
 
     def _build_model(
         self,
@@ -450,7 +464,7 @@ class ClassifierModel:
             ),
             "gb": lambda: GradientBoostingClassifier(random_state=self.random_state),
             "xgb": lambda: XGBClassifier(
-                device=self._get_xgb_device(),
+                device=self._xgb_device(),
                 tree_method="hist",
                 eval_metric="logloss",
                 random_state=self.random_state,
@@ -478,8 +492,10 @@ class ClassifierModel:
                     (
                         "xgb",
                         XGBClassifier(
-                            random_state=self.random_state,
+                            device=self._xgb_device(),
+                            tree_method="hist",
                             eval_metric="logloss",
+                            random_state=self.random_state,
                             n_jobs=self.n_jobs,
                         ),
                     ),

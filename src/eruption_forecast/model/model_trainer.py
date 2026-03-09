@@ -237,6 +237,7 @@ class ModelTrainer:
         plot_shap: bool = False,
         n_jobs: int = 1,
         grid_search_n_jobs: int = 1,
+        use_gpu: bool = False,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -279,10 +280,26 @@ class ModelTrainer:
                 ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
+            use_gpu (bool, optional): Enable GPU acceleration for XGBoost. Defaults to False.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
+        _xgb_classifiers = {"xgb", "voting"}
+        if use_gpu and classifier in _xgb_classifiers:
+            if n_jobs != 1:
+                logger.warning(
+                    "use_gpu=True forces n_jobs=1 to avoid GPU memory contention "
+                    "from parallel seed workers sharing the same device."
+                )
+                n_jobs = 1
+            if grid_search_n_jobs != 1:
+                logger.warning(
+                    "use_gpu=True forces grid_search_n_jobs=1 to avoid GPU memory "
+                    "contention from parallel GridSearchCV fold workers sharing the same device."
+                )
+                grid_search_n_jobs = 1
+
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
         df_labels = load_labels_from_csv(label_features_csv)
 
@@ -291,6 +308,7 @@ class ModelTrainer:
             cv_strategy=cv_strategy,
             n_splits=cv_splits,
             verbose=verbose,
+            use_gpu=use_gpu,
         )
 
         (
