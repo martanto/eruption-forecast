@@ -238,6 +238,7 @@ class ModelTrainer:
         n_jobs: int = 1,
         grid_search_n_jobs: int = 1,
         use_gpu: bool = False,
+        gpu_id: int = 0,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -281,24 +282,19 @@ class ModelTrainer:
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
             use_gpu (bool, optional): Enable GPU acceleration for XGBoost. Defaults to False.
+            gpu_id (int, optional): GPU device index to use when use_gpu is True.
+                Use 0 for the first GPU, 1 for the second, etc. Defaults to 0.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
         _xgb_classifiers = {"xgb", "voting"}
-        if use_gpu and classifier in _xgb_classifiers:
-            if n_jobs != 1:
-                logger.warning(
-                    "use_gpu=True forces n_jobs=1 to avoid GPU memory contention "
-                    "from parallel seed workers sharing the same device."
-                )
-                n_jobs = 1
-            if grid_search_n_jobs != 1:
-                logger.warning(
-                    "use_gpu=True forces grid_search_n_jobs=1 to avoid GPU memory "
-                    "contention from parallel GridSearchCV fold workers sharing the same device."
-                )
-                grid_search_n_jobs = 1
+        if use_gpu and classifier in _xgb_classifiers and n_jobs != 1:
+            logger.warning(
+                "use_gpu=True forces n_jobs=1 to avoid GPU memory contention "
+                "from parallel seed workers sharing the same device."
+            )
+            n_jobs = 1
 
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
         df_labels = load_labels_from_csv(label_features_csv)
@@ -309,6 +305,7 @@ class ModelTrainer:
             n_splits=cv_splits,
             verbose=verbose,
             use_gpu=use_gpu,
+            gpu_id=gpu_id,
         )
 
         (
@@ -911,12 +908,17 @@ class ModelTrainer:
             random_state=random_state
         )
 
+        # Force n_jobs=1 for GPU classifiers: parallel CV fold workers would
+        # each try to use the same GPU device simultaneously, causing VRAM contention.
+        # FeatureSelector (CPU-only) is unaffected and keeps self.grid_search_n_jobs.
+        _gs_n_jobs = 1 if clf.use_gpu else self.grid_search_n_jobs
+
         grid_search = GridSearchCV(
             estimator=clf.model,
             param_grid=clf.grid,
             cv=clf.get_cv_splitter(),
             scoring="balanced_accuracy",
-            n_jobs=self.grid_search_n_jobs,
+            n_jobs=_gs_n_jobs,
             verbose=0,
         )
 

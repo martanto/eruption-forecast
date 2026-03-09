@@ -1130,6 +1130,7 @@ class ForecastModel:
         grid_search_n_jobs: int = 1,
         overwrite: bool = False,
         use_gpu: bool = False,
+        gpu_id: int = 0,
         verbose: bool = False,
     ) -> tuple[str, str]:
         """Train a single classifier and append results to instance state.
@@ -1165,6 +1166,7 @@ class ForecastModel:
                 Defaults to False.
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
             use_gpu (bool, optional): Enable GPU acceleration for XGBoost. Defaults to False.
+            gpu_id (int, optional): GPU device index to use when use_gpu is True. Defaults to 0.
 
         Returns:
             tuple[str, str]: Classifier name and trained model CSV filepath
@@ -1183,6 +1185,7 @@ class ForecastModel:
             grid_search_n_jobs=grid_search_n_jobs,
             verbose=verbose,
             use_gpu=use_gpu,
+            gpu_id=gpu_id,
         )
 
         # Override default grid search parameters
@@ -1225,6 +1228,7 @@ class ForecastModel:
         plot_shap: bool = False,
         overwrite: bool = False,
         use_gpu: bool = False,
+        gpu_id: int = 0,
         verbose: bool = False,
         save_model: bool = True,
     ) -> Self:
@@ -1280,6 +1284,8 @@ class ForecastModel:
                 Defaults to True.
             use_gpu (bool, optional): Enable GPU acceleration for XGBoost. Has no effect
                 for other classifiers. Defaults to False.
+            gpu_id (int, optional): GPU device index to use when use_gpu is True
+                (e.g. 0 for the first GPU, 1 for the second). Defaults to 0.
 
         Returns:
             Self: ForecastModel instance for method chaining.
@@ -1357,6 +1363,7 @@ class ForecastModel:
                 overwrite=overwrite or self.overwrite,
                 verbose=verbose or self.verbose,
                 use_gpu=use_gpu and _classifier in {"xgb", "voting"},
+                gpu_id=gpu_id,
             )
             trained_models[classifier_name] = trained_model_csv
 
@@ -1397,6 +1404,7 @@ class ForecastModel:
             plot_shap=plot_shap,
             save_model=save_model,
             use_gpu=use_gpu,
+            gpu_id=gpu_id,
         )
 
         self.trained_models = trained_models

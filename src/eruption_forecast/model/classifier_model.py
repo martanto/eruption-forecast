@@ -122,6 +122,7 @@ class ClassifierModel:
         class_weight: str | dict[int, float] | None = None,
         n_jobs: int = 1,
         use_gpu: bool = False,
+        gpu_id: int = 0,
     ):
         """Initialize the ClassifierModel with a classifier type and cross-validation settings.
 
@@ -148,6 +149,9 @@ class ClassifierModel:
                 ``device="cuda"``. Defaults to False (CPU only). Enable only when
                 training on a single large batch outside cross-validation loops,
                 as repeated CPU↔GPU transfers during CV can cause instability.
+            gpu_id (int, optional): GPU device index to use when use_gpu is True
+                (e.g. 0 for the first GPU, 1 for the second). Ignored when
+                use_gpu is False. Defaults to 0.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -161,6 +165,7 @@ class ClassifierModel:
         self.class_weight = class_weight
         self.n_jobs = n_jobs
         self.use_gpu = use_gpu
+        self.gpu_id = gpu_id
 
         if use_gpu and classifier not in {"xgb", "voting"}:
             logger.warning(
@@ -397,16 +402,15 @@ class ClassifierModel:
         return self._build_model()
 
     def _xgb_device(self) -> str:
-        """Return the XGBoost device string based on use_gpu.
+        """Return the XGBoost device string based on use_gpu and gpu_id.
 
-        Returns "cuda" only when use_gpu is True; otherwise returns "cpu".
-        GPU mode should be enabled only for single-batch training, not for
-        cross-validation loops where repeated CPU↔GPU transfers cause instability.
+        Returns "cuda:<gpu_id>" when use_gpu is True so that a specific GPU
+        can be targeted on multi-GPU machines; otherwise returns "cpu".
 
         Returns:
-            str: "cuda" if use_gpu is True, otherwise "cpu".
+            str: "cuda:<gpu_id>" if use_gpu is True, otherwise "cpu".
         """
-        return "cuda" if self.use_gpu else "cpu"
+        return f"cuda:{self.gpu_id}" if self.use_gpu else "cpu"
 
     def _build_model(
         self,

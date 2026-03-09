@@ -272,9 +272,11 @@ class TrainConfig(_ConfigBase):
             Defaults to ``False``.
         save_model (bool): Whether to serialise the ``ForecastModel`` instance
             to disk after training completes. Defaults to ``True``.
-        use_gpu (bool): Enable GPU acceleration for XGBoost via ``device="cuda"``.
+        use_gpu (bool): Enable GPU acceleration for XGBoost via ``device="cuda:<gpu_id>"``.
             Forces ``n_jobs=1`` to prevent GPU memory contention across parallel
             seed workers. Has no effect on other classifiers. Defaults to ``False``.
+        gpu_id (int): GPU device index to use when use_gpu is True. Use 0 for the
+            first GPU, 1 for the second, etc. Defaults to ``0``.
     """
 
     classifiers: list[str] = field(default_factory=lambda: ["rf"])
@@ -293,6 +295,7 @@ class TrainConfig(_ConfigBase):
     plot_shap: bool = False
     save_model: bool = True
     use_gpu: bool = False
+    gpu_id: int = 0
 
 
 @dataclass
