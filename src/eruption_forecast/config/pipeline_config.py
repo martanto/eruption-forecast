@@ -61,12 +61,10 @@ class ModelConfig(_ConfigBase):
     Attributes:
         station (str): Seismic station code (e.g. ``"OJN"``). Defaults to ``""``.
         channel (str): Seismic channel code (e.g. ``"EHZ"``). Defaults to ``""``.
-        start_date (str): Pipeline start date in ``"YYYY-MM-DD"`` format. Defaults to ``""``.
-        end_date (str): Pipeline end date in ``"YYYY-MM-DD"`` format. Defaults to ``""``.
         window_size (int): Duration in days of each tremor window. Defaults to ``1``.
         volcano_id (str): Unique volcano identifier used in output filenames. Defaults to ``""``.
-        network (str): Seismic network code. Defaults to ``"VG"``.
-        location (str): Seismic location code. Defaults to ``"00"``.
+        network (str): Seismic network code. Defaults to ``""``.
+        location (str): Seismic location code. Defaults to ``""``.
         output_dir (str | None): Base output directory. ``None`` resolves to
             ``root_dir/output``. Defaults to ``None``.
         root_dir (str | None): Anchor directory for resolving relative paths.
@@ -79,12 +77,10 @@ class ModelConfig(_ConfigBase):
 
     station: str = ""
     channel: str = ""
-    start_date: str = ""
-    end_date: str = ""
     window_size: int = 1
     volcano_id: str = ""
-    network: str = "VG"
-    location: str = "00"
+    network: str = ""
+    location: str = ""
     output_dir: str | None = None
     root_dir: str | None = None
     overwrite: bool = False
@@ -101,6 +97,10 @@ class CalculateConfig(_ConfigBase):
     calculation step can be replayed identically.
 
     Attributes:
+        start_date (str): Tremor calculation start date in ``"YYYY-MM-DD"`` format.
+            Defaults to ``""``.
+        end_date (str): Tremor calculation end date in ``"YYYY-MM-DD"`` format.
+            Defaults to ``""``.
         source (str): Seismic data source — ``"sds"`` or ``"fdsn"``. Defaults to ``"sds"``.
         sds_dir (str | None): Path to the SDS archive directory. Required when
             ``source="sds"``. Defaults to ``None``.
@@ -132,6 +132,8 @@ class CalculateConfig(_ConfigBase):
         debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
+    start_date: str = ""
+    end_date: str = ""
     source: str = "sds"
     sds_dir: str | None = None
     methods: list[str] | None = None
