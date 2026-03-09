@@ -151,6 +151,8 @@ def predict(forecast_model: ForecastModel) -> None:
     forecast_model.build_label(
         start_date=TRAINING_PREDICTION_START_DATE,
         end_date=TRAINING_PREDICTION_END_DATE,
+        builder="dynamic",
+        day_to_forecast=14,
         **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
         with_evaluation=False, **TRAINING_PARAMETERS
@@ -171,11 +173,11 @@ def main():
         remove_outlier_method="maximum",
     )
 
-    # Train and evaluate
-    train_and_evaluate(forecast_model=fm)
-
     # Predict
     predict(forecast_model=fm)
+
+    # Train and evaluate
+    train_and_evaluate(forecast_model=fm)
 
 
 if __name__ == "__main__":
