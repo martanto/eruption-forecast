@@ -27,11 +27,11 @@ from eruption_forecast.config.pipeline_config import (
     BuildLabelConfig,
     ExtractFeaturesConfig,
 )
+from eruption_forecast.report.pipeline_report import PipelineReport
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
-from eruption_forecast.report.pipeline_report import PipelineReport
 
 
 class ForecastModel:
@@ -427,7 +427,7 @@ class ForecastModel:
         if self.start_date_minus_window_size is None:
             raise ValueError("self.start_date_minus_window_size cannot be None")
         if self.end_date is None:
-            raise ValueError("self.start_date_minus_window_size cannot be None")
+            raise ValueError("self.end_date cannot be None")
 
         # Create CalculateTremor with explicit parameters for type safety
         calculate = CalculateTremor(
@@ -530,7 +530,7 @@ class ForecastModel:
             if self.verbose:
                 logger.info(
                     f"start_date parameter: {self.start_date_minus_window_size} updated to "
-                    f"tremor start date: {tremor_data.start_date}"
+                    f"tremor start date: {self.start_date_str}"
                 )
 
         # Adjust end date if later than tremor end
@@ -540,7 +540,7 @@ class ForecastModel:
             if self.verbose:
                 logger.info(
                     f"end_date parameter: {self.end_date} updated to "
-                    f"tremor end date: {tremor_data.end_date}"
+                    f"tremor end date: {self.end_date_str}"
                 )
 
     @staticmethod
@@ -730,7 +730,10 @@ class ForecastModel:
 
         Returns:
             Self: ForecastModel instance for method chaining.
-                Sets self.tremor_data, self.TremorData, and self.tremor_csv.
+                Sets ``self.tremor_data``, ``self.TremorData``, ``self.tremor_csv``,
+                ``self.start_date``, ``self.end_date``, ``self.start_date_str``,
+                ``self.end_date_str``, and ``self.start_date_minus_window_size``
+                from the loaded tremor DataFrame's datetime index.
 
         Example:
             >>> model = ForecastModel(
@@ -749,6 +752,15 @@ class ForecastModel:
         self.tremor_data = tremor_data.from_csv(tremor_csv)
         self.TremorData.csv = tremor_csv
         self.tremor_csv = tremor_csv
+
+        self.start_date = self.tremor_data.index[0].to_pydatetime()
+        self.end_date = self.tremor_data.index[-1].to_pydatetime()
+        self.start_date_str = self.start_date.strftime("%Y-%m-%d")
+        self.end_date_str = self.end_date.strftime("%Y-%m-%d")
+        self.start_date_minus_window_size = self.start_date - timedelta(
+            days=self.window_size
+        )
+
         return self
 
     def calculate(
@@ -1026,7 +1038,7 @@ class ForecastModel:
                 )
             label_builder = DynamicLabelBuilder(
                 days_before_eruption=days_before_eruption,
-                **label_kwargs,  # ty:ignore[invalid-argument-type]
+                **label_kwargs,
             ).build()
 
             return label_builder
@@ -1046,7 +1058,7 @@ class ForecastModel:
         label_builder = LabelBuilder(
             start_date=to_datetime(train_start_date),
             end_date=to_datetime(train_end_date),
-            **label_kwargs,  # ty:ignore[invalid-argument-type]
+            **label_kwargs,
         ).build()
 
         return label_builder
