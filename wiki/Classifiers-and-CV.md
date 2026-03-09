@@ -8,14 +8,14 @@ Pass any `classifier` key to `ModelTrainer` or `ForecastModel.train()`.
 |-----|-----------|--------------------|-------|
 | `rf` | Random Forest | `class_weight="balanced"` | Robust default; good all-round performance |
 | `gb` | Gradient Boosting | None (natural) | Handles imbalance natively via boosting weights |
-| `xgb` | XGBoost | `scale_pos_weight` grid search | Excellent for imbalanced data; most tunable |
+| `xgb` | XGBoost | `scale_pos_weight` grid search | Excellent for imbalanced data; most tunable; **GPU-capable** (`use_gpu=True`) |
 | `svm` | Support Vector Machine | `class_weight="balanced"` | Effective in high-dimensional feature spaces |
 | `lr` | Logistic Regression | `class_weight="balanced"` | Fast and interpretable; good baseline |
 | `nn` | Neural Network (MLP) | None | Captures complex non-linear patterns |
 | `dt` | Decision Tree | `class_weight="balanced"` | Interpretable single-tree baseline |
 | `knn` | K-Nearest Neighbors | None | Simple distance-based baseline |
 | `nb` | Gaussian Naive Bayes | None | Very fast probabilistic baseline |
-| `voting` | Soft Voting Ensemble | Combined | Combines RF + XGBoost with probability averaging |
+| `voting` | Soft Voting Ensemble | Combined | Combines RF + XGBoost with probability averaging; **GPU-capable** (XGBoost component only) |
 | `lite-rf` | Random Forest (lite grid) | `class_weight="balanced"` | Smaller hyperparameter grid for faster training |
 
 ### Training multiple classifiers

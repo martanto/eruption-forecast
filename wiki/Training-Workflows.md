@@ -209,7 +209,33 @@ See [Evaluation and Forecasting](Evaluation-and-Forecasting) for how `ModelPredi
 
 ## Parallelism
 
-- `n_jobs` — outer loop: parallel seed workers (each seed is an independent job)
-- `grid_search_n_jobs` — inner loop: parallel folds inside each `GridSearchCV` call
+Two independent parallelism levels control training speed:
+
+- **`n_jobs`** — outer loop: parallel seed workers via `joblib.Parallel(backend="loky")`. Each worker runs one full seed independently (resample → feature selection → GridSearchCV → evaluate → save). The `loky` backend is used instead of `threading` for nested-parallelism safety.
+- **`grid_search_n_jobs`** — inner loop: parallel folds inside `GridSearchCV` and parallel workers inside `FeatureSelector` (tsfresh/RandomForest). These are separate scopes even though they share the same parameter.
 - Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count`
-- Uses `joblib.Parallel(backend="loky")` for nested-parallelism safety
+
+## GPU Acceleration (XGBoost only)
+
+XGBoost (`xgb`) and the voting ensemble (`voting`) support GPU training via `use_gpu=True`. Use `gpu_id` to pick a specific device on multi-GPU machines.
+
+```python
+trainer = ModelTrainer(
+    extracted_features_csv="output/features/all_features.csv",
+    label_features_csv="output/features/label_features.csv",
+    classifier="xgb",
+    use_gpu=True,    # enable CUDA
+    gpu_id=1,        # use second GPU (default: 0)
+)
+trainer.train(random_state=0, total_seed=500)
+```
+
+When `use_gpu=True` the following restrictions are automatically enforced:
+
+| Parallelism level | CPU (default) | GPU (`use_gpu=True`) |
+|---|---|---|
+| `n_jobs` (outer seed workers) | Configurable | Forced to `1` — multiple seeds sharing one GPU cause VRAM contention |
+| `GridSearchCV` inner `n_jobs` | Uses `grid_search_n_jobs` | Forced to `1` — parallel CV fold workers each claim the GPU simultaneously |
+| `FeatureSelector` inner `n_jobs` | Uses `grid_search_n_jobs` | **Unchanged** — feature selection is CPU-only (tsfresh / RandomForest) and safe to parallelise |
+
+> `use_gpu=True` has no effect on non-XGBoost classifiers (`rf`, `gb`, `svm`, etc.). Passing it with those classifiers emits a warning and training continues on CPU.
