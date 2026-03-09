@@ -28,10 +28,11 @@ ERUPTION_DATES = [
     "2025-08-17",
 ]
 
+CALCULATE_START_DATE = "2025-01-01"
+CALCULATE_END_DATE = "2025-12-31"
+
 FORECAST_PARAMETERS: dict[str, Any] = {
     "root_dir": ROOT_DIR,
-    "start_date": "2025-01-01",  # tremor calculation start date
-    "end_date": "2025-12-31",  # tremor calculation end date
     "station": "OJN",
     "channel": "EHZ",
     "network": "VG",
@@ -39,7 +40,7 @@ FORECAST_PARAMETERS: dict[str, Any] = {
     "window_size": 2,  # days to calculate tremor
     "volcano_id": "Lewotobi Laki-laki",  # required
     "n_jobs": N_JOBS,
-    "verbose": True,  # show more informations
+    "verbose": True,  # show more information
     "overwrite": False,
     "debug": False,
 }
@@ -49,11 +50,11 @@ LABEL_PARAMETERS: dict[str, Any] = {
     "window_step": 6,
     "window_step_unit": "hours",
     "eruption_dates": ERUPTION_DATES,
-    "verbose": True,  # show more informations
+    "verbose": True,  # show more information
 }
 
 EXTRACT_FEATURES_PARAMETERS: dict[str, Any] = {
-    "select_tremor_columns": ["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
+    "select_tremor_columns": ["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4", "entropy"],
     "save_tremor_matrix_per_method": True,
     "save_tremor_matrix_per_id": False,
     "exclude_features": [
@@ -79,7 +80,7 @@ TRAINING_PARAMETERS: dict[str, Any] = {
     "sampling_strategy": 0.75,
     "save_all_features": True,
     "plot_significant_features": True,
-    "n_jobs": 4,
+    "n_jobs": 6,
     "grid_search_n_jobs": 1,
     "overwrite": False,
     "plot_shap": False,  # SHAP Explanation plot
@@ -97,6 +98,15 @@ PREDICTION_PARAMETERS: dict[str, Any] = {
 
 
 def train_and_evaluate(forecast_model: ForecastModel) -> None:
+    """Run training, evaluation, and comparison stages of the pipeline.
+
+    Trains the model with an 80/20 split and evaluation, then evaluates each
+    trained classifier with MultiModelEvaluator and compares all classifiers
+    with ClassifierComparator when more than one classifier is trained.
+
+    Args:
+        forecast_model (ForecastModel): A configured ForecastModel instance.
+    """
     forecast_model.build_label(
         start_date=TRAINING_START_DATE, end_date=TRAINING_END_DATE, **LABEL_PARAMETERS
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
@@ -148,11 +158,17 @@ def train_and_evaluate(forecast_model: ForecastModel) -> None:
 
 
 def predict(forecast_model: ForecastModel) -> None:
+    """Run the prediction (no-evaluation) training and forecast stages.
+
+    Builds labels using LabelBuilder, extracts features, trains on
+    the full dataset without evaluation, runs forecast, and generates a report.
+
+    Args:
+        forecast_model (ForecastModel): A configured ForecastModel instance.
+    """
     forecast_model.build_label(
         start_date=TRAINING_PREDICTION_START_DATE,
         end_date=TRAINING_PREDICTION_END_DATE,
-        builder="dynamic",
-        day_to_forecast=14,
         **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
         with_evaluation=False, **TRAINING_PARAMETERS
@@ -162,10 +178,17 @@ def predict(forecast_model: ForecastModel) -> None:
 @timer("Forecast Model")
 @notify("Primer - Workflow")
 def main():
+    """Execute the full eruption forecast workflow.
+
+    Initialises a ForecastModel, calculates tremor data from SDS archive,
+    runs the prediction pipeline, and then runs training with evaluation.
+    """
     fm = ForecastModel(**FORECAST_PARAMETERS)
 
     # Calculate Tremor
     fm.calculate(
+        start_date=CALCULATE_START_DATE,
+        end_date=CALCULATE_END_DATE,
         source="sds",
         sds_dir=SDS_DIR,
         plot_daily=True,
