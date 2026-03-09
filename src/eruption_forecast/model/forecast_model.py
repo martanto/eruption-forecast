@@ -832,7 +832,7 @@ class ForecastModel:
         self.end_date_str = _end_str
         self.start_date_minus_window_size = _start - timedelta(days=self.window_size)
 
-        if self.verbose:
+        if verbose or self.verbose:
             logger.info(f"Start Date: {_start_str}")
             logger.info(f"End Date: {_end_str}")
 
@@ -1162,8 +1162,8 @@ class ForecastModel:
         self.basename = os.path.basename(label_builder.csv).split(".csv")[0]
 
         # Filter labels from start_date onwards
-        if builder == "standard":
-            df_label = df_label.loc[self.start_date :]
+        if builder == "standard" and train_start_date is not None:
+            df_label = df_label.loc[train_start_date :]
 
         if df_label.empty:
             raise ValueError(f"Label from start date {self.start_date} is empty.")
