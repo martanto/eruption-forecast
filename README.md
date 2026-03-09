@@ -479,6 +479,25 @@ fm.train(
 )
 ```
 
+**Parallelism architecture:**
+
+```
+ModelTrainer.fit()
+│
+├── [outer] n_jobs  → Parallel(loky backend)
+│   Each worker runs one full seed independently:
+│   resample → feature selection → GridSearchCV → evaluate → save
+│   GPU: forced to 1 (seeds share one GPU device)
+│
+└── [inner, per seed] grid_search_n_jobs
+    │
+    ├── FeatureSelector  → tsfresh/RandomForest, CPU-only
+    │   GPU: unchanged — safe to parallelise
+    │
+    └── GridSearchCV  → runs XGBoost CV folds
+        GPU: forced to 1 (fold workers share one GPU device)
+```
+
 **Parallelism rules when `use_gpu=True`:**
 
 | Parameter | Normal (CPU) | GPU (`use_gpu=True`) |
