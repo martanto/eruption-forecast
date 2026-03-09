@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 import pandas as pd
+from cycler import V
 from tsfresh import (
     extract_features as tsfresh_extract_features,
     extract_relevant_features,
@@ -427,11 +428,11 @@ class FeaturesBuilder:
 
             df = df[df["id"].isin(y_series.index)]
 
-            # Ensure tremor unified IDs has the sama ID with y_series
+            # Ensure tremor unified IDs match the IDs in y_series
             length_unique_id = len(df["id"].unique())
             if len(y_series.index) != length_unique_id:
                 error_message = (
-                    "IDs in tremor matrix unified is not the samw with ID from labels."
+                    "IDs in tremor matrix are not the same as IDs from labels."
                 )
                 logger.error(error_message)
                 raise ValueError(error_message)
@@ -557,6 +558,9 @@ class FeaturesBuilder:
         )
         label_df.to_csv(label_csv, index=True)
         self.label_features_csv = label_csv
+
+        if self.verbose:
+            logger.info(f"Label features CSV saved at {label_csv}")
 
         return dates_str, label_df
 
