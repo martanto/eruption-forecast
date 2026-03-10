@@ -1460,7 +1460,7 @@ class ModelTrainer:
             classifier_model.slug_name: []
             for classifier_model in self.classifier_models
         }
-        records_per_clf: dict[str, list[dict]] = {
+        records_per_classifier: dict[str, list[dict]] = {
             classifier_model.slug_name: []
             for classifier_model in self.classifier_models
         }
@@ -1513,7 +1513,7 @@ class ModelTrainer:
                     ) = self._generate_classifier_filepaths(_rs, classifier_slug)
                     with open(_metrics_filepath) as f:
                         metrics = json.load(f)
-                    records_per_clf[classifier_slug].append(
+                    records_per_classifier[classifier_slug].append(
                         {
                             "random_state": _rs,
                             "significant_features_csv": _significant_filepath,
@@ -1547,13 +1547,13 @@ class ModelTrainer:
                 y_test_filepath,
                 shap_explanation_filepath,
             ) in seed_results.items():
-                if classifier_slug not in records_per_clf:
-                    records_per_clf[classifier_slug] = []
+                if classifier_slug not in records_per_classifier:
+                    records_per_classifier[classifier_slug] = []
                     all_metrics[classifier_slug] = []
                 # Only append significant_features_csv once (same for all classifiers)
                 if significant_features_csv not in self.significant_features_csvs:
                     self.significant_features_csvs.append(significant_features_csv)
-                records_per_clf[classifier_slug].append(
+                records_per_classifier[classifier_slug].append(
                     {
                         "random_state": _random_state,
                         "significant_features_csv": significant_features_csv,
@@ -1573,10 +1573,10 @@ class ModelTrainer:
         # Save registry and metrics per classifier
         for classifier_model in self.classifier_models:
             classifier_slug = classifier_model.slug_name
-            if not records_per_clf[classifier_slug]:
+            if not records_per_classifier[classifier_slug]:
                 continue
             suffix_filename = self._save_models_registry(
-                records_per_clf[classifier_slug],
+                records_per_classifier[classifier_slug],
                 random_state,
                 total_seed,
                 classifier_slug=classifier_slug,
@@ -1759,7 +1759,7 @@ class ModelTrainer:
         if plot_significant_features:
             ensure_dir(self.shared_figures_dir)
 
-        records_per_clf: dict[str, list[dict]] = {
+        records_per_classifier: dict[str, list[dict]] = {
             classifier_model.slug_name: []
             for classifier_model in self.classifier_models
         }
@@ -1808,7 +1808,7 @@ class ModelTrainer:
                         _,
                         _,
                     ) = self._generate_classifier_filepaths(_rs, classifier_slug)
-                    records_per_clf[classifier_slug].append(
+                    records_per_classifier[classifier_slug].append(
                         {
                             "random_state": _rs,
                             "significant_features_csv": _significant_filepath,
@@ -1834,11 +1834,11 @@ class ModelTrainer:
                 significant_features_csv,
                 trained_model_filepath,
             ) in seed_results.items():
-                if classifier_slug not in records_per_clf:
-                    records_per_clf[classifier_slug] = []
+                if classifier_slug not in records_per_classifier:
+                    records_per_classifier[classifier_slug] = []
                 if significant_features_csv not in self.significant_features_csvs:
                     self.significant_features_csvs.append(significant_features_csv)
-                records_per_clf[classifier_slug].append(
+                records_per_classifier[classifier_slug].append(
                     {
                         "random_state": _random_state,
                         "significant_features_csv": significant_features_csv,
@@ -1854,10 +1854,10 @@ class ModelTrainer:
         # Save registry per classifier
         for classifier_model in self.classifier_models:
             classifier_slug = classifier_model.slug_name
-            if not records_per_clf[classifier_slug]:
+            if not records_per_classifier[classifier_slug]:
                 continue
             self._save_models_registry(
-                records_per_clf[classifier_slug],
+                records_per_classifier[classifier_slug],
                 random_state,
                 total_seed,
                 classifier_slug=classifier_slug,
