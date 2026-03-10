@@ -13,6 +13,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import (
+    ShuffleSplit,
     StratifiedKFold,
     TimeSeriesSplit,
     StratifiedShuffleSplit,
@@ -47,7 +48,7 @@ class ClassifierModel:
     Attributes:
         classifier (str): Classifier type identifier ("svm", "knn", "dt", etc.).
         random_state (int | None): Random seed for reproducibility.
-        cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "timeseries").
+        cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "shuffle-stratified", "timeseries").
         n_splits (int): Number of cross-validation splits.
         test_size (float): Proportion of data for test set (used with StratifiedShuffleSplit).
         verbose (bool): Enable verbose logging.
@@ -62,11 +63,12 @@ class ClassifierModel:
             Classifier type identifier.
         random_state (int | None, optional): Random seed for reproducibility. Applies to
             classifiers that support it (rf, gb, dt, nn, lr, svm). Defaults to None.
-        cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
-            Cross-validation strategy. Defaults to "shuffle".
+        cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"], optional):
+            Cross-validation strategy. Defaults to "shuffle-stratified".
 
-            - "shuffle": StratifiedShuffleSplit (randomized stratified folds)
+            - "shuffle": ShuffleSplit (randomized splits without stratification)
             - "stratified": StratifiedKFold (preserves class distribution)
+            - "shuffle-stratified": StratifiedShuffleSplit (randomized stratified folds) — **default**
             - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
         n_splits (int, optional): Number of cross-validation splits. Defaults to 5.
         test_size (float, optional): Test set proportion for StratifiedShuffleSplit.
@@ -115,9 +117,11 @@ class ClassifierModel:
             "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ],
         random_state: int | None = None,
-        cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
+        cv_strategy: Literal[
+            "shuffle", "stratified", "shuffle-stratified", "timeseries"
+        ] = "shuffle-stratified",
         n_splits: int = 5,
-        test_size: float = 0.2,
+        test_size: float = 0.25,
         verbose: bool = False,
         class_weight: str | dict[int, float] | None = None,
         n_jobs: int = 1,
@@ -135,8 +139,8 @@ class ClassifierModel:
                 "lr", "voting", "lite-rf"]): Short identifier for the classifier to use.
             random_state (int | None, optional): Random seed passed to classifiers
                 that support it. Defaults to None.
-            cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
-                Cross-validation strategy. Defaults to "shuffle".
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"], optional):
+                Cross-validation strategy. Defaults to "shuffle-stratified".
             n_splits (int, optional): Number of CV folds. Defaults to 5.
             test_size (float, optional): Fraction of data used for the test split
                 when cv_strategy is "shuffle". Defaults to 0.2.
@@ -216,8 +220,9 @@ class ClassifierModel:
 
     def get_cv_splitter(
         self,
-        strategy: Literal["shuffle", "stratified", "timeseries"] | None = None,
-    ) -> TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
+        strategy: Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"]
+        | None = None,
+    ) -> ShuffleSplit | TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
         """Get the cross-validation splitter based on cv_strategy.
 
         Returns the appropriate cross-validator for the configured strategy.
@@ -228,12 +233,13 @@ class ClassifierModel:
                 Cross-validation strategy. If None, uses ``self.cv_strategy``.
                 Defaults to None.
 
-                - "shuffle": StratifiedShuffleSplit (randomized stratified folds)
+                - "shuffle": ShuffleSplit (shuffle without stratification)
                 - "stratified": StratifiedKFold (preserves class distribution)
+                - "shuffle-stratified": StratifiedShuffleSplit (randomized stratified folds)
                 - "timeseries": TimeSeriesSplit (for temporal data, prevents data leakage)
 
         Returns:
-            TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
+            ShuffleSplit | TimeSeriesSplit | StratifiedKFold | StratifiedShuffleSplit:
                 Configured sklearn cross-validation splitter instance.
 
         Examples:
@@ -256,18 +262,30 @@ class ClassifierModel:
         """
         strategy = strategy or self.cv_strategy
 
-        if strategy == "timeseries":
-            return TimeSeriesSplit(n_splits=self.n_splits)
+        if strategy == "shuffle":
+            return ShuffleSplit(
+                n_splits=self.n_splits,
+                test_size=self.test_size,
+                random_state=self.random_state,
+            )
 
         if strategy == "stratified":
             return StratifiedKFold(
                 n_splits=self.n_splits, shuffle=True, random_state=self.random_state
             )
 
-        return StratifiedShuffleSplit(
-            n_splits=self.n_splits,
-            test_size=self.test_size,
-            random_state=self.random_state,
+        if strategy == "shuffle-stratified":
+            return StratifiedShuffleSplit(
+                n_splits=self.n_splits,
+                test_size=self.test_size,
+                random_state=self.random_state,
+            )
+
+        if strategy == "timeseries":
+            return TimeSeriesSplit(n_splits=self.n_splits)
+
+        raise ValueError(
+            "Unknown CV strategy {strategy}. Choose between: shuffle, stratified, shuffle-stratified, timeseries"
         )
 
     @property

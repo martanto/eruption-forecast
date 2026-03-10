@@ -1215,7 +1215,7 @@ class ForecastModel:
     def _train_per_classifier(
         self,
         classifier: str,
-        cv_strategy: Literal["shuffle", "stratified", "timeseries"],
+        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"],
         features_csv: str,
         label_csv: str,
         output_dir: str,
@@ -1238,7 +1238,7 @@ class ForecastModel:
 
         Args:
             classifier (str): Classifier key (e.g. ``"rf"``, ``"xgb"``).
-            cv_strategy (Literal["shuffle", "stratified", "timeseries"]): Cross-validation
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"]): Cross-validation
                 strategy passed to ``ModelTrainer``.
             features_csv (str): Path to the extracted features CSV file.
             label_csv (str): Path to the aligned labels CSV file.
@@ -1309,7 +1309,7 @@ class ForecastModel:
     def train(
         self,
         classifier: str | list[str] = "rf",
-        cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
+        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"] = "shuffle-stratified",
         random_state: int = 0,
         total_seed: int = 500,
         with_evaluation: bool = False,
@@ -1351,7 +1351,7 @@ class ForecastModel:
                 ``"lr"``, ``"voting"``, ``"lite-rf"``. A comma-separated string
                 (e.g. ``"rf,xgb"``) is also accepted. Defaults to ``"rf"``.
             cv_strategy (str, optional): Cross-validation strategy ("shuffle", "stratified",
-                "timeseries"). Defaults to "shuffle".
+                "shuffle-stratified", "timeseries"). Defaults to "shuffle-stratified".
             random_state (int, optional): Initial random seed. Defaults to 0.
             total_seed (int, optional): Total number of random seeds. Defaults to 500.
             with_evaluation (bool, optional): If True, performs an 80/20 train/test split
