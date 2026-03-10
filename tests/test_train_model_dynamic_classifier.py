@@ -24,10 +24,10 @@ def test_random_forest_classifier():
 
     # Create trainer with Random Forest
     trainer = ModelTrainer(
-        features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
-        label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
+        extracted_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
+        label_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,
-        classifier="rf",
+        classifiers="rf",
         cv_strategy="shuffle",
         cv_splits=3,
         n_jobs=1,
@@ -71,10 +71,10 @@ def test_gradient_boosting_classifier():
 
     # Create trainer with Gradient Boosting
     trainer = ModelTrainer(
-        features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
-        label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
+        extracted_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
+        label_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,
-        classifier="gb",
+        classifiers="gb",
         cv_strategy="stratified",
         cv_splits=3,
         n_jobs=1,
@@ -117,10 +117,10 @@ def test_logistic_regression_classifier():
 
     # Create trainer with Logistic Regression
     trainer = ModelTrainer(
-        features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
-        label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
+        extracted_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
+        label_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,
-        classifier="lr",
+        classifiers="lr",
         cv_strategy="timeseries",
         cv_splits=3,
         n_jobs=1,

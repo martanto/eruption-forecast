@@ -86,7 +86,7 @@ def _full_pipeline_config() -> PipelineConfig:
             use_relevant_features=False,
         ),
         train=TrainConfig(
-            classifier="xgb",
+            classifiers=["xgb"],
             cv_strategy="stratified",
             random_state=0,
             total_seed=10,
@@ -281,10 +281,10 @@ class TestTrainConfig:
     def test_to_dict_from_dict_round_trip(self) -> None:
         """All fields survive a round-trip."""
         cfg = TrainConfig(
-            classifier="xgb", cv_strategy="stratified", total_seed=100, n_jobs=4
+            classifiers=["xgb"], cv_strategy="stratified", total_seed=100, n_jobs=4
         )
         restored = TrainConfig.from_dict(cfg.to_dict())
-        assert restored.classifier == "xgb"
+        assert restored.classifiers == ["xgb"]
         assert restored.cv_strategy == "stratified"
         assert restored.total_seed == 100
         assert restored.n_jobs == 4
@@ -292,7 +292,7 @@ class TestTrainConfig:
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
         cfg = TrainConfig.from_dict({"classifier": "nb", "grid_params": {"a": 1}})
-        assert cfg.classifier == "nb"
+        assert cfg.classifiers == ["rf"]  # unknown key ignored; default preserved
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +427,7 @@ class TestPipelineConfigYaml:
         """Loading a config with only model + train sections works."""
         config = PipelineConfig(
             model=ModelConfig(station="OJN"),
-            train=TrainConfig(classifier="rf"),
+            train=TrainConfig(classifiers=["rf"]),
         )
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "partial.yaml")

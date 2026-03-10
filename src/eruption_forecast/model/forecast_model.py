@@ -1233,8 +1233,9 @@ class ForecastModel:
         Creates a single ``ModelTrainer`` for all classifiers so that under-sampling
         and feature selection are performed once per seed and reused across classifiers,
         eliminating redundant computation. Runs ``fit()`` on the shared trainer, then
-        stores per-classifier trainer info in ``self.trainers`` and returns a mapping
-        of classifier name to registry CSV path.
+        builds and persists per-classifier training results in ``self.trained_models``
+        as a mapping of classifier name to trained-model registry CSV path, and
+        returns the same mapping.
 
         Args:
             classifiers (list[str]): List of classifier keys (e.g. ``["rf", "xgb"]``).

@@ -381,8 +381,8 @@ class TestModelTrainerValidation:
         with tempfile.TemporaryDirectory() as tmp:
             features_csv, label_csv = _write_synthetic_csvs(tmp)
             model = ModelTrainer(
-                features_csv=features_csv,
-                label_csv=label_csv,
+                extracted_features_csv=features_csv,
+                label_features_csv=label_csv,
                 output_dir=os.path.join(tmp, "out"),
             )
             assert model.df_features.shape[0] == 20
@@ -402,8 +402,8 @@ class TestModelTrainerValidation:
 
             with pytest.raises(ValueError, match="Features cannot be empty"):
                 ModelTrainer(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
+                    extracted_features_csv=os.path.join(tmp, "features.csv"),
+                    label_features_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
                 )
 
@@ -422,8 +422,8 @@ class TestModelTrainerValidation:
 
             with pytest.raises(ValueError, match="Labels cannot be empty"):
                 ModelTrainer(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
+                    extracted_features_csv=os.path.join(tmp, "features.csv"),
+                    label_features_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
                 )
 
@@ -442,8 +442,8 @@ class TestModelTrainerValidation:
 
             with pytest.raises(ValueError, match="do not match"):
                 ModelTrainer(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
+                    extracted_features_csv=os.path.join(tmp, "features.csv"),
+                    label_features_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
                 )
 
@@ -456,8 +456,8 @@ class TestModelTrainerValidation:
             features_csv, label_csv = _write_synthetic_csvs(tmp)
             out = os.path.join(tmp, "predictions")
             model = ModelTrainer(
-                features_csv=features_csv,
-                label_csv=label_csv,
+                extracted_features_csv=features_csv,
+                label_features_csv=label_csv,
                 output_dir=out,
             )
             assert os.path.isdir(out)
@@ -477,8 +477,8 @@ class TestModelTrainerValidation:
             # Must be ValueError — never AssertionError
             with pytest.raises(ValueError):
                 ModelTrainer(
-                    features_csv=os.path.join(tmp, "features.csv"),
-                    label_csv=os.path.join(tmp, "labels.csv"),
+                    extracted_features_csv=os.path.join(tmp, "features.csv"),
+                    label_features_csv=os.path.join(tmp, "labels.csv"),
                     output_dir=os.path.join(tmp, "out"),
                 )
 
@@ -523,8 +523,8 @@ class TestIntegration:
 
             # 3. ModelTrainer should initialise successfully
             model = ModelTrainer(
-                features_csv=features_csv,
-                label_csv=label_csv,
+                extracted_features_csv=features_csv,
+                label_features_csv=label_csv,
                 output_dir=os.path.join(tmp, "predictions"),
             )
             assert model.df_features.shape[0] == n_rows
