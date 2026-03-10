@@ -29,7 +29,7 @@ evaluator = ModelEvaluator(
     model_name="XGBClassifier",
     cv_name="StratifiedKFold",
     # output_dir is optional: defaults to
-    # output/trainings/evaluations/xgb-classifier/stratified-k-fold/
+    # output/trainings/evaluations/classifiers/xgb-classifier/stratified-k-fold/
 )
 ```
 
@@ -50,9 +50,9 @@ evaluator = ModelEvaluator.from_files(
 
 | `model_name` | `cv_name` | Resolved `output_dir` |
 |---|---|---|
-| `"model"` (default) | `"cv"` (default) | `<cwd>/output/trainings/evaluations/model/cv/` |
-| `"RandomForestClassifier"` | `"StratifiedKFold"` | `<cwd>/output/trainings/evaluations/random-forest-classifier/stratified-k-fold/` |
-| `"XGBClassifier"` | `"ShuffleSplit"` | `<cwd>/output/trainings/evaluations/xgb-classifier/shuffle-split/` |
+| `"model"` (default) | `"cv"` (default) | `<cwd>/output/trainings/evaluations/classifiers/model/cv/` |
+| `"RandomForestClassifier"` | `"StratifiedKFold"` | `<cwd>/output/trainings/evaluations/classifiers/random-forest-classifier/stratified-k-fold/` |
+| `"XGBClassifier"` | `"ShuffleSplit"` | `<cwd>/output/trainings/evaluations/classifiers/xgb-classifier/shuffle-split/` |
 
 Both names are passed through `slugify_class_name()` — `CamelCase` → `kebab-case`. This convention matches the directory structure produced by `ModelTrainer.train_and_evaluate()`.
 
@@ -148,7 +148,7 @@ Three construction modes are available:
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/evaluations/classifiers/xgb-classifier/stratified-shuffle-split"
 trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 
 # Mode 1: registry CSV only — enables aggregate plots

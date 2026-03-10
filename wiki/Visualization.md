@@ -245,14 +245,14 @@ from eruption_forecast.plots import plot_seed_stability
 
 # Single classifier
 ev = MultiModelEvaluator(
-    metrics_dir="output/.../xgb-classifier/stratified-shuffle-split/metrics"
+    metrics_dir="output/.../classifiers/xgb-classifier/stratified-shuffle-split/metrics"
 )
 fig = ev.plot_seed_stability(metric="f1_score")
 
 # Compare multiple classifiers side-by-side
 metrics_by_clf = {}
 for clf in ["xgb", "rf", "gb", "svm"]:
-    ev = MultiModelEvaluator(metrics_dir=f"output/.../{clf}/metrics")
+    ev = MultiModelEvaluator(metrics_dir=f"output/.../classifiers/{clf}-classifier/stratified-shuffle-split/metrics")
     metrics_by_clf[clf] = ev.get_metrics_list()
 
 fig, df = plot_seed_stability(

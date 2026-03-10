@@ -37,65 +37,69 @@ output/
     │   │   ├── evaluations_trained_models.json   # {ClassifierName: trained_model_*.csv} registry
     │   │   ├── evaluations_config.yaml           # Pipeline config snapshot (written by save_model)
     │   │   ├── evaluations_forecast_model.pkl    # Serialised ForecastModel (written by save_model)
-    │   │   └── {classifier-slug}/                # e.g., random-forest-classifier
-    │   │       └── {cv-slug}/                    # e.g., stratified-shuffle-split
-    │   │           ├── features/
-    │   │           │   ├── significant_features/     # Per-seed top-N features
-    │   │           │   │   ├── 00000.csv
-    │   │           │   │   └── ...
-    │   │           │   ├── all_features/             # All ranked features (optional)
-    │   │           │   │   ├── 00000.csv
-    │   │           │   │   └── ...
-    │   │           │   ├── figures/significant/      # Feature importance plots (optional)
-    │   │           │   │   └── 00000.jpg
-    │   │           │   ├── tests/                    # Per-seed held-out test splits
-    │   │           │   │   ├── 00000_X_test.csv
-    │   │           │   │   ├── 00000_y_test.csv
-    │   │           │   │   └── ...
-    │   │           │   ├── significant_features.csv  # Aggregated top features (all seeds)
-    │   │           │   └── top_{n}_significant_features.csv
-    │   │           ├── models/
-    │   │           │   ├── 00000.pkl                 # Trained model — seed 0
-    │   │           │   ├── 00001.pkl
-    │   │           │   └── ...
-    │   │           ├── metrics/
-    │   │           │   ├── 00000.json                # Per-seed metrics JSON
-    │   │           │   └── ...
-    │   │           ├── figures/                      # Aggregate evaluation plots
-    │   │           │   ├── aggregate_roc_curve.png / .csv
-    │   │           │   ├── aggregate_pr_curve.png / .csv
-    │   │           │   ├── aggregate_calibration.png / .csv
-    │   │           │   ├── aggregate_prediction_distribution.png / .csv
-    │   │           │   ├── aggregate_confusion_matrix.png / .csv
-    │   │           │   ├── aggregate_threshold_analysis.png / .csv
-    │   │           │   ├── aggregate_feature_importance.png / .csv
-    │   │           │   ├── aggregate_shap_summary.png
-    │   │           │   ├── aggregate_shap_summary.pkl   # shap.Explanation (joblib)
-    │   │           │   └── aggregate_metrics.csv
-    │   │           ├── trained_model_{suffix}.csv    # Registry of all trained models
-    │   │           ├── merged_model_{suffix}.pkl     # SeedEnsemble (all seeds merged — optional)
-    │   │           ├── all_metrics_{suffix}.csv      # All per-seed metrics
-    │   │           └── metrics_summary_{suffix}.csv  # Mean ± std summary
+    │   │   ├── features/                         # Shared across all classifiers
+    │   │   │   └── {cv-slug}/                    # e.g., stratified-shuffle-split
+    │   │   │       ├── significant_features/     # Per-seed top-N features
+    │   │   │       │   ├── 00000.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── all_features/             # All ranked features (optional)
+    │   │   │       │   ├── 00000.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── figures/significant/      # Feature importance plots (optional)
+    │   │   │       │   └── 00000.jpg
+    │   │   │       ├── tests/                    # Per-seed held-out test splits
+    │   │   │       │   ├── 00000_X_test.csv
+    │   │   │       │   ├── 00000_y_test.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── significant_features.csv  # Aggregated top features (all seeds)
+    │   │   │       └── top_{n}_significant_features.csv
+    │   │   └── classifiers/                      # Per-classifier outputs
+    │   │       └── {classifier-slug}/            # e.g., random-forest-classifier
+    │   │           └── {cv-slug}/                # e.g., stratified-shuffle-split
+    │   │               ├── models/
+    │   │               │   ├── 00000.pkl                 # Trained model — seed 0
+    │   │               │   ├── 00001.pkl
+    │   │               │   └── ...
+    │   │               ├── metrics/
+    │   │               │   ├── 00000.json                # Per-seed metrics JSON
+    │   │               │   └── ...
+    │   │               ├── figures/                      # Aggregate evaluation plots
+    │   │               │   ├── aggregate_roc_curve.png / .csv
+    │   │               │   ├── aggregate_pr_curve.png / .csv
+    │   │               │   ├── aggregate_calibration.png / .csv
+    │   │               │   ├── aggregate_prediction_distribution.png / .csv
+    │   │               │   ├── aggregate_confusion_matrix.png / .csv
+    │   │               │   ├── aggregate_threshold_analysis.png / .csv
+    │   │               │   ├── aggregate_feature_importance.png / .csv
+    │   │               │   ├── aggregate_shap_summary.png
+    │   │               │   ├── aggregate_shap_summary.pkl   # shap.Explanation (joblib)
+    │   │               │   └── aggregate_metrics.csv
+    │   │               ├── trained_model_{suffix}.csv    # Registry of all trained models
+    │   │               ├── merged_model_{suffix}.pkl     # SeedEnsemble (all seeds merged — optional)
+    │   │               ├── all_metrics_{suffix}.csv      # All per-seed metrics
+    │   │               └── metrics_summary_{suffix}.csv  # Mean ± std summary
     │   │
     │   └── predictions/                       # Output of train(with_evaluation=False)
     │       ├── predictions_trained_models.json   # {ClassifierName: trained_model_*.csv} registry
     │       ├── predictions_config.yaml           # Pipeline config snapshot (written by save_model)
     │       ├── predictions_forecast_model.pkl    # Serialised ForecastModel (written by save_model)
-    │       └── {classifier-slug}/
-    │           └── {cv-slug}/
-    │               ├── features/
-    │               │   ├── significant_features/
-    │               │   │   ├── 00000.csv
-    │               │   │   └── ...
-    │               │   ├── all_features/ (optional)
-    │               │   ├── figures/significant/ (optional)
-    │               │   ├── significant_features.csv
-    │               │   └── top_{n}_significant_features.csv
-    │               ├── models/
-    │               │   ├── 00000.pkl
-    │               │   └── ...
-    │               ├── trained_model_{suffix}.csv    # Registry used by ModelPredictor
-    │               └── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
+    │       ├── features/                         # Shared across all classifiers
+    │       │   └── {cv-slug}/
+    │       │       ├── significant_features/
+    │       │       │   ├── 00000.csv
+    │       │       │   └── ...
+    │       │       ├── all_features/ (optional)
+    │       │       ├── figures/significant/ (optional)
+    │       │       ├── significant_features.csv
+    │       │       └── top_{n}_significant_features.csv
+    │       └── classifiers/                      # Per-classifier outputs
+    │           └── {classifier-slug}/
+    │               └── {cv-slug}/
+    │                   ├── models/
+    │                   │   ├── 00000.pkl
+    │                   │   └── ...
+    │                   ├── trained_model_{suffix}.csv    # Registry used by ModelPredictor
+    │                   └── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
     │
     ├── trainings/merged_classifiers_{suffix}.pkl   # Multi-classifier bundle (optional — call merge_classifier_models())
     │
