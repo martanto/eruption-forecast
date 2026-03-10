@@ -148,9 +148,13 @@ class ModelTrainer:
         feature_selection_method (Literal[...], optional): Feature selection method.
             Defaults to "tsfresh".
         overwrite (bool, optional): Overwrite existing output files. Defaults to False.
+        plot_shap (bool, optional): Compute and save SHAP summary plots after training.
+            Defaults to False.
         n_jobs (int, optional): Number of parallel seed workers. Defaults to 1.
         grid_search_n_jobs (int, optional): Parallel jobs inside GridSearchCV.
             Defaults to 1.
+        use_gpu (bool, optional): Enable GPU acceleration for XGBoost. Defaults to False.
+        gpu_id (int, optional): GPU device index when use_gpu is True. Defaults to 0.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
         debug (bool, optional): Enable debug mode. Defaults to False.
 

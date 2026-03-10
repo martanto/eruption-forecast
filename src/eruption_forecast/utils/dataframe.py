@@ -16,7 +16,7 @@ def remove_anomalies(
     df: pd.DataFrame,
     columns: list[str] | None = None,
     interpolate: bool = False,
-    threshold=3.5,
+    threshold: float = 3.5,
     inplace: bool = False,
     debug: bool = False,
 ) -> pd.DataFrame:
@@ -27,15 +27,25 @@ def remove_anomalies(
     Operates in-place or on a copy depending on the ``inplace`` flag.
 
     Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list[str] | None): List of column names needs to be checked.
-        interpolate (bool, optional): Interpolate dataframe after anomalies removal. Defaults to False.
-        threshold (float, optional): Threshold for anomalies. Defaults to 3.5 std.
-        inplace (bool, optional): Inplace current dataframe. Defaults to False.
-        debug (bool, optional): Debug mode. Defaults to False.
+        df (pd.DataFrame): Input DataFrame with a DatetimeIndex.
+        columns (list[str] | None, optional): List of column names to check for
+            anomalies. If None, all columns are checked. Defaults to None.
+        interpolate (bool, optional): If True, interpolate the DataFrame after
+            anomaly removal using time-based interpolation. Defaults to False.
+        threshold (float, optional): Z-score threshold for anomaly detection.
+            Values with |z-score| > threshold are flagged. Defaults to 3.5.
+        inplace (bool, optional): If True, modify the input DataFrame in place.
+            Defaults to False.
+        debug (bool, optional): If True, log the number of anomalies removed per
+            column. Defaults to False.
 
     Returns:
-        pd.DataFrame: DataFrame with anomalies removed.
+        pd.DataFrame: DataFrame with anomalous values replaced by NaN.
+
+    Raises:
+        TypeError: If ``df.index`` is not a ``pd.DatetimeIndex``.
+        ValueError: If ``threshold`` is not a positive number.
+        ValueError: If any column in ``columns`` does not exist in ``df``.
     """
     if not isinstance(df.index, pd.DatetimeIndex):
         raise TypeError("Dataframe index should be a DatetimeIndex")
