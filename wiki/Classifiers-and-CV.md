@@ -120,16 +120,18 @@ clf.grid = {
 
 | Key | scikit-learn Class | Best For |
 |-----|--------------------|----------|
-| `shuffle` | `StratifiedShuffleSplit` | Random splits with class stratification — default, fast |
+| `shuffle` | `ShuffleSplit` | Random splits without stratification — fast baseline |
 | `stratified` | `StratifiedKFold` | Preserves class ratio across all folds |
+| `shuffle-stratified` | `StratifiedShuffleSplit` | Randomized stratified folds — **default** |
 | `timeseries` | `TimeSeriesSplit` | Temporal data — strict no-future-leakage ordering |
 
 Set via `cv_strategy` in `ModelTrainer` or `ForecastModel.train()`. Number of folds is controlled by `cv_splits` (default: 5).
 
 ### When to use each
 
-- **`shuffle`** — fastest; good when data has no strong temporal autocorrelation.
-- **`stratified`** — use when class imbalance is severe and every fold must represent both classes fairly.
+- **`shuffle`** — fastest; no stratification; good for quick experiments when class balance is not critical.
+- **`stratified`** — use when class imbalance is severe and every fold must represent both classes fairly across a fixed split structure.
+- **`shuffle-stratified`** — **recommended default**; combines random splits with class stratification via `StratifiedShuffleSplit`; each seed gets a different random stratified split, which works well for multi-seed training.
 - **`timeseries`** — use when temporal ordering matters and you want to strictly prevent the model from seeing future data during cross-validation. Note: this strategy does not stratify, so very small minority classes may be absent from some folds.
 
 ---

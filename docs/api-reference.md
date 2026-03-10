@@ -71,7 +71,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Defaults to `os.getcwd()` |
 | `prefix_filename` | `str \| None` | `None` | Optional prefix prepended to every output filename |
 | `classifier` | `str` | `"rf"` | Classifier type — see [Supported Classifiers](../docs/step-by-step-guide.md#7-supported-classifiers). `ForecastModel.train()` also accepts a `list[str]` or comma-separated string to train multiple classifiers in sequence |
-| `cv_strategy` | `str` | `"shuffle"` | Cross-validation strategy — `"shuffle"`, `"stratified"`, or `"timeseries"` |
+| `cv_strategy` | `str` | `"shuffle-stratified"` | Cross-validation strategy — `"shuffle"`, `"stratified"`, `"shuffle-stratified"`, or `"timeseries"` |
 | `cv_splits` | `int` | `5` | Number of CV folds |
 | `number_of_significant_features` | `int` | `20` | Top-N features retained per seed and aggregated across seeds |
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection algorithm — `"tsfresh"`, `"random_forest"`, or `"combined"` |

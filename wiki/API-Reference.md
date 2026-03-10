@@ -63,7 +63,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `root_dir` | `str \| None` | `None` | Anchor for path resolution |
 | `prefix_filename` | `str \| None` | `None` | Optional prefix on every output filename |
 | `classifier` | `str` | `"rf"` | Classifier key (see [Classifiers and CV](Classifiers-and-CV)) |
-| `cv_strategy` | `str` | `"shuffle"` | CV strategy — `"shuffle"`, `"stratified"`, `"timeseries"` |
+| `cv_strategy` | `str` | `"shuffle-stratified"` | CV strategy — `"shuffle"`, `"stratified"`, `"shuffle-stratified"`, `"timeseries"` |
 | `cv_splits` | `int` | `5` | Number of CV folds |
 | `number_of_significant_features` | `int` | `20` | Top-N features retained per seed |
 | `feature_selection_method` | `str` | `"tsfresh"` | Feature selection — `"tsfresh"`, `"random_forest"`, `"combined"` |
