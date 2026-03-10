@@ -16,11 +16,11 @@ class TremorData(BaseDataContainer):
     convenience properties for common metadata. Data can be supplied
     directly as a DataFrame or loaded from a CSV file.
 
-    Inherits from :class:`BaseDataContainer`, providing `csv_path`, `start_date_str`,
-    `end_date_str`, and `data` as part of the shared data-container interface.
+    Inherits from :class:`BaseDataContainer`, providing ``csv``, ``start_date_str``,
+    ``end_date_str``, and ``data`` as part of the shared data-container interface.
 
     Attributes:
-        csv_path (str): Path to the source CSV file, set by
+        csv (str): Path to the source CSV file, set by
             :meth:`from_csv`. Empty string until data is loaded.
         verbose (bool): If True, emit informational log messages.
         debug (bool): If True, emit debug-level log messages.
@@ -52,7 +52,7 @@ class TremorData(BaseDataContainer):
         """Initialize the TremorData container with an optional DataFrame.
 
         Stores the provided DataFrame (or an empty one when df is None),
-        initialises ``csv_path`` to an empty string, and configures logging flags.
+        initialises ``csv`` to an empty string, and configures logging flags.
 
         Args:
             df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame with
@@ -74,7 +74,7 @@ class TremorData(BaseDataContainer):
             str: A string showing the CSV path, DataFrame shape, and logging flags.
         """
         return (
-            f"{self.__class__.__name__}(csv_path={self.csv_path}, df={self.df.shape}, "
+            f"{self.__class__.__name__}(csv={self.csv}, df={self.df.shape}, "
             f"verbose={self.verbose}, debug={self.debug})"
         )
 
@@ -83,7 +83,7 @@ class TremorData(BaseDataContainer):
 
         Reads the CSV, parses the ``datetime`` column as the index, and
         sorts the index in ascending order. The CSV path is stored in
-        ``self.csv_path`` for later reference.
+        ``self.csv`` for later reference.
 
         Args:
             tremor_csv (str): Absolute or relative path to the tremor CSV

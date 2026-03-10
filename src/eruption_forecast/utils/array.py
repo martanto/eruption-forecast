@@ -120,7 +120,7 @@ def aggregate_seed_probabilities(
     return mean_probability, std, confidence, prediction
 
 
-def detect_anomalies_zscore(data: np.ndarray, threshold=3.5) -> NDArray[np.bool_]:
+def detect_anomalies_zscore(data: np.ndarray, threshold: float = 3.5) -> NDArray[np.bool_]:
     """Detect anomalies using z-score method.
 
     Args:
@@ -180,11 +180,23 @@ def mask_zero_values(data: np.ndarray) -> np.ndarray:
 def get_completeness(stream_or_trace: Stream | Trace) -> float:
     """Check daily data completeness.
 
+    Computes the ratio of valid (non-zero, non-NaN) samples to the expected
+    total for a full 24-hour day at the stream's sampling rate.
+
     Args:
-        stream_or_trace (Stream | Trace): Stream or trace object.
+        stream_or_trace (Stream | Trace): ObsPy Stream or Trace object.
 
     Returns:
-        float: Daily data completeness.
+        float: Daily data completeness as a fraction in [0.0, 1.0].
+
+    Raises:
+        TypeError: If the input is not a Stream or Trace object.
+
+    Examples:
+        >>> from obspy import read
+        >>> stream = read()
+        >>> completeness = get_completeness(stream)
+        >>> print(f"Completeness: {completeness:.2%}")
     """
     if isinstance(stream_or_trace, Stream):
         stream_or_trace = stream_or_trace.merge(fill_value=np.nan)

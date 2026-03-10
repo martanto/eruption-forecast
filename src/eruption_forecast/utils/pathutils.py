@@ -95,26 +95,28 @@ def build_model_directories(
     cv_slug: str,
     mode: Literal["with-evaluation", "only"],
 ) -> dict[str, str]:
-    """
-    Build standardized model output directory structure.
+    """Build standardized model output directory structure.
 
-    Creates a hierarchical directory structure for model training outputs:
-    - trainings/{mode}/{classifier_slug}/{cv_slug}/
+    Creates a hierarchical directory structure for model training outputs under
+    ``trainings/{mode}/{classifier_slug}/{cv_slug}/``.
 
     Args:
-        root_dir: Base output directory path.
-        classifier_slug: Slugified classifier name (e.g., 'xgb-classifier').
-        cv_slug: Slugified CV strategy name (e.g., 'stratified-shuffle-split').
-        mode: Training mode - 'with-evaluation' or 'only'.
+        root_dir (str): Base output directory path.
+        classifier_slug (str): Slugified classifier name (e.g., ``"xgb-classifier"``).
+        cv_slug (str): Slugified CV strategy name (e.g., ``"stratified-shuffle-split"``).
+        mode (Literal["with-evaluation", "only"]): Training mode —
+            ``"with-evaluation"`` adds ``metrics/`` and ``figures/`` subdirectories.
 
     Returns:
-        Dictionary with directory paths:
-            - 'base': Top-level training directory
-            - 'features': Features output directory
-            - 'significant_features': Significant features subdirectory
-            - 'models': Trained models directory
-            - 'metrics': Evaluation metrics directory (if mode='with-evaluation')
-            - 'figures': Plot figures directory (if mode='with-evaluation')
+        dict[str, str]: Dictionary with directory paths:
+            - ``"base"`` (str): Top-level training directory.
+            - ``"features"`` (str): Features output directory.
+            - ``"significant_features"`` (str): Significant features subdirectory.
+            - ``"models"`` (str): Trained models directory.
+            - ``"metrics"`` (str): Evaluation metrics directory (only when
+              ``mode="with-evaluation"``).
+            - ``"figures"`` (str): Plot figures directory (only when
+              ``mode="with-evaluation"``).
 
     Examples:
         >>> dirs = build_model_directories(
@@ -124,7 +126,7 @@ def build_model_directories(
         ...     mode="with-evaluation"
         ... )
         >>> print(dirs['base'])
-        /path/to/output/trainings/evaluations/random-forest-classifier/stratified-k-fold
+        /path/to/output/trainings/model-with-evaluation/random-forest-classifier/stratified-k-fold
     """
     mode_dir = f"model-{mode}"
     base_dir = os.path.join(root_dir, "trainings", mode_dir, classifier_slug, cv_slug)
