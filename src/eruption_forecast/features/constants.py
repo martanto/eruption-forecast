@@ -55,6 +55,7 @@ DEFAULT_EXCLUDE_FEATURES: set[str] = {
     "has_duplicate",
     "linear_trend_timewise",
     "length",
+    "quantile",
     "sum_of_reoccurring_data_points",
     "sum_of_reoccurring_values",
     "value_count",
