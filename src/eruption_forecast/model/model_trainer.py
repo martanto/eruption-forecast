@@ -295,8 +295,8 @@ class ModelTrainer:
         classifier_dirs: dict[str, str] = {}
         models_dirs: dict[str, str] = {}
         metrics_dirs: dict[str, str] = {}
-        for clf_model in classifier_models:
-            slug = clf_model.slug_name
+        for classifier_model in classifier_models:
+            slug = classifier_model.slug_name
             classifier_dir = os.path.join(_output_dir, "classifiers", slug, _cv_slug)
             classifier_dirs[slug] = classifier_dir
             models_dirs[slug] = os.path.join(classifier_dir, "models")
@@ -448,7 +448,7 @@ class ModelTrainer:
                 - **classifier_id** (str): Combined identifier (e.g., "RandomForestClassifier-StratifiedKFold")
 
         Examples:
-            >>> name, slug, cv_slug, id_ = trainer.get_classifier_properties(clf_model)
+            >>> name, slug, cv_slug, id_ = trainer.get_classifier_properties(classifier_model)
             >>> print(name)  # "RandomForestClassifier"
             >>> print(slug)  # "random-forest-classifier"
         """
@@ -510,8 +510,8 @@ class ModelTrainer:
         self.shared_tests_dir = os.path.join(self.shared_features_dir, "tests")
 
         # Rebuild per-classifier directories
-        for clf_model in self.classifier_models:
-            slug = clf_model.slug_name
+        for classifier_model in self.classifier_models:
+            slug = classifier_model.slug_name
             classifier_dir = os.path.join(
                 self.output_dir, "classifiers", slug, _cv_slug
             )
@@ -974,15 +974,15 @@ class ModelTrainer:
         Raises:
             ValueError: If no records were produced (no models trained).
         """
-        clf_dir = self.classifier_dirs[classifier_slug]
+        classifier_dir = self.classifier_dirs[classifier_slug]
         # Build the classifier_id from the matching ClassifierModel
-        _clf_model = next(
+        _classifier_model = next(
             m for m in self.classifier_models if m.slug_name == classifier_slug
         )
-        clf_id = f"{_clf_model.name}-{_clf_model.cv_name}"
+        classifier_id = f"{_classifier_model.name}-{_classifier_model.cv_name}"
 
         suffix = (
-            f"{clf_id}_rs-{random_state}_ts-{total_seed}"
+            f"{classifier_id}_rs-{random_state}_ts-{total_seed}"
             f"_top-{self.number_of_significant_features}"
         )
         filename = f"trained_model_{suffix}.csv"
@@ -991,7 +991,7 @@ class ModelTrainer:
         if registry_df.empty:
             raise ValueError("No significant features or trained models found.")
 
-        csv = os.path.join(clf_dir, filename)
+        csv = os.path.join(classifier_dir, filename)
         registry_df.to_csv(csv, index=True)
 
         self.df[classifier_slug] = registry_df
@@ -1217,7 +1217,7 @@ class ModelTrainer:
         Returns:
             dict[str, Any]: Metrics dictionary produced by ModelEvaluator.
         """
-        clf_model = classifier_model
+        classifier_model = classifier_model
         features_train_resampled_selected, top_selected_features, _, _ = (
             selected_features
         )
@@ -1229,7 +1229,7 @@ class ModelTrainer:
             features_train_resampled_selected,
             y_train,
             top_n_features,
-            classifier_model=clf_model,
+            classifier_model=classifier_model,
         )
 
         joblib.dump(best_model, model_filepath)
@@ -1256,8 +1256,8 @@ class ModelTrainer:
             model=grid_search,
             X_test=X_test_selected,
             y_test=y_test,
-            model_name=clf_model.name,
-            output_dir=self.classifier_dirs[clf_model.slug_name],
+            model_name=classifier_model.name,
+            output_dir=self.classifier_dirs[classifier_model.slug_name],
             plot_shap=self.plot_shap,
             selected_features=top_n_features,
             shap_explanation_filepath=shap_explanation_filepath,
@@ -1372,14 +1372,14 @@ class ModelTrainer:
 
         # ========== STEPS 4-5: Per-classifier GridSearchCV + Evaluation ==========
         seed_results: dict[str, tuple] = {}
-        for clf_model in self.classifier_models:
-            clf_slug = clf_model.slug_name
+        for classifier_model in self.classifier_models:
+            classifier_slug = classifier_model.slug_name
             (
                 model_filepath,
                 metrics_filepath,
                 shap_explanation_filepath,
                 learning_curve_path,
-            ) = self._generate_classifier_filepaths(random_state, clf_slug)
+            ) = self._generate_classifier_filepaths(random_state, classifier_slug)
 
             metrics = self._cv_train_evaluate(
                 y_train=y_train,
@@ -1390,11 +1390,11 @@ class ModelTrainer:
                 model_filepath=model_filepath,
                 metrics_filepath=metrics_filepath,
                 learning_curve_path=learning_curve_path,
-                classifier_model=clf_model,
+                classifier_model=classifier_model,
                 shap_explanation_filepath=shap_explanation_filepath,
             )
 
-            seed_results[clf_slug] = (
+            seed_results[classifier_slug] = (
                 random_state,
                 significant_filepath,
                 model_filepath,
@@ -1457,10 +1457,12 @@ class ModelTrainer:
 
         # Accumulate results across all seeds per classifier before aggregating
         all_metrics: dict[str, list[dict]] = {
-            clf_model.slug_name: [] for clf_model in self.classifier_models
+            classifier_model.slug_name: []
+            for classifier_model in self.classifier_models
         }
         records_per_clf: dict[str, list[dict]] = {
-            clf_model.slug_name: [] for clf_model in self.classifier_models
+            classifier_model.slug_name: []
+            for classifier_model in self.classifier_models
         }
 
         # Pre-filter: collect already-completed seeds without re-running them
@@ -1480,14 +1482,14 @@ class ModelTrainer:
 
             # Check if all classifiers have already been trained for this seed
             _all_classifier_done = True
-            for clf_model in self.classifier_models:
-                clf_slug = clf_model.slug_name
+            for classifier_model in self.classifier_models:
+                classifier_slug = classifier_model.slug_name
                 (
                     _model_filepath,
                     _metrics_filepath,
                     _shap_filepath,
                     _,
-                ) = self._generate_classifier_filepaths(_rs, clf_slug)
+                ) = self._generate_classifier_filepaths(_rs, classifier_slug)
                 _done = (
                     not self.overwrite
                     and os.path.isfile(_significant_filepath)
@@ -1501,17 +1503,17 @@ class ModelTrainer:
             if _all_classifier_done:
                 logger.info(f"Seed {_rs:05d} already trained.")
                 self.significant_features_csvs.append(_significant_filepath)
-                for clf_model in self.classifier_models:
-                    clf_slug = clf_model.slug_name
+                for classifier_model in self.classifier_models:
+                    classifier_slug = classifier_model.slug_name
                     (
                         _model_filepath,
                         _metrics_filepath,
                         _shap_filepath,
                         _,
-                    ) = self._generate_classifier_filepaths(_rs, clf_slug)
+                    ) = self._generate_classifier_filepaths(_rs, classifier_slug)
                     with open(_metrics_filepath) as f:
                         metrics = json.load(f)
-                    records_per_clf[clf_slug].append(
+                    records_per_clf[classifier_slug].append(
                         {
                             "random_state": _rs,
                             "significant_features_csv": _significant_filepath,
@@ -1521,7 +1523,7 @@ class ModelTrainer:
                             "shap_explanation_filepath": _shap_filepath,
                         }
                     )
-                    all_metrics[clf_slug].append(metrics)
+                    all_metrics[classifier_slug].append(metrics)
             else:
                 pending_jobs.append(
                     (
@@ -1535,8 +1537,8 @@ class ModelTrainer:
         for seed_results in self._run_jobs(self._run_train_and_evaluate, pending_jobs):
             if seed_results is None:  # Feature selection returned nothing
                 continue
-            # seed_results is dict[clf_slug -> 7-tuple]
-            for clf_slug, (
+            # seed_results is dict[classifier_slug -> 7-tuple]
+            for classifier_slug, (
                 _random_state,
                 significant_features_csv,
                 trained_model_filepath,
@@ -1545,13 +1547,13 @@ class ModelTrainer:
                 y_test_filepath,
                 shap_explanation_filepath,
             ) in seed_results.items():
-                if clf_slug not in records_per_clf:
-                    records_per_clf[clf_slug] = []
-                    all_metrics[clf_slug] = []
+                if classifier_slug not in records_per_clf:
+                    records_per_clf[classifier_slug] = []
+                    all_metrics[classifier_slug] = []
                 # Only append significant_features_csv once (same for all classifiers)
                 if significant_features_csv not in self.significant_features_csvs:
                     self.significant_features_csvs.append(significant_features_csv)
-                records_per_clf[clf_slug].append(
+                records_per_clf[classifier_slug].append(
                     {
                         "random_state": _random_state,
                         "significant_features_csv": significant_features_csv,
@@ -1561,7 +1563,7 @@ class ModelTrainer:
                         "shap_explanation_filepath": shap_explanation_filepath,
                     }
                 )
-                all_metrics[clf_slug].append(metrics)
+                all_metrics[classifier_slug].append(metrics)
 
         # Aggregate feature selection results (shared across classifiers)
         self.df_significant_features = self.concat_significant_features(
@@ -1569,20 +1571,20 @@ class ModelTrainer:
         )
 
         # Save registry and metrics per classifier
-        for clf_model in self.classifier_models:
-            clf_slug = clf_model.slug_name
-            if not records_per_clf[clf_slug]:
+        for classifier_model in self.classifier_models:
+            classifier_slug = classifier_model.slug_name
+            if not records_per_clf[classifier_slug]:
                 continue
             suffix_filename = self._save_models_registry(
-                records_per_clf[clf_slug],
+                records_per_clf[classifier_slug],
                 random_state,
                 total_seed,
-                classifier_slug=clf_slug,
+                classifier_slug=classifier_slug,
             )
             self._aggregate_metrics(
-                all_metrics[clf_slug],
+                all_metrics[classifier_slug],
                 suffix_filename=suffix_filename,
-                classifier_slug=clf_slug,
+                classifier_slug=classifier_slug,
             )
 
         if self.verbose:
@@ -1674,21 +1676,21 @@ class ModelTrainer:
         logger.info(f"Fitting Seed: {random_state:05d}")
 
         seed_results: dict[str, tuple] = {}
-        for clf_model in self.classifier_models:
-            clf_slug = clf_model.slug_name
+        for classifier_model in self.classifier_models:
+            classifier_slug = classifier_model.slug_name
             (
                 model_filepath,
                 _,
                 _,
                 _,
-            ) = self._generate_classifier_filepaths(random_state, clf_slug)
+            ) = self._generate_classifier_filepaths(random_state, classifier_slug)
 
             _, _, best_model = self._setup_grid_search(
                 random_state,
                 features_resampled_selected,
                 labels_resampled,
                 top_n_features,
-                classifier_model=clf_model,
+                classifier_model=classifier_model,
             )
 
             joblib.dump(best_model, model_filepath)
@@ -1696,7 +1698,7 @@ class ModelTrainer:
             if self.verbose:
                 logger.info(f"Model {random_state:05d}: {model_filepath}")
 
-            seed_results[clf_slug] = (
+            seed_results[classifier_slug] = (
                 random_state,
                 significant_filepath,
                 model_filepath,
@@ -1758,7 +1760,8 @@ class ModelTrainer:
             ensure_dir(self.shared_figures_dir)
 
         records_per_clf: dict[str, list[dict]] = {
-            clf_model.slug_name: [] for clf_model in self.classifier_models
+            classifier_model.slug_name: []
+            for classifier_model in self.classifier_models
         }
 
         # Pre-filter: collect already-completed seeds without re-running them
@@ -1777,14 +1780,14 @@ class ModelTrainer:
             ) = self._generate_shared_filepaths(_rs)
 
             _all_classifier_done = True
-            for clf_model in self.classifier_models:
-                clf_slug = clf_model.slug_name
+            for classifier_model in self.classifier_models:
+                classifier_slug = classifier_model.slug_name
                 (
                     _model_filepath,
                     _,
                     _,
                     _,
-                ) = self._generate_classifier_filepaths(_rs, clf_slug)
+                ) = self._generate_classifier_filepaths(_rs, classifier_slug)
                 _done = (
                     not self.overwrite
                     and os.path.isfile(_significant_filepath)
@@ -1797,15 +1800,15 @@ class ModelTrainer:
             if _all_classifier_done:
                 logger.info(f"Seed {_rs:05d} already fitted.")
                 self.significant_features_csvs.append(_significant_filepath)
-                for clf_model in self.classifier_models:
-                    clf_slug = clf_model.slug_name
+                for classifier_model in self.classifier_models:
+                    classifier_slug = classifier_model.slug_name
                     (
                         _model_filepath,
                         _,
                         _,
                         _,
-                    ) = self._generate_classifier_filepaths(_rs, clf_slug)
-                    records_per_clf[clf_slug].append(
+                    ) = self._generate_classifier_filepaths(_rs, classifier_slug)
+                    records_per_clf[classifier_slug].append(
                         {
                             "random_state": _rs,
                             "significant_features_csv": _significant_filepath,
@@ -1825,17 +1828,17 @@ class ModelTrainer:
         for seed_results in self._run_jobs(self._run_train, pending_jobs):
             if seed_results is None:  # Feature selection returned nothing
                 continue
-            # seed_results is dict[clf_slug -> 3-tuple]
-            for clf_slug, (
+            # seed_results is dict[classifier_slug -> 3-tuple]
+            for classifier_slug, (
                 _random_state,
                 significant_features_csv,
                 trained_model_filepath,
             ) in seed_results.items():
-                if clf_slug not in records_per_clf:
-                    records_per_clf[clf_slug] = []
+                if classifier_slug not in records_per_clf:
+                    records_per_clf[classifier_slug] = []
                 if significant_features_csv not in self.significant_features_csvs:
                     self.significant_features_csvs.append(significant_features_csv)
-                records_per_clf[clf_slug].append(
+                records_per_clf[classifier_slug].append(
                     {
                         "random_state": _random_state,
                         "significant_features_csv": significant_features_csv,
@@ -1849,15 +1852,15 @@ class ModelTrainer:
         )
 
         # Save registry per classifier
-        for clf_model in self.classifier_models:
-            clf_slug = clf_model.slug_name
-            if not records_per_clf[clf_slug]:
+        for classifier_model in self.classifier_models:
+            classifier_slug = classifier_model.slug_name
+            if not records_per_clf[classifier_slug]:
                 continue
             self._save_models_registry(
-                records_per_clf[clf_slug],
+                records_per_clf[classifier_slug],
                 random_state,
                 total_seed,
-                classifier_slug=clf_slug,
+                classifier_slug=classifier_slug,
             )
 
         if self.verbose:
@@ -1901,7 +1904,7 @@ class ModelTrainer:
             >>> trainer.train_and_evaluate(total_seed=100)
             >>> # Creates: all_metrics_{suffix}.csv and metrics_summary_{suffix}.csv
         """
-        clf_dir = self.classifier_dirs[classifier_slug]
+        classifier_dir = self.classifier_dirs[classifier_slug]
         metrics_dir = self.metrics_dirs[classifier_slug]
         ensure_dir(metrics_dir)
 
@@ -1910,13 +1913,13 @@ class ModelTrainer:
         # Calculate summary statistics
         summary = df_metrics.describe().T
         summary_filepath = os.path.join(
-            clf_dir, f"metrics_summary_{suffix_filename}.csv"
+            classifier_dir, f"metrics_summary_{suffix_filename}.csv"
         )
         summary.to_csv(summary_filepath)
 
         # Save all individual metrics
         all_metrics_filepath = os.path.join(
-            clf_dir, f"all_metrics_{suffix_filename}.csv"
+            classifier_dir, f"all_metrics_{suffix_filename}.csv"
         )
         df_metrics = df_metrics.set_index("random_state")
         df_metrics.to_csv(all_metrics_filepath, index=True)
