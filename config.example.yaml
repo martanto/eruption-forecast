@@ -66,7 +66,7 @@ extract_features:
 train:
   classifiers:              # One or more classifier keys to train
     - xgb                   # Options: rf, lite-rf, gb, xgb, svm, lr, nn, dt, knn, nb, voting
-  cv_strategy: stratified   # Cross-validation strategy: 'shuffle', 'stratified', 'timeseries'
+  cv_strategy: shuffle-stratified   # Cross-validation strategy: 'shuffle', 'stratified', 'shuffle-stratified', 'timeseries'
   random_state: 0           # Starting random seed
   total_seed: 500           # Number of seeds (random_state … random_state + total_seed - 1)
   with_evaluation: false    # true = 80/20 split + metrics; false = train on full dataset
