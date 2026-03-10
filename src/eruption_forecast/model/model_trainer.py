@@ -366,60 +366,6 @@ class ModelTrainer:
                 f"and {cv_strategy} CV strategy ({cv_splits} splits)"
             )
 
-    @property
-    def significant_features_dir(self) -> str:
-        """Return the shared significant features directory.
-
-        Returns:
-            str: Path to the shared significant features directory.
-        """
-        return self.shared_significant_dir
-
-    @property
-    def all_features_dir(self) -> str:
-        """Return the shared all-features directory.
-
-        Returns:
-            str: Path to the shared all-features directory.
-        """
-        return self.shared_all_features_dir
-
-    @property
-    def figures_dir(self) -> str:
-        """Return the shared features figures directory.
-
-        Returns:
-            str: Path to the shared features figures directory.
-        """
-        return os.path.dirname(self.shared_figures_dir)  # features/figures/
-
-    @property
-    def significant_figures_dir(self) -> str:
-        """Return the shared significant-features figures directory.
-
-        Returns:
-            str: Path to the shared significant-features figures directory.
-        """
-        return self.shared_figures_dir
-
-    @property
-    def tests_dir(self) -> str:
-        """Return the shared per-seed test data directory.
-
-        Returns:
-            str: Path to the shared tests directory.
-        """
-        return self.shared_tests_dir
-
-    @property
-    def features_dir(self) -> str:
-        """Return the shared features root directory.
-
-        Returns:
-            str: Path to the shared features directory.
-        """
-        return self.shared_features_dir
-
     def validate(self) -> None:
         """Validate that features and labels are non-empty and aligned.
 
