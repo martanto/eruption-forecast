@@ -90,9 +90,6 @@ class ForecastModel:
         use_relevant_features (bool): Whether relevance filtering was applied.
         select_tremor_columns (list[str] | None): Selected tremor columns for processing.
         feature_selection_method (str): Feature selection method.
-        trainers (list[dict[str, Any]]): List of trainer info dicts, one per classifier run.
-            Each dict contains keys ``classifier_model``, ``classifier_name``,
-            ``model_trainer``, ``trained_model_df``, and ``trained_model_csv``.
         trained_models (dict[str, str]): Mapping of classifier name to trained model
             registry CSV path. Populated after ``train()``; used by ``forecast()``.
         ModelPredictor (ModelPredictor | None): Predictor instance.
@@ -273,7 +270,6 @@ class ForecastModel:
         # Will be set after train() called
         # ------------------------------------------------------------------
         self._plot_shap = False
-        self.trainers: list[dict[str, Any]] = []
         self.trained_models: dict[str, str] = {}
 
         # ------------------------------------------------------------------
@@ -1163,7 +1159,7 @@ class ForecastModel:
 
         # Filter labels from start_date onwards
         if builder == "standard" and train_start_date is not None:
-            df_label = df_label.loc[train_start_date :]
+            df_label = df_label.loc[train_start_date:]
 
         if df_label.empty:
             raise ValueError(f"Label from start date {self.start_date} is empty.")
@@ -1212,10 +1208,12 @@ class ForecastModel:
         self.feature_selection_method = using
         return self
 
-    def _train_per_classifier(
+    def _train_all_classifiers(
         self,
-        classifier: str,
-        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"],
+        classifiers: list[str],
+        cv_strategy: Literal[
+            "shuffle", "stratified", "shuffle-stratified", "timeseries"
+        ],
         features_csv: str,
         label_csv: str,
         output_dir: str,
@@ -1229,17 +1227,19 @@ class ForecastModel:
         use_gpu: bool = False,
         gpu_id: int = 0,
         verbose: bool = False,
-    ) -> tuple[str, str]:
-        """Train a single classifier and append results to instance state.
+    ) -> dict[str, str]:
+        """Train all classifiers with shared under-sampling and feature selection.
 
-        Creates a ``ModelTrainer`` for the given classifier, optionally overrides
-        its hyperparameter grid, runs ``fit()``, then stores the trainer info dict
-        in ``self.trainers`` and the registry CSV path in ``self.trained_models``.
+        Creates a single ``ModelTrainer`` for all classifiers so that under-sampling
+        and feature selection are performed once per seed and reused across classifiers,
+        eliminating redundant computation. Runs ``fit()`` on the shared trainer, then
+        stores per-classifier trainer info in ``self.trainers`` and returns a mapping
+        of classifier name to registry CSV path.
 
         Args:
-            classifier (str): Classifier key (e.g. ``"rf"``, ``"xgb"``).
-            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"]): Cross-validation
-                strategy passed to ``ModelTrainer``.
+            classifiers (list[str]): List of classifier keys (e.g. ``["rf", "xgb"]``).
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"]):
+                Cross-validation strategy passed to ``ModelTrainer``.
             features_csv (str): Path to the extracted features CSV file.
             label_csv (str): Path to the aligned labels CSV file.
             output_dir (str): Root directory for training outputs.
@@ -1250,29 +1250,27 @@ class ForecastModel:
             number_of_significant_features (int, optional): Top-N features retained
                 per seed. Defaults to 20.
             grid_params (dict[str, Any] | None, optional): Custom hyperparameter grid
-                for GridSearchCV. If None, the classifier default grid is used.
-                Defaults to None.
-            n_jobs (int, optional): Parallel workers for this classifier run.
+                for GridSearchCV applied to all classifiers. If None, each classifier's
+                default grid is used. Defaults to None.
+            n_jobs (int, optional): Parallel workers for the outer seed loop.
                 Defaults to 1.
             grid_search_n_jobs (int, optional): Number of parallel jobs inside each
-                GridSearchCV call (inner loop). Safe to set > 1 because the loky
-                backend handles nested parallelism without deadlocks. Combine with
-                ``n_jobs`` to control the total CPU budget:
-                ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
+                GridSearchCV call (inner loop). Defaults to 1.
             overwrite (bool, optional): If True, overwrites existing output files.
                 Defaults to False.
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
             use_gpu (bool, optional): Enable GPU acceleration for XGBoost. Defaults to False.
-            gpu_id (int, optional): GPU device index to use when use_gpu is True. Defaults to 0.
+            gpu_id (int, optional): GPU device index to use when use_gpu is True.
+                Defaults to 0.
 
         Returns:
-            tuple[str, str]: Classifier name and trained model CSV filepath
+            dict[str, str]: Mapping of classifier name to trained-model registry CSV path.
         """
         train_model = ModelTrainer(
             extracted_features_csv=features_csv,
             label_features_csv=label_csv,
             output_dir=output_dir,
-            classifier=classifier,  # ty:ignore[invalid-argument-type]
+            classifiers=classifiers,
             cv_strategy=cv_strategy,
             number_of_significant_features=number_of_significant_features,
             feature_selection_method=self.feature_selection_method,
@@ -1285,31 +1283,30 @@ class ForecastModel:
             gpu_id=gpu_id,
         )
 
-        # Override default grid search parameters
+        # Override default grid search parameters for all classifiers
         if grid_params is not None:
-            train_model.ClassifierModel.grid = grid_params
+            for clf_model in train_model.classifier_models:
+                clf_model.grid = grid_params
 
         train_model.fit(with_evaluation=with_evaluation, **train_params)
 
-        classifier_name: str = train_model.ClassifierModel.name
-        trained_model_csv = str(train_model.csv)
+        # Build result mapping: classifier_name -> registry CSV path
+        trained_models: dict[str, str] = {}
+        for clf_model in train_model.classifier_models:
+            clf_name = clf_model.name
+            clf_slug = clf_model.slug_name
+            csv_path = train_model.csv.get(clf_slug)
+            if csv_path is not None:
+                trained_models[clf_name] = csv_path
 
-        self.trainers.append(
-            {
-                "classifier_model": train_model.ClassifierModel,
-                "classifier_name": classifier_name,
-                "model_trainer": train_model,
-                "trained_model_df": train_model.df,
-                "trained_model_csv": train_model.csv,
-            }
-        )
-
-        return classifier_name, trained_model_csv
+        return trained_models
 
     def train(
         self,
         classifier: str | list[str] = "rf",
-        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"] = "shuffle-stratified",
+        cv_strategy: Literal[
+            "shuffle", "stratified", "shuffle-stratified", "timeseries"
+        ] = "shuffle-stratified",
         random_state: int = 0,
         total_seed: int = 500,
         with_evaluation: bool = False,
@@ -1439,30 +1436,26 @@ class ForecastModel:
             "plot_significant_features": plot_significant_features,
         }
 
-        # Train multi classifiers — reset accumulated state from any prior train() call
-        self.trainers = []
-        self.trained_models = {}
+        # Train all classifiers together — shared under-sampling and feature selection
+        # Reset accumulated state from any prior train() call
         self._plot_shap = plot_shap
-        trained_models: dict[str, str] = {}
-        for _classifier in classifiers:
-            classifier_name, trained_model_csv = self._train_per_classifier(
-                classifier=_classifier,
-                cv_strategy=cv_strategy,
-                features_csv=features_csv,
-                label_csv=label_csv,
-                output_dir=output_dir,
-                train_params=train_params,
-                with_evaluation=with_evaluation,
-                number_of_significant_features=number_of_significant_features,
-                grid_params=grid_params,
-                n_jobs=n_jobs or self.n_jobs,
-                grid_search_n_jobs=grid_search_n_jobs,
-                overwrite=overwrite or self.overwrite,
-                verbose=verbose or self.verbose,
-                use_gpu=use_gpu and _classifier in {"xgb", "voting"},
-                gpu_id=gpu_id,
-            )
-            trained_models[classifier_name] = trained_model_csv
+        trained_models: dict[str, str] = self._train_all_classifiers(
+            classifiers=classifiers,
+            cv_strategy=cv_strategy,
+            features_csv=features_csv,
+            label_csv=label_csv,
+            output_dir=output_dir,
+            train_params=train_params,
+            with_evaluation=with_evaluation,
+            number_of_significant_features=number_of_significant_features,
+            grid_params=grid_params,
+            n_jobs=n_jobs or self.n_jobs,
+            grid_search_n_jobs=grid_search_n_jobs,
+            overwrite=overwrite or self.overwrite,
+            verbose=verbose or self.verbose,
+            use_gpu=use_gpu,
+            gpu_id=gpu_id,
+        )
 
         prefix = "evaluations" if with_evaluation else "predictions"
 
