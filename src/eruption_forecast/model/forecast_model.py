@@ -1289,7 +1289,7 @@ class ForecastModel:
             for clf_model in train_model.classifier_models:
                 clf_model.grid = grid_params
 
-        train_model.fit(with_evaluation=with_evaluation, **train_params)
+        train_model.fit(with_evaluation=with_evaluation, **train_params).merge_models()
 
         # Build result mapping: classifier_name -> registry CSV path
         trained_models: dict[str, str] = {}

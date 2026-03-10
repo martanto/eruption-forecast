@@ -404,7 +404,6 @@ def _extract_trained_model_suffix(csv_path: str) -> str:
 
 def merge_seed_models(
     registry_csv: str,
-    output_path: str | None = None,
     output_dir: str | None = None,
 ) -> str:
     """Load all seed models from a registry CSV and bundle into one SeedEnsemble pkl.
@@ -418,7 +417,7 @@ def merge_seed_models(
     Args:
         registry_csv (str): Path to the trained-model registry CSV (the
             ``trained_model_{suffix}.csv`` file written by ``ModelTrainer``).
-        output_path (str | None, optional): Destination path for the merged
+        output_dir (str | None, optional): Destination path for the merged
             ``.pkl`` file.  If ``None``, the file is written to the same
             directory as ``registry_csv`` with the name
             ``merged_model_{suffix}.pkl``, where ``{suffix}`` is derived from
@@ -436,9 +435,8 @@ def merge_seed_models(
         else os.path.dirname(os.path.abspath(registry_csv))
     )
 
-    if output_path is None:
-        suffix = _extract_trained_model_suffix(registry_csv)
-        output_path = os.path.join(output_dir, f"merged_model_{suffix}.pkl")
+    suffix = _extract_trained_model_suffix(registry_csv)
+    output_path = os.path.join(output_dir, f"merged_model_{suffix}.pkl")
 
     ensemble = SeedEnsemble.from_registry(registry_csv)
     ensemble.save(output_path)

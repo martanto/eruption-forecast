@@ -1868,7 +1868,7 @@ class ModelTrainer:
 
         return None
 
-    def fit(self, with_evaluation: bool = True, **kwargs) -> None:
+    def fit(self, with_evaluation: bool = True, **kwargs) -> Self:
         """Dispatch to ``train_and_evaluate()`` or ``train()`` based on ``with_evaluation``.
 
         Args:
@@ -1876,10 +1876,15 @@ class ModelTrainer:
                 (80/20 split + metrics). If False, calls ``train()`` (full dataset,
                 no metrics). Defaults to True.
             **kwargs: Additional keyword arguments forwarded to the chosen method.
+
+        Returns:
+            Self: The ModelTrainer instance for method chaining.
         """
         if with_evaluation:
-            return self.train_and_evaluate(**kwargs)
-        return self.train(**kwargs)
+            self.train_and_evaluate(**kwargs)
+        else:
+            self.train(**kwargs)
+        return self
 
     def _aggregate_metrics(
         self,
@@ -1943,23 +1948,24 @@ class ModelTrainer:
             logger.info(f"Summary metrics saved to: {summary_filepath}")
             logger.info(f"All metrics saved to: {all_metrics_filepath}")
 
-    def merge_models(self, output_path: str | None = None) -> str:
-        """Merge all seed models for the first classifier into a single SeedEnsemble pkl.
+    def merge_models(self, output_path: str | None = None) -> dict[str, str]:
+        """Merge all seed models for each classifier into a single SeedEnsemble pkl.
 
         Convenience wrapper around
-        :func:`eruption_forecast.utils.ml.merge_seed_models` that uses
-        the first classifier's registry CSV from ``self.csv``.  The registry CSV
+        :func:`eruption_forecast.utils.ml.merge_seed_models` that iterates over
+        all classifier registry CSVs from ``self.csv``.  The registry CSVs
         must exist (i.e. ``train()`` or ``train_and_evaluate()`` must have been
         called first).
 
         Args:
             output_path (str | None, optional): Destination path for the merged
-                ``.pkl`` file.  If ``None``, the file is placed alongside the
+                ``.pkl`` files.  If ``None``, each file is placed alongside its
                 registry CSV as ``merged_model_{suffix}.pkl``.
                 Defaults to ``None``.
 
         Returns:
-            str: Absolute path to the saved merged ``.pkl`` file.
+            dict[str, str]: Mapping of classifier slug to the absolute path of
+                the saved merged ``.pkl`` file for each classifier.
 
         Raises:
             RuntimeError: If no registry CSV is available (training not yet run).
@@ -1970,11 +1976,11 @@ class ModelTrainer:
                 "train_and_evaluate() before calling merge_models()."
             )
 
-        # Use first available classifier CSV
-        first_csv = next(iter(self.csv.values()))
-        output_path = output_path or self.output_dir
-
-        return merge_seed_models(first_csv, output_path=output_path)
+        _output_dir = output_path or os.path.join(self.output_dir, "classifiers")
+        return {
+            slug: merge_seed_models(csv, output_dir=_output_dir)
+            for slug, csv in self.csv.items()
+        }
 
     @staticmethod
     def merge_classifier_models(

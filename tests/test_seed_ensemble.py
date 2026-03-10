@@ -174,14 +174,15 @@ def test_merge_all_classifiers() -> None:
     print(f"[PASS] merge_all_classifiers: keys={list(loaded.keys())}")
 
 
-def test_custom_output_path() -> None:
-    """Test merge_seed_models() with an explicit output path."""
+def test_custom_output_dir() -> None:
+    """Test merge_seed_models() with an explicit output directory."""
     registry_csv = os.path.join(TESTS_OUT, "trained_model_rf_test.csv")
-    custom_out = os.path.join(TESTS_OUT, "custom_merged.pkl")
-    path = merge_seed_models(registry_csv, output_path=custom_out)
-    assert path == custom_out, f"Expected {custom_out}, got {path}"
-    assert os.path.isfile(custom_out), "Custom output file not created"
-    print(f"[PASS] custom output path: {custom_out}")
+    custom_dir = os.path.join(TESTS_OUT, "custom_output")
+    os.makedirs(custom_dir, exist_ok=True)
+    path = merge_seed_models(registry_csv, output_dir=custom_dir)
+    assert os.path.isfile(path), f"Merged file not created: {path}"
+    assert os.path.dirname(os.path.abspath(path)) == os.path.abspath(custom_dir)
+    print(f"[PASS] custom output dir: {path}")
 
 
 def main() -> None:
@@ -199,8 +200,8 @@ def main() -> None:
     print("\n--- Test 3: merge_all_classifiers ---")
     test_merge_all_classifiers()
 
-    print("\n--- Test 4: custom output path ---")
-    test_custom_output_path()
+    print("\n--- Test 4: custom output directory ---")
+    test_custom_output_dir()
 
     print("\n" + "=" * 60)
     print("All tests PASSED.")
