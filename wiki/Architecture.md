@@ -316,6 +316,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 - Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
 - CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
 - Uses `RandomUnderSampler` to handle class imbalance
+- Feature selection runs once per seed and is shared across classifiers; results are written to `features/{cv-slug}/` rather than inside each classifier directory
 - Two training modes:
   - `train_and_evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
   - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
@@ -327,7 +328,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
-  - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
+  - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/classifiers/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
 - `MultiModelEvaluator`: Aggregate evaluation across all seeds (`multi_model_evaluator.py`)
   - Methods: `plot_all()`, `plot_roc()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
 - `ModelPredictor`: Runs inference in evaluation or forecast mode (`model_predictor.py`)

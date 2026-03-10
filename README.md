@@ -651,8 +651,12 @@ output/
     ├── tremor/          # Merged tremor CSVs + daily plots
     ├── features/        # Extracted features + aligned labels
     └── trainings/
-        ├── evaluations/   # Output of train_and_evaluate()
-        └── predictions/              # Output of train()
+        ├── evaluations/
+        │   ├── features/          # Shared feature selection outputs
+        │   └── classifiers/       # Per-classifier model outputs (evaluations)
+        └── predictions/
+            ├── features/          # Shared feature selection outputs
+            └── classifiers/       # Per-classifier model outputs (predictions)
 ```
 
 > Full directory tree with all sub-paths: [docs/output-structure.md](docs/output-structure.md)

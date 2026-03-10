@@ -6,7 +6,7 @@ to a root anchor directory, creating directories, and loading JSON files.
 
 import os
 import json
-from typing import Any, Literal
+from typing import Any
 
 
 def ensure_dir(path: str) -> str:
@@ -88,62 +88,3 @@ def resolve_output_dir(
         return output_dir
     return os.path.join(anchor, output_dir)
 
-
-def build_model_directories(
-    root_dir: str,
-    classifier_slug: str,
-    cv_slug: str,
-    mode: Literal["with-evaluation", "only"],
-) -> dict[str, str]:
-    """
-    Build standardized model output directory structure.
-
-    Creates a hierarchical directory structure for model training outputs:
-    - trainings/{mode}/{classifier_slug}/{cv_slug}/
-
-    Args:
-        root_dir: Base output directory path.
-        classifier_slug: Slugified classifier name (e.g., 'xgb-classifier').
-        cv_slug: Slugified CV strategy name (e.g., 'stratified-shuffle-split').
-        mode: Training mode - 'with-evaluation' or 'only'.
-
-    Returns:
-        Dictionary with directory paths:
-            - 'base': Top-level training directory
-            - 'features': Features output directory
-            - 'significant_features': Significant features subdirectory
-            - 'models': Trained models directory
-            - 'metrics': Evaluation metrics directory (if mode='with-evaluation')
-            - 'figures': Plot figures directory (if mode='with-evaluation')
-
-    Examples:
-        >>> dirs = build_model_directories(
-        ...     root_dir="/path/to/output",
-        ...     classifier_slug="random-forest-classifier",
-        ...     cv_slug="stratified-k-fold",
-        ...     mode="with-evaluation"
-        ... )
-        >>> print(dirs['base'])
-        /path/to/output/trainings/evaluations/random-forest-classifier/stratified-k-fold
-    """
-    mode_dir = f"model-{mode}"
-    base_dir = os.path.join(root_dir, "trainings", mode_dir, classifier_slug, cv_slug)
-
-    directories = {
-        "base": base_dir,
-        "features": os.path.join(base_dir, "features"),
-        "significant_features": os.path.join(
-            base_dir, "features", "significant_features"
-        ),
-        "models": os.path.join(base_dir, "models"),
-    }
-
-    if mode == "with-evaluation":
-        directories["metrics"] = os.path.join(base_dir, "metrics")
-        directories["figures"] = os.path.join(base_dir, "figures")
-
-    # Create all directories
-    for dir_path in directories.values():
-        ensure_dir(dir_path)
-
-    return directories

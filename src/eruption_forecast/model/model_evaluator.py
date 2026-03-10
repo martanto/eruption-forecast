@@ -123,7 +123,8 @@ class ModelEvaluator:
             model_name (str, optional): Identifier used in output filenames.
                 Defaults to "model".
             output_dir (str | None, optional): Base directory for evaluation outputs.
-                Defaults to ``root_dir/output/evaluations``. Defaults to None.
+                Defaults to ``root_dir/output/trainings/evaluations/classifiers/{clf}/{cv}``.
+                Defaults to None.
             selected_features (list[str] | None, optional): Subset of X_test columns
                 to use. If None, all columns are used. Defaults to None.
             random_state (int | None, optional): Seed used to derive a filename prefix.
@@ -152,12 +153,14 @@ class ModelEvaluator:
             clf_slug = slugify_class_name(model_name)
             cv_slug = slugify_class_name(cv_name)
             default_subpath = os.path.join(
-                "output", "trainings", "evaluations", clf_slug, cv_slug
+                "output", "trainings", "evaluations", "classifiers", clf_slug, cv_slug
             )
             output_dir = resolve_output_dir(None, root_dir, default_subpath)
         else:
             output_dir = resolve_output_dir(
-                output_dir, root_dir, os.path.join("output", "trainings", "evaluations")
+                output_dir,
+                root_dir,
+                os.path.join("output", "trainings", "evaluations"),
             )
         metrics_dir = os.path.join(output_dir, "metrics")
         figures_dir = os.path.join(output_dir, "figures")

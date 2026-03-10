@@ -168,7 +168,7 @@ All plots are saved to `output_dir` with publication-quality styling.
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/evaluations/classifiers/xgb-classifier/stratified-shuffle-split"
 trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 
 # Plots from registry CSV
@@ -196,7 +196,7 @@ base = "output/trainings/evaluations"
 metrics_by_clf = {}
 for clf in ["xgb", "rf", "gb"]:
     ev = MultiModelEvaluator(
-        metrics_dir=f"{base}/{clf}-classifier/stratified-shuffle-split/metrics"
+        metrics_dir=f"{base}/classifiers/{clf}-classifier/stratified-shuffle-split/metrics"
     )
     metrics_by_clf[clf] = ev.get_metrics_list()
 
@@ -258,7 +258,7 @@ from eruption_forecast.plots import plot_seed_stability
 
 # From a single classifier's evaluator (single violin)
 ev = MultiModelEvaluator(
-    metrics_dir="output/.../xgb-classifier/stratified-shuffle-split/metrics",
+    metrics_dir="output/.../classifiers/xgb-classifier/stratified-shuffle-split/metrics",
     trained_model_csv="output/.../trained_model_registry.csv",
 )
 fig = ev.plot_seed_stability(metric="f1_score")  # saves automatically
@@ -267,7 +267,7 @@ fig = ev.plot_seed_stability(metric="f1_score")  # saves automatically
 metrics_by_clf = {}
 for clf in ["xgb", "rf", "gb", "svm"]:
     ev = MultiModelEvaluator(
-        metrics_dir=f"output/.../trainings/{clf}/metrics"
+        metrics_dir=f"output/.../trainings/evaluations/classifiers/{clf}-classifier/stratified-shuffle-split/metrics"
     )
     metrics_by_clf[clf] = ev.get_metrics_list()
 

@@ -33,8 +33,8 @@ def test_full_training_pipeline():
 
     # Create trainer
     trainer = ModelTrainer(
-        features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
-        label_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
+        extracted_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/relevant_features_2025-01-03-2025-07-24.csv",
+        label_features_csv="D:/Projects/eruption-forecast/output/VG.OJN.00.EHZ/features/label_features_2025-01-03-2025-07-24.csv",
         output_dir=output_dir,
         n_jobs=1,
         verbose=True,

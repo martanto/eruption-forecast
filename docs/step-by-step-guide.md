@@ -774,7 +774,7 @@ import pandas as pd
 
 # Suffix format: {ClassifierName}-{CVName}_rs-{random_state}_ts-{total_seed}_top-{n}
 # e.g., XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20
-base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/evaluations/classifiers/xgb-classifier/stratified-shuffle-split"
 suffix = "XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20"
 
 # All per-seed metrics
@@ -791,7 +791,7 @@ print(f"Balanced Accuracy:  {best_seed['balanced_accuracy']:.4f}")
 print(f"F1 Score:           {best_seed['f1_score']:.4f}")
 
 # Aggregated significant features
-sig_features = pd.read_csv(f"{base}/features/significant_features.csv")
+sig_features = pd.read_csv("output/trainings/evaluations/features/stratified-shuffle-split/significant_features.csv")
 print(sig_features.head(10))
 ```
 

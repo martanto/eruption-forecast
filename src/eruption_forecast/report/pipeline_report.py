@@ -179,14 +179,14 @@ class PipelineReport(BaseReport):
                         )
                     )
 
-        # Fall back to live fm.trainers when no evaluations directory exists yet
+        # Fall back to fm.trained_models when no evaluations directory exists yet.
+        # trained_models maps classifier_name -> registry CSV path; the metrics
+        # directory is always a sibling of that CSV.
         if not training_rpts:
-            for trainer in fm.trainers:
-                clf_name = trainer.get("classifier_name", "Classifier")
-                model_trainer = trainer.get("model_trainer")
+            for clf_name, csv_path in fm.trained_models.items():
                 metrics_dir: str | None = None
-                if model_trainer is not None:
-                    metrics_dir = getattr(model_trainer, "metrics_dir", None)
+                if csv_path and os.path.isfile(csv_path):
+                    metrics_dir = os.path.join(os.path.dirname(csv_path), "metrics")
                 training_rpts.append(
                     TrainingReport(
                         metrics_dir=metrics_dir,
