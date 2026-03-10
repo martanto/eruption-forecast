@@ -244,7 +244,8 @@ class TrainConfig(_ConfigBase):
         classifiers (list[str]): Ordered list of classifier keys to train
             (e.g. ``["rf", "xgb"]``). Defaults to ``["rf"]``.
         cv_strategy (str): Cross-validation strategy — ``"shuffle"``,
-            ``"stratified"``, or ``"timeseries"``. Defaults to ``"shuffle"``.
+            ``"stratified"``, ``"shuffle-stratified"``, or ``"timeseries"``.
+            Defaults to ``"shuffle-stratified"``.
         random_state (int): Starting random seed. Seeds run from
             ``random_state`` to ``random_state + total_seed - 1``.
             Defaults to ``0``.

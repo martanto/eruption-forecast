@@ -109,7 +109,7 @@ class ModelTrainer:
         grid_search_n_jobs (int): Number of parallel jobs inside each GridSearchCV call.
         prefix_filename (str | None): Optional prefix for output filenames.
         classifier (str): Classifier type ("rf", "gb", "xgb", etc.).
-        cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "timeseries").
+        cv_strategy (str): Cross-validation strategy ("shuffle", "stratified", "shuffle-stratified", "timeseries").
         cv_splits (int): Number of CV splits.
         number_of_significant_features (int): Number of top features to save separately.
         feature_selection_method (str): Feature selection method ("tsfresh", "random_forest", "combined").
@@ -153,8 +153,8 @@ class ModelTrainer:
             Defaults to None.
         classifier (Literal[ "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"], optional):
             Classifier type. Defaults to "rf".
-        cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
-            Cross-validation strategy. Defaults to "shuffle".
+        cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"], optional):
+            Cross-validation strategy. Defaults to "shuffle-stratified".
         cv_splits (int, optional): Number of CV splits. Defaults to 5.
         number_of_significant_features (int, optional): Number of top features
             to save separately. Defaults to 20.
@@ -227,7 +227,7 @@ class ModelTrainer:
         classifier: Literal[
             "svm", "knn", "dt", "rf", "gb", "xgb", "nn", "nb", "lr", "voting", "lite-rf"
         ] = "rf",
-        cv_strategy: Literal["shuffle", "stratified", "timeseries"] = "shuffle",
+        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"] = "shuffle-stratified",
         cv_splits: int = DEFAULT_CV_SPLITS,
         number_of_significant_features: int = DEFAULT_N_SIGNIFICANT_FEATURES,
         feature_selection_method: Literal[
@@ -263,8 +263,8 @@ class ModelTrainer:
                 Defaults to None.
             classifier (Literal[...], optional): Short classifier identifier.
                 Defaults to "rf".
-            cv_strategy (Literal["shuffle", "stratified", "timeseries"], optional):
-                Cross-validation strategy. Defaults to "shuffle".
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"], optional):
+                Cross-validation strategy. Defaults to "shuffle-stratified".
             cv_splits (int, optional): Number of cross-validation folds.
                 Defaults to DEFAULT_CV_SPLITS.
             number_of_significant_features (int, optional): Number of top features
@@ -740,7 +740,9 @@ class ModelTrainer:
         )
 
         if selector.n_features == 0:
-            logger.warning(f"{random_state:05d}: Skip training model.")
+            logger.warning(
+                f"{random_state:05d}: Features reduced to 0. Skip training model."
+            )
             return None
 
         # Series indexed by feature name; values are p-values or importance score sorted by it's value.
@@ -1596,20 +1598,20 @@ class ModelTrainer:
             all_figures_filepath=all_figures_filepath if plot_features else None,
         )
 
-        if result is None:  # Feature selection returned nothing; skip this seed
+        if result is None:  # Feature selection returned nothing or zero; skip this seed
             return None  # Signal caller to skip: no features, no model
 
         (
             features_resampled_selected,
-            top_selected_features,
-            _selected_features,
+            top_n_features,
+            _all_selected_features,
             _n_features,
         ) = result
 
         # ========== STEP 3: Cross-Validation with Dynamic Classifier ==========
         logger.info(f"Fitting Seed: {random_state:05d}")
 
-        top_n_features = top_selected_features.index.tolist()
+        top_n_features = top_n_features.index.tolist()
 
         _, _, best_model = self._setup_grid_search(
             random_state,

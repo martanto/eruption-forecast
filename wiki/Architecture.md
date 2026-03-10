@@ -314,7 +314,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 
 **`ModelTrainer`** trains classifiers across multiple random seeds:
 - Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
-- CV strategies: `shuffle`, `stratified`, `timeseries`
+- CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
 - Uses `RandomUnderSampler` to handle class imbalance
 - Two training modes:
   - `train_and_evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save

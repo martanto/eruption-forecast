@@ -8,7 +8,7 @@ training — ClassifierModel is a pure factory/configuration class.
 import pytest
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, TimeSeriesSplit
+from sklearn.model_selection import ShuffleSplit, StratifiedKFold, StratifiedShuffleSplit, TimeSeriesSplit
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
@@ -58,10 +58,10 @@ class TestClassifierModelInit:
         clf = ClassifierModel("rf")
         assert clf.random_state is None
 
-    def test_default_cv_strategy_is_shuffle(self) -> None:
-        """cv_strategy defaults to 'shuffle'."""
+    def test_default_cv_strategy_is_shuffle_stratified(self) -> None:
+        """cv_strategy defaults to 'shuffle-stratified'."""
         clf = ClassifierModel("rf")
-        assert clf.cv_strategy == "shuffle"
+        assert clf.cv_strategy == "shuffle-stratified"
 
     def test_cv_name_set_on_init(self) -> None:
         """cv_name is derived from the CV splitter class on init."""
@@ -120,9 +120,14 @@ class TestSetRandomState:
 class TestGetCvSplitter:
     """Test get_cv_splitter() returns correct CV object for each strategy."""
 
-    def test_shuffle_returns_stratified_shuffle_split(self) -> None:
-        """'shuffle' strategy returns StratifiedShuffleSplit."""
+    def test_shuffle_returns_shuffle_split(self) -> None:
+        """'shuffle' strategy returns ShuffleSplit."""
         clf = ClassifierModel("rf", cv_strategy="shuffle")
+        assert isinstance(clf.get_cv_splitter(), ShuffleSplit)
+
+    def test_shuffle_stratified_returns_stratified_shuffle_split(self) -> None:
+        """'shuffle-stratified' strategy returns StratifiedShuffleSplit."""
+        clf = ClassifierModel("rf", cv_strategy="shuffle-stratified")
         assert isinstance(clf.get_cv_splitter(), StratifiedShuffleSplit)
 
     def test_stratified_returns_stratified_k_fold(self) -> None:

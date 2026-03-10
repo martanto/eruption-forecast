@@ -147,8 +147,9 @@ trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv
 
 | CV strategy key | Folder slug |
 |-----------------|-------------|
-| `shuffle` | `stratified-shuffle-split` |
+| `shuffle` | `shuffle-split` |
 | `stratified` | `stratified-k-fold` |
+| `shuffle-stratified` | `stratified-shuffle-split` |
 | `timeseries` | `time-series-split` |
 
 ---
