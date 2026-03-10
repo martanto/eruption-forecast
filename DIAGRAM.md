@@ -14,43 +14,43 @@ structured artifact consumed by the next.
 
 ```mermaid
 flowchart TD
-    SRC["Data Source\nSDS archive or FDSN web service"]
+    SRC["Data Source<br/>SDS archive or FDSN web service"]
 
     subgraph S1["Stage 1 - CalculateTremor"]
-        CT["CalculateTremor\ncalculate_tremor.py"]
+        CT["CalculateTremor<br/>calculate_tremor.py"]
     end
 
     subgraph S2["Stage 2 - LabelBuilder"]
-        LB["LabelBuilder / DynamicLabelBuilder\nlabel_builder.py"]
+        LB["LabelBuilder / DynamicLabelBuilder<br/>label_builder.py"]
     end
 
     subgraph S3["Stage 3 - TremorMatrixBuilder"]
-        TMB["TremorMatrixBuilder\ntremor_matrix_builder.py"]
+        TMB["TremorMatrixBuilder<br/>tremor_matrix_builder.py"]
     end
 
     subgraph S4["Stage 4 - FeaturesBuilder"]
-        FB["FeaturesBuilder + FeatureSelector\nfeatures_builder.py"]
+        FB["FeaturesBuilder + FeatureSelector<br/>features_builder.py"]
     end
 
     subgraph S5["Stage 5 - ModelTrainer"]
-        MT["ModelTrainer\nmodel_trainer.py"]
+        MT["ModelTrainer<br/>model_trainer.py"]
     end
 
     subgraph S6["Stage 6 - Evaluation"]
-        ME["ModelEvaluator\nMultiModelEvaluator\nClassifierComparator"]
+        ME["ModelEvaluator<br/>MultiModelEvaluator<br/>ClassifierComparator"]
     end
 
     subgraph S7["Stage 7 - ModelPredictor"]
-        MP["ModelPredictor\nmodel_predictor.py"]
+        MP["ModelPredictor<br/>model_predictor.py"]
     end
 
-    OUT_T["Tremor CSV\nrsam_f0, dsar_f0-f1, entropy\n10-min samples"]
-    OUT_L["Label CSV\nid, is_erupted\nsliding windows"]
-    OUT_M["Tremor Matrix\nid, datetime, tremor columns"]
-    OUT_F["Features CSV\n~5000 tsfresh features\nselected features list"]
-    OUT_PKL["Model artifacts\n.pkl per seed, metrics JSON\nregistry CSV"]
-    OUT_EVL["Evaluation reports\nmetrics, plots, SHAP"]
-    OUT_FC["Forecast CSV\nper-classifier + consensus\nprobability columns"]
+    OUT_T["Tremor CSV<br/>rsam_f0, dsar_f0-f1, entropy<br/>10-min samples"]
+    OUT_L["Label CSV<br/>id, is_erupted<br/>sliding windows"]
+    OUT_M["Tremor Matrix<br/>id, datetime, tremor columns"]
+    OUT_F["Features CSV<br/>~5000 tsfresh features<br/>selected features list"]
+    OUT_PKL["Model artifacts<br/>.pkl per seed, metrics JSON<br/>registry CSV"]
+    OUT_EVL["Evaluation reports<br/>metrics, plots, SHAP"]
+    OUT_FC["Forecast CSV<br/>per-classifier + consensus<br/>probability columns"]
 
     SRC --> S1 --> OUT_T
     OUT_T --> S2
@@ -75,28 +75,28 @@ processed in parallel via `joblib` with `n_jobs` workers.
 
 ```mermaid
 flowchart TD
-    CFG["Configuration\nstation, channel, start_date, end_date\nfrequency_bands, n_jobs"]
+    CFG["Configuration<br/>station, channel, start_date, end_date<br/>frequency_bands, n_jobs"]
 
     subgraph SOURCE["Data Source Selection"]
         SRC_DECISION{{"from_sds() or from_fdsn()?"}}
-        SDS_SRC["SDS archive\nSeisComP Data Structure\nsds.py"]
-        FDSN_SRC["FDSN web service\nwith local SDS cache\nfdsn.py"]
+        SDS_SRC["SDS archive<br/>SeisComP Data Structure<br/>sds.py"]
+        FDSN_SRC["FDSN web service<br/>with local SDS cache<br/>fdsn.py"]
     end
 
     subgraph PARALLEL["Parallel Processing - joblib n_jobs workers"]
-        DAY["One day of waveforms\nObsPy Stream / Trace"]
+        DAY["One day of waveforms<br/>ObsPy Stream / Trace"]
 
         subgraph METRICS["Metric Computation per Frequency Band"]
-            RSAM["RSAM\nMean amplitude per band\nrsam.py"]
-            DSAR["DSAR\nRatio between consecutive bands\ndsar.py"]
-            ENTROPY["ShannonEntropy\nSignal complexity 1-16 Hz\n.filter().calculate()\nshannon_entropy.py"]
+            RSAM["RSAM<br/>Mean amplitude per band<br/>rsam.py"]
+            DSAR["DSAR<br/>Ratio between consecutive bands<br/>dsar.py"]
+            ENTROPY["ShannonEntropy<br/>Signal complexity 1-16 Hz<br/>.filter().calculate()<br/>shannon_entropy.py"]
         end
 
-        DAILY_CSV["Daily CSV\ntemporary output per day"]
+        DAILY_CSV["Daily CSV<br/>temporary output per day"]
     end
 
-    MERGE["Merge all daily CSVs\ninto single DataFrame"]
-    OUT["Tremor CSV\nDateTime index, 10-min intervals\nrsam_f0, rsam_f1\ndsar_f0-f1, dsar_f1-f2\nentropy"]
+    MERGE["Merge all daily CSVs<br/>into single DataFrame"]
+    OUT["Tremor CSV<br/>DateTime index, 10-min intervals<br/>rsam_f0, rsam_f1<br/>dsar_f0-f1, dsar_f1-f2<br/>entropy"]
 
     CFG --> SRC_DECISION
     SRC_DECISION -->|"from_sds()"| SDS_SRC
@@ -130,24 +130,24 @@ all windows with unique IDs.
 
 ```mermaid
 flowchart TD
-    CFG["Configuration\nstart_date, end_date\neruption_dates\nwindow_step, window_step_unit\nday_to_forecast, volcano_id"]
+    CFG["Configuration<br/>start_date, end_date<br/>eruption_dates<br/>window_step, window_step_unit<br/>day_to_forecast, volcano_id"]
 
     VARIANT{{"LabelBuilder variant?"}}
 
     subgraph STATIC["LabelBuilder - global sliding windows"]
-        SW["Create sliding windows\nover full date range\nstep = window_step in minutes/hours"]
+        SW["Create sliding windows<br/>over full date range<br/>step = window_step in minutes/hours"]
         INIT["Initialize all window labels to 0"]
-        MARK["For each eruption_date:\nmark windows in\n[eruption_date - day_to_forecast,\n eruption_date]\nas is_erupted = 1"]
+        MARK["For each eruption_date:<br/>mark windows in<br/>[eruption_date - day_to_forecast,<br/> eruption_date]<br/>as is_erupted = 1"]
     end
 
     subgraph DYNAMIC["DynamicLabelBuilder - per-eruption windows"]
         FOREACH["For each eruption_date"]
-        WIN_PER["Create windows spanning\ndays_before_eruption days\nbefore eruption_date"]
-        MARK_D["Label windows relative\nto that eruption"]
-        CONCAT["Concatenate all per-eruption\nwindows with unique IDs"]
+        WIN_PER["Create windows spanning<br/>days_before_eruption days<br/>before eruption_date"]
+        MARK_D["Label windows relative<br/>to that eruption"]
+        CONCAT["Concatenate all per-eruption<br/>windows with unique IDs"]
     end
 
-    OUT["Label CSV\nDateTime index\nid (int), is_erupted (0 or 1)\nFilename encodes all parameters"]
+    OUT["Label CSV<br/>DateTime index<br/>id (int), is_erupted (0 or 1)<br/>Filename encodes all parameters"]
 
     CFG --> VARIANT
     VARIANT -->|"LabelBuilder"| SW
@@ -171,21 +171,21 @@ stacks all slices into a single matrix ready for feature extraction.
 
 ```mermaid
 flowchart TD
-    IN_T["Tremor DataFrame\nDateTime index, tremor columns\n10-min sampling"]
-    IN_L["Label DataFrame\nid, is_erupted\nwindow start/end times"]
+    IN_T["Tremor DataFrame<br/>DateTime index, tremor columns<br/>10-min sampling"]
+    IN_L["Label DataFrame<br/>id, is_erupted<br/>window start/end times"]
 
     ITER["Iterate over label windows"]
 
     subgraph WINDOW_PROC["Per-Window Processing"]
-        SLICE["Slice tremor DataFrame\nto window time range"]
-        VALIDATE["Validate sample count\nagainst expected window_size"]
+        SLICE["Slice tremor DataFrame<br/>to window time range"]
+        VALIDATE["Validate sample count<br/>against expected window_size"]
         VALID{{"Sample count valid?"}}
-        SKIP["Skip window\nlog warning"]
+        SKIP["Skip window<br/>log warning"]
         PREPEND["Prepend window id column"]
     end
 
     CONCAT["Concatenate all valid window slices"]
-    OUT["Tremor matrix DataFrame\nid, datetime\nrsam_f0, rsam_f1\ndsar_f0-f1\nentropy"]
+    OUT["Tremor matrix DataFrame<br/>id, datetime<br/>rsam_f0, rsam_f1<br/>dsar_f0-f1<br/>entropy"]
 
     IN_T --> ITER
     IN_L --> ITER
@@ -209,29 +209,29 @@ features to a manageable, statistically relevant subset.
 
 ```mermaid
 flowchart TD
-    IN_M["Tremor matrix\nid, datetime, tremor columns"]
+    IN_M["Tremor matrix<br/>id, datetime, tremor columns"]
     IN_L{{"Label DataFrame provided?"}}
 
     subgraph TRAIN_MODE["Training Mode - labels provided"]
-        FILTER_W["Filter tremor matrix windows\nto match label IDs"]
-        ALIGN_L["Save aligned label CSV\nto features output dir"]
-        EXTRACT_T["tsfresh extraction\nper tremor column\nwith relevance filter\nFDR-based feature filtering"]
+        FILTER_W["Filter tremor matrix windows<br/>to match label IDs"]
+        ALIGN_L["Save aligned label CSV<br/>to features output dir"]
+        EXTRACT_T["tsfresh extraction<br/>per tremor column<br/>with relevance filter<br/>FDR-based feature filtering"]
     end
 
     subgraph PRED_MODE["Prediction Mode - no labels"]
-        EXTRACT_P["tsfresh extraction\nper tremor column\nall features, no relevance filter"]
+        EXTRACT_P["tsfresh extraction<br/>per tremor column<br/>all features, no relevance filter"]
     end
 
     subgraph SELECTOR["FeatureSelector - 2-stage selection"]
-        STAGE1["Stage 1 - tsfresh FDR\nStatistical relevance filtering\nBenjamini-Hochberg correction"]
+        STAGE1["Stage 1 - tsfresh FDR<br/>Statistical relevance filtering<br/>Benjamini-Hochberg correction"]
         STAGE2{{"Method?"}}
-        TSFRESH_ONLY["tsfresh only\nmethod: tsfresh"]
-        RF_SEL["Stage 2 - RandomForest importance\nTop N significant features\nmethod: random_forest"]
-        BOTH["Combined:\ntsfresh FDR then RandomForest\nmethod: combined"]
+        TSFRESH_ONLY["tsfresh only<br/>method: tsfresh"]
+        RF_SEL["Stage 2 - RandomForest importance<br/>Top N significant features<br/>method: random_forest"]
+        BOTH["Combined:<br/>tsfresh FDR then RandomForest<br/>method: combined"]
     end
 
-    OUT_F["Features CSV\n~5000 raw or filtered features\none row per window"]
-    OUT_S["Selected features list\nsignificant_features.txt"]
+    OUT_F["Features CSV<br/>~5000 raw or filtered features<br/>one row per window"]
+    OUT_S["Selected features list<br/>significant_features.txt"]
 
     IN_M --> IN_L
     IN_L -->|"Yes"| FILTER_W
@@ -262,37 +262,37 @@ The `fit()` method dispatches to one of two training modes controlled by the
 
 ```mermaid
 flowchart TD
-    IN_F["Features CSV\nselected features list"]
-    IN_LABEL["Label CSV\naligned to features"]
-    CFG["Configuration\nclassifier, cv_strategy\nrandom_state, total_seed\nn_jobs, grid_search_n_jobs\nnumber_of_significant_features"]
+    IN_F["Features CSV<br/>selected features list"]
+    IN_LABEL["Label CSV<br/>aligned to features"]
+    CFG["Configuration<br/>classifier, cv_strategy<br/>random_state, total_seed<br/>n_jobs, grid_search_n_jobs<br/>number_of_significant_features"]
 
     FIT{{"fit(with_evaluation=?)"}}
 
     subgraph EVAL_MODE["train_and_evaluate() - with_evaluation=True"]
-        SPLIT["80/20 train/test split\nsklearn train_test_split"]
-        RESAMPLE_E["RandomUnderSampler\non training split only"]
-        FEAT_SEL_E["FeatureSelector\non training data only"]
-        GS_E["GridSearchCV\ncv_strategy: shuffle / stratified /\nshuffle-stratified / timeseries"]
-        EVAL["ModelEvaluator\nmetrics on held-out test set\naccuracy, F1, ROC-AUC\nconfusion matrix, plots"]
-        SAVE_E["Save model .pkl\nmetrics JSON\nregistry CSV entry"]
+        SPLIT["80/20 train/test split<br/>sklearn train_test_split"]
+        RESAMPLE_E["RandomUnderSampler<br/>on training split only"]
+        FEAT_SEL_E["FeatureSelector<br/>on training data only"]
+        GS_E["GridSearchCV<br/>cv_strategy: shuffle / stratified /<br/>shuffle-stratified / timeseries"]
+        EVAL["ModelEvaluator<br/>metrics on held-out test set<br/>accuracy, F1, ROC-AUC<br/>confusion matrix, plots"]
+        SAVE_E["Save model .pkl<br/>metrics JSON<br/>registry CSV entry"]
     end
 
     subgraph TRAIN_MODE["train() - with_evaluation=False"]
-        RESAMPLE_T["RandomUnderSampler\non full dataset"]
-        FEAT_SEL_T["FeatureSelector\non full resampled data"]
-        GS_T["GridSearchCV\nacross CV folds"]
-        SAVE_T["Save model .pkl\nno metrics\nregistry CSV entry"]
+        RESAMPLE_T["RandomUnderSampler<br/>on full dataset"]
+        FEAT_SEL_T["FeatureSelector<br/>on full resampled data"]
+        GS_T["GridSearchCV<br/>across CV folds"]
+        SAVE_T["Save model .pkl<br/>no metrics<br/>registry CSV entry"]
     end
 
     subgraph PARALLEL["joblib.Parallel - loky backend"]
-        SEED_LOOP["One worker per random seed\nn_jobs outer workers\ngrid_search_n_jobs inner workers\nconstraint: n_jobs x grid_search_n_jobs <= cpu_count"]
+        SEED_LOOP["One worker per random seed<br/>n_jobs outer workers<br/>grid_search_n_jobs inner workers<br/>constraint: n_jobs x grid_search_n_jobs <= cpu_count"]
     end
 
-    CLASSIFIERS["10 supported classifiers\nrf, gb, xgb, svm, lr\nnn, dt, knn, nb, voting"]
+    CLASSIFIERS["10 supported classifiers<br/>rf, gb, xgb, svm, lr<br/>nn, dt, knn, nb, voting"]
 
-    OUT["Per-seed artifacts\ntrained_model_{seed}.pkl\nmetrics_{seed}.json\nregistry.csv"]
-    MERGE["merge_models() / merge_classifier_models()\nSeedEnsemble or ClassifierEnsemble"]
-    OUT_MERGED["Merged model .pkl\nSeedEnsemble per classifier\nClassifierEnsemble across classifiers"]
+    OUT["Per-seed artifacts<br/>trained_model_{seed}.pkl<br/>metrics_{seed}.json<br/>registry.csv"]
+    MERGE["merge_models() / merge_classifier_models()<br/>SeedEnsemble or ClassifierEnsemble"]
+    OUT_MERGED["Merged model .pkl<br/>SeedEnsemble per classifier<br/>ClassifierEnsemble across classifiers"]
 
     IN_F --> FIT
     IN_LABEL --> FIT
@@ -325,28 +325,28 @@ handles one seed, `MultiModelEvaluator` aggregates across all seeds for one clas
 
 ```mermaid
 flowchart TD
-    IN_PKL["Per-seed model .pkl\nmetrics JSON files\nregistry CSV"]
+    IN_PKL["Per-seed model .pkl<br/>metrics JSON files<br/>registry CSV"]
 
     subgraph SINGLE["ModelEvaluator - per-seed evaluation"]
-        ME_INIT["Load model and test data\n__init__() or from_files()"]
-        ME_METRICS["Compute metrics\naccuracy, balanced_accuracy\nF1, precision, recall\nROC-AUC, threshold analysis"]
-        ME_PLOTS["Generate plots\nROC curve, calibration\nconfusion matrix\nlearning curve\nprediction distribution"]
-        ME_OUT["Per-seed metrics dict\nplot files"]
+        ME_INIT["Load model and test data<br/>__init__() or from_files()"]
+        ME_METRICS["Compute metrics<br/>accuracy, balanced_accuracy<br/>F1, precision, recall<br/>ROC-AUC, threshold analysis"]
+        ME_PLOTS["Generate plots<br/>ROC curve, calibration<br/>confusion matrix<br/>learning curve<br/>prediction distribution"]
+        ME_OUT["Per-seed metrics dict<br/>plot files"]
     end
 
     subgraph MULTI["MultiModelEvaluator - aggregate across seeds"]
-        MME_LOAD["Load all per-seed JSON metrics\nor read registry CSV"]
-        MME_AGG["Aggregate statistics\nmean, std across seeds"]
-        MME_PLOTS["Aggregate plots\nSHAP summary\nROC envelope\naggregate calibration\nconfusion matrix heatmap\nlearning curve with variance\nseed stability"]
-        MME_OUT["Ensemble-level metrics\naggregate plot files"]
+        MME_LOAD["Load all per-seed JSON metrics<br/>or read registry CSV"]
+        MME_AGG["Aggregate statistics<br/>mean, std across seeds"]
+        MME_PLOTS["Aggregate plots<br/>SHAP summary<br/>ROC envelope<br/>aggregate calibration<br/>confusion matrix heatmap<br/>learning curve with variance<br/>seed stability"]
+        MME_OUT["Ensemble-level metrics<br/>aggregate plot files"]
     end
 
     subgraph COMPARE["ClassifierComparator - cross-classifier comparison"]
-        CC_MAP["Accept mapping:\nclassifier_name -> registry CSV path"]
-        CC_BUILD["Build one MultiModelEvaluator\nper classifier"]
-        CC_TABLE["Side-by-side comparison table\nmean metrics per classifier"]
-        CC_PLOTS["Comparison plots\nplot_classifier_comparison()"]
-        CC_OUT["Comparison table CSV\ncomparison plot files"]
+        CC_MAP["Accept mapping:<br/>classifier_name -> registry CSV path"]
+        CC_BUILD["Build one MultiModelEvaluator<br/>per classifier"]
+        CC_TABLE["Side-by-side comparison table<br/>mean metrics per classifier"]
+        CC_PLOTS["Comparison plots<br/>plot_classifier_comparison()"]
+        CC_OUT["Comparison table CSV<br/>comparison plot files"]
     end
 
     IN_PKL --> SINGLE
@@ -370,33 +370,33 @@ classifier (`SeedEnsemble`) and optionally across classifiers (`ClassifierEnsemb
 
 ```mermaid
 flowchart TD
-    IN_MODELS["Trained model(s)\nSeedEnsemble .pkl per classifier\nor ClassifierEnsemble .pkl"]
-    IN_TREMOR["New tremor CSV\nDatetime index, tremor columns"]
+    IN_MODELS["Trained model(s)<br/>SeedEnsemble .pkl per classifier<br/>or ClassifierEnsemble .pkl"]
+    IN_TREMOR["New tremor CSV<br/>Datetime index, tremor columns"]
 
     MODE{{"Operating mode?"}}
 
     subgraph EVAL_MODE["Evaluation Mode - future_labels_csv provided"]
-        PREP_E["Load tremor data\nTremorData"]
-        MATRIX_E["TremorMatrixBuilder\nslice into labeled windows"]
-        FEAT_E["FeaturesBuilder\nextract tsfresh features\nprediction mode"]
+        PREP_E["Load tremor data<br/>TremorData"]
+        MATRIX_E["TremorMatrixBuilder<br/>slice into labeled windows"]
+        FEAT_E["FeaturesBuilder<br/>extract tsfresh features<br/>prediction mode"]
         ALIGN_LABELS["Align features to label windows"]
-        PREDICT["predict() or predict_best()\nrequires labels"]
-        METRICS_E["Compute per-classifier metrics\naccuracy, F1, recall\nROC-AUC, balanced accuracy"]
-        OUT_E["Evaluation results\nper-seed and per-classifier metrics\nplots via ModelEvaluator"]
+        PREDICT["predict() or predict_best()<br/>requires labels"]
+        METRICS_E["Compute per-classifier metrics<br/>accuracy, F1, recall<br/>ROC-AUC, balanced accuracy"]
+        OUT_E["Evaluation results<br/>per-seed and per-classifier metrics<br/>plots via ModelEvaluator"]
     end
 
     subgraph FORECAST_MODE["Forecast Mode - no labels"]
-        PREP_F["Load tremor data\nTremorData"]
-        MATRIX_F["TremorMatrixBuilder\nslice into unlabeled windows"]
-        FEAT_F["FeaturesBuilder\nextract tsfresh features\nprediction mode"]
-        PROBA["predict_proba()\nno labels required"]
-        AGG_SEED["SeedEnsemble\naggregate across seeds per classifier\nmean probability + uncertainty"]
+        PREP_F["Load tremor data<br/>TremorData"]
+        MATRIX_F["TremorMatrixBuilder<br/>slice into unlabeled windows"]
+        FEAT_F["FeaturesBuilder<br/>extract tsfresh features<br/>prediction mode"]
+        PROBA["predict_proba()<br/>no labels required"]
+        AGG_SEED["SeedEnsemble<br/>aggregate across seeds per classifier<br/>mean probability + uncertainty"]
         AGG_CLF{{"Multi-classifier?"}}
-        CLF_ENS["ClassifierEnsemble\naggregate across classifiers\nconsensus probability + uncertainty"]
-        SINGLE_OUT["Single-classifier output\nprobability, uncertainty\nconfidence, prediction columns"]
-        MULTI_OUT["Multi-classifier output\nper-classifier dashed columns\nconsensus solid column\nshaded uncertainty band"]
-        OUT_F["Forecast CSV\nDatetime index\n{name}_eruption_probability\n{name}_uncertainty\n{name}_confidence\n{name}_prediction\nconsensus_* columns"]
-        PLOT_F["Forecast plot\nplot_forecast() or\nplot_forecast_with_events()"]
+        CLF_ENS["ClassifierEnsemble<br/>aggregate across classifiers<br/>consensus probability + uncertainty"]
+        SINGLE_OUT["Single-classifier output<br/>probability, uncertainty<br/>confidence, prediction columns"]
+        MULTI_OUT["Multi-classifier output<br/>per-classifier dashed columns<br/>consensus solid column<br/>shaded uncertainty band"]
+        OUT_F["Forecast CSV<br/>Datetime index<br/>{name}_eruption_probability<br/>{name}_uncertainty<br/>{name}_confidence<br/>{name}_prediction<br/>consensus_* columns"]
+        PLOT_F["Forecast plot<br/>plot_forecast() or<br/>plot_forecast_with_events()"]
     end
 
     IN_MODELS --> MODE
@@ -421,26 +421,26 @@ via joblib.
 
 ```mermaid
 flowchart TD
-    BASE["BaseEnsemble\nbase_ensemble.py\nsave(path) / load(path) mixin"]
+    BASE["BaseEnsemble<br/>base_ensemble.py<br/>save(path) / load(path) mixin"]
 
-    subgraph SEED_ENS["SeedEnsemble - one classifier, all seeds\nseed_ensemble.py"]
-        SE_LOAD["from_registry(registry_csv)\nload all seed .pkl files"]
-        SE_PRED["predict_proba(X)\naggregate across seeds\nreturn mean probability + std"]
-        SE_UNC["predict_with_uncertainty(X)\nreturn mean, std, confidence, prediction"]
-        SE_SAVE["save(path) / load(path)\nBaseEnsemble mixin\njoblib serialisation"]
+    subgraph SEED_ENS["SeedEnsemble - one classifier, all seeds<br/>seed_ensemble.py"]
+        SE_LOAD["from_registry(registry_csv)<br/>load all seed .pkl files"]
+        SE_PRED["predict_proba(X)<br/>aggregate across seeds<br/>return mean probability + std"]
+        SE_UNC["predict_with_uncertainty(X)<br/>return mean, std, confidence, prediction"]
+        SE_SAVE["save(path) / load(path)<br/>BaseEnsemble mixin<br/>joblib serialisation"]
     end
 
-    subgraph CLF_ENS["ClassifierEnsemble - multiple classifiers\nclassifier_ensemble.py"]
-        CE_LOAD["from_seed_ensembles(dict)\nor from_registry_dict(dict)"]
-        CE_PRED["predict_proba(X)\naggregate across classifiers\nper-classifier dict output"]
-        CE_UNC["predict_with_uncertainty(X)\nmean, std, conf, pred\nper_clf_dict"]
-        CE_PROP["classifiers property\n__getitem__, __len__"]
-        CE_SAVE["save(path) / load(path)\nBaseEnsemble mixin"]
+    subgraph CLF_ENS["ClassifierEnsemble - multiple classifiers<br/>classifier_ensemble.py"]
+        CE_LOAD["from_seed_ensembles(dict)<br/>or from_registry_dict(dict)"]
+        CE_PRED["predict_proba(X)<br/>aggregate across classifiers<br/>per-classifier dict output"]
+        CE_UNC["predict_with_uncertainty(X)<br/>mean, std, conf, pred<br/>per_clf_dict"]
+        CE_PROP["classifiers property<br/>__getitem__, __len__"]
+        CE_SAVE["save(path) / load(path)<br/>BaseEnsemble mixin"]
     end
 
-    PKL_SEEDS["Per-seed .pkl files\nGridSearchCV fitted estimators"]
-    REG_CSV["registry.csv\nmaps seed -> model path"]
-    MERGED_PKL["SeedEnsemble .pkl\nor ClassifierEnsemble .pkl"]
+    PKL_SEEDS["Per-seed .pkl files<br/>GridSearchCV fitted estimators"]
+    REG_CSV["registry.csv<br/>maps seed -> model path"]
+    MERGED_PKL["SeedEnsemble .pkl<br/>or ClassifierEnsemble .pkl"]
 
     PKL_SEEDS --> SE_LOAD
     REG_CSV --> SE_LOAD
@@ -470,42 +470,42 @@ relative to `root_dir`.
 
 ```mermaid
 flowchart TD
-    ROOT["root_dir/output/\n{network}.{station}.{location}.{channel}/"]
+    ROOT["root_dir/output/<br/>{network}.{station}.{location}.{channel}/"]
 
     subgraph TREMOR_DIR["tremor/"]
-        T_DAILY["daily/\n{date}_tremor.csv\ntemporary, cleaned up optionally"]
-        T_FIGS["figures/\n{date}_tremor.png\ncreated if plot_daily=True"]
-        T_MERGED["{nslc}_{start}_{end}.csv\nfinal merged tremor CSV"]
+        T_DAILY["daily/<br/>{date}_tremor.csv<br/>temporary, cleaned up optionally"]
+        T_FIGS["figures/<br/>{date}_tremor.png<br/>created if plot_daily=True"]
+        T_MERGED["{nslc}_{start}_{end}.csv<br/>final merged tremor CSV"]
     end
 
     subgraph LABEL_DIR["label/"]
-        L_CSV["label_YYYY-MM-DD_YYYY-MM-DD\n_ws-X_step-X-unit_dtf-X.csv"]
+        L_CSV["label_YYYY-MM-DD_YYYY-MM-DD<br/>_ws-X_step-X-unit_dtf-X.csv"]
     end
 
     subgraph FEAT_DIR["features/"]
-        F_CSV["features_{start}_{end}.csv\n~5000 tsfresh features"]
-        F_LABEL["aligned_labels.csv\nmatched to feature rows"]
-        F_SIG["significant_features.txt\nselected feature names"]
+        F_CSV["features_{start}_{end}.csv<br/>~5000 tsfresh features"]
+        F_LABEL["aligned_labels.csv<br/>matched to feature rows"]
+        F_SIG["significant_features.txt<br/>selected feature names"]
     end
 
     subgraph TRAIN_DIR["trainings/{classifier-slug}/{cv-slug}/"]
-        TR_PKL["trained_model_{seed}.pkl\nfitted GridSearchCV estimator"]
-        TR_JSON["metrics_{seed}.json\nper-seed evaluation metrics"]
-        TR_REG["registry.csv\nmaps seed to model path + metadata"]
-        TR_PLOTS["plots/\nROC, calibration, confusion matrix\nlearning curve, SHAP"]
+        TR_PKL["trained_model_{seed}.pkl<br/>fitted GridSearchCV estimator"]
+        TR_JSON["metrics_{seed}.json<br/>per-seed evaluation metrics"]
+        TR_REG["registry.csv<br/>maps seed to model path + metadata"]
+        TR_PLOTS["plots/<br/>ROC, calibration, confusion matrix<br/>learning curve, SHAP"]
     end
 
     subgraph EVAL_DIR["evaluations/{classifier-slug}/{cv-slug}/"]
-        EV_PLOTS["aggregate plots\nensemble ROC, SHAP summary\nstability, comparison"]
-        EV_MERGED["merged_registry.csv\naggregated seed statistics"]
+        EV_PLOTS["aggregate plots<br/>ensemble ROC, SHAP summary<br/>stability, comparison"]
+        EV_MERGED["merged_registry.csv<br/>aggregated seed statistics"]
     end
 
     subgraph FORECAST_DIR["forecast/"]
-        FC_CSV["forecast_{start}_{end}.csv\nprobability, uncertainty\nconsensus columns"]
-        FC_PLOT["forecast_{start}_{end}.png\ntime-series probability plot"]
+        FC_CSV["forecast_{start}_{end}.csv<br/>probability, uncertainty<br/>consensus columns"]
+        FC_PLOT["forecast_{start}_{end}.png<br/>time-series probability plot"]
     end
 
-    CONFIG["config.yaml\nfull pipeline configuration\nreplayable via from_config()"]
+    CONFIG["config.yaml<br/>full pipeline configuration<br/>replayable via from_config()"]
 
     ROOT --> TREMOR_DIR
     ROOT --> LABEL_DIR
@@ -525,28 +525,28 @@ the full call sequence and the optional paths available to users.
 
 ```mermaid
 flowchart TD
-    INIT["ForecastModel(\n  root_dir, station, channel\n  start_date, end_date\n  window_size, volcano_id, n_jobs\n)"]
+    INIT["ForecastModel(<br/>  root_dir, station, channel<br/>  start_date, end_date<br/>  window_size, volcano_id, n_jobs<br/>)"]
 
     DATA_CHOICE{{"Data acquisition choice"}}
 
-    CALC["calculate(\n  source='sds' or 'fdsn'\n  sds_dir or fdsn_url\n)"]
-    LOAD_T["load_tremor_data(\n  tremor_csv\n)\nalternative to calculate()"]
+    CALC["calculate(<br/>  source='sds' or 'fdsn'<br/>  sds_dir or fdsn_url<br/>)"]
+    LOAD_T["load_tremor_data(<br/>  tremor_csv<br/>)<br/>alternative to calculate()"]
 
-    BUILD_LABEL["build_label(\n  start_date, end_date\n  eruption_dates\n  day_to_forecast\n  window_step, window_step_unit\n)"]
+    BUILD_LABEL["build_label(<br/>  start_date, end_date<br/>  eruption_dates<br/>  day_to_forecast<br/>  window_step, window_step_unit<br/>)"]
 
-    EXTRACT["extract_features(\n  select_tremor_columns\n)"]
+    EXTRACT["extract_features(<br/>  select_tremor_columns<br/>)"]
 
-    SET_FS["set_feature_selection_method(\n  using='tsfresh' or\n  'random_forest' or 'combined'\n)\noptional before train()"]
+    SET_FS["set_feature_selection_method(<br/>  using='tsfresh' or<br/>  'random_forest' or 'combined'<br/>)<br/>optional before train()"]
 
-    TRAIN["train(\n  classifier, cv_strategy\n  random_state, total_seed\n  with_evaluation=True or False\n  number_of_significant_features\n)"]
+    TRAIN["train(<br/>  classifier, cv_strategy<br/>  random_state, total_seed<br/>  with_evaluation=True or False<br/>  number_of_significant_features<br/>)"]
 
-    FORECAST["forecast(\n  start_date, end_date\n  window_size, window_step\n  window_step_unit\n)"]
+    FORECAST["forecast(<br/>  start_date, end_date<br/>  window_size, window_step<br/>  window_step_unit<br/>)"]
 
-    SAVE_CFG["save_config(path, fmt)\npersist pipeline configuration"]
-    LOAD_CFG["ForecastModel.from_config(path)\nrestore and replay configuration"]
-    SAVE_MODEL["save_model(path)\nserialise full ForecastModel\nvia joblib"]
-    LOAD_MODEL["ForecastModel.load_model(path)\nrestore full model object"]
-    RUN["run()\nreplay all stages\nfrom loaded config"]
+    SAVE_CFG["save_config(path, fmt)<br/>persist pipeline configuration"]
+    LOAD_CFG["ForecastModel.from_config(path)<br/>restore and replay configuration"]
+    SAVE_MODEL["save_model(path)<br/>serialise full ForecastModel<br/>via joblib"]
+    LOAD_MODEL["ForecastModel.load_model(path)<br/>restore full model object"]
+    RUN["run()<br/>replay all stages<br/>from loaded config"]
 
     INIT --> DATA_CHOICE
     DATA_CHOICE -->|"new data"| CALC
