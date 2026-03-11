@@ -142,12 +142,12 @@ Example with `window_step=12h`, `day_to_forecast=2d`, eruption on January 15.
 ```
 Timeline (each tick = 12 hours):
 
-──── Jan10 ──────── Jan11 ──────── Jan12 ──────── Jan13 ──────── Jan14 ────── Jan15  ☄
- 00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00
+── Jan10 ───┬─── Jan11 ───┬─── Jan12 ───┬─── Jan13 ───┬─── Jan14 ───┬─── Jan15 ───┐ ☄
+ 00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │  00  │  12  │ 
      │      │      │      │      │      │      │      │      │      │      │      │
-     ← window_step: 12h →        │      │      │      │      │      │      │      │
-                                 │      ◄───────── day_to_forecast=2d ───────────►│
-                                 │                    label = 1 zone              │
+      ← window_step: 12h →              │      │      │      │      │      │      │
+                                        │◄──────── day_to_forecast=2d ───────────►│
+                                        │             label = 1 zone              │
 ```
 
 ```
