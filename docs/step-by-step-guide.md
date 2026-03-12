@@ -236,28 +236,34 @@ print(scores.head(10))
 Two training workflows are available depending on your evaluation strategy.
 
 ```
-   train_and_evaluate()                  train()
-  ─────────────────────            ────────────────────
-      Full Dataset                      Full Dataset
-           │                                │
-           ▼                                ▼
-      80/20 Split                    RandomUnderSampler
-      (stratified)                     (full dataset)
-      ┌────┴────┐                           │
-    Train     Test                   Feature Selection
-      │         │                      (full dataset)
-    RandomUnder │                           │
-    Sampler     │                      GridSearchCV
-      │         │                       + CV folds
-    Feature     │                           │
-    Selection   │                    ┌──────┴──────┐
-      │         │                model.pkl   registry.csv
-    GridSearchCV│
-    + CV folds  │
-      │         │
-    Evaluate ◄──┘
-      │
-    Save model + metrics
+        train_and_evaluate()                          train()
+   ──────────────────────────────           ──────────────────────────
+         Full Dataset                             Full Dataset
+               │                                       │
+               ▼                                       ▼
+     80/20 Stratified Split                   RandomUnderSampler
+        ┌──────┴───────┐                        (full dataset)
+      Train           Test                            │
+   (imbalanced)   (imbalanced,                 Feature Selection
+        │          never touched)               (resampled data)
+        ▼               │                            │
+  RandomUnderSampler    │                            ▼
+  (training set only)   │                       GridSearchCV
+        │               │                   (CV folds on resampled
+        ▼               │                       balanced data)
+  Feature Selection     │                            │
+  (resampled data)      │                     ┌──────┴──────┐
+        │               │                 model.pkl   registry.csv
+        ▼               │
+   GridSearchCV         │
+  (CV folds on          │
+   resampled data)      │
+        │               │
+        └───► Evaluate ◄┘
+              on Test set
+                  │
+       ┌──────────┴──────────┐
+   model.pkl  metrics.json  registry.csv
 ```
 
 #### Which workflow should I use?
