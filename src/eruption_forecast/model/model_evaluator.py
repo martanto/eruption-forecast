@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Any, Self, Literal
+from typing import Any, Self, Literal, Mapping
 
 import numpy as np
 import joblib
@@ -751,8 +751,19 @@ class ModelEvaluator:
         # Delegate to styled plotting function
         top_n = self.top_n if self.top_n < 20 else top_n
 
+        # Pipeline-like estimators may wrap the final classifier under the
+        # "classifier" step name; unwrap it when available.
+        plot_model: BaseEstimator = self.model
+
+        # Handle imbalanced pipeline
+        named_steps = getattr(self.model, "named_steps", None)
+        if isinstance(named_steps, Mapping):
+            classifier_step = named_steps.get("classifier")
+            if isinstance(classifier_step, BaseEstimator):
+                plot_model = classifier_step
+
         fig = _plot_fi_styled(
-            model=self.model,
+            model=plot_model,
             feature_names=list(self.X_test.columns),
             top_n=top_n,
             title=f"Top-{top_n} Feature Importances — {self.model_name}",
