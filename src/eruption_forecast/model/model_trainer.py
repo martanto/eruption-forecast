@@ -9,6 +9,8 @@ import joblib
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.metrics import f1_score, make_scorer, recall_score
+from imblearn.pipeline import Pipeline as ImbPipeline
+from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import (
     GridSearchCV,
     StratifiedKFold,
@@ -20,7 +22,6 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
     merge_seed_models,
     load_labels_from_csv,
-    random_under_sampler,
     merge_all_classifiers,
 )
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
@@ -884,8 +885,14 @@ class ModelTrainer:
         labels: pd.Series,
         top_n_features: list[str],
         classifier_model: ClassifierModel,
+        sampling_strategy: str | float | None = None,
     ) -> tuple[ClassifierModel, GridSearchCV, Any]:
         """Set up, fit, and return a GridSearchCV with the configured classifier.
+
+        When ``sampling_strategy`` is provided, the classifier is wrapped in an
+        ``ImbPipeline`` so that ``RandomUnderSampler`` runs *inside* each CV fold
+        (training splits only). This prevents the validation splits from seeing
+        resampled data, giving more honest CV scores.
 
         Args:
             random_state (int): Random seed for the classifier.
@@ -893,6 +900,9 @@ class ModelTrainer:
             labels (pd.Series): Training labels.
             top_n_features (list[str]): Column names to select from features.
             classifier_model (ClassifierModel): ClassifierModel instance to use.
+            sampling_strategy (str | float | None, optional): Under-sampling ratio
+                passed to ``RandomUnderSampler``. When ``None``, no pipeline is
+                built and data must already be resampled. Defaults to ``None``.
 
         Returns:
             tuple: Configured classifier, fitted GridSearchCV, best estimator.
@@ -906,9 +916,32 @@ class ModelTrainer:
         # FeatureSelector (CPU-only) is unaffected and keeps self.grid_search_n_jobs.
         _gs_n_jobs = 1 if classifier.use_gpu else self.grid_search_n_jobs
 
+        if sampling_strategy is not None:
+            sampler = RandomUnderSampler(
+                sampling_strategy=sampling_strategy,
+                random_state=random_state,
+            )
+            estimator = ImbPipeline(
+                [
+                    ("sampler", sampler),
+                    ("classifier", classifier.model),
+                ]
+            )
+            grid = classifier.grid
+            if isinstance(grid, list):
+                # List-of-dicts grid (e.g. SVM with per-kernel sub-grids).
+                param_grid = [
+                    {f"classifier__{k}": v for k, v in g.items()} for g in grid
+                ]
+            else:
+                param_grid = {f"classifier__{k}": v for k, v in grid.items()}
+        else:
+            estimator = classifier.model
+            param_grid = classifier.grid
+
         grid_search = GridSearchCV(
-            estimator=classifier.model,
-            param_grid=classifier.grid,
+            estimator=estimator,
+            param_grid=param_grid,
             cv=classifier.get_cv_splitter(),
             scoring="balanced_accuracy",
             n_jobs=_gs_n_jobs,
@@ -1004,24 +1037,21 @@ class ModelTrainer:
         X: pd.DataFrame,
         y: pd.Series,
         random_state: int,
-        sampling_strategy: str | float = 0.75,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-        """Steps 1-2: stratified train/test split then RandomUnderSampler on train.
+        """Step 1: stratified train/test split.
 
-        Saves the held-out test split to disk for later aggregate evaluation.
+        Resampling is handled inside GridSearchCV by the ImbPipeline, so this
+        method only performs the outer train/test split. The ``sampling_strategy``
+        parameter is accepted for API compatibility but is not used here.
 
         Args:
             X (pd.DataFrame): Full feature matrix.
             y (pd.Series): Full label series.
-            random_state (int): Random seed for both split and sampler.
-            sampling_strategy (str | float, optional): Under-sampling ratio.
-                Defaults to 0.75.
+            random_state (int): Random seed for the split.
 
         Returns:
-            tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]: A 4-tuple of
-                (X_train_resampled, X_test, y_train_resampled, y_test) where
-                X_train_resampled and y_train_resampled are under-sampled training
-                data and X_test / y_test are the held-out test split.
+            tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]: 4-tuple of
+                (X_train, X_test, y_train, y_test).
         """
         X_train, X_test, y_train, y_test = train_test_split(
             X,
@@ -1030,14 +1060,7 @@ class ModelTrainer:
             random_state=random_state,
             stratify=y,
         )
-
-        X_train_resampled, y_train_resampled = random_under_sampler(
-            features=X_train,
-            labels=y_train,
-            sampling_strategy=sampling_strategy,
-            random_state=random_state,
-        )
-        return X_train_resampled, X_test, y_train_resampled, y_test
+        return X_train, X_test, y_train, y_test
 
     def _select_features_for_seed(
         self,
@@ -1183,7 +1206,9 @@ class ModelTrainer:
 
     def _cv_train_evaluate(
         self,
+        X_train: pd.DataFrame,
         y_train: pd.Series,
+        sampling_strategy: str | float,
         X_test: pd.DataFrame,
         y_test: pd.Series,
         selected_features: tuple,
@@ -1194,14 +1219,18 @@ class ModelTrainer:
         classifier_model: ClassifierModel,
         shap_explanation_filepath: str | None = None,
     ) -> dict[str, Any]:
-        """Steps 4-5: GridSearchCV training then evaluation on the held-out test set.
+        """Steps 3-4: GridSearchCV training then evaluation on the held-out test set.
 
-        Fits the configured classifier via GridSearchCV on the selected training
-        features, saves the best model to disk, evaluates it on the held-out test
-        set, and writes per-seed metrics JSON.
+        Fits the configured classifier via GridSearchCV on the original (imbalanced)
+        training features wrapped in an ImbPipeline so that RandomUnderSampler runs
+        only on the training splits of each CV fold. Saves the best model to disk,
+        evaluates it on the held-out test set, and writes per-seed metrics JSON.
 
         Args:
-            y_train (pd.Series): Resampled training labels.
+            X_train (pd.DataFrame): Original training features (imbalanced).
+            y_train (pd.Series): Original training labels.
+            sampling_strategy (str | float): Under-sampling ratio passed to the
+                ImbPipeline's RandomUnderSampler step inside each CV fold.
             X_test (pd.DataFrame): Held-out test features (pre-selection).
             y_test (pd.Series): Held-out test labels.
             selected_features (tuple): Return value of :meth:`select_features`
@@ -1218,18 +1247,17 @@ class ModelTrainer:
             dict[str, Any]: Metrics dictionary produced by ModelEvaluator.
         """
         classifier_model = classifier_model
-        features_train_resampled_selected, top_selected_features, _, _ = (
-            selected_features
-        )
+        _, top_selected_features, _, _ = selected_features
         top_n_features = top_selected_features.index.tolist()
         X_test_selected = X_test[top_n_features]
 
         classifier, grid_search, best_model = self._setup_grid_search(
             random_state,
-            features_train_resampled_selected,
+            X_train,
             y_train,
             top_n_features,
             classifier_model=classifier_model,
+            sampling_strategy=sampling_strategy,
         )
 
         joblib.dump(best_model, model_filepath)
@@ -1239,7 +1267,7 @@ class ModelTrainer:
         try:
             self._compute_all_learning_curves(
                 estimator=best_model,
-                X_train=features_train_resampled_selected[top_n_features],
+                X_train=X_train[top_n_features],
                 y_train=y_train,
                 random_state=random_state,
                 filepath=learning_curve_path,
@@ -1307,9 +1335,10 @@ class ModelTrainer:
 
         Orchestrates the per-seed pipeline:
 
-        1–2. Under-sampling and train/test split (ONCE per seed).
-        3.   Feature selection on training set (ONCE per seed, shared across classifiers).
-        4–5. For each classifier: GridSearchCV training and evaluation on held-out test set.
+        1. Train/test split (ONCE per seed).
+        2. Feature selection on original training set (ONCE per seed, shared across classifiers).
+        3–4. For each classifier: GridSearchCV with ImbPipeline (resamples each fold)
+             and evaluation on held-out test set.
 
         Args:
             random_state (int): Base random state value.
@@ -1344,15 +1373,14 @@ class ModelTrainer:
 
         logger.info(f"Training Seed: {random_state:05d}")
 
-        # ========== STEPS 1-2: Train/Test Split + Resample (ONCE) ==========
+        # ========== STEP 1: Train/Test Split (ONCE) ==========
         X_train, X_test, y_train, y_test = self._split_and_resample(
             X=self.df_features,
             y=self.df_labels,
             random_state=random_state,
-            sampling_strategy=sampling_strategy,
         )
 
-        # ========== STEP 3: Feature Selection (ONCE, shared) ==========
+        # ========== STEP 2: Feature Selection (ONCE, shared) ==========
         result = self._select_features_for_seed(
             X_train=X_train,
             y_train=y_train,
@@ -1382,7 +1410,9 @@ class ModelTrainer:
             ) = self._generate_classifier_filepaths(random_state, classifier_slug)
 
             metrics = self._cv_train_evaluate(
+                X_train=X_train,
                 y_train=y_train,
+                sampling_strategy=sampling_strategy,
                 X_test=X_test,
                 y_test=y_test,
                 selected_features=result,
@@ -1603,10 +1633,11 @@ class ModelTrainer:
 
         Performs:
 
-        1. Random under-sampling on full dataset (ONCE per seed).
-        2. Feature selection on resampled data (ONCE per seed, shared).
-        3. For each classifier: GridSearchCV training.
-        4. For each classifier: save trained model.
+        1. Feature selection on original data (ONCE per seed, shared across classifiers).
+        2. For each classifier: GridSearchCV with an ImbPipeline that applies
+           RandomUnderSampler inside each CV fold only (avoids leaking resampled data
+           into validation splits).
+        3. For each classifier: save trained model.
 
         Args:
             random_state (int): Random seed for reproducibility.
@@ -1642,18 +1673,10 @@ class ModelTrainer:
             plot_features=plot_features,
         )
 
-        # ========== STEP 1: Resample Full Dataset (ONCE) ==========
-        features_resampled, labels_resampled = random_under_sampler(
+        # ========== STEP 1: Feature Selection (ONCE, shared) ==========
+        result = self.select_features(
             features=self.df_features,
             labels=self.df_labels,
-            sampling_strategy=sampling_strategy,
-            random_state=random_state,
-        )
-
-        # ========== STEP 2: Feature Selection (ONCE, shared) ==========
-        result = self.select_features(
-            features=features_resampled,
-            labels=labels_resampled,
             random_state=random_state,
             significant_filepath=significant_filepath,
             all_features_filepath=all_features_filepath,
@@ -1664,7 +1687,7 @@ class ModelTrainer:
             return None
 
         (
-            features_resampled_selected,
+            _,
             top_n_features_series,
             _all_selected_features,
             _n_features,
@@ -1687,10 +1710,11 @@ class ModelTrainer:
 
             _, _, best_model = self._setup_grid_search(
                 random_state,
-                features_resampled_selected,
-                labels_resampled,
+                self.df_features,
+                self.df_labels,
                 top_n_features,
                 classifier_model=classifier_model,
+                sampling_strategy=sampling_strategy,
             )
 
             joblib.dump(best_model, model_filepath)
