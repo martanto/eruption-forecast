@@ -1274,7 +1274,7 @@ class ModelPredictor:
         all_model_means = np.stack(list(model_mean_probabilities.values()), axis=0)
         consensus_mean = all_model_means.mean(axis=0)
         consensus_std = all_model_means.std(axis=0)
-        consensus_pred = (consensus_mean >= 0.5).astype(int)
+        consensus_pred = (consensus_mean >= ERUPTION_PROBABILITY_THRESHOLD).astype(int)
 
         # Fraction of classifiers agreeing with the majority vote
         n_classifiers = all_model_means.shape[0]
