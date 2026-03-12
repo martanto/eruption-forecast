@@ -2,7 +2,7 @@ import os
 import json
 import warnings
 from typing import Any, Self, Literal
-from collections.abc import Callable
+from collections.abc import Mapping, Callable
 
 import numpy as np
 import joblib
@@ -878,6 +878,71 @@ class ModelTrainer:
             learning_curve_path,
         )
 
+    def _validate_cv_train_folds(
+        self,
+        cv_splitter: Any,
+        X: pd.DataFrame,
+        y: pd.Series,
+        cv_strategy: str,
+    ) -> None:
+        """Validate that every CV training fold contains both classes.
+
+        This check is required when using per-fold under-sampling inside an
+        imblearn Pipeline. If a training fold has only one class, the sampler
+        and many classifiers will fail during fit.
+        """
+        for fold_idx, (train_idx, _) in enumerate(cv_splitter.split(X, y), start=1):
+            y_train_fold = y.iloc[train_idx]
+            if y_train_fold.nunique() < 2:
+                raise ValueError(
+                    "Invalid CV split: training fold "
+                    f"{fold_idx} for cv_strategy='{cv_strategy}' contains only one class. "
+                    "Use a stratified strategy ('stratified' or 'shuffle-stratified') "
+                    "or reduce cv_splits."
+                )
+
+    def _normalize_sampling_strategy_for_cv(
+        self,
+        sampling_strategy: str | float,
+        cv_splitter: Any,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> str | float:
+        """Normalize float sampling_strategy to be feasible for every CV fold.
+
+        For RandomUnderSampler with float strategy, each fold must satisfy:
+        minority_count / majority_count <= sampling_strategy. Some folds can be
+        more balanced than the global dataset, making a fixed low ratio invalid.
+        """
+        if not isinstance(sampling_strategy, float):
+            return sampling_strategy
+
+        if not (0.0 < sampling_strategy <= 1.0):
+            raise ValueError(
+                "sampling_strategy must be in [0, 1] when passed as float."
+            )
+
+        max_fold_ratio = 0.0
+        for train_idx, _ in cv_splitter.split(X, y):
+            y_train_fold = y.iloc[train_idx]
+            class_counts = y_train_fold.value_counts()
+            minority_count = int(class_counts.min())
+            majority_count = int(class_counts.max())
+            if majority_count == 0:
+                continue
+            fold_ratio = minority_count / majority_count
+            max_fold_ratio = max(max_fold_ratio, fold_ratio)
+
+        effective_strategy = max(sampling_strategy, max_fold_ratio)
+        if effective_strategy > sampling_strategy:
+            logger.warning(
+                f"sampling_strategy={sampling_strategy} is not feasible for at least one "
+                f"CV fold; using {effective_strategy:.4f} for this run to avoid "
+                "fold-level under-sampling failures."
+            )
+
+        return effective_strategy
+
     def _setup_grid_search(
         self,
         random_state: int,
@@ -915,8 +980,24 @@ class ModelTrainer:
         # each try to use the same GPU device simultaneously, causing VRAM contention.
         # FeatureSelector (CPU-only) is unaffected and keeps self.grid_search_n_jobs.
         _gs_n_jobs = 1 if classifier.use_gpu else self.grid_search_n_jobs
+        cv_splitter = classifier.get_cv_splitter()
+        selected_features = features[top_n_features]
 
         if sampling_strategy is not None:
+            # self._validate_cv_train_folds(
+            #     cv_splitter=cv_splitter,
+            #     X=selected_features,
+            #     y=labels,
+            #     cv_strategy=classifier.cv_strategy,
+            # )
+            #
+            # effective_sampling_strategy = self._normalize_sampling_strategy_for_cv(
+            #     sampling_strategy=sampling_strategy,
+            #     cv_splitter=cv_splitter,
+            #     X=selected_features,
+            #     y=labels,
+            # )
+
             sampler = RandomUnderSampler(
                 sampling_strategy=sampling_strategy,
                 random_state=random_state,
@@ -942,7 +1023,7 @@ class ModelTrainer:
         grid_search = GridSearchCV(
             estimator=estimator,
             param_grid=param_grid,
-            cv=classifier.get_cv_splitter(),
+            cv=cv_splitter,
             scoring="balanced_accuracy",
             n_jobs=_gs_n_jobs,
             verbose=0,
@@ -951,7 +1032,7 @@ class ModelTrainer:
         # Force loky backend to avoid the threading backend that Intel's
         # scikit-learn extension (sklearnex) does not support.
         with joblib.parallel_backend("loky"):
-            grid_search.fit(features[top_n_features], labels)
+            grid_search.fit(selected_features, labels)
 
         return classifier, grid_search, grid_search.best_estimator_
 
@@ -1130,6 +1211,16 @@ class ModelTrainer:
             n_splits=self.cv_splits, shuffle=True, random_state=random_state
         )
 
+        # Learning curves already run on selected train data prepared for model
+        # evaluation. If estimator is an imblearn pipeline, unwrap the final
+        # classifier to avoid re-running the sampler on tiny train-size subsets.
+        estimator_for_curve = estimator
+        named_steps = getattr(estimator, "named_steps", None)
+        if isinstance(named_steps, Mapping):
+            classifier_step = named_steps.get("classifier")
+            if classifier_step is not None:
+                estimator_for_curve = classifier_step
+
         # Force n_jobs=1: already inside a loky parallel worker (outer seed loop).
         # Suppress the single-label UserWarning: at very small training-size
         # fractions (≤20%) the model may predict only one class, causing
@@ -1141,7 +1232,7 @@ class ModelTrainer:
                 category=UserWarning,
             )
             train_sizes_abs, train_scores, test_scores = learning_curve(
-                estimator=estimator,
+                estimator=estimator_for_curve,
                 X=X_train,
                 y=y_train,
                 cv=cv,
