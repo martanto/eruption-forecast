@@ -312,11 +312,12 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 **`ModelTrainer`** trains classifiers across multiple random seeds:
 - Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
 - CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
-- Uses `RandomUnderSampler` to handle class imbalance
+- Uses `RandomUnderSampler` (via `imblearn.pipeline.Pipeline` / `ImbPipeline`) to handle class imbalance; resampling occurs inside each CV fold's training split — validation splits are never touched, eliminating CV leakage
+- The saved `.pkl` is an `ImbPipeline([("sampler", RandomUnderSampler), ("classifier", <clf>)])`; `predict`/`predict_proba` skip the sampler automatically at inference time
 - Feature selection runs once per seed and is shared across classifiers; results are written to `features/{cv-slug}/` rather than inside each classifier directory
 - Two training modes:
-  - `train_and_evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
-  - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
+  - `train_and_evaluate()`: 80/20 split → feature selection on resampled X_train → GridSearchCV with ImbPipeline (resamples each CV fold) → evaluate on test set → save
+  - `train()`: Feature selection on original imbalanced data → GridSearchCV with ImbPipeline (resamples each CV fold) → save (no metrics)
 
 **Key classes:**
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
@@ -349,9 +350,11 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 │   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
 │   │           │                                                   │                              │  │
 │   │   train_and_evaluate()                                     train()                           │  │
-│   │   80/20 split → resample                            full dataset → resample                  │  │
-│   │   → feature select → CV                              → feature select → CV                   │  │
-│   │   → eval on test set                                    (no evaluation)                      │  │
+│   │   80/20 split → feature select on                  feature select on imbalanced data          │  │
+│   │   resampled X_train →                              → GridSearchCV + ImbPipeline               │  │
+│   │   GridSearchCV + ImbPipeline                        (resample each CV fold only)              │  │
+│   │   (resample each CV fold only)                         → save (no evaluation)                 │  │
+│   │   → eval on test set                                                                          │  │
 │   └───────────────────┬──────────────────────────────────────────────────────────────────────────┘  │
 │                       │ produces (per seed)                                                         │
 │                       ▼                                                                             │

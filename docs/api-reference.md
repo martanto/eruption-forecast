@@ -85,26 +85,32 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 
 ### `train_and_evaluate()` Parameters
 
-Splits data **before** resampling and feature selection to prevent data leakage.
+Splits data first, then resamples only X_train (once, for feature selection), and wraps the
+classifier in an `ImbPipeline` so `RandomUnderSampler` fires inside each CV fold's training
+split only — validation splits and the held-out test set are never resampled.
 Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
+The saved `.pkl` is an `ImbPipeline`; `predict`/`predict_proba` work transparently
+(imblearn skips the sampler at inference time).
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `random_state` | `int` | `0` | Starting random seed; seeds are `random_state, random_state+1, …, random_state+total_seed−1` |
 | `total_seed` | `int` | `500` | Number of seeds (independent train/test splits) to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on training data only |
+| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio passed to `RandomUnderSampler` inside the `ImbPipeline`; applied only to each CV fold's training split (and once to X_train for feature selection) |
 | `save_all_features` | `bool` | `False` | Save all ranked features per seed (can produce many files) |
 | `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
 
 ### `train()` Parameters
 
 Trains on the **entire current/present dataset** across multiple seeds — no internal 80/20 split.
+Feature selection runs on the original imbalanced data; the classifier is wrapped in an `ImbPipeline`
+so `RandomUnderSampler` fires inside each CV fold's training split only. The saved `.pkl` is an `ImbPipeline`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `random_state` | `int` | `0` | Starting random seed |
 | `total_seed` | `int` | `500` | Number of seeds to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on full dataset |
+| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio passed to `RandomUnderSampler` inside the `ImbPipeline`; applied only to each CV fold's training split (feature selection uses the original imbalanced data) |
 | `save_all_features` | `bool` | `False` | Save all ranked features per seed |
 | `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
 

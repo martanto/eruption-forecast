@@ -486,7 +486,7 @@ ModelTrainer.fit()
 │
 ├── [outer] n_jobs  → Parallel(loky backend)
 │   Each worker runs one full seed independently:
-│   resample → feature selection → GridSearchCV → evaluate → save
+│   feature selection → GridSearchCV + ImbPipeline → evaluate → save
 │   GPU: forced to 1 (seeds share one GPU device)
 │
 └── [inner, per seed] grid_search_n_jobs

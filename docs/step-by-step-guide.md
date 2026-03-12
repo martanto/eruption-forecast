@@ -235,31 +235,6 @@ print(scores.head(10))
 
 Two training workflows are available depending on your evaluation strategy.
 
-```
-   train_and_evaluate()                  train()
-  ─────────────────────            ────────────────────
-      Full Dataset                      Full Dataset
-           │                                │
-           ▼                                ▼
-      80/20 Split                    RandomUnderSampler
-      (stratified)                     (full dataset)
-      ┌────┴────┐                           │
-    Train     Test                   Feature Selection
-      │         │                      (full dataset)
-    RandomUnder │                           │
-    Sampler     │                      GridSearchCV
-      │         │                       + CV folds
-    Feature     │                           │
-    Selection   │                    ┌──────┴──────┐
-      │         │                model.pkl   registry.csv
-    GridSearchCV│
-    + CV folds  │
-      │         │
-    Evaluate ◄──┘
-      │
-    Save model + metrics
-```
-
 #### Which workflow should I use?
 
 - **`train_and_evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
@@ -274,8 +249,49 @@ Two training workflows are available depending on your evaluation strategy.
 
 #### `train_and_evaluate()` — with held-out test set (80/20 split)
 
-Splits data **before** resampling and feature selection to prevent data leakage.
-Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
+```
+Full Dataset (imbalanced)
+         │
+         ▼
+ Train / Test Split  ── stratified, 80/20 ───────────────────────────────────┐
+         │                                                                   │
+    X_train (80%)                                                       X_test (20%)
+         │                                                          (held-out, never resampled)
+         ▼
+ Feature Selection on X_train  ── tsfresh FDR + RandomForest importance ──
+ (original imbalanced data, ONCE per seed, shared across all classifiers)
+         │
+         ▼  top-N features
+         │
+         ▼
+ GridSearchCV  ┌─────────────────────────────────────────────────────┐
+               │  For each CV fold:                                  │
+               │  ┌──────────────────────────────────────────────┐   │
+               │  │  ImbPipeline                                 │   │
+               │  │  1. RandomUnderSampler  → fold-train only    │   │
+               │  │  2. Classifier.fit()   → on balanced fold    │   │
+               │  └──────────────────────────────────────────────┘   │
+               │     CV score measured on unsampled fold-validation  │
+               └─────────────────────────────────────────────────────┘
+         │
+         ▼
+ ┌──────────────────────────────────────────────────┐
+ │  Saved model  →  ImbPipeline  (.pkl)             │
+ │  ┌────────────────┐   ┌────────────────────────┐ │
+ │  │ step: sampler  │ → │ step: classifier       │ │
+ │  │ RandomUnder-   │   │ e.g. XGBClassifier     │ │
+ │  │ Sampler        │   │ (skipped at inference) │ │
+ │  └────────────────┘   └────────────────────────┘ │
+ └──────────────────────────────────────────────────┘
+         │
+         ▼
+ Evaluate on X_test (20%, original imbalanced)
+ → per-seed metrics JSON, plots
+```
+
+Evaluates each seed on the held-out 20% and aggregates metrics across seeds. The saved
+`.pkl` is an `ImbPipeline`; calling `predict` / `predict_proba` on it works transparently
+because imblearn skips the sampler step at inference time.
 
 ```python
 from eruption_forecast.model.model_trainer import ModelTrainer
@@ -300,9 +316,43 @@ trainer.train_and_evaluate(
 
 #### `train()` — full dataset training (no split)
 
-Trains on the **entire current/present dataset** across multiple seeds — no internal 80/20 split.
-The dataset passed here represents your known historical period. Evaluation is deferred to
-`ModelPredictor` using a **separate future dataset** that was not seen during training.
+```
+Full Dataset (imbalanced)
+         │
+         ▼
+ Feature Selection on Full Dataset  ── tsfresh FDR + RandomForest importance ──
+ (original imbalanced data, ONCE per seed, shared across all classifiers)
+         │
+         ▼  top-N features
+         │
+         ▼
+ GridSearchCV  ┌────────────────────────────────────────────────────┐
+               │  For each CV fold:                                 │
+               │  ┌──────────────────────────────────────────────┐  │
+               │  │  ImbPipeline                                 │  │
+               │  │  1. RandomUnderSampler  → fold-train only    │  │
+               │  │  2. Classifier.fit()   → on balanced fold    │  │
+               │  └──────────────────────────────────────────────┘  │
+               │   CV score measured on unsampled fold-validation   │
+               └────────────────────────────────────────────────────┘
+         │
+         ▼
+ ┌───────────────────────────────────────────────────┐
+ │  Saved model  →  ImbPipeline  (.pkl)              │
+ │  ┌────────────────┐   ┌────────────────────────┐  │
+ │  │ step: sampler  │ → │ step: classifier       │  │
+ │  │ RandomUnder-   │   │ e.g. RandomForest      │  │
+ │  │ Sampler        │   │ (skipped at inference) │  │
+ │  └────────────────┘   └────────────────────────┘  │
+ └───────────────────────────────────────────────────┘
+         │
+         ▼
+ Evaluation deferred → ModelPredictor (separate future dataset)
+```
+
+Trains on the **entire current/present dataset** — no internal 80/20 split. Feature selection
+runs on the original imbalanced data. The saved `.pkl` is an `ImbPipeline`; evaluation is
+deferred to `ModelPredictor` using a **separate future dataset** not seen during training.
 
 ```python
 trainer = ModelTrainer(
@@ -376,7 +426,7 @@ without dropping down to `ModelTrainer`.
 |-----------|------|---------|-------------|
 | `random_state` | `int` | `0` | Starting random seed; seeds are `random_state, random_state+1, …, random_state+total_seed−1` |
 | `total_seed` | `int` | `500` | Number of seeds (independent train/test splits) to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on training data only |
+| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio passed to `RandomUnderSampler` inside the `ImbPipeline`; applied only to each CV fold's training split (and once to X_train for feature selection) |
 | `save_all_features` | `bool` | `False` | Save all ranked features per seed (can produce many files) |
 | `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
 
@@ -386,7 +436,7 @@ without dropping down to `ModelTrainer`.
 |-----------|------|---------|-------------|
 | `random_state` | `int` | `0` | Starting random seed |
 | `total_seed` | `int` | `500` | Number of seeds to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on full dataset |
+| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio passed to `RandomUnderSampler` inside the `ImbPipeline`; applied only to each CV fold's training split (feature selection uses the original imbalanced data) |
 | `save_all_features` | `bool` | `False` | Save all ranked features per seed |
 | `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
 
