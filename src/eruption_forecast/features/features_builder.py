@@ -1,6 +1,10 @@
 import os
 from typing import Any
 
+# Prevent stumpy/numba from initialising GPU contexts in loky worker processes,
+# which fails when VRAM is exhausted and kills the entire worker pool.
+os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
+
 import pandas as pd
 from tsfresh import (
     extract_features as tsfresh_extract_features,
