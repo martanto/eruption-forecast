@@ -539,8 +539,12 @@ class EvaluationTrainer(BaseModelTrainer):
                 _,
             ) = self._generate_shared_filepaths(_rs)
 
-            # Shared work not done — queue Phase 1; no Phase 2 jobs possible yet.
-            if self.overwrite or not os.path.isfile(_significant_filepath):
+            # Shared work not done or incomplete — queue Phase 1; no Phase 2 jobs possible yet.
+            if self.overwrite or not (
+                os.path.isfile(_significant_filepath)
+                and os.path.isfile(_X_test_filepath)
+                and os.path.isfile(_y_test_filepath)
+            ):
                 pending_phase1_jobs.append(
                     (
                         _rs,
