@@ -9,7 +9,7 @@ are tuned for imbalanced volcanic-eruption datasets.
 
 from typing import Any
 
-from sklearn.metrics import make_scorer, recall_score, f1_score
+from sklearn.metrics import f1_score, make_scorer, recall_score
 
 
 def safe_recall(y_true, y_pred, **kwargs) -> float:

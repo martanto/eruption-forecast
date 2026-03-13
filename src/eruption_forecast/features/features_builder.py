@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+
 # Prevent stumpy/numba from initialising GPU contexts in loky worker processes,
 # which fails when VRAM is exhausted and kills the entire worker pool.
 # Allow GPU-capable runs to opt out by setting ERUPTION_FORECAST_DISABLE_NUMBA_CUDA="0".
