@@ -257,18 +257,27 @@ class ModelTrainer(EvaluationTrainer):
         pending_phase2_jobs: list[tuple] = []
 
         for _rs in random_states:
-            (
-                _,
-                _significant_filepath,
-                _,
-                _,
-                _,
-                _,
-                _,
-            ) = self._generate_shared_filepaths(_rs)
+            # Generate all shared filepaths for this seed (significant features,
+            # optional all-features CSV, plots, etc.).
+            _shared_paths = self._generate_shared_filepaths(_rs)
+            _, _significant_filepath, * _optional_shared_paths = _shared_paths
 
             # Shared work not done — queue Phase 1; no Phase 2 jobs possible yet.
-            if self.overwrite or not os.path.isfile(_significant_filepath):
+            phase1_incomplete = self.overwrite or not os.path.isfile(
+                _significant_filepath
+            )
+
+            # If additional shared artifacts were requested, ensure they also exist
+            # before considering Phase 1 complete for this seed.
+            if not phase1_incomplete and (save_all_features or plot_significant_features):
+                for _path in _optional_shared_paths:
+                    if _path is None:
+                        continue
+                    if not os.path.isfile(_path):
+                        phase1_incomplete = True
+                        break
+
+            if phase1_incomplete:
                 pending_phase1_jobs.append(
                     (
                         _rs,
