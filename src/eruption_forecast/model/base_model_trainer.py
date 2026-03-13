@@ -556,10 +556,19 @@ class BaseModelTrainer:
                 else f"top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
             )
 
+            # Determine the score column name: "p_values" for tsfresh,
+            # "importance" for random_forest. Sort by whatever column is present.
+            score_cols = [c for c in combined_features_df.columns if c != "features"]
+            if not score_cols:
+                raise ValueError(
+                    "Significant features CSV must contain a score column "
+                    "(e.g. 'p_values' or 'importance') besides the 'features' index."
+                )
+            score_col = score_cols[0]
             combined_features_df = (
                 combined_features_df.groupby(by="features")
                 .count()
-                .sort_values(by="p_values", ascending=False)
+                .sort_values(by=score_col, ascending=False)
             )
             combined_features_df.index.name = "features"
             combined_features_df.to_csv(
