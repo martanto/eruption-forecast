@@ -299,8 +299,29 @@ class EvaluationTrainer(BaseModelTrainer):
             plot_features=plot_features,
         )
 
-        # Short-circuit if shared work was already done in a previous run.
-        if can_skip_shared:
+        # Short-circuit if shared work was already done in a previous run,
+        # but only if all required shared artifacts actually exist.
+        can_skip = (
+            can_skip_shared
+            and os.path.exists(significant_filepath)
+            and os.path.exists(X_test_filepath)
+            and os.path.exists(y_test_filepath)
+            and (
+                not save_features
+                or (
+                    all_features_filepath is not None
+                    and os.path.exists(all_features_filepath)
+                )
+            )
+            and (
+                not plot_features
+                or (
+                    all_figures_filepath is not None
+                    and os.path.exists(all_figures_filepath)
+                )
+            )
+        )
+        if can_skip:
             logger.info(f"Seed {random_state:05d}: shared work already done, skipping.")
             return significant_filepath
 
