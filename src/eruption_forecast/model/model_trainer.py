@@ -1964,8 +1964,9 @@ class ModelTrainer:
                 Defaults to ``None``.
 
         Returns:
-            dict[str, str]: Mapping of classifier slug to the absolute path of
-                the saved merged ``.pkl`` file for each classifier.
+            dict[str, str]: Mapping of classifier class name (e.g.,
+                ``"RandomForestClassifier"``) — not the slug — to the absolute
+                path of the saved merged ``.pkl`` file for each classifier.
 
         Raises:
             RuntimeError: If no registry CSV is available (training not yet run).
@@ -1977,8 +1978,14 @@ class ModelTrainer:
             )
 
         _output_dir = output_path or os.path.join(self.output_dir, "classifiers")
+
+        # Build slug class name mapping so callers receive consistent class-name keys
+        slug_to_name: dict[str, str] = {
+            clf_model.slug_name: clf_model.name for clf_model in self.classifier_models
+        }
+
         return {
-            slug: merge_seed_models(csv, output_dir=_output_dir)
+            slug_to_name.get(slug, slug): merge_seed_models(csv, output_dir=_output_dir)
             for slug, csv in self.csv.items()
         }
 
