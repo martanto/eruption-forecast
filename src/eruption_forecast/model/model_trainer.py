@@ -99,7 +99,23 @@ class ModelTrainer(EvaluationTrainer):
         )
 
         # Short-circuit if shared work was already done in a previous run.
-        if can_skip_shared:
+        # In addition to the significant-features CSV (captured by can_skip_shared),
+        # ensure that any optional outputs requested for this run also exist.
+        can_skip_optional = True
+        if save_features:
+            can_skip_optional = (
+                can_skip_optional
+                and all_features_filepath is not None
+                and os.path.exists(all_features_filepath)
+            )
+        if plot_features:
+            can_skip_optional = (
+                can_skip_optional
+                and all_figures_filepath is not None
+                and os.path.exists(all_figures_filepath)
+            )
+
+        if can_skip_shared and can_skip_optional:
             logger.info(f"Seed {random_state:05d}: shared work already done, skipping.")
             return significant_filepath
 
