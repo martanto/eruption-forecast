@@ -48,9 +48,12 @@ def safe_recall(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     Returns:
         float: Recall score, or 0.0 if class 1 is not present in y_true.
     """
-    if 1 not in y_true:
+    # Convert to NumPy array to ensure membership check operates on values,
+    # not on indices (e.g. when y_true is a pandas Series).
+    y_true_arr = np.asarray(y_true)
+    if not np.any(y_true_arr == 1):
         return 0.0
-    return recall_score(y_true, y_pred, zero_division=0)
+    return recall_score(y_true_arr, y_pred, zero_division=0)
 
 
 def safe_f1_weighted(y_true: np.ndarray, y_pred: np.ndarray) -> float:
