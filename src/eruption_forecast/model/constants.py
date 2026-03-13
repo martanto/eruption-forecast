@@ -9,9 +9,37 @@ are tuned for imbalanced volcanic-eruption datasets.
 
 from typing import Any
 
-from sklearn.metrics import make_scorer
+from sklearn.metrics import make_scorer, recall_score, f1_score
 
-from eruption_forecast.utils.ml import safe_recall, safe_f1_weighted
+
+def safe_recall(y_true, y_pred, **kwargs) -> float:
+    """Recall score that avoids ZeroDivisionError for edge cases.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Ground truth (correct) target values.
+    y_pred : array-like
+        Estimated targets as returned by a classifier.
+    **kwargs :
+        Additional keyword arguments forwarded to ``sklearn.metrics.recall_score``.
+    """
+    return recall_score(y_true, y_pred, zero_division=0, **kwargs)
+
+
+def safe_f1_weighted(y_true, y_pred, **kwargs) -> float:
+    """Weighted F1 score that avoids ZeroDivisionError for edge cases.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Ground truth (correct) target values.
+    y_pred : array-like
+        Estimated targets as returned by a classifier.
+    **kwargs :
+        Additional keyword arguments forwarded to ``sklearn.metrics.f1_score``.
+    """
+    return f1_score(y_true, y_pred, average="weighted", zero_division=0, **kwargs)
 
 
 # Module-level callables are picklable by loky workers (unlike lambdas or
