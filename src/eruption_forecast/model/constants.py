@@ -9,6 +9,18 @@ are tuned for imbalanced volcanic-eruption datasets.
 
 from typing import Any
 
+from sklearn.metrics import make_scorer
+
+from eruption_forecast.utils.ml import safe_recall, safe_f1_weighted
+
+
+# Module-level callables are picklable by loky workers (unlike lambdas or
+# make_scorer objects built inside __init__).
+LEARNING_CURVE_SCORER_MAP: dict[str, str | Any] = {
+    "balanced_accuracy": "balanced_accuracy",
+    "recall": make_scorer(safe_recall),
+    "f1_weighted": make_scorer(safe_f1_weighted),
+}
 
 CLASSIFIERS: list[str] = [
     "svm",

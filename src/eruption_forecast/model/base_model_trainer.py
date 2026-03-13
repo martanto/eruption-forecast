@@ -2,11 +2,9 @@ import os
 from typing import Any, Self, Literal
 from collections.abc import Callable
 
-import numpy as np
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.metrics import f1_score, make_scorer, recall_score
 from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
@@ -30,51 +28,6 @@ from eruption_forecast.plots.feature_plots import (
 )
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
-
-
-def _safe_recall(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """Compute recall, returning 0.0 when class 1 is absent from y_true.
-
-    Guards against sklearn's pos_label validation error that fires before
-    zero_division is considered — common in small CV folds with class imbalance.
-
-    Args:
-        y_true (np.ndarray): True binary labels.
-        y_pred (np.ndarray): Predicted binary labels.
-
-    Returns:
-        float: Recall score, or 0.0 if class 1 is not present in y_true.
-    """
-    if 1 not in y_true:
-        return 0.0
-    return recall_score(y_true, y_pred, zero_division=0)
-
-
-def _safe_f1_weighted(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """Compute weighted F1, returning 0.0 when only one class is present in y_true.
-
-    Guards against degenerate CV folds where the training slice contains only
-    one class after random under-sampling at small training sizes.
-
-    Args:
-        y_true (np.ndarray): True binary labels.
-        y_pred (np.ndarray): Predicted binary labels.
-
-    Returns:
-        float: Weighted F1 score, or 0.0 if fewer than two classes are present.
-    """
-    if len(np.unique(y_true)) < 2:
-        return 0.0
-    return f1_score(y_true, y_pred, average="weighted", zero_division=0)
-
-
-# Module-level callables are picklable by loky workers (unlike lambdas or
-# make_scorer objects built inside __init__).
-_LEARNING_CURVE_SCORER_MAP: dict[str, str | Any] = {
-    "balanced_accuracy": "balanced_accuracy",
-    "recall": make_scorer(_safe_recall),
-    "f1_weighted": make_scorer(_safe_f1_weighted),
-}
 
 
 class BaseModelTrainer:

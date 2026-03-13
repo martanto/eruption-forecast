@@ -9,14 +9,12 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold, learning_curve
 
 from eruption_forecast.logger import logger
+from eruption_forecast.model.constants import LEARNING_CURVE_SCORER_MAP
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.config.constants import LEARNING_CURVE_SCORINGS
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.classifier_model import ClassifierModel
-from eruption_forecast.model.base_model_trainer import (
-    _LEARNING_CURVE_SCORER_MAP,
-    BaseModelTrainer,
-)
+from eruption_forecast.model.base_model_trainer import BaseModelTrainer
 
 
 class EvaluationTrainer(BaseModelTrainer):
@@ -78,7 +76,7 @@ class EvaluationTrainer(BaseModelTrainer):
                 X=X_train,
                 y=y_train,
                 cv=cv,
-                scoring=_LEARNING_CURVE_SCORER_MAP.get(scoring, scoring),
+                scoring=LEARNING_CURVE_SCORER_MAP.get(scoring, scoring),
                 train_sizes=np.linspace(0.1, 1.0, 10),
                 n_jobs=1,
             )
