@@ -24,8 +24,14 @@ Examples:
 """
 
 import logging
+import os
 from importlib.metadata import version
 
+# Prevent stumpy/numba from initialising GPU contexts in loky worker processes,
+# which fails when VRAM is exhausted and kills the entire worker pool.
+# Allow GPU-capable runs to opt out by setting ERUPTION_FORECAST_DISABLE_NUMBA_CUDA="0".
+if os.getenv("ERUPTION_FORECAST_DISABLE_NUMBA_CUDA", "1") == "1":
+    os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
 
 logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
