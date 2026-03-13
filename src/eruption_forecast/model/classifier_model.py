@@ -1,4 +1,4 @@
-from typing import Any, Self, Literal, ClassVar
+from typing import Any, Self, Literal, ClassVar, TypeAlias
 
 from xgboost import XGBClassifier
 from sklearn.svm import SVC
@@ -23,6 +23,9 @@ from eruption_forecast.logger import logger
 from eruption_forecast.model.constants import DEFAULT_GRID_PARAMS
 from eruption_forecast.utils.formatting import slugify_class_name
 from eruption_forecast.utils.validation import validate_random_state
+
+
+GridSpec: TypeAlias = dict[str, Any] | list[dict[str, Any]]
 
 
 class ClassifierModel:
@@ -109,7 +112,7 @@ class ClassifierModel:
     """
 
     # Maps classifier key → hyperparameter grid; used by the ``grid`` property.
-    _GRID_REGISTRY: ClassVar[dict[str, dict[str, Any]]] = DEFAULT_GRID_PARAMS
+    _GRID_REGISTRY: ClassVar[dict[str, GridSpec]] = DEFAULT_GRID_PARAMS
 
     def __init__(
         self,
@@ -193,7 +196,7 @@ class ClassifierModel:
             | VotingClassifier
             | None
         ) = None
-        self._grid: dict[str, Any] | None = None
+        self._grid: GridSpec | None = None
         self.cv_name = type(self.get_cv_splitter()).__name__
 
     def set_random_state(self, random_state: int) -> Self:
@@ -325,15 +328,15 @@ class ClassifierModel:
         return slugify_class_name(self.cv_name)
 
     @property
-    def grid(self) -> dict[str, Any]:
+    def grid(self) -> GridSpec:
         """Get the hyperparameter grid for GridSearchCV.
 
         Returns the default grid for the configured classifier if no custom
         grid has been set. Otherwise returns the custom grid.
 
         Returns:
-            dict[str, Any]: Dictionary mapping parameter names to lists of values
-                to search over during hyperparameter optimization.
+            GridSpec: Hyperparameter grid for GridSearchCV. May be either a
+                single parameter dictionary or a list of dictionaries.
 
         Raises:
             ValueError: If the classifier type is unknown.
@@ -356,7 +359,7 @@ class ClassifierModel:
         raise ValueError(f"Unknown classifier: {self.classifier}")
 
     @grid.setter
-    def grid(self, grid: dict[str, Any]):
+    def grid(self, grid: GridSpec):
         """Set a custom hyperparameter grid, overriding the default.
 
         Stores the provided grid in ``_grid`` so that subsequent calls to
@@ -364,7 +367,7 @@ class ClassifierModel:
         ``None`` to ``_grid`` directly to revert to the default grid.
 
         Args:
-            grid (dict[str, Any]): Custom hyperparameter grid for GridSearchCV.
+            grid (GridSpec): Custom hyperparameter grid for GridSearchCV.
 
         Examples:
             >>> clf = ClassifierModel("rf")
@@ -621,7 +624,7 @@ class ClassifierModel:
             | LogisticRegression
             | VotingClassifier
         ),
-        grid: dict[str, Any],
+        grid: GridSpec,
     ) -> Self:
         """Update both model classifier and hyperparameter grid.
 
@@ -634,7 +637,7 @@ class ClassifierModel:
                 MLPClassifier | GaussianNB | LogisticRegression | VotingClassifier):
                 Classifier instance to use. Accepts any supported sklearn or
                 XGBoost estimator.
-            grid (dict[str, Any]): Hyperparameter grid for GridSearchCV.
+            grid (GridSpec): Hyperparameter grid for GridSearchCV.
 
         Returns:
             Self: The ClassifierModel instance for method chaining.
