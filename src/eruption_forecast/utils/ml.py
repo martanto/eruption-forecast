@@ -35,6 +35,45 @@ from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
 
+def safe_recall(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute recall, returning 0.0 when class 1 is absent from y_true.
+
+    Guards against sklearn's pos_label validation error that fires before
+    zero_division is considered — common in small CV folds with class imbalance.
+
+    Args:
+        y_true (np.ndarray): True binary labels.
+        y_pred (np.ndarray): Predicted binary labels.
+
+    Returns:
+        float: Recall score, or 0.0 if class 1 is not present in y_true.
+    """
+    # Convert to NumPy array to ensure membership check operates on values,
+    # not on indices (e.g. when y_true is a pandas Series).
+    y_true_arr = np.asarray(y_true)
+    if not np.any(y_true_arr == 1):
+        return 0.0
+    return recall_score(y_true_arr, y_pred, zero_division=0)
+
+
+def safe_f1_weighted(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute weighted F1, returning 0.0 when only one class is present in y_true.
+
+    Guards against degenerate CV folds where the training slice contains only
+    one class after random under-sampling at small training sizes.
+
+    Args:
+        y_true (np.ndarray): True binary labels.
+        y_pred (np.ndarray): Predicted binary labels.
+
+    Returns:
+        float: Weighted F1 score, or 0.0 if fewer than two classes are present.
+    """
+    if len(np.unique(y_true)) < 2:
+        return 0.0
+    return f1_score(y_true, y_pred, average="weighted", zero_division=0)
+
+
 def compute_threshold_metrics(
     y_true: np.ndarray,
     y_proba: np.ndarray,

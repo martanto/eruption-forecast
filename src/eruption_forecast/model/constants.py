@@ -9,6 +9,46 @@ are tuned for imbalanced volcanic-eruption datasets.
 
 from typing import Any
 
+from sklearn.metrics import make_scorer, recall_score, f1_score
+
+
+def safe_recall(y_true, y_pred, **kwargs) -> float:
+    """Recall score that avoids ZeroDivisionError for edge cases.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Ground truth (correct) target values.
+    y_pred : array-like
+        Estimated targets as returned by a classifier.
+    **kwargs :
+        Additional keyword arguments forwarded to ``sklearn.metrics.recall_score``.
+    """
+    return recall_score(y_true, y_pred, zero_division=0, **kwargs)
+
+
+def safe_f1_weighted(y_true, y_pred, **kwargs) -> float:
+    """Weighted F1 score that avoids ZeroDivisionError for edge cases.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Ground truth (correct) target values.
+    y_pred : array-like
+        Estimated targets as returned by a classifier.
+    **kwargs :
+        Additional keyword arguments forwarded to ``sklearn.metrics.f1_score``.
+    """
+    return f1_score(y_true, y_pred, average="weighted", zero_division=0, **kwargs)
+
+
+# Module-level callables are picklable by loky workers (unlike lambdas or
+# make_scorer objects built inside __init__).
+LEARNING_CURVE_SCORER_MAP: dict[str, str | Any] = {
+    "balanced_accuracy": "balanced_accuracy",
+    "recall": make_scorer(safe_recall),
+    "f1_weighted": make_scorer(safe_f1_weighted),
+}
 
 CLASSIFIERS: list[str] = [
     "svm",
