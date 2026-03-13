@@ -271,6 +271,7 @@ class ForecastModel:
         # ------------------------------------------------------------------
         self._plot_shap = False
         self.trained_models: dict[str, str] = {}
+        self.merged_models: dict[str, str] = {}
 
         # ------------------------------------------------------------------
         # Will be set after predict() called
@@ -1289,7 +1290,9 @@ class ForecastModel:
             for clf_model in train_model.classifier_models:
                 clf_model.grid = grid_params
 
-        train_model.fit(with_evaluation=with_evaluation, **train_params).merge_models()
+        merged_models = train_model.fit(
+            with_evaluation=with_evaluation, **train_params
+        ).merge_models()
 
         # Build result mapping: classifier_name -> registry CSV path
         trained_models: dict[str, str] = {}
@@ -1299,6 +1302,8 @@ class ForecastModel:
             csv_path = train_model.csv.get(clf_slug)
             if csv_path is not None:
                 trained_models[clf_name] = csv_path
+
+        self.merged_models = merged_models
 
         return trained_models
 
@@ -1556,7 +1561,10 @@ class ForecastModel:
         output_dir = output_dir or self.station_dir
         overwrite = overwrite or self.overwrite
         n_jobs = n_jobs or self.n_jobs
+
         trained_models = self.trained_models
+        if len(self.merged_models) > 0:
+            trained_models = self.merged_models
 
         if trained_models is None or len(trained_models) == 0:
             raise ValueError(

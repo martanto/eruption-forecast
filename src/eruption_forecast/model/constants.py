@@ -24,13 +24,12 @@ CLASSIFIERS: list[str] = [
     "lite-rf",
 ]
 
-DEFAULT_GRID_PARAMS: dict[str, dict[str, Any]] = {
-    "svm": {
-        "C": [0.001, 0.01, 0.1, 1, 10],
-        "kernel": ["poly", "rbf", "sigmoid"],
-        "degree": [2, 3, 4, 5],
-        "decision_function_shape": ["ovo", "ovr"],
-    },
+DEFAULT_GRID_PARAMS: dict[str, dict[str, Any] | list[dict[str, Any]]] = {
+    "svm": [
+        {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["poly"], "degree": [2, 3], "decision_function_shape": ["ovr"]},
+        {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["rbf"], "decision_function_shape": ["ovr"]},
+        {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["linear"], "decision_function_shape": ["ovr"]},
+    ],
     "knn": {
         "n_neighbors": [3, 6, 12, 24],
         "weights": ["uniform", "distance"],
@@ -42,42 +41,46 @@ DEFAULT_GRID_PARAMS: dict[str, dict[str, Any]] = {
         "max_features": ["sqrt", "log2", None],
     },
     "rf": {
-        "n_estimators": [50, 100, 200],
+        "n_estimators": [50, 100],
         "max_depth": [3, 5, 7],
         "criterion": ["gini", "entropy"],
         "max_features": ["sqrt", "log2", None],
-        "min_samples_split": [2, 5, 10],
-        "min_samples_leaf": [1, 2, 4],
+        "min_samples_split": [2, 5],
+        "min_samples_leaf": [1, 2],
     },
     "gb": {
-        "n_estimators": [50, 100, 200],
+        "n_estimators": [100, 200],
         "max_depth": [3, 5, 7],
-        "learning_rate": [0.01, 0.1, 0.2],
+        "learning_rate": [0.01, 0.1],
         "subsample": [0.8, 1.0],
         "min_samples_split": [2, 5],
         "min_samples_leaf": [1, 2],
     },
     "xgb": {
-        "n_estimators": [100, 200, 300],
+        "n_estimators": [100, 200],
         "max_depth": [3, 5, 7],
-        "learning_rate": [0.01, 0.1, 0.2],
+        "learning_rate": [0.01, 0.1],
         "subsample": [0.8, 1.0],
         "colsample_bytree": [0.8, 1.0],
         "min_child_weight": [1, 3],
-        "scale_pos_weight": [1, 5, 10, 15],
+        "scale_pos_weight": [1],  # RandomUnderSampler already balances classes
     },
     "nn": {
-        "activation": ["identity", "logistic", "tanh", "relu"],
+        "activation": ["logistic", "tanh", "relu"],  # "identity" dropped — linear, rarely useful
         "hidden_layer_sizes": [(50,), (100,), (100, 50), (100, 100)],
         "learning_rate_init": [0.001, 0.01],
     },
-    "nb": {"var_smoothing": [1.0]},
-    "lr": {
-        "penalty": ["l2", "l1", "elasticnet"],
-        "C": [0.001, 0.01, 0.1, 1, 10],
-        "solver": ["lbfgs", "saga"],
-        "l1_ratio": [0.15, 0.5, 0.85],
-    },
+    "nb": {"var_smoothing": [1e-9, 1e-7, 1e-5, 1e-3, 1e-1, 1.0]},
+    "lr": [
+        {"penalty": ["l2"], "C": [0.001, 0.01, 0.1, 1, 10], "solver": ["lbfgs", "saga"]},
+        {"penalty": ["l1"], "C": [0.001, 0.01, 0.1, 1, 10], "solver": ["saga"]},
+        {
+            "penalty": ["elasticnet"],
+            "C": [0.001, 0.01, 0.1, 1, 10],
+            "solver": ["saga"],
+            "l1_ratio": [0.15, 0.5, 0.85],
+        },
+    ],
     "voting": {
         "rf__n_estimators": [100, 200],
         "rf__max_depth": [10, None],
