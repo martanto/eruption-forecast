@@ -432,7 +432,8 @@ class EvaluationTrainer(BaseModelTrainer):
 
             if _all_classifier_done:
                 logger.info(f"Seed {_rs:05d} already trained.")
-                self.significant_features_csvs.append(_significant_filepath)
+                if _significant_filepath not in self.significant_features_csvs:
+                    self.significant_features_csvs.append(_significant_filepath)
                 for classifier_model in self.classifier_models:
                     classifier_slug = classifier_model.slug_name
                     _model_filepath, _metrics_filepath, _shap_filepath = (
