@@ -18,9 +18,12 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    ensure_dir,
+    save_figure,
+    resolve_output_dir,
+)
 from eruption_forecast.config.constants import (
-    PLOT_DPI,
     THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
     LEARNING_CURVE_SCORINGS,
@@ -282,34 +285,6 @@ class ModelEvaluator:
             random_state,
         )
 
-    def _save_plot(
-        self,
-        fig: plt.Figure,
-        save: bool,
-        filepath: str,
-        dpi: int = PLOT_DPI,
-    ) -> None:
-        """Save and close a plot figure.
-
-        Saves the figure to disk when requested, then always closes it to
-        remove it from pyplot's figure manager. This prevents stale figures
-        from being reused by subsequent plot calls.
-
-        Args:
-            fig: Matplotlib figure object to save.
-            save (bool): Whether to save the figure to disk.
-            filepath (str): Destination file path for the saved figure.
-            dpi (int): Dots per inch for saved figure. Defaults to PLOT_DPI constant.
-
-        Returns:
-            None
-        """
-        if save:
-            fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
-            if self.verbose:
-                logger.info(f"Saved: {filepath}")
-        plt.close(fig)
-
     def _get_proba(self) -> np.ndarray | None:
         """Retrieve predicted eruption probabilities or decision scores for the test set.
 
@@ -480,16 +455,14 @@ class ModelEvaluator:
         plot_dir = os.path.join(self.figures_dir, plot_type)
         ensure_dir(plot_dir)
 
-        default_filepath = os.path.join(
-            plot_dir, filename or f"{self._prefix}_{plot_type}.png"
-        )
-
-        return default_filepath
+        default_filename = filename or f"{self._prefix}_{plot_type}"
+        # Strip extension if caller included one; save_figure appends it.
+        default_filename = os.path.splitext(default_filename)[0]
+        return os.path.join(plot_dir, default_filename)
 
     def plot_confusion_matrix(
         self,
         normalize: str | None = None,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure:
@@ -499,8 +472,6 @@ class ModelEvaluator:
             normalize (str | None, optional): Normalisation mode passed to
                 ``sklearn.metrics.confusion_matrix``. Use ``"true"`` to
                 normalise by row. Defaults to None (raw counts).
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_confusion_matrix.png"``.
                 Defaults to None.
@@ -519,26 +490,18 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("confusion_matrix", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("confusion_matrix", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
     def plot_roc_curve(
         self,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
         """Plot the ROC curve with AUC annotation.
 
         Args:
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_roc_curve.png"``.
                 Defaults to None.
@@ -562,26 +525,18 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("roc_curve", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("roc_curve", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
     def plot_precision_recall_curve(
         self,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
         """Plot the Precision-Recall curve with average precision annotation.
 
         Args:
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_pr_curve.png"``.
                 Defaults to None.
@@ -604,12 +559,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("pr_curve", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("pr_curve", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -679,7 +629,6 @@ class ModelEvaluator:
 
     def plot_threshold_analysis(
         self,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
@@ -688,8 +637,6 @@ class ModelEvaluator:
         Marks the default 0.5 threshold and the optimal F1 threshold.
 
         Args:
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_threshold_analysis.png"``.
                 Defaults to None.
@@ -712,19 +659,13 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("threshold_analysis", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("threshold_analysis", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
     def plot_feature_importance(
         self,
         top_n: int = 20,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
@@ -737,8 +678,6 @@ class ModelEvaluator:
         Args:
             top_n (int, optional): Number of top features to display.
                 Defaults to 20.
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_feature_importance.png"``.
                 Defaults to None.
@@ -766,19 +705,13 @@ class ModelEvaluator:
             )
             return None
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("feature_importance", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("feature_importance", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
     def plot_calibration(
         self,
         n_bins: int = 10,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
@@ -790,8 +723,6 @@ class ModelEvaluator:
         Args:
             n_bins (int, optional): Number of bins for the calibration
                 curve. Defaults to 10.
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_calibration.png"``.
                 Defaults to None.
@@ -815,18 +746,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("calibration", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("calibration", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
     def plot_prediction_distribution(
         self,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure | None:
@@ -836,8 +761,6 @@ class ModelEvaluator:
         orange. A dashed line marks the default 0.5 decision threshold.
 
         Args:
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_prediction_distribution.png"``.
                 Defaults to None.
@@ -862,14 +785,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath(
-                "prediction_distribution", filename=filename
-            ),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("prediction_distribution", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -926,7 +842,6 @@ class ModelEvaluator:
     def plot_shap_summary(
         self,
         max_display: int = 20,
-        save: bool = True,
         filename: str | None = None,
         dpi: int = 150,
     ) -> plt.Figure:
@@ -939,8 +854,6 @@ class ModelEvaluator:
         Args:
             max_display (int, optional): Maximum number of features to show,
                 sorted by mean |SHAP| descending. Defaults to 20.
-            save (bool, optional): If True, save the figure to
-                ``output_dir``. Defaults to True.
             filename (str | None, optional): Output filename. If None,
                 defaults to ``"<model_name>_shap_summary.png"``.
                 Defaults to None.
@@ -966,17 +879,11 @@ class ModelEvaluator:
             ensure_dir(os.path.dirname(self._shap_explanation_filepath))
             joblib.dump(explanation, self._shap_explanation_filepath)
 
-        self._save_plot(
-            fig,
-            save,
-            filepath=self._get_plot_filepath("shap_summary", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("shap_summary", filename=filename), dpi, verbose=self.verbose)
         return fig
 
     def plot_learning_curve(
         self,
-        save: bool = True,
         dpi: int = 150,
     ) -> plt.Figure | None:
         """Plot per-seed learning curves for all scoring metrics in one figure.
@@ -988,8 +895,6 @@ class ModelEvaluator:
         shaded bands.
 
         Args:
-            save (bool, optional): If True, save the figure to
-                ``figures_dir/learning_curve/``. Defaults to True.
             dpi (int, optional): Figure resolution. Defaults to 150.
 
         Returns:
@@ -1008,10 +913,10 @@ class ModelEvaluator:
             json_filepath=self._learning_curve_path,
             plot_filepath=plot_filepath,
             scorings=LEARNING_CURVE_SCORINGS,
-            overwrite=save,
+            overwrite=True,
             dpi=dpi,
         )
-        self._save_plot(fig, save, filepath=plot_filepath, dpi=dpi)
+        save_figure(fig, plot_filepath, dpi, verbose=self.verbose)
         return fig
 
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:
