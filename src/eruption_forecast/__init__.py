@@ -23,9 +23,10 @@ Examples:
     ... ).extract_features().train(classifier="xgb")
 """
 
-import logging
 import os
+import logging
 from importlib.metadata import version
+
 
 # Prevent stumpy/numba from initialising GPU contexts in loky worker processes,
 # which fails when VRAM is exhausted and kills the entire worker pool.
