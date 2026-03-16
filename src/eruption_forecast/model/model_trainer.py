@@ -381,6 +381,8 @@ class ModelTrainer(EvaluationTrainer):
             ... )
             >>> trainer.train(random_state=0, total_seed=5)
         """
+        # Ensure train-only runs use the predictions output tree, even after evaluate().
+        self.with_evaluation = False
         self.create_directories(save_all_features, plot_significant_features)
 
         random_states: list[int] = [random_state + seed for seed in range(total_seed)]
