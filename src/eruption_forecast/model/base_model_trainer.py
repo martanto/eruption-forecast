@@ -1,5 +1,12 @@
+"""Base infrastructure shared by all model-trainer subclasses.
+
+Provides the constructor, validation, directory management, feature selection,
+grid-search setup, and model-registry utilities that are reused by both
+:class:`EvaluationTrainer` and :class:`ModelTrainer`.
+"""
+
 import os
-from typing import Any, Self, Literal
+from typing import Any, Literal
 from collections.abc import Callable
 
 import joblib
@@ -12,8 +19,10 @@ from eruption_forecast.utils.ml import (
     merge_seed_models,
     load_labels_from_csv,
     random_under_sampler,
+    get_classifier_models,
     merge_all_classifiers,
 )
+from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
@@ -104,10 +113,9 @@ class BaseModelTrainer:
         self,
         extracted_features_csv: str,
         label_features_csv: str,
+        classifiers: str | list[str] = "rf",
         output_dir: str | None = None,
         root_dir: str | None = None,
-        prefix_filename: str | None = None,
-        classifiers: str | list[str] = "rf",
         cv_strategy: Literal[
             "shuffle", "stratified", "shuffle-stratified", "timeseries"
         ] = "shuffle-stratified",
@@ -116,6 +124,7 @@ class BaseModelTrainer:
         feature_selection_method: Literal[
             "tsfresh", "random_forest", "combined"
         ] = "tsfresh",
+        prefix_filename: str | None = None,
         overwrite: bool = False,
         plot_shap: bool = False,
         n_jobs: int = 1,
@@ -166,35 +175,21 @@ class BaseModelTrainer:
                 Defaults to 0.
             plot_shap (bool, optional): Compute and save SHAP summary plots. Defaults to False.
         """
-        # Normalise to list[str] regardless of whether a single string was passed
-        _classifiers: list[str] = (
-            [classifiers] if isinstance(classifiers, str) else classifiers
-        )
-
-        _xgb_classifiers = {"xgb", "voting"}
-        _has_xgb = any(c in _xgb_classifiers for c in _classifiers)
-        if use_gpu and _has_xgb and n_jobs != 1:
-            logger.warning(
-                "use_gpu=True forces n_jobs=1 to avoid GPU memory contention "
-                "from parallel seed workers sharing the same device."
-            )
-            n_jobs = 1
-
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
         df_labels = load_labels_from_csv(label_features_csv)
 
-        # Build one ClassifierModel per classifier key
-        classifier_models: list[ClassifierModel] = [
-            ClassifierModel(
-                classifier=classifier,  # ty:ignore[invalid-argument-type]
-                cv_strategy=cv_strategy,
-                n_splits=cv_splits,
-                verbose=verbose,
-                use_gpu=use_gpu and classifier in _xgb_classifiers,
-                gpu_id=gpu_id,
-            )
-            for classifier in _classifiers
-        ]
+        classifiers: list[str] = (
+            [classifiers] if isinstance(classifiers, str) else classifiers
+        )
+
+        classifier_models: list[ClassifierModel] = get_classifier_models(
+            classifiers,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            use_gpu=use_gpu,
+            gpu_id=gpu_id,
+            verbose=verbose,
+        )
 
         # Output training dir: ``<root_dir>/output/trainings``
         output_dir = resolve_output_dir(
@@ -202,86 +197,72 @@ class BaseModelTrainer:
             root_dir,
             os.path.join("output"),
         )
+        output_dir = os.path.join(output_dir, "trainings")
 
-        # Base evaluations dir: ``<output_dir>/trainings/evaluations``
-        _output_dir = os.path.join(output_dir, "trainings", "evaluations")
-
-        # CV slug is shared across all classifiers (same CV strategy)
-        _cv_slug = classifier_models[0].slug_cv_name
-
-        # Shared feature directories (under the CV slug, not per classifier)
-        shared_features_dir = os.path.join(_output_dir, "features", _cv_slug)
-        shared_significant_dir = os.path.join(
-            shared_features_dir, "significant_features"
+        classifier_use_gpu = any(
+            classifier in GPU_CLASSIFIERS for classifier in classifiers
         )
-        shared_all_features_dir = os.path.join(shared_features_dir, "all_features")
-        shared_figures_dir = os.path.join(shared_features_dir, "figures", "significant")
-        shared_tests_dir = os.path.join(shared_features_dir, "tests")
-
-        # Per-classifier directories keyed by classifier slug
-        classifier_dirs: dict[str, str] = {}
-        models_dirs: dict[str, str] = {}
-        metrics_dirs: dict[str, str] = {}
-        for classifier_model in classifier_models:
-            slug = classifier_model.slug_name
-            classifier_dir = os.path.join(_output_dir, "classifiers", slug, _cv_slug)
-            classifier_dirs[slug] = classifier_dir
-            models_dirs[slug] = os.path.join(classifier_dir, "models")
-            metrics_dirs[slug] = os.path.join(classifier_dir, "metrics")
+        if use_gpu and classifier_use_gpu and n_jobs != 1:
+            logger.warning(
+                "use_gpu=True forces n_jobs=1 to avoid GPU memory contention "
+                "from parallel seed workers sharing the same device."
+            )
+            n_jobs = 1
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties
         # ------------------------------------------------------------------
         self.df_features = df_features
         self.df_labels = df_labels
-        self.output_dir = _output_dir
-        self.n_jobs = n_jobs
-        self.grid_search_n_jobs = grid_search_n_jobs
-        self.prefix_filename = prefix_filename
-        self.classifiers = _classifiers
-        self.classifier_models = classifier_models
+        self.classifiers = classifiers
+        self.root_dir = root_dir
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
-        self.number_of_significant_features: int = number_of_significant_features
-        self.feature_selection_method = feature_selection_method
-        self.plot_shap = plot_shap
+        self.number_of_significant_features = number_of_significant_features
+        self.feature_selection_method: str = feature_selection_method
+        self.prefix_filename = prefix_filename
         self.overwrite = overwrite
+        self.plot_shap = plot_shap
+        self.n_jobs = n_jobs
+        self.grid_search_n_jobs = grid_search_n_jobs
+        self.use_gpu = use_gpu
+        self.gpu_id = gpu_id
         self.verbose = verbose
         self.debug = debug
 
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
         # ------------------------------------------------------------------
+        self.cv_slug_name = classifier_models[0].slug_cv_name
+        self.classifier_models = classifier_models
         self.FeatureSelector = FeatureSelector(
             method=feature_selection_method, verbose=verbose, n_jobs=grid_search_n_jobs
         )
 
-        # Shared directories
-        self.shared_features_dir = shared_features_dir
-        self.shared_significant_dir = shared_significant_dir
-        self.shared_all_features_dir = shared_all_features_dir
-        self.shared_figures_dir = shared_figures_dir
-        self.shared_tests_dir = shared_tests_dir
+        # Must be initialised before set_directories() because that method
+        # reads this flag to choose the "evaluations" vs "predictions" sub-path.
+        self.with_evaluation = False
 
-        # Per-classifier directories
-        self.classifier_dirs = classifier_dirs
-        self.models_dirs = models_dirs
-        self.metrics_dirs = metrics_dirs
-
-        # ------------------------------------------------------------------
-        # Will be set after train_and_evaluate() method called
-        # ------------------------------------------------------------------
+        # Set directories
+        (
+            self.output_dir,
+            self.shared_features_dir,
+            self.shared_significant_dir,
+            self.shared_all_features_dir,
+            self.shared_figures_dir,
+            self.shared_tests_dir,
+            self.classifier_dirs,
+            self.models_dirs,
+            self.metrics_dirs,
+        ) = self.set_directories(output_dir)
         self.significant_features_csvs: list[str] = []
         self.df_significant_features: pd.DataFrame = pd.DataFrame()
 
-        # Will be set after train_and_evaluate() or train() called
+        # Will be set after evaluate() or train() called
         # Keyed by classifier slug
         self.df: dict[str, pd.DataFrame] = {}
         self.csv: dict[str, str] = {}
 
-        # ------------------------------------------------------------------
-        # Validate and create directories
-        # ------------------------------------------------------------------
         self.validate()
 
         # ------------------------------------------------------------------
@@ -393,62 +374,57 @@ class BaseModelTrainer:
             classifier_id,
         )
 
-    def update_directories(
-        self, output_dir: str | None = None, root_dir: str | None = None
-    ) -> Self:
-        """Recompute and update all subdirectory paths from a new output directory.
+    def set_directories(self, output_dir: str):
+        """Build and store the full directory hierarchy for training outputs.
 
-        Resolves the new output directory using the same rules as ``__init__``,
-        then rebuilds every derived path (classifier, models, metrics, features,
-        figures). Calls ``create_directories()`` to ensure the paths exist.
+        Derives all shared (feature-selection) and per-classifier output paths
+        from ``output_dir``, appending ``evaluations/`` or ``predictions/``
+        depending on ``self.with_evaluation``.  The returned paths are assigned
+        to the corresponding instance attributes by the caller.
 
         Args:
-            output_dir (str | None, optional): New base output directory. Resolved
-                against ``root_dir`` (or ``os.getcwd()`` when None). Defaults to None.
-            root_dir (str | None, optional): Anchor directory for resolving relative
-                ``output_dir`` values. Defaults to None.
+            output_dir (str): Base trainings directory (e.g. ``output/trainings``).
 
         Returns:
-            Self: The trainer instance for method chaining.
-
-        Examples:
-            >>> trainer = ModelTrainer(...)
-            >>> trainer.update_directories(output_dir="new_output", root_dir="/project")
+            tuple: A 9-tuple of
+                ``(output_dir, shared_features_dir, shared_significant_dir,
+                shared_all_features_dir, shared_figures_dir, shared_tests_dir,
+                classifier_dirs, models_dirs, metrics_dirs)``.
         """
-        self.output_dir = resolve_output_dir(
-            output_dir,
-            root_dir,
-            os.path.join("output", "trainings", "evaluations"),
-        )
+        sub_output_dir = "evaluations" if self.with_evaluation else "predictions"
+        output_dir = os.path.join(output_dir, sub_output_dir)
 
-        _cv_slug = self.classifier_models[0].slug_cv_name
+        shared_features_dir = os.path.join(output_dir, "features", self.cv_slug_name)
+        shared_significant_dir = os.path.join(
+            shared_features_dir, "significant_features"
+        )
+        shared_all_features_dir = os.path.join(shared_features_dir, "all_features")
+        shared_figures_dir = os.path.join(shared_features_dir, "figures", "significant")
+        shared_tests_dir = os.path.join(shared_features_dir, "tests")
 
-        # Rebuild shared feature directories
-        self.shared_features_dir = os.path.join(self.output_dir, "features", _cv_slug)
-        self.shared_significant_dir = os.path.join(
-            self.shared_features_dir, "significant_features"
-        )
-        self.shared_all_features_dir = os.path.join(
-            self.shared_features_dir, "all_features"
-        )
-        self.shared_figures_dir = os.path.join(
-            self.shared_features_dir, "figures", "significant"
-        )
-        self.shared_tests_dir = os.path.join(self.shared_features_dir, "tests")
-
-        # Rebuild per-classifier directories
+        classifier_dirs: dict[str, str] = {}
+        models_dirs: dict[str, str] = {}
+        metrics_dirs: dict[str, str] = {}
         for classifier_model in self.classifier_models:
             slug = classifier_model.slug_name
             classifier_dir = os.path.join(
-                self.output_dir, "classifiers", slug, _cv_slug
+                output_dir, "classifiers", slug, self.cv_slug_name
             )
-            self.classifier_dirs[slug] = classifier_dir
-            self.models_dirs[slug] = os.path.join(classifier_dir, "models")
-            self.metrics_dirs[slug] = os.path.join(classifier_dir, "metrics")
+            classifier_dirs[slug] = classifier_dir
+            models_dirs[slug] = os.path.join(classifier_dir, "models")
+            metrics_dirs[slug] = os.path.join(classifier_dir, "metrics")
 
-        self.create_directories()
-
-        return self
+        return (
+            output_dir,
+            shared_features_dir,
+            shared_significant_dir,
+            shared_all_features_dir,
+            shared_figures_dir,
+            shared_tests_dir,
+            classifier_dirs,
+            models_dirs,
+            metrics_dirs,
+        )
 
     def update_grid_params(
         self, classifier: ClassifierModel, grid_params: dict[str, Any]
@@ -478,23 +454,50 @@ class BaseModelTrainer:
 
         return classifier
 
-    def create_directories(self) -> None:
-        """Create required output directories for training results.
+    def create_directories(
+        self,
+        save_all_features: bool = False,
+        plot_significant_features: bool = False,
+        with_evaluation: bool = False,
+    ) -> None:
+        """Create all required output directories for the current training run.
 
-        Creates shared feature directories and per-classifier model/metric
-        directories. Called at the start of ``train_and_evaluate()``, ``train()``,
-        and ``update_directories()``.
+        Always creates the base output and significant-features directories.
+        Optionally creates the all-features, figures, test-split, and per-classifier
+        metrics directories when the corresponding flags are set.
 
-        Example:
-            >>> trainer = ModelTrainer(...)
-            >>> trainer.create_directories()
+        Args:
+            save_all_features (bool, optional): Create the all-features directory.
+                Defaults to False.
+            plot_significant_features (bool, optional): Create the figures directory.
+                Defaults to False.
+            with_evaluation (bool, optional): Create the held-out test-split and
+                per-classifier metrics directories needed by the evaluation pipeline.
+                Defaults to False.
+
+        Returns:
+            None
         """
         ensure_dir(self.output_dir)
         ensure_dir(self.shared_significant_dir)
-        ensure_dir(self.shared_tests_dir)
-        ensure_dir(self.shared_figures_dir)
-        for slug in self.classifier_dirs:
-            ensure_dir(self.models_dirs[slug])
+
+        # Always ensure per-classifier output and models directories so that
+        # later writes (e.g., joblib.dump and model registry CSVs) do not fail
+        # with FileNotFoundError.
+        for classifier_model in self.classifier_models:
+            ensure_dir(self.classifier_dirs[classifier_model.slug_name])
+            ensure_dir(self.models_dirs[classifier_model.slug_name])
+
+        if save_all_features:
+            ensure_dir(self.shared_all_features_dir)
+
+        if plot_significant_features:
+            ensure_dir(self.shared_figures_dir)
+
+        if with_evaluation:
+            ensure_dir(self.shared_tests_dir)
+            for classifier_model in self.classifier_models:
+                ensure_dir(self.metrics_dirs[classifier_model.slug_name])
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
@@ -517,7 +520,7 @@ class BaseModelTrainer:
 
         Example:
             >>> trainer = ModelTrainer(...)
-            >>> trainer.train_and_evaluate(total_seed=100)
+            >>> trainer.evaluate(total_seed=100)
             >>> _df = trainer.concat_significant_features(plot=True)
             >>> print(_df.head())
         """
@@ -920,7 +923,7 @@ class BaseModelTrainer:
         Args:
             records (list[dict]): One dict per seed with keys
                 ``random_state``, ``significant_features_csv``,
-                ``trained_model_filepath``, and (for ``train_and_evaluate`` only)
+                ``trained_model_filepath``, and (for ``evaluate`` only)
                 ``X_test_filepath`` and ``y_test_filepath``.
             random_state (int): Initial random state used for this run.
             total_seed (int): Total number of seeds used for this run.
@@ -998,47 +1001,13 @@ class BaseModelTrainer:
         )
         return X_train_resampled, X_test, y_train_resampled, y_test
 
-    def _select_features_for_seed(
-        self,
-        X_train: pd.DataFrame,
-        y_train: pd.Series,
-        random_state: int,
-        significant_filepath: str,
-        all_features_filepath: str | None = None,
-        all_figures_filepath: str | None = None,
-    ) -> tuple | None:
-        """Step 3: feature selection on the resampled training data.
-
-        Delegates to :meth:`select_features` and returns its result unchanged.
-
-        Args:
-            X_train (pd.DataFrame): Resampled training features.
-            y_train (pd.Series): Resampled training labels.
-            random_state (int): Random seed for feature selector.
-            significant_filepath (str): Path to save top-N features CSV.
-            all_features_filepath (str | None, optional): Path to save all features.
-            all_figures_filepath (str | None, optional): Path to save feature plots.
-
-        Returns:
-            tuple | None: Result from :meth:`select_features`, or None if no
-                features survived selection.
-        """
-        return self.select_features(
-            features=X_train,
-            labels=y_train,
-            random_state=random_state,
-            significant_filepath=significant_filepath,
-            all_features_filepath=all_features_filepath,
-            all_figures_filepath=all_figures_filepath,
-        )
-
     def merge_models(self, output_path: str | None = None) -> dict[str, str]:
         """Merge all seed models for each classifier into a single SeedEnsemble pkl.
 
         Convenience wrapper around
         :func:`eruption_forecast.utils.ml.merge_seed_models` that iterates over
         all classifier registry CSVs from ``self.csv``.  The registry CSVs
-        must exist (i.e. ``train()`` or ``train_and_evaluate()`` must have been
+        must exist (i.e. ``train()`` or ``evaluate()`` must have been
         called first).
 
         Args:
@@ -1058,7 +1027,7 @@ class BaseModelTrainer:
         if not self.csv:
             raise RuntimeError(
                 "No model registry CSV found. Run train() or "
-                "train_and_evaluate() before calling merge_models()."
+                "evaluate() before calling merge_models()."
             )
 
         _output_dir = output_path or os.path.join(self.output_dir, "classifiers")

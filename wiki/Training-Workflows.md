@@ -4,7 +4,7 @@
 
 ## Overview
 
-| | `train_and_evaluate()` | `train()` |
+| | `evaluate()` | `train()` |
 |---|---|---|
 | In-sample metrics (accuracy, F1, AUC)? | Yes — held-out 20% test set | No |
 | Uses 100% of training data? | No (80%) | Yes |
@@ -12,7 +12,7 @@
 | Use with `ModelPredictor`? | Optional | Recommended |
 | Best for? | Exploring classifiers, comparing configs | Final production model |
 
-## Workflow 1 — train_and_evaluate()
+## Workflow 1 — evaluate()
 
 ```
       Full Dataset
@@ -53,7 +53,7 @@ trainer = ModelTrainer(
     n_jobs=4,
 )
 
-trainer.train_and_evaluate(
+trainer.evaluate(
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
@@ -119,7 +119,7 @@ trainer.train(
 `fit(with_evaluation=True/False)` dispatches to either workflow. Use it when the calling code needs a single method regardless of which workflow is active.
 
 ```python
-# Equivalent to train_and_evaluate()
+# Equivalent to evaluate()
 trainer.fit(
     with_evaluation=True,
     random_state=0,
@@ -140,7 +140,7 @@ trainer.fit(
 
 ## Multi-Seeding
 
-Seeds run from `random_state` to `random_state + total_seed - 1`. Each seed produces an independently trained model with its own data split (for `train_and_evaluate`) or resampling (for `train`). Results are aggregated after all seeds complete.
+Seeds run from `random_state` to `random_state + total_seed - 1`. Each seed produces an independently trained model with its own data split (for `evaluate`) or resampling (for `train`). Results are aggregated after all seeds complete.
 
 Benefits:
 

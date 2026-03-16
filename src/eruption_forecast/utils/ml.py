@@ -5,7 +5,7 @@ computation, and eruption probability prediction.
 """
 
 import os
-from typing import cast
+from typing import Literal, cast
 
 import numpy as np
 import joblib
@@ -25,6 +25,7 @@ from eruption_forecast.utils.array import (
     aggregate_seed_probabilities,
     predict_proba_from_estimator,
 )
+from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series, load_label_csv
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.config.constants import (
@@ -32,6 +33,7 @@ from eruption_forecast.config.constants import (
     ERUPTION_PROBABILITY_THRESHOLD,
 )
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
 
@@ -538,15 +540,63 @@ def merge_all_classifiers(
 
 
 def get_default_features() -> list[str]:
-    """Get default features extraction
+    """Return the sorted list of tsfresh ComprehensiveFCParameters feature names.
 
-    https://tsfresh.readthedocs.io/en/latest/text/list_of_features.html
+    Instantiates ``ComprehensiveFCParameters`` and extracts its keys, giving the
+    full set of features that tsfresh can compute. See the tsfresh documentation
+    for the complete feature catalogue.
 
     Returns:
-        list[str]: List of default features extracted
+        list[str]: Sorted list of tsfresh feature name strings.
     """
     default_fc_parameters = ComprehensiveFCParameters()
     default_fc_parameters_keys = default_fc_parameters.data
     keys: list[str] = list(default_fc_parameters_keys.keys())
     keys.sort()
     return keys
+
+
+def get_classifier_models(
+    classifiers: list[str],
+    cv_strategy: Literal[
+        "shuffle", "stratified", "shuffle-stratified", "timeseries"
+    ] = "shuffle-stratified",
+    cv_splits: int = 5,
+    use_gpu: bool = False,
+    gpu_id: int = 0,
+    verbose: bool = False,
+) -> list[ClassifierModel]:
+    """Instantiate one ClassifierModel per classifier key.
+
+    Builds a :class:`~eruption_forecast.model.classifier_model.ClassifierModel`
+    for each slug in ``classifiers``, applying a shared CV strategy, split count,
+    and GPU settings. GPU acceleration is enabled only for classifiers listed in
+    ``GPU_CLASSIFIERS``.
+
+    Args:
+        classifiers (list[str]): List of classifier slug names (e.g. ``["rf", "xgb"]``).
+        cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"],
+            optional): Cross-validation strategy. Defaults to ``"shuffle-stratified"``.
+        cv_splits (int, optional): Number of CV folds. Defaults to 5.
+        use_gpu (bool, optional): Enable GPU acceleration for supported classifiers.
+            Defaults to False.
+        gpu_id (int, optional): GPU device index when ``use_gpu`` is True. Defaults to 0.
+        verbose (bool, optional): Emit progress log messages. Defaults to False.
+
+    Returns:
+        list[ClassifierModel]: One configured :class:`ClassifierModel` per slug,
+            in the same order as ``classifiers``.
+    """
+    classifier_models: list[ClassifierModel] = [
+        ClassifierModel(
+            classifier=classifier,  # ty:ignore[invalid-argument-type]
+            cv_strategy=cv_strategy,
+            n_splits=cv_splits,
+            use_gpu=use_gpu and classifier in GPU_CLASSIFIERS,
+            gpu_id=gpu_id,
+            verbose=verbose,
+        )
+        for classifier in classifiers
+    ]
+
+    return classifier_models

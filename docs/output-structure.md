@@ -22,7 +22,7 @@ output/
     │   └── label_features_*.csv             # Labels aligned with features
     │
     └── trainings/
-        ├── evaluations/        # Output of train_and_evaluate()
+        ├── evaluations/        # Output of evaluate()
         │   ├── features/                             # Shared across all classifiers
         │   │   └── {cv-slug}/                        # e.g., stratified-shuffle-split
         │   │       ├── significant_features/         # Per-seed top-N features

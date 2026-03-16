@@ -75,7 +75,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
-### `train_and_evaluate()` Parameters
+### `evaluate()` Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -99,7 +99,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()`; `False` → `train()` |
+| `with_evaluation` | `bool` | `True` | `True` → `evaluate()`; `False` → `train()` |
 | `**kwargs` | — | — | Forwarded to the dispatched method |
 
 ### Merge Methods

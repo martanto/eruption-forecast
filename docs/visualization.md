@@ -97,7 +97,7 @@ The `ModelEvaluator` class provides 7 evaluation plot types for single-seed and 
 7. **Prediction Distribution** - Score distributions by class (histogram + KDE)
 8. **SHAP Summary** - Beeswarm plot showing feature impact direction and magnitude
 
-**Aggregate across all seeds** (`MultiModelEvaluator`, requires `train_and_evaluate()`):
+**Aggregate across all seeds** (`MultiModelEvaluator`, requires `evaluate()`):
 - `evaluator.plot_all()` — runs all 10 aggregate plots at once
 - `evaluator.plot_roc()` — mean ROC ± std band across seeds
 - `evaluator.plot_precision_recall()` — mean PR curve ± std band

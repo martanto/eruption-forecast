@@ -1,3 +1,10 @@
+"""Evaluation-mode trainer that extends BaseModelTrainer with per-seed metrics.
+
+Adds the full evaluation pipeline on top of :class:`BaseModelTrainer`:
+train/test split, GridSearchCV training, held-out test evaluation, learning
+curves, SHAP, and metric aggregation across seeds.
+"""
+
 import os
 import json
 import warnings
@@ -18,11 +25,13 @@ from eruption_forecast.model.base_model_trainer import BaseModelTrainer
 
 
 class EvaluationTrainer(BaseModelTrainer):
-    """Extends BaseModelTrainer with train_and_evaluate() and its helper methods.
+    """Extends BaseModelTrainer with evaluate() and its helper methods.
 
-    Adds the full evaluation pipeline: per-seed train/test split, GridSearchCV
-    training, held-out test evaluation, learning curves, SHAP, and metric
-    aggregation across seeds.
+    Adds the full evaluation pipeline on top of :class:`BaseModelTrainer`:
+    per-seed stratified train/test split, random under-sampling on the training
+    set, feature selection, GridSearchCV training, held-out test evaluation,
+    learning-curve computation, SHAP explanation caching, and metric aggregation
+    across all seeds.
 
     All constructor arguments are forwarded to :class:`BaseModelTrainer`.
     """
@@ -256,9 +265,9 @@ class EvaluationTrainer(BaseModelTrainer):
         save_features: bool = False,
         plot_features: bool = False,
     ) -> str | None:
-        """Phase 1 worker: split, resample, select features, and save test data to disk.
+        """Phase 1 - Feature Selection worker: split, resample, select features, and save test data to disk.
 
-        Performs the shared per-seed work for train_and_evaluate mode:
+        Performs the shared per-seed work for evaluate mode:
         train/test split, random under-sampling on the training set, and
         feature selection. Saves the top-N significant features CSV and the
         held-out test split to disk so Phase 2 workers can load them without
@@ -334,9 +343,9 @@ class EvaluationTrainer(BaseModelTrainer):
             sampling_strategy=sampling_strategy,
         )
 
-        result = self._select_features_for_seed(
-            X_train=X_train,
-            y_train=y_train,
+        result = self.select_features(
+            features=X_train,
+            labels=y_train,
             random_state=random_state,
             significant_filepath=significant_filepath,
             all_features_filepath=all_features_filepath,
@@ -363,7 +372,7 @@ class EvaluationTrainer(BaseModelTrainer):
         """Phase 2 worker: train and evaluate one (seed, classifier) pair.
 
         Reconstructs the training data deterministically by re-running the
-        split and resample with the same random_state used in Phase 1. Loads
+        split and resample with the same random_state used in Phase 1 - Feature Selection. Loads
         the pre-selected top-N features from the significant features CSV
         written by _run_shared_evaluate(), then trains the specified classifier
         via GridSearchCV and evaluates it on the held-out test set.
@@ -372,10 +381,10 @@ class EvaluationTrainer(BaseModelTrainer):
         (seed, classifier) combinations via _run_jobs().
 
         Args:
-            random_state (int): Random seed matching the Phase 1 run for this seed.
+            random_state (int): Random seed matching the Phase 1 - Feature Selection run for this seed.
             classifier_slug (str): Slug name of the classifier to train.
             sampling_strategy (str | float, optional): Under-sampling ratio,
-                must match the value used in Phase 1. Defaults to 0.75.
+                must match the value used in Phase 1 - Feature Selection. Defaults to 0.75.
 
         Returns:
             tuple: An 8-tuple of (classifier_slug, random_state,
@@ -441,7 +450,7 @@ class EvaluationTrainer(BaseModelTrainer):
                 shap_explanation_filepath,
             )
 
-        # Deterministically reproduce the same split and resample as Phase 1.
+        # Deterministically reproduce the same split and resample as Phase 1 - Feature Selection.
         X_train, X_test, y_train, y_test = self._split_and_resample(
             X=self.df_features,
             y=self.df_labels,
@@ -500,7 +509,7 @@ class EvaluationTrainer(BaseModelTrainer):
         Args:
             random_states (list[int]): Ordered list of random seed values to inspect.
             sampling_strategy (str | float): Under-sampling ratio forwarded to
-                pending Phase 1 jobs.
+                pending Phase 1 - Feature Selection jobs.
             save_all_features (bool): Whether to save all ranked features per seed.
             plot_significant_features (bool): Whether to generate feature importance
                 plots.
@@ -508,10 +517,10 @@ class EvaluationTrainer(BaseModelTrainer):
         Returns:
             tuple: A 4-tuple of:
 
-                - **pending_phase1_jobs** (list[tuple]): Seeds missing shared work,
+                - **pending_feature_selection_jobs** (list[tuple]): Seeds missing shared work,
                   each as ``(random_state, sampling_strategy, save_all_features,
                   plot_significant_features)``.
-                - **pending_phase2_jobs** (list[tuple]): (seed, classifier) pairs
+                - **pending_evaluate_model_jobs** (list[tuple]): (seed, classifier) pairs
                   missing classifier outputs, each as
                   ``(random_state, classifier_slug, sampling_strategy)``.
                 - **records_per_classifier** (dict[str, list[dict]]): Already-completed
@@ -525,10 +534,10 @@ class EvaluationTrainer(BaseModelTrainer):
         all_metrics: dict[str, list[dict]] = {
             m.slug_name: [] for m in self.classifier_models
         }
-        pending_phase1_jobs: list[tuple] = []
-        pending_phase2_jobs: list[tuple] = []
+        pending_feature_selection_jobs: list[tuple] = []
+        pending_evaluate_model_jobs: list[tuple] = []
 
-        for _rs in random_states:
+        for random_state in random_states:
             (
                 _,
                 _significant_filepath,
@@ -537,17 +546,17 @@ class EvaluationTrainer(BaseModelTrainer):
                 _X_test_filepath,
                 _y_test_filepath,
                 _,
-            ) = self._generate_shared_filepaths(_rs)
+            ) = self._generate_shared_filepaths(random_state)
 
-            # Shared work not done or incomplete — queue Phase 1; no Phase 2 jobs possible yet.
+            # Shared work not done or incomplete — queue Phase 1 - Feature Selection; no Phase 2 jobs possible yet.
             if self.overwrite or not (
                 os.path.isfile(_significant_filepath)
                 and os.path.isfile(_X_test_filepath)
                 and os.path.isfile(_y_test_filepath)
             ):
-                pending_phase1_jobs.append(
+                pending_feature_selection_jobs.append(
                     (
-                        _rs,
+                        random_state,
                         sampling_strategy,
                         save_all_features,
                         plot_significant_features,
@@ -559,7 +568,7 @@ class EvaluationTrainer(BaseModelTrainer):
             for classifier_model in self.classifier_models:
                 classifier_slug = classifier_model.slug_name
                 _model_filepath, _metrics_filepath, _shap_filepath, _ = (
-                    self._generate_classifier_filepaths(_rs, classifier_slug)
+                    self._generate_classifier_filepaths(random_state, classifier_slug)
                 )
 
                 if (
@@ -571,7 +580,7 @@ class EvaluationTrainer(BaseModelTrainer):
                         metrics = json.load(f)
                     records_per_classifier[classifier_slug].append(
                         {
-                            "random_state": _rs,
+                            "random_state": random_state,
                             "significant_features_csv": _significant_filepath,
                             "trained_model_filepath": _model_filepath,
                             "X_test_filepath": _X_test_filepath,
@@ -581,11 +590,18 @@ class EvaluationTrainer(BaseModelTrainer):
                     )
                     all_metrics[classifier_slug].append(metrics)
                 else:
-                    pending_phase2_jobs.append((_rs, classifier_slug, sampling_strategy))
+                    pending_evaluate_model_jobs.append(
+                        (random_state, classifier_slug, sampling_strategy)
+                    )
 
-        return pending_phase1_jobs, pending_phase2_jobs, records_per_classifier, all_metrics
+        return (
+            pending_feature_selection_jobs,
+            pending_evaluate_model_jobs,
+            records_per_classifier,
+            all_metrics,
+        )
 
-    def train_and_evaluate(
+    def evaluate(
         self,
         random_state: int = 0,
         total_seed: int = 500,
@@ -597,14 +613,14 @@ class EvaluationTrainer(BaseModelTrainer):
 
         Uses a two-phase parallel dispatch to maximise CPU utilisation:
 
-        - **Phase 1** (parallel across seeds): train/test split, random
+        - **Phase 1 - Feature Selection** (parallel across seeds): train/test split, random
           under-sampling, and feature selection. Results are saved to disk.
-        - **Phase 2** (parallel across seed × classifier pairs): GridSearchCV
+        - **Phase 2 - Evaluate Model** (parallel across seed × classifier pairs): GridSearchCV
           training and held-out test evaluation for every (seed, classifier)
           combination. Training data is reconstructed deterministically via
           the fixed ``random_state``.
 
-        Under-sampling and feature selection are run ONCE per seed (Phase 1)
+        Under-sampling and feature selection are run ONCE per seed (Phase 1 - Feature Selection)
         and reused across all classifiers (Phase 2), which significantly
         reduces redundant computation when training multiple classifiers.
 
@@ -623,47 +639,64 @@ class EvaluationTrainer(BaseModelTrainer):
             ...     extracted_features_csv="...",
             ...     label_features_csv="...",
             ...     classifiers=["rf", "xgb"],
-            ... ).train_and_evaluate(random_state=42, total_seed=100)
+            ... ).evaluate(random_state=42, total_seed=100)
         """
-        self.create_directories()
-        for slug in self.classifier_dirs:
-            ensure_dir(self.metrics_dirs[slug])
-
-        if save_all_features:
-            ensure_dir(self.shared_all_features_dir)
-
-        if plot_significant_features:
-            ensure_dir(self.shared_figures_dir)
+        self.with_evaluation = True
+        # Re-derive all output paths now that with_evaluation is True so that
+        # artefacts land under "evaluations/" instead of "predictions/".
+        (
+            self.output_dir,
+            self.shared_features_dir,
+            self.shared_significant_dir,
+            self.shared_all_features_dir,
+            self.shared_figures_dir,
+            self.shared_tests_dir,
+            self.classifier_dirs,
+            self.models_dirs,
+            self.metrics_dirs,
+        ) = self.set_directories(os.path.dirname(self.output_dir))
+        self.create_directories(
+            save_all_features, plot_significant_features, with_evaluation=True
+        )
 
         random_states: list[int] = [random_state + seed for seed in range(total_seed)]
-        pending_phase1_jobs, pending_phase2_jobs, records_per_classifier, all_metrics = (
-            self._collect_pending_evaluate_jobs(
-                random_states,
-                sampling_strategy,
-                save_all_features,
-                plot_significant_features,
-            )
+        (
+            pending_feature_selection_jobs,
+            pending_evaluate_model_jobs,
+            records_per_classifier,
+            all_metrics,
+        ) = self._collect_pending_evaluate_jobs(
+            random_states,
+            sampling_strategy,
+            save_all_features,
+            plot_significant_features,
         )
 
         # ===== PHASE 1: Parallel feature selection across seeds =====
-        phase1_results: list[str | None] = self._run_jobs(
-            self._run_shared_evaluate, pending_phase1_jobs
+        feature_selection_results: list[str | None] = self._run_jobs(
+            self._run_shared_evaluate, pending_feature_selection_jobs
         )
 
         # Build Phase 2 jobs for seeds that completed Phase 1 successfully.
-        new_phase2_jobs: list[tuple] = []
-        for result_path, job in zip(phase1_results, pending_phase1_jobs, strict=True):
+        new_evaluate_model_jobs: list[tuple] = []
+        for result_path, job in zip(
+            feature_selection_results, pending_feature_selection_jobs, strict=True
+        ):
             if result_path is None:
                 continue  # Feature selection produced 0 features — skip all classifiers.
             _rs = job[0]
             for classifier_model in self.classifier_models:
-                new_phase2_jobs.append((_rs, classifier_model.slug_name, sampling_strategy))
+                new_evaluate_model_jobs.append(
+                    (_rs, classifier_model.slug_name, sampling_strategy)
+                )
 
         # ===== PHASE 2: Parallel (seed × classifier) training + evaluation =====
-        all_phase2_jobs = pending_phase2_jobs + new_phase2_jobs
-        phase2_results = self._run_jobs(self._run_classify_and_evaluate, all_phase2_jobs)
+        all_evaluate_model_jobs = pending_evaluate_model_jobs + new_evaluate_model_jobs
+        evaluate_model_results = self._run_jobs(
+            self._run_classify_and_evaluate, all_evaluate_model_jobs
+        )
 
-        for result in phase2_results:
+        for result in evaluate_model_results:
             if result is None:
                 continue
             (
@@ -744,7 +777,7 @@ class EvaluationTrainer(BaseModelTrainer):
 
         Example:
             >>> trainer = ModelTrainer(...)
-            >>> trainer.train_and_evaluate(total_seed=100)
+            >>> trainer.evaluate(total_seed=100)
             >>> # Creates: all_metrics_{suffix}.csv and metrics_summary_{suffix}.csv
         """
         classifier_dir = self.classifier_dirs[classifier_slug]

@@ -3,7 +3,7 @@
 This page covers how to evaluate trained models and run inference on new seismic data. Four classes are involved:
 
 - **`ModelEvaluator`** — evaluates a single trained model (one seed) against a held-out test set.
-- **`MultiModelEvaluator`** — aggregates metrics and plots across all seeds produced by `train_and_evaluate()`.
+- **`MultiModelEvaluator`** — aggregates metrics and plots across all seeds produced by `evaluate()`.
 - **`ClassifierComparator`** — compares multiple classifiers side-by-side with ranking tables and comparison plots.
 - **`ModelPredictor`** — runs inference using models trained by `ModelTrainer.train()`, in either evaluation or forecast mode.
 
@@ -11,7 +11,7 @@ This page covers how to evaluate trained models and run inference on new seismic
 
 ## ModelEvaluator — Single-Seed Evaluation
 
-`ModelEvaluator` computes classification metrics and generates diagnostic plots for a single trained model evaluated on a held-out test set. Use it after `train_and_evaluate()` (which saves per-seed test splits automatically) or after calling `ModelPredictor.predict_best()` (which returns a ready-made evaluator for the best-performing seed).
+`ModelEvaluator` computes classification metrics and generates diagnostic plots for a single trained model evaluated on a held-out test set. Use it after `evaluate()` (which saves per-seed test splits automatically) or after calling `ModelPredictor.predict_best()` (which returns a ready-made evaluator for the best-performing seed).
 
 ### Creating an evaluator
 
@@ -54,7 +54,7 @@ evaluator = ModelEvaluator.from_files(
 | `"RandomForestClassifier"` | `"StratifiedKFold"` | `<cwd>/output/trainings/evaluations/classifiers/random-forest-classifier/stratified-k-fold/` |
 | `"XGBClassifier"` | `"ShuffleSplit"` | `<cwd>/output/trainings/evaluations/classifiers/xgb-classifier/shuffle-split/` |
 
-Both names are passed through `slugify_class_name()` — `CamelCase` → `kebab-case`. This convention matches the directory structure produced by `ModelTrainer.train_and_evaluate()`.
+Both names are passed through `slugify_class_name()` — `CamelCase` → `kebab-case`. This convention matches the directory structure produced by `ModelTrainer.evaluate()`.
 
 Once created, inspect the model with:
 
@@ -139,7 +139,7 @@ path = evaluator.save_metrics("results/xgb_42_metrics.json")
 
 ## MultiModelEvaluator — Aggregate Across All Seeds
 
-`MultiModelEvaluator` aggregates evaluation results across all seeds produced by `train_and_evaluate()`. It can work from a model registry CSV (enabling aggregate plots), from per-seed JSON metrics files (enabling aggregate statistics), or from both at once.
+`MultiModelEvaluator` aggregates evaluation results across all seeds produced by `evaluate()`. It can work from a model registry CSV (enabling aggregate plots), from per-seed JSON metrics files (enabling aggregate statistics), or from both at once.
 
 ### Creating an evaluator
 

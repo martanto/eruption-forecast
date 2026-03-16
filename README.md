@@ -61,7 +61,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, frequency band contribution charts, and **learning curve plots** (`plot_learning_curve_grid`) via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
-- **Two Training Workflows**: `train_and_evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
+- **Two Training Workflows**: `evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
 - **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables sklearn-compatible `predict_proba()` / `predict()` calls directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function — no external dependencies except an optional `weasyprint` for PDF export
@@ -121,7 +121,7 @@ Raw Seismic Data (SDS / FDSN)
 │  │   or        │   │ (10 classifiers,     │ │
 │  │  combined   │   │  3 CV strategies)    │ │
 │  └─────────────┘   └──────────────────────┘ │
-│         ↓  train_and_evaluate()  ↓ train()  │
+│         ↓  evaluate()  ↓ train()  │
 │    80/20 split + metrics   Full dataset     │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
@@ -528,7 +528,7 @@ fm.train(
 
 ### Compare multiple classifiers side-by-side
 
-After training several classifiers with `train_and_evaluate()`, use `ClassifierComparator`
+After training several classifiers with `evaluate()`, use `ClassifierComparator`
 to rank them and produce comparison plots:
 
 ```python

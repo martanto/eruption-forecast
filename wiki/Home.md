@@ -18,7 +18,7 @@ This package produces **probabilistic predictions**, not deterministic guarantee
 | [Data Sources](Data-Sources) | SDS format, FDSN web service, data loading |
 | [Quick Start](Quick-Start) | End-to-end pipeline example |
 | [Pipeline Walkthrough](Pipeline-Walkthrough) | Per-stage guide (tremor → labels → features → training → forecast) |
-| [Training Workflows](Training-Workflows) | `train_and_evaluate()` vs `train()`, multi-seeding, feature selection |
+| [Training Workflows](Training-Workflows) | `evaluate()` vs `train()`, multi-seeding, feature selection |
 | [Classifiers and CV](Classifiers-and-CV) | Supported classifiers, hyperparameter grids, cross-validation strategies |
 | [Evaluation and Forecasting](Evaluation-and-Forecasting) | ModelEvaluator, MultiModelEvaluator, ModelPredictor |
 | [Visualization](Visualization) | All plot types with code examples |

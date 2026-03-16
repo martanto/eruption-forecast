@@ -313,7 +313,7 @@ Feature selection runs inside `ModelTrainer` automatically — you do not need t
 Two workflows are available depending on your evaluation strategy:
 
 ```
-   train_and_evaluate()                  train()
+   evaluate()                  train()
   ─────────────────────            ────────────────────
       Full Dataset                      Full Dataset
            │                                │
@@ -337,12 +337,12 @@ Two workflows are available depending on your evaluation strategy:
     Save model + metrics
 ```
 
-- **`train_and_evaluate()`** — splits the full dataset 80/20 internally. Trains on the 80% split and evaluates each seed on the held-out 20%. Use this when you want per-seed metrics and an in-sample accuracy estimate to compare classifiers or tune hyperparameters.
+- **`evaluate()`** — splits the full dataset 80/20 internally. Trains on the 80% split and evaluates each seed on the held-out 20%. Use this when you want per-seed metrics and an in-sample accuracy estimate to compare classifiers or tune hyperparameters.
 - **`train()`** — treats the entire dataset as the training set with no internal split. Evaluation is deferred to `ModelPredictor` using a separate future dataset. Use this for final production models where no data should be withheld.
 
 For full detail on both workflows, see the [Training Workflows](Training-Workflows) wiki page.
 
-### `train_and_evaluate()` — with held-out test set
+### `evaluate()` — with held-out test set
 
 ```python
 from eruption_forecast.model.model_trainer import ModelTrainer
@@ -358,7 +358,7 @@ trainer = ModelTrainer(
     n_jobs=4,
 )
 
-trainer.train_and_evaluate(
+trainer.evaluate(
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
@@ -386,7 +386,7 @@ trainer.train(
 `fit()` is a unified entry point that dispatches to either workflow based on the `with_evaluation` flag:
 
 ```python
-# Equivalent to train_and_evaluate()
+# Equivalent to evaluate()
 trainer.fit(with_evaluation=True, random_state=0, total_seed=500, sampling_strategy=0.75)
 
 # Equivalent to train()

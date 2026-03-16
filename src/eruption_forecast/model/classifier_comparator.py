@@ -44,7 +44,7 @@ class ClassifierComparator:
     """Compare multiple classifiers side-by-side using aggregate seed metrics.
 
     Accepts a mapping of classifier names to trained-model registry CSV paths
-    (produced by ``ModelTrainer.train_and_evaluate()``), constructs one
+    (produced by ``ModelTrainer.evaluate()``), constructs one
     ``MultiModelEvaluator`` per classifier, and exposes methods for generating
     comparison tables and plots.
 

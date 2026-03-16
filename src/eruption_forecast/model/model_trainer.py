@@ -1,3 +1,10 @@
+"""Top-level ModelTrainer that composes EvaluationTrainer and train-only logic.
+
+Exposes :meth:`ModelTrainer.fit` as the single entry point that dispatches to
+:meth:`evaluate` (80/20 split + metrics) or :meth:`train` (full
+dataset, no metrics) depending on the ``with_evaluation`` flag.
+"""
+
 import os
 from typing import Self
 
@@ -6,7 +13,6 @@ import pandas as pd
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import random_under_sampler
-from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.evaluation_trainer import EvaluationTrainer
 
 
@@ -19,17 +25,17 @@ class ModelTrainer(EvaluationTrainer):
     2. Random under-sampling on training set only to balance classes
     3. Feature selection on training set using tsfresh relevance filtering (ONCE per seed)
     4. For each classifier: GridSearchCV training and cross-validation
-    5. Evaluation on held-out test set (when using train_and_evaluate)
+    5. Evaluation on held-out test set (when using evaluate)
 
-    Both ``train_and_evaluate`` and ``train`` use a two-phase parallel dispatch:
+    Both ``evaluate`` and ``train`` use a two-phase parallel dispatch:
 
-    - **Phase 1** (parallel across seeds): shared per-seed work (split/resample +
+    - **Phase 1 - Feature Selection** (parallel across seeds): shared per-seed work (split/resample +
       feature selection). Results are saved to disk.
     - **Phase 2** (parallel across seed × classifier pairs): one GridSearchCV job
       per (seed, classifier) combination. Training data is reconstructed
       deterministically via the fixed ``random_state``.
 
-    Use :meth:`train_and_evaluate` for 80/20 split with held-out evaluation metrics,
+    Use :meth:`evaluate` for 80/20 split with held-out evaluation metrics,
     or :meth:`train` for full-dataset training (no metrics) intended for production.
     Call :meth:`fit` to dispatch between the two modes via the ``with_evaluation`` flag.
 
@@ -56,7 +62,7 @@ class ModelTrainer(EvaluationTrainer):
         save_features: bool = False,
         plot_features: bool = False,
     ) -> str | None:
-        """Phase 1 worker: resample the full dataset and select features for train mode.
+        """Phase 1 - Feature Selection worker: resample the full dataset and select features for train mode.
 
         Performs the shared per-seed work for train (no evaluation) mode:
         random under-sampling on the full dataset and feature selection. Saves
@@ -149,7 +155,7 @@ class ModelTrainer(EvaluationTrainer):
         """Phase 2 worker: train one (seed, classifier) pair in train-only mode.
 
         Reconstructs the resampled training data deterministically by re-running
-        random under-sampling with the same random_state used in Phase 1. Loads
+        random under-sampling with the same random_state used in Phase 1 - Feature Selection. Loads
         the pre-selected top-N features from the significant features CSV written
         by _run_shared_train(), then trains the specified classifier via
         GridSearchCV and saves the model.
@@ -158,10 +164,10 @@ class ModelTrainer(EvaluationTrainer):
         in parallel across all (seed, classifier) combinations via _run_jobs().
 
         Args:
-            random_state (int): Random seed matching the Phase 1 run for this seed.
+            random_state (int): Random seed matching the Phase 1 - Feature Selection run for this seed.
             classifier_slug (str): Slug name of the classifier to train.
             sampling_strategy (str | float, optional): Under-sampling ratio,
-                must match the value used in Phase 1. Defaults to 0.75.
+                must match the value used in Phase 1 - Feature Selection. Defaults to 0.75.
 
         Returns:
             tuple: A 4-tuple of (classifier_slug, random_state,
@@ -206,7 +212,7 @@ class ModelTrainer(EvaluationTrainer):
             )
             return classifier_slug, random_state, significant_filepath, model_filepath
 
-        # Deterministically reproduce the same resample as Phase 1.
+        # Deterministically reproduce the same resample as Phase 1 - Feature Selection.
         features_resampled, labels_resampled = random_under_sampler(
             features=self.df_features,
             labels=self.df_labels,
@@ -249,7 +255,7 @@ class ModelTrainer(EvaluationTrainer):
         Args:
             random_states (list[int]): Ordered list of random seed values to inspect.
             sampling_strategy (str | float): Under-sampling ratio forwarded to
-                pending Phase 1 jobs.
+                pending Phase 1 - Feature Selection jobs.
             save_all_features (bool): Whether to save all ranked features per seed.
             plot_significant_features (bool): Whether to generate feature importance
                 plots.
@@ -257,10 +263,10 @@ class ModelTrainer(EvaluationTrainer):
         Returns:
             tuple: A 3-tuple of:
 
-                - **pending_phase1_jobs** (list[tuple]): Seeds missing shared work,
+                - **pending_feature_selection_jobs** (list[tuple]): Seeds missing shared work,
                   each as ``(random_state, sampling_strategy, save_all_features,
                   plot_significant_features)``.
-                - **pending_phase2_jobs** (list[tuple]): (seed, classifier) pairs
+                - **pending_training_model_jobs** (list[tuple]): (seed, classifier) pairs
                   missing model files, each as
                   ``(random_state, classifier_slug, sampling_strategy)``.
                 - **records_per_classifier** (dict[str, list[dict]]): Already-completed
@@ -269,34 +275,38 @@ class ModelTrainer(EvaluationTrainer):
         records_per_classifier: dict[str, list[dict]] = {
             m.slug_name: [] for m in self.classifier_models
         }
-        pending_phase1_jobs: list[tuple] = []
-        pending_phase2_jobs: list[tuple] = []
+        pending_feature_selection_jobs: list[tuple] = []
+        pending_training_model_jobs: list[tuple] = []
 
-        for _rs in random_states:
+        for random_state in random_states:
             # Generate all shared filepaths for this seed (significant features,
             # optional all-features CSV, plots, etc.).
-            _shared_paths = self._generate_shared_filepaths(_rs)
-            _, _significant_filepath, * _optional_shared_paths = _shared_paths
+            _shared_paths = self._generate_shared_filepaths(random_state)
+            # _generate_shared_filepaths returns a trailing boolean flag; exclude it from path checks.
+            _shared_paths_without_flag = _shared_paths[:-1]
+            _, _significant_filepath, *_optional_shared_paths = _shared_paths_without_flag
 
-            # Shared work not done — queue Phase 1; no Phase 2 jobs possible yet.
-            phase1_incomplete = self.overwrite or not os.path.isfile(
+            # Shared work not done — queue Phase 1 - Feature Selection; no Phase 2 jobs possible yet.
+            feature_selection_incomplete = self.overwrite or not os.path.isfile(
                 _significant_filepath
             )
 
             # If additional shared artifacts were requested, ensure they also exist
-            # before considering Phase 1 complete for this seed.
-            if not phase1_incomplete and (save_all_features or plot_significant_features):
+            # before considering Phase 1 - Feature Selection complete for this seed.
+            if not feature_selection_incomplete and (
+                save_all_features or plot_significant_features
+            ):
                 for _path in _optional_shared_paths:
                     if _path is None:
                         continue
                     if not os.path.isfile(_path):
-                        phase1_incomplete = True
+                        feature_selection_incomplete = True
                         break
 
-            if phase1_incomplete:
-                pending_phase1_jobs.append(
+            if feature_selection_incomplete:
+                pending_feature_selection_jobs.append(
                     (
-                        _rs,
+                        random_state,
                         sampling_strategy,
                         save_all_features,
                         plot_significant_features,
@@ -307,22 +317,28 @@ class ModelTrainer(EvaluationTrainer):
             # Shared work done — check each classifier independently.
             for classifier_model in self.classifier_models:
                 classifier_slug = classifier_model.slug_name
-                _model_filepath = self._get_model_filepath(_rs, classifier_slug)
+                _model_filepath = self._get_model_filepath(
+                    random_state, classifier_slug
+                )
 
                 if not self.overwrite and os.path.isfile(_model_filepath):
                     records_per_classifier[classifier_slug].append(
                         {
-                            "random_state": _rs,
+                            "random_state": random_state,
                             "significant_features_csv": _significant_filepath,
                             "trained_model_filepath": _model_filepath,
                         }
                     )
                 else:
-                    pending_phase2_jobs.append(
-                        (_rs, classifier_slug, sampling_strategy)
+                    pending_training_model_jobs.append(
+                        (random_state, classifier_slug, sampling_strategy)
                     )
 
-        return pending_phase1_jobs, pending_phase2_jobs, records_per_classifier
+        return (
+            pending_feature_selection_jobs,
+            pending_training_model_jobs,
+            records_per_classifier,
+        )
 
     def train(
         self,
@@ -336,13 +352,13 @@ class ModelTrainer(EvaluationTrainer):
 
         Uses a two-phase parallel dispatch:
 
-        - **Phase 1** (parallel across seeds): random under-sampling and feature
+        - **Phase 1 - Feature Selection** (parallel across seeds): random under-sampling and feature
           selection on the full dataset. Results are saved to disk.
         - **Phase 2** (parallel across seed × classifier pairs): one GridSearchCV
           job per (seed, classifier) combination. Training data is reconstructed
           deterministically via the fixed ``random_state``.
 
-        Unlike ``train_and_evaluate()``, this method does NOT perform a train/test
+        Unlike ``evaluate()``, this method does NOT perform a train/test
         split and does NOT compute evaluation metrics. It is intended for final model
         training when a separate "future" dataset will be used for evaluation
         via ``ModelPredictor``.
@@ -365,50 +381,47 @@ class ModelTrainer(EvaluationTrainer):
             ... )
             >>> trainer.train(random_state=0, total_seed=5)
         """
-        # Since we are not using evaluation, change the folder name from
-        # ``evaluations`` to ``predictions``
-        output_dir = self.output_dir.replace("evaluations", "predictions")
-
-        # Update current directories with new output directory
-        self.update_directories(output_dir=output_dir)
-
-        if save_all_features:
-            ensure_dir(self.shared_all_features_dir)
-
-        if plot_significant_features:
-            ensure_dir(self.shared_figures_dir)
+        # Ensure train-only runs use the predictions output tree, even after evaluate().
+        self.with_evaluation = False
+        self.create_directories(save_all_features, plot_significant_features)
 
         random_states: list[int] = [random_state + seed for seed in range(total_seed)]
-        pending_phase1_jobs, pending_phase2_jobs, records_per_classifier = (
-            self._collect_pending_train_jobs(
-                random_states,
-                sampling_strategy,
-                save_all_features,
-                plot_significant_features,
-            )
+        (
+            pending_feature_selection_jobs,
+            pending_training_model_jobs,
+            records_per_classifier,
+        ) = self._collect_pending_train_jobs(
+            random_states,
+            sampling_strategy,
+            save_all_features,
+            plot_significant_features,
         )
 
         # ===== PHASE 1: Parallel feature selection across seeds =====
-        phase1_results: list[str | None] = self._run_jobs(
-            self._run_shared_train, pending_phase1_jobs
+        feature_selection_results: list[str | None] = self._run_jobs(
+            self._run_shared_train, pending_feature_selection_jobs
         )
 
         # Build Phase 2 jobs for seeds that completed Phase 1 successfully.
-        new_phase2_jobs: list[tuple] = []
-        for result_path, job in zip(phase1_results, pending_phase1_jobs, strict=True):
+        new_training_model_jobs: list[tuple] = []
+        for result_path, job in zip(
+            feature_selection_results, pending_feature_selection_jobs, strict=True
+        ):
             if result_path is None:
                 continue  # Feature selection produced 0 features — skip all classifiers.
             _rs = job[0]
             for classifier_model in self.classifier_models:
-                new_phase2_jobs.append(
+                new_training_model_jobs.append(
                     (_rs, classifier_model.slug_name, sampling_strategy)
                 )
 
         # ===== PHASE 2: Parallel (seed × classifier) training =====
-        all_phase2_jobs = pending_phase2_jobs + new_phase2_jobs
-        phase2_results = self._run_jobs(self._run_train_classifier, all_phase2_jobs)
+        all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs
+        training_model_results = self._run_jobs(
+            self._run_train_classifier, all_training_model_jobs
+        )
 
-        for result in phase2_results:
+        for result in training_model_results:
             if result is None:
                 continue
             (
@@ -458,10 +471,10 @@ class ModelTrainer(EvaluationTrainer):
         return None
 
     def fit(self, with_evaluation: bool = True, **kwargs) -> Self:
-        """Dispatch to ``train_and_evaluate()`` or ``train()`` based on ``with_evaluation``.
+        """Dispatch to ``evaluate()`` or ``train()`` based on ``with_evaluation``.
 
         Args:
-            with_evaluation (bool, optional): If True, calls ``train_and_evaluate()``
+            with_evaluation (bool, optional): If True, calls ``evaluate()``
                 (80/20 split + metrics). If False, calls ``train()`` (full dataset,
                 no metrics). Defaults to True.
             **kwargs: Additional keyword arguments forwarded to the chosen method.
@@ -470,7 +483,7 @@ class ModelTrainer(EvaluationTrainer):
             Self: The ModelTrainer instance for method chaining.
         """
         if with_evaluation:
-            self.train_and_evaluate(**kwargs)
+            self.evaluate(**kwargs)
         else:
             self.train(**kwargs)
         return self

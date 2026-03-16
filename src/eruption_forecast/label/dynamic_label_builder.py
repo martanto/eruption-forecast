@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from eruption_forecast import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import resolve_output_dir
 from eruption_forecast.utils.date_utils import sort_dates, to_datetime
+from eruption_forecast.label.label_builder import LabelBuilder
 
 
 class DynamicLabelBuilder(LabelBuilder):
