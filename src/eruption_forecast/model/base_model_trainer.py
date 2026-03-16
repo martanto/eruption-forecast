@@ -584,6 +584,7 @@ class BaseModelTrainer:
                     df=combined_features_df.reset_index(),
                     filepath=os.path.join(self.shared_features_dir, filename),
                     overwrite=True,
+                    values_column=score_col,
                 )
 
         return combined_features_df
