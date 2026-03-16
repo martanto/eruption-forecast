@@ -13,34 +13,45 @@ from sklearn.metrics import f1_score, make_scorer, recall_score
 
 
 def safe_recall(y_true, y_pred, **kwargs) -> float:
-    """Recall score that avoids ZeroDivisionError for edge cases.
+    """Compute recall score with zero-division handling.
 
-    Parameters
-    ----------
-    y_true : array-like
-        Ground truth (correct) target values.
-    y_pred : array-like
-        Estimated targets as returned by a classifier.
-    **kwargs :
-        Additional keyword arguments forwarded to ``sklearn.metrics.recall_score``.
+    Wraps ``sklearn.metrics.recall_score`` and passes ``zero_division=0`` so
+    that folds or seeds with no positive predictions return 0.0 instead of
+    raising a ``ZeroDivisionError``.
+
+    Args:
+        y_true (array-like): Ground-truth target values.
+        y_pred (array-like): Estimated targets as returned by a classifier.
+        **kwargs: Additional keyword arguments forwarded to
+            ``sklearn.metrics.recall_score``.
+
+    Returns:
+        float: Recall score in [0, 1], or 0.0 when no positive predictions exist.
     """
     return recall_score(y_true, y_pred, zero_division=0, **kwargs)
 
 
 def safe_f1_weighted(y_true, y_pred, **kwargs) -> float:
-    """Weighted F1 score that avoids ZeroDivisionError for edge cases.
+    """Compute weighted F1 score with zero-division handling.
 
-    Parameters
-    ----------
-    y_true : array-like
-        Ground truth (correct) target values.
-    y_pred : array-like
-        Estimated targets as returned by a classifier.
-    **kwargs :
-        Additional keyword arguments forwarded to ``sklearn.metrics.f1_score``.
+    Wraps ``sklearn.metrics.f1_score`` with ``average="weighted"`` and
+    ``zero_division=0`` so that folds or seeds with no positive predictions
+    return 0.0 instead of raising a ``ZeroDivisionError``.
+
+    Args:
+        y_true (array-like): Ground-truth target values.
+        y_pred (array-like): Estimated targets as returned by a classifier.
+        **kwargs: Additional keyword arguments forwarded to
+            ``sklearn.metrics.f1_score``.
+
+    Returns:
+        float: Weighted F1 score in [0, 1], or 0.0 when no positive predictions exist.
     """
     return f1_score(y_true, y_pred, average="weighted", zero_division=0, **kwargs)
 
+
+GPU_CLASSIFIERS = {"xgb", "voting"}
+"""Use GPU if classifier is either one of these"""
 
 # Module-level callables are picklable by loky workers (unlike lambdas or
 # make_scorer objects built inside __init__).
@@ -66,9 +77,22 @@ CLASSIFIERS: list[str] = [
 
 DEFAULT_GRID_PARAMS: dict[str, dict[str, Any] | list[dict[str, Any]]] = {
     "svm": [
-        {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["poly"], "degree": [2, 3], "decision_function_shape": ["ovr"]},
-        {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["rbf"], "decision_function_shape": ["ovr"]},
-        {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["linear"], "decision_function_shape": ["ovr"]},
+        {
+            "C": [0.001, 0.01, 0.1, 1, 10],
+            "kernel": ["poly"],
+            "degree": [2, 3],
+            "decision_function_shape": ["ovr"],
+        },
+        {
+            "C": [0.001, 0.01, 0.1, 1, 10],
+            "kernel": ["rbf"],
+            "decision_function_shape": ["ovr"],
+        },
+        {
+            "C": [0.001, 0.01, 0.1, 1, 10],
+            "kernel": ["linear"],
+            "decision_function_shape": ["ovr"],
+        },
     ],
     "knn": {
         "n_neighbors": [3, 6, 12, 24],
@@ -106,13 +130,21 @@ DEFAULT_GRID_PARAMS: dict[str, dict[str, Any] | list[dict[str, Any]]] = {
         "scale_pos_weight": [1],  # RandomUnderSampler already balances classes
     },
     "nn": {
-        "activation": ["logistic", "tanh", "relu"],  # "identity" dropped — linear, rarely useful
+        "activation": [
+            "logistic",
+            "tanh",
+            "relu",
+        ],  # "identity" dropped — linear, rarely useful
         "hidden_layer_sizes": [(50,), (100,), (100, 50), (100, 100)],
         "learning_rate_init": [0.001, 0.01],
     },
     "nb": {"var_smoothing": [1e-9, 1e-7, 1e-5, 1e-3, 1e-1, 1.0]},
     "lr": [
-        {"penalty": ["l2"], "C": [0.001, 0.01, 0.1, 1, 10], "solver": ["lbfgs", "saga"]},
+        {
+            "penalty": ["l2"],
+            "C": [0.001, 0.01, 0.1, 1, 10],
+            "solver": ["lbfgs", "saga"],
+        },
         {"penalty": ["l1"], "C": [0.001, 0.01, 0.1, 1, 10], "solver": ["saga"]},
         {
             "penalty": ["elasticnet"],
