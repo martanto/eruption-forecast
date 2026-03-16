@@ -14,7 +14,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
-from eruption_forecast.plots.styles import apply_nature_style
 
 
 if TYPE_CHECKING:
@@ -69,20 +68,14 @@ def plot_shap_summary(
     # model types, so the masker is always passed explicitly here.
     shap_explanation = compute_shap_explanation(model, X)
 
-    with apply_nature_style():
-        # shap.plots.beeswarm always draws on the current figure; capture it
-        # immediately after the call rather than diffing figure numbers, which
-        # is fragile when other threads or callbacks create figures concurrently.
-        shap.plots.beeswarm(
-            shap_explanation,
-            max_display=max_display,
-            s=32,  # Default 16
-            show=False,
-        )
-        fig = plt.gcf()
-        fig.set_size_inches(20, max(8, max_display * 0.5))
-        fig.set_dpi(dpi)
-        fig.suptitle(title or "SHAP Summary Plot", y=1.02)
+    fig = plt.figure(figsize=(20, max(8, max_display * 0.5)), dpi=dpi)
+    shap.plots.beeswarm(
+        shap_explanation,
+        max_display=max_display,
+        s=32,  # Default 16
+        show=False,
+    )
+    fig.suptitle(title or "SHAP Summary Plot", y=1.02)
 
     return fig, shap_explanation
 
@@ -306,11 +299,8 @@ def plot_aggregate_shap_summary(
         seed_explanations, per_seed_names, all_names
     )
 
-    with apply_nature_style():
-        shap.plots.beeswarm(agg_explanation, max_display=max_display, show=False)
-        fig = plt.gcf()
-        fig.set_size_inches(20, max(8, max_display * 0.5))
-        fig.set_dpi(dpi)
-        fig.suptitle(title or "Aggregate SHAP Beeswarm", y=1.02)
+    fig = plt.figure(figsize=(20, max(8, max_display * 0.5)), dpi=dpi)
+    shap.plots.beeswarm(agg_explanation, max_display=max_display, show=False)
+    fig.suptitle(title or "Aggregate SHAP Beeswarm", y=1.02)
 
     return fig, agg_explanation
