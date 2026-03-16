@@ -70,11 +70,12 @@ def plot_shap_summary(
     # model types, so the masker is always passed explicitly here.
     shap_explanation = compute_shap_explanation(model, X)
 
-    fig = plt.figure(figsize=(20, max(8, max_display * 0.5)), dpi=dpi)
+    fig = plt.figure(figsize=(16, max(8, max_display * 0.5)), dpi=dpi)
     shap.plots.beeswarm(
         shap_explanation,
         max_display=max_display,
         s=32,  # Default 16
+        plot_size=None,
         show=False,
     )
     fig.suptitle(title or "SHAP Summary Plot", y=1.02)
@@ -122,10 +123,12 @@ def plot_shap_from_file(
 
     explanation: shap.Explanation = joblib.load(path)
 
-    fig = plt.figure(figsize=(20, max(8, max_display * 0.5)), dpi=dpi)
+    fig = plt.figure(figsize=(16, max(8, max_display * 0.5)), dpi=dpi)
     shap.plots.beeswarm(
         explanation,
         max_display=max_display,
+        s=32,
+        plot_size=None,
         show=False,
     )
     fig.suptitle(title or "SHAP Summary Plot", y=1.02)
@@ -165,7 +168,9 @@ def compute_shap_explanation(
     cols = list(X.columns) if isinstance(X, pd.DataFrame) else feature_names
     masker = shap.maskers.Independent(X, max_samples=len(X))  # ty:ignore[possibly-missing-attribute]
     explainer = shap.Explainer(model.predict_proba, masker)
-    shap_output = explainer(X)
+    logger.info("Computing SHAP values for %d samples ...", len(X))
+    shap_output = explainer(X, silent=True)
+    logger.info("SHAP computation complete.")
     # Binary classifier: shape (n, features, 2) — take positive-class slice.
     if shap_output.values.ndim == 3:  # noqa: PD011
         return shap.Explanation(
@@ -352,8 +357,14 @@ def plot_aggregate_shap_summary(
         seed_explanations, per_seed_names, all_names
     )
 
-    fig = plt.figure(figsize=(20, max(8, max_display * 0.5)), dpi=dpi)
-    shap.plots.beeswarm(agg_explanation, max_display=max_display, show=False)
+    fig = plt.figure(figsize=(16, max(8, max_display * 0.5)), dpi=dpi)
+    shap.plots.beeswarm(
+        agg_explanation,
+        max_display=max_display,
+        s=32,
+        plot_size=None,
+        show=False,
+    )
     fig.suptitle(title or "Aggregate SHAP Beeswarm", y=1.02)
 
     return fig, agg_explanation
