@@ -559,13 +559,13 @@ class BaseModelTrainer:
                 else f"top_{number_of_significant_features}_{SIGNIFICANT_FEATURES_FILENAME}"
             )
 
-            # Determine the score column name: "p_values" for tsfresh,
-            # "importance" for random_forest. Sort by whatever column is present.
+            # The score column is always "score" for aggregated per-seed files.
+            # Sort by whatever column is present for backward-compat with old files.
             score_cols = [c for c in combined_features_df.columns if c != "features"]
             if not score_cols:
                 raise ValueError(
                     "Significant features CSV must contain a score column "
-                    "(e.g. 'p_values' or 'importance') besides the 'features' index."
+                    "(e.g. 'score') besides the 'features' index."
                 )
             score_col = score_cols[0]
             combined_features_df = (
@@ -695,6 +695,7 @@ class BaseModelTrainer:
             df=all_selected_features,
             filepath=all_figures_filepath,
             top_features=top_features or self.number_of_significant_features,
+            values_column="score",
             overwrite=self.overwrite,
             dpi=150,
         )
