@@ -297,6 +297,7 @@ class EvaluationTrainer(BaseModelTrainer):
         (
             _,
             significant_filepath,
+            tsfresh_filepath,
             all_features_filepath,
             all_figures_filepath,
             X_test_filepath,
@@ -310,9 +311,11 @@ class EvaluationTrainer(BaseModelTrainer):
 
         # Short-circuit if shared work was already done in a previous run,
         # but only if all required shared artifacts actually exist.
+        # For "combined" method, Phase 1 completion is marked by tsfresh_filepath.
+        phase1_marker = tsfresh_filepath
         can_skip = (
             can_skip_shared
-            and os.path.exists(significant_filepath)
+            and os.path.exists(phase1_marker)
             and os.path.exists(X_test_filepath)
             and os.path.exists(y_test_filepath)
             and (
@@ -332,7 +335,7 @@ class EvaluationTrainer(BaseModelTrainer):
         )
         if can_skip:
             logger.info(f"Seed {random_state:05d}: shared work already done, skipping.")
-            return significant_filepath
+            return tsfresh_filepath
 
         logger.info(f"Training Seed: {random_state:05d}")
 
@@ -343,11 +346,14 @@ class EvaluationTrainer(BaseModelTrainer):
             sampling_strategy=sampling_strategy,
         )
 
+        # For "combined" method, select_features() writes tsfresh-filtered features to
+        # tsfresh_filepath; for other methods it writes top-N features to significant_filepath.
+        phase1_output_filepath = tsfresh_filepath
         result = self.select_features(
             features=X_train,
             labels=y_train,
             random_state=random_state,
-            significant_filepath=significant_filepath,
+            significant_filepath=phase1_output_filepath,
             all_features_filepath=all_features_filepath,
             all_figures_filepath=all_figures_filepath,
         )
@@ -356,12 +362,14 @@ class EvaluationTrainer(BaseModelTrainer):
             return None
 
         # Save held-out test data once — shared across all classifiers for this seed.
-        _, top_selected_features, _, _ = result
-        top_n_features = top_selected_features.index.tolist()
-        X_test[top_n_features].to_csv(X_test_filepath)
+        # Use all available feature names from Phase 1 output so X_test is not narrowed
+        # before Phase 2 applies per-classifier RF importance selection.
+        df_selected, _, _, _ = result
+        phase1_feature_names = df_selected.columns.tolist()
+        X_test[phase1_feature_names].to_csv(X_test_filepath)
         y_test.to_csv(y_test_filepath)
 
-        return significant_filepath
+        return tsfresh_filepath
 
     def _run_classify_and_evaluate(
         self,
@@ -400,6 +408,7 @@ class EvaluationTrainer(BaseModelTrainer):
         (
             _,
             significant_filepath,
+            tsfresh_filepath,
             _,
             _,
             X_test_filepath,
@@ -407,26 +416,28 @@ class EvaluationTrainer(BaseModelTrainer):
             _,
         ) = self._generate_shared_filepaths(random_state=random_state)
 
-        if not os.path.isfile(significant_filepath):
+        # Phase 1 completion marker: tsfresh_filepath for "combined", else significant_filepath.
+        phase1_filepath = tsfresh_filepath
+        if not os.path.isfile(phase1_filepath):
             logger.warning(
-                f"Seed {random_state:05d}: significant features file missing, skipping."
+                f"Seed {random_state:05d}: Phase 1 features file missing, skipping."
             )
             return None
-
-        top_n_features = pd.read_csv(significant_filepath, index_col=0).index.tolist()
-        if not top_n_features:
-            return None
-
-        classifier_model = next(
-            m for m in self.classifier_models if m.slug_name == classifier_slug
-        )
 
         (
             model_filepath,
             metrics_filepath,
             shap_explanation_filepath,
             learning_curve_path,
+            classifier_features_filepath,
         ) = self._generate_classifier_filepaths(random_state, classifier_slug)
+
+        # For "combined" method, the final per-classifier top-N features CSV is
+        # classifier_features_filepath. For other methods use significant_filepath.
+        if self.feature_selection_method == "combined":
+            registry_features_filepath = classifier_features_filepath
+        else:
+            registry_features_filepath = significant_filepath
 
         # Return cached result without re-training if outputs already exist.
         if (
@@ -442,7 +453,7 @@ class EvaluationTrainer(BaseModelTrainer):
             return (
                 classifier_slug,
                 random_state,
-                significant_filepath,
+                registry_features_filepath,
                 model_filepath,
                 metrics,
                 X_test_filepath,
@@ -450,7 +461,7 @@ class EvaluationTrainer(BaseModelTrainer):
                 shap_explanation_filepath,
             )
 
-        # Deterministically reproduce the same split and resample as Phase 1 - Feature Selection.
+        # Deterministically reproduce the same split and resample as Phase 1.
         X_train, X_test, y_train, y_test = self._split_and_resample(
             X=self.df_features,
             y=self.df_labels,
@@ -458,8 +469,73 @@ class EvaluationTrainer(BaseModelTrainer):
             sampling_strategy=sampling_strategy,
         )
 
+        if self.feature_selection_method == "combined":
+            # Load tsfresh-filtered features from Phase 1.
+            tsfresh_feature_names = pd.read_csv(
+                tsfresh_filepath, index_col=0
+            ).index.tolist()
+            if not tsfresh_feature_names:
+                return None
+
+            classifier_model = next(
+                m for m in self.classifier_models if m.slug_name == classifier_slug
+            )
+
+            # Run GridSearchCV on tsfresh features first; afterwards reuse the best
+            # estimator for RF importance selection to skip a redundant RF training.
+            tsfresh_selected = (
+                X_train[tsfresh_feature_names],
+                pd.Series(index=tsfresh_feature_names, dtype=float),
+                None,
+                len(tsfresh_feature_names),
+            )
+            metrics = self._cv_train_evaluate(
+                y_train=y_train,
+                X_test=X_test,
+                y_test=y_test,
+                selected_features=tsfresh_selected,
+                random_state=random_state,
+                model_filepath=model_filepath,
+                metrics_filepath=metrics_filepath,
+                learning_curve_path=learning_curve_path,
+                classifier_model=classifier_model,
+                shap_explanation_filepath=shap_explanation_filepath,
+            )
+
+            # Load the just-saved best model to use as the RF importance estimator.
+            best_model = joblib.load(model_filepath)
+            # Use the best model only when it is a tree-based estimator compatible
+            # with permutation_importance (all sklearn classifiers qualify).
+            top_feature_names, _ = self._apply_rf_importance_selection(
+                X=X_train[tsfresh_feature_names],
+                y=y_train,
+                top_n=self.number_of_significant_features,
+                random_state=random_state,
+                classifier_features_filepath=classifier_features_filepath,
+                estimator=best_model,
+            )
+
+            return (
+                classifier_slug,
+                random_state,
+                classifier_features_filepath,
+                model_filepath,
+                metrics,
+                X_test_filepath,
+                y_test_filepath,
+                shap_explanation_filepath,
+            )
+
+        # Non-combined path: load pre-selected top-N features from Phase 1.
+        top_n_features = pd.read_csv(significant_filepath, index_col=0).index.tolist()
+        if not top_n_features:
+            return None
+
+        classifier_model = next(
+            m for m in self.classifier_models if m.slug_name == classifier_slug
+        )
+
         # Reconstruct the selected_features tuple expected by _cv_train_evaluate.
-        # Only index (feature names) and the selected DataFrame are used downstream.
         selected_features = (
             X_train[top_n_features],
             pd.Series(index=top_n_features, dtype=float),
@@ -541,6 +617,7 @@ class EvaluationTrainer(BaseModelTrainer):
             (
                 _,
                 _significant_filepath,
+                _tsfresh_filepath,
                 _,
                 _,
                 _X_test_filepath,
@@ -548,9 +625,12 @@ class EvaluationTrainer(BaseModelTrainer):
                 _,
             ) = self._generate_shared_filepaths(random_state)
 
-            # Shared work not done or incomplete — queue Phase 1 - Feature Selection; no Phase 2 jobs possible yet.
+            # Phase 1 completion is marked by tsfresh_filepath (for "combined" method)
+            # or significant_filepath (for other methods).  Both are the same file
+            # for non-combined methods, so this check is always correct.
+            _phase1_filepath = _tsfresh_filepath
             if self.overwrite or not (
-                os.path.isfile(_significant_filepath)
+                os.path.isfile(_phase1_filepath)
                 and os.path.isfile(_X_test_filepath)
                 and os.path.isfile(_y_test_filepath)
             ):
@@ -567,9 +647,16 @@ class EvaluationTrainer(BaseModelTrainer):
             # Shared work done — check each classifier independently.
             for classifier_model in self.classifier_models:
                 classifier_slug = classifier_model.slug_name
-                _model_filepath, _metrics_filepath, _shap_filepath, _ = (
+                _model_filepath, _metrics_filepath, _shap_filepath, _, _clf_features_filepath = (
                     self._generate_classifier_filepaths(random_state, classifier_slug)
                 )
+
+                # For "combined" method the registry stores classifier_features_filepath;
+                # for other methods it stores significant_filepath.
+                if self.feature_selection_method == "combined":
+                    _registry_features_filepath = _clf_features_filepath
+                else:
+                    _registry_features_filepath = _significant_filepath
 
                 if (
                     not self.overwrite
@@ -581,7 +668,7 @@ class EvaluationTrainer(BaseModelTrainer):
                     records_per_classifier[classifier_slug].append(
                         {
                             "random_state": random_state,
-                            "significant_features_csv": _significant_filepath,
+                            "significant_features_csv": _registry_features_filepath,
                             "trained_model_filepath": _model_filepath,
                             "X_test_filepath": _X_test_filepath,
                             "y_test_filepath": _y_test_filepath,
@@ -725,8 +812,10 @@ class EvaluationTrainer(BaseModelTrainer):
             all_metrics[classifier_slug].append(metrics)
 
         # Collect significant_features_csvs for all completed seeds.
+        # For "combined" method the tsfresh_filepath (index 2) holds the Phase 1
+        # feature set written once per seed; for other methods index 2 == index 1.
         for _rs in random_states:
-            sf = self._generate_shared_filepaths(_rs)[1]
+            sf = self._generate_shared_filepaths(_rs)[2]
             if os.path.isfile(sf) and sf not in self.significant_features_csvs:
                 self.significant_features_csvs.append(sf)
 

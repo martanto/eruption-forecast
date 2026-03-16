@@ -600,26 +600,86 @@ class BaseModelTrainer:
     ) -> tuple[pd.DataFrame, pd.Series, pd.Series, int] | None:
         """Select the most predictive features from a resampled training set.
 
-        Uses tsfresh statistical significance testing with FDR control
-        or permutation importance analysis, depending on ``self.feature_selection_method``.
+        Uses tsfresh statistical significance testing with FDR control or
+        permutation importance analysis, depending on
+        ``self.feature_selection_method``.
+
+        When ``feature_selection_method`` is ``"combined"``, only the tsfresh
+        stage (Phase 1) is run here.  The RandomForest importance stage is
+        deferred to Phase 2 so the best model from GridSearchCV can be reused
+        as the estimator — avoiding a second RF training pass.  In this case
+        ``significant_filepath`` receives all tsfresh-filtered features (not
+        the final top-N), and the caller is responsible for running
+        ``_apply_rf_importance_selection()`` afterwards.
 
         Args:
             features (pd.DataFrame): Resampled features to select.
             labels (pd.Series): Target labels.
-            significant_filepath (str): Save path for significant features.
+            significant_filepath (str): Save path for significant (or tsfresh-
+                filtered) features. For "combined" method this holds all features
+                that passed the tsfresh FDR test; for other methods it holds the
+                final top-N features.
             random_state (int, optional): Random seed for feature selection. Defaults to 42.
-            all_features_filepath (str, optional): Save path for all features.
-            all_figures_filepath (str, optional): Save path for all features figures.
+            all_features_filepath (str | None, optional): Save path for all features.
+                Defaults to None.
+            all_figures_filepath (str | None, optional): Save path for feature importance
+                figures. Defaults to None.
 
         Returns:
-            tuple[pd.DataFrame, pd.Series, pd.Series, int]: Selected features dataframe,
-                top (n) features, all selected features, (n) features
+            tuple[pd.DataFrame, pd.Series, pd.Series, int]: A 4-tuple of
+                (selected_features_df, top_selected_features, all_selected_features,
+                n_features). For "combined" method the "top" and "all" Series both
+                contain all tsfresh-filtered features (top-N slicing happens in Phase 2).
             None: If features reduced to zero after selection.
         """
         selector = self.FeatureSelector.set_random_state(random_state)
         number_of_significant_features = self.number_of_significant_features
 
-        # Reduced features/columns
+        if self.feature_selection_method == "combined":
+            # Phase 1 only: run tsfresh filtering and return ALL significant features.
+            # The RF importance stage is deferred to Phase 2 (_apply_rf_importance_selection)
+            # so the GridSearchCV best estimator can be reused as the RF surrogate,
+            # eliminating a redundant RandomForest fit when the classifier is also RF.
+            tsfresh_selector = FeatureSelector(
+                method="tsfresh",
+                random_state=random_state,
+                n_jobs=self.FeatureSelector.n_jobs,
+                verbose=self.verbose,
+            )
+            df_selected_features = tsfresh_selector.fit_transform(features, labels)
+
+            if tsfresh_selector.n_features == 0:
+                logger.warning(
+                    f"{random_state:05d}: Features reduced to 0 after tsfresh. "
+                    "Skip training model."
+                )
+                return None
+
+            # For "combined", significant_filepath stores ALL tsfresh-filtered features;
+            # top-N selection happens later in Phase 2.
+            all_selected_features = tsfresh_selector.selected_features_
+            all_selected_features.to_csv(significant_filepath, index=True)
+
+            n_available = df_selected_features.shape[1]
+            if all_features_filepath:
+                all_selected_features.to_csv(all_features_filepath, index=True)
+                if all_figures_filepath:
+                    self._plot_all_significant_features(
+                        all_selected_features=pd.DataFrame(
+                            all_selected_features
+                        ).reset_index(),
+                        all_figures_filepath=all_figures_filepath,
+                        top_features=number_of_significant_features,
+                    )
+
+            return (
+                df_selected_features,
+                all_selected_features,
+                all_selected_features,
+                n_available,
+            )
+
+        # Non-combined path: run the configured method end-to-end (tsfresh or random_forest).
         df_selected_features = selector.fit_transform(
             features, labels, top_n=number_of_significant_features
         )
@@ -630,10 +690,10 @@ class BaseModelTrainer:
             )
             return None
 
-        # Series indexed by feature name; values are p-values or importance score sorted by it's value.
+        # Series indexed by feature name; values are p-values or importance scores.
         all_selected_features = selector.selected_features_
 
-        # Handle if columns in df_selected_features has less than number_of_significant_features
+        # Handle fewer features than requested
         len_features_columns = len(df_selected_features.columns)
         if len_features_columns < number_of_significant_features:
             logger.warning(
@@ -646,9 +706,9 @@ class BaseModelTrainer:
             number_of_significant_features
         )
 
-        # Save TOP-N significant features
-        # significant_filepath Will be used in ModelEvaluator.from_files(...) method
-        # as selected_features_path paramater
+        # Save TOP-N significant features.
+        # significant_filepath is used in ModelEvaluator.from_files() as
+        # the selected_features_path parameter.
         top_selected_features.to_csv(significant_filepath, index=True)
 
         # Save all SELECTED features if requested
@@ -669,6 +729,68 @@ class BaseModelTrainer:
             all_selected_features,
             number_of_significant_features,
         )
+
+    def _apply_rf_importance_selection(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        top_n: int,
+        random_state: int,
+        classifier_features_filepath: str,
+        estimator: object | None = None,
+    ) -> tuple[list[str], pd.Series]:
+        """Phase 2 RF importance step for "combined" feature selection.
+
+        Runs the RandomForest permutation importance stage on the tsfresh-filtered
+        features produced by Phase 1.  When the Phase 2 classifier is itself a
+        RandomForest, the caller should pass the GridSearchCV best estimator as
+        ``estimator`` to skip training a second RF.
+
+        The top-N feature names and their importance scores are saved to
+        ``classifier_features_filepath`` for use by ModelEvaluator.
+
+        Args:
+            X (pd.DataFrame): Tsfresh-filtered feature matrix (Phase 1 output).
+            y (pd.Series): Training labels.
+            top_n (int): Number of top features to retain.
+            random_state (int): Random seed for permutation importance.
+            classifier_features_filepath (str): Path to save the top-N features CSV.
+            estimator (object | None, optional): Pre-fitted sklearn-compatible estimator
+                to reuse for permutation importance instead of training a new RF.
+                Defaults to None (a new RF is trained internally).
+
+        Returns:
+            tuple[list[str], pd.Series]: A 2-tuple of:
+                - **top_feature_names** (list[str]): Ordered list of top-N feature names.
+                - **importance_scores** (pd.Series): Importance scores for all
+                  features (sorted descending), indexed by feature name.
+        """
+        rf_selector = FeatureSelector(
+            method="random_forest",
+            random_state=random_state,
+            n_jobs=self.FeatureSelector.n_jobs,
+            verbose=self.verbose,
+        )
+
+        # Clamp top_n to the available feature count.
+        effective_top_n = min(top_n, X.shape[1])
+        if effective_top_n < top_n:
+            logger.warning(
+                f"{random_state:05d}: Requested top_n={top_n} but only "
+                f"{X.shape[1]} tsfresh features available; using {effective_top_n}."
+            )
+
+        rf_selector.fit(X, y, top_n=effective_top_n, estimator=estimator)
+        importance_scores: pd.Series = rf_selector.selected_features_
+        top_feature_names: list[str] = rf_selector.feature_names_
+
+        # Save top-N features to disk; this path is used as the
+        # selected_features_path in ModelEvaluator.from_files().
+        importance_scores.head(effective_top_n).to_csv(
+            classifier_features_filepath, index=True
+        )
+
+        return top_feature_names, importance_scores
 
     def _plot_all_significant_features(
         self,
@@ -706,12 +828,18 @@ class BaseModelTrainer:
         random_state: int,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[str, str, str | None, str | None, str, str, bool]:
+    ) -> tuple[str, str, str, str | None, str | None, str, str, bool]:
         """Generate shared filepaths that are the same for all classifiers in a seed.
 
         These paths cover feature selection outputs, test data, and learning curve prefix.
         All classifiers in the same seed share the same under-sampling and feature
         selection results, so these paths are written once.
+
+        When ``feature_selection_method`` is ``"combined"``, Phase 1 writes the
+        broader tsfresh-filtered feature set to ``tsfresh_filepath`` (all features
+        that passed the FDR test) and Phase 2 writes the final per-classifier
+        top-N subset to ``significant_filepath``.  For other methods, both paths
+        point to the same file so callers can use ``significant_filepath`` uniformly.
 
         Args:
             random_state (int): Random seed for this training run.
@@ -721,10 +849,13 @@ class BaseModelTrainer:
                 Defaults to False.
 
         Returns:
-            tuple: A 7-tuple of:
+            tuple: An 8-tuple of:
 
                 - **filename** (str): Base filename stem for this seed.
-                - **significant_filepath** (str): Path to significant features CSV.
+                - **significant_filepath** (str): Path to top-N significant features CSV
+                  (final Phase 2 output for "combined"; Phase 1 output otherwise).
+                - **tsfresh_filepath** (str): Path to all tsfresh-filtered features CSV
+                  (Phase 1 output for "combined"; same as significant_filepath otherwise).
                 - **all_features_filepath** (str | None): Path to all features CSV, or None.
                 - **all_figures_filepath** (str | None): Path to feature plot PNG, or None.
                 - **X_test_filepath** (str): Path to held-out X_test CSV.
@@ -740,6 +871,17 @@ class BaseModelTrainer:
         significant_filepath = os.path.join(
             self.shared_significant_dir, f"{filename}.csv"
         )
+
+        # For "combined" method, Phase 1 writes all tsfresh-significant features to a
+        # separate file so Phase 2 can load them without repeating tsfresh filtering.
+        # For other methods, tsfresh_filepath is identical to significant_filepath.
+        if self.feature_selection_method == "combined":
+            tsfresh_filepath = os.path.join(
+                self.shared_significant_dir, f"{filename}_tsfresh.csv"
+            )
+        else:
+            tsfresh_filepath = significant_filepath
+
         all_features_filepath = (
             os.path.join(self.shared_all_features_dir, f"{filename}.csv")
             if save_features
@@ -753,7 +895,9 @@ class BaseModelTrainer:
         X_test_filepath = os.path.join(self.shared_tests_dir, f"{filename}_X_test.csv")
         y_test_filepath = os.path.join(self.shared_tests_dir, f"{filename}_y_test.csv")
 
-        shared_required = [significant_filepath]
+        # Phase 1 completion is indicated by the tsfresh_filepath existing.
+        # For non-combined methods this is the same as significant_filepath.
+        shared_required = [tsfresh_filepath]
         can_skip_shared = not self.overwrite and all(
             os.path.isfile(p) for p in shared_required
         )
@@ -761,6 +905,7 @@ class BaseModelTrainer:
         return (
             filename,
             significant_filepath,
+            tsfresh_filepath,
             all_features_filepath,
             all_figures_filepath,
             X_test_filepath,
@@ -772,12 +917,13 @@ class BaseModelTrainer:
         self,
         random_state: int,
         classifier_slug: str,
-    ) -> tuple[str, str, str, str]:
+    ) -> tuple[str, str, str, str, str]:
         """Generate per-classifier filepaths for a given seed and classifier.
 
         These paths are unique to each (seed, classifier) combination and cover
         the trained model pickle, per-seed metrics JSON, SHAP explanation cache,
-        and learning curve JSON.
+        learning curve JSON, and (for "combined" method) the per-classifier top-N
+        features CSV written by Phase 2.
 
         Args:
             random_state (int): Random seed for this training run.
@@ -785,12 +931,16 @@ class BaseModelTrainer:
                 correct output subdirectory.
 
         Returns:
-            tuple: A 4-tuple of:
+            tuple: A 5-tuple of:
 
                 - **model_filepath** (str): Path to the trained model pickle.
                 - **metrics_filepath** (str): Path to per-seed metrics JSON.
                 - **shap_explanation_filepath** (str): Path to SHAP cache pickle.
                 - **learning_curve_path** (str): Path to learning curve JSON.
+                - **classifier_features_filepath** (str): Path to the per-classifier
+                  top-N feature CSV written in Phase 2 when method is "combined".
+                  For other methods this path is unused but still returned for a
+                  uniform interface.
         """
         filename = (
             f"{self.prefix_filename}_{random_state:05d}"
@@ -808,12 +958,17 @@ class BaseModelTrainer:
         learning_curve_path = os.path.join(
             metrics_dir, "learning_curve", f"{filename}.json"
         )
+        # Per-classifier top-N features CSV used by Phase 2 when method="combined".
+        classifier_features_filepath = os.path.join(
+            self.models_dirs[classifier_slug], f"{filename}_features.csv"
+        )
 
         return (
             model_filepath,
             metrics_filepath,
             shap_explanation_filepath,
             learning_curve_path,
+            classifier_features_filepath,
         )
 
     def _setup_grid_search(

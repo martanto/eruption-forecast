@@ -255,6 +255,7 @@ class FeatureSelector:
         max_depth: int | None = 10,
         min_samples_leaf: int = 20,
         n_repeats: int = 10,
+        estimator: object | None = None,
     ) -> tuple[pd.DataFrame, pd.Series]:
         """Stage 2: RandomForest permutation importance selection.
 
@@ -280,6 +281,12 @@ class FeatureSelector:
             n_repeats (int, optional): Number of permutation repeats for importance
                 estimation. Higher values give more stable and reliable importance
                 scores but increase computation time. Defaults to 10.
+            estimator (object | None, optional): Pre-fitted sklearn-compatible estimator
+                to use for permutation importance. When provided, the RandomForest
+                training step is skipped entirely and this estimator is used directly.
+                Use this when the caller already trained a model on the same data to
+                avoid redundant computation (e.g., combined method with RF classifier).
+                Defaults to None.
 
         Returns:
             tuple[pd.DataFrame, pd.Series]: A tuple containing:
@@ -300,20 +307,26 @@ class FeatureSelector:
         if self.verbose:
             logger.info(f"{self.random_state:05d}: RandomForest features importance...")
 
-        # Train RandomForest with regularization to prevent overfitting
-        rf = RandomForestClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            min_samples_leaf=min_samples_leaf,
-            random_state=self.random_state,
-            n_jobs=self.n_jobs,
-        )
-
-        rf.fit(X, y)
+        if estimator is not None:
+            # Use the provided estimator directly; skip training a new RandomForest.
+            # This avoids redundant RF training when the caller already fitted a model
+            # (e.g., when method="combined" and the final classifier is also RF).
+            fitted_estimator = estimator
+        else:
+            # Train RandomForest with regularization to prevent overfitting.
+            rf = RandomForestClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                min_samples_leaf=min_samples_leaf,
+                random_state=self.random_state,
+                n_jobs=self.n_jobs,
+            )
+            rf.fit(X, y)
+            fitted_estimator = rf
 
         # Use permutation importance (more reliable than Gini importance)
         perm_importance = permutation_importance(
-            rf,
+            fitted_estimator,
             X,
             y,
             n_repeats=n_repeats,
@@ -360,6 +373,7 @@ class FeatureSelector:
         y: pd.Series,
         fdr_level: float = 0.05,
         top_n: int = 20,
+        estimator: object | None = None,
         **rf_kwargs,
     ) -> Self:
         """Fit the feature selector on training data.
@@ -379,6 +393,10 @@ class FeatureSelector:
             top_n (int, optional): Number of top features for final selection.
                 Used in RandomForest selection (Stage 2). Only used when method is
                 "random_forest" or "combined". Defaults to 20.
+            estimator (object | None, optional): Pre-fitted sklearn-compatible estimator
+                to reuse for permutation importance instead of training a new
+                RandomForest. Only used when method is "random_forest" or "combined".
+                Defaults to None.
             **rf_kwargs: Additional keyword arguments for RandomForest permutation
                 importance. Supported arguments:
                 - n_estimators (int): Number of trees (default: 200)
@@ -427,7 +445,7 @@ class FeatureSelector:
         elif self.method == "random_forest":
             # Stage 2 only: RandomForest permutation importance
             X_selected, importance_scores = self._select_random_forest(
-                X, y, top_n=top_n, **rf_kwargs
+                X, y, top_n=top_n, estimator=estimator, **rf_kwargs
             )
             self.selected_features_ = importance_scores
             self.feature_names_ = X_selected.columns.tolist()
@@ -440,9 +458,10 @@ class FeatureSelector:
             # Stage 1: tsfresh
             X_filtered, p_values = self._select_tsfresh(X, y, fdr_level=fdr_level)
 
-            # Stage 2: RandomForest on filtered features
+            # Stage 2: RandomForest on filtered features; reuse provided estimator
+            # when the caller already fitted a model on the same data.
             X_selected, importance_scores = self._select_random_forest(
-                X_filtered, y, top_n=top_n, **rf_kwargs
+                X_filtered, y, top_n=top_n, estimator=estimator, **rf_kwargs
             )
 
             self.selected_features_ = importance_scores
@@ -509,6 +528,7 @@ class FeatureSelector:
         y: pd.Series,
         fdr_level: float = 0.05,
         top_n: int = 20,
+        estimator: object | None = None,
         **rf_kwargs,
     ) -> pd.DataFrame:
         """Fit the selector and transform X in one step.
@@ -521,6 +541,8 @@ class FeatureSelector:
             y (pd.Series): Target labels with shape (n_samples,).
             fdr_level (float, optional): FDR level for tsfresh selection. Defaults to 0.05.
             top_n (int, optional): Number of top features to select. Defaults to 20.
+            estimator (object | None, optional): Pre-fitted sklearn-compatible estimator
+                to reuse for permutation importance. See fit() for details. Defaults to None.
             **rf_kwargs: Additional keyword arguments for RandomForest permutation importance
                 (n_estimators, max_depth, min_samples_leaf, n_repeats).
 
@@ -538,7 +560,7 @@ class FeatureSelector:
             ...     X_train, y_train, top_n=30, n_estimators=300, n_repeats=15
             ... )
         """
-        self.fit(X, y, fdr_level=fdr_level, top_n=top_n, **rf_kwargs)
+        self.fit(X, y, fdr_level=fdr_level, top_n=top_n, estimator=estimator, **rf_kwargs)
         return self.transform(X)
 
     def get_feature_scores(self) -> pd.DataFrame:
