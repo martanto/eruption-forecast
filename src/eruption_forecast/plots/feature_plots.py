@@ -222,7 +222,7 @@ def _process_single_file(
 
     Notes:
         - Auto-detects features column (tries "features" or uses index)
-        - Auto-detects values column (uses first numeric column, expected to be "score")
+        - Auto-detects values column with priority: "score" -> "p_values" -> "importance" -> first numeric column
         - Output filename matches input CSV filename with .png extension
         - Errors are logged but don't raise exceptions for robustness
     """
@@ -250,13 +250,23 @@ def _process_single_file(
         # Auto-detect values column if not in kwargs
         values_column = kwargs.get("values_column", None)
         if values_column is None:
-            # Use first numeric column (expected to be "score")
+            # Prefer well-known legacy names before falling back to first numeric column
             numeric_cols = df.select_dtypes(include="number").columns
-            if len(numeric_cols) > 0:
-                values_column = numeric_cols[0]
-            else:
+            if len(numeric_cols) == 0:
                 msg = f"No numeric columns found in {csv_path.name}"
                 raise ValueError(msg)
+
+            # Priority order for backward compatibility
+            preferred_order = ["score", "p_values", "importance"]
+            for col_name in preferred_order:
+                if col_name in numeric_cols:
+                    values_column = col_name
+                    break
+
+            # Fallback to first numeric column if no preferred column is found
+            if values_column is None:
+                values_column = numeric_cols[0]
+
             kwargs["values_column"] = values_column
 
         # Plot
