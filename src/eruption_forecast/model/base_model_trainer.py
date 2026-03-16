@@ -481,6 +481,13 @@ class BaseModelTrainer:
         ensure_dir(self.output_dir)
         ensure_dir(self.shared_significant_dir)
 
+        # Always ensure per-classifier output and models directories so that
+        # later writes (e.g., joblib.dump and model registry CSVs) do not fail
+        # with FileNotFoundError.
+        for classifier_model in self.classifier_models:
+            ensure_dir(self.classifier_dirs[classifier_model.slug_name])
+            ensure_dir(self.models_dirs[classifier_model.slug_name])
+
         if save_all_features:
             ensure_dir(self.shared_all_features_dir)
 
