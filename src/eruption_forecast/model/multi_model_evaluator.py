@@ -46,7 +46,7 @@ class MultiModelEvaluator:
 
     Accepts per-seed JSON metrics files (written by
     ``ModelEvaluator.save_metrics()``) and/or a model registry CSV (written
-    by ``ModelTrainer.train_and_evaluate()``) to compute ensemble-level
+    by ``ModelTrainer.evaluate()``) to compute ensemble-level
     statistics and generate aggregate plots.
 
     Attributes:
@@ -60,7 +60,7 @@ class MultiModelEvaluator:
             per-seed JSON metrics files. Takes precedence over
             ``metrics_dir``. Defaults to None.
         trained_model_csv (str | None, optional): Path to the model registry CSV
-            produced by ``ModelTrainer.train_and_evaluate()``. Required for
+            produced by ``ModelTrainer.evaluate()``. Required for
             plot methods. Defaults to None.
         root_dir (str | None, optional): Root directory used to anchor
             output_dir resolution. Defaults to None.

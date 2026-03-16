@@ -25,7 +25,7 @@ from eruption_forecast.model.base_model_trainer import BaseModelTrainer
 
 
 class EvaluationTrainer(BaseModelTrainer):
-    """Extends BaseModelTrainer with train_and_evaluate() and its helper methods.
+    """Extends BaseModelTrainer with evaluate() and its helper methods.
 
     Adds the full evaluation pipeline on top of :class:`BaseModelTrainer`:
     per-seed stratified train/test split, random under-sampling on the training
@@ -267,7 +267,7 @@ class EvaluationTrainer(BaseModelTrainer):
     ) -> str | None:
         """Phase 1 - Feature Selection worker: split, resample, select features, and save test data to disk.
 
-        Performs the shared per-seed work for train_and_evaluate mode:
+        Performs the shared per-seed work for evaluate mode:
         train/test split, random under-sampling on the training set, and
         feature selection. Saves the top-N significant features CSV and the
         held-out test split to disk so Phase 2 workers can load them without

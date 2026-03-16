@@ -1,7 +1,7 @@
 """Top-level ModelTrainer that composes EvaluationTrainer and train-only logic.
 
 Exposes :meth:`ModelTrainer.fit` as the single entry point that dispatches to
-:meth:`train_and_evaluate` (80/20 split + metrics) or :meth:`train` (full
+:meth:`evaluate` (80/20 split + metrics) or :meth:`train` (full
 dataset, no metrics) depending on the ``with_evaluation`` flag.
 """
 
@@ -25,9 +25,9 @@ class ModelTrainer(EvaluationTrainer):
     2. Random under-sampling on training set only to balance classes
     3. Feature selection on training set using tsfresh relevance filtering (ONCE per seed)
     4. For each classifier: GridSearchCV training and cross-validation
-    5. Evaluation on held-out test set (when using train_and_evaluate)
+    5. Evaluation on held-out test set (when using evaluate)
 
-    Both ``train_and_evaluate`` and ``train`` use a two-phase parallel dispatch:
+    Both ``evaluate`` and ``train`` use a two-phase parallel dispatch:
 
     - **Phase 1 - Feature Selection** (parallel across seeds): shared per-seed work (split/resample +
       feature selection). Results are saved to disk.
@@ -35,7 +35,7 @@ class ModelTrainer(EvaluationTrainer):
       per (seed, classifier) combination. Training data is reconstructed
       deterministically via the fixed ``random_state``.
 
-    Use :meth:`train_and_evaluate` for 80/20 split with held-out evaluation metrics,
+    Use :meth:`evaluate` for 80/20 split with held-out evaluation metrics,
     or :meth:`train` for full-dataset training (no metrics) intended for production.
     Call :meth:`fit` to dispatch between the two modes via the ``with_evaluation`` flag.
 
@@ -356,7 +356,7 @@ class ModelTrainer(EvaluationTrainer):
           job per (seed, classifier) combination. Training data is reconstructed
           deterministically via the fixed ``random_state``.
 
-        Unlike ``train_and_evaluate()``, this method does NOT perform a train/test
+        Unlike ``evaluate()``, this method does NOT perform a train/test
         split and does NOT compute evaluation metrics. It is intended for final model
         training when a separate "future" dataset will be used for evaluation
         via ``ModelPredictor``.
@@ -467,10 +467,10 @@ class ModelTrainer(EvaluationTrainer):
         return None
 
     def fit(self, with_evaluation: bool = True, **kwargs) -> Self:
-        """Dispatch to ``train_and_evaluate()`` or ``train()`` based on ``with_evaluation``.
+        """Dispatch to ``evaluate()`` or ``train()`` based on ``with_evaluation``.
 
         Args:
-            with_evaluation (bool, optional): If True, calls ``train_and_evaluate()``
+            with_evaluation (bool, optional): If True, calls ``evaluate()``
                 (80/20 split + metrics). If False, calls ``train()`` (full dataset,
                 no metrics). Defaults to True.
             **kwargs: Additional keyword arguments forwarded to the chosen method.

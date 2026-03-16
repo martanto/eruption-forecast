@@ -513,7 +513,7 @@ class BaseModelTrainer:
 
         Example:
             >>> trainer = ModelTrainer(...)
-            >>> trainer.train_and_evaluate(total_seed=100)
+            >>> trainer.evaluate(total_seed=100)
             >>> _df = trainer.concat_significant_features(plot=True)
             >>> print(_df.head())
         """
@@ -916,7 +916,7 @@ class BaseModelTrainer:
         Args:
             records (list[dict]): One dict per seed with keys
                 ``random_state``, ``significant_features_csv``,
-                ``trained_model_filepath``, and (for ``train_and_evaluate`` only)
+                ``trained_model_filepath``, and (for ``evaluate`` only)
                 ``X_test_filepath`` and ``y_test_filepath``.
             random_state (int): Initial random state used for this run.
             total_seed (int): Total number of seeds used for this run.
@@ -1000,7 +1000,7 @@ class BaseModelTrainer:
         Convenience wrapper around
         :func:`eruption_forecast.utils.ml.merge_seed_models` that iterates over
         all classifier registry CSVs from ``self.csv``.  The registry CSVs
-        must exist (i.e. ``train()`` or ``train_and_evaluate()`` must have been
+        must exist (i.e. ``train()`` or ``evaluate()`` must have been
         called first).
 
         Args:
@@ -1020,7 +1020,7 @@ class BaseModelTrainer:
         if not self.csv:
             raise RuntimeError(
                 "No model registry CSV found. Run train() or "
-                "train_and_evaluate() before calling merge_models()."
+                "evaluate() before calling merge_models()."
             )
 
         _output_dir = output_path or os.path.join(self.output_dir, "classifiers")

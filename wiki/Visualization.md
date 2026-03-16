@@ -118,7 +118,7 @@ evaluator.plot_shap_summary(max_display=20)  # Requires shap>=0.46
 
 ### Aggregate (`MultiModelEvaluator`)
 
-Requires `train_and_evaluate()` output — loads test data per seed and aggregates.
+Requires `evaluate()` output — loads test data per seed and aggregates.
 
 ```python
 from eruption_forecast import MultiModelEvaluator

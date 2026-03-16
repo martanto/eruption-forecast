@@ -41,7 +41,7 @@ def test_full_training_pipeline():
     )
 
     # Run with small number of seeds for testing
-    trainer.train_and_evaluate(
+    trainer.evaluate(
         random_state=42,
         total_seed=3,  # Small number for quick testing
         number_of_significant_features=10,  # Small number for quick testing

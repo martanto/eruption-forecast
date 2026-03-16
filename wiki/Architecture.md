@@ -102,7 +102,7 @@ Raw Seismic Data (SDS / FDSN)
 │  │   or        │   │ (10 classifiers,     │ │
 │  │  combined   │   │  3 CV strategies)    │ │
 │  └─────────────┘   └──────────────────────┘ │
-│         ↓  train_and_evaluate()  ↓ train()  │
+│         ↓  evaluate()  ↓ train()  │
 │    80/20 split + metrics   Full dataset     │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
@@ -149,7 +149,7 @@ operating on the same `ForecastModel` instance.
          │
          ├──────────────────────────────────────────────────────────────────┐
          │                                                                  │
-         │  train_and_evaluate(fm)                    predict(fm)           │
+         │  evaluate(fm)                              predict(fm)           │
          │                                                                  │
          ▼                                                                  ▼
 ┌─────────────────┐                                            ┌─────────────────┐
@@ -318,12 +318,12 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 - Uses `RandomUnderSampler` to handle class imbalance
 - Feature selection runs once per seed and is shared across classifiers; results are written to `features/{cv-slug}/` rather than inside each classifier directory
 - Two training modes:
-  - `train_and_evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
+  - `evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
   - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
 
 **Key classes:**
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
-  - `fit(with_evaluation=True)`: Dispatches to `train_and_evaluate()` or `train()` based on flag
+  - `fit(with_evaluation=True)`: Dispatches to `evaluate()` or `train()` based on flag
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
@@ -347,7 +347,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 │   │                                                                                              │  │
 │   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
 │   │           │                                                   │                              │  │
-│   │   train_and_evaluate()                                     train()                           │  │
+│   │   evaluate()                                     train()                           │  │
 │   │   80/20 split → resample                            full dataset → resample                  │  │
 │   │   → feature select → CV                              → feature select → CV                   │  │
 │   │   → eval on test set                                    (no evaluation)                      │  │

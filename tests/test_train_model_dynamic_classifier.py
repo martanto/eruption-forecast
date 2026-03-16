@@ -35,7 +35,7 @@ def test_random_forest_classifier():
     )
 
     # Run with 1 seed for quick testing
-    trainer.train_and_evaluate(
+    trainer.evaluate(
         random_state=42,
         total_seed=1,
         number_of_significant_features=5,
@@ -82,7 +82,7 @@ def test_gradient_boosting_classifier():
     )
 
     # Run with 1 seed for quick testing
-    trainer.train_and_evaluate(
+    trainer.evaluate(
         random_state=42,
         total_seed=1,
         number_of_significant_features=5,
@@ -128,7 +128,7 @@ def test_logistic_regression_classifier():
     )
 
     # Run with 1 seed for quick testing
-    trainer.train_and_evaluate(
+    trainer.evaluate(
         random_state=42,
         total_seed=1,
         number_of_significant_features=5,

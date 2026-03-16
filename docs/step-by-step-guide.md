@@ -236,7 +236,7 @@ print(scores.head(10))
 Two training workflows are available depending on your evaluation strategy.
 
 ```
-        train_and_evaluate()                          train()
+        evaluate()                          train()
    ──────────────────────────────           ──────────────────────────
          Full Dataset                             Full Dataset
                │                                       │
@@ -268,17 +268,17 @@ Two training workflows are available depending on your evaluation strategy.
 
 #### Which workflow should I use?
 
-- **`train_and_evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
+- **`evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
 - **`train()`** — treats data as two separate time periods: a **current/present dataset** used for training (passed via `extracted_features_csv`) and a **future dataset** evaluated separately via `ModelPredictor`. No internal split; the model is trained on 100% of the current data.
 
-| Question | `train_and_evaluate()` | `train()` |
+| Question | `evaluate()` | `train()` |
 |---|---|---|
 | Do I want to measure in-sample performance? | Yes — evaluates each seed on held-out 20% | No metrics computed |
 | Do I have a separate future dataset to evaluate on? | — | Use with `ModelPredictor` |
 | Am I exploring classifiers and hyperparameters? | Quick feedback per run | Not suitable |
 | Am I training the final production model? | Wastes 20% of data | Uses 100% of data |
 
-#### `train_and_evaluate()` — with held-out test set (80/20 split)
+#### `evaluate()` — with held-out test set (80/20 split)
 
 Splits data **before** resampling and feature selection to prevent data leakage.
 Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
@@ -297,7 +297,7 @@ trainer = ModelTrainer(
     n_jobs=4,
 )
 
-trainer.train_and_evaluate(
+trainer.evaluate(
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
@@ -328,12 +328,12 @@ trainer.train(
 
 #### `fit()` — Unified entry point
 
-`fit()` dispatches to `train_and_evaluate()` or `train()` based on the
+`fit()` dispatches to `evaluate()` or `train()` based on the
 `with_evaluation` flag. Use it when the calling code needs a single method
 regardless of which workflow is active.
 
 ```python
-# Equivalent to train_and_evaluate()
+# Equivalent to evaluate()
 trainer.fit(
     with_evaluation=True,
     random_state=0,
@@ -376,7 +376,7 @@ without dropping down to `ModelTrainer`.
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
-#### `train_and_evaluate()` method parameters
+#### `evaluate()` method parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -400,8 +400,8 @@ without dropping down to `ModelTrainer`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
-| `**kwargs` | — | — | Forwarded to `train_and_evaluate()` or `train()` (same parameters as those methods) |
+| `with_evaluation` | `bool` | `True` | `True` → `evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
+| `**kwargs` | — | — | Forwarded to `evaluate()` or `train()` (same parameters as those methods) |
 
 ### 7. Supported Classifiers
 

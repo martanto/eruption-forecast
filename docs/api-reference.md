@@ -83,7 +83,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
-### `train_and_evaluate()` Parameters
+### `evaluate()` Parameters
 
 Splits data **before** resampling and feature selection to prevent data leakage.
 Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
@@ -110,16 +110,16 @@ Trains on the **entire current/present dataset** across multiple seeds — no in
 
 ### `fit()` Parameters
 
-`fit()` dispatches to `train_and_evaluate()` or `train()` based on the `with_evaluation` flag.
+`fit()` dispatches to `evaluate()` or `train()` based on the `with_evaluation` flag.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `train_and_evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
-| `**kwargs` | — | — | Forwarded to `train_and_evaluate()` or `train()` (same parameters as those methods) |
+| `with_evaluation` | `bool` | `True` | `True` → `evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
+| `**kwargs` | — | — | Forwarded to `evaluate()` or `train()` (same parameters as those methods) |
 
 ### `compute_learning_curve()` Parameters
 
-Computes a scikit-learn learning curve for a single seed and saves the result as a JSON file. Called internally by `train_and_evaluate()` and `train()`.
+Computes a scikit-learn learning curve for a single seed and saves the result as a JSON file. Called internally by `evaluate()` and `train()`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -150,7 +150,7 @@ lc = trainer.compute_learning_curve(X, y, classifier_model, scoring=LEARNING_CUR
 
 | Method | Description |
 |--------|-------------|
-| `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: alongside the registry CSV as `merged_model_{suffix}.pkl`. Must call `train()` or `train_and_evaluate()` first. |
+| `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: alongside the registry CSV as `merged_model_{suffix}.pkl`. Must call `train()` or `evaluate()` first. |
 | `merge_classifier_models(trained_models, output_path=None)` | Bundle multiple classifier registry CSVs into one `dict[str, SeedEnsemble]` `.pkl`. Accepts `{"rf": "path/to/rf.csv", "xgb": "path/to/xgb.csv"}`. |
 
 ---
