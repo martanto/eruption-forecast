@@ -1,12 +1,18 @@
 """File path resolution utilities.
 
 This module provides utilities for resolving output directory paths relative
-to a root anchor directory, creating directories, and loading JSON files.
+to a root anchor directory, creating directories, loading JSON files, and
+saving matplotlib figures and data artifacts.
 """
 
 import os
 import json
 from typing import Any
+
+import joblib
+import matplotlib.pyplot as plt
+
+from eruption_forecast.logger import logger
 
 
 def ensure_dir(path: str) -> str:
@@ -87,4 +93,67 @@ def resolve_output_dir(
     if os.path.isabs(output_dir):
         return output_dir
     return os.path.join(anchor, output_dir)
+
+
+def save_figure(
+    fig: plt.Figure,
+    filepath: str,
+    dpi: int,
+    *,
+    filetype: str = "png",
+    verbose: bool = True,
+) -> None:
+    """Save a matplotlib figure to disk and always close it.
+
+    The file extension is determined by ``filetype`` and appended to
+    ``filepath``; do not include an extension in ``filepath``. The figure
+    is closed unconditionally after saving so it cannot be reused by
+    subsequent plot calls.
+
+    Args:
+        fig (plt.Figure): Figure to save and close.
+        filepath (str): Destination path WITHOUT a file extension.
+        dpi (int): Resolution in dots per inch.
+        filetype (str): File extension without a leading dot. Defaults to
+            ``"png"``.
+        verbose (bool): When True, log an info message after saving.
+            Defaults to True.
+
+    Returns:
+        None
+    """
+    full_path = f"{filepath}.{filetype}"
+    ensure_dir(os.path.dirname(full_path))
+    fig.savefig(full_path, dpi=dpi, bbox_inches="tight")
+    if verbose:
+        logger.info(f"Saved: {full_path}")
+    plt.close(fig)
+
+
+def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
+    """Persist a data object to disk.
+
+    Dispatches on ``filetype``: ``"csv"`` writes a ``pd.DataFrame`` via
+    ``to_csv``; any other value serialises the object with
+    ``joblib.dump``. The destination directory is created automatically
+    if absent.
+
+    Args:
+        data (Any): Object to persist. Pass a ``pd.DataFrame`` with
+            ``filetype="csv"``; pass any joblib-serialisable object
+            (e.g. ``shap.Explanation``) with ``filetype="pkl"``.
+        path (str): Destination path WITHOUT a file extension.
+        filetype (str): File extension without a leading dot, also
+            determines the serialisation method. Defaults to ``"csv"``.
+
+    Returns:
+        None
+    """
+    full_path = f"{path}.{filetype}"
+    ensure_dir(os.path.dirname(full_path))
+    if filetype == "csv":
+        data.to_csv(full_path)
+    else:
+        joblib.dump(data, full_path)
+    logger.info(f"Saved: {full_path}")
 

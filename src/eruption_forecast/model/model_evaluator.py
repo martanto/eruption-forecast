@@ -24,7 +24,6 @@ from eruption_forecast.utils.pathutils import (
     resolve_output_dir,
 )
 from eruption_forecast.config.constants import (
-    PLOT_DPI,
     THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
     LEARNING_CURVE_SCORINGS,
@@ -286,29 +285,6 @@ class ModelEvaluator:
             random_state,
         )
 
-    def _save_plot(
-        self,
-        fig: plt.Figure,
-        filepath: str,
-        dpi: int = PLOT_DPI,
-    ) -> None:
-        """Save and close a plot figure.
-
-        Delegates to :func:`~eruption_forecast.utils.pathutils.save_figure`,
-        forwarding the instance ``verbose`` flag.
-
-        Args:
-            fig (plt.Figure): Matplotlib figure object to save and close.
-            filepath (str): Destination path WITHOUT a file extension;
-                ``save_figure`` appends ``".png"`` automatically.
-            dpi (int): Dots per inch for the saved image. Defaults to
-                PLOT_DPI.
-
-        Returns:
-            None
-        """
-        save_figure(fig, filepath, dpi, verbose=self.verbose)
-
     def _get_proba(self) -> np.ndarray | None:
         """Retrieve predicted eruption probabilities or decision scores for the test set.
 
@@ -514,11 +490,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("confusion_matrix", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("confusion_matrix", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -553,11 +525,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("roc_curve", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("roc_curve", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -591,11 +559,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("pr_curve", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("pr_curve", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -695,11 +659,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("threshold_analysis", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("threshold_analysis", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -745,11 +705,7 @@ class ModelEvaluator:
             )
             return None
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("feature_importance", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("feature_importance", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -790,11 +746,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("calibration", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("calibration", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -833,13 +785,7 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath(
-                "prediction_distribution", filename=filename
-            ),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("prediction_distribution", filename=filename), dpi, verbose=self.verbose)
 
         return fig
 
@@ -933,11 +879,7 @@ class ModelEvaluator:
             ensure_dir(os.path.dirname(self._shap_explanation_filepath))
             joblib.dump(explanation, self._shap_explanation_filepath)
 
-        self._save_plot(
-            fig,
-            filepath=self._get_plot_filepath("shap_summary", filename=filename),
-            dpi=dpi,
-        )
+        save_figure(fig, self._get_plot_filepath("shap_summary", filename=filename), dpi, verbose=self.verbose)
         return fig
 
     def plot_learning_curve(
@@ -974,7 +916,7 @@ class ModelEvaluator:
             overwrite=True,
             dpi=dpi,
         )
-        self._save_plot(fig, filepath=plot_filepath, dpi=dpi)
+        save_figure(fig, plot_filepath, dpi, verbose=self.verbose)
         return fig
 
     def plot_all(self, dpi: int = 150) -> dict[str, plt.Figure | None]:

@@ -22,7 +22,12 @@ from sklearn.base import BaseEstimator
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import predict_proba_from_estimator
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    save_data,
+    ensure_dir,
+    save_figure,
+    resolve_output_dir,
+)
 from eruption_forecast.plots.shap_plots import (
     compute_shap_explanation,
     plot_aggregate_shap_summary,
@@ -239,38 +244,43 @@ class MultiModelEvaluator:
         dpi: int,
         save: bool,
     ) -> None:
-        """Save a figure and optional data CSV to the output directory.
+        """Save a figure and optional data artifact to the output directory.
+
+        Delegates figure saving to
+        :func:`~eruption_forecast.utils.pathutils.save_figure` and data
+        saving to :func:`~eruption_forecast.utils.pathutils.save_data`.
+        The figure is always closed after a save attempt. Pass filenames
+        WITHOUT a file extension; extensions are appended automatically
+        (``".png"`` for figures, ``".csv"`` for DataFrames, ``".pkl"`` for
+        ``shap.Explanation`` objects).
 
         Args:
-            fig (plt.Figure): The figure to save.
-            data (pd.DataFrame | shap.Explanation | None): Aggregate data to save.
-                Skipped when None or when ``data_filename`` is None.
-            fig_filename (str): PNG filename for the figure.
-            data_filename (str | None): CSV filename for the data.
-                If None, no CSV is written.
+            fig (plt.Figure): The figure to save and close.
+            data (pd.DataFrame | shap.Explanation | None): Aggregate data
+                to persist. Skipped when None or when ``data_filename``
+                is None.
+            fig_filename (str): Figure basename WITHOUT extension, joined
+                with ``self.output_dir``.
+            data_filename (str | None): Data basename WITHOUT extension.
+                If None, no data file is written.
             dpi (int): Figure resolution in dots per inch.
-            save (bool): When False, nothing is written.
+            save (bool): When False, nothing is written to disk.
+
+        Returns:
+            None
         """
-        fig_path = os.path.join(self.output_dir, fig_filename)
+        # Strip any caller-provided extension so save_figure/save_data can
+        # append the correct one without doubling it.
+        fig_path = os.path.join(self.output_dir, os.path.splitext(fig_filename)[0])
         if save:
-            ensure_dir(self.output_dir)
-            fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
-            logger.info(f"Saved aggregate plot: {fig_path}")
-            if data is not None and data_filename is not None:
-                if isinstance(data, shap.Explanation):
-                    data_filename = data_filename.replace(".csv", ".pkl")
-                    data_path = os.path.join(self.output_dir, data_filename)
-                    joblib.dump(data, data_path)
-                    logger.info(f"Saved aggregate data: {data_path}")
-                elif isinstance(data, pd.DataFrame):
-                    data_path = os.path.join(self.output_dir, data_filename)
-                    data.to_csv(data_path)
-                    logger.info(f"Saved aggregate data: {data_path}")
-                else:
-                    logger.warning(
-                        f"Cannot save aggregate data. Data type is {type(data)}."
-                    )
+            save_figure(fig, fig_path, dpi)
+        else:
             plt.close(fig)
+
+        if save and data is not None and data_filename is not None:
+            data_path = os.path.join(self.output_dir, os.path.splitext(data_filename)[0])
+            filetype = "pkl" if isinstance(data, shap.Explanation) else "csv"
+            save_data(data, data_path, filetype=filetype)
 
     @functools.cached_property
     def _predictions(
@@ -421,8 +431,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_roc_curve.png",
-            f"{self.classifier_name}_aggregate_roc_curve.csv",
+            filename or f"{self.classifier_name}_aggregate_roc_curve",
+            f"{self.classifier_name}_aggregate_roc_curve",
             dpi,
             save,
         )
@@ -465,8 +475,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_pr_curve.png",
-            f"{self.classifier_name}_aggregate_pr_curve.csv",
+            filename or f"{self.classifier_name}_aggregate_pr_curve",
+            f"{self.classifier_name}_aggregate_pr_curve",
             dpi,
             save,
         )
@@ -509,8 +519,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_calibration.png",
-            f"{self.classifier_name}_aggregate_calibration.csv",
+            filename or f"{self.classifier_name}_aggregate_calibration",
+            f"{self.classifier_name}_aggregate_calibration",
             dpi,
             save,
         )
@@ -550,8 +560,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_prediction_distribution.png",
-            f"{self.classifier_name}_aggregate_prediction_distribution.csv",
+            filename or f"{self.classifier_name}_aggregate_prediction_distribution",
+            f"{self.classifier_name}_aggregate_prediction_distribution",
             dpi,
             save,
         )
@@ -598,8 +608,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_confusion_matrix.png",
-            f"{self.classifier_name}_aggregate_confusion_matrix.csv",
+            filename or f"{self.classifier_name}_aggregate_confusion_matrix",
+            f"{self.classifier_name}_aggregate_confusion_matrix",
             dpi,
             save,
         )
@@ -642,8 +652,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_threshold_analysis.png",
-            f"{self.classifier_name}_aggregate_threshold_analysis.csv",
+            filename or f"{self.classifier_name}_aggregate_threshold_analysis",
+            f"{self.classifier_name}_aggregate_threshold_analysis",
             dpi,
             save,
         )
@@ -709,8 +719,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_feature_importance.png",
-            f"{self.classifier_name}_aggregate_feature_importance.csv",
+            filename or f"{self.classifier_name}_aggregate_feature_importance",
+            f"{self.classifier_name}_aggregate_feature_importance",
             dpi,
             save,
         )
@@ -981,8 +991,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or f"{self.classifier_name}_aggregate_shap_summary.png",
-            f"{self.classifier_name}_aggregate_shap_summary.csv",
+            filename or f"{self.classifier_name}_aggregate_shap_summary",
+            f"{self.classifier_name}_aggregate_shap_summary",
             dpi,
             save,
         )
@@ -1038,8 +1048,8 @@ class MultiModelEvaluator:
                 metric=metric,
                 dpi=dpi,
             )
-            fig_filename = f"{self.classifier_name}_seed_stability_{metric}.png"
-            data_filename = f"{self.classifier_name}_seed_stability_{metric}.csv"
+            fig_filename = f"{self.classifier_name}_seed_stability_{metric}"
+            data_filename = f"{self.classifier_name}_seed_stability_{metric}"
             self._save_outputs(
                 fig, data, filename or fig_filename, data_filename, dpi, save
             )
@@ -1087,8 +1097,8 @@ class MultiModelEvaluator:
         self._save_outputs(
             fig,
             data,
-            filename or "frequency_band_contribution.png",
-            "frequency_band_contribution.csv",
+            filename or "frequency_band_contribution",
+            "frequency_band_contribution",
             dpi,
             save,
         )
