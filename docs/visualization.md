@@ -48,7 +48,7 @@ plot_tremor(
 
 #### plot_significant_features()
 
-Visualize feature importance or p-values as horizontal bar charts.
+Visualize feature scores as horizontal bar charts. The score column is always `"score"` regardless of the feature selection method used (`"tsfresh"`, `"random_forest"`, or `"combined"`).
 
 ```python
 from eruption_forecast.plots.feature_plots import plot_significant_features
@@ -70,7 +70,7 @@ plot_significant_features(
     features="path/to/features.csv",
     number_of_features=30,
     top_features=10,
-    values_column="importance",  # or "p_values"
+    values_column="score",
     output_dir="output/figures",
 )
 ```
@@ -79,7 +79,7 @@ plot_significant_features(
 - `features` - DataFrame or CSV path with feature data
 - `number_of_features` - Total features to display (default: 50)
 - `top_features` - Number highlighted with darker color (default: 20)
-- `values_column` - Column name for values (auto-detected if None)
+- `values_column` - Column name for score values (defaults to `"score"`; auto-detected from first numeric column if not provided)
 
 ### Model Evaluation Plots
 
