@@ -6,10 +6,12 @@ model predictions and feature contributions.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 import shap
 import numpy as np
+import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -78,6 +80,57 @@ def plot_shap_summary(
     fig.suptitle(title or "SHAP Summary Plot", y=1.02)
 
     return fig, shap_explanation
+
+
+def plot_shap_from_file(
+    filepath: str,
+    max_display: int = 20,
+    title: str | None = None,
+    dpi: int = 150,
+) -> tuple[plt.Figure, shap.Explanation]:
+    """Load a pickled SHAP Explanation and render a beeswarm plot.
+
+    Loads a ``shap.Explanation`` object previously saved with
+    ``save_data(..., filetype="pkl")`` via ``joblib.load``, then renders
+    a beeswarm plot identical to the one produced by ``plot_shap_summary``.
+
+    Args:
+        filepath (str): Path to the ``.pkl`` file containing the saved
+            ``shap.Explanation`` object (with or without the extension).
+        max_display (int, optional): Maximum number of features to display,
+            sorted by mean |SHAP| descending. Defaults to 20.
+        title (str | None, optional): Plot title. If None, uses
+            ``"SHAP Summary Plot"``. Defaults to None.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to 150.
+
+    Returns:
+        tuple[plt.Figure, shap.Explanation]: Matplotlib figure with the
+        beeswarm plot and the loaded ``shap.Explanation`` object.
+
+    Raises:
+        FileNotFoundError: If ``filepath`` does not exist (with or without
+            the ``.pkl`` extension).
+
+    Examples:
+        >>> fig, explanation = plot_shap_from_file("output/shap_values.pkl")
+        >>> fig.savefig("shap_summary.png")
+    """
+    path = filepath if filepath.endswith(".pkl") else f"{filepath}.pkl"
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"SHAP pickle file not found: {path}")
+
+    explanation: shap.Explanation = joblib.load(path)
+
+    fig = plt.figure(figsize=(20, max(8, max_display * 0.5)), dpi=dpi)
+    shap.plots.beeswarm(
+        explanation,
+        max_display=max_display,
+        show=False,
+    )
+    fig.suptitle(title or "SHAP Summary Plot", y=1.02)
+
+    return fig, explanation
 
 
 def compute_shap_explanation(

@@ -229,6 +229,15 @@ fig = evaluator.plot_shap_summary(max_display=20)
 # Aggregate SHAP beeswarm across seeds
 ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
 fig = ev.plot_shap_summary(max_display=20)
+
+# Plot directly from a saved SHAP Explanation pickle
+from eruption_forecast.plots.shap_plots import plot_shap_from_file
+
+fig, explanation = plot_shap_from_file(
+    "output/.../shap_values.pkl",
+    max_display=20,
+    title="SHAP Summary",
+)
 ```
 
 > Requires `shap >= 0.46`.
@@ -384,7 +393,7 @@ from eruption_forecast.plots.feature_plots import (
     replot_significant_features,
     plot_frequency_band_contribution,
 )
-from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
+from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary, plot_shap_from_file
 from eruption_forecast.plots import plot_classifier_comparison, plot_seed_stability
 from eruption_forecast.plots.evaluation_plots import (
     plot_learning_curve,

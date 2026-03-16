@@ -246,6 +246,16 @@ fig, agg_exp = plot_aggregate_shap_summary(
     max_display=20,
 )
 # agg_exp is a shap.Explanation with shape (total_samples, n_union_features)
+
+# Load a saved SHAP Explanation from disk and plot directly
+from eruption_forecast.plots.shap_plots import plot_shap_from_file
+
+fig, explanation = plot_shap_from_file(
+    "output/.../shap_values.pkl",
+    max_display=20,
+    title="SHAP Summary",
+)
+fig.savefig("shap_from_file.png", bbox_inches="tight")
 ```
 
 ### Seed Stability Plot
@@ -541,5 +551,6 @@ from eruption_forecast.plots import (
 from eruption_forecast.plots.shap_plots import (
     plot_shap_summary,
     plot_aggregate_shap_summary,
+    plot_shap_from_file,
 )
 ```
