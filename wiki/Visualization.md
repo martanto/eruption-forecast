@@ -54,7 +54,7 @@ print(f"Created: {results['created']}, Skipped: {results['skipped']}, Failed: {r
 
 ### `plot_significant_features()`
 
-Horizontal bar chart of feature importance or p-values.
+Horizontal bar chart of feature scores. The score column is always `"score"` regardless of the feature selection method used (`"tsfresh"`, `"random_forest"`, or `"combined"`).
 
 ```python
 from eruption_forecast.plots.feature_plots import plot_significant_features
@@ -63,7 +63,7 @@ plot_significant_features(
     features="path/to/features.csv",  # or a DataFrame
     number_of_features=50,
     top_features=20,                   # Highlighted with darker colour
-    values_column="importance",        # or "p_values"
+    values_column="score",
     output_dir="output/figures",
     filename="feature_importance",
     dpi=150,

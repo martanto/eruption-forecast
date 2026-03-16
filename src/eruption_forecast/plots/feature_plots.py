@@ -26,7 +26,7 @@ def plot_significant_features(
     title: str | None = None,
     figsize: tuple[float, float] = (4, 12),
     features_column: str = "features",
-    values_column: str = "p_values",
+    values_column: str = "score",
     dpi: int = 150,
     overwrite: bool = True,
 ) -> None:
@@ -61,7 +61,7 @@ def plot_significant_features(
             "features".
         values_column (str, optional): Name of the column containing
             significance values (e.g., p-values or importance scores). Must be
-            numeric. Defaults to "p_values".
+            numeric. Defaults to "score".
         dpi (int, optional): Figure resolution in dots per inch for saved PNG.
             Defaults to 150.
         overwrite (bool, optional): If True, overwrite an existing file at
@@ -155,7 +155,7 @@ def plot_significant_features(
 
         # Configure axes
         configure_spine(ax)
-        ax.set_xlabel("P-value" if values_column == "p_values" else "Importance Score")
+        ax.set_xlabel("Score")
         ax.set_ylabel("Feature")
         ax.set_title(title or f"{number_of_features} Significant Features")
 
@@ -222,7 +222,7 @@ def _process_single_file(
 
     Notes:
         - Auto-detects features column (tries "features" or uses index)
-        - Auto-detects values column (tries "p_values", "importance", or first numeric)
+        - Auto-detects values column with priority: "score" -> "p_values" -> "importance" -> first numeric column
         - Output filename matches input CSV filename with .png extension
         - Errors are logged but don't raise exceptions for robustness
     """
@@ -250,18 +250,23 @@ def _process_single_file(
         # Auto-detect values column if not in kwargs
         values_column = kwargs.get("values_column", None)
         if values_column is None:
-            if "p_values" in df.columns:
-                values_column = "p_values"
-            elif "importance" in df.columns:
-                values_column = "importance"
-            else:
-                # Use first numeric column
-                numeric_cols = df.select_dtypes(include="number").columns
-                if len(numeric_cols) > 0:
-                    values_column = numeric_cols[0]
-                else:
-                    msg = f"No numeric columns found in {csv_path.name}"
-                    raise ValueError(msg)
+            # Prefer well-known legacy names before falling back to first numeric column
+            numeric_cols = df.select_dtypes(include="number").columns
+            if len(numeric_cols) == 0:
+                msg = f"No numeric columns found in {csv_path.name}"
+                raise ValueError(msg)
+
+            # Priority order for backward compatibility
+            preferred_order = ["score", "p_values", "importance"]
+            for col_name in preferred_order:
+                if col_name in numeric_cols:
+                    values_column = col_name
+                    break
+
+            # Fallback to first numeric column if no preferred column is found
+            if values_column is None:
+                values_column = numeric_cols[0]
+
             kwargs["values_column"] = values_column
 
         # Plot
@@ -359,8 +364,8 @@ def replot_significant_features(
     Notes:
         - CSV files are expected to have either a 'features' column or feature
           names in the index.
-        - The function attempts to auto-detect the values column (tries
-          'p_values', 'importance', or first numeric column).
+        - The function attempts to auto-detect the values column (uses first
+          numeric column, expected to be "score").
         - Errors are logged but don't stop processing of remaining files.
         - Output filenames match input CSV filenames with .png extension.
         - Default output directory is ``<parent>/figures/significant`` where

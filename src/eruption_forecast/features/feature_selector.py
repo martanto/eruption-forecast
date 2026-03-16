@@ -42,6 +42,7 @@ class FeatureSelector:
         output_dir (str): Directory for saving selected features.
         verbose (bool): Enable verbose logging.
         selected_features_ (pd.Series): Selected features with their scores (set after fit).
+            Series name is always ``"score"`` regardless of the selection method used.
         p_values_ (pd.Series): P-values from tsfresh selection (set after fit, if applicable).
         importance_scores_ (pd.Series): Permutation importance scores (set after fit, if applicable).
         n_features_tsfresh (int): Number of features after tsfresh selection (set after fit).
@@ -421,7 +422,7 @@ class FeatureSelector:
         if self.method == "tsfresh":
             # Stage 1 only: tsfresh statistical selection
             X_filtered, p_values = self._select_tsfresh(X, y, fdr_level=fdr_level)
-            self.selected_features_ = p_values
+            self.selected_features_ = p_values.rename("score")
             self.feature_names_ = X_filtered.columns.tolist()
 
         elif self.method == "random_forest":
@@ -429,7 +430,7 @@ class FeatureSelector:
             X_selected, importance_scores = self._select_random_forest(
                 X, y, top_n=top_n, **rf_kwargs
             )
-            self.selected_features_ = importance_scores
+            self.selected_features_ = importance_scores.rename("score")
             self.feature_names_ = X_selected.columns.tolist()
 
         elif self.method == "combined":
@@ -445,7 +446,7 @@ class FeatureSelector:
                 X_filtered, y, top_n=top_n, **rf_kwargs
             )
 
-            self.selected_features_ = importance_scores
+            self.selected_features_ = importance_scores.rename("score")
             self.feature_names_ = X_selected.columns.tolist()
 
             if self.verbose:
