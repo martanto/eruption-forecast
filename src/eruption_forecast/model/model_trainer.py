@@ -282,7 +282,9 @@ class ModelTrainer(EvaluationTrainer):
             # Generate all shared filepaths for this seed (significant features,
             # optional all-features CSV, plots, etc.).
             _shared_paths = self._generate_shared_filepaths(random_state)
-            _, _significant_filepath, *_optional_shared_paths = _shared_paths
+            # _generate_shared_filepaths returns a trailing boolean flag; exclude it from path checks.
+            _shared_paths_without_flag = _shared_paths[:-1]
+            _, _significant_filepath, *_optional_shared_paths = _shared_paths_without_flag
 
             # Shared work not done — queue Phase 1 - Feature Selection; no Phase 2 jobs possible yet.
             feature_selection_incomplete = self.overwrite or not os.path.isfile(
