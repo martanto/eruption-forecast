@@ -235,9 +235,13 @@ class FeatureSelector:
         self.p_values_ = p_values
 
         if self.n_features_tsfresh == 0:
-            logger.warning(
+            logger.error(
                 f"{self.random_state:05d}: Features reduced to 0 from {X.shape[1]}"
             )
+            logger.error(f"Labels: \n{y}")
+            logger.error(f"Features length: {len(X)}")
+            logger.error(f"Features index: \n{X.index}")
+            logger.error(f"Filtered Features columns: \n{X_filtered.shape[1]}")
 
         if self.verbose:
             logger.info(
