@@ -892,7 +892,10 @@ class CalculateTremor:
 
         # Build tremor DataFrame index
         datetime_index = pd.date_range(
-            start=date, end=date + timedelta(days=1), freq=DEFAULT_SAMPLING_FREQUENCY, inclusive="left"
+            start=date,
+            end=date + timedelta(days=1),
+            freq=DEFAULT_SAMPLING_FREQUENCY,
+            inclusive="left",
         )
 
         # Init tremor DataFrame without tremor values
@@ -1079,7 +1082,7 @@ class CalculateTremor:
                     freq_max=freq_band[1],
                 )
                 .calculate(
-                    value_multiplier=self.value_multiplier or 1.0,
+                    value_multiplier=1.0e9,
                     remove_outlier_method=self.remove_outlier_method,
                     interpolate=self.interpolate,
                 )
