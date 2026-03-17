@@ -284,7 +284,9 @@ class ModelTrainer(EvaluationTrainer):
             _shared_paths = self._generate_shared_filepaths(random_state)
             # _generate_shared_filepaths returns a trailing boolean flag; exclude it from path checks.
             _shared_paths_without_flag = _shared_paths[:-1]
-            _, _significant_filepath, *_optional_shared_paths = _shared_paths_without_flag
+            _, _significant_filepath, *_optional_shared_paths = (
+                _shared_paths_without_flag
+            )
 
             # Shared work not done — queue Phase 1 - Feature Selection; no Phase 2 jobs possible yet.
             feature_selection_incomplete = self.overwrite or not os.path.isfile(
@@ -449,12 +451,17 @@ class ModelTrainer(EvaluationTrainer):
                 self.significant_features_csvs.append(sf)
 
         # Aggregate feature selection results (shared)
+        if self.verbose:
+            logger.info("Prediction: Concatenat significan features...")
         self.df_significant_features = self.concat_significant_features(
             plot=plot_significant_features,
         )
 
         # Save registry per classifier
         for classifier_model in self.classifier_models:
+            if self.verbose:
+                logger.info(f"Prediction: Saving {classifier_model} model registry...")
+
             classifier_slug = classifier_model.slug_name
             if not records_per_classifier[classifier_slug]:
                 continue
@@ -466,7 +473,7 @@ class ModelTrainer(EvaluationTrainer):
             )
 
         if self.verbose:
-            logger.info(f"Models saved to: {self.csv}")
+            logger.info(f"Prediction: Models saved to: {self.csv}")
 
         return None
 
