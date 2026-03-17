@@ -231,6 +231,15 @@ def get_significant_features(
     _significant_features.name = "p_values"
     _significant_features.index.name = "features"
 
+    # If no relevant features found, fall back to the 50 most significant
+    # features ranked by p-value rather than FDR threshold.
+    if len(features_filtered.columns) == 0:
+        logger.warning(
+            f"No significant features found (FDR: {fdr_level}). Use top 50 features (p_values based)"
+        )
+        selected_features: list[str] = _significant_features.head(50).index.tolist()
+        features_filtered = features[selected_features]
+
     return features_filtered, _significant_features
 
 
