@@ -92,36 +92,36 @@ eruption-forecast/
 
 ```
 Raw Seismic Data (SDS / FDSN)
-         │
-         ▼
+           │
+           ▼
 ┌─────────────────────┐
 │   CalculateTremor   │  RSAM + DSAR + Entropy → tremor.csv
-└─────────┬───────────┘
-          │
-          ▼
+└──────────┬──────────┘
+           │
+           ▼
 ┌─────────────────────┐
 │    LabelBuilder     │  Binary labels → label_*.csv
-└─────────┬───────────┘
-          │
-          ▼
+└──────────┬──────────┘
+           │
+           ▼
 ┌─────────────────────┐
 │ TremorMatrixBuilder │  Windowed matrix → tremor_matrix_*.csv
-└─────────┬───────────┘
-          │
-          ▼
+└──────────┬──────────┘
+           │
+           ▼
 ┌─────────────────────┐
 │   FeaturesBuilder   │  700+ features → all_extracted_features_*.csv
-└─────────┬───────────┘
-          │
-          ▼
+└──────────┬──────────┘
+           │
+           ▼
 ┌─────────────────────────────────────────────┐
 │                 ModelTrainer                │
-│  ┌─────────────┐   ┌──────────────────────┐ │
-│  │FeatureSelect│   │   ClassifierModel    │ │
-│  │   or        │   │ (10 classifiers,     │ │
-│  │  combined   │   │  3 CV strategies)    │ │
-│  └─────────────┘   └──────────────────────┘ │
-│         ↓  evaluate()  ↓ train()  │
+│  ┌─────────────┐   ┌─────────────────────┐  │
+│  │FeatureSelect│   │   ClassifierModel   │  │
+│  │   or        │   │ (10 classifiers,    │  │
+│  │  combined   │   │  3 CV strategies)   │  │
+│  └─────────────┘   └─────────────────────┘  │
+│         ↓  evaluate()  ↓ train()            │
 │    80/20 split + metrics   Full dataset     │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
@@ -141,11 +141,11 @@ Raw Seismic Data (SDS / FDSN)
 │  └──────────────────────────────────────┘   │
 │  Single model, merged pkl, or multi-model   │
 │  consensus                                  │
-└─────────────────┬───────────────────────────┘
-                  │
-                  ▼
+└──────────────────────┬──────────────────────┘
+                       │
+                       ▼
 ┌─────────────────────────────────────────────┐
-│              Report (optional)              │
+│           Report (beta, optional)           │
 │   generate_report() / fm.generate_report()  │
 │   → self-contained HTML (Plotly, CDN JS)    │
 │   Tremor · Labels · Features · Training     │
