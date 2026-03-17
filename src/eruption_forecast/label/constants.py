@@ -33,6 +33,8 @@ LABEL_PREFIX = "label"
 LABEL_EXTENSION = ".csv"
 WINDOW_STEP_PREFIX = "step-"
 DAY_TO_FORECAST_PREFIX = "dtf-"
+ERUPTION_BUFFER_PREFIX = "buffer-"
+"""Filename segment prefix for eruption_buffer parameter."""
 
 # Validation constants
 MIN_DATE_RANGE_DAYS = 7

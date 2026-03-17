@@ -1072,6 +1072,7 @@ class ForecastModel:
         tremor_columns: list[str] | None = None,
         builder: Literal["standard", "dynamic"] = "standard",
         days_before_eruption: int | None = None,
+        eruption_buffer: int = 1,
         verbose: bool | None = None,
         debug: bool | None = None,
     ) -> Self:
@@ -1102,6 +1103,8 @@ class ForecastModel:
                 ``"standard"``.
             days_before_eruption (int | None): Days before each eruption to start its
                 window. Required when ``builder="dynamic"``. Defaults to None.
+            eruption_buffer (int, optional): Number of window steps to prepend before the
+                start of the positive labeling window. Defaults to 1.
             verbose (bool | None, optional): If True, enables verbose logging. Defaults to None.
             debug (bool | None, optional): If True, enables debug mode. Defaults to None.
 
@@ -1133,6 +1136,7 @@ class ForecastModel:
             "volcano_id": self.volcano_id,
             "output_dir": output_dir,
             "root_dir": self.root_dir,
+            "eruption_buffer": eruption_buffer,
             "verbose": verbose,
             "debug": debug,
         }
@@ -1180,6 +1184,7 @@ class ForecastModel:
             tremor_columns=tremor_columns,
             builder=builder,
             days_before_eruption=days_before_eruption,
+            eruption_buffer=eruption_buffer,
             verbose=bool(verbose),
             debug=bool(debug),
         )

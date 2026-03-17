@@ -89,6 +89,7 @@ class LabelBuilder:
         volcano_id: str,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        eruption_buffer: int = 1,
         verbose: bool = False,
         debug: bool = False,
     ):
@@ -115,6 +116,10 @@ class LabelBuilder:
                 Absolute paths are used as-is. Defaults to None.
             root_dir (str | None, optional): Anchor directory for resolving relative
                 output_dir paths. If None, uses current working directory. Defaults to None.
+            eruption_buffer (int, optional): Number of window steps to prepend before the
+                start of the positive labeling window. Shifts start_eruption back by
+                ``eruption_buffer × window_step``, capturing extra windows just before the
+                N-day forecast window begins. Set to 0 to disable. Defaults to 1.
             verbose (bool, optional): Enable informational logging. Defaults to False.
             debug (bool, optional): Enable debug-level logging. Defaults to False.
 
@@ -167,6 +172,7 @@ class LabelBuilder:
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = sort_dates(eruption_dates)
         self.volcano_id: str = str(volcano_id)
+        self.eruption_buffer: int = int(eruption_buffer)
         self.verbose: bool = bool(verbose)
         self.debug: bool = bool(debug)
 
@@ -181,10 +187,11 @@ class LabelBuilder:
         self.n_days: int = (end_date - start_date).days
         self.output_dir = output_dir
         self.label_dir = label_dir
+        buf_segment = f"_buffer-{eruption_buffer}" if eruption_buffer != 0 else ""
         self.filename = (
             f"label_{start_date_str}_{end_date_str}"
             f"_step-{window_step}-{window_step_unit}"
-            f"_dtf-{day_to_forecast}.csv"
+            f"_dtf-{day_to_forecast}{buf_segment}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
 
@@ -205,6 +212,7 @@ class LabelBuilder:
             logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
             logger.info(f"Window Step ({window_step_unit}): {window_step}")
             logger.info(f"Day To Forecast (days): {day_to_forecast}")
+            logger.info(f"Eruption Buffer (steps): {eruption_buffer}")
             logger.info(f"Volcano ID: {volcano_id}")
 
     def __repr__(self) -> str:
@@ -221,7 +229,8 @@ class LabelBuilder:
             f"{self.window_step}, "
             f"{self.window_step_unit}, "
             f"{self.day_to_forecast}, "
-            f"{self.eruption_dates}), "
+            f"{self.eruption_dates}, "
+            f"eruption_buffer={self.eruption_buffer}), "
             f"{self.volcano_id}"
         )
 
@@ -499,17 +508,21 @@ class LabelBuilder:
         if self.verbose:
             logger.info(f"Processing {len(self.eruption_dates)} eruption dates")
 
+        window_step_delta = timedelta(**{self.window_step_unit: self.window_step})
+
         for eruption in self.eruption_dates:
             try:
                 day_of_eruption = to_datetime(eruption)
 
-                # Move the start of eruption to number of day_to_forecast
-                start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
+                # Start of positive window: buffer steps before eruption date
+                start_eruption = day_of_eruption.replace(hour=0, minute=0, second=0)
+                start_eruption -= self.eruption_buffer * window_step_delta
 
-                # Set start time of eruption to 00:00:00 and end time of eruption to at 23:59:59
-                start_eruption, end_eruption, _start_eruption_str, end_eruption_str = (
-                    normalize_dates(start_eruption, day_of_eruption)
-                )
+                # End of positive window: N days after eruption date at 23:59:59
+                end_eruption = (
+                    day_of_eruption + timedelta(days=self.day_to_forecast)
+                ).replace(hour=23, minute=59, second=59)
+                end_eruption_str = end_eruption.strftime("%Y-%m-%d")
 
                 # Stop if eruption date is beyond the end date
                 if end_eruption > self.end_date:

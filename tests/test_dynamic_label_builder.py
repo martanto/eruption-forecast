@@ -67,16 +67,20 @@ class TestDynamicLabelBuilderBuild:
             assert set(builder.df["is_erupted"].unique()).issubset({0, 1})
 
     def test_build_positive_labels_within_day_to_forecast(self) -> None:
-        """Test that rows within day_to_forecast window are labelled 1."""
+        """Test that rows within the look-forward window are labelled 1.
+
+        Look-forward: positive = [E - buffer×step, E + day_to_forecast].
+        eruption=2025-03-20, step=12h, buffer=1, dtf=2 →
+        positive_start = 2025-03-19 12:00, positive_end = 2025-03-22 23:59:59.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             builder = _make_builder(tmpdir, day_to_forecast=2).build()
 
-            eruption_dt = datetime(2025, 3, 20, 23, 59, 59)
-            positive_start = datetime(2025, 3, 18, 0, 0, 0)
+            positive_start = datetime(2025, 3, 19, 12, 0, 0)
+            positive_end = datetime(2025, 3, 22, 23, 59, 59)
 
             df = builder.df
-            # All rows inside [positive_start, eruption_dt] must be 1
-            mask = (df.index >= positive_start) & (df.index <= eruption_dt)
+            mask = (df.index >= positive_start) & (df.index <= positive_end)
             assert (df.loc[mask, "is_erupted"] == 1).all()
 
     def test_build_non_overlapping_eruptions(self) -> None:
@@ -94,9 +98,15 @@ class TestDynamicLabelBuilderBuild:
             assert len(builder.df_eruption) > 0
 
     def test_build_overlapping_eruptions(self) -> None:
-        """Test cross-year eruption projection: 2020-11-05 projects into 2021-11-10 window."""
+        """Test cross-year eruption projection: 2020-11-05 projects into 2021-11-10 window.
+
+        Look-forward, step=24h, buffer=1, dtf=2:
+        - Projected Nov 5 → pos_start=Nov 4, pos_end=Nov 7
+        - Primary Nov 10 → pos_start=Nov 9, pos_end=Nov 12
+        - Gap: Nov 8
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
-            # 2020-11-05 projected to 2021-11-05 falls inside 2021-10-31 → 2021-11-10 window.
+            # 2020-11-05 projected to 2021-11-05 falls inside 2021-10-31 → 2021-11-12 window.
             builder = _make_builder(
                 tmpdir,
                 eruption_dates=["2020-11-05", "2021-11-10"],
@@ -112,21 +122,21 @@ class TestDynamicLabelBuilderBuild:
             assert len(df_second) > 0
             assert (df_second["is_erupted"] == 1).all()
 
-            # Projected eruption (Nov 5) → positive rows Nov 3, 4, 5
+            # Projected eruption (Nov 5) → positive rows Nov 4, 5, 6, 7
             full_df = builder.df
-            for d in ["2021-11-03", "2021-11-04", "2021-11-05"]:
+            for d in ["2021-11-04", "2021-11-05", "2021-11-06", "2021-11-07"]:
                 dt = datetime.fromisoformat(d)
                 rows = full_df.loc[dt:dt + timedelta(hours=23, minutes=59, seconds=59), "is_erupted"]
                 assert (rows == 1).any(), f"Expected positive labels on {d}"
 
-            # Gap days Nov 6, 7 should be 0
-            for d in ["2021-11-06", "2021-11-07"]:
+            # Gap: Nov 8 falls between the two positive windows
+            for d in ["2021-11-08"]:
                 dt = datetime.fromisoformat(d)
                 rows = full_df.loc[dt:dt + timedelta(hours=23, minutes=59, seconds=59), "is_erupted"]
                 assert (rows == 0).all(), f"Expected zero labels on {d}"
 
-            # Primary eruption (Nov 10) → positive rows Nov 8, 9, 10
-            for d in ["2021-11-08", "2021-11-09", "2021-11-10"]:
+            # Primary eruption (Nov 10) → positive rows Nov 9, 10, 11, 12
+            for d in ["2021-11-09", "2021-11-10", "2021-11-11", "2021-11-12"]:
                 dt = datetime.fromisoformat(d)
                 rows = full_df.loc[dt:dt + timedelta(hours=23, minutes=59, seconds=59), "is_erupted"]
                 assert (rows == 1).any(), f"Expected positive labels on {d}"
@@ -185,7 +195,12 @@ class TestMarkEruptionLabels:
         return pd.DataFrame({"is_erupted": 0}, index=idx)
 
     def test_mark_single_eruption_no_overlap(self) -> None:
-        """Test that a single eruption's positive period is correctly marked."""
+        """Test that a single eruption's positive period is correctly marked.
+
+        Look-forward, eruption=2025-03-20, step=12h, buffer=1, dtf=2:
+        pos_start = 2025-03-19 12:00 (E 00:00 - 12h)
+        pos_end = 2025-03-22 23:59:59 (E + 2 days), but clamped to window_end (2025-03-20 23:59:59).
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             builder = _make_builder(tmpdir, eruption_dates=["2025-03-20"], day_to_forecast=2)
             eruption_dt = datetime(2025, 3, 20)
@@ -194,8 +209,8 @@ class TestMarkEruptionLabels:
             df = self._blank_df(window_start, eruption_dt)
             result = builder._mark_eruption_labels(df, window_start, eruption_dt, eruption_dt)
 
-            positive_start = datetime(2025, 3, 18, 0, 0, 0)
-            positive_end = datetime(2025, 3, 20, 23, 59, 59)
+            positive_start = datetime(2025, 3, 19, 12, 0, 0)
+            positive_end = datetime(2025, 3, 20, 23, 59, 59)  # clamped to window end
             mask = (result.index >= positive_start) & (result.index <= positive_end)
             assert (result.loc[mask, "is_erupted"] == 1).all()
             assert (result.loc[~mask, "is_erupted"] == 0).all()
@@ -217,8 +232,8 @@ class TestMarkEruptionLabels:
                 df, window_start, window_end, datetime(2021, 11, 10)
             )
 
-            # Projected eruption (Nov 5 → 2021-11-05) → positive: Nov 3, 4, 5
-            for d in ["2021-11-03", "2021-11-04", "2021-11-05"]:
+            # Projected eruption (Nov 5 → 2021-11-05) → look-forward: positive Nov 4 (12:00), 5, 6, 7
+            for d in ["2021-11-05", "2021-11-06", "2021-11-07"]:
                 dt = datetime.fromisoformat(d)
                 assert result.loc[dt, "is_erupted"] == 1, f"Expected 1 on {d}"
 

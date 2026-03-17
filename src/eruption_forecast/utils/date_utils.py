@@ -143,13 +143,28 @@ def parse_label_filename(basename: str) -> dict:
     _VALID_UNITS = ("minutes", "hours")
 
     parts = basename.split("_")
-    if len(parts) != 5:
+    if len(parts) not in (5, 6):
         raise ValueError(
             f"Label filename has {len(parts)} underscore-separated part(s); "
-            f"expected 5. Got: '{basename}'. Expected format: {_EXPECTED_FORMAT}"
+            f"expected 5 or 6. Got: '{basename}'. Expected format: {_EXPECTED_FORMAT}"
         )
 
-    _, start_date_str, end_date_str, window_step_and_unit, day_to_forecast_part = parts
+    _, start_date_str, end_date_str, window_step_and_unit, day_to_forecast_part = parts[:5]
+
+    eruption_buffer = 0
+    if len(parts) == 6:
+        buf_part = parts[5]
+        if not buf_part.startswith("buffer-"):
+            raise ValueError(
+                f"Buffer segment must start with 'buffer-'. "
+                f"Got: '{buf_part}'. Expected format: {_EXPECTED_FORMAT}"
+            )
+        try:
+            eruption_buffer = int(buf_part.split("-")[1])
+        except (IndexError, ValueError):
+            raise ValueError(  # noqa: B904
+                f"Buffer value must be an integer. Got: '{buf_part}'."
+            )
 
     if not window_step_and_unit.startswith("step-"):
         raise ValueError(
@@ -211,6 +226,7 @@ def parse_label_filename(basename: str) -> dict:
         "window_step": window_step,
         "window_step_unit": window_step_unit,
         "day_to_forecast": day_to_forecast,
+        "eruption_buffer": eruption_buffer,
     }
 
 

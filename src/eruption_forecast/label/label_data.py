@@ -180,7 +180,7 @@ class LabelData(BaseDataContainer):
             )
 
         parts = self.basename.split("_")
-        if len(parts) != 5:
+        if len(parts) not in (5, 6):
             raise ValueError(
                 f"Label filename is invalid. "
                 f"Expected format: label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X.csv "
@@ -194,7 +194,7 @@ class LabelData(BaseDataContainer):
             end_date,
             window_step,
             day_to_forecast,
-        ) = parts
+        ) = parts[:5]
 
         # Validating start date and end date
         try:

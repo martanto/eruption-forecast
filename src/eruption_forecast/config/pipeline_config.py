@@ -178,6 +178,8 @@ class BuildLabelConfig(_ConfigBase):
             Defaults to ``"standard"``.
         days_before_eruption (int | None): Days before each eruption to start
             its window. Required when ``builder="dynamic"``. Defaults to ``None``.
+        eruption_buffer (int): Number of window steps to prepend before the start
+            of the positive labeling window. Defaults to ``1``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
         debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
@@ -191,6 +193,7 @@ class BuildLabelConfig(_ConfigBase):
     tremor_columns: list[str] | None = None
     builder: str = "standard"
     days_before_eruption: int | None = None
+    eruption_buffer: int = 1
     verbose: bool = False
     debug: bool = False
 

@@ -46,6 +46,7 @@ class DynamicLabelBuilder(LabelBuilder):
         root_dir: str | None = None,
         prefix_filename: str | None = None,
         overwrite: bool = False,
+        eruption_buffer: int = 1,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -67,6 +68,8 @@ class DynamicLabelBuilder(LabelBuilder):
             prefix_filename (str | None, optional): Custom prefix for the output
                 filename. Defaults to ``"label"``.
             overwrite (bool, optional): Overwrite existing output files. Defaults to False.
+            eruption_buffer (int, optional): Number of window steps to prepend before the
+                start of each eruption's positive labeling window. Defaults to 1.
             verbose (bool, optional): Enable informational logging. Defaults to False.
             debug (bool, optional): Enable debug-level logging. Defaults to False.
 
@@ -77,11 +80,11 @@ class DynamicLabelBuilder(LabelBuilder):
         eruption_dates = sort_dates(eruption_dates)
         prefix_filename = prefix_filename or "label"
 
-        # Compute overall data range from eruption dates + look-back window.
+        # Compute overall data range from eruption dates + look-forward window.
         overall_start: datetime = to_datetime(eruption_dates[0]) - timedelta(
             days=days_before_eruption
         )
-        overall_end: datetime = to_datetime(eruption_dates[-1])
+        overall_end: datetime = to_datetime(eruption_dates[-1]) + timedelta(days=day_to_forecast)
 
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         label_dir = os.path.join(output_dir, "labels")
@@ -100,6 +103,7 @@ class DynamicLabelBuilder(LabelBuilder):
             volcano_id,
             output_dir,
             root_dir,
+            eruption_buffer,
             verbose,
             debug,
         )
@@ -108,10 +112,11 @@ class DynamicLabelBuilder(LabelBuilder):
         self.days_before_eruption: int = days_before_eruption
 
         # Override filename/csv with custom prefix if provided.
+        buf_segment = f"_buffer-{eruption_buffer}" if eruption_buffer != 0 else ""
         self.filename = (
             f"{prefix_filename}_{overall_start_str}_{overall_end_str}"
             f"_step-{window_step}-{window_step_unit}"
-            f"_dtf-{day_to_forecast}.csv"
+            f"_dtf-{day_to_forecast}{buf_segment}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
         self.overwrite = overwrite
@@ -143,7 +148,7 @@ class DynamicLabelBuilder(LabelBuilder):
         label_dates: list[tuple[datetime, datetime]] = []
         for eruption_date in self._eruption_dates:
             start_date = eruption_date - timedelta(days=self.days_before_eruption)
-            end_date = eruption_date
+            end_date = eruption_date + timedelta(days=self.day_to_forecast)
             label_dates.append((start_date, end_date))
 
         return label_dates
@@ -198,10 +203,12 @@ class DynamicLabelBuilder(LabelBuilder):
                     f"{current_eruption_date.date()}; marking overlapping positive labels."
                 )
 
-            pos_start = (projected - timedelta(days=self.day_to_forecast)).replace(
-                hour=0, minute=0, second=0
+            window_step_delta = timedelta(**{self.window_step_unit: self.window_step})
+            pos_start = projected.replace(hour=0, minute=0, second=0)
+            pos_start -= self.eruption_buffer * window_step_delta
+            pos_end = (projected + timedelta(days=self.day_to_forecast)).replace(
+                hour=23, minute=59, second=59
             )
-            pos_end = projected.replace(hour=23, minute=59, second=59)
             clamp_start = max(pos_start, window_start)
             clamp_end = min(pos_end, window_end_ts)
             df.loc[clamp_start:clamp_end, "is_erupted"] = 1
@@ -255,27 +262,29 @@ class DynamicLabelBuilder(LabelBuilder):
         dfs: list[pd.DataFrame] = []
         df_eruptions_dict: dict[str, pd.DataFrame] = {}
 
-        for index, label_date in enumerate(self._label_dates):
-            start_date, end_eruption = label_date
+        for index, (label_date, eruption_date) in enumerate(
+            zip(self._label_dates, self._eruption_dates, strict=True)
+        ):
+            start_date, end_date = label_date
 
             # Initialise per-eruption window DataFrame.
             # Initiate ``is_erupted`` column value to 0 (no eruption).
-            df = self.initiate_label(start_date=start_date, end_date=end_eruption)
+            df = self.initiate_label(start_date=start_date, end_date=end_date)
 
-            end_eruption_ts = end_eruption.replace(hour=23, minute=59, second=59)
+            end_date_ts = end_date.replace(hour=23, minute=59, second=59)
 
             logger.info(
-                f"Start label: {start_date}. End label: {end_eruption_ts}. "
+                f"Start label: {start_date}. End label: {end_date_ts}. "
                 f"Total labels: {len(df)}"
             )
 
-            df = self._mark_eruption_labels(df, start_date, end_eruption, end_eruption)
+            df = self._mark_eruption_labels(df, start_date, end_date, eruption_date)
 
             length_df = len(df)
             df["id"] = range(index * length_df, (index + 1) * length_df)
             df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
 
-            eruption_key = end_eruption.strftime("%Y-%m-%d")
+            eruption_key = eruption_date.strftime("%Y-%m-%d")
             df_eruptions_dict[eruption_key] = df[df["is_erupted"] > 0]
 
             dfs.append(df)
