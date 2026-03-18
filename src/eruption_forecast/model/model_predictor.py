@@ -1,5 +1,5 @@
 import os
-from typing import Literal, cast
+from typing import Literal
 from datetime import datetime, timedelta
 
 import joblib
@@ -18,14 +18,13 @@ import matplotlib.pyplot as plt
 
 from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import load_labels_from_csv, compute_model_probabilities
+from eruption_forecast.utils.ml import compute_model_probabilities
 from eruption_forecast.utils.window import construct_windows
-from eruption_forecast.model.constants import METRIC_KEYS
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import normalize_dates
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
-from eruption_forecast.model.model_evaluator import ModelEvaluator
+from eruption_forecast.plots.forecast_plots import plot_forecast
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
@@ -34,20 +33,10 @@ from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 class ModelPredictor:
     """Evaluate or forecast with one or more sets of trained full-dataset models.
 
-    Loads models produced by ``ModelTrainer.train()`` and runs inference in
-    either evaluation or forecast mode. Supports single-model or multi-model
-    consensus predictions by aggregating across classifiers.
-
-    Two operating modes are supported:
-
-    * **Evaluation mode** (``future_labels_csv`` provided): Evaluates every
-      seed of every classifier on labeled future data and aggregates metrics
-      per classifier and across classifiers. Use :meth:`predict` and
-      :meth:`predict_best`.
-
-    * **Forecast mode** (no ``future_labels_csv``): Aggregates eruption
-      probability across seeds *and* classifiers with uncertainty quantification.
-      Use :meth:`predict_proba`.
+    Loads models produced by ``ModelTrainer.train()`` and runs forecast
+    inference. Supports single-model or multi-model consensus predictions by
+    aggregating across classifiers and seeds with uncertainty quantification.
+    Use :meth:`predict_proba` for unlabelled forecast mode.
 
     Attributes:
         start_date (datetime): Start of the prediction window.
@@ -91,23 +80,6 @@ class ModelPredictor:
         FileNotFoundError: If any trained model registry CSV does not exist.
 
     Examples:
-        >>> # Single model, evaluation mode
-        >>> predictor = ModelPredictor(
-        ...     start_date="2025-03-20",
-        ...     end_date="2025-03-22",
-        ...     trained_models="output/trainings/rf/trained_model_rf.csv",
-        ... )
-        >>> df_metrics = predictor.predict(
-        ...     future_features_csv="output/features/future_features.csv",
-        ...     future_labels_csv="output/features/future_labels.csv",
-        ... )
-        >>> evaluator = predictor.predict_best(
-        ...     future_features_csv="output/features/future_features.csv",
-        ...     future_labels_csv="output/features/future_labels.csv",
-        ... )
-        >>> print(evaluator.summary())
-
-        >>> # Multi-model consensus, forecast mode
         >>> predictor = ModelPredictor(
         ...     start_date="2025-03-20",
         ...     end_date="2025-03-22",
@@ -309,10 +281,6 @@ class ModelPredictor:
 
         self._multi_model: bool = len(self.trained_models) > 1
 
-        # Will be set after predict() is called
-        self.predict_all_metrics: list[dict] | None = None
-        self.predict_evaluators: list[ModelEvaluator] | None = None
-
         # Will be set after predict_proba() is called
         self.df: pd.DataFrame | None = None
 
@@ -323,369 +291,6 @@ class ModelPredictor:
     def model_names(self) -> list[str]:
         """Names of registered classifier types."""
         return list(self.trained_models.keys())
-
-    def predict(
-        self, future_features_csv: str, future_labels_csv: str, plot: bool = False
-    ) -> pd.DataFrame:
-        """Evaluate every trained model on LABELLED data.
-
-        Iterates over all classifiers and all seeds within each classifier,
-        computing evaluation metrics for each (classifier, seed) pair.
-
-        For multi-model usage a ``classifier`` column is added so rows can be
-        grouped per classifier.  A consensus summary (mean across all
-        classifiers) is logged and saved separately.
-
-        Args:
-            future_features_csv (str): Extracted features dataframe from future tremor.
-            future_labels_csv (str): Path to a labels CSV
-                matching ``future_features_csv``.  Required for :meth:`predict` /
-                :meth:`predict_best`.
-            plot (bool, optional): Save per-seed plots to the output
-                directory. Defaults to False.
-
-        Returns:
-            pd.DataFrame: One row per (classifier, seed) with all evaluation
-            metrics plus a ``classifier`` column.
-
-        Raises:
-            RuntimeError: If no ``future_labels_csv`` was provided.
-        """
-        features_df = pd.read_csv(future_features_csv, index_col=0)
-
-        labels_df = load_labels_from_csv(future_labels_csv)
-
-        if labels_df.empty:
-            raise RuntimeError(
-                "predict() requires labels. "
-                "Pass future_labels_csv= at construction, or use predict_proba() "
-                "for unlabelled forecast mode."
-            )
-
-        all_metrics: list[dict] = []
-        evaluators: list[ModelEvaluator] = []
-
-        for model_name, df_models in self.trained_models.items():
-            logger.info(f"Evaluating classifier: {model_name}")
-
-            model_output_dir = os.path.join(self.output_dir, model_name)
-            ensure_dir(model_output_dir)
-
-            if isinstance(df_models, SeedEnsemble):
-                self._evaluate_seed_ensemble(
-                    df_models,
-                    model_name,
-                    model_output_dir,
-                    features_df,
-                    labels_df,
-                    plot,
-                    all_metrics,
-                    evaluators,
-                )
-            else:
-                self._evaluate_registry(
-                    df_models,
-                    model_name,
-                    model_output_dir,
-                    features_df,
-                    labels_df,
-                    plot,
-                    all_metrics,
-                    evaluators,
-                )
-
-        self.predict_log_metrics_summary(all_metrics)
-        self.predict_all_metrics = all_metrics
-        self.predict_evaluators = evaluators
-
-        df_result = pd.DataFrame(all_metrics)
-        df_result.to_csv(
-            os.path.join(self.output_dir, f"all_metrics_{self.basename}.csv"),
-            index=False,
-        )
-        return df_result
-
-    @staticmethod
-    def _collect_seed_result(
-        evaluator: ModelEvaluator,
-        seed_model_name: str,
-        random_state: int,
-        plot: bool,
-        all_metrics: list[dict],
-        evaluators: list[ModelEvaluator],
-    ) -> None:
-        """Collect metrics and evaluator for one seed after inference.
-
-        Calls ``get_metrics()`` on the evaluator, stamps ``classifier`` and
-        ``random_state`` into the metrics dict, appends to the running lists,
-        optionally triggers plotting, and emits a one-line recall log.
-
-        Args:
-            evaluator (ModelEvaluator): Fitted evaluator for this seed.
-            seed_model_name (str): Full seed identifier (e.g. ``"rf_seed_00042"``).
-            random_state (int): Integer seed used to train this model.
-            plot (bool): Whether to call ``evaluator.plot_all()``.
-            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
-            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
-        """
-        metrics = evaluator.get_metrics()
-        assert isinstance(metrics, dict)
-        metrics["classifier"] = seed_model_name
-        metrics["random_state"] = random_state
-        all_metrics.append(metrics)
-        evaluators.append(evaluator)
-
-        if plot:
-            evaluator.plot_all()
-
-        logger.info(f"  Seed {random_state:05d} — recall: {metrics['recall']:.4f}")
-
-    @staticmethod
-    def _build_seed_evaluator(
-        model: object,
-        features_df: pd.DataFrame,
-        labels_df: pd.Series,
-        selected_features: list[str] | str,
-        seed_model_name: str,
-        random_state: int,
-        output_dir: str,
-    ) -> ModelEvaluator:
-        """Build a ModelEvaluator for a single seed from either in-memory or file-based sources.
-
-        Dispatches to ``ModelEvaluator.__init__`` when ``model`` is a fitted
-        estimator object (``SeedEnsemble`` path), or to
-        ``ModelEvaluator.from_files`` when ``model`` is a file path string
-        (registry CSV path).
-
-        Args:
-            model (object): A fitted scikit-learn estimator, or a path string
-                to a serialised model ``.pkl`` file.
-            features_df (pd.DataFrame): Future feature matrix.
-            labels_df (pd.Series): True labels aligned with ``features_df``.
-            selected_features (list[str] | str): Feature names list (in-memory
-                path) or path to the significant-features CSV (file path).
-            seed_model_name (str): Full seed identifier (e.g. ``"rf_seed_00042"``).
-            random_state (int): Integer seed used to train this model.
-            output_dir (str): Directory for evaluation outputs.
-
-        Raises:
-            TypeError: If model type is not ``str`` or ``BaseEstimator | GridSearchCV``,
-                or selected_features type is not ``str`` or ``list```
-
-        Returns:
-            ModelEvaluator: Constructed and ready-to-query evaluator.
-        """
-        if isinstance(model, str) and isinstance(selected_features, str):
-            return ModelEvaluator.from_files(
-                model_path=model,
-                X_test=features_df,
-                y_test=labels_df,
-                selected_features_path=selected_features,
-                model_name=seed_model_name,
-                random_state=random_state,
-                output_dir=output_dir,
-            )
-
-        if isinstance(selected_features, list):
-            return ModelEvaluator(
-                model=model,  # type: ignore[arg-type]
-                X_test=features_df,
-                y_test=labels_df,
-                selected_features=selected_features,
-                model_name=seed_model_name,
-                random_state=random_state,
-                output_dir=output_dir,
-            )
-
-        raise TypeError("Type error for model or selected_features.")
-
-    def _evaluate_single_seed(
-        self,
-        model_name: str,
-        model_output_dir: str,
-        random_state: int,
-        model: object,
-        selected_features: list[str] | str,
-        features_df: pd.DataFrame,
-        labels_df: pd.Series,
-        plot: bool,
-        all_metrics: list[dict],
-        evaluators: list[ModelEvaluator],
-    ) -> None:
-        """Evaluate one seed model and accumulate results.
-
-        Derives the seed name and output directory from ``model_name`` and
-        ``random_state``, constructs a ``ModelEvaluator`` via
-        :meth:`_build_seed_evaluator`, then delegates collection to
-        :meth:`_collect_seed_result`.
-
-        Args:
-            model_name (str): Classifier identifier used for output paths and labels.
-            model_output_dir (str): Root output directory for this classifier.
-            random_state (int): Integer seed used to train this model.
-            model (object): A fitted scikit-learn estimator or a path string to a ``.pkl`` file.
-            selected_features (list[str] | str): Feature names list or path to the
-                significant-features CSV.
-            features_df (pd.DataFrame): Future feature matrix.
-            labels_df (pd.Series): True labels aligned with ``features_df``.
-            plot (bool): Whether to save per-seed evaluation plots.
-            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
-            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
-        """
-        seed_model_name = f"{model_name}_seed_{random_state:05d}"
-        seed_output_dir = os.path.join(model_output_dir, seed_model_name)
-
-        evaluator = self._build_seed_evaluator(
-            model=model,
-            features_df=features_df,
-            labels_df=labels_df,
-            selected_features=selected_features,
-            seed_model_name=seed_model_name,
-            random_state=random_state,
-            output_dir=seed_output_dir if plot else model_output_dir,
-        )
-
-        self._collect_seed_result(
-            evaluator, seed_model_name, random_state, plot, all_metrics, evaluators
-        )
-
-    def _evaluate_seed_ensemble(
-        self,
-        seed_ensemble: SeedEnsemble,
-        model_name: str,
-        model_output_dir: str,
-        features_df: pd.DataFrame,
-        labels_df: pd.Series,
-        plot: bool,
-        all_metrics: list[dict],
-        evaluators: list[ModelEvaluator],
-    ) -> None:
-        """Evaluate every seed in a SeedEnsemble on labelled data.
-
-        Iterates ``seed_ensemble.seeds`` and delegates each seed to
-        :meth:`_evaluate_single_seed`.
-
-        Args:
-            seed_ensemble (SeedEnsemble): Ensemble whose seeds to evaluate.
-            model_name (str): Classifier identifier used for output paths and labels.
-            model_output_dir (str): Root output directory for this classifier.
-            features_df (pd.DataFrame): Future feature matrix.
-            labels_df (pd.Series): True labels aligned with ``features_df``.
-            plot (bool): Whether to save per-seed evaluation plots.
-            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
-            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
-        """
-        for seed in seed_ensemble.seeds:
-            self._evaluate_single_seed(
-                model_name=model_name,
-                model_output_dir=model_output_dir,
-                random_state=seed["random_state"],
-                model=seed[self.model_name],
-                selected_features=seed["feature_names"],
-                features_df=features_df,
-                labels_df=labels_df,
-                plot=plot,
-                all_metrics=all_metrics,
-                evaluators=evaluators,
-            )
-
-    def _evaluate_registry(
-        self,
-        df_models: pd.DataFrame,
-        model_name: str,
-        model_output_dir: str,
-        features_df: pd.DataFrame,
-        labels_df: pd.Series,
-        plot: bool,
-        all_metrics: list[dict],
-        evaluators: list[ModelEvaluator],
-    ) -> None:
-        """Evaluate every seed in a CSV registry on labelled data.
-
-        Iterates rows of the trained-model registry DataFrame and delegates
-        each seed to :meth:`_evaluate_single_seed`.
-
-        Args:
-            df_models (pd.DataFrame): Registry DataFrame with ``random_state``
-                as index and columns ``significant_features_csv`` and
-                ``trained_model_filepath``.
-            model_name (str): Classifier identifier used for output paths and labels.
-            model_output_dir (str): Root output directory for this classifier.
-            features_df (pd.DataFrame): Future feature matrix.
-            labels_df (pd.Series): True labels aligned with ``features_df``.
-            plot (bool): Whether to save per-seed evaluation plots.
-            all_metrics (list[dict]): Accumulator for per-seed metric dicts.
-            evaluators (list[ModelEvaluator]): Accumulator for evaluator objects.
-        """
-        for random_state, row in df_models.iterrows():
-            self._evaluate_single_seed(
-                model_name=model_name,
-                model_output_dir=model_output_dir,
-                random_state=cast(int, random_state),
-                model=row["trained_model_filepath"],
-                selected_features=row["significant_features_csv"],
-                features_df=features_df,
-                labels_df=labels_df,
-                plot=plot,
-                all_metrics=all_metrics,
-                evaluators=evaluators,
-            )
-
-    def predict_best(
-        self,
-        future_features_csv: str,
-        future_labels_csv: str,
-        criterion: str = "recall",
-        plot: bool = False,
-    ) -> ModelEvaluator:
-        """Return the ``ModelEvaluator`` for the best (classifier, seed) pair.
-
-        Searches across all classifiers and seeds to find the single model
-        with the highest value for *criterion*.
-
-        Args:
-            future_features_csv (str): Extracted features dataframe from future tremor.
-            future_labels_csv (str): Path to a labels CSV
-                matching ``future_features_csv``.  Required for :meth:`predict` /
-                :meth:`predict_best`.
-            criterion (str, optional): Metric name to optimise.
-                Defaults to ``"recall"``.
-            plot (bool, optional): Passed to :meth:`predict` when called
-                internally.
-
-        Returns:
-            ModelEvaluator: Evaluator for the best (classifier, seed).
-
-        Raises:
-            RuntimeError: If no ``future_labels_csv`` was provided.
-
-        Example:
-            >>> best = predictor.predict_best(criterion="f1_score")
-            >>> print(best.summary())
-        """
-        if self.predict_all_metrics is None or self.predict_evaluators is None:
-            self.predict(
-                future_features_csv=future_features_csv,
-                future_labels_csv=future_labels_csv,
-                plot=plot,
-            )
-
-        assert self.predict_all_metrics is not None
-        assert self.predict_evaluators is not None
-
-        best_idx = max(
-            range(len(self.predict_all_metrics)),
-            key=lambda i: self.predict_all_metrics[i].get(criterion, float("-inf")),  # type: ignore[index]
-        )
-
-        best_evaluator = self.predict_evaluators[best_idx]
-        best: dict = self.predict_all_metrics[best_idx]
-        logger.info(
-            f"Best model: classifier={best.get('classifier')} "
-            f"seed={best.get('random_state')} "
-            f"({criterion}={best.get(criterion):.4f})"
-        )
-        return best_evaluator
 
     def build_future_labels(
         self,
@@ -1145,6 +750,43 @@ class ModelPredictor:
             )
         return consensus_mean, consensus_std, consensus_conf, consensus_pred
 
+    def _get_classifier_proba(
+        self,
+        df_models: pd.DataFrame | SeedEnsemble,
+        model_name: str,
+        features_df: pd.DataFrame,
+        model_output_dir: str,
+        threshold: float,
+        save_predictions: bool,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Return ``(mean, std, confidence, prediction)`` for one classifier.
+
+        Dispatches to ``SeedEnsemble.predict_with_uncertainty`` for in-memory
+        models or to :func:`compute_model_probabilities` for CSV-registry models.
+
+        Args:
+            df_models (pd.DataFrame | SeedEnsemble): Seed data source.
+            model_name (str): Classifier identifier used for output paths.
+            features_df (pd.DataFrame): Future feature matrix.
+            model_output_dir (str): Directory for per-classifier result output.
+            threshold (float): Probability threshold for binary prediction.
+            save_predictions (bool): Whether to persist per-seed predictions to disk.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Arrays of
+            ``(mean_probability, std_probability, confidence, prediction)``.
+        """
+        if isinstance(df_models, SeedEnsemble):
+            return df_models.predict_with_uncertainty(features_df, threshold)
+        return compute_model_probabilities(
+            df_models=df_models,
+            features_df=features_df,
+            classifier_name=model_name,
+            output_dir=model_output_dir,
+            save_predictions=save_predictions,
+            overwrite=self.overwrite,
+        )
+
     def _forecast_single_classifier(
         self,
         model_name: str,
@@ -1158,9 +800,8 @@ class ModelPredictor:
     ) -> None:
         """Run inference for a single classifier and store results.
 
-        Dispatches to ``SeedEnsemble.predict_with_uncertainty`` for
-        in-memory models or to :func:`compute_model_probabilities` for
-        CSV-registry-based models, then calls :meth:`_store_classifier_proba`.
+        Calls :meth:`_get_classifier_proba` to obtain aggregated probability
+        arrays then delegates storage to :meth:`_store_classifier_proba`.
 
         Args:
             model_name (str): Classifier identifier used for logging and output paths.
@@ -1180,21 +821,16 @@ class ModelPredictor:
         model_output_dir = os.path.join(result_dir, model_name)
         ensure_dir(model_output_dir)
 
-        if isinstance(df_models, SeedEnsemble):
-            mean_probability, std_probability, confidence, prediction = (
-                df_models.predict_with_uncertainty(features_df, threshold)
+        mean_probability, std_probability, confidence, prediction = (
+            self._get_classifier_proba(
+                df_models=df_models,
+                model_name=model_name,
+                features_df=features_df,
+                model_output_dir=model_output_dir,
+                threshold=threshold,
+                save_predictions=save_predictions,
             )
-        else:
-            mean_probability, std_probability, confidence, prediction = (
-                compute_model_probabilities(
-                    df_models=df_models,
-                    features_df=features_df,
-                    classifier_name=model_name,
-                    output_dir=model_output_dir,
-                    save_predictions=save_predictions,
-                    overwrite=self.overwrite,
-                )
-            )
+        )
 
         self._store_classifier_proba(
             model_name=model_name,
@@ -1314,230 +950,28 @@ class ModelPredictor:
             )
         logger.info("=" * 60)
 
-    def predict_log_metrics_summary(self, all_metrics: list[dict]) -> None:
-        """Log per-classifier and consensus metrics summary.
-
-        Args:
-            all_metrics (list[dict]): List of metric dictionaries from all predictions.
-        """
-        df = pd.DataFrame(all_metrics)
-
-        logger.info("=" * 60)
-        logger.info("Evaluation Metrics Summary (mean ± std across seeds)")
-        logger.info("=" * 60)
-
-        for model_name in self.model_names:
-            sub = (
-                df[df["classifier"] == model_name] if "classifier" in df.columns else df
-            )
-            logger.info(f"  Classifier: {model_name}")
-            for metric in METRIC_KEYS:
-                if metric in sub.columns:
-                    logger.info(
-                        f"    {metric:20s}: {sub[metric].mean():.4f} ± {sub[metric].std():.4f}"
-                    )
-
-        if self._multi_model:
-            logger.info("-" * 60)
-            logger.info("  Consensus (mean across classifiers):")
-            # Average the per-classifier means
-            for metric in METRIC_KEYS:
-                if metric in df.columns:
-                    per_clf_means = [
-                        df[df["classifier"] == n][metric].mean()
-                        for n in self.model_names
-                    ]
-                    consensus_mean = float(np.mean(per_clf_means))
-                    consensus_std = float(np.std(per_clf_means))
-                    logger.info(
-                        f"    {metric:20s}: {consensus_mean:.4f} ± {consensus_std:.4f}"
-                    )
-
-        logger.info("=" * 60)
-
-        # Save summary
-        summary_path = os.path.join(self.output_dir, "all_metrics_summary.csv")
-        df.describe().T.to_csv(summary_path)
-        logger.info(f"Metrics summary saved to: {summary_path}")
-
     def _plot_forecast(
         self,
         df: pd.DataFrame,
         model_mean_probabilities: dict[str, np.ndarray],
     ) -> None:
-        """Save a time-series probability + confidence plot with enhanced styling.
+        """Save a time-series probability + confidence plot.
 
-        Multi-model: draws each classifier as a separate line plus the
-        consensus with a shaded ±1 std band.
-        Single-model: same styling without multi-model comparison.
+        Delegates to :func:`eruption_forecast.plots.forecast_plots.plot_forecast`
+        for figure construction, then saves to the figures directory.
 
         Args:
             df (pd.DataFrame): Forecast dataframe with predictions and confidence.
             model_mean_probabilities (dict[str, np.ndarray]): Mean probabilities per model.
         """
-        # Define custom color palette
-        custom_colors = [
-            "#1f77b4",
-            "#ff7f0e",
-            "#2ca02c",
-            "#d62728",
-            "#9467bd",
-            "#8c564b",
-            "#e377c2",
-            "#7f7f7f",
-            "#bcbd22",
-            "#17becf",
-        ]
-
-        # Create figure with better proportions
-        fig, (ax1, ax2) = plt.subplots(
-            2,
-            1,
+        fig = plot_forecast(
+            df=df,
+            model_names=list(model_mean_probabilities.keys()),
+            multi_model=self._multi_model,
             figsize=(14, 8),
-            sharex=True,
-            gridspec_kw={"height_ratios": [1.2, 1]},
-            layout="constrained",
+            dpi=300,
         )
-
-        index = range(len(df)) if not hasattr(df.index, "to_pydatetime") else df.index
-
-        # ========== TOP PANEL: Eruption Probability ==========
-        # Per-classifier probability lines (subtle)
-        for i, name in enumerate(model_mean_probabilities):
-            col = f"{name}_eruption_probability"
-            ax1.plot(
-                index,
-                df[col],
-                linewidth=1.5,
-                alpha=0.5,
-                color=custom_colors[i % len(custom_colors)],
-                linestyle="--",
-                label=f"{name.upper()}",
-                marker="o",
-                markersize=2,
-                markevery=max(1, len(df) // 20),
-            )
-
-        # Consensus with uncertainty band (prominent)
-        cp = df["consensus_eruption_probability"]
-        cu = df["consensus_uncertainty"]
-        ax1.fill_between(
-            index,
-            (cp - cu).clip(0, 1),
-            (cp + cu).clip(0, 1),
-            alpha=0.25,
-            # color="#34495e",
-            label="Uncertainty (±1σ)",
-            edgecolor="#2c3e50",
-            linewidth=0.5,
-        )
-        ax1.plot(
-            index,
-            cp,
-            color="#2c3e50",
-            linewidth=3.0,
-            label="Consensus",
-            marker="o",
-            markersize=3,
-            markevery=max(1, len(df) // 20),
-            zorder=5,
-        )
-
-        # Threshold line with better styling
-        ax1.axhline(
-            0.5,
-            color="#e74c3c",
-            linestyle="--",
-            linewidth=2,
-            label="Threshold (0.5)",
-            alpha=0.8,
-            zorder=3,
-        )
-
-        # High-risk zone shading
-        # ax1.axhspan(0.5, 1.0, alpha=0.05, color="#e74c3c", zorder=0)
-
-        # Styling
-        ax1.set_ylabel("Eruption Probability", fontsize=12, fontweight="bold")
-        ax1.set_ylim(-0.02, 1.02)
-        ax1.legend(
-            loc="upper left",
-            fontsize=9,
-            frameon=True,
-            shadow=True,
-            fancybox=True,
-            ncol=2 if len(model_mean_probabilities) > 3 else 1,
-        )
-        ax1.grid(True, alpha=0.3, linestyle="--", linewidth=0.8)
-        ax1.set_title(
-            "Volcanic Eruption Forecast"
-            + (" — Multi-Model Consensus" if self._multi_model else ""),
-            fontsize=14,
-            fontweight="bold",
-            pad=15,
-        )
-        ax1.spines["top"].set_visible(False)
-        ax1.spines["right"].set_visible(False)
-
-        # ========== BOTTOM PANEL: Model Confidence ==========
-        # Per-classifier confidence lines
-        for i, name in enumerate(model_mean_probabilities):
-            ax2.plot(
-                index,
-                df[f"{name}_confidence"],
-                # linewidth=1.5,
-                # alpha=0.5,
-                color=custom_colors[i % len(custom_colors)],
-                # linestyle="--",
-                label=f"{name.upper()}",
-                # marker="s",
-                # markersize=2,
-                markevery=max(1, len(df) // 20),
-            )
-
-        # Consensus confidence (prominent)
-        ax2.plot(
-            index,
-            df["consensus_confidence"],
-            # color="#2c3e50",
-            linewidth=3.0,
-            label="Consensus",
-            # marker="s",
-            # markersize=3,
-            markevery=max(1, len(df) // 20),
-            zorder=5,
-        )
-
-        # Reference lines
-        ax2.axhline(0.5, color="#95a5a6", linestyle=":", linewidth=1.5, alpha=0.7)
-        ax2.axhline(
-            0.75,
-            color="red",
-            linestyle=":",
-            linewidth=1,
-            # alpha=0.5,
-            label="High confidence",
-        )
-
-        # Styling
-        ax2.set_ylabel("Model Confidence", fontsize=12, fontweight="bold")
-        ax2.set_xlabel("Time Window", fontsize=12, fontweight="bold")
-        ax2.set_ylim(-0.02, 1.02)
-        ax2.legend(
-            loc="upper left",
-            fontsize=9,
-            frameon=False,
-            shadow=False,
-            fancybox=False,
-            ncol=2 if len(model_mean_probabilities) > 3 else 1,
-        )
-        ax2.grid(True, alpha=0.3, linestyle="--", linewidth=0.8)
-        ax2.spines["top"].set_visible(False)
-        ax2.spines["right"].set_visible(False)
-
         path = os.path.join(self.figures_dir, f"eruption_forecast_{self.basename}.png")
-        fig.savefig(
-            path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none"
-        )
+        fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none")
         plt.close(fig)
         logger.info(f"Forecast plot saved to: {path}")
