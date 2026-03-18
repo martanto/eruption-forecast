@@ -556,7 +556,7 @@ evaluator.plot_all()
 |-----------|------|---------|-------------|
 | `start_date` | `str \| datetime` | — | Start date for prediction period (format: YYYY-MM-DD) |
 | `end_date` | `str \| datetime` | — | End date for prediction period (format: YYYY-MM-DD) |
-| `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path (from `train()`) or a `{name: path}` dict for multi-model consensus |
+| `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path (from `train()`) or a merged `.pkl` path (from `merge_models()`); or a `{name: path}` dict for multi-model consensus (paths may be `.csv` or `.pkl`) |
 | `overwrite` | `bool` | `False` | Overwrite existing output files |
 | `n_jobs` | `int` | `1` | Number of parallel jobs for feature extraction |
 | `output_dir` | `str \| None` | `None` | Output directory; defaults to `<root_dir>/output/predictions` |

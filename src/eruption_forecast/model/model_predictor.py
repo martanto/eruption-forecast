@@ -70,8 +70,9 @@ class ModelPredictor:
         start_date (str | datetime): Start of the prediction window (YYYY-MM-DD).
         end_date (str | datetime): End of the prediction window (YYYY-MM-DD).
         trained_models (str | dict[str, str]): Either a single path to a
-            ``trained_model_{suffix}.csv`` file produced by ``ModelTrainer.train()``;
-            or a dict mapping classifier name to its CSV path
+            ``trained_model_{suffix}.csv`` file produced by ``ModelTrainer.train()``
+            or a merged ``.pkl`` file produced by ``ModelTrainer.merge_models()``;
+            or a dict mapping classifier name to its CSV or ``.pkl`` path
             (e.g., ``{"rf": "...", "xgb": "...", "voting": "..."}``).
         overwrite (bool, optional): Re-compute cached files if True.
             Defaults to False.

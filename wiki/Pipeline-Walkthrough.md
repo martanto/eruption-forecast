@@ -414,7 +414,7 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
-    trained_models=trainer.csv,  # trained_model_*.csv from train()
+    trained_models=trainer.csv,  # trained_model_*.csv or merged .pkl from merge_models()
     output_dir="output/predictions",
 )
 
@@ -443,7 +443,7 @@ evaluator.plot_all()
 predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
-    trained_models=trainer.csv,
+    trained_models=trainer.csv,  # trained_model_*.csv or merged .pkl from merge_models()
     output_dir="output/predictions",
 )
 
