@@ -27,8 +27,7 @@ def predict_proba_from_estimator(
     classifiers (``predict_proba``) and margin-based classifiers
     (``decision_function``) — into a single interface.  The ``ndim`` of the
     ``predict_proba`` output is validated to guard against estimators that
-    erroneously return a 1-D array instead of the expected ``(n_samples, 2)``
-    shape.
+    return a 1-D array instead of the expected ``(n_samples, 2)`` shape.
 
     For the ``decision_function`` case the raw scores are converted to
     probabilities via the logistic sigmoid, and a ``(n_samples, 2)`` scores
@@ -120,7 +119,9 @@ def aggregate_seed_probabilities(
     return mean_probability, std, confidence, prediction
 
 
-def detect_anomalies_zscore(data: np.ndarray, threshold: float = 3.5) -> NDArray[np.bool_]:
+def detect_anomalies_zscore(
+    data: np.ndarray, threshold: float = 3.5
+) -> NDArray[np.bool_]:
     """Detect anomalies using z-score method.
 
     Args:
@@ -132,7 +133,7 @@ def detect_anomalies_zscore(data: np.ndarray, threshold: float = 3.5) -> NDArray
             True indicates an anomaly at that position.
     """
     # Compute on non-NaN values only
-    valid = _filter_nans(data)
+    valid = filter_nans(data)
     median = np.median(valid)
 
     # Median Absolute Deviation
@@ -240,7 +241,7 @@ def count_valid_values(data: np.ndarray) -> int:
     return int(np.sum((data != 0.0) & ~np.isnan(data)))
 
 
-def _filter_nans(data: np.ndarray) -> np.ndarray:
+def filter_nans(data: np.ndarray) -> np.ndarray:
     """Remove NaN values from an array.
 
     Args:
@@ -299,7 +300,7 @@ def detect_maximum_outlier(
 
     # Handle NaN values
     if np.any(np.isnan(data)):
-        data = _filter_nans(data)
+        data = filter_nans(data)
         if len(data) == 0:
             return False, np.nan, np.nan
 
@@ -433,7 +434,7 @@ def remove_outliers(
 
     # Handle NaN values
     if np.any(np.isnan(data)):
-        data = _filter_nans(data)
+        data = filter_nans(data)
         if len(data) == 0:
             return np.array([])
 
