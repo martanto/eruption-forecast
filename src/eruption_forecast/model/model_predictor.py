@@ -20,6 +20,7 @@ from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import load_labels_from_csv, compute_model_probabilities
 from eruption_forecast.utils.window import construct_windows
+from eruption_forecast.model.constants import METRIC_KEYS
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import normalize_dates
 from eruption_forecast.tremor.tremor_data import TremorData
@@ -28,15 +29,6 @@ from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
-
-
-_METRIC_KEYS = [
-    "accuracy",
-    "balanced_accuracy",
-    "f1_score",
-    "precision",
-    "recall",
-]
 
 
 class ModelPredictor:
@@ -1338,7 +1330,7 @@ class ModelPredictor:
                 df[df["classifier"] == model_name] if "classifier" in df.columns else df
             )
             logger.info(f"  Classifier: {model_name}")
-            for metric in _METRIC_KEYS:
+            for metric in METRIC_KEYS:
                 if metric in sub.columns:
                     logger.info(
                         f"    {metric:20s}: {sub[metric].mean():.4f} ± {sub[metric].std():.4f}"
@@ -1348,7 +1340,7 @@ class ModelPredictor:
             logger.info("-" * 60)
             logger.info("  Consensus (mean across classifiers):")
             # Average the per-classifier means
-            for metric in _METRIC_KEYS:
+            for metric in METRIC_KEYS:
                 if metric in df.columns:
                     per_clf_means = [
                         df[df["classifier"] == n][metric].mean()
@@ -1366,11 +1358,6 @@ class ModelPredictor:
         summary_path = os.path.join(self.output_dir, "all_metrics_summary.csv")
         df.describe().T.to_csv(summary_path)
         logger.info(f"Metrics summary saved to: {summary_path}")
-
-    def _plot_forecast_new(
-        self, df: pd.DataFrame, model_mean_probabilities: dict[str, np.ndarray]
-    ) -> None:
-        return None
 
     def _plot_forecast(
         self,

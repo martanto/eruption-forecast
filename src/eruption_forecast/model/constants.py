@@ -61,6 +61,14 @@ LEARNING_CURVE_SCORER_MAP: dict[str, str | Any] = {
     "f1_weighted": make_scorer(safe_f1_weighted),
 }
 
+METRIC_KEYS = [
+    "accuracy",
+    "balanced_accuracy",
+    "f1_score",
+    "precision",
+    "recall",
+]
+
 CLASSIFIERS: list[str] = [
     "svm",
     "knn",
