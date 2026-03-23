@@ -145,11 +145,11 @@ operating on the same `ForecastModel` instance.
 │                 │  dates: 2025-01-01 → 2025-12-31
 └────────┬────────┘
          │
-         ├──────────────────────────────────────────────────────────────────┐
-         │                                                                  │
-         │  evaluate(fm)                              predict(fm)           │
-         │                                                                  │
-         ▼                                                                  ▼
+         ├──────────────────────────────────────────────────────────────┐
+         │                                                              │
+         │  evaluate(fm)                              predict(fm)       │
+         │                                                              │
+         ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
 │  build_label()  │  2025-01-01 → 2025-08-24                   │  build_label()  │  2025-07-28 → 2025-08-20
 │                 │  window_step=6h, dtf=2                     │                 │  window_step=6h, dtf=2
@@ -284,10 +284,10 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
  ┌───────────────────────────┐   ┌───────────────────────────┐
  │ days_before_eruption = 10 │   │ days_before_eruption = 10 │
  │                           │   │                           │
- │  0  0  0  0  0  0  1  1  E│  │  0  1  1  1  1  1  1  1  E│
- │                    ↑      │   │     ↑           ↑         │
- │              dtf start    │   │  overlap from   dtf start │
- │             (Mar 18)      │   │  Eruption A    (Mar 20)   │
+ │ 0  0  0  0  0  0  1  1  E │   │ 0  1  1  1  1  1  1  1  E │
+ │                   ↑       │   │    ↑           ↑          │
+ │                dtf start  │   │ overlap from  dtf start   │
+ │                (Mar 18)   │   │ Eruption A    (Mar 20)    │
  └───────────────────────────┘   └───────────────────────────┘
                                    ↑ secondary overlap → warning logged
    E = eruption date (is_erupted = 1)
@@ -361,7 +361,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 │   │                                                                                              │  │
 │   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
 │   │           │                                                   │                              │  │
-│   │   evaluate()                                     train()                           │  │
+│   │       evaluate()                                            train()                          │  │
 │   │   80/20 split → resample                            full dataset → resample                  │  │
 │   │   → feature select → CV                              → feature select → CV                   │  │
 │   │   → eval on test set                                    (no evaluation)                      │  │
