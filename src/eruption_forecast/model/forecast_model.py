@@ -224,6 +224,7 @@ class ForecastModel:
         self.nslc = nslc
         self.station_dir = station_dir
         self.features_dir = features_dir
+        self.include_eruption_date: bool = False
         self.basename: str | None = None
 
         # ------------------------------------------------------------------
@@ -1068,6 +1069,7 @@ class ForecastModel:
         eruption_dates: list[str],
         start_date: str | datetime | None = None,
         end_date: str | datetime | None = None,
+        include_eruption_date: bool = False,
         output_dir: str | None = None,
         tremor_columns: list[str] | None = None,
         builder: Literal["standard", "dynamic"] = "standard",
@@ -1096,6 +1098,8 @@ class ForecastModel:
                 ``builder="standard"``.
             end_date (str, optional): Override self.end_date. Used only when
                 ``builder="standard"``.
+            include_eruption_date (bool, optional): Date of eruption will marked
+                as an eruption (not excluded). Defaults to False.
             output_dir (Optional[str], optional): Output directory. Defaults to None.
             tremor_columns (Optional[list[str]], optional): Columns to select. Defaults to None.
             builder (Literal["standard", "dynamic"]): Label builder type. Defaults to
@@ -1131,6 +1135,7 @@ class ForecastModel:
             "day_to_forecast": day_to_forecast,
             "eruption_dates": eruption_dates,
             "volcano_id": self.volcano_id,
+            "include_eruption_date": include_eruption_date,
             "output_dir": output_dir,
             "root_dir": self.root_dir,
             "verbose": verbose,
@@ -1177,6 +1182,7 @@ class ForecastModel:
             eruption_dates=eruption_dates,
             start_date=str(train_start_date) if start_date is not None else None,
             end_date=str(train_end_date) if end_date is not None else None,
+            include_eruption_date=include_eruption_date,
             tremor_columns=tremor_columns,
             builder=builder,
             days_before_eruption=days_before_eruption,
