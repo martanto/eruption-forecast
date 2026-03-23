@@ -87,6 +87,7 @@ class LabelBuilder:
         day_to_forecast: int,
         eruption_dates: list[str],
         volcano_id: str,
+        include_eruption_date: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         verbose: bool = False,
@@ -110,6 +111,8 @@ class LabelBuilder:
             eruption_dates (list[str]): List of eruption dates in YYYY-MM-DD format.
                 Dates are automatically sorted.
             volcano_id (str): Unique identifier for the volcano, used in output filenames.
+            include_eruption_date (bool, optional): Date of eruption will marked
+                as an eruption (not excluded). Defaults to False.
             output_dir (str | None, optional): Output directory path. If None, defaults
                 to "output" subdirectory. Relative paths are resolved against root_dir.
                 Absolute paths are used as-is. Defaults to None.
@@ -167,6 +170,7 @@ class LabelBuilder:
         self.day_to_forecast: int = int(day_to_forecast)
         self.eruption_dates: list[str] = sort_dates(eruption_dates)
         self.volcano_id: str = str(volcano_id)
+        self.include_eruption_date = include_eruption_date
         self.verbose: bool = bool(verbose)
         self.debug: bool = bool(debug)
 
@@ -201,8 +205,8 @@ class LabelBuilder:
             logger.info("⚠️ Label Builder :: Debug mode is ON")
 
         if verbose:
-            logger.info(f"Start Date (YYYY-MM-DD): {start_date_str}")
-            logger.info(f"End Date (YYYY-MM-DD): {end_date_str}")
+            logger.info(f"Start Date: {start_date_str}")
+            logger.info(f"End Date: {end_date_str}")
             logger.info(f"Window Step ({window_step_unit}): {window_step}")
             logger.info(f"Day To Forecast (days): {day_to_forecast}")
             logger.info(f"Volcano ID: {volcano_id}")
@@ -504,7 +508,12 @@ class LabelBuilder:
                 day_of_eruption = to_datetime(eruption)
 
                 # Move the start of eruption to number of day_to_forecast
+                # Including the day of the eruption
                 start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
+
+                # Excluding date of eruption to be marked as eruption
+                if not self.include_eruption_date:
+                    day_of_eruption = day_of_eruption - timedelta(days=1)
 
                 # Set start time of eruption to 00:00:00 and end time of eruption to at 23:59:59
                 start_eruption, end_eruption, _start_eruption_str, end_eruption_str = (
