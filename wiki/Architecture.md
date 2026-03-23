@@ -249,6 +249,7 @@ calculate = CalculateTremor(
 **`LabelBuilder`** generates binary labels for supervised learning:
 - Creates sliding time windows and labels them erupted (1) or not (0)
 - Uses `day_to_forecast` to look ahead N days before eruptions
+- `include_eruption_date` (default `False`): when `True`, the eruption date itself is included in the positive window; when `False`, the window ends the day before the eruption
 - Label filenames follow: `label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv`
 
 **`DynamicLabelBuilder`** (extends `LabelBuilder`) generates one window per eruption:
@@ -258,7 +259,7 @@ calculate = CalculateTremor(
 
 ```
 LabelBuilder — one global window over the full date range
-─────────────────────────────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────
  start_date                                              end_date
  │                                                           │
  ├──────────────────────── window ───────────────────────────┤
@@ -266,6 +267,18 @@ LabelBuilder — one global window over the full date range
  │                               ↑           ↑               │
  │                           dtf start   eruption            │
  └───────────────────────────────────────────────────────────┘
+
+ include_eruption_date=False (default)
+ │  0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  0                │
+ │                       ↑              ↑  ↑                │
+ │                   dtf start    day before | eruption     │
+ │                                eruption   | (excluded)   │
+
+ include_eruption_date=True
+ │  0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  1                │
+ │                       ↑                 ↑                │
+ │                   dtf start          eruption            │
+ │                                      (included)          │
 
 DynamicLabelBuilder — one window per eruption, overlaps handled
 ─────────────────────────────────────────────────────────────────────
@@ -347,7 +360,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 │   │                                                                                              │  │
 │   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
 │   │           │                                                   │                              │  │
-│   │   evaluate()                                     train()                           │  │
+│   │       evaluate()                                            train()                          │  │
 │   │   80/20 split → resample                            full dataset → resample                  │  │
 │   │   → feature select → CV                              → feature select → CV                   │  │
 │   │   → eval on test set                                    (no evaluation)                      │  │
