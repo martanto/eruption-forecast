@@ -119,6 +119,47 @@ def aggregate_seed_probabilities(
     return mean_probability, std, confidence, prediction
 
 
+def aggregate_major_votes(
+    vote_matrix: np.ndarray,
+    threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Aggregate a binary vote matrix from multiple seeds into summary statistics.
+
+    Treats each seed's ``predict()`` output as a Bernoulli trial and computes
+    the vote ratio, standard deviation, 95 % confidence interval (margin of
+    error), and binary prediction for each sample.
+
+    Unlike :func:`aggregate_seed_probabilities`, which works on continuous
+    P(eruption) values, this function works on hard binary decisions (0 or 1)
+    and interprets the fraction of seeds that predict eruption as the vote
+    ratio.
+
+    Args:
+        vote_matrix (np.ndarray): Array of shape (n_samples, n_seeds) containing
+            binary (0 or 1) predictions from each seed estimator.
+        threshold (float, optional): Vote-ratio threshold above which a sample
+            is classified as eruption. Defaults to
+            ``ERUPTION_PROBABILITY_THRESHOLD``.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D arrays
+            of shape (n_samples,):
+
+            - ``vote_ratio``: Fraction of seeds predicting eruption (0.0–1.0).
+            - ``std``: Bernoulli standard deviation ``sqrt(p * (1 - p))``.
+            - ``confidence``: 95 % margin of error
+              ``1.96 * sqrt(p * (1 - p) / n_seeds)``.
+            - ``prediction``: Binary predictions (0 or 1) based on
+              ``threshold``.
+    """
+    n_seeds = vote_matrix.shape[1]
+    vote_ratio: np.ndarray = vote_matrix.sum(axis=1) / n_seeds
+    std: np.ndarray = np.sqrt(vote_ratio * (1.0 - vote_ratio))
+    confidence: np.ndarray = 1.96 * np.sqrt(vote_ratio * (1.0 - vote_ratio) / n_seeds)
+    prediction: np.ndarray = (vote_ratio >= threshold).astype(int)
+    return vote_ratio, std, confidence, prediction
+
+
 def detect_anomalies_zscore(
     data: np.ndarray, threshold: float = 3.5
 ) -> NDArray[np.bool_]:

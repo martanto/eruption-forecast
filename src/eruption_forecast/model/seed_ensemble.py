@@ -17,6 +17,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
+    aggregate_major_votes,
     aggregate_seed_probabilities,
     predict_proba_from_estimator,
 )
@@ -152,6 +153,26 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         )
         return eruption_proba
 
+    @staticmethod
+    def _compute_seed_vote(seed: dict, X: pd.DataFrame) -> np.ndarray:
+        """Compute binary prediction for a single seed.
+
+        Selects the seed-specific features from ``X``, then calls
+        ``predict()`` on the stored estimator and returns a 1-D binary array.
+
+        Args:
+            seed (dict): Seed record with keys ``model`` and ``feature_names``.
+            X (pd.DataFrame): Extracted features DataFrame with shape
+                (n_samples, n_features).
+
+        Returns:
+            np.ndarray: 1-D integer array of shape ``(n_samples,)`` with binary
+                predictions (0 or 1).
+        """
+        model = seed["model"]
+        feature_names: list[str] = seed["feature_names"]
+        return model.predict(X[feature_names])
+
     # ------------------------------------------------------------------
     # Public sklearn-compatible interface
     # ------------------------------------------------------------------
@@ -229,6 +250,43 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         )  # (n_samples, n_seeds)
 
         return aggregate_seed_probabilities(seed_probas, threshold=threshold)
+
+    def predict_with_major_voting(
+        self,
+        X: pd.DataFrame,
+        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Return vote ratio, uncertainty, confidence, and binary predictions via majority voting.
+
+        Aggregates binary decisions from each seed estimator's ``predict()``
+        call — rather than continuous probabilities — into four summary
+        statistics.  The vote ratio is the fraction of seeds that individually
+        predicted eruption (1).
+
+        Args:
+            X (pd.DataFrame): Extracted features DataFrame with shape
+                (n_samples, n_features).
+            threshold (float, optional): Vote-ratio threshold for eruption
+                classification. Defaults to ``ERUPTION_PROBABILITY_THRESHOLD``.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D
+                arrays of shape ``(n_samples,)``:
+
+                - ``vote_ratio``: Fraction of seeds predicting eruption
+                  (0.0–1.0).
+                - ``std``: Bernoulli standard deviation
+                  ``sqrt(p * (1 - p))``.
+                - ``confidence``: 95 % margin of error
+                  ``1.96 * sqrt(p * (1 - p) / n_seeds)``.
+                - ``prediction``: Binary predictions (0 or 1) based on
+                  ``threshold``.
+        """
+        vote_matrix = np.stack(
+            [self._compute_seed_vote(seed, X) for seed in self.seeds], axis=1
+        )  # (n_samples, n_seeds)
+
+        return aggregate_major_votes(vote_matrix, threshold=threshold)
 
     # ------------------------------------------------------------------
     # Serialisation

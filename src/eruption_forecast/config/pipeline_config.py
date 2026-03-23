@@ -329,6 +329,8 @@ class ForecastConfig(_ConfigBase):
         overwrite (bool): Whether to overwrite existing forecast output files.
             Defaults to ``False``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
+        method (str): Inference strategy — ``"proba"`` (probability averaging)
+            or ``"voting"`` (majority vote). Defaults to ``"proba"``.
     """
 
     start_date: str = ""
@@ -341,6 +343,7 @@ class ForecastConfig(_ConfigBase):
     n_jobs: int | None = None
     overwrite: bool = False
     verbose: bool = False
+    method: str = "proba"
 
 
 @dataclass

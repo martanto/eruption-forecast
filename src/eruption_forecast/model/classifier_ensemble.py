@@ -214,6 +214,85 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             per_clf_results,
         )
 
+    def predict_with_major_voting(
+        self,
+        X: pd.DataFrame,
+        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]:
+        """Return consensus major-voting statistics and per-classifier results.
+
+        For each classifier, calls
+        :meth:`SeedEnsemble.predict_with_major_voting` to obtain per-seed
+        aggregated binary-vote statistics, then computes cross-classifier
+        consensus by averaging vote ratios across classifiers.
+
+        Confidence is defined as the fraction of classifiers whose binary
+        prediction agrees with the consensus prediction.
+
+        Args:
+            X (pd.DataFrame): Extracted features DataFrame with shape
+                (n_samples, n_features).
+            threshold (float, optional): Vote-ratio threshold for binary
+                eruption classification. Defaults to
+                ``ERUPTION_PROBABILITY_THRESHOLD``.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]:
+                A 5-tuple:
+
+                - ``consensus_vote_ratio`` (np.ndarray): Shape ``(n_samples,)``
+                  — mean vote ratio averaged across all classifiers.
+                - ``consensus_std`` (np.ndarray): Shape ``(n_samples,)`` — std
+                  of per-classifier vote ratios (inter-classifier uncertainty).
+                - ``consensus_confidence`` (np.ndarray): Shape ``(n_samples,)``
+                  — fraction of classifiers agreeing with the consensus
+                  prediction.
+                - ``consensus_prediction`` (np.ndarray): Shape ``(n_samples,)``
+                  — binary predictions (0 or 1).
+                - ``per_classifier_results`` (dict): Mapping from classifier
+                  name to a dict with keys ``"vote_ratio"``, ``"std"``,
+                  ``"confidence"``, ``"prediction"`` — each a 1-D
+                  ``np.ndarray`` of shape ``(n_samples,)``.
+        """
+        per_clf_results: dict[str, dict[str, np.ndarray]] = {}
+        for name, seed_ensemble in self.ensembles.items():
+            vote_ratio, std, conf, pred = seed_ensemble.predict_with_major_voting(
+                X, threshold
+            )
+            per_clf_results[name] = {
+                "vote_ratio": vote_ratio,
+                "std": std,
+                "confidence": conf,
+                "prediction": pred,
+            }
+
+        # Cross-classifier consensus
+        all_ratios = np.stack(
+            [v["vote_ratio"] for v in per_clf_results.values()], axis=0
+        )  # (n_classifiers, n_samples)
+        consensus_vote_ratio: np.ndarray = all_ratios.mean(axis=0)
+        consensus_std: np.ndarray = all_ratios.std(axis=0)
+        consensus_pred: np.ndarray = (consensus_vote_ratio >= threshold).astype(int)
+
+        n_classifiers = all_ratios.shape[0]
+        clf_preds = np.stack(
+            [v["prediction"] for v in per_clf_results.values()], axis=0
+        )  # (n_classifiers, n_samples)
+        votes = np.where(
+            consensus_pred == 1,
+            (clf_preds == 1).sum(axis=0),
+            (clf_preds == 0).sum(axis=0),
+        )
+        consensus_conf: np.ndarray = votes / n_classifiers
+
+        return (
+            consensus_vote_ratio,
+            consensus_std,
+            consensus_conf,
+            consensus_pred,
+            per_clf_results,
+        )
+
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------

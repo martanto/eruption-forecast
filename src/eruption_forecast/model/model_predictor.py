@@ -255,57 +255,8 @@ class ModelPredictor:
         #   - dict[str, pd.DataFrame]   for CSV-based registry (existing path)
         #   - dict[str, SeedEnsemble]   for merged .pkl files (new path)
         self._classifier_ensemble: ClassifierEnsemble | None = None
-        if isinstance(trained_models, str):
-            if trained_models.endswith(".pkl"):
-                loaded = joblib.load(trained_models)
-                if isinstance(loaded, ClassifierEnsemble):
-                    # New multi-classifier merged pkl
-                    self._classifier_ensemble: ClassifierEnsemble = loaded
-                    self.trained_models: dict[str, pd.DataFrame | SeedEnsemble] = dict(
-                        loaded.ensembles.items()
-                    )
-                elif isinstance(loaded, SeedEnsemble):
-                    # Single-classifier merged pkl
-                    self.trained_models = {model_name: loaded}
-                elif isinstance(loaded, dict):
-                    # Backward-compat: plain dict[str, SeedEnsemble] pkl — auto-wrap
-                    self._classifier_ensemble: ClassifierEnsemble = (
-                        ClassifierEnsemble.from_seed_ensembles(loaded)
-                    )
-                    self.trained_models = loaded
-                else:
-                    raise ValueError(f"Unrecognised object type in pkl: {type(loaded)}")
-            else:
-                self.trained_models = {
-                    model_name: pd.read_csv(trained_models, index_col=0)
-                }
-        elif isinstance(trained_models, dict):
-            first_val = next(iter(trained_models.values()))
-            if isinstance(first_val, str) and first_val.endswith(".pkl"):
-                # Values are paths to per-classifier merged pkl files
-                self.trained_models = {}
-                for model_name, path in trained_models.items():
-                    loaded = joblib.load(path)
-                    if isinstance(loaded, SeedEnsemble):
-                        self.trained_models[model_name] = loaded
-                    elif isinstance(loaded, dict):
-                        # Unlikely but handle gracefully
-                        self.trained_models.update(loaded)
-                    else:
-                        raise ValueError(
-                            f"Unrecognised object type in {path}: {type(loaded)}"
-                        )
-            elif isinstance(first_val, str):
-                # Values are paths to CSV registry files
-                logger.info("Models prediction using CSV.")
-                self.trained_models = {
-                    model_name: pd.read_csv(path, index_col=0)
-                    for model_name, path in trained_models.items()
-                }
-            else:
-                raise ValueError(
-                    f"Unrecognised trained_models value type: {type(first_val)}"
-                )
+        self.trained_models: dict[str, pd.DataFrame | SeedEnsemble] = {}
+        self._load_trained_models(trained_models, model_name)
 
         self._multi_model: bool = len(self.trained_models) > 1
 
@@ -318,6 +269,79 @@ class ModelPredictor:
 
         if verbose:
             logger.info(f"Models registered: {len(self.trained_models)}")
+
+    def _load_trained_models(
+        self,
+        trained_models: str | dict[str, str],
+        model_name: str,
+    ) -> None:
+        """Normalise ``trained_models`` and populate ``self.trained_models`` and ``self._classifier_ensemble``.
+
+        Accepts a single path (CSV registry or ``.pkl``) or a dict mapping
+        classifier names to paths, and converts them into the two internal
+        representations used throughout ``ModelPredictor``:
+
+        - ``dict[str, pd.DataFrame]`` for CSV-based registries
+        - ``dict[str, SeedEnsemble]`` for merged ``.pkl`` files
+
+        Args:
+            trained_models (str | dict[str, str]): Single path or dict of paths
+                to trained model registries or merged ``.pkl`` files.
+            model_name (str): Slugified model name used as the key when a single
+                CSV or ``SeedEnsemble`` pkl is provided.
+        """
+        if isinstance(trained_models, str):
+            if trained_models.endswith(".pkl"):
+                loaded = joblib.load(trained_models)
+                if isinstance(loaded, ClassifierEnsemble):
+                    # New multi-classifier merged pkl
+                    self._classifier_ensemble = loaded
+                    self.trained_models = dict(loaded.ensembles.items())
+                elif isinstance(loaded, SeedEnsemble):
+                    # Single-classifier merged pkl
+                    self.trained_models = {model_name: loaded}
+                elif isinstance(loaded, dict):
+                    # Backward-compat: plain dict[str, SeedEnsemble] pkl — auto-wrap
+                    self._classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+                        loaded
+                    )
+                    self.trained_models = loaded
+                else:
+                    raise ValueError(f"Unrecognised object type in pkl: {type(loaded)}")
+            else:
+                self.trained_models = {
+                    model_name: pd.read_csv(trained_models, index_col=0)
+                }
+
+        elif isinstance(trained_models, dict):
+            first_val = next(iter(trained_models.values()))
+
+            if isinstance(first_val, str) and first_val.endswith(".pkl"):
+                # Values are paths to per-classifier merged pkl files
+                self.trained_models = {}
+                for clf_name, path in trained_models.items():
+                    loaded = joblib.load(path)
+                    if isinstance(loaded, SeedEnsemble):
+                        self.trained_models[clf_name] = loaded
+                    elif isinstance(loaded, dict):
+                        # Unlikely but handle gracefully
+                        self.trained_models.update(loaded)
+                    else:
+                        raise ValueError(
+                            f"Unrecognised object type in {path}: {type(loaded)}"
+                        )
+
+            elif isinstance(first_val, str):
+                # Values are paths to CSV registry files
+                logger.info("Models prediction using CSV.")
+                self.trained_models = {
+                    clf_name: pd.read_csv(path, index_col=0)
+                    for clf_name, path in trained_models.items()
+                }
+            else:
+                raise ValueError(
+                    f"Unrecognised trained_models value type: {type(first_val)}"
+                )
 
     @property
     def model_names(self) -> list[str]:
@@ -1004,10 +1028,8 @@ class ModelPredictor:
             pd.DataFrame: Index matches the future features index.  Columns
             include per-classifier metrics and consensus metrics.
         """
-        tremor_data = self.get_tremor_dataframe(tremor_data)
-
-        features_df = self.get_features_dataframe(
-            tremor_df=tremor_data,
+        features_df = self._prepare_forecast_features(
+            tremor_data=tremor_data,
             window_size=window_size,
             window_step=window_step,
             window_step_unit=window_step_unit,
@@ -1063,8 +1085,48 @@ class ModelPredictor:
         self.df = df_forecast
         return df_forecast
 
+    def _prepare_forecast_features(
+        self,
+        tremor_data: str | pd.DataFrame,
+        window_size: int,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+        use_relevant_features: bool,
+        select_tremor_columns: list[str] | None,
+    ) -> pd.DataFrame:
+        """Load tremor data and extract forecast features.
+
+        Shared setup step used by both :meth:`predict_proba` and
+        :meth:`predict_voting`.  Calls :meth:`get_tremor_dataframe` followed
+        by :meth:`get_features_dataframe` and returns the resulting feature
+        matrix.
+
+        Args:
+            tremor_data (str | pd.DataFrame): Tremor data as a filepath or
+                pre-loaded DataFrame.
+            window_size (int): Window size in days.
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of ``window_step``.
+            use_relevant_features (bool): Whether to filter to statistically
+                relevant features only.
+            select_tremor_columns (list[str] | None): Subset of tremor columns
+                to use.  ``None`` uses all columns.
+
+        Returns:
+            pd.DataFrame: Extracted features dataframe, one row per window.
+        """
+        tremor_df = self.get_tremor_dataframe(tremor_data)
+        return self.get_features_dataframe(
+            tremor_df=tremor_df,
+            window_size=window_size,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            use_relevant_features=use_relevant_features,
+            select_tremor_columns=select_tremor_columns,
+        )
+
     @staticmethod
-    def _store_classifier_proba(
+    def _store_classifier_result(
         model_name: str,
         mean: np.ndarray,
         std: np.ndarray,
@@ -1073,17 +1135,17 @@ class ModelPredictor:
         cols: dict[str, np.ndarray],
         model_mean_probabilities: dict[str, np.ndarray],
     ) -> None:
-        """Store per-classifier probability arrays and log a one-line summary.
+        """Store per-classifier result arrays and log a one-line summary.
 
         Writes the four per-classifier result columns into ``cols``, records
-        the mean probability array in ``model_mean_probabilities``, and emits
+        the mean value array in ``model_mean_probabilities``, and emits
         a log line with mean eruption probability and mean confidence.
 
         Args:
             model_name (str): Classifier identifier used as column prefix.
-            mean (np.ndarray): Mean eruption probability per window.
-            std (np.ndarray): Standard deviation of probability across seeds.
-            confidence (np.ndarray): Fraction of seeds agreeing with the majority vote.
+            mean (np.ndarray): Mean eruption probability (or vote ratio) per window.
+            std (np.ndarray): Standard deviation across seeds.
+            confidence (np.ndarray): Confidence metric per window.
             prediction (np.ndarray): Binary prediction per window (0 or 1).
             cols (dict[str, np.ndarray]): Mutable column accumulator for the
                 forecast DataFrame.
@@ -1112,7 +1174,7 @@ class ModelPredictor:
         Calls ``ClassifierEnsemble.predict_with_uncertainty`` for the fast
         path where all classifiers are bundled in a single object, then
         populates ``cols`` and ``model_mean_probabilities`` via
-        :meth:`_store_classifier_proba`.
+        :meth:`_store_classifier_result`.
 
         Args:
             features_df (pd.DataFrame): Future feature matrix.
@@ -1134,7 +1196,7 @@ class ModelPredictor:
             )
         )
         for model_name, clf_result in per_clf.items():
-            self._store_classifier_proba(
+            self._store_classifier_result(
                 model_name=model_name,
                 mean=clf_result["mean"],
                 std=clf_result["std"],
@@ -1160,7 +1222,7 @@ class ModelPredictor:
 
         Dispatches to ``SeedEnsemble.predict_with_uncertainty`` for
         in-memory models or to :func:`compute_model_probabilities` for
-        CSV-registry-based models, then calls :meth:`_store_classifier_proba`.
+        CSV-registry-based models, then calls :meth:`_store_classifier_result`.
 
         Args:
             model_name (str): Classifier identifier used for logging and output paths.
@@ -1196,7 +1258,7 @@ class ModelPredictor:
                 )
             )
 
-        self._store_classifier_proba(
+        self._store_classifier_result(
             model_name=model_name,
             mean=mean_probability,
             std=std_probability,
@@ -1541,3 +1603,242 @@ class ModelPredictor:
         )
         plt.close(fig)
         logger.info(f"Forecast plot saved to: {path}")
+
+    def _forecast_voting_with_classifier_ensemble(
+        self,
+        features_df: pd.DataFrame,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+        threshold: float,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Delegate major-voting inference and consensus to a ClassifierEnsemble.
+
+        Calls ``ClassifierEnsemble.predict_with_major_voting`` for the fast
+        path where all classifiers are bundled in a single object, then
+        populates ``cols`` and ``model_mean_probabilities`` via
+        :meth:`_store_classifier_result`.
+
+        Args:
+            features_df (pd.DataFrame): Future feature matrix.
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable
+                accumulator for cross-classifier consensus computation.
+            threshold (float): Vote-ratio threshold for binary classification.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
+            ``(consensus_vote_ratio, consensus_std, consensus_conf, consensus_pred)``.
+        """
+        assert self._classifier_ensemble is not None
+        consensus_mean, consensus_std, consensus_conf, consensus_pred, per_clf = (
+            self._classifier_ensemble.predict_with_major_voting(
+                features_df, threshold=threshold
+            )
+        )
+        for model_name, clf_result in per_clf.items():
+            self._store_classifier_result(
+                model_name=model_name,
+                mean=clf_result["vote_ratio"],
+                std=clf_result["std"],
+                confidence=clf_result["confidence"],
+                prediction=clf_result["prediction"],
+                cols=cols,
+                model_mean_probabilities=model_mean_probabilities,
+            )
+        return consensus_mean, consensus_std, consensus_conf, consensus_pred
+
+    def _forecast_voting_single_classifier(
+        self,
+        model_name: str,
+        df_models: pd.DataFrame | SeedEnsemble,
+        features_df: pd.DataFrame,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+        threshold: float,
+    ) -> None:
+        """Run major-voting inference for a single classifier and store results.
+
+        Dispatches to ``SeedEnsemble.predict_with_major_voting`` for
+        in-memory models.  CSV-registry-based models are not supported for
+        voting and raise ``NotImplementedError``.
+
+        Args:
+            model_name (str): Classifier identifier used for logging and output paths.
+            df_models (pd.DataFrame | SeedEnsemble): Either a ``SeedEnsemble``
+                or a registry ``DataFrame`` with model file paths.
+            features_df (pd.DataFrame): Future feature matrix.
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable
+                accumulator for cross-classifier consensus computation.
+            threshold (float): Vote-ratio threshold for binary classification.
+
+        Raises:
+            NotImplementedError: If ``df_models`` is a CSV registry DataFrame.
+                Use a merged ``.pkl`` (``SeedEnsemble``) instead.
+        """
+        logger.info(f"Voting with classifier: {model_name}")
+
+        if isinstance(df_models, pd.DataFrame):
+            raise NotImplementedError(
+                "predict_voting() requires a merged SeedEnsemble .pkl. "
+                "CSV registry is not supported — call ModelTrainer.merge_models() first."
+            )
+
+        vote_ratio, std, confidence, prediction = df_models.predict_with_major_voting(
+            features_df, threshold
+        )
+        self._store_classifier_result(
+            model_name=model_name,
+            mean=vote_ratio,
+            std=std,
+            confidence=confidence,
+            prediction=prediction,
+            cols=cols,
+            model_mean_probabilities=model_mean_probabilities,
+        )
+
+    def _forecast_voting_with_trained_models(
+        self,
+        features_df: pd.DataFrame,
+        cols: dict[str, np.ndarray],
+        model_mean_probabilities: dict[str, np.ndarray],
+        threshold: float,
+    ) -> None:
+        """Iterate over all registered classifiers and run per-classifier major-voting.
+
+        Calls :meth:`_forecast_voting_single_classifier` for each entry in
+        ``self.trained_models``.
+
+        Args:
+            features_df (pd.DataFrame): Future feature matrix.
+            cols (dict[str, np.ndarray]): Mutable column accumulator for the
+                forecast DataFrame.
+            model_mean_probabilities (dict[str, np.ndarray]): Mutable
+                accumulator for cross-classifier consensus computation.
+            threshold (float): Vote-ratio threshold for binary classification.
+        """
+        for model_name, df_models in self.trained_models.items():
+            self._forecast_voting_single_classifier(
+                model_name=model_name,
+                df_models=df_models,
+                features_df=features_df,
+                cols=cols,
+                model_mean_probabilities=model_mean_probabilities,
+                threshold=threshold,
+            )
+
+    def predict_voting(
+        self,
+        tremor_data: str | pd.DataFrame,
+        window_size: int,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+        use_relevant_features: bool = True,
+        select_tremor_columns: list[str] | None = None,
+        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
+        save_predictions: bool = True,
+        plot: bool = True,
+    ) -> pd.DataFrame:
+        """Forecast eruption probability using seed majority voting.
+
+        For each classifier and each of its seed models, ``predict()`` is
+        called on the future feature set (binary vote per seed) rather than
+        continuous probabilities.  Results are aggregated in two stages:
+
+        1. **Within each classifier** — binary votes are aggregated across all
+           seeds to produce a vote ratio and uncertainty per window, stored as
+           ``{name}_eruption_probability``, ``{name}_uncertainty``,
+           ``{name}_confidence``, and ``{name}_prediction``.
+
+        2. **Across classifiers (consensus)** — per-classifier vote ratios are
+           averaged to produce ``consensus_*`` columns.
+
+        This method requires merged ``.pkl`` inputs (``SeedEnsemble`` or
+        ``ClassifierEnsemble``).  CSV registry inputs are not supported and
+        will raise ``NotImplementedError``.
+
+        The result is saved as ``result_all_model_voting_{basename}.csv``.
+        If *plot* is ``True`` a time-series figure is also saved.
+
+        Args:
+            tremor_data (str | pd.DataFrame): Tremor data as CSV path or
+                pre-loaded DataFrame.
+            window_size (int): Window size in days.
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of
+                ``window_step``.
+            use_relevant_features (bool, optional): Whether to filter to
+                statistically relevant features only.  Defaults to True.
+            select_tremor_columns (list[str] | None, optional): Subset of
+                tremor columns to use.  Defaults to None (all columns).
+            threshold (float, optional): Vote-ratio threshold for binary
+                eruption classification.  Defaults to
+                ``ERUPTION_PROBABILITY_THRESHOLD``.
+            save_predictions (bool, optional): Save voting result to CSV.
+                Defaults to True.
+            plot (bool, optional): Save a probability time-series plot.
+                Defaults to True.
+
+        Returns:
+            pd.DataFrame: Index matches the future features index.  Columns
+            include per-classifier vote metrics and consensus metrics.
+
+        Raises:
+            NotImplementedError: If any registered model is a CSV registry
+                DataFrame (not a ``SeedEnsemble`` merged ``.pkl``).
+        """
+        features_df = self._prepare_forecast_features(
+            tremor_data=tremor_data,
+            window_size=window_size,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            use_relevant_features=use_relevant_features,
+            select_tremor_columns=select_tremor_columns,
+        )
+
+        cols: dict[str, np.ndarray] = {}
+        model_mean_probabilities: dict[str, np.ndarray] = {}
+
+        if isinstance(self._classifier_ensemble, ClassifierEnsemble):
+            consensus_mean, consensus_std, consensus_conf, consensus_pred = (
+                self._forecast_voting_with_classifier_ensemble(
+                    features_df,
+                    cols,
+                    model_mean_probabilities,
+                    threshold=threshold,
+                )
+            )
+        else:
+            self._forecast_voting_with_trained_models(
+                features_df=features_df,
+                cols=cols,
+                model_mean_probabilities=model_mean_probabilities,
+                threshold=threshold,
+            )
+            consensus_mean, consensus_std, consensus_conf, consensus_pred = (
+                self._compute_consensus(cols, model_mean_probabilities)
+            )
+
+        cols["consensus_eruption_probability"] = consensus_mean
+        cols["consensus_uncertainty"] = consensus_std
+        cols["consensus_confidence"] = consensus_conf
+        cols["consensus_prediction"] = consensus_pred
+
+        df_forecast = pd.DataFrame(cols, index=features_df.index)
+
+        if save_predictions:
+            csv_path = os.path.join(
+                self.output_dir, f"result_all_model_voting_{self.basename}.csv"
+            )
+            df_forecast.to_csv(csv_path)
+            logger.info(f"Voting predictions saved to: {csv_path}")
+
+        self._log_forecast_summary(df_forecast, model_mean_probabilities)
+
+        if plot:
+            self._plot_forecast(df_forecast, model_mean_probabilities)
+
+        self.df = df_forecast
+        return df_forecast

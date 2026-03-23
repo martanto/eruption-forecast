@@ -277,7 +277,7 @@ class ForecastModel:
         # Will be set after predict() called
         # ------------------------------------------------------------------
         self.ModelPredictor: ModelPredictor | None = None
-        self.prediction_df: pd.DataFrame = pd.DataFrame()
+        self.df_prediction: pd.DataFrame = pd.DataFrame()
 
         # ------------------------------------------------------------------
         # Pipeline configuration (accumulates params as each stage is called)
@@ -1520,6 +1520,7 @@ class ForecastModel:
         end_date: str | datetime,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
+        method: Literal["proba", "voting"] = "proba",
         save_predictions: bool = True,
         threshold: float = 0.5,
         save_plot: bool = True,
@@ -1531,15 +1532,19 @@ class ForecastModel:
         """Generate probabilistic eruption forecasts for a future date range.
 
         Constructs a ``ModelPredictor`` from the trained model registry, runs
-        ``predict_proba()`` on the provided tremor data for the specified future
-        window, and stores results in ``self.prediction_df``. Saves the pipeline
-        configuration to ``config.yaml`` after completion.
+        the chosen inference method on the provided tremor data for the specified
+        future window, and stores results in ``self.df_prediction``. Saves the
+        pipeline configuration to ``config.yaml`` after completion.
 
         Args:
             start_date (str | datetime): Start date for forecasting windows.
             end_date (str | datetime): End date for forecasting windows.
             window_step (int): Step size between consecutive forecast windows.
             window_step_unit (Literal["minutes", "hours"]): Unit of window step.
+            method (Literal["proba", "voting"], optional): Inference strategy.
+                ``"proba"`` averages continuous seed probabilities (default).
+                ``"voting"`` aggregates binary seed decisions via majority vote.
+                Defaults to ``"proba"``.
             save_predictions (bool, optional): If True, saves the prediction DataFrame
                 to a CSV file. Defaults to True.
             threshold (float, optional): Threshold for classifying eruption
@@ -1586,25 +1591,33 @@ class ForecastModel:
             overwrite=overwrite,
         )
 
-        df_prediction = model_predictor.predict_proba(
-            tremor_data=self.tremor_data,
-            window_size=self.window_size,
-            window_step=window_step,
-            window_step_unit=window_step_unit,
-            select_tremor_columns=self.select_tremor_columns,
-            threshold=threshold,
-            save_predictions=save_predictions,
-            plot=save_plot,
+        forecast_kwargs = {
+            "tremor_data": self.tremor_data,
+            "window_size": self.window_size,
+            "window_step": window_step,
+            "window_step_unit": window_step_unit,
+            "select_tremor_columns": self.select_tremor_columns,
+            "threshold": threshold,
+            "save_predictions": save_predictions,
+            "plot": save_plot,
+        }
+
+        predict_fn = (
+            model_predictor.predict_voting
+            if method == "voting"
+            else model_predictor.predict_proba
         )
+        df_prediction = predict_fn(**forecast_kwargs)  # ty:ignore[invalid-argument-type]
 
         self.ModelPredictor = model_predictor
-        self.prediction_df = df_prediction
+        self.df_prediction = df_prediction
 
         self._config.forecast = ForecastConfig(
             start_date=str(to_datetime(start_date).date()),
             end_date=str(to_datetime(end_date).date()),
             window_step=window_step,
             window_step_unit=window_step_unit,
+            method=method,
             save_predictions=save_predictions,
             threshold=threshold,
             save_plot=save_plot,
