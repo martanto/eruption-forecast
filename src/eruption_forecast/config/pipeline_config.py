@@ -172,6 +172,9 @@ class BuildLabelConfig(_ConfigBase):
             ``None`` uses ``ForecastModel.start_date``. Defaults to ``None``.
         end_date (str | None): Override for the training period end date.
             ``None`` uses ``ForecastModel.end_date``. Defaults to ``None``.
+        include_eruption_date (bool): If ``True``, the eruption date itself is
+            labeled as erupted (not excluded from the positive window).
+            Defaults to ``False``.
         tremor_columns (list[str] | None): Subset of tremor columns to retain
             for labeling. ``None`` keeps all columns. Defaults to ``None``.
         builder (str): Label builder type — ``"standard"`` or ``"dynamic"``.
@@ -188,6 +191,7 @@ class BuildLabelConfig(_ConfigBase):
     eruption_dates: list[str] = field(default_factory=list)
     start_date: str | None = None
     end_date: str | None = None
+    include_eruption_date: bool = False
     tremor_columns: list[str] | None = None
     builder: str = "standard"
     days_before_eruption: int | None = None
