@@ -415,7 +415,7 @@ class FeaturesBuilder:
         df = tremor_matrix_df[[ID_COLUMN, DATETIME_COLUMN, column_method]]
 
         if self.verbose:
-            logger.info(f"Extracting features for {column_method}")
+            logger.info(f"{column_method} :: Extracting features...")
 
         # Extract features
         if use_relevant_features and not y.empty:
@@ -438,12 +438,13 @@ class FeaturesBuilder:
 
             # Extract features
             extracted_features = extract_relevant_features(
-                df, y_series, **extract_params
+                df, y_series, disable_progressbar=True, **extract_params
             )
         else:
             extracted_features = tsfresh_extract_features(
                 df,
                 impute_function=impute,
+                disable_progressbar=True,
                 **extract_params,
             )
 
@@ -451,7 +452,7 @@ class FeaturesBuilder:
         extracted_features.index.name = ID_COLUMN
         extracted_features.to_csv(extracted_csv, index=True)
 
-        logger.info(f"Extracted features for {column_method} saved: {extracted_csv}")
+        logger.info(f"{column_method} :: Features extracted: {extracted_csv}")
 
         return extracted_csv
 
