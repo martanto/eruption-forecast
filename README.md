@@ -631,6 +631,23 @@ predictor = ModelPredictor(
 )
 ```
 
+### Disable logging
+
+Silence all console and file output — useful for batch jobs or when embedding the package:
+
+```python
+from eruption_forecast import disable_logging, enable_logging
+
+disable_logging()
+fm.calculate(...).build_label(...).train(...)  # Silent — no output
+enable_logging()   # Restore output
+
+# Fine-grained control
+from eruption_forecast.logger import set_log_level, set_log_directory
+set_log_level("WARNING")              # Only warnings and errors to console
+set_log_directory("output/logs")      # Write log files to a custom directory
+```
+
 ### Save and replay pipeline configuration
 
 ```python
@@ -781,4 +798,4 @@ MIT License — see LICENSE file for details.
 
 **Version:** 0.1.0
 **Status:** Active Development
-**Last Updated:** 2026-03-09
+**Last Updated:** 2026-03-23
