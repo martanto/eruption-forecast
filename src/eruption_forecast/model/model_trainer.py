@@ -220,7 +220,8 @@ class ModelTrainer(EvaluationTrainer):
             random_state=random_state,
         )
 
-        logger.info(f"Fitting Seed: {random_state:05d} / {classifier_slug}")
+        if self.verbose:
+            logger.info(f"Fitting Seed: {random_state:05d} / {classifier_slug}")
 
         _, _, best_model = self._setup_grid_search(
             random_state,
@@ -233,7 +234,9 @@ class ModelTrainer(EvaluationTrainer):
         joblib.dump(best_model, model_filepath)
 
         if self.verbose:
-            logger.info(f"Model {random_state:05d}: {model_filepath}")
+            logger.info(
+                f"Model {random_state:05d} / {classifier_slug} : {model_filepath}"
+            )
 
         return classifier_slug, random_state, significant_filepath, model_filepath
 

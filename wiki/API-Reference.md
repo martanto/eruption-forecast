@@ -367,3 +367,48 @@ X_selected = selector.fit_transform(
 )
 scores = selector.get_feature_scores()   # DataFrame with feature rankings
 ```
+
+---
+
+## Logger Utilities
+
+Functions for controlling package-wide logging output at runtime.
+
+```python
+from eruption_forecast import disable_logging, enable_logging
+# or
+from eruption_forecast.logger import disable_logging, enable_logging, set_log_level, set_log_directory
+```
+
+### `disable_logging()`
+
+Removes all active loguru handlers so no messages are written to the console or log files.
+
+```python
+disable_logging()
+fm.calculate(...)  # Silent — no output
+```
+
+### `enable_logging()`
+
+Restores console and file handlers using the current log directory. Has no effect if logging is already enabled.
+
+```python
+enable_logging()
+```
+
+### `set_log_level(level)`
+
+Changes the console log level dynamically. File handlers retain their original levels.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `level` | `str` | `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, or `"CRITICAL"`. Case-insensitive. |
+
+### `set_log_directory(log_dir)`
+
+Changes the log file output directory. Creates the directory if it does not exist.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `log_dir` | `str` | Absolute or relative path to the new log directory. |

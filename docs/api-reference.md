@@ -9,6 +9,7 @@ Full constructor and method parameter tables for the main pipeline classes.
 - [ForecastModel](#forecastmodel)
 - [ModelTrainer](#modeltrainer)
 - [ModelPredictor](#modelpredictor)
+- [Logger Utilities](#logger-utilities)
 
 ---
 
@@ -300,3 +301,52 @@ df_forecast = predictor.predict_proba(
 | `consensus_uncertainty` | Std of per-classifier means (inter-model disagreement) |
 | `consensus_confidence` | Fraction of classifiers voting with consensus majority |
 | `consensus_prediction` | Hard label — `1` if `consensus_eruption_probability ≥ 0.5` |
+
+---
+
+## Logger Utilities
+
+Functions for controlling package-wide logging output at runtime.
+
+```python
+from eruption_forecast import disable_logging, enable_logging
+# or
+from eruption_forecast.logger import disable_logging, enable_logging, set_log_level, set_log_directory
+```
+
+### `disable_logging()`
+
+Removes all active loguru handlers so no messages are written to the console or log files.
+
+```python
+from eruption_forecast import disable_logging
+
+disable_logging()
+fm.calculate(...)  # Silent — no output
+```
+
+### `enable_logging()`
+
+Restores console and file handlers using the current log directory. Has no effect if logging is already enabled.
+
+```python
+from eruption_forecast import enable_logging
+
+enable_logging()
+```
+
+### `set_log_level(level)`
+
+Changes the console log level dynamically. File handlers retain their original levels (`DEBUG` for the general log, `ERROR` for the error log).
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `level` | `str` | Console log level: `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, or `"CRITICAL"`. Case-insensitive. |
+
+### `set_log_directory(log_dir)`
+
+Changes the log file output directory. Creates the directory if it does not exist.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `log_dir` | `str` | Absolute or relative path to the new log directory. |
