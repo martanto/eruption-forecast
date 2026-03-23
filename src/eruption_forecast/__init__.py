@@ -36,6 +36,7 @@ if os.getenv("ERUPTION_FORECAST_DISABLE_NUMBA_CUDA", "1") == "1":
 
 logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
+from eruption_forecast.logger import enable_logging, disable_logging
 from eruption_forecast.report import (
     LabelReport,
     TremorReport,
@@ -86,6 +87,8 @@ __all__ = [
     "TremorData",
     "PipelineConfig",
     "BaseDataContainer",
+    "disable_logging",
+    "enable_logging",
     "notify",
     "generate_report",
     "TremorReport",
