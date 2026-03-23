@@ -12,9 +12,8 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 > M. M., & De Angelis, S. (2025). Ergodic seismic precursors and transfer learning for short term eruption 
 > forecasting at data scarce volcanoes. Nature Communications , 16(1), 1–12. https://doi.org/10.1038/s41467-025-56689-x
 
-> Ardid, A., Dempsey, D., Caudron, C., & Cronin, S. (2022). Seismic precursors to the Whakaari 2019 
-> phreatic eruption are transferable to other eruptions and volcanoes. 
-> Nature Communications, 13(1), 2002. https://doi.org/10.1038/s41467-022-29681-y
+> Ardid, A., Dempsey, D., Caudron, C., & Cronin, S. (2022). Seismic precursors to the Whakaari 2019 phreatic eruption 
+> are transferable to other eruptions and volcanoes. Nature Communications, 13(1), 2002. https://doi.org/10.1038/s41467-022-29681-y
 
 > Endo, E. T., & Murray, T. L. (1991). Real-time Seismic Amplitude Measurement (RSAM): 
 > a volcano monitoring and prediction tool. Bulletin of Volcanology, 53, 533–545.
@@ -31,6 +30,9 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 > volcanic tremor for eruption forecasting at White Island volcano (Whakaari), New Zealand.
 > Journal of Volcanology and Geothermal Research, 302, 11–23.
 > https://doi.org/10.1016/j.jvolgeores.2015.06.001
+
+> Christ, M., Braun, N., Neuffer, J., & Kempa-Liehr, A. W. (2018). Time Series FeatuRe Extraction on basis of 
+> Scalable Hypothesis tests (tsfresh – A Python package). Neurocomputing, 307, 72–77. https://doi.org/10.1016/j.neucom.2018.03.067
 
 > Time-series feature analysis and eruption forecasting for volcano data. 
 > This model implements a time series feature engineering and classification workflow that issues eruption 
