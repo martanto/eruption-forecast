@@ -6,6 +6,36 @@
 
 A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
 
+## References
+> Ardid, A., Dempsey, D., Caudron, C., Cronin, S., Kennedy, B., Girona, T., Roman, D., Miller, C., Potter, 
+> S., Lamb, O. D., Martanto, A., Cubuk-Sabuncu, Y., Cabrera, L., Ruiz, S., Contreras, R., Pacheco, J., Mora, 
+> M. M., & De Angelis, S. (2025). Ergodic seismic precursors and transfer learning for short term eruption 
+> forecasting at data scarce volcanoes. Nature Communications , 16(1), 1–12. https://doi.org/10.1038/s41467-025-56689-x
+
+> Ardid, A., Dempsey, D., Caudron, C., & Cronin, S. (2022). Seismic precursors to the Whakaari 2019 
+> phreatic eruption are transferable to other eruptions and volcanoes. 
+> Nature Communications, 13(1), 2002. https://doi.org/10.1038/s41467-022-29681-y
+
+> Endo, E. T., & Murray, T. L. (1991). Real-time Seismic Amplitude Measurement (RSAM): 
+> a volcano monitoring and prediction tool. Bulletin of Volcanology, 53, 533–545.
+
+> Caudron, C., et al., 2019, Change in seismic attenuation as a long-term precursor of
+> gas-driven eruptions: Geology, https://doi.org/10.1130/G46107.1
+
+> Rey-Devesa, P., Prudencio, J., Benítez, C., Bretón, M., Plasencia, I., León, Z., Ortigosa, 
+> F., Gutiérrez, L., Arámbula-Mendoza, R., & Ibáñez, J. M. (2023). 
+> Tracking volcanic explosions using Shannon entropy at Volcán de Colima. 
+> Scientific Reports, 13(1), 1–11. https://doi.org/10.1038/s41598-023-36964-x
+
+> Chardot, L., Jolly, A. D., Kennedy, B. M., Fournier, N., & Sherburn, S. (2015). Using
+> volcanic tremor for eruption forecasting at White Island volcano (Whakaari), New Zealand.
+> Journal of Volcanology and Geothermal Research, 302, 11–23.
+> https://doi.org/10.1016/j.jvolgeores.2015.06.001
+
+> Time-series feature analysis and eruption forecasting for volcano data. 
+> This model implements a time series feature engineering and classification workflow that issues eruption 
+> alerts based on real-time tremor data. https://github.com/ddempsey/puia
+
 ## Important Disclaimers
 
 **This software is intended for research purposes only.**
