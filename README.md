@@ -65,7 +65,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 ---
 
 ## Table of Contents
-
+- [References and Acknowledgments](#references-and-acknowledgments)
 - [Features](#features)
 - [Package Architecture](#package-architecture)
 - [Pipeline Overview](#pipeline-overview)
@@ -81,7 +81,6 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
-- [Citation](#citation)
 
 **Detailed documentation:**
 - [Step-by-Step Usage Guide](docs/step-by-step-guide.md) — Sections 1–12, per-stage code examples
@@ -777,19 +776,6 @@ pytest tests/test_train_model.py
 MIT License — see LICENSE file for details.
 
 **Disclaimer of Liability**: This software is provided "as is" without warranty of any kind, express or implied. The authors and contributors shall not be liable for any damages or losses arising from the use of this software. Volcanic eruption forecasting is inherently uncertain, and this software should be used only as a research tool, not for operational volcano monitoring or public safety decisions.
-
-## Citation
-
-If you use this package in your research, please cite:
-
-```bibtex
-@software{eruption_forecast,
-  author = {Martanto},
-  title = {eruption-forecast: Volcanic Eruption Forecasting with Seismic Data},
-  year = {2025},
-  url = {https://github.com/martanto/eruption-forecast}
-}
-```
 
 ---
 
