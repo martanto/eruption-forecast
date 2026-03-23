@@ -30,20 +30,26 @@ from eruption_forecast.utils.pathutils import ensure_dir
 _GENERAL_LOG_RETENTION = "30 days"
 _ERROR_LOG_RETENTION = "90 days"
 
+# Tracks whether logging is currently enabled.
+_logging_enabled: bool = True
+
+# Define default log directory
+DEFAULT_LOG_DIR = ensure_dir(os.path.join(os.getcwd(), "logs"))
+
+
 # File log format shared across all file handlers.
-_FILE_FORMAT = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+_FILE_FORMAT = (
+    "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+)
 
 # Console format with colour codes.
 _CONSOLE_FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | "
-    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+    "<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 )
 
 # Init default handler
 logger.remove()
-
-# Define default log directory
-DEFAULT_LOG_DIR = ensure_dir(os.path.join(os.getcwd(), "logs"))
 
 
 def _configure_handlers(log_dir: str, console_level: str = "INFO") -> None:
@@ -88,7 +94,9 @@ def _configure_handlers(log_dir: str, console_level: str = "INFO") -> None:
 
 
 # Initial handler setup at import time.
-_configure_handlers(DEFAULT_LOG_DIR)
+# Skip if the parent process disabled logging (env var is inherited by workers).
+if os.environ.get("DISABLE_LOGGING") != "1":
+    _configure_handlers(DEFAULT_LOG_DIR)
 
 
 def get_logger():
@@ -154,3 +162,42 @@ def set_log_directory(log_dir: str) -> None:
     DEFAULT_LOG_DIR = ensure_dir(os.path.abspath(log_dir))
     _configure_handlers(DEFAULT_LOG_DIR)
     logger.info(f"Log directory changed to: {DEFAULT_LOG_DIR}")
+
+
+def disable_logging() -> None:
+    """Disable all logging output globally.
+
+    Removes all active loguru handlers so no messages are written to the
+    console or log files. Call enable_logging() to restore handlers.
+
+    Returns:
+        None
+
+    Examples:
+        >>> from eruption_forecast.logger import disable_logging
+        >>> disable_logging()  # Silence all output
+    """
+    global _logging_enabled
+    _logging_enabled = False
+    os.environ["DISABLE_LOGGING"] = "1"
+    logger.remove()
+
+
+def enable_logging() -> None:
+    """Re-enable logging after a previous disable_logging() call.
+
+    Restores console and file handlers using the current DEFAULT_LOG_DIR.
+    Has no effect if logging is already enabled.
+
+    Returns:
+        None
+
+    Examples:
+        >>> from eruption_forecast.logger import enable_logging
+        >>> enable_logging()  # Restore output
+    """
+    global _logging_enabled
+    if not _logging_enabled:
+        _logging_enabled = True
+        os.environ.pop("DISABLE_LOGGING", None)
+        _configure_handlers(DEFAULT_LOG_DIR)
