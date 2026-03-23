@@ -309,12 +309,12 @@ class ModelPredictor:
         """
         self.window_step = window_step
         self.window_step_unit = window_step_unit
-        filename = f"{self.basename}_ws-{window_step}-{window_step_unit}"
+        filename = f"{self.basename}_step-{window_step}-{window_step_unit}"
 
         ensure_dir(self.features_dir)
         futures_labels_filepath = os.path.join(
             self.features_dir,
-            f"future_labels_{filename}.csv",
+            f"future-labels_{filename}.csv",
         )
 
         # Skip if file exists
@@ -971,7 +971,9 @@ class ModelPredictor:
             figsize=(14, 8),
             dpi=300,
         )
-        path = os.path.join(self.figures_dir, f"eruption_forecast_{self.basename}.png")
-        fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none")
+        path = os.path.join(self.figures_dir, f"forecast_{self.basename}.png")
+        fig.savefig(
+            path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none"
+        )
         plt.close(fig)
         logger.info(f"Forecast plot saved to: {path}")
