@@ -6,7 +6,7 @@
 
 A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
 
-## References
+## References and Acknowledgments
 > Ardid, A., Dempsey, D., Caudron, C., Cronin, S., Kennedy, B., Girona, T., Roman, D., Miller, C., Potter, 
 > S., Lamb, O. D., Martanto, A., Cubuk-Sabuncu, Y., Cabrera, L., Ruiz, S., Contreras, R., Pacheco, J., Mora, 
 > M. M., & De Angelis, S. (2025). Ergodic seismic precursors and transfer learning for short term eruption 
@@ -26,15 +26,23 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 > Tracking volcanic explosions using Shannon entropy at Volcán de Colima. 
 > Scientific Reports, 13(1), 1–11. https://doi.org/10.1038/s41598-023-36964-x
 
+> Christ, M., Braun, N., Neuffer, J., & Kempa-Liehr, A. W. (2018). Time Series FeatuRe Extraction on basis of 
+> Scalable Hypothesis tests (tsfresh – A Python package). Neurocomputing, 307, 72–77. https://doi.org/10.1016/j.neucom.2018.03.067
+
+> Lei, Y., & Wu, Z. (2020). Time series classification based on statistical features. 
+> Eurasip Journal on Wireless Communications and Networking, 2020(1). https://doi.org/10.1186/s13638-020-1661-4
+
 > Chardot, L., Jolly, A. D., Kennedy, B. M., Fournier, N., & Sherburn, S. (2015). Using
 > volcanic tremor for eruption forecasting at White Island volcano (Whakaari), New Zealand.
 > Journal of Volcanology and Geothermal Research, 302, 11–23.
 > https://doi.org/10.1016/j.jvolgeores.2015.06.001
 
-> Christ, M., Braun, N., Neuffer, J., & Kempa-Liehr, A. W. (2018). Time Series FeatuRe Extraction on basis of 
-> Scalable Hypothesis tests (tsfresh – A Python package). Neurocomputing, 307, 72–77. https://doi.org/10.1016/j.neucom.2018.03.067
-
 > Time-series feature analysis and eruption forecasting for volcano data. 
+> Eruption forecast model for Whakaari (White Island, New Zealand). This model implements a time series 
+> feature engineering and classification workflow that issues eruption alerts based on real-time tremor data.
+> https://github.com/ddempsey/whakaari
+
+> Time-series feature analysis and eruption forecasting for volcano data. Successor package to Whakaari.
 > This model implements a time series feature engineering and classification workflow that issues eruption 
 > alerts based on real-time tremor data. https://github.com/ddempsey/puia
 
