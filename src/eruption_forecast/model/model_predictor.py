@@ -446,6 +446,7 @@ class ModelPredictor:
             output_dir=self.features_dir,
             overwrite=self.overwrite,
             n_jobs=self.n_jobs,
+            verbose=self.verbose,
         )
 
         extracted_features_df = features_builder.extract_features(
