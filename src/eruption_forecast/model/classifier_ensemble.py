@@ -6,6 +6,8 @@ the cross-classifier consensus logic previously inline in
 ``ModelPredictor.predict_proba()``.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -123,9 +125,9 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return np.column_stack([1.0 - consensus_mean, consensus_mean])
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Return binary predictions using ``ERUPTION_PROBABILITY_THRESHOLD`` on consensus probability.
+        """Return binary predictions using 0.5 threshold on consensus probability.
 
-        Applies ``ERUPTION_PROBABILITY_THRESHOLD`` to the consensus mean P(eruption).
+        Applies 0.5 threshold to the consensus mean P(eruption).
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
@@ -134,14 +136,16 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             np.ndarray: 1-D integer array of shape ``(n_samples,)`` with values
                 0 (non-eruption) or 1 (eruption).
         """
-        return (self.predict_proba(X)[:, 1] >= ERUPTION_PROBABILITY_THRESHOLD).astype(
-            int
-        )
+        return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
 
     def predict_with_uncertainty(
         self,
         X: pd.DataFrame,
         threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
+        save: bool = False,
+        output_dir: str | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]:
         """Return consensus statistics and per-classifier results.
 
@@ -157,6 +161,14 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             threshold (float, optional): Probability threshold for binary
                 eruption classification.  Defaults to
                 ``ERUPTION_PROBABILITY_THRESHOLD``.
+            save (bool, optional): If ``True``, save per-seed predictions to CSV
+                files under ``{output_dir}/{classifier_name}/``. Defaults to ``False``.
+            output_dir (str | None, optional): Base directory for per-seed CSV output.
+                Required when ``save`` is ``True``. Defaults to ``None``.
+            overwrite (bool, optional): If ``True``, overwrite existing CSV files.
+                Defaults to ``False``.
+            verbose (bool, optional): If ``True``, log a message for each saved file.
+                Defaults to ``False``.
 
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]: A 5-tuple:
@@ -176,7 +188,14 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         clf_results: dict[str, dict[str, np.ndarray]] = {}
         for name, seed_ensemble in self.ensembles.items():
-            mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(X, threshold)
+            clf_output_dir = os.path.join(output_dir, name) if (save and output_dir) else None
+            mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(
+                X, threshold,
+                save=save,
+                output_dir=clf_output_dir,
+                overwrite=overwrite,
+                verbose=verbose,
+            )
             clf_results[name] = {
                 "mean": mean,
                 "std": std,
@@ -185,23 +204,18 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             }
 
         # Cross-classifier consensus
-        all_means = np.stack(
-            [v["mean"] for v in clf_results.values()], axis=0
-        )  # (n_classifiers, n_samples)
-        consensus_mean: np.ndarray = all_means.mean(axis=0)
-        consensus_std: np.ndarray = all_means.std(axis=0)
-        consensus_pred: np.ndarray = (consensus_mean >= threshold).astype(int)
-
-        n_classifiers = all_means.shape[0]
-        clf_preds = np.stack(
+        all_proba_means = np.stack([v["mean"] for v in clf_results.values()], axis=0)
+        all_predict_means = np.stack(
             [v["prediction"] for v in clf_results.values()], axis=0
-        )  # (n_classifiers, n_samples)
-        votes = np.where(
-            consensus_pred == 1,
-            (clf_preds == 1).sum(axis=0),
-            (clf_preds == 0).sum(axis=0),
         )
-        consensus_conf: np.ndarray = votes / n_classifiers
+        consensus_mean: np.ndarray = all_proba_means.mean(axis=0)
+        consensus_std: np.ndarray = all_proba_means.std(axis=0)
+        consensus_pred: np.ndarray = all_predict_means.mean(axis=0)
+
+        n_classifiers = all_predict_means.shape[0]
+        consensus_conf: np.ndarray = 1.96 * (
+            np.sqrt(consensus_pred * (1 - consensus_pred) / n_classifiers)
+        )
 
         return (
             consensus_mean,

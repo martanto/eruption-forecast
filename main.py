@@ -16,7 +16,7 @@ DEBUG = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
 
 ROOT_DIR = r"D:\Projects\eruption-forecast"
 SDS_DIR = r"D:\Data\OJN"
-N_JOBS = 16
+N_JOBS = 8
 CLASSIFIER = ["lite-rf", "rf"] if DEBUG else ["lite-rf", "rf", "gb", "xgb"]
 TRAINING_SEEDS = 25 if DEBUG else 500
 
@@ -48,7 +48,7 @@ FORECAST_PARAMETERS: dict[str, Any] = {
 
 LABEL_PARAMETERS: dict[str, Any] = {
     "day_to_forecast": 2,  # days before eruptions
-    "window_step": 12,
+    "window_step": 6,
     "window_step_unit": "hours",
     "eruption_dates": ERUPTION_DATES,
     "include_eruption_date": True,
@@ -289,8 +289,8 @@ def main(
 if __name__ == "__main__":
     logger.info("Start forecasting..")
     main(
-        run_prediction=True,
+        run_prediction=False,
         run_evaluation=False,
-        run_scenarios=False,
+        run_scenarios=True,
     )
     logger.info("Finish forecasting..")
