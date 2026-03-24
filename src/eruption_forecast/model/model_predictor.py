@@ -733,12 +733,17 @@ class ModelPredictor:
             ``(consensus_mean, consensus_std, consensus_conf, consensus_pred)``.
         """
         assert self._classifier_ensemble is not None
-        consensus_mean, consensus_std, consensus_conf, consensus_pred, per_clf = (
-            self._classifier_ensemble.predict_with_uncertainty(
-                features_df, threshold=threshold
-            )
+        (
+            consensus_mean,  # mean P(eruption) averaged across all classifiers
+            consensus_std,  # std P(eruption) averaged across all classifiers
+            consensus_conf,  # fraction of classifiers agreeing with the consensus prediction
+            consensus_pred,  # binary predictions (0 or 1)
+            clf_results,  # a dict with keys ``"mean"``, ``"std"``, ``"confidence"``,``"prediction"``
+        ) = self._classifier_ensemble.predict_with_uncertainty(
+            features_df, threshold=threshold
         )
-        for model_name, clf_result in per_clf.items():
+
+        for model_name, clf_result in clf_results.items():
             self._store_classifier_proba(
                 model_name=model_name,
                 mean=clf_result["mean"],

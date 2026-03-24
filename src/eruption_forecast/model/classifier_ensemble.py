@@ -6,7 +6,6 @@ the cross-classifier consensus logic previously inline in
 ``ModelPredictor.predict_proba()``.
 """
 
-
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -73,9 +72,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return obj
 
     @classmethod
-    def from_registry_dict(
-        cls, registry_csvs: dict[str, str]
-    ) -> "ClassifierEnsemble":
+    def from_registry_dict(cls, registry_csvs: dict[str, str]) -> "ClassifierEnsemble":
         """Build a ClassifierEnsemble directly from registry CSV paths.
 
         Calls :meth:`SeedEnsemble.from_registry` for each entry and assembles
@@ -137,7 +134,9 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             np.ndarray: 1-D integer array of shape ``(n_samples,)`` with values
                 0 (non-eruption) or 1 (eruption).
         """
-        return (self.predict_proba(X)[:, 1] >= ERUPTION_PROBABILITY_THRESHOLD).astype(int)
+        return (self.predict_proba(X)[:, 1] >= ERUPTION_PROBABILITY_THRESHOLD).astype(
+            int
+        )
 
     def predict_with_uncertainty(
         self,
@@ -175,12 +174,10 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                   ``"prediction"`` — each a 1-D ``np.ndarray`` of shape
                   ``(n_samples,)``.
         """
-        per_clf_results: dict[str, dict[str, np.ndarray]] = {}
+        clf_results: dict[str, dict[str, np.ndarray]] = {}
         for name, seed_ensemble in self.ensembles.items():
-            mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(
-                X, threshold
-            )
-            per_clf_results[name] = {
+            mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(X, threshold)
+            clf_results[name] = {
                 "mean": mean,
                 "std": std,
                 "confidence": conf,
@@ -189,7 +186,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         # Cross-classifier consensus
         all_means = np.stack(
-            [v["mean"] for v in per_clf_results.values()], axis=0
+            [v["mean"] for v in clf_results.values()], axis=0
         )  # (n_classifiers, n_samples)
         consensus_mean: np.ndarray = all_means.mean(axis=0)
         consensus_std: np.ndarray = all_means.std(axis=0)
@@ -197,7 +194,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         n_classifiers = all_means.shape[0]
         clf_preds = np.stack(
-            [v["prediction"] for v in per_clf_results.values()], axis=0
+            [v["prediction"] for v in clf_results.values()], axis=0
         )  # (n_classifiers, n_samples)
         votes = np.where(
             consensus_pred == 1,
@@ -211,7 +208,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             consensus_std,
             consensus_conf,
             consensus_pred,
-            per_clf_results,
+            clf_results,
         )
 
     # ------------------------------------------------------------------
@@ -282,7 +279,4 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             str: Representation including classifier names and counts.
         """
         names = list(self.ensembles.keys())
-        return (
-            f"ClassifierEnsemble(n_classifiers={len(names)}, "
-            f"classifiers={names!r})"
-        )
+        return f"ClassifierEnsemble(n_classifiers={len(names)}, classifiers={names!r})"
