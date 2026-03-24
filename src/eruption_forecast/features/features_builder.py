@@ -452,7 +452,8 @@ class FeaturesBuilder:
         extracted_features.index.name = ID_COLUMN
         extracted_features.to_csv(extracted_csv, index=True)
 
-        logger.info(f"{column_method} :: Features extracted: {extracted_csv}")
+        if self.verbose:
+            logger.info(f"{column_method} :: Features extracted: {extracted_csv}")
 
         return extracted_csv
 
@@ -591,11 +592,6 @@ class FeaturesBuilder:
             >>> print(empty_labels.empty)
             True
         """
-        logger.info(
-            "No labels provided. Using relevant features will be disabled. "
-            "All features will be extracted."
-        )
-
         if not isinstance(tremor_matrix_df[DATETIME_COLUMN], pd.Timestamp):
             tremor_matrix_df[DATETIME_COLUMN] = pd.to_datetime(
                 tremor_matrix_df[DATETIME_COLUMN]
