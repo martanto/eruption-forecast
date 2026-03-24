@@ -509,11 +509,13 @@ class LabelBuilder:
 
                 # Move the start of eruption to number of day_to_forecast
                 # Including the day of the eruption
-                start_eruption = day_of_eruption - timedelta(days=self.day_to_forecast)
+                start_eruption = day_of_eruption - timedelta(
+                    days=self.day_to_forecast - 1
+                )
 
                 # Excluding date of eruption to be marked as eruption
                 if not self.include_eruption_date:
-                    day_of_eruption = day_of_eruption - timedelta(days=1)
+                    start_eruption = start_eruption - timedelta(days=1)
 
                 # Set start time of eruption to 00:00:00 and end time of eruption to at 23:59:59
                 start_eruption, end_eruption, _start_eruption_str, end_eruption_str = (

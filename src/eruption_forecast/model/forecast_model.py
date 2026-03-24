@@ -960,6 +960,7 @@ class ForecastModel:
             output_dir=self.features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs or self.n_jobs,
+            verbose=verbose or self.verbose,
         )
 
         extracted_features_df = features_builder.extract_features(
@@ -971,7 +972,6 @@ class ForecastModel:
         self.TremorMatrixBuilder = tremor_matrix_builder
         self.tremor_matrix_df = tremor_matrix_df
         self.tremor_matrix_csv = tremor_matrix_builder.csv
-
         self.FeaturesBuilder = features_builder
         self.features_df = extracted_features_df
         self.features_csv = features_builder.csv
@@ -1580,7 +1580,6 @@ class ForecastModel:
 
         if verbose:
             logger.info("Starting Prediction...")
-            logger.info(f"Total trained models: {len(trained_models)}")
 
         model_predictor = ModelPredictor(
             start_date=start_date,

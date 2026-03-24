@@ -4,7 +4,9 @@ from typing import Any
 from dotenv import load_dotenv
 
 from eruption_forecast import ForecastModel
+from eruption_forecast.logger import logger
 from eruption_forecast.decorators import timer, notify
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
@@ -14,9 +16,9 @@ DEBUG = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
 
 ROOT_DIR = r"D:\Projects\eruption-forecast"
 SDS_DIR = r"D:\Data\OJN"
-N_JOBS = 6
+N_JOBS = 16
 CLASSIFIER = ["lite-rf", "rf"] if DEBUG else ["lite-rf", "rf", "gb", "xgb"]
-TRAINING_SEEDS = 5 if DEBUG else 500
+TRAINING_SEEDS = 25 if DEBUG else 500
 
 ERUPTION_DATES = [
     "2025-03-20",
@@ -32,7 +34,6 @@ CALCULATE_START_DATE = "2025-01-01"
 CALCULATE_END_DATE = "2025-12-31"
 
 FORECAST_PARAMETERS: dict[str, Any] = {
-    "root_dir": ROOT_DIR,
     "station": "OJN",
     "channel": "EHZ",
     "network": "VG",
@@ -47,14 +48,15 @@ FORECAST_PARAMETERS: dict[str, Any] = {
 
 LABEL_PARAMETERS: dict[str, Any] = {
     "day_to_forecast": 2,  # days before eruptions
-    "window_step": 6,
+    "window_step": 12,
     "window_step_unit": "hours",
     "eruption_dates": ERUPTION_DATES,
+    "include_eruption_date": True,
     "verbose": True,  # show more information
 }
 
 EXTRACT_FEATURES_PARAMETERS: dict[str, Any] = {
-    "select_tremor_columns": ["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4", "entropy"],
+    "select_tremor_columns": ["rsam_f2", "rsam_f3", "rsam_f4", "dsar_f3-f4"],
     "save_tremor_matrix_per_method": True,
     "save_tremor_matrix_per_id": False,
     "exclude_features": [
@@ -70,34 +72,87 @@ EXTRACT_FEATURES_PARAMETERS: dict[str, Any] = {
 }
 
 TRAINING_START_DATE = "2025-01-01"
-TRAINING_END_DATE = "2025-08-24"
+TRAINING_END_DATE = "2025-07-26"
 TRAINING_PARAMETERS: dict[str, Any] = {
     "classifier": CLASSIFIER,
-    "cv_strategy": "stratified",
+    "cv_strategy": "shuffle-stratified",
     "random_state": 0,
     "total_seed": TRAINING_SEEDS,
     "number_of_significant_features": 20,
     "sampling_strategy": 0.75,
-    "save_all_features": True,
-    "plot_significant_features": True,
-    "n_jobs": 6,
-    "grid_search_n_jobs": 1,
+    "save_all_features": False,
+    "plot_significant_features": False,
+    "n_jobs": 4,
+    "grid_search_n_jobs": 4,
     "overwrite": False,
     "plot_shap": False,  # SHAP Explanation plot
     "verbose": True,
 }
 
 TRAINING_PREDICTION_START_DATE = "2025-01-01"
-TRAINING_PREDICTION_END_DATE = "2025-07-27"
+TRAINING_PREDICTION_END_DATE = "2025-07-26"
+
+PREDICTION_START_DATE = "2025-07-27"
+PREDICTION_END_DATE = "2025-08-22"
 PREDICTION_PARAMETERS: dict[str, Any] = {
-    "start_date": "2025-07-28",
-    "end_date": "2025-08-20",
     "window_step": 10,
     "window_step_unit": "minutes",
 }
 
 
-def train_and_evaluate(forecast_model: ForecastModel) -> None:
+@timer("Run Multiple Scenarios")
+@notify("Run Multiple Scenarios")
+def scenarios(forecast_model: ForecastModel) -> None:
+    _scenarios = [
+        {
+            "name": "Scenario 1",
+            "description": "Training using FIRST eruption to forecast SECOND eruption",
+            "train_start_date": "2025-01-01",
+            "train_end_date": "2025-03-31",
+            "prediction_start_date": "2025-04-01",
+            "prediction_end_date": "2025-04-30",
+        },
+        # {
+        #     "name": "Scenario 2",
+        #     "description": "Training using FIRST eruption to forecast THIRD eruption",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-03-31",
+        #     "prediction_start_date": "2025-05-01",
+        #     "prediction_end_date": "2025-05-31",
+        # },
+        # {
+        #     "name": "Scenario 3",
+        #     "description": "Training using FIRST eruption to forecast FOURTH eruption",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-03-31",
+        #     "prediction_start_date": "2025-06-01",
+        #     "prediction_end_date": "2025-06-30",
+        # },
+    ]
+
+    for scenario in _scenarios:
+        print(
+            f"\n\n\n[workflow] Scenario {scenario['name']}: {scenario['description']}\n\n\n"
+        )
+        output_dir = os.path.join(
+            ROOT_DIR, "output", "scenarios", slugify(scenario["name"])
+        )
+
+        predict(
+            forecast_model=forecast_model,
+            training_start_date=scenario["train_start_date"],
+            training_end_date=scenario["train_end_date"],
+            prediction_start_date=scenario["prediction_start_date"],
+            prediction_end_date=scenario["prediction_end_date"],
+            output_dir=output_dir,
+        )
+
+    return None
+
+
+@timer("Evaluation Model")
+@notify("Evaluation Model")
+def evaluate(forecast_model: ForecastModel) -> None:
     """Run training, evaluation, and comparison stages of the pipeline.
 
     Trains the model with an 80/20 split and evaluation, then evaluates each
@@ -134,7 +189,7 @@ def train_and_evaluate(forecast_model: ForecastModel) -> None:
                 metrics_dir=metrics_dir,
                 classifier_name=name,
                 output_dir=csv_dir,
-                plot_shap=False,
+                plot_shap=TRAINING_PARAMETERS["plot_shap"],
             )
 
             if metrics_dir is not None:
@@ -157,7 +212,16 @@ def train_and_evaluate(forecast_model: ForecastModel) -> None:
         comparator.plot_all()
 
 
-def predict(forecast_model: ForecastModel) -> None:
+@timer("Model Prediction")
+@notify("Model Prediction")
+def predict(
+    forecast_model: ForecastModel,
+    training_start_date: str | None = None,
+    training_end_date: str | None = None,
+    prediction_start_date: str | None = None,
+    prediction_end_date: str | None = None,
+    output_dir: str | None = None,
+) -> None:
     """Run the prediction (no-evaluation) training and forecast stages.
 
     Builds labels using LabelBuilder, extracts features, trains on
@@ -165,25 +229,38 @@ def predict(forecast_model: ForecastModel) -> None:
 
     Args:
         forecast_model (ForecastModel): A configured ForecastModel instance.
+        training_start_date: str | None: The training start date for prediction.
+        training_end_date: str | None: The training end date for prediction.
+        prediction_start_date: str | None: The prediction start date for prediction.
+        prediction_end_date: str | None: The prediction end date for prediction.
+        output_dir: str | None: The output directory for prediction.
     """
     forecast_model.build_label(
-        start_date=TRAINING_PREDICTION_START_DATE,
-        end_date=TRAINING_PREDICTION_END_DATE,
+        start_date=training_start_date or TRAINING_PREDICTION_START_DATE,
+        end_date=training_end_date or TRAINING_PREDICTION_END_DATE,
         **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
         with_evaluation=False, **TRAINING_PARAMETERS
-    ).forecast(**PREDICTION_PARAMETERS).generate_report()
+    ).forecast(
+        start_date=prediction_start_date or PREDICTION_START_DATE,
+        end_date=prediction_end_date or PREDICTION_END_DATE,
+        output_dir=output_dir,
+        **PREDICTION_PARAMETERS,
+    ).generate_report()
 
 
-@timer("Forecast Model")
-@notify("Primer - Workflow")
-def main():
+def main(
+    root_dir: str | None = None,
+    run_prediction: bool = True,
+    run_evaluation: bool = False,
+    run_scenarios: bool = False,
+) -> None:
     """Execute the full eruption forecast workflow.
 
     Initialises a ForecastModel, calculates tremor data from SDS archive,
     runs the prediction pipeline, and then runs training with evaluation.
     """
-    fm = ForecastModel(**FORECAST_PARAMETERS)
+    fm = ForecastModel(root_dir=root_dir or ROOT_DIR, **FORECAST_PARAMETERS)
 
     # Calculate Tremor
     fm.calculate(
@@ -197,11 +274,23 @@ def main():
     )
 
     # Predict
-    predict(forecast_model=fm)
+    if run_prediction:
+        predict(forecast_model=fm)
 
     # Train and evaluate
-    train_and_evaluate(forecast_model=fm)
+    if run_evaluation:
+        evaluate(forecast_model=fm)
+
+    # Run multiple forecast scenarios
+    if run_scenarios:
+        scenarios(forecast_model=fm)
 
 
 if __name__ == "__main__":
-    main()
+    logger.info("Start forecasting..")
+    main(
+        run_prediction=True,
+        run_evaluation=False,
+        run_scenarios=False,
+    )
+    logger.info("Finish forecasting..")
