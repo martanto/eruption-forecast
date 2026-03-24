@@ -22,12 +22,12 @@ from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
+    _save_seed_proba_csv,
     aggregate_seed_probabilities,
     predict_proba_from_estimator,
 )
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series, load_label_csv
-from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.config.constants import (
     THRESHOLD_RESOLUTION,
     ERUPTION_PROBABILITY_THRESHOLD,
@@ -214,7 +214,7 @@ def compute_seed_eruption_probability(
     overwrite: bool = False,
     verbose: bool = False,
     debug: bool = False,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Compute eruption probability for a single random seed model.
 
     Loads a trained model and computes eruption probabilities for the given features.
@@ -261,10 +261,23 @@ def compute_seed_eruption_probability(
     filename = f"p_{random_state:05d}.csv"
     filepath = os.path.join(output_dir, f"{filename}")
 
+    # Return cached result regardless of the `save` flag — if the file exists
+    # and overwrite is False, we skip inference entirely and serve the cache.
+    # `save=True` here means "persist if not already cached", not "always write".
     if os.path.exists(filepath) and not overwrite:
         seed_df = pd.read_csv(filepath, index_col=0)
         eruption_probabilities = seed_df["p_eruption"]
-        return eruption_probabilities.to_numpy(), seed_df.to_numpy()
+        eruption_predictions = seed_df["prediction"]
+        return (
+            eruption_probabilities.to_numpy(),
+            seed_df[
+                [
+                    "p_non_eruption",
+                    "p_eruption",
+                ]
+            ].to_numpy(),
+            eruption_predictions.to_numpy(),
+        )
 
     df_sig = pd.read_csv(significant_features_csv, index_col=0)
     feature_names: list[str] = df_sig.index.tolist()
@@ -275,8 +288,8 @@ def compute_seed_eruption_probability(
     # Select features dataframe with top-n significant features
     X: pd.DataFrame = features_df[feature_names]
 
-    probabilities_eruption, probabilities_scores = predict_proba_from_estimator(
-        model, X, identifier=random_state
+    probabilities_eruption, probabilities_scores, predictions_eruption = (
+        predict_proba_from_estimator(model, X, identifier=random_state)
     )
 
     if debug:
@@ -284,19 +297,13 @@ def compute_seed_eruption_probability(
             f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
         )
 
-    if save and not overwrite:
-        ensure_dir(output_dir)
-        probabilities_df = pd.DataFrame(
-            probabilities_scores, columns=["p_non_eruption", "p_eruption"]
+    if save:
+        _save_seed_proba_csv(
+            output_dir, random_state, probabilities_eruption, predictions_eruption,
+            overwrite=overwrite, verbose=verbose,
         )
 
-        probabilities_df.index.name = "label_id"
-        probabilities_df.to_csv(filepath, index=True)
-
-        if verbose:
-            logger.info(f"Saved seed {random_state:05d} probability to: {filepath}")
-
-    return probabilities_eruption, probabilities_scores
+    return probabilities_eruption, probabilities_scores, predictions_eruption
 
 
 def compute_model_probabilities(
@@ -310,6 +317,7 @@ def compute_model_probabilities(
     output_dir: str | None = None,
     save_predictions: bool = False,
     overwrite: bool = False,
+    verbose: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Aggregate eruption probabilities across all seeds of a single classifier.
 
@@ -338,6 +346,7 @@ def compute_model_probabilities(
             Defaults to False.
         overwrite (bool, optional): If True, overwrite existing cached predictions.
             Defaults to False.
+        verbose (bool, optional): If True, log save operations. Defaults to False.
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Tuple containing arrays
@@ -358,25 +367,32 @@ def compute_model_probabilities(
         Mean eruption probability: 0.450
     """
     seed_eruption_probabilities: list[np.ndarray] = []
+    seed_eruption_predictions: list[np.ndarray] = []
 
     for seed_count, (random_state, row) in enumerate(df_models.iterrows(), start=1):
         random_state_int = int(cast(int, random_state))
         significant_features_csv: str = row[features_csv_column]
         model_filepath: str = row[trained_model_filepath_column]
 
-        probabilities_eruption, _ = compute_seed_eruption_probability(
-            random_state=random_state_int,
-            significant_features_csv=significant_features_csv,
-            model_filepath=model_filepath,
-            features_df=features_df,
-            output_dir=output_dir,
-            overwrite=overwrite,
-            save=save_predictions,
+        probabilities_eruption, _, predictions_eruption = (
+            compute_seed_eruption_probability(
+                random_state=random_state_int,
+                significant_features_csv=significant_features_csv,
+                model_filepath=model_filepath,
+                features_df=features_df,
+                output_dir=output_dir,
+                overwrite=overwrite,
+                save=save_predictions,
+                verbose=verbose,
+            )
         )
 
         seed_eruption_probabilities.append(probabilities_eruption)
+        seed_eruption_predictions.append(predictions_eruption)
+
         logger.debug(
             f"[{classifier_name}] Seed {random_state:05d} — "
+            f"vote prediction: {predictions_eruption.mean():.4f}, "
             f"mean P(eruption): {probabilities_eruption.mean():.4f}"
         )
 
@@ -387,8 +403,12 @@ def compute_model_probabilities(
         seed_eruption_probabilities, axis=1
     )  # (n_windows, n_seeds)
 
+    predictions_eruption_matrix = np.stack(
+        seed_eruption_predictions, axis=1
+    )  # (n_windows, n_seeds)
+
     return aggregate_seed_probabilities(
-        probabilities_eruption_matrix, threshold=threshold
+        probabilities_eruption_matrix, predictions_eruption_matrix, threshold=threshold
     )
 
 
@@ -414,7 +434,7 @@ def _extract_trained_model_suffix(csv_path: str) -> str:
 
 
 def merge_seed_models(
-    registry_csv: str,
+    trained_model_csv: str,
     output_dir: str | None = None,
 ) -> str:
     """Load all seed models from a registry CSV and bundle into one SeedEnsemble pkl.
@@ -426,11 +446,11 @@ def merge_seed_models(
     prediction time.
 
     Args:
-        registry_csv (str): Path to the trained-model registry CSV (the
+        trained_model_csv (str): Path to the trained-model registry CSV (the
             ``trained_model_{suffix}.csv`` file written by ``ModelTrainer``).
         output_dir (str | None, optional): Destination path for the merged
             ``.pkl`` file.  If ``None``, the file is written to the same
-            directory as ``registry_csv`` with the name
+            directory as ``trained_model_csv`` with the name
             ``merged_model_{suffix}.pkl``, where ``{suffix}`` is derived from
             the registry CSV filename.  Defaults to ``None``.
 
@@ -443,13 +463,13 @@ def merge_seed_models(
     output_dir = (
         output_dir
         if output_dir is not None
-        else os.path.dirname(os.path.abspath(registry_csv))
+        else os.path.dirname(os.path.abspath(trained_model_csv))
     )
 
-    suffix = _extract_trained_model_suffix(registry_csv)
+    suffix = _extract_trained_model_suffix(trained_model_csv)
     output_path = os.path.join(output_dir, f"merged_model_{suffix}.pkl")
 
-    ensemble = SeedEnsemble.from_registry(registry_csv)
+    ensemble = SeedEnsemble.from_registry(trained_model_csv)
     ensemble.save(output_path)
 
     logger.info(f"Saved merged seed model to: {output_path}")

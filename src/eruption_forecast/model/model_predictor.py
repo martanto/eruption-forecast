@@ -1,4 +1,5 @@
 import os
+import warnings
 from typing import Literal
 from datetime import datetime, timedelta
 
@@ -632,19 +633,20 @@ class ModelPredictor:
                     cols,
                     model_mean_probabilities,
                     threshold=threshold,
+                    save_predictions=save_predictions,
+                    result_dir=result_dir,
                 )
             )
         else:
-            self._forecast_with_trained_models(
-                features_df=features_df,
-                result_dir=result_dir,
-                threshold=threshold,
-                save_predictions=save_predictions,
-                cols=cols,
-                model_mean_probabilities=model_mean_probabilities,
-            )
             consensus_mean, consensus_std, consensus_conf, consensus_pred = (
-                self._compute_consensus(cols, model_mean_probabilities)
+                self._forecast_with_trained_models(
+                    features_df=features_df,
+                    result_dir=result_dir,
+                    threshold=threshold,
+                    save_predictions=save_predictions,
+                    cols=cols,
+                    model_mean_probabilities=model_mean_probabilities,
+                )
             )
 
         cols["consensus_eruption_probability"] = consensus_mean
@@ -712,6 +714,10 @@ class ModelPredictor:
         cols: dict[str, np.ndarray],
         model_mean_probabilities: dict[str, np.ndarray],
         threshold: float,
+        save_predictions: bool = False,
+        result_dir: str | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Delegate inference and consensus to a ClassifierEnsemble.
 
@@ -726,22 +732,37 @@ class ModelPredictor:
                 forecast DataFrame.
             model_mean_probabilities (dict[str, np.ndarray]): Mutable
                 accumulator for cross-classifier consensus computation.
-            threshold (float, optional): Threshold for classifying eruption
-                probability as positive.
+            threshold (float): Threshold for classifying eruption probability
+                as positive.
+            save_predictions (bool, optional): If ``True``, save per-seed
+                predictions to CSV files. Defaults to ``False``.
+            result_dir (str | None, optional): Base directory for per-seed CSV
+                output. Used only when ``save_predictions`` is ``True``.
+                Defaults to ``None``.
+            overwrite (bool, optional): If ``True``, overwrite existing CSV
+                files. Defaults to ``False``.
+            verbose (bool, optional): If ``True``, log a message for each saved
+                file. Defaults to ``False``.
 
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
             ``(consensus_mean, consensus_std, consensus_conf, consensus_pred)``.
         """
         assert self._classifier_ensemble is not None
+        seeds_dir = os.path.join(result_dir, "seeds") if result_dir else None
         (
             consensus_mean,  # mean P(eruption) averaged across all classifiers
             consensus_std,  # std P(eruption) averaged across all classifiers
             consensus_conf,  # fraction of classifiers agreeing with the consensus prediction
-            consensus_pred,  # binary predictions (0 or 1)
+            consensus_pred,  # mean binary of eruption (from binary)
             clf_results,  # a dict with keys ``"mean"``, ``"std"``, ``"confidence"``,``"prediction"``
         ) = self._classifier_ensemble.predict_with_uncertainty(
-            features_df, threshold=threshold
+            features_df,
+            threshold=threshold,
+            save=save_predictions,
+            output_dir=seeds_dir,
+            overwrite=overwrite,
+            verbose=verbose,
         )
 
         for model_name, clf_result in clf_results.items():
@@ -769,6 +790,9 @@ class ModelPredictor:
 
         Dispatches to ``SeedEnsemble.predict_with_uncertainty`` for in-memory
         models or to :func:`compute_model_probabilities` for CSV-registry models.
+        CSV-registry loading is the legacy path — prefer merging models into a
+        ``SeedEnsemble`` pkl via :func:`~eruption_forecast.utils.ml.merge_seed_models`
+        before passing to :class:`ModelPredictor`.
 
         Args:
             df_models (pd.DataFrame | SeedEnsemble): Seed data source.
@@ -783,7 +807,21 @@ class ModelPredictor:
             ``(mean_probability, std_probability, confidence, prediction)``.
         """
         if isinstance(df_models, SeedEnsemble):
-            return df_models.predict_with_uncertainty(features_df, threshold)
+            return df_models.predict_with_uncertainty(
+                features_df,
+                threshold,
+                save=save_predictions,
+                output_dir=model_output_dir,
+                overwrite=self.overwrite,
+                verbose=self.verbose,
+            )
+        warnings.warn(
+            f"[{model_name}] Loading models from a CSV registry at prediction time is "
+            "deprecated. Call merge_seed_models() first and pass the resulting .pkl "
+            "to ModelPredictor. CSV-registry support will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
         return compute_model_probabilities(
             df_models=df_models,
             features_df=features_df,
@@ -791,6 +829,7 @@ class ModelPredictor:
             output_dir=model_output_dir,
             save_predictions=save_predictions,
             overwrite=self.overwrite,
+            verbose=self.verbose,
         )
 
     def _forecast_single_classifier(
@@ -827,7 +866,7 @@ class ModelPredictor:
         model_output_dir = os.path.join(result_dir, model_name)
         ensure_dir(model_output_dir)
 
-        mean_probability, std_probability, confidence, prediction = (
+        mean_probability, std_probability, confidence, mean_prediction = (
             self._get_classifier_proba(
                 df_models=df_models,
                 model_name=model_name,
@@ -843,7 +882,7 @@ class ModelPredictor:
             mean=mean_probability,
             std=std_probability,
             confidence=confidence,
-            prediction=prediction,
+            prediction=mean_prediction,
             cols=cols,
             model_mean_probabilities=model_mean_probabilities,
         )
@@ -856,11 +895,13 @@ class ModelPredictor:
         save_predictions: bool,
         cols: dict[str, np.ndarray],
         model_mean_probabilities: dict[str, np.ndarray],
-    ) -> None:
-        """Iterate over all registered classifiers and run per-classifier inference.
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Iterate over all registered classifiers, run inference, and return consensus.
 
         Calls :meth:`_forecast_single_classifier` for each entry in
-        ``self.trained_models``.
+        ``self.trained_models``, then computes cross-classifier consensus using
+        the same CI-based formula as
+        :meth:`~eruption_forecast.model.classifier_ensemble.ClassifierEnsemble.predict_with_uncertainty`.
 
         Args:
             features_df (pd.DataFrame): Future feature matrix.
@@ -871,6 +912,10 @@ class ModelPredictor:
                 forecast DataFrame.
             model_mean_probabilities (dict[str, np.ndarray]): Mutable
                 accumulator for cross-classifier consensus computation.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
+            ``(consensus_mean, consensus_std, consensus_conf, consensus_pred)``.
         """
         for model_name, df_models in self.trained_models.items():
             self._forecast_single_classifier(
@@ -884,44 +929,18 @@ class ModelPredictor:
                 model_mean_probabilities=model_mean_probabilities,
             )
 
-    def _compute_consensus(
-        self,
-        cols: dict[str, np.ndarray],
-        model_mean_probabilities: dict[str, np.ndarray],
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Compute cross-classifier consensus probability, uncertainty, confidence, and prediction.
-
-        Averages per-classifier mean probabilities to form the consensus
-        probability, derives uncertainty as the standard deviation across
-        classifiers, and computes confidence as the fraction of classifiers
-        whose binary prediction agrees with the majority vote.
-
-        Args:
-            cols (dict[str, np.ndarray]): Column accumulator containing
-                ``{name}_prediction`` arrays for each registered classifier.
-            model_mean_probabilities (dict[str, np.ndarray]): Mean eruption
-                probability array per classifier.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
-            ``(consensus_mean, consensus_std, consensus_conf, consensus_pred)``.
-        """
+        # Consensus uses the same CI-based formula as ClassifierEnsemble
         all_model_means = np.stack(list(model_mean_probabilities.values()), axis=0)
-        consensus_mean = all_model_means.mean(axis=0)
-        consensus_std = all_model_means.std(axis=0)
-        consensus_pred = (consensus_mean >= ERUPTION_PROBABILITY_THRESHOLD).astype(int)
-
-        # Fraction of classifiers agreeing with the majority vote
-        n_classifiers = all_model_means.shape[0]
         clf_preds = np.stack(
             [cols[f"{n}_prediction"] for n in self.trained_models], axis=0
         )
-        votes_with_majority = np.where(
-            consensus_pred == 1,
-            (clf_preds == 1).sum(axis=0),
-            (clf_preds == 0).sum(axis=0),
+        consensus_mean: np.ndarray = all_model_means.mean(axis=0)
+        consensus_std: np.ndarray = all_model_means.std(axis=0)
+        consensus_pred: np.ndarray = clf_preds.mean(axis=0)
+        n_classifiers = all_model_means.shape[0]
+        consensus_conf: np.ndarray = 1.96 * np.sqrt(
+            consensus_pred * (1 - consensus_pred) / n_classifiers
         )
-        consensus_conf = votes_with_majority / n_classifiers
         return consensus_mean, consensus_std, consensus_conf, consensus_pred
 
     def _log_forecast_summary(
