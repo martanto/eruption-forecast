@@ -584,8 +584,8 @@ class ModelPredictor:
 
         2. **Across classifiers (consensus)** — the per-classifier mean
            probabilities are averaged to produce ``consensus_*`` columns.
-           Consensus confidence is the fraction of classifiers voting with
-           the majority.
+           Consensus confidence is the 95 % CI half-width of the inter-classifier
+           vote fraction: ``1.96 × sqrt(p × (1-p) / n_classifiers)``.
 
         When only a single classifier was registered (``trained_models`` was a
         plain string), per-classifier columns use the prefix ``"model_"`` and
@@ -753,7 +753,7 @@ class ModelPredictor:
         (
             consensus_mean,  # mean P(eruption) averaged across all classifiers
             consensus_std,  # std P(eruption) averaged across all classifiers
-            consensus_conf,  # fraction of classifiers agreeing with the consensus prediction
+            consensus_conf,  # 95% CI half-width: 1.96 * sqrt(p * (1-p) / n_classifiers)
             consensus_pred,  # mean binary of eruption (from binary)
             clf_results,  # a dict with keys ``"mean"``, ``"std"``, ``"confidence"``,``"prediction"``
         ) = self._classifier_ensemble.predict_with_uncertainty(

@@ -153,8 +153,10 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         to obtain per-seed-aggregated statistics, then computes cross-classifier
         consensus by averaging mean probabilities across classifiers.
 
-        Confidence is defined as the fraction of classifiers whose binary
-        prediction agrees with the consensus prediction.
+        Consensus confidence is the 95 % CI half-width of the inter-classifier
+        vote fraction: ``1.96 × sqrt(p × (1-p) / n_classifiers)``, where ``p``
+        is the mean binary prediction across classifiers.  Lower values indicate
+        tighter agreement.
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
@@ -178,7 +180,9 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 - ``consensus_std`` (np.ndarray): Shape ``(n_samples,)`` — std of
                   per-classifier mean probabilities (inter-classifier uncertainty).
                 - ``consensus_confidence`` (np.ndarray): Shape ``(n_samples,)`` —
-                  fraction of classifiers agreeing with the consensus prediction.
+                  95 % CI half-width of the inter-classifier vote fraction
+                  (``1.96 × sqrt(p × (1-p) / n_classifiers)``).  Lower means
+                  tighter inter-classifier agreement.
                 - ``consensus_prediction`` (np.ndarray): Shape ``(n_samples,)`` —
                   binary predictions (0 or 1).
                 - ``per_classifier_results`` (dict): Mapping from classifier name to

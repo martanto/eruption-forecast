@@ -238,10 +238,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 - ``mean_probability``: Mean P(eruption) across seeds.
                 - ``std``: Standard deviation of P(eruption) across seeds
                   (uncertainty).
-                - ``confidence``: Fraction of seeds voting with the majority
-                  decision (0.5–1.0).
-                - ``prediction``: Binary predictions (0 or 1) based on
-                  ``threshold``.
+                - ``confidence``: 95 % CI half-width of the seed vote fraction
+                  (``1.96 × sqrt(p × (1-p) / n_seeds)``).  Lower means tighter
+                  agreement across seeds.
+                - ``prediction``: Mean binary vote across seeds.
         """
         seed_probas: list[np.ndarray] = []
         seed_preds: list[np.ndarray] = []

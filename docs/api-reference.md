@@ -295,12 +295,12 @@ df_forecast = predictor.predict_proba(
 |--------|-------------|
 | `{name}_eruption_probability` | Mean P(eruption) across seeds of that classifier |
 | `{name}_uncertainty` | Std across seeds of that classifier |
-| `{name}_confidence` | Seed-level agreement fraction (0.5–1.0) |
+| `{name}_confidence` | 95 % CI half-width of seed vote fraction — lower means tighter seed agreement |
 | `{name}_prediction` | Hard label for that classifier |
 | `consensus_eruption_probability` | Mean P(eruption) averaged across all classifiers |
 | `consensus_uncertainty` | Std of per-classifier means (inter-model disagreement) |
-| `consensus_confidence` | Fraction of classifiers voting with consensus majority |
-| `consensus_prediction` | Hard label — `1` if `consensus_eruption_probability ≥ 0.5` |
+| `consensus_confidence` | 95 % CI half-width of inter-classifier vote fraction — lower means tighter classifier agreement |
+| `consensus_prediction` | Mean binary vote across classifiers |
 
 ---
 
