@@ -111,8 +111,14 @@ class LabelBuilder:
             eruption_dates (list[str]): List of eruption dates in YYYY-MM-DD format.
                 Dates are automatically sorted.
             volcano_id (str): Unique identifier for the volcano, used in output filenames.
-            include_eruption_date (bool, optional): Date of eruption will marked
-                as an eruption (not excluded). Defaults to False.
+            include_eruption_date (bool, optional): Controls whether the eruption
+                date counts as one of the ``day_to_forecast`` positive days.
+                When ``True``, the positive window spans exactly ``day_to_forecast``
+                days ending on (and including) the eruption date.
+                When ``False`` (default), the ``day_to_forecast`` days are strictly
+                before the eruption date; the eruption day is additionally marked
+                positive, giving ``day_to_forecast + 1`` positive days in total.
+                Defaults to False.
             output_dir (str | None, optional): Output directory path. If None, defaults
                 to "output" subdirectory. Relative paths are resolved against root_dir.
                 Absolute paths are used as-is. Defaults to None.
