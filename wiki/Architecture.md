@@ -249,7 +249,7 @@ calculate = CalculateTremor(
 **`LabelBuilder`** generates binary labels for supervised learning:
 - Creates sliding time windows and labels them erupted (1) or not (0)
 - Uses `day_to_forecast` to look ahead N days before eruptions
-- `include_eruption_date` (default `False`): when `True`, the eruption date itself is included in the positive window; when `False`, the window ends the day before the eruption
+- `include_eruption_date` (default `False`): controls whether the eruption date counts toward the `day_to_forecast` window. When `True`, the window spans exactly `day_to_forecast` days ending on the eruption date. When `False`, the window covers `day_to_forecast` days strictly before the eruption date and the eruption day itself is additionally marked positive (`day_to_forecast + 1` positive days total)
 - Label filenames follow: `label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv`
 
 **`DynamicLabelBuilder`** (extends `LabelBuilder`) generates one window per eruption:
@@ -269,16 +269,19 @@ LabelBuilder — one global window over the full date range
  └──────────────────────────────────────────────────────────┘
 
  include_eruption_date=False (default)
- │  0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  0                │
+ │  0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  1                │
  │                       ↑              ↑  ↑                │
- │                   dtf start    day before | eruption     │
- │                                eruption   | (excluded)   │
+ │                   dtf start    day before  eruption      │
+ │                                eruption    (also = 1)    │
+ │  → day_to_forecast days strictly before eruption         │
+ │    + eruption day = day_to_forecast + 1 positive days    │
 
  include_eruption_date=True
- │  0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  1                │
- │                       ↑                 ↑                │
- │                   dtf start          eruption            │
- │                                      (included)          │
+ │  0 0 0 0 0 0 0 0 0 0  0  1  1  1  1  1  1                │
+ │                          ↑              ↑                │
+ │                      dtf start      eruption             │
+ │                                    (counted in dtf)      │
+ │  → exactly day_to_forecast days ending on eruption day   │
 
 DynamicLabelBuilder — one window per eruption, overlaps handled
 ─────────────────────────────────────────────────────────────────────
