@@ -28,11 +28,11 @@ def plot_forecast(
     Multi-model mode shows individual classifier predictions plus consensus with uncertainty.
 
     Args:
-        df (pd.DataFrame): Forecast DataFrame with datetime index and columns:
+        df (pd.DataFrame): Forecast Consensus DataFrame with datetime index and columns:
             - Single model: "eruption_probability", "confidence", "prediction"
-              (or "{model_name}_eruption_probability", etc.)
-            - Multi-model: "{name}_eruption_probability", "{name}_confidence" for
-              each classifier, plus "consensus_eruption_probability",
+              (or "{model_name}_probability", etc.)
+            - Multi-model: "{name}_probability", "{name}_confidence" for
+              each classifier, plus "consensus_probability",
               "consensus_uncertainty", "consensus_confidence"
         model_names (list[str]): List of model names (keys for multi-model columns).
             For single model, pass a list with one name, e.g., ["xgb"].
@@ -81,7 +81,7 @@ def plot_forecast(
         if multi_model:
             # Plot individual classifier predictions
             for i, name in enumerate(model_names):
-                col = f"{name}_eruption_probability"
+                col = f"{name}_probability"
                 if col in df.columns:
                     ax1.plot(
                         index,
@@ -94,8 +94,8 @@ def plot_forecast(
                     )
 
             # Plot consensus with uncertainty band
-            if "consensus_eruption_probability" in df.columns:
-                cp = df["consensus_eruption_probability"]
+            if "consensus_probability" in df.columns:
+                cp = df["consensus_probability"]
                 cu = df["consensus_uncertainty"]
                 ax1.fill_between(
                     index,
@@ -116,8 +116,8 @@ def plot_forecast(
         else:
             # Single model: plot main probability
             prob_col = (
-                f"{model_names[0]}_eruption_probability"
-                if f"{model_names[0]}_eruption_probability" in df.columns
+                f"{model_names[0]}_probability"
+                if f"{model_names[0]}_probability" in df.columns
                 else "eruption_probability"
             )
             ax1.plot(

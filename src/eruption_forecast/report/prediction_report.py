@@ -113,14 +113,14 @@ class PredictionReport(BaseReport):
         annotations: list[dict[str, Any]] = []
 
         # Per-classifier probability lines
-        prob_cols = [c for c in df.columns if c.endswith("_eruption_probability")]
+        prob_cols = [c for c in df.columns if c.endswith("_probability")]
         std_col = next((c for c in df.columns if "consensus_uncertainty" in c), None)
         consensus_col = next(
-            (c for c in df.columns if "consensus_eruption_probability" in c), None
+            (c for c in df.columns if "consensus_probability" in c), None
         )
 
         for col in prob_cols:
-            clf_label = col.replace("_eruption_probability", "").replace("_", " ")
+            clf_label = col.replace("_probability", "").replace("_", " ")
             traces.append(
                 {
                     "type": "scatter",
@@ -259,8 +259,8 @@ class PredictionReport(BaseReport):
         start = _fmt_date(df.index[0]) if not df.empty else "—"
         end = _fmt_date(df.index[-1]) if not df.empty else "—"
 
-        clf_cols = [c for c in df.columns if c.endswith("_eruption_probability")]
-        classifiers = [c.replace("_eruption_probability", "") for c in clf_cols]
+        clf_cols = [c for c in df.columns if c.endswith("_probability")]
+        classifiers = [c.replace("_probability", "") for c in clf_cols]
 
         return {
             "start_date": start,

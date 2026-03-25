@@ -98,7 +98,7 @@ class ModelPredictor:
         ... )
         >>> # Columns: rf_eruption_probability, xgb_eruption_probability, ...,
         >>> #          consensus_eruption_probability, consensus_confidence, ...
-        >>> print(df_forecast[["consensus_eruption_probability", "consensus_confidence"]])
+        >>> print(df_forecast[["consensus_probability", "consensus_confidence"]])
     """
 
     def __init__(
@@ -649,7 +649,7 @@ class ModelPredictor:
                 )
             )
 
-        cols["consensus_eruption_probability"] = consensus_mean
+        cols["consensus_probability"] = consensus_mean
         cols["consensus_uncertainty"] = consensus_std
         cols["consensus_confidence"] = consensus_conf
         cols["consensus_prediction"] = consensus_pred
@@ -699,7 +699,7 @@ class ModelPredictor:
                 for cross-classifier consensus computation.
         """
         model_mean_probabilities[model_name] = mean
-        cols[f"{model_name}_eruption_probability"] = mean
+        cols[f"{model_name}_probability"] = mean
         cols[f"{model_name}_uncertainty"] = std
         cols[f"{model_name}_confidence"] = confidence
         cols[f"{model_name}_prediction"] = prediction
@@ -965,7 +965,7 @@ class ModelPredictor:
                 f"mean_P={mean_p.mean():.4f}  mean_conf={conf.mean():.4f}"
             )
         if self._multi_model:
-            cp = df["consensus_eruption_probability"].to_numpy()
+            cp = df["consensus_probability"].to_numpy()
             cc = df["consensus_confidence"].to_numpy()
             pred_c = df["consensus_prediction"].to_numpy()
             logger.info("-" * 60)
@@ -986,7 +986,7 @@ class ModelPredictor:
         for figure construction, then saves to the figures directory.
 
         Args:
-            df (pd.DataFrame): Forecast dataframe with predictions and confidence.
+            df (pd.DataFrame): Forecast consensus dataframe with predictions and confidence.
             model_mean_probabilities (dict[str, np.ndarray]): Mean probabilities per model.
         """
         fig = plot_forecast(
