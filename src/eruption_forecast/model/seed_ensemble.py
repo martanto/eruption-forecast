@@ -21,7 +21,6 @@ from eruption_forecast.utils.array import (
     aggregate_seed_probabilities,
     predict_proba_from_estimator,
 )
-from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.model.base_ensemble import BaseEnsemble
 
 
@@ -184,18 +183,15 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         result = np.column_stack([1.0 - mean_eruption, mean_eruption])
         return result
 
-    def predict(
-        self, X: pd.DataFrame, threshold: float = ERUPTION_PROBABILITY_THRESHOLD
-    ) -> np.ndarray:
-        """Return binary predictions using ``ERUPTION_PROBABILITY_THRESHOLD`` on mean probability.
+    def predict(self, X: pd.DataFrame, threshold: float = 0.5) -> np.ndarray:
+        """Return binary predictions using 0.5 value on mean probability.
 
-        Applies ``ERUPTION_PROBABILITY_THRESHOLD`` to the mean P(eruption) returned by
-        :meth:`predict_proba`.
+        Applies 0.5 value to the mean P(eruption) returned by :meth:`predict_proba`.
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
             threshold (float, optional): Probability threshold for eruption classification.
-                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
+                Defaults to 0.5.
 
         Returns:
             np.ndarray: 1-D integer array of shape ``(n_samples,)`` with values
@@ -206,7 +202,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     def predict_with_uncertainty(
         self,
         X: pd.DataFrame,
-        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
         save: bool = False,
         output_dir: str | None = None,
         overwrite: bool = False,
@@ -220,8 +215,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
-            threshold (float, optional): Probability threshold for eruption classification.
-                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
             save (bool, optional): If ``True``, save per-seed predictions to CSV files
                 under ``output_dir``. Defaults to ``False``.
             output_dir (str | None, optional): Directory for per-seed CSV output.
@@ -265,9 +258,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                     verbose=verbose,
                 )
 
-        return aggregate_seed_probabilities(
-            seed_proba_matrix, seed_predicts_matrix, threshold=threshold
-        )
+        return aggregate_seed_probabilities(seed_proba_matrix, seed_predicts_matrix)
 
     # ------------------------------------------------------------------
     # Serialisation

@@ -13,7 +13,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 from eruption_forecast.logger import logger
-from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.model.base_ensemble import BaseEnsemble
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 
@@ -141,7 +140,6 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     def predict_with_uncertainty(
         self,
         X: pd.DataFrame,
-        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
         save: bool = False,
         output_dir: str | None = None,
         overwrite: bool = False,
@@ -158,9 +156,6 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
-            threshold (float, optional): Probability threshold for binary
-                eruption classification.  Defaults to
-                ``ERUPTION_PROBABILITY_THRESHOLD``.
             save (bool, optional): If ``True``, save per-seed predictions to CSV
                 files under ``{output_dir}/{classifier_name}/``. Defaults to ``False``.
             output_dir (str | None, optional): Base directory for per-seed CSV output.
@@ -188,9 +183,11 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         clf_results: dict[str, dict[str, np.ndarray]] = {}
         for name, seed_ensemble in self.ensembles.items():
-            clf_output_dir = os.path.join(output_dir, name) if (save and output_dir) else None
+            clf_output_dir = (
+                os.path.join(output_dir, name) if (save and output_dir) else None
+            )
             mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(
-                X, threshold,
+                X,
                 save=save,
                 output_dir=clf_output_dir,
                 overwrite=overwrite,

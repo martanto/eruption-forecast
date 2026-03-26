@@ -15,7 +15,6 @@ from numpy.typing import NDArray
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir
-from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 
 
 def _save_seed_proba_csv(
@@ -122,7 +121,6 @@ def predict_proba_from_estimator(
 def aggregate_seed_probabilities(
     seed_proba_matrix: np.ndarray,
     seed_predict_matrix: np.ndarray,
-    threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Aggregate a seed probability matrix into summary statistics.
 
@@ -139,8 +137,6 @@ def aggregate_seed_probabilities(
             containing per-seed P(eruption) values.
         seed_predict_matrix (np.ndarray): Array of shape (n_samples, n_seeds)
             containing per-seed binary predictions (0 or 1).
-        threshold (float, optional): Unused — kept for API compatibility.
-            Defaults to ``ERUPTION_PROBABILITY_THRESHOLD``.
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D arrays

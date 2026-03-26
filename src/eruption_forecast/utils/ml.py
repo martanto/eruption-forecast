@@ -28,10 +28,7 @@ from eruption_forecast.utils.array import (
 )
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series, load_label_csv
-from eruption_forecast.config.constants import (
-    THRESHOLD_RESOLUTION,
-    ERUPTION_PROBABILITY_THRESHOLD,
-)
+from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
@@ -299,8 +296,12 @@ def compute_seed_eruption_probability(
 
     if save:
         _save_seed_proba_csv(
-            output_dir, random_state, probabilities_eruption, predictions_eruption,
-            overwrite=overwrite, verbose=verbose,
+            output_dir,
+            random_state,
+            probabilities_eruption,
+            predictions_eruption,
+            overwrite=overwrite,
+            verbose=verbose,
         )
 
     return probabilities_eruption, probabilities_scores, predictions_eruption
@@ -312,7 +313,6 @@ def compute_model_probabilities(
     features_csv_column: str = "significant_features_csv",
     trained_model_filepath_column: str = "trained_model_filepath",
     classifier_name: str = "model",
-    threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
     number_of_seeds: int | None = None,
     output_dir: str | None = None,
     save_predictions: bool = False,
@@ -336,8 +336,6 @@ def compute_model_probabilities(
         trained_model_filepath_column (str, optional): Column name containing paths to
             trained model files. Defaults to "trained_model_filepath".
         classifier_name (str, optional): Classifier name for logging. Defaults to "model".
-        threshold (float, optional): Minimum mean probability threshold to classify as
-            eruption (0.0-1.0). Defaults to 0.5.
         number_of_seeds (int | None, optional): Maximum number of seeds to use. If None,
             uses all seeds. Defaults to None.
         output_dir (str | None, optional): Directory to save per-seed predictions.
@@ -408,7 +406,7 @@ def compute_model_probabilities(
     )  # (n_windows, n_seeds)
 
     return aggregate_seed_probabilities(
-        probabilities_eruption_matrix, predictions_eruption_matrix, threshold=threshold
+        probabilities_eruption_matrix, predictions_eruption_matrix
     )
 
 
