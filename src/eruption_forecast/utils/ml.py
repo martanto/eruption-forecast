@@ -588,3 +588,25 @@ def get_classifier_models(
     ]
 
     return classifier_models
+
+
+def get_classifier_label(classifier_name: str) -> str:
+    """Return classifier code given its slug name."""
+    classifier_slugs = {
+        "SVC": "svm",
+        "KNeighborsClassifier": "KNN",
+        "DecisionTreeClassifier": "Decision Tree",
+        "RandomForestClassifier": "Random Forest",
+        "LiteRandomForestClassifier": "(lite) Random Forest",
+        "GradientBoostingClassifier": "Gradient Boosting",
+        "XGBClassifier": "XGBoost",
+        "MLPClassifier": "Neural Network",
+        "GaussianNB": "Naive Bayes",
+        "LogisticRegression": "Logistic Regression",
+        "VotingClassifier": "Voting Classifier",
+    }
+
+    if classifier_name not in classifier_slugs:
+        return classifier_name
+
+    return classifier_slugs[classifier_name]
