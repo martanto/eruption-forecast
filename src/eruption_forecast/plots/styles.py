@@ -39,7 +39,9 @@ import matplotlib
 from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 
 
-matplotlib.use(MATPLOTLIB_BACKEND)  # Must be called before pyplot import — non-interactive backend safe for worker threads
+matplotlib.use(
+    MATPLOTLIB_BACKEND
+)  # Must be called before pyplot import — non-interactive backend safe for worker threads
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from cycler import cycler
@@ -67,9 +69,42 @@ OKABE_ITO = [
     "#009E73",  # Bluish green
     "#F0E442",  # Yellow
     "#0072B2",  # Blue
-    "#D55E00",  # Vermillion
+    "#D55E00",  # Vermillion/red
     "#CC79A7",  # Reddish purple
     "#000000",  # Black
+]
+
+# https://coolors.co/palette/f94144-f3722c-f8961e-f9844a-f9c74f-90be6d-43aa8b-4d908e-577590-277da1
+VIBRANT_TONES = [
+    "#f94144",
+    "#CC79A7",
+    "#f3722c",
+    "#f8961e",
+    "#f9844a",
+    "#f9c74f",
+    "#90be6d",
+    "#43aa8b",
+    "#4d908e",
+    "#577590",
+    "#277da1",
+]
+
+# https://coolors.co/palette/233d4d-fe7f2d-fcca46-a1c181-619b8a
+SUNRISE_GLOW = ["#233d4d", "#fe7f2d", "#fcca46", "#a1c181", "#619b8a"]
+
+# https://colorbrewer2.org/?type=diverging&scheme=RdYlBu&n=10
+DIVERGING_BREWER = [
+    "#a50026",
+    "#009E73",
+    "#fdae61",
+    "#313695",
+    "#f46d43",
+    "#fee090",
+    "#4575b4",
+    "#d73027",
+    "#e0f3f8",
+    "#abd9e9",
+    "#74add1",
 ]
 
 # Perceptually uniform sequential colormaps
@@ -288,8 +323,15 @@ def get_color(
         except (ValueError, IndexError) as e:
             msg = f"Invalid Okabe-Ito index '{name}'. Must be 0-{len(OKABE_ITO) - 1}"
             raise ValueError(msg) from e
+    elif palette == "vibrant":
+        try:
+            index = int(name)
+            return VIBRANT_TONES[index]
+        except (ValueError, IndexError) as e:
+            msg = f"Invalid Vibrant Tones index '{name}'. Must be 0-{len(VIBRANT_TONES) - 1}"
+            raise ValueError(msg) from e
     else:
-        msg = f"Unknown palette '{palette}'. Use 'nature' or 'okabe_ito'"
+        msg = f"Unknown palette '{palette}'. Use 'nature', 'okabe_ito', or 'vibrant'"
         raise ValueError(msg)
 
 
