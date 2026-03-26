@@ -214,54 +214,99 @@ def parse_label_filename(basename: str) -> dict:
     }
 
 
-def label_id_to_datetime(
-    label_df: pd.DataFrame | pd.Series, target_df: pd.DataFrame, inplace: bool = False
+def set_datetime_index(
+    datetime_map: pd.DataFrame | pd.Series,
+    df: pd.DataFrame,
+    on: str | None = None,
 ) -> pd.DataFrame:
-    """Add datetime column to target DataFrame by merging with label DataFrame.
+    """Set a DatetimeIndex on a DataFrame by merging with a datetime mapping.
 
-    Merges the label DataFrame (containing id and datetime) with the target DataFrame
-    to add datetime information. This is useful for adding temporal context to
-    extracted features, tremor matrices, or prediction results.
+    Merges ``datetime_map`` (containing ``id`` and ``datetime``) with ``df``,
+    then replaces the index with a ``DatetimeIndex``. This is useful for adding
+    temporal context to extracted features, eruption probabilities, or tremor
+    matrices.
+
+    If ``df`` already has a ``DatetimeIndex``, it is returned unchanged.
 
     Args:
-        label_df (pd.DataFrame | pd.Series): Label DataFrame or Series with datetime
-            index containing 'id' and 'datetime' columns. If Series, will be converted
-            to DataFrame.
-        target_df (pd.DataFrame): Target DataFrame to which datetime will be added.
-            Can be extracted features, eruption probabilities, or tremor matrix.
-            Must have matching index with label_df.
+        datetime_map (pd.DataFrame | pd.Series): Source of the ``id → datetime``
+            mapping. Accepted forms:
+            - DataFrame with an integer ``id`` index and a ``"datetime"`` column.
+            - Series named ``"datetime"`` with an integer ``id`` index.
+            - DatetimeIndex-based DataFrame with an ``"id"`` column used as the
+              merge key.
+        df (pd.DataFrame): DataFrame whose index will be replaced with a
+            ``DatetimeIndex``. Can hold features, eruption probabilities, or tremor
+            data.
+        on (str | None, optional): Column in ``df`` to use as the join key against
+            the index of ``datetime_map``. When ``None`` (default), merges on the
+            index of both DataFrames.
 
     Returns:
-        pd.DataFrame: Target DataFrame with datetime column merged from label_df.
+        pd.DataFrame: Copy of ``df`` with a ``DatetimeIndex`` derived from
+        ``datetime_map``'s ``"datetime"`` column.
+
+    Raises:
+        ValueError: If ``datetime_map`` is a Series not named ``"datetime"``.
+        ValueError: If a DatetimeIndex-based ``datetime_map`` has no ``"id"`` column.
+        ValueError: If ``datetime_map`` does not contain a ``"datetime"`` column
+            after normalisation.
+        ValueError: If ``on`` is specified but the column does not exist in ``df``.
 
     Examples:
-        >>> label_df = pd.DataFrame({"id": [1, 2], "datetime": ["2025-01-01", "2025-01-02"]})
-        >>> target_df = pd.DataFrame({"feature_1": [0.5, 0.8]}, index=[1, 2])
-        >>> result = label_id_to_datetime(label_df, target_df)
-        >>> print(result.columns)
-        Index(['feature_1', 'id', 'datetime'], dtype='object')
+        >>> datetime_map = pd.DataFrame(
+        ...     {"datetime": ["2025-01-01", "2025-01-02"]}, index=[1, 2]
+        ... )
+        >>> df = pd.DataFrame({"feature_1": [0.5, 0.8]}, index=[1, 2])
+        >>> result = set_datetime_index(datetime_map, df)
+        >>> print(result.columns.tolist())
+        ['feature_1']
+        >>> print(type(result.index))
+        <class 'pandas.core.indexes.datetimes.DatetimeIndex'>
+        >>> # Merge on a column instead of the index
+        >>> df_with_id = pd.DataFrame({"id": [1, 2], "feature_1": [0.5, 0.8]})
+        >>> result = set_datetime_index(datetime_map, df_with_id, on="id")
+        >>> print(result.columns.tolist())
+        ['feature_1']
     """
-    if isinstance(target_df.index, pd.DatetimeIndex):
-        return target_df
+    if isinstance(df.index, pd.DatetimeIndex):
+        return df
 
-    if isinstance(label_df, pd.Series):
-        label_df = pd.DataFrame(label_df)
+    if isinstance(datetime_map, pd.Series):
+        if datetime_map.name != "datetime":
+            raise ValueError(
+                f"Series passed as datetime_map must be named 'datetime'. Got: '{datetime_map.name}'"
+            )
+        datetime_map = datetime_map.to_frame()
 
-    if isinstance(label_df.index, pd.DatetimeIndex):
-        label_df = label_df.reset_index()
-        label_df.index = label_df["id"]
-        label_df = label_df.drop(columns=["id"])
+    if isinstance(datetime_map.index, pd.DatetimeIndex):
+        if "id" not in datetime_map.columns:
+            raise ValueError(
+                "DatetimeIndex-based datetime_map must have an 'id' column to use as merge key. "
+                f"Got columns: {datetime_map.columns.tolist()}"
+            )
+        datetime_map = datetime_map.reset_index(drop=True)
+        datetime_map = datetime_map.set_index("id")
 
-    if "datetime" not in label_df.columns:
+    if "datetime" not in datetime_map.columns:
         raise ValueError(
-            f"Label DataFrame must have `datetime` column. Got: {label_df.columns.tolist()}"
+            f"datetime_map must have a 'datetime' column. Got: {datetime_map.columns.tolist()}"
         )
 
-    label_df = label_df[["datetime"]]
-    df = target_df.merge(label_df, left_index=True, right_index=True)
+    if on is not None and on not in df.columns:
+        raise ValueError(
+            f"Column '{on}' specified in 'on' does not exist in df. "
+            f"Got columns: {df.columns.tolist()}"
+        )
 
-    if inplace:
-        df.index = pd.to_datetime(df["datetime"])
-        df = df.drop(columns=["datetime"])
+    datetime_map: pd.DataFrame = datetime_map[["datetime"]]
 
-    return df
+    if on is not None:
+        result = df.merge(datetime_map, left_on=on, right_index=True).drop(columns=[on])
+    else:
+        result = df.merge(datetime_map, left_index=True, right_index=True)
+
+    result.index = pd.to_datetime(result["datetime"])
+    result = result.drop(columns=["datetime"])
+
+    return result
