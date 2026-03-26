@@ -215,7 +215,7 @@ def parse_label_filename(basename: str) -> dict:
 
 
 def label_id_to_datetime(
-    label_df: pd.DataFrame | pd.Series, target_df: pd.DataFrame
+    label_df: pd.DataFrame | pd.Series, target_df: pd.DataFrame, inplace: bool = False
 ) -> pd.DataFrame:
     """Add datetime column to target DataFrame by merging with label DataFrame.
 
@@ -241,7 +241,27 @@ def label_id_to_datetime(
         >>> print(result.columns)
         Index(['feature_1', 'id', 'datetime'], dtype='object')
     """
+    if isinstance(target_df.index, pd.DatetimeIndex):
+        return target_df
+
     if isinstance(label_df, pd.Series):
         label_df = pd.DataFrame(label_df)
 
-    return target_df.merge(label_df, left_index=True, right_index=True)
+    if isinstance(label_df.index, pd.DatetimeIndex):
+        label_df = label_df.reset_index()
+        label_df.index = label_df["id"]
+        label_df = label_df.drop(columns=["id"])
+
+    if "datetime" not in label_df.columns:
+        raise ValueError(
+            f"Label DataFrame must have `datetime` column. Got: {label_df.columns.tolist()}"
+        )
+
+    label_df = label_df[["datetime"]]
+    df = target_df.merge(label_df, left_index=True, right_index=True)
+
+    if inplace:
+        df.index = pd.to_datetime(df["datetime"])
+        df = df.drop(columns=["datetime"])
+
+    return df
