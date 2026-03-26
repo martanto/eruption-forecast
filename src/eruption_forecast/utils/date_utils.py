@@ -285,7 +285,7 @@ def set_datetime_index(
                 "DatetimeIndex-based datetime_map must have an 'id' column to use as merge key. "
                 f"Got columns: {datetime_map.columns.tolist()}"
             )
-        datetime_map = datetime_map.reset_index(drop=True)
+        datetime_map = datetime_map.reset_index(drop=False)
         datetime_map = datetime_map.set_index("id")
 
     if "datetime" not in datetime_map.columns:
