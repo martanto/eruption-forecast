@@ -1,8 +1,22 @@
-"""DataFrame validation and manipulation utilities.
+"""DataFrame manipulation utilities for tremor, label, and feature data.
 
-This module provides functions for DataFrame operations including column
-validation, sampling consistency checks, series conversion, and feature
-concatenation for tsfresh processing.
+This module provides DataFrame helpers used at multiple stages of the pipeline:
+cleaning raw tremor data, preparing labels for tsfresh, merging extracted
+feature sets, and computing forecast envelope statistics.
+
+Key functions
+-------------
+- ``remove_anomalies`` — apply modified z-score detection column-wise and replace
+  flagged values with NaN; optionally interpolate the result
+- ``to_series`` — extract a value column from a DataFrame and reindex by another
+  column (e.g. convert a label DataFrame to a tsfresh-compatible ``id``-indexed
+  ``Series``)
+- ``load_label_csv`` — read an aligned label CSV produced by ``FeaturesBuilder``
+  and return an ``id``-indexed binary eruption ``Series``
+- ``concat_features`` — horizontally concatenate per-column tsfresh feature CSVs
+  into a single combined feature matrix and persist it to disk
+- ``get_envelope_values`` — compute rolling min/max envelopes for per-classifier
+  probability and prediction columns in a forecast output DataFrame
 """
 
 import numpy as np
@@ -196,3 +210,65 @@ def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFra
     df.to_csv(filepath, index=True)
 
     return filepath, df
+
+
+def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute rolling min/max envelopes for per-classifier probability and prediction columns.
+
+    Adds eight new columns to ``df`` in place (no copy is made):
+
+    - ``consensus_probability_max`` / ``consensus_probability_min``: row-wise
+      max/min across all ``*_probability`` columns (excluding ``consensus_*``).
+    - ``consensus_probability_max_envelope`` / ``consensus_probability_min_envelope``:
+      centered rolling max/min (window=6) of the above.
+    - ``consensus_prediction_max`` / ``consensus_prediction_min``: row-wise
+      max/min across all ``*_prediction`` columns (excluding ``consensus_*``).
+    - ``consensus_prediction_max_envelope`` / ``consensus_prediction_min_envelope``:
+      centered rolling max/min (window=6) of the above.
+
+    Args:
+        df (pd.DataFrame): Consensus forecast DataFrame containing per-classifier
+            columns ending in ``_probability`` and ``_prediction``. Modified in place.
+
+    Returns:
+        pd.DataFrame: The same DataFrame with the eight envelope columns added.
+    """
+    prob_cols = [
+        col
+        for col in df.columns
+        if (col.endswith("_probability") and not col.startswith("consensus"))
+    ]
+
+    pred_cols = [
+        col
+        for col in df.columns
+        if (col.endswith("_prediction") and not col.startswith("consensus"))
+    ]
+
+    df["consensus_probability_max"] = df[prob_cols].max(axis=1)
+    df["consensus_probability_min"] = df[prob_cols].min(axis=1)
+    df["consensus_probability_min_envelope"] = (
+        df["consensus_probability_min"]
+        .rolling(window=6, center=True, min_periods=1)
+        .min()
+    )
+    df["consensus_probability_max_envelope"] = (
+        df["consensus_probability_max"]
+        .rolling(window=6, center=True, min_periods=1)
+        .max()
+    )
+
+    df["consensus_prediction_max"] = df[pred_cols].max(axis=1)
+    df["consensus_prediction_min"] = df[pred_cols].min(axis=1)
+    df["consensus_prediction_min_envelope"] = (
+        df["consensus_prediction_min"]
+        .rolling(window=6, center=True, min_periods=1)
+        .min()
+    )
+    df["consensus_prediction_max_envelope"] = (
+        df["consensus_prediction_max"]
+        .rolling(window=6, center=True, min_periods=1)
+        .max()
+    )
+
+    return df

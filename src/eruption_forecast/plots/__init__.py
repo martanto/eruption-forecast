@@ -1,13 +1,25 @@
 """Publication-quality scientific plotting for volcanic eruption forecasting.
 
-This module provides Nature/Science journal-standard visualizations for:
-- Tremor time-series analysis
-- Feature importance and selection
-- Model evaluation (ROC, PR, confusion matrix, calibration)
-- Eruption forecast probability plots
+This package provides a unified set of plotting utilities styled after Nature/Science
+journal standards. All figures use the Okabe-Ito colorblind-safe palette by default,
+clean spines, and font sizes matched to typical journal column widths.
 
-All plots use consistent styling, colorblind-safe palettes, and publication-ready
-typography.
+Key sub-modules and their public exports:
+
+- ``styles``: Color palettes (``NATURE_COLORS``, ``OKABE_ITO``), rcParams helpers
+  (``apply_nature_style``, ``setup_nature_style``), and utilities
+  (``get_color``, ``configure_spine``, ``get_figure_size``).
+- ``tremor_plots``: ``plot_tremor`` — multi-panel RSAM/DSAR/entropy time-series.
+- ``feature_plots``: ``plot_significant_features``, ``replot_significant_features``,
+  ``plot_frequency_band_contribution`` — tsfresh feature importance visualisation.
+- ``evaluation_plots``: full suite of classifier evaluation charts including ROC,
+  precision-recall, calibration, confusion matrix, learning curves, threshold
+  analysis, feature importance, prediction distribution, seed stability, and
+  classifier comparison.
+- ``shap_plots``: ``plot_shap_summary``, ``plot_aggregate_shap_summary`` — SHAP
+  beeswarm explainability plots (XGBoost >= 3.x compatible via Independent masker).
+- ``forecast_plots``: ``plot_forecast``, ``plot_forecast_from_file`` — eruption
+  probability time-series with per-classifier panels and consensus band.
 """
 
 # Style configuration
@@ -40,7 +52,7 @@ from eruption_forecast.plots.feature_plots import (
 # Forecast plotting
 from eruption_forecast.plots.forecast_plots import (
     plot_forecast,
-    plot_forecast_with_events,
+    plot_forecast_from_file,
 )
 
 # Evaluation plotting
@@ -91,5 +103,5 @@ __all__ = [
     "plot_aggregate_shap_summary",
     # Forecast plotting
     "plot_forecast",
-    "plot_forecast_with_events",
+    "plot_forecast_from_file",
 ]

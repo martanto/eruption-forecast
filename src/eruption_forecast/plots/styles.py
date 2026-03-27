@@ -1,34 +1,26 @@
-"""Nature/Science journal publication-quality styling for plots.
+"""Nature/Science journal publication-quality styling for matplotlib plots.
 
-This module provides consistent styling configurations following Nature and Science
-journal standards for scientific visualization. It includes color palettes, typography
-settings, figure dimensions, and context managers for applying styles.
+Centralises all visual design decisions used across the plots package: color palettes,
+typography, figure dimensions, DPI settings, grid and spine configuration, and rcParams
+helpers. Every other plotting module in this package imports from here rather than
+defining its own style constants.
 
-Color Palettes:
-    - NATURE_COLORS: High-contrast primary colors for data visualization
-    - OKABE_ITO: Colorblind-safe categorical palette (8 colors)
-    - SEQUENTIAL: Perceptually uniform sequential colormap names
-    - DIVERGING: Diverging colormap for heatmaps with neutral midpoint
+Key contents:
 
-Typography:
-    - Sans-serif fonts (Arial/Helvetica family)
-    - Font sizes: 8-12pt for various elements
-    - High DPI outputs (150-300)
-
-Layout:
-    - Clean axis spines (remove top/right)
-    - Light grid lines (gray, alpha=0.3)
-    - Tight bounding boxes
-    - Standard column widths for journals
-
-Example:
-    >>> import matplotlib.pyplot as plt
-    >>> from eruption_forecast.plots.styles import apply_nature_style
-    >>>
-    >>> with apply_nature_style():
-    ...     fig, ax = plt.subplots()
-    ...     ax.plot([1, 2, 3], [1, 4, 9])
-    ...     plt.savefig("output.png")
+- **Color palettes**: ``NATURE_COLORS`` (named hex dict), ``OKABE_ITO`` (8-color
+  colorblind-safe list), ``VIBRANT_TONES``, ``SUNRISE_GLOW``, ``DIVERGING_BREWER``,
+  ``SEQUENTIAL``, ``DIVERGING``.
+- **Typography**: ``FONT_FAMILY``, ``FONT_SANS_SERIF``, ``FONT_SIZES`` — sizes for
+  title, label, tick, legend, and annotation elements.
+- **Figure dimensions**: ``FIGURE_SIZES`` — predefined (width, height) tuples matching
+  Nature single-column (3.5"), double-column (7"), and other standard formats.
+- **DPI constants**: ``DPI_SCREEN``, ``DPI_PRINT``, ``DPI_PUBLICATION``.
+- **Style helpers**: ``setup_nature_style()`` returns an rcParams dict;
+  ``apply_nature_style()`` is a context manager that applies and restores settings;
+  ``nature_figure()`` combines both and yields a ``(fig, ax)`` pair.
+- **Utilities**: ``get_color(name, palette)`` retrieves hex codes by name or index;
+  ``configure_spine(ax, which)`` removes publication-standard spines;
+  ``get_figure_size(key)`` returns a predefined ``(width, height)`` tuple.
 """
 
 from typing import Any, Literal
@@ -282,19 +274,21 @@ def nature_figure(
 
 def get_color(
     name: str,
-    palette: Literal["nature", "okabe_ito"] = "nature",
+    palette: Literal["nature", "okabe_ito", "vibrant"] = "nature",
 ) -> str:
     """Get a color from a named palette.
 
-    Retrieves a hex color code from either the NATURE_COLORS or OKABE_ITO palette.
-    For Nature palette, use color names. For Okabe-Ito, use numeric indices (0-7).
+    Retrieves a hex color code from the NATURE_COLORS, OKABE_ITO, or VIBRANT_TONES
+    palette. For Nature palette, use color names. For Okabe-Ito and Vibrant, use
+    numeric indices.
 
     Args:
         name (str): Color name (for "nature") like "blue", "red", "green", etc.,
             or numeric index as string (for "okabe_ito") like "0", "1", ..., "7".
-        palette (Literal["nature", "okabe_ito"], optional): Palette identifier.
-            Use "nature" for named colors or "okabe_ito" for colorblind-safe
-            indexed palette. Defaults to "nature".
+        palette (Literal["nature", "okabe_ito", "vibrant"], optional): Palette
+            identifier. Use "nature" for named colors, "okabe_ito" for
+            colorblind-safe indexed palette, or "vibrant" for vibrant tones.
+            Defaults to "nature".
 
     Returns:
         str: Hex color code (e.g., "#1f77b4").

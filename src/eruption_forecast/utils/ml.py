@@ -1,7 +1,32 @@
-"""Machine learning utilities for model training and evaluation.
+"""Machine learning utilities for model training, inference, and ensemble management.
 
-This module provides functions for data balancing, feature selection, metrics
-computation, and eruption probability prediction.
+This module centralises the ML-specific helpers that are shared across
+``ModelTrainer``, ``ModelPredictor``, and the ensemble classes.  It covers
+the full lifecycle from data preparation through prediction and model merging.
+
+Key functions
+-------------
+- ``random_under_sampler`` — apply ``RandomUnderSampler`` to balance training data;
+  returns resampled ``(X, y)`` and the fitted sampler
+- ``get_significant_features`` — run tsfresh ``FeatureSelector`` (and optionally a
+  RandomForest importance filter) to reduce the feature matrix to the most
+  relevant columns
+- ``compute_threshold_metrics`` — sweep decision thresholds and record precision,
+  recall, F1, and balanced accuracy at each step
+- ``compute_seed_eruption_probability`` — run one seed model on a feature matrix,
+  aggregate per-seed statistics, and optionally persist a CSV
+- ``compute_model_probabilities`` — iterate over all seeds in a ``SeedEnsemble`` or
+  dict thereof and return a consensus probability DataFrame
+- ``merge_seed_models`` — load all per-seed model files recorded in a registry CSV
+  and bundle them into a ``SeedEnsemble``
+- ``merge_all_classifiers`` — combine multiple ``SeedEnsemble`` objects into a single
+  ``ClassifierEnsemble``
+- ``get_classifier_models`` — instantiate ``ClassifierModel`` objects for a given
+  classifier name and CV strategy
+- ``load_labels_from_csv`` — thin wrapper around ``load_label_csv`` kept for
+  backward compatibility
+- ``get_classifier_label`` — translate an internal classifier key to a
+  human-readable display label
 """
 
 import os
@@ -232,17 +257,18 @@ def compute_seed_eruption_probability(
         debug (bool, optional): If True, log detailed debug information. Defaults to False.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Tuple containing:
+        tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing:
             - probabilities_eruption (np.ndarray): 1D array of eruption probabilities (P(class=1)).
             - probabilities_scores (np.ndarray): 2D array of shape (n_windows, 2) with
               columns [P(non-eruption), P(eruption)].
+            - predictions_eruption (np.ndarray): 1D array of binary predictions (0 or 1).
 
     Raises:
         ValueError: If model output is 1-dimensional.
         RuntimeError: If model supports neither predict_proba nor decision_function.
 
     Examples:
-        >>> proba_1d, proba_2d = compute_seed_eruption_probability(
+        >>> proba_1d, proba_2d, pred_1d = compute_seed_eruption_probability(
         ...     random_state=42,
         ...     features_df=features,
         ...     significant_features_csv="sig_features.csv",
@@ -358,7 +384,6 @@ def compute_model_probabilities(
         >>> mean_p, std_p, conf, pred = compute_model_probabilities(
         ...     df_models=model_registry,
         ...     features_df=features,
-        ...     threshold=0.6,
         ...     number_of_seeds=100
         ... )
         >>> print(f"Mean eruption probability: {mean_p.mean():.3f}")
@@ -591,7 +616,20 @@ def get_classifier_models(
 
 
 def get_classifier_label(classifier_name: str) -> str:
-    """Return classifier code given its slug name."""
+    """Return a human-readable label for a classifier given its scikit-learn class name.
+
+    Looks up ``classifier_name`` in a fixed mapping of class names to display labels.
+    If the name is not found (e.g., an unrecognised or custom classifier), the input
+    string is returned unchanged.
+
+    Args:
+        classifier_name (str): Scikit-learn class name of the classifier, e.g.
+            ``"RandomForestClassifier"`` or ``"XGBClassifier"``.
+
+    Returns:
+        str: Human-readable display label, e.g. ``"Random Forest"`` or ``"XGBoost"``.
+            Returns ``classifier_name`` unchanged if not found in the mapping.
+    """
     classifier_slugs = {
         "SVC": "svm",
         "KNeighborsClassifier": "KNN",

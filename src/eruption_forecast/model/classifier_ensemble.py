@@ -1,9 +1,27 @@
-"""ClassifierEnsemble: wraps multiple SeedEnsemble objects for cross-classifier consensus.
+"""Wrap multiple SeedEnsemble objects for cross-classifier consensus inference.
 
-This module provides the ``ClassifierEnsemble`` class, which bundles one
-``SeedEnsemble`` per classifier into a single, serialisable object and owns
-the cross-classifier consensus logic previously inline in
-``ModelPredictor.predict_proba()``.
+Provides :class:`ClassifierEnsemble`, a serialisable sklearn-compatible
+estimator that bundles one :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`
+per classifier type.
+
+Each :class:`SeedEnsemble` already averages predictions across random seeds for
+a single classifier.  ``ClassifierEnsemble`` adds a second aggregation layer:
+it collects the per-classifier mean probabilities and computes a consensus
+prediction (mean of means) together with an uncertainty estimate (standard
+deviation across classifiers).
+
+Key capabilities:
+    - ``from_seed_ensembles(ensembles)``: Construct from an existing dict of
+      ``SeedEnsemble`` objects.
+    - ``from_registry_dict(registry_dict)``: Load from a mapping of classifier
+      names to registry CSV paths (delegates to ``SeedEnsemble.from_registry()``).
+    - ``predict_proba(X)``: Return per-classifier probabilities and consensus
+      probability array.
+    - ``predict_with_uncertainty(X)``: Return mean probability, standard
+      deviation, confidence, binary prediction, and a per-classifier breakdown
+      dict.
+    - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
+      from :class:`~eruption_forecast.model.base_ensemble.BaseEnsemble`).
 """
 
 import os
@@ -186,7 +204,12 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             clf_output_dir = (
                 os.path.join(output_dir, name) if (save and output_dir) else None
             )
-            mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(
+            (
+                seed_probability,
+                seed_uncertainty,
+                seed_prediction,
+                seed_confidence,
+            ) = seed_ensemble.predict_with_uncertainty(
                 X,
                 save=save,
                 output_dir=clf_output_dir,
@@ -194,31 +217,33 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 verbose=verbose,
             )
             clf_results[name] = {
-                "mean": mean,
-                "std": std,
-                "confidence": conf,
-                "prediction": pred,
+                "mean": seed_probability,
+                "std": seed_uncertainty,
+                "prediction": seed_prediction,
+                "confidence": seed_confidence,
             }
 
         # Cross-classifier consensus
-        all_proba_means = np.stack([v["mean"] for v in clf_results.values()], axis=0)
+        all_proba_means = np.stack(
+            [v["mean"] for v in clf_results.values()], axis=0
+        )
         all_predict_means = np.stack(
             [v["prediction"] for v in clf_results.values()], axis=0
         )
-        consensus_mean: np.ndarray = all_proba_means.mean(axis=0)
-        consensus_std: np.ndarray = all_proba_means.std(axis=0)
-        consensus_pred: np.ndarray = all_predict_means.mean(axis=0)
+        consensus_probability: np.ndarray = all_proba_means.mean(axis=0)
+        consensus_uncertainty: np.ndarray = all_proba_means.std(axis=0)
+        consensus_prediction: np.ndarray = all_predict_means.mean(axis=0)
 
         n_classifiers = all_predict_means.shape[0]
-        consensus_conf: np.ndarray = 1.96 * (
-            np.sqrt(consensus_pred * (1 - consensus_pred) / n_classifiers)
+        consensus_confidence: np.ndarray = 1.96 * (
+            np.sqrt(consensus_prediction * (1 - consensus_prediction) / n_classifiers)
         )
 
         return (
-            consensus_mean,
-            consensus_std,
-            consensus_conf,
-            consensus_pred,
+            consensus_probability,
+            consensus_uncertainty,
+            consensus_prediction,
+            consensus_confidence,
             clf_results,
         )
 

@@ -1,11 +1,25 @@
-"""SeedEnsemble: bundles all seed models for a single classifier into one object.
+"""Bundle all seed models for a single classifier into one serialisable object.
 
-This module provides the ``SeedEnsemble`` class, which wraps the 500 (or any
-number of) trained estimators produced by ``ModelTrainer`` — along with the
-per-seed significant feature lists — into a single, serialisable object.
+Provides :class:`SeedEnsemble`, a serialisable sklearn-compatible estimator
+that aggregates all per-seed estimators produced by ``ModelTrainer`` for one
+classifier type.
 
-Instead of loading 500 ``.pkl`` files and 500 ``.csv`` files at prediction
-time, callers load one file and call ``predict_proba()`` directly.
+Averaging predictions across seeds reduces variance and provides an uncertainty
+estimate (standard deviation of per-seed probabilities).  This mirrors the
+file-based logic in
+:func:`eruption_forecast.utils.ml.compute_model_probabilities` but operates
+entirely on in-memory estimators so the ``.pkl`` files do not need to be
+re-loaded on every inference call.
+
+Key capabilities:
+    - ``from_registry(registry_csv)``: Construct a ``SeedEnsemble`` by loading
+      all seed model ``.pkl`` files listed in a model registry CSV.
+    - ``predict_proba(X)``: Average ``predict_proba`` output across seeds;
+      each seed uses only its own significant feature subset.
+    - ``predict_with_uncertainty(X)``: Return mean probability, standard
+      deviation across seeds, confidence score, and binary prediction array.
+    - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
+      from :class:`~eruption_forecast.model.base_ensemble.BaseEnsemble`).
 """
 
 import os
@@ -138,8 +152,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
 
         Returns:
-            np.ndarray: 1-D array of shape ``(n_samples,)`` with P(eruption).
-            np.ndarray: 1-D array of shape ``(n_samples,)`` with binary prediction (0 and 1).
+            tuple[np.ndarray, np.ndarray]: A 2-tuple of:
+
+                - 1-D array of shape ``(n_samples,)`` with P(eruption).
+                - 1-D array of shape ``(n_samples,)`` with binary prediction (0 or 1).
 
         Raises:
             RuntimeError: If the estimator supports neither ``predict_proba``
@@ -228,13 +244,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D
                 arrays of shape ``(n_samples,)``:
 
-                - ``mean_probability``: Mean P(eruption) across seeds.
-                - ``std``: Standard deviation of P(eruption) across seeds
-                  (uncertainty).
-                - ``confidence``: Fraction of seeds voting with the majority
-                  decision (0.5–1.0).
-                - ``prediction``: Binary predictions (0 or 1) based on
-                  ``threshold``.
+            - ``seed_probability``: Mean P(eruption) across seeds.
+            - ``seed_uncertainty``: Standard deviation of P(eruption) across seeds.
+            - ``seed_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
+            - ``seed_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
         """
         seed_probas: list[np.ndarray] = []
         seed_preds: list[np.ndarray] = []

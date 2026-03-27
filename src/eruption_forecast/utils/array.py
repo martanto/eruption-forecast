@@ -1,8 +1,23 @@
-"""Array operations and outlier detection utilities.
+"""Array operations, outlier detection, and seed-probability aggregation utilities.
 
-This module provides functions for array manipulation and outlier detection
-using z-score methods. Supports removing zero values, detecting maximum outliers,
-and filtering all outliers from numpy arrays.
+This module provides low-level array helpers used throughout the pipeline for
+seismic data quality control, probabilistic inference, and per-seed output
+management.
+
+Key functions
+-------------
+- ``detect_maximum_outlier`` — z-score test on the array maximum; returns index and value
+- ``remove_maximum_outlier`` — removes a single maximum outlier per call
+- ``remove_outliers`` — removes all z-score outliers in one pass
+- ``detect_anomalies_zscore`` — returns a boolean mask of anomalous positions using
+  the modified z-score (MAD-based)
+- ``mask_zero_values`` / ``filter_nans`` — array cleaning helpers
+- ``count_valid_values`` / ``get_completeness`` — data-quality metrics for ObsPy
+  streams and traces
+- ``predict_proba_from_estimator`` — unified ``predict_proba`` / ``decision_function``
+  interface; the single entry point for per-seed inference
+- ``aggregate_seed_probabilities`` — reduces a seed × sample matrix to mean, std,
+  confidence, and vote statistics
 """
 
 import os
@@ -142,19 +157,21 @@ def aggregate_seed_probabilities(
         tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D arrays
             of shape (n_samples,):
 
-            - ``mean_probability``: Mean P(eruption) across seeds.
-            - ``std``: Standard deviation of P(eruption) across seeds.
-            - ``confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
-            - ``mean_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
+            - ``seed_probability``: Mean P(eruption) across seeds.
+            - ``seed_uncertainty``: Standard deviation of P(eruption) across seeds.
+            - ``seed_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
+            - ``seed_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
     """
-    mean_probability: np.ndarray = seed_proba_matrix.mean(axis=1)
-    mean_prediction: np.ndarray = seed_predict_matrix.mean(axis=1)
-    std: np.ndarray = seed_proba_matrix.std(axis=1)
+    seed_probability: np.ndarray = seed_proba_matrix.mean(axis=1)
+    seed_uncertainty: np.ndarray = seed_proba_matrix.std(axis=1)
+    seed_prediction: np.ndarray = seed_predict_matrix.mean(axis=1)
 
     n_seeds = seed_proba_matrix.shape[1]
-    confidence = 1.96 * (np.sqrt(mean_prediction * (1 - mean_prediction) / n_seeds))
+    seed_confidence = 1.96 * (
+        np.sqrt(seed_prediction * (1 - seed_prediction) / n_seeds)
+    )
 
-    return mean_probability, std, confidence, mean_prediction
+    return seed_probability, seed_uncertainty, seed_prediction, seed_confidence
 
 
 def detect_anomalies_zscore(

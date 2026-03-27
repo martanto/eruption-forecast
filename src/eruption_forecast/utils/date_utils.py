@@ -1,8 +1,23 @@
-"""Date and time conversion and normalization utilities.
+"""Date and time conversion, normalisation, and label-filename parsing utilities.
 
-This module provides functions for date conversion, normalization, sorting,
-and filename parsing. Validation of date ranges and window steps has been
-moved to :mod:`eruption_forecast.utils.validation`.
+This module standardises all date handling across the pipeline.  Every public
+function accepts either a ``datetime`` object or a ``"YYYY-MM-DD"`` string and
+returns a well-typed result.  Validation of date ranges and window step
+constraints is intentionally delegated to
+:mod:`eruption_forecast.utils.validation` to avoid circular imports.
+
+Key functions
+-------------
+- ``to_datetime`` — coerce a string or ``datetime`` to a ``datetime``; raises a
+  descriptive ``ValueError`` for malformed inputs
+- ``normalize_dates`` — anchor start to 00:00:00 and end to 23:59:59; returns both
+  ``datetime`` objects and ``"YYYY-MM-DD"`` strings
+- ``sort_dates`` — sort a list of date strings chronologically; optionally return
+  ``datetime`` objects
+- ``parse_label_filename`` — extract all structured parameters (start/end date,
+  window step, unit, day-to-forecast) from a label CSV basename
+- ``set_datetime_index`` — attach a ``DatetimeIndex`` to a DataFrame by joining with
+  an ``id → datetime`` mapping; used for features and forecast outputs
 """
 
 from datetime import datetime
@@ -46,17 +61,20 @@ def to_datetime(date: str | datetime, variable_name: str | None = None) -> datet
         )
 
 
-def sort_dates(dates: list[str]) -> list[str]:
+def sort_dates(dates: list[str], as_datetime: bool = False) -> list[str] | list[datetime]:
     """Sort a list of date strings chronologically.
 
     Converts date strings to datetime objects, sorts them chronologically,
-    and returns them as formatted strings. Used for sorting eruption dates.
+    and returns them either as formatted strings or as datetime objects.
 
     Args:
         dates (list[str]): List of date strings in YYYY-MM-DD format.
+        as_datetime (bool, optional): If True, returns a list of datetime objects
+            instead of formatted strings. Defaults to False.
 
     Returns:
-        list[str]: Sorted list of date strings in YYYY-MM-DD format.
+        list[str] | list[datetime]: Sorted dates as YYYY-MM-DD strings when
+        ``as_datetime`` is False, or as datetime objects when True.
 
     Examples:
         >>> sort_dates(["2025-03-20", "2025-01-15", "2025-02-10"])
@@ -64,6 +82,10 @@ def sort_dates(dates: list[str]) -> list[str]:
     """
     date_series = pd.Series(dates)
     date_series = date_series.apply(pd.to_datetime, format="%Y-%m-%d").sort_values()
+
+    if as_datetime:
+        return date_series.tolist()
+
     date_list: list[str] = list(date_series.dt.strftime("%Y-%m-%d"))
 
     return date_list
