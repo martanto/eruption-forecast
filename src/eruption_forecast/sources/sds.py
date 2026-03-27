@@ -25,8 +25,8 @@ class SDS(SeismicDataSource):
         sds_dir (str): Root path to SDS directory.
         station (str): Station code (e.g., "OJN").
         channel (str): Channel code (e.g., "EHZ").
-        network (str, optional): Network code. Defaults to "VG".
-        location (str, optional): Location code. Defaults to "00".
+        network (str, optional): Network code. (e.g., "VG").
+        location (str): Location code (e.g., "00"). Empty string accepted.
         interpolate (bool, optional): Interpolate missing data. Defaults to True.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
         debug (bool, optional): Enable debug logging. Defaults to False.
@@ -55,8 +55,8 @@ class SDS(SeismicDataSource):
         sds_dir: str,
         station: str,
         channel: str,
-        network: str = "VG",
-        location: str = "00",
+        network: str,
+        location: str,
         interpolate: bool = True,
         verbose: bool = False,
         debug: bool = False,
@@ -70,8 +70,9 @@ class SDS(SeismicDataSource):
             sds_dir (str): Absolute path to the root of the SDS archive.
             station (str): Seismic station code (e.g., "OJN"). Must be non-empty.
             channel (str): Channel code (e.g., "EHZ"). Must be non-empty.
-            network (str, optional): Seismic network code. Defaults to "VG".
-            location (str, optional): Location code. Defaults to "00".
+            network (str, optional): Seismic network code (e.g., "VG"). Cannot be empty.
+            location (str): Location code (e.g., "00"). Empty string is accepted;
+                pass ``""`` when no location code is assigned. Cannot be None.
             interpolate (bool, optional): Apply linear interpolation to fill gaps
                 in loaded streams. Defaults to True.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
@@ -87,6 +88,10 @@ class SDS(SeismicDataSource):
             raise ValueError("Station code must be a non-empty string")
         if not channel or not isinstance(channel, str):
             raise ValueError("Channel code must be a non-empty string")
+        if not network or not isinstance(network, str):
+            raise ValueError("Network must be a non-empty string")
+        if location is None or not isinstance(location, str):
+            raise ValueError("Location code must be not None")
 
         # Check if SDS directory exists
         sds_path = Path(sds_dir)
@@ -293,7 +298,7 @@ class SDS(SeismicDataSource):
             logger.debug(f"{date_str} :: Stream loaded successfully")
             logger.info(
                 f"{date_str} :: {len(stream)} trace(s), {n_samples} samples, "
-                f"{duration:.1f}s duration @ {sampling_rate}Hz"
+                f"{duration:.1f}s duration @ {sampling_rate}Hz."
             )
 
         return stream
