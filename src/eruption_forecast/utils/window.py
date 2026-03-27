@@ -4,6 +4,7 @@ This module provides functions for creating time windows, extracting window
 information from seismic traces, and calculating window-based metrics for
 tremor analysis.
 """
+
 from typing import Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable
@@ -180,7 +181,7 @@ def chunk_daily_data(
 
     # Pad data so the last incomplete window is filled with NaN
     difference_samples = int(samples_per_day) - len(data)
-    if difference_samples != 0:
+    if difference_samples > 0:
         data = np.concatenate([data, np.full(difference_samples, np.nan)])
 
     if debug:
