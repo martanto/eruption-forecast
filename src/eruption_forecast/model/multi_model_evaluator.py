@@ -118,8 +118,10 @@ class MultiModelEvaluator:
             trained_model_csv (str | None, optional): Path to a trained model registry
                 CSV produced by ModelTrainer. Used for aggregate plot generation.
                 Defaults to None.
-            classifier_name (str). CLassifier name to bes used as prefix filename.
+            classifier_name (str): Classifier name used as prefix filename.
                 Defaults to "model".
+            plot_shap (bool, optional): If ``True``, generate aggregate SHAP
+                summary plots. Defaults to ``False``.
             root_dir (str | None, optional): Root directory used to anchor output_dir
                 resolution. See class-level docs for resolution priority. Defaults to None.
             output_dir (str | None, optional): Directory for saving evaluation outputs.
@@ -209,7 +211,7 @@ class MultiModelEvaluator:
                 f"{e}. significant_features_csv: {row['significant_features_csv']}"
             )
 
-        proba, _ = predict_proba_from_estimator(model, X_test_filtered)
+        proba, _, _ = predict_proba_from_estimator(model, X_test_filtered)
 
         return model, X_test_filtered, y_true, proba
 
@@ -278,7 +280,9 @@ class MultiModelEvaluator:
             plt.close(fig)
 
         if save and data is not None and data_filename is not None:
-            data_path = os.path.join(self.output_dir, os.path.splitext(data_filename)[0])
+            data_path = os.path.join(
+                self.output_dir, os.path.splitext(data_filename)[0]
+            )
             filetype = "pkl" if isinstance(data, shap.Explanation) else "csv"
             save_data(data, data_path, filetype=filetype)
 
