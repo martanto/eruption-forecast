@@ -161,7 +161,6 @@ class FeatureSelector:
         """
         if self.n_jobs < 1:
             raise ValueError(f"n_jobs must be >= 1. Your value is {self.n_jobs}")
-        return None
 
     def set_random_state(self, random_state: int) -> Self:
         """Change the random state value for reproducibility.
