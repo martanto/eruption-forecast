@@ -240,8 +240,6 @@ class FeaturesBuilder:
         if not self.label_df.empty:
             validate_columns(self.label_df, [ID_COLUMN, ERUPTED_COLUMN])
 
-        return None
-
     @staticmethod
     def _initialize_feature_parameters() -> tuple[ComprehensiveFCParameters, set[str]]:
         """Initialize tsfresh feature extraction parameters with defaults.
