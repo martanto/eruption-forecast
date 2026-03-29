@@ -455,7 +455,7 @@ class ModelTrainer(EvaluationTrainer):
 
         # Aggregate feature selection results (shared)
         if self.verbose:
-            logger.info("Prediction: Concatenat significan features...")
+            logger.info("Prediction: Concatenating significant features")
         self.df_significant_features = self.concat_significant_features(
             plot=plot_significant_features,
         )
