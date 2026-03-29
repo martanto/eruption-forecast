@@ -1,16 +1,23 @@
-"""Model module for volcanic eruption forecasting.
+"""Model package for volcanic eruption forecasting.
 
-This module provides components for training, evaluating, and deploying
-machine learning models for eruption prediction.
+Exposes the primary model classes used to train, evaluate, and
+run inference with classifier ensembles built from seismic tremor features.
 
-Classes:
-    ClassifierModel: Manages ML classifiers with hyperparameter grids.
-    ModelTrainer: Trains models with multi-seed cross-validation.
-    ModelEvaluator: Evaluates a single fitted model with metrics and plots.
-    MultiModelEvaluator: Aggregates metrics and plots across multiple seeds.
-    ClassifierComparator: Compares multiple classifiers side-by-side.
-    ModelPredictor: Runs inference in evaluation or forecast mode.
-    ForecastModel: Orchestrates the complete forecasting pipeline.
+Public API:
+    - ``SeedEnsemble``: Bundles all seed models for a single classifier into a
+      serialisable sklearn-compatible estimator.
+    - ``ClassifierEnsemble``: Wraps multiple ``SeedEnsemble`` objects to produce
+      cross-classifier consensus probabilities and uncertainty estimates.
+    - ``ModelEvaluator``: Evaluates a single fitted model — computes metrics,
+      plots ROC/calibration/learning curves, and optionally saves outputs.
+    - ``MultiModelEvaluator``: Aggregates per-seed evaluation results from JSON
+      metrics files or a registry CSV and generates ensemble-level statistics
+      and plots (SHAP, ROC, calibration, learning curves, confusion matrix).
+    - ``ClassifierComparator``: Accepts a mapping of classifier names to registry
+      CSV paths and produces side-by-side comparison tables and plots.
+
+On import the package silences the ``sklearnex`` logger and, when Intel
+scikit-learn-intelex is available, patches sklearn for accelerated CPU execution.
 """
 
 import logging
@@ -20,8 +27,9 @@ logging.getLogger("sklearnex").setLevel(logging.WARNING)
 
 try:
     from sklearnex import patch_sklearn  # type: ignore[import-untyped]
+
     patch_sklearn(verbose=False)
-except ImportError:
+except (ImportError, RuntimeError):
     pass
 
 from eruption_forecast.model.seed_ensemble import SeedEnsemble

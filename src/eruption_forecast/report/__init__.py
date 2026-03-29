@@ -1,22 +1,28 @@
 """Report generation package for the eruption-forecast pipeline.
 
-Provides self-contained interactive HTML reports (Plotly, CDN JS) for each
-pipeline stage and a combined full-pipeline report. PDF export is optional
-via ``weasyprint``.
+Generates self-contained interactive HTML reports (backed by Plotly and CDN JS)
+for each stage of the forecasting pipeline, as well as a combined full-pipeline
+report with sidebar navigation. PDF export is optionally available via
+``weasyprint``.
 
-Entry points:
-    1. :func:`generate_report` — standalone post-hoc function from saved
-       output files.
-    2. ``ForecastModel.generate_report()`` — chainable after any pipeline
-       stage (defined in ``forecast_model.py``).
+Public classes (one per pipeline stage):
 
-Examples:
-    >>> from eruption_forecast.report import generate_report
-    >>> path = generate_report("output/VG.OJN.00.EHZ")
-    >>> print(f"Report saved to {path}")
+- ``BaseReport`` — abstract base class; all section reports inherit from it.
+- ``TremorReport`` — tremor completeness, gap statistics, and interactive charts.
+- ``LabelReport`` — window configuration, class distribution, and eruption timeline.
+- ``FeaturesReport`` — feature counts, selection method, and band contributions.
+- ``TrainingReport`` — per-seed metrics, ROC, confusion matrix, and seed stability.
+- ``ComparatorReport`` — side-by-side classifier comparison charts and tables.
+- ``PredictionReport`` — probability time-series with uncertainty band and consensus.
+- ``PipelineReport`` — combines all section reports; ``from_output_dir()`` scans an
+  existing output directory and auto-detects which sections have artifacts available.
+
+Standalone entry point:
+
+- ``generate_report(output_dir, sections, fmt)`` — scans an output directory and
+  builds a ``PipelineReport`` from available artifacts. Returns the path to the
+  saved HTML (or PDF) file. Equivalent to ``ForecastModel.generate_report()``.
 """
-
-import os
 
 from eruption_forecast.report.base_report import BaseReport
 from eruption_forecast.report.label_report import LabelReport
