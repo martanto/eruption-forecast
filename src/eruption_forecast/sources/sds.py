@@ -1,3 +1,24 @@
+"""SeisComP Data Structure (SDS) adapter for reading local miniSEED archives.
+
+This module provides the ``SDS`` class, which reads seismic waveform data from a
+local SDS directory hierarchy. SDS is the standard archive format used by SeisComP
+and compatible with ObsPy's ``read()`` function. Files are located by constructing
+the canonical SDS path from the network, station, location, channel, year, and
+Julian day.
+
+SDS directory structure::
+
+    {sds_dir}/{year}/{network}/{station}/{channel}.D/{nslc}.D.{year}.{julian_day}
+
+Key class:
+    - ``SDS``: Implements ``SeismicDataSource.get(date)``, reading miniSEED data for
+      a single day and returning an ObsPy ``Stream``. Supports optional data
+      interpolation for gaps and handles missing or unreadable files gracefully.
+    - Also used internally by ``FDSN`` as the local cache backend.
+
+Reference: https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html
+"""
+
 import os
 from typing import Any
 from pathlib import Path
@@ -37,6 +58,7 @@ class SDS(SeismicDataSource):
         channel (str): Channel code (uppercase).
         network (str): Network code (uppercase).
         location (str): Location code (uppercase).
+        channel_type (str): str = Channel type. Defaults to "D".,
         interpolate (bool): Interpolate missing data. Defaults to True.
         nslc (str): Network.Station.Location.Channel identifier.
         files (list[dict[str, Any]]): Metadata of loaded files.
@@ -57,6 +79,7 @@ class SDS(SeismicDataSource):
         channel: str,
         network: str,
         location: str,
+        channel_type: str = "D",
         interpolate: bool = True,
         verbose: bool = False,
         debug: bool = False,
@@ -73,6 +96,7 @@ class SDS(SeismicDataSource):
             network (str, optional): Seismic network code (e.g., "VG"). Cannot be empty.
             location (str): Location code (e.g., "00"). Empty string is accepted;
                 pass ``""`` when no location code is assigned. Cannot be None.
+            channel_type (str, optional): Set channel type. Defaults to "D".
             interpolate (bool, optional): Apply linear interpolation to fill gaps
                 in loaded streams. Defaults to True.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
@@ -105,6 +129,7 @@ class SDS(SeismicDataSource):
         self.channel = channel.upper()
         self.network = network.upper()
         self.location = location.upper()
+        self.channel_type = channel_type.upper()
         self.interpolate = interpolate
         self.verbose = verbose
         self.debug = debug
@@ -144,7 +169,7 @@ class SDS(SeismicDataSource):
             str(date.year),
             self.network,
             self.station,
-            f"{self.channel}.D",
+            f"{self.channel}.{self.channel_type}",
         )
         filepath = self.get_filepath(date)
 
@@ -189,7 +214,11 @@ class SDS(SeismicDataSource):
 
         # Construct SDS directory structure
         data_dir = os.path.join(
-            self.sds_dir, str(year), self.network, self.station, f"{self.channel}.D"
+            self.sds_dir,
+            str(year),
+            self.network,
+            self.station,
+            f"{self.channel}.{self.channel_type}",
         )
 
         if self.debug:
@@ -304,14 +333,19 @@ class SDS(SeismicDataSource):
         return stream
 
     def get_trace(self, date: datetime) -> Trace | None:
-        """Get Trace object and data.
+        """Retrieve a single Trace object for the given date.
+
+        Loads the seismic stream for the specified date and returns its single
+        merged trace. Returns None when no data is available.
 
         Args:
             date (datetime): Date for which to retrieve data.
 
         Returns:
-            Trace: Trace object, or empty Trace if unavailable.
-            np.ndarray: Array of trace data, or empty np.ndarray if unavailable.
+            Trace | None: The merged Trace object, or None if no data is available.
+
+        Raises:
+            ValueError: If the stream contains more than one trace after merging.
         """
         stream = self.get(date)
 

@@ -166,6 +166,7 @@ class CalculateTremor:
         channel: str,
         network: str,
         location: str,
+        channel_type: str = "D",
         methods: list[str] | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -199,6 +200,7 @@ class CalculateTremor:
             channel (str): Channel code (e.g., "EHZ").
             network (str): Seismic network code (e.g., ``"VG"``).
             location (str): Seismic location code (e.g., ``"00"``). Empty string accepted.
+            channel_type (str, optional): Set channel type. Defaults to "D".
             methods (list[str] | None, optional): Tremor metrics to compute.
                 Defaults to ["rsam", "dsar", "entropy"].
             output_dir (str | None, optional): Base output directory. Defaults to
@@ -247,6 +249,7 @@ class CalculateTremor:
         self.channel = channel.upper()
         self.network = network.upper()
         self.location = location.upper()
+        self.channel_type = channel_type.upper()
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
 
@@ -634,6 +637,7 @@ class CalculateTremor:
             station=self.station,
             channel=self.channel,
             location=self.location,
+            channel_type=self.channel_type,
             verbose=self.verbose,
             interpolate=self.interpolate,
             debug=self.debug,
