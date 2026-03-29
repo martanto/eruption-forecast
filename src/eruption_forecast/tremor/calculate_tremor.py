@@ -1,3 +1,31 @@
+"""Orchestrator for calculating tremor metrics from raw seismic data.
+
+This module provides the ``CalculateTremor`` class, which coordinates the full
+tremor calculation workflow: reading seismic streams day-by-day from an SDS
+archive or FDSN web service, computing RSAM, DSAR, and Shannon entropy across
+configurable frequency bands, and saving the results as time-series CSV files.
+
+Key class:
+    - ``CalculateTremor``: Reads seismic data via ``from_sds()`` or ``from_fdsn()``,
+      runs parallel daily calculations via multiprocessing (``n_jobs``), merges
+      per-day CSV outputs into a single file, and optionally plots and saves daily
+      tremor figures.
+
+Typical usage::
+
+    calculate = (
+        CalculateTremor(
+            station="OJN",
+            channel="EHZ",
+            start_date="2025-01-01",
+            end_date="2025-01-03",
+            n_jobs=4,
+        )
+        .from_sds(sds_dir="/path/to/sds")
+        .run()
+    )
+"""
+
 import os
 import glob
 import shutil
@@ -253,7 +281,6 @@ class CalculateTremor:
         self.end_date_utc_datetime = UTCDateTime(self.end_date)
         self.freq_bands: list[tuple[float, float]] = list(DEFAULT_FREQUENCY_BANDS)
         self.figures_dir = figures_dir
-        self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
             start=self.start_date, end=self.end_date
         )
@@ -996,9 +1023,6 @@ class CalculateTremor:
                 value_multiplier=1.0,  # Don't multiply yet, do it once on ratio
             )
 
-            # Interpolate missing values
-            # current_series = current_series.interpolate(method="time")
-
             # Free filtered stream immediately to reduce memory footprint
             del filtered_stream
 
@@ -1238,7 +1262,7 @@ class CalculateTremor:
         # Restrict to rows inside the gap
         day_df = day_df[(day_df.index >= gap_start) & (day_df.index <= gap_end)]
 
-        # Check agian after anomalies removal
+        # Check again after anomalies removal
         if day_df.empty or day_df.isna().all(axis=None):
             return None
 

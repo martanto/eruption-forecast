@@ -1,3 +1,20 @@
+"""Real Seismic Amplitude Measurement (RSAM) calculator.
+
+This module provides the ``RSAM`` class, which computes mean absolute seismic
+amplitude over fixed-duration time windows for each frequency band. RSAM is a
+widely used metric for monitoring volcanic tremor intensity and is the primary
+amplitude measure produced by ``CalculateTremor``.
+
+Key class:
+    - ``RSAM``: Accepts an ObsPy ``Trace`` or ``Stream``, applies a bandpass filter
+      via ``filter()``, and computes windowed mean absolute amplitude via
+      ``calculate()``. Returns a ``pd.Series`` indexed by window start times.
+
+Usage::
+
+    rsam = RSAM(stream=stream).filter(freqmin=2.0, freqmax=5.0).calculate()
+"""
+
 from typing import Self, Literal
 from datetime import datetime
 from collections.abc import Callable
