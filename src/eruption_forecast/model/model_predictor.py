@@ -631,7 +631,7 @@ class ModelPredictor:
             use_relevant_features (bool, optional): Whether to use relevant features. Defaults to True.
             select_tremor_columns (list[str] | None): List of tremor columns to use. Defaults to None.
             threshold (float, optional): Probability threshold use in forecast plot for eruption classification.
-                Defaults to 0.5.
+                Defaults to 0.7.
             save_predictions (bool, optional): Save predictions result. Defaults to True.
             plot (bool, optional): Save a probability time-series plot.
                 Defaults to True.
