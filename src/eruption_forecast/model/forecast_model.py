@@ -1527,7 +1527,7 @@ class ForecastModel:
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         save_predictions: bool = True,
-        threshold: float = 0.5,
+        threshold: float = 0.7,
         save_plot: bool = True,
         output_dir: str | None = None,
         n_jobs: int | None = None,
@@ -1549,7 +1549,7 @@ class ForecastModel:
             save_predictions (bool, optional): If True, saves the prediction DataFrame
                 to a CSV file. Defaults to True.
             threshold (float, optional): Threshold for classifying eruption
-                probability as positive. Defaults to 0.5.
+                probability as positive. Defaults to 0.7.
             save_plot (bool, optional): If True, saves the forecast probability plot.
                 Defaults to True.
             output_dir (str | None, optional): Directory for forecast output files.
