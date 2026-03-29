@@ -1,3 +1,20 @@
+"""Label builder for generating binary eruption classification labels.
+
+This module provides the ``LabelBuilder`` class, which creates sliding time windows
+across a global date range and assigns binary eruption labels based on known eruption
+dates and a configurable lead-time (``day_to_forecast``). Windows whose end time
+falls within ``[eruption_date - day_to_forecast, eruption_date]`` are labeled as
+positive (erupted = 1); all other windows are labeled as negative (erupted = 0).
+
+Key class:
+    - ``LabelBuilder``: Requires ``start_date``, ``end_date``, ``window_size``,
+      ``window_step``, ``window_step_unit``, ``day_to_forecast``, ``eruption_dates``,
+      and ``volcano_id``. Call ``build()`` to generate and save the label CSV.
+    - Supports ``include_eruption_date`` flag to control whether the eruption date
+      itself counts as one of the positive ``day_to_forecast`` days.
+    - Output filenames encode all parameters for reproducibility.
+"""
+
 import os
 from typing import Self, Literal
 from datetime import datetime, timedelta

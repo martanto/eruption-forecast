@@ -1,3 +1,18 @@
+"""Per-eruption dynamic label builder for volcanic eruption forecasting.
+
+This module provides the ``DynamicLabelBuilder`` class, a subclass of ``LabelBuilder``
+that generates one label window per eruption event rather than a single global window.
+Each per-eruption window spans ``days_before_eruption`` days ending on the eruption
+date, giving denser positive-class coverage and making it suitable for datasets where
+eruptions are sparse across a long date range.
+
+Key class:
+    - ``DynamicLabelBuilder``: Extends ``LabelBuilder`` with a ``days_before_eruption``
+      parameter. For each eruption date, a separate window is constructed, labeled,
+      and concatenated into a single DataFrame with unique sequential IDs. Call
+      ``build()`` to generate and save the combined label CSV.
+"""
+
 import os
 from typing import Self, Literal
 from datetime import datetime, timedelta

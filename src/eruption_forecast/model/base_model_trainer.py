@@ -631,7 +631,7 @@ class BaseModelTrainer:
             )
             return None
 
-        # Series indexed by feature name; values are p-values or importance score sorted by it's value.
+        # Series indexed by feature name; values are p-values or importance score sorted by its value.
         all_selected_features = selector.selected_features_
 
         # Handle if columns in df_selected_features has less than number_of_significant_features
@@ -647,9 +647,8 @@ class BaseModelTrainer:
             number_of_significant_features
         )
 
-        # Save TOP-N significant features
-        # significant_filepath Will be used in ModelEvaluator.from_files(...) method
-        # as selected_features_path paramater
+        # Save TOP-N significant features — used by ModelEvaluator.from_files()
+        # as selected_features_path parameter
         top_selected_features.to_csv(significant_filepath, index=True)
 
         # Save all SELECTED features if requested
