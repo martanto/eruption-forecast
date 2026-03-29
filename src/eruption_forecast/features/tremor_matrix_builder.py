@@ -16,7 +16,7 @@ from eruption_forecast.features.constants import (
 
 
 class TremorMatrixBuilder:
-    """Builds tremor matrices and extracts features.
+    """Build windowed tremor matrices aligned with label windows.
 
     Slices tremor time-series into fixed-size windows aligned with label windows,
     then concatenates them into a single tremor matrix suitable for downstream
