@@ -286,7 +286,7 @@ def plot_forecast_from_file(
         plt.Figure: Matplotlib figure object with three vertically stacked subplots.
     """
     df = pd.read_csv(consensus_file, index_col="id")
-    label_df = pd.read_csv(label_file)
+    label_df = pd.read_csv(label_file, index_col=0, parse_dates=True)
 
     df = set_datetime_index(label_df, df)
 
