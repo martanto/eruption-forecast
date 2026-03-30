@@ -16,7 +16,7 @@ Key functions
   streams and traces
 - ``predict_proba_from_estimator`` — unified ``predict_proba`` / ``decision_function``
   interface; the single entry point for per-seed inference
-- ``aggregate_seed_probabilities`` — reduces a seed × sample matrix to mean, std,
+- ``compute_model_probabilities`` — reduces a seed × sample matrix to mean, std,
   confidence, and vote statistics
 """
 
@@ -32,7 +32,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir
 
 
-def _save_seed_proba_csv(
+def save_forecast_seed(
     output_dir: str,
     random_state: int,
     p_eruption: np.ndarray,
@@ -133,9 +133,9 @@ def predict_proba_from_estimator(
     return eruption_proba, scores, eruption_predict
 
 
-def aggregate_seed_probabilities(
-    seed_proba_matrix: np.ndarray,
-    seed_predict_matrix: np.ndarray,
+def compute_model_probabilities(
+    probabilities_matrix: np.ndarray,
+    predictions_matrix: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Aggregate a seed probability matrix into summary statistics.
 
@@ -145,33 +145,44 @@ def aggregate_seed_probabilities(
 
     This is the shared aggregation kernel used by both
     :meth:`SeedEnsemble.predict_with_uncertainty` and
-    :func:`eruption_forecast.utils.ml.compute_model_probabilities`.
+    :meth:`ClassifierEnsemble.predict_with_uncertainty`.
 
     Args:
-        seed_proba_matrix (np.ndarray): Array of shape (n_samples, n_seeds)
+        probabilities_matrix (np.ndarray): Array of shape (n_samples, n_seeds)
             containing per-seed P(eruption) values.
-        seed_predict_matrix (np.ndarray): Array of shape (n_samples, n_seeds)
+        predictions_matrix (np.ndarray): Array of shape (n_samples, n_seeds)
             containing per-seed binary predictions (0 or 1).
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D arrays
             of shape (n_samples,):
 
-            - ``seed_probability``: Mean P(eruption) across seeds.
-            - ``seed_uncertainty``: Standard deviation of P(eruption) across seeds.
-            - ``seed_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
-            - ``seed_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
+            - ``mean_probability``: Mean P(eruption) across seeds.
+            - ``mean_uncertainty``: Standard deviation of P(eruption) across seeds.
+            - ``mean_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
+            - ``mean_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
     """
-    seed_probability: np.ndarray = seed_proba_matrix.mean(axis=1)
-    seed_uncertainty: np.ndarray = seed_proba_matrix.std(axis=1)
-    seed_prediction: np.ndarray = seed_predict_matrix.mean(axis=1)
+    mean_probability: np.ndarray = probabilities_matrix.mean(axis=1)
+    mean_uncertainty: np.ndarray = probabilities_matrix.std(axis=1)
+    mean_prediction: np.ndarray = predictions_matrix.mean(axis=1)
+    mean_confidence = confidence_interval(mean_prediction, predictions_matrix.shape[1])
 
-    n_seeds = seed_proba_matrix.shape[1]
-    seed_confidence = 1.96 * (
-        np.sqrt(seed_prediction * (1 - seed_prediction) / n_seeds)
-    )
+    return mean_probability, mean_uncertainty, mean_prediction, mean_confidence
 
-    return seed_probability, seed_uncertainty, seed_prediction, seed_confidence
+
+def confidence_interval(predictions: np.ndarray, total_predictions: int) -> np.ndarray:
+    """Calculate the confidence interval across predictions.
+
+    Args:
+        predictions (np.ndarray): Array of shape (n_samples,):
+        total_predictions (int): Total number of predictions.
+
+    Returns:
+        np.ndarray: Array of confidences (n_samples,):
+    """
+    confidence = 1.96 * (np.sqrt(predictions * (1 - predictions) / total_predictions))
+
+    return confidence
 
 
 def detect_anomalies_zscore(

@@ -30,7 +30,7 @@ Key functions
 """
 
 import os
-from typing import Literal, cast
+from typing import Literal
 
 import numpy as np
 import joblib
@@ -47,8 +47,7 @@ from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
-    _save_seed_proba_csv,
-    aggregate_seed_probabilities,
+    save_forecast_seed,
     predict_proba_from_estimator,
 )
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
@@ -321,7 +320,7 @@ def compute_seed_eruption_probability(
         )
 
     if save:
-        _save_seed_proba_csv(
+        save_forecast_seed(
             output_dir,
             random_state,
             probabilities_eruption,
@@ -331,108 +330,6 @@ def compute_seed_eruption_probability(
         )
 
     return probabilities_eruption, probabilities_scores, predictions_eruption
-
-
-def compute_model_probabilities(
-    df_models: pd.DataFrame,
-    features_df: pd.DataFrame,
-    features_csv_column: str = "significant_features_csv",
-    trained_model_filepath_column: str = "trained_model_filepath",
-    classifier_name: str = "model",
-    number_of_seeds: int | None = None,
-    output_dir: str | None = None,
-    save_predictions: bool = False,
-    overwrite: bool = False,
-    verbose: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Aggregate eruption probabilities across all seeds of a single classifier.
-
-    Computes consensus predictions by averaging probabilities from multiple models
-    trained with different random seeds. This reduces variance and improves prediction
-    reliability. Calculates mean probability, uncertainty (std), confidence, and
-    binary predictions.
-
-    Args:
-        df_models (pd.DataFrame): Model registry DataFrame with random_state as index.
-            Must contain columns specified by features_csv_column and
-            trained_model_filepath_column.
-        features_df (pd.DataFrame): Extracted feature matrix for the prediction windows.
-        features_csv_column (str, optional): Column name containing paths to significant
-            features CSVs. Defaults to "significant_features_csv".
-        trained_model_filepath_column (str, optional): Column name containing paths to
-            trained model files. Defaults to "trained_model_filepath".
-        classifier_name (str, optional): Classifier name for logging. Defaults to "model".
-        number_of_seeds (int | None, optional): Maximum number of seeds to use. If None,
-            uses all seeds. Defaults to None.
-        output_dir (str | None, optional): Directory to save per-seed predictions.
-            Defaults to None.
-        save_predictions (bool, optional): If True, save per-seed predictions to CSV.
-            Defaults to False.
-        overwrite (bool, optional): If True, overwrite existing cached predictions.
-            Defaults to False.
-        verbose (bool, optional): If True, log save operations. Defaults to False.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Tuple containing arrays
-            of shape (n_windows,):
-            - mean_probability (np.ndarray): Mean eruption probability across seeds.
-            - std_proba (np.ndarray): Standard deviation of probabilities (uncertainty).
-            - confidence (np.ndarray): Voting agreement fraction (0.5-1.0).
-            - prediction (np.ndarray): Binary predictions (0 or 1) based on threshold.
-
-    Examples:
-        >>> mean_p, std_p, conf, pred = compute_model_probabilities(
-        ...     df_models=model_registry,
-        ...     features_df=features,
-        ...     number_of_seeds=100
-        ... )
-        >>> print(f"Mean eruption probability: {mean_p.mean():.3f}")
-        Mean eruption probability: 0.450
-    """
-    seed_eruption_probabilities: list[np.ndarray] = []
-    seed_eruption_predictions: list[np.ndarray] = []
-
-    for seed_count, (random_state, row) in enumerate(df_models.iterrows(), start=1):
-        random_state_int = int(cast(int, random_state))
-        significant_features_csv: str = row[features_csv_column]
-        model_filepath: str = row[trained_model_filepath_column]
-
-        probabilities_eruption, _, predictions_eruption = (
-            compute_seed_eruption_probability(
-                random_state=random_state_int,
-                significant_features_csv=significant_features_csv,
-                model_filepath=model_filepath,
-                features_df=features_df,
-                output_dir=output_dir,
-                overwrite=overwrite,
-                save=save_predictions,
-                verbose=verbose,
-            )
-        )
-
-        seed_eruption_probabilities.append(probabilities_eruption)
-        seed_eruption_predictions.append(predictions_eruption)
-
-        logger.debug(
-            f"[{classifier_name}] Seed {random_state:05d} — "
-            f"vote prediction: {predictions_eruption.mean():.4f}, "
-            f"mean P(eruption): {probabilities_eruption.mean():.4f}"
-        )
-
-        if number_of_seeds is not None and seed_count >= number_of_seeds:
-            break
-
-    probabilities_eruption_matrix = np.stack(
-        seed_eruption_probabilities, axis=1
-    )  # (n_windows, n_seeds)
-
-    predictions_eruption_matrix = np.stack(
-        seed_eruption_predictions, axis=1
-    )  # (n_windows, n_seeds)
-
-    return aggregate_seed_probabilities(
-        probabilities_eruption_matrix, predictions_eruption_matrix
-    )
 
 
 def _extract_trained_model_suffix(csv_path: str) -> str:
