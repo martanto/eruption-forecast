@@ -652,14 +652,15 @@ class ModelPredictor:
         )
 
         cols: dict[str, np.ndarray] = {}
-        seed_aggregates: dict[str, np.ndarray] = {}
         result_dir = os.path.join(self.output_dir, "results")
 
         if self._classifier_ensemble is None and self._registry_csv_paths:
             ensembles: dict[str, SeedEnsemble] = {}
             for name, csv_path in self._registry_csv_paths.items():
                 ensembles[name] = SeedEnsemble.from_registry(csv_path)
-            self._classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(ensembles)
+            self._classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+                ensembles
+            )
 
         (
             consensus_probability,
@@ -667,21 +668,18 @@ class ModelPredictor:
             consensus_prediction,
             consensus_confidence,
         ) = self._forecast_with_classifier_ensemble(
-            features_df,
-            cols,
-            seed_aggregates,
+            features_df=features_df,
+            cols=cols,
             save_predictions=save_predictions,
             result_dir=result_dir,
         )
 
         cols["consensus_probability"] = consensus_probability
         cols["consensus_uncertainty"] = consensus_uncertainty
-        cols["consensus_confidence"] = consensus_confidence
         cols["consensus_prediction"] = consensus_prediction
+        cols["consensus_confidence"] = consensus_confidence
 
         df_forecast = pd.DataFrame(cols, index=features_df.index)
-        self._log_forecast_summary(df_forecast, seed_aggregates)
-
         csv_path = os.path.join(
             self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
         )
@@ -690,6 +688,7 @@ class ModelPredictor:
         if self.labels_df is not None:
             df_forecast = set_datetime_index(self.labels_df, df_forecast)
 
+        # Always save prediction results
         df_forecast.to_csv(csv_path)
         logger.info(f"Predictions saved to: {csv_path}")
 
@@ -699,64 +698,22 @@ class ModelPredictor:
         self.df = df_forecast
         return df_forecast
 
-    @staticmethod
-    def _store_classifier_proba(
-        model_name: str,
-        mean: np.ndarray,
-        std: np.ndarray,
-        confidence: np.ndarray,
-        prediction: np.ndarray,
-        cols: dict[str, np.ndarray],
-        seed_aggregates: dict[str, np.ndarray],
-    ) -> None:
-        """Store per-classifier probability arrays and log a one-line summary.
-
-        Writes the four per-classifier result columns into ``cols``, records
-        the mean probability array in ``seed_aggregates``, and emits
-        a log line with mean eruption probability and mean confidence.
-
-        Args:
-            model_name (str): Classifier identifier used as column prefix.
-            mean (np.ndarray): Mean eruption probability per window.
-            std (np.ndarray): Standard deviation of probability across seeds.
-            confidence (np.ndarray): Fraction of seeds agreeing with the majority vote.
-            prediction (np.ndarray): Binary prediction per window (0 or 1).
-            cols (dict[str, np.ndarray]): Mutable column accumulator for the
-                forecast DataFrame.
-            seed_aggregates (dict[str, np.ndarray]): Mutable accumulator
-                for cross-classifier consensus computation.
-        """
-        seed_aggregates[model_name] = mean
-        cols[f"{model_name}_probability"] = mean
-        cols[f"{model_name}_uncertainty"] = std
-        cols[f"{model_name}_confidence"] = confidence
-        cols[f"{model_name}_prediction"] = prediction
-        logger.info(
-            f"  {model_name} — mean P(eruption): {mean.mean():.4f}, "
-            f"mean confidence: {confidence.mean():.4f}"
-        )
-
     def _forecast_with_classifier_ensemble(
         self,
         features_df: pd.DataFrame,
         cols: dict[str, np.ndarray],
-        seed_aggregates: dict[str, np.ndarray],
         save_predictions: bool = False,
         result_dir: str | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Delegate inference and consensus to a ClassifierEnsemble.
 
         Calls ``ClassifierEnsemble.predict_with_uncertainty`` for the fast
-        path where all classifiers are bundled in a single object, then
-        populates ``cols`` and ``seed_aggregates`` via
-        :meth:`_store_classifier_proba`.
+        path where all classifiers are bundled in a single object.
 
         Args:
             features_df (pd.DataFrame): Future feature matrix.
             cols (dict[str, np.ndarray]): Mutable column accumulator for the
                 forecast DataFrame.
-            seed_aggregates (dict[str, np.ndarray]): Mutable
-                accumulator for cross-classifier consensus computation.
             save_predictions (bool, optional): If ``True``, save per-seed
                 predictions to CSV files. Defaults to ``False``.
             result_dir (str | None, optional): Base directory for per-seed CSV
@@ -771,10 +728,10 @@ class ModelPredictor:
         seeds_dir = os.path.join(result_dir, "seeds") if result_dir else None
         (
             consensus_probability,  # mean P(eruption) averaged across all classifiers
-            consensus_uncertainty,  # std P(eruption) averaged across all classifiers
-            consensus_prediction,  # fraction of classifiers agreeing with the consensus prediction
-            consensus_confidence,  # mean binary of eruption (from binary)
-            clf_results,  # a dict with keys ``"mean"``, ``"std"``, ``"confidence"``,``"prediction"``
+            consensus_uncertainty,  # std of P(eruption) across classifiers
+            consensus_prediction,  # mean of per-classifier binary votes (continuous, [0, 1])
+            consensus_confidence,  # CI-like metric: 1.96 * sqrt(p * (1 - p) / n_classifiers)
+            clf_results,  # a dict with keys ``"probability"``, ``"uncertainty"``, ``"prediction"``,``"confidence"``
         ) = self._classifier_ensemble.predict_with_uncertainty(
             features_df,
             save=save_predictions,
@@ -784,53 +741,21 @@ class ModelPredictor:
         )
 
         for model_name, clf_result in clf_results.items():
-            self._store_classifier_proba(
-                model_name=model_name,
-                mean=clf_result["mean"],
-                std=clf_result["std"],
-                confidence=clf_result["confidence"],
-                prediction=clf_result["prediction"],
-                cols=cols,
-                seed_aggregates=seed_aggregates,
+            cols[f"{model_name}_probability"] = clf_result["probability"]
+            cols[f"{model_name}_uncertainty"] = clf_result["uncertainty"]
+            cols[f"{model_name}_prediction"] = clf_result["prediction"]
+            cols[f"{model_name}_confidence"] = clf_result["confidence"]
+            logger.info(
+                f"  {model_name} — mean probability: {clf_result['probability'].mean():.4f}, "
+                f"mean prediction: {clf_result['prediction'].mean():.4f}"
             )
+
         return (
             consensus_probability,
             consensus_uncertainty,
             consensus_prediction,
             consensus_confidence,
         )
-
-    def _log_forecast_summary(
-        self,
-        df: pd.DataFrame,
-        seed_aggregates: dict[str, np.ndarray],
-    ) -> None:
-        """Log a per-classifier + consensus forecast summary.
-
-        Args:
-            df (pd.DataFrame): Forecast dataframe with predictions.
-            seed_aggregates (dict[str, np.ndarray]): Mean probabilities per model.
-        """
-        logger.info("=" * 60)
-        logger.info("Forecast Summary")
-        logger.info("=" * 60)
-        for name, mean_p in seed_aggregates.items():
-            pred = df[f"{name}_prediction"].to_numpy()
-            prob = df[f"{name}_probability"].to_numpy()
-            logger.info(
-                f"  {name:12s}  eruption_windows={int(pred.sum()):4d}  "
-                f"mean_P={mean_p.mean():.4f}  mean_conf={prob.mean():.4f}"
-            )
-        if self._multi_model:
-            cp = df["consensus_probability"].to_numpy()
-            cc = df["consensus_confidence"].to_numpy()
-            pred_c = df["consensus_prediction"].to_numpy()
-            logger.info("-" * 60)
-            logger.info(
-                f"  {'consensus':12s}  eruption_windows={int(pred_c.sum()):4d}  "
-                f"mean_P={cp.mean():.4f}  mean_conf={cc.mean():.4f}"
-            )
-        logger.info("=" * 60)
 
     def _plot_forecast(self, df: pd.DataFrame, threshold: float) -> None:
         """Save a time-series probability + confidence plot.
