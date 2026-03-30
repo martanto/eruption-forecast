@@ -22,6 +22,7 @@ TRAINING_SEEDS = 25 if DEBUG else 500
 
 ERUPTION_DATES = [
     "2025-03-20",
+    "2025-04-10",
     "2025-04-22",
     "2025-05-18",
     "2025-06-17",
@@ -112,22 +113,22 @@ def scenarios(forecast_model: ForecastModel) -> None:
             "prediction_start_date": "2025-04-01",
             "prediction_end_date": "2025-04-30",
         },
-        # {
-        #     "name": "Scenario 2",
-        #     "description": "Training using FIRST eruption to forecast THIRD eruption",
-        #     "train_start_date": "2025-01-01",
-        #     "train_end_date": "2025-03-31",
-        #     "prediction_start_date": "2025-05-01",
-        #     "prediction_end_date": "2025-05-31",
-        # },
-        # {
-        #     "name": "Scenario 3",
-        #     "description": "Training using FIRST eruption to forecast FOURTH eruption",
-        #     "train_start_date": "2025-01-01",
-        #     "train_end_date": "2025-03-31",
-        #     "prediction_start_date": "2025-06-01",
-        #     "prediction_end_date": "2025-06-30",
-        # },
+        {
+            "name": "Scenario 2",
+            "description": "Training using FIRST eruption to forecast THIRD eruption",
+            "train_start_date": "2025-01-01",
+            "train_end_date": "2025-03-31",
+            "prediction_start_date": "2025-05-01",
+            "prediction_end_date": "2025-05-31",
+        },
+        {
+            "name": "Scenario 3",
+            "description": "Training using FIRST eruption to forecast FOURTH eruption",
+            "train_start_date": "2025-01-01",
+            "train_end_date": "2025-03-31",
+            "prediction_start_date": "2025-06-01",
+            "prediction_end_date": "2025-06-30",
+        },
     ]
 
     for scenario in _scenarios:
@@ -240,7 +241,7 @@ def predict(
         end_date=training_end_date or TRAINING_PREDICTION_END_DATE,
         **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
-        with_evaluation=False, **TRAINING_PARAMETERS
+        with_evaluation=False, output_dir=output_dir, **TRAINING_PARAMETERS
     ).forecast(
         start_date=prediction_start_date or PREDICTION_START_DATE,
         end_date=prediction_end_date or PREDICTION_END_DATE,

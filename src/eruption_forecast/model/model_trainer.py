@@ -72,6 +72,14 @@ class ModelTrainer(EvaluationTrainer):
         This method is designed to be called in parallel across seeds via
         _run_jobs(). It is deterministic for a given random_state.
 
+        If ``significant_filepath`` and ``resampled_filepath`` already exist on
+        disk from a previous run, the method short-circuits and returns
+        ``significant_filepath`` immediately without repeating resampling or
+        feature selection. When ``save_features`` or ``plot_features`` are
+        requested, their corresponding output files must also exist for the
+        short-circuit to apply. Set ``self.overwrite = True`` to force
+        re-computation regardless of cached files.
+
         Args:
             random_state (int): Random seed controlling resampling and
                 feature selection.
@@ -97,6 +105,7 @@ class ModelTrainer(EvaluationTrainer):
             all_figures_filepath,
             _,
             _,
+            resampled_filepath,
             can_skip_shared,
         ) = self._generate_shared_filepaths(
             random_state=random_state,
@@ -132,6 +141,10 @@ class ModelTrainer(EvaluationTrainer):
             random_state=random_state,
         )
 
+        pd.concat([features_resampled, labels_resampled], axis=1).to_csv(
+            resampled_filepath
+        )
+
         result = self.select_features(
             features=features_resampled,
             labels=labels_resampled,
@@ -150,12 +163,10 @@ class ModelTrainer(EvaluationTrainer):
         self,
         random_state: int,
         classifier_slug: str,
-        sampling_strategy: str | float = 0.75,
     ) -> tuple | None:
         """Phase 2 worker: train one (seed, classifier) pair in train-only mode.
 
-        Reconstructs the resampled training data deterministically by re-running
-        random under-sampling with the same random_state used in Phase 1 - Feature Selection. Loads
+        Loads the resampled training data saved by Phase 1 - Feature Selection and
         the pre-selected top-N features from the significant features CSV written
         by _run_shared_train(), then trains the specified classifier via
         GridSearchCV and saves the model.
@@ -166,8 +177,6 @@ class ModelTrainer(EvaluationTrainer):
         Args:
             random_state (int): Random seed matching the Phase 1 - Feature Selection run for this seed.
             classifier_slug (str): Slug name of the classifier to train.
-            sampling_strategy (str | float, optional): Under-sampling ratio,
-                must match the value used in Phase 1 - Feature Selection. Defaults to 0.75.
 
         Returns:
             tuple: A 4-tuple of (classifier_slug, random_state,
@@ -186,6 +195,7 @@ class ModelTrainer(EvaluationTrainer):
             _,
             _,
             _,
+            resampled_filepath,
             _,
         ) = self._generate_shared_filepaths(random_state=random_state)
 
@@ -212,13 +222,10 @@ class ModelTrainer(EvaluationTrainer):
             )
             return classifier_slug, random_state, significant_filepath, model_filepath
 
-        # Deterministically reproduce the same resample as Phase 1 - Feature Selection.
-        features_resampled, labels_resampled = random_under_sampler(
-            features=self.df_features,
-            labels=self.df_labels,
-            sampling_strategy=sampling_strategy,
-            random_state=random_state,
-        )
+        # Load the resampled training data saved by Phase 1 - Feature Selection.
+        _resampled_df = pd.read_csv(resampled_filepath, index_col=0)
+        labels_resampled = _resampled_df["is_erupted"]
+        features_resampled = _resampled_df.drop(columns=["is_erupted"])
 
         if self.verbose:
             logger.info(f"Fitting Seed: {random_state:05d} / {classifier_slug}...")
@@ -270,8 +277,7 @@ class ModelTrainer(EvaluationTrainer):
                   each as ``(random_state, sampling_strategy, save_all_features,
                   plot_significant_features)``.
                 - **pending_training_model_jobs** (list[tuple]): (seed, classifier) pairs
-                  missing model files, each as
-                  ``(random_state, classifier_slug, sampling_strategy)``.
+                  missing model files, each as ``(random_state, classifier_slug)``.
                 - **records_per_classifier** (dict[str, list[dict]]): Already-completed
                   seed records keyed by classifier slug.
         """
@@ -287,13 +293,14 @@ class ModelTrainer(EvaluationTrainer):
             _shared_paths = self._generate_shared_filepaths(random_state)
             # _generate_shared_filepaths returns a trailing boolean flag; exclude it from path checks.
             _shared_paths_without_flag = _shared_paths[:-1]
-            _, _significant_filepath, *_optional_shared_paths = (
+            _, _significant_filepath, *_optional_shared_paths, _resampled_filepath = (
                 _shared_paths_without_flag
             )
 
             # Shared work not done — queue Phase 1 - Feature Selection; no Phase 2 jobs possible yet.
-            feature_selection_incomplete = self.overwrite or not os.path.isfile(
-                _significant_filepath
+            feature_selection_incomplete = self.overwrite or not (
+                os.path.isfile(_significant_filepath)
+                and os.path.isfile(_resampled_filepath)
             )
 
             # If additional shared artifacts were requested, ensure they also exist
@@ -336,7 +343,7 @@ class ModelTrainer(EvaluationTrainer):
                     )
                 else:
                     pending_training_model_jobs.append(
-                        (random_state, classifier_slug, sampling_strategy)
+                        (random_state, classifier_slug)
                     )
 
         return (
@@ -417,7 +424,7 @@ class ModelTrainer(EvaluationTrainer):
             _rs = job[0]
             for classifier_model in self.classifier_models:
                 new_training_model_jobs.append(
-                    (_rs, classifier_model.slug_name, sampling_strategy)
+                    (_rs, classifier_model.slug_name)
                 )
 
         # ===== PHASE 2: Parallel (seed × classifier) training =====
@@ -455,7 +462,7 @@ class ModelTrainer(EvaluationTrainer):
 
         # Aggregate feature selection results (shared)
         if self.verbose:
-            logger.info("Prediction: Concatenat significan features...")
+            logger.info("Prediction: Concatenating significant features")
         self.df_significant_features = self.concat_significant_features(
             plot=plot_significant_features,
         )

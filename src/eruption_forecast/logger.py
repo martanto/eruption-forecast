@@ -1,21 +1,28 @@
-"""
-Centralized logger module using loguru for the package.
+"""Centralised logging configuration for the eruption-forecast package.
 
-This module provides a single configured logger instance that all modules can import and use.
-It configures console output with colors, daily rotating log files with compression, and separate
-error-only log files for better debugging and monitoring.
+This module sets up a package-wide `loguru` logger with three output sinks:
 
-The logger configuration includes:
-- Console output with colored formatting
-- Daily rotating general log files (retained for 30 days)
-- Daily rotating error-only log files (retained for 90 days)
-- Thread-safe logging with queue-based handlers
-- Automatic log compression (zip format)
+- **Console** (stderr): coloured output at ``INFO`` level by default.
+- **General log file** (``logs/forecast_YYYY-MM-DD.log``): ``DEBUG`` and above,
+  rotated daily, retained for 30 days, compressed to ZIP.
+- **Error log file** (``logs/errors_YYYY-MM-DD.log``): ``ERROR`` and above,
+  rotated daily, retained for 90 days, compressed to ZIP.
 
-Examples:
-    >>> from eruption_forecast.logger import logger
-    >>> logger.info("Processing started")
-    >>> logger.error("An error occurred")
+All file writes use ``enqueue=True`` for safe use inside ``joblib`` worker
+processes. If the ``DISABLE_LOGGING`` environment variable is set to ``"1"``
+(inherited by child processes), no handlers are registered.
+
+Key exports:
+    - ``logger``: The configured `loguru` ``Logger`` instance — import this
+      directly via ``from eruption_forecast.logger import logger``.
+    - ``get_logger()``: Returns the same logger instance.
+    - ``enable_logging()`` / ``disable_logging()``: Toggle all handlers at
+      runtime; also update the ``DISABLE_LOGGING`` env var so worker processes
+      inherit the setting.
+    - ``set_log_level(level)``: Change the console sink level dynamically.
+    - ``set_log_directory(log_dir)``: Redirect file sinks to a new directory.
+    - ``DEFAULT_LOG_DIR``: Resolved path to the active log directory
+      (``<cwd>/logs`` by default).
 """
 
 import os
@@ -33,22 +40,17 @@ _ERROR_LOG_RETENTION = "90 days"
 # Tracks whether logging is currently enabled.
 _logging_enabled: bool = True
 
-# Define default log directory
 DEFAULT_LOG_DIR = ensure_dir(os.path.join(os.getcwd(), "logs"))
 
-
-# File log format shared across all file handlers.
 _FILE_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
 )
 
-# Console format with colour codes.
 _CONSOLE_FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | "
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 )
 
-# Init default handler
 logger.remove()
 
 
@@ -93,25 +95,16 @@ def _configure_handlers(log_dir: str, console_level: str = "INFO") -> None:
     )
 
 
-# Initial handler setup at import time.
 # Skip if the parent process disabled logging (env var is inherited by workers).
 if os.environ.get("DISABLE_LOGGING") != "1":
     _configure_handlers(DEFAULT_LOG_DIR)
 
 
 def get_logger():
-    """Get the configured logger instance.
-
-    Returns the package-wide loguru Logger instance with pre-configured console
-    and file handlers.
+    """Return the package-wide loguru logger instance.
 
     Returns:
         loguru.Logger: The configured logger instance with console and file handlers.
-
-    Examples:
-        >>> from eruption_forecast.logger import get_logger
-        >>> logger = get_logger()
-        >>> logger.info("Application started")
     """
     return logger
 
@@ -120,21 +113,12 @@ def set_log_level(level: str) -> None:
     """Change the console log level dynamically.
 
     Removes all existing handlers and re-adds them with the new console level.
-    File handlers retain their original levels (DEBUG for the general log,
-    ERROR for the error log). This allows you to control console verbosity
-    without affecting what gets written to files.
+    File handlers retain their original levels.
 
     Args:
         level (str): Desired log level for the console handler. One of
-            "DEBUG", "INFO", "WARNING", "ERROR", or "CRITICAL". Case-insensitive.
-
-    Returns:
-        None
-
-    Examples:
-        >>> from eruption_forecast.logger import set_log_level
-        >>> set_log_level("DEBUG")  # Show all debug messages in console
-        >>> set_log_level("WARNING")  # Only show warnings and errors in console
+            ``"DEBUG"``, ``"INFO"``, ``"WARNING"``, ``"ERROR"``, or
+            ``"CRITICAL"``. Case-insensitive.
     """
     _configure_handlers(DEFAULT_LOG_DIR, console_level=level)
 
@@ -142,21 +126,12 @@ def set_log_level(level: str) -> None:
 def set_log_directory(log_dir: str) -> None:
     """Change the log file directory dynamically.
 
-    Updates the global DEFAULT_LOG_DIR, creates the directory if needed, then
-    reconfigures all handlers to write log files to the new location. All future
-    log files will be written to this directory.
+    Updates the global ``DEFAULT_LOG_DIR``, creates the directory if needed,
+    then reconfigures all handlers to write to the new location.
 
     Args:
         log_dir (str): Absolute or relative path to the new log directory.
-            The directory is created automatically if it does not exist.
-
-    Returns:
-        None
-
-    Examples:
-        >>> from eruption_forecast.logger import set_log_directory
-        >>> set_log_directory("output/logs")  # Use relative path
-        >>> set_log_directory("/var/log/eruption_forecast")  # Use absolute path
+            Created automatically if it does not exist.
     """
     global DEFAULT_LOG_DIR
     DEFAULT_LOG_DIR = ensure_dir(os.path.abspath(log_dir))
@@ -167,15 +142,8 @@ def set_log_directory(log_dir: str) -> None:
 def disable_logging() -> None:
     """Disable all logging output globally.
 
-    Removes all active loguru handlers so no messages are written to the
-    console or log files. Call enable_logging() to restore handlers.
-
-    Returns:
-        None
-
-    Examples:
-        >>> from eruption_forecast.logger import disable_logging
-        >>> disable_logging()  # Silence all output
+    Remove all active loguru handlers so no messages are written to the
+    console or log files. Call :func:`enable_logging` to restore handlers.
     """
     global _logging_enabled
     _logging_enabled = False
@@ -184,17 +152,10 @@ def disable_logging() -> None:
 
 
 def enable_logging() -> None:
-    """Re-enable logging after a previous disable_logging() call.
+    """Re-enable logging after a previous :func:`disable_logging` call.
 
-    Restores console and file handlers using the current DEFAULT_LOG_DIR.
+    Restore console and file handlers using the current ``DEFAULT_LOG_DIR``.
     Has no effect if logging is already enabled.
-
-    Returns:
-        None
-
-    Examples:
-        >>> from eruption_forecast.logger import enable_logging
-        >>> enable_logging()  # Restore output
     """
     global _logging_enabled
     if not _logging_enabled:

@@ -1,11 +1,25 @@
-"""SeedEnsemble: bundles all seed models for a single classifier into one object.
+"""Bundle all seed models for a single classifier into one serialisable object.
 
-This module provides the ``SeedEnsemble`` class, which wraps the 500 (or any
-number of) trained estimators produced by ``ModelTrainer`` — along with the
-per-seed significant feature lists — into a single, serialisable object.
+Provides :class:`SeedEnsemble`, a serialisable sklearn-compatible estimator
+that aggregates all per-seed estimators produced by ``ModelTrainer`` for one
+classifier type.
 
-Instead of loading 500 ``.pkl`` files and 500 ``.csv`` files at prediction
-time, callers load one file and call ``predict_proba()`` directly.
+Averaging predictions across seeds reduces variance and provides an uncertainty
+estimate (standard deviation of per-seed probabilities).  This mirrors the
+file-based logic in
+:func:`eruption_forecast.utils.ml.compute_model_probabilities` but operates
+entirely on in-memory estimators so the ``.pkl`` files do not need to be
+re-loaded on every inference call.
+
+Key capabilities:
+    - ``from_registry(registry_csv)``: Construct a ``SeedEnsemble`` by loading
+      all seed model ``.pkl`` files listed in a model registry CSV.
+    - ``predict_proba(X)``: Average ``predict_proba`` output across seeds;
+      each seed uses only its own significant feature subset.
+    - ``predict_with_uncertainty(X)``: Return mean probability, standard
+      deviation across seeds, confidence score, and binary prediction array.
+    - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
+      from :class:`~eruption_forecast.model.base_ensemble.BaseEnsemble`).
 """
 
 import os
@@ -17,11 +31,10 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
-    _save_seed_proba_csv,
-    aggregate_seed_probabilities,
+    save_forecast_seed,
+    compute_model_probabilities,
     predict_proba_from_estimator,
 )
-from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.model.base_ensemble import BaseEnsemble
 
 
@@ -30,10 +43,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
     Wraps all trained estimators produced by ``ModelTrainer`` for one
     classifier — along with their per-seed significant feature lists — into a
-    single serialisable object.  Aggregating predictions across seeds reduces
-    variance and mirrors the logic in
-    :func:`eruption_forecast.utils.ml.compute_model_probabilities`, but
-    operates on in-memory estimators instead of loading files on every call.
+    single serialisable object.
 
     Attributes:
         classifier_name (str): Human-readable classifier name (e.g.
@@ -139,8 +149,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
 
         Returns:
-            np.ndarray: 1-D array of shape ``(n_samples,)`` with P(eruption).
-            np.ndarray: 1-D array of shape ``(n_samples,)`` with binary prediction (0 and 1).
+            tuple[np.ndarray, np.ndarray]: A 2-tuple of:
+
+                - 1-D array of shape ``(n_samples,)`` with P(eruption).
+                - 1-D array of shape ``(n_samples,)`` with binary prediction (0 or 1).
 
         Raises:
             RuntimeError: If the estimator supports neither ``predict_proba``
@@ -184,18 +196,15 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         result = np.column_stack([1.0 - mean_eruption, mean_eruption])
         return result
 
-    def predict(
-        self, X: pd.DataFrame, threshold: float = ERUPTION_PROBABILITY_THRESHOLD
-    ) -> np.ndarray:
-        """Return binary predictions using ``ERUPTION_PROBABILITY_THRESHOLD`` on mean probability.
+    def predict(self, X: pd.DataFrame, threshold: float = 0.5) -> np.ndarray:
+        """Return binary predictions using a threshold on the mean probability.
 
-        Applies ``ERUPTION_PROBABILITY_THRESHOLD`` to the mean P(eruption) returned by
-        :meth:`predict_proba`.
+        Applies the given threshold to the mean P(eruption) returned by :meth:`predict_proba`.
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
             threshold (float, optional): Probability threshold for eruption classification.
-                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
+                Defaults to 0.5.
 
         Returns:
             np.ndarray: 1-D integer array of shape ``(n_samples,)`` with values
@@ -206,7 +215,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     def predict_with_uncertainty(
         self,
         X: pd.DataFrame,
-        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
         save: bool = False,
         output_dir: str | None = None,
         overwrite: bool = False,
@@ -214,14 +222,8 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Return mean probability, uncertainty, confidence, and binary predictions.
 
-        Aggregates per-seed eruption probabilities into four summary statistics
-        that mirror the output of
-        :func:`eruption_forecast.utils.ml.compute_model_probabilities`.
-
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
-            threshold (float, optional): Probability threshold for eruption classification.
-                Defaults to ``ERUPTION_PROBABILITY_THRESHOLD`` which value is 0.5.
             save (bool, optional): If ``True``, save per-seed predictions to CSV files
                 under ``output_dir``. Defaults to ``False``.
             output_dir (str | None, optional): Directory for per-seed CSV output.
@@ -235,13 +237,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four 1-D
                 arrays of shape ``(n_samples,)``:
 
-                - ``mean_probability``: Mean P(eruption) across seeds.
-                - ``std``: Standard deviation of P(eruption) across seeds
-                  (uncertainty).
-                - ``confidence``: Fraction of seeds voting with the majority
-                  decision (0.5–1.0).
-                - ``prediction``: Binary predictions (0 or 1) based on
-                  ``threshold``.
+            - ``seed_probability``: Mean P(eruption) across seeds.
+            - ``seed_uncertainty``: Standard deviation of P(eruption) across seeds.
+            - ``seed_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
+            - ``seed_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
         """
         seed_probas: list[np.ndarray] = []
         seed_preds: list[np.ndarray] = []
@@ -256,7 +255,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         if save and output_dir is not None:
             for idx, seed in enumerate(self.seeds):
-                _save_seed_proba_csv(
+                save_forecast_seed(
                     output_dir,
                     seed["random_state"],
                     seed_proba_matrix[:, idx],
@@ -265,9 +264,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                     verbose=verbose,
                 )
 
-        return aggregate_seed_probabilities(
-            seed_proba_matrix, seed_predicts_matrix, threshold=threshold
-        )
+        return compute_model_probabilities(seed_proba_matrix, seed_predicts_matrix)
 
     # ------------------------------------------------------------------
     # Serialisation

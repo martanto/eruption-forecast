@@ -301,6 +301,7 @@ class EvaluationTrainer(BaseModelTrainer):
             all_figures_filepath,
             X_test_filepath,
             y_test_filepath,
+            resampled_filepath,
             can_skip_shared,
         ) = self._generate_shared_filepaths(
             random_state=random_state,
@@ -343,6 +344,8 @@ class EvaluationTrainer(BaseModelTrainer):
             sampling_strategy=sampling_strategy,
         )
 
+        pd.concat([X_train, y_train], axis=1).to_csv(resampled_filepath)
+
         result = self.select_features(
             features=X_train,
             labels=y_train,
@@ -367,15 +370,13 @@ class EvaluationTrainer(BaseModelTrainer):
         self,
         random_state: int,
         classifier_slug: str,
-        sampling_strategy: str | float = 0.75,
     ) -> tuple | None:
         """Phase 2 worker: train and evaluate one (seed, classifier) pair.
 
-        Reconstructs the training data deterministically by re-running the
-        split and resample with the same random_state used in Phase 1 - Feature Selection. Loads
-        the pre-selected top-N features from the significant features CSV
-        written by _run_shared_evaluate(), then trains the specified classifier
-        via GridSearchCV and evaluates it on the held-out test set.
+        Loads the resampled training data saved by Phase 1 - Feature Selection and
+        the pre-selected top-N features from the significant features CSV written
+        by _run_shared_evaluate(), then trains the specified classifier via
+        GridSearchCV and evaluates it on the held-out test set.
 
         This method is designed to be called in parallel across all
         (seed, classifier) combinations via _run_jobs().
@@ -383,8 +384,6 @@ class EvaluationTrainer(BaseModelTrainer):
         Args:
             random_state (int): Random seed matching the Phase 1 - Feature Selection run for this seed.
             classifier_slug (str): Slug name of the classifier to train.
-            sampling_strategy (str | float, optional): Under-sampling ratio,
-                must match the value used in Phase 1 - Feature Selection. Defaults to 0.75.
 
         Returns:
             tuple: An 8-tuple of (classifier_slug, random_state,
@@ -404,6 +403,7 @@ class EvaluationTrainer(BaseModelTrainer):
             _,
             X_test_filepath,
             y_test_filepath,
+            resampled_filepath,
             _,
         ) = self._generate_shared_filepaths(random_state=random_state)
 
@@ -450,13 +450,12 @@ class EvaluationTrainer(BaseModelTrainer):
                 shap_explanation_filepath,
             )
 
-        # Deterministically reproduce the same split and resample as Phase 1 - Feature Selection.
-        X_train, X_test, y_train, y_test = self._split_and_resample(
-            X=self.df_features,
-            y=self.df_labels,
-            random_state=random_state,
-            sampling_strategy=sampling_strategy,
-        )
+        # Load the resampled training data saved by Phase 1 - Feature Selection.
+        _resampled_train = pd.read_csv(resampled_filepath, index_col=0)
+        y_train = _resampled_train["is_erupted"]
+        X_train = _resampled_train.drop(columns=["is_erupted"])
+        X_test = pd.read_csv(X_test_filepath, index_col=0)
+        y_test = pd.read_csv(y_test_filepath, index_col=0).iloc[:, 0]
 
         # Reconstruct the selected_features tuple expected by _cv_train_evaluate.
         # Only index (feature names) and the selected DataFrame are used downstream.
@@ -521,8 +520,7 @@ class EvaluationTrainer(BaseModelTrainer):
                   each as ``(random_state, sampling_strategy, save_all_features,
                   plot_significant_features)``.
                 - **pending_evaluate_model_jobs** (list[tuple]): (seed, classifier) pairs
-                  missing classifier outputs, each as
-                  ``(random_state, classifier_slug, sampling_strategy)``.
+                  missing classifier outputs, each as ``(random_state, classifier_slug)``.
                 - **records_per_classifier** (dict[str, list[dict]]): Already-completed
                   seed records keyed by classifier slug.
                 - **all_metrics** (dict[str, list[dict]]): Loaded metrics dicts for
@@ -545,6 +543,7 @@ class EvaluationTrainer(BaseModelTrainer):
                 _,
                 _X_test_filepath,
                 _y_test_filepath,
+                _resampled_filepath,
                 _,
             ) = self._generate_shared_filepaths(random_state)
 
@@ -553,6 +552,7 @@ class EvaluationTrainer(BaseModelTrainer):
                 os.path.isfile(_significant_filepath)
                 and os.path.isfile(_X_test_filepath)
                 and os.path.isfile(_y_test_filepath)
+                and os.path.isfile(_resampled_filepath)
             ):
                 pending_feature_selection_jobs.append(
                     (
@@ -591,7 +591,7 @@ class EvaluationTrainer(BaseModelTrainer):
                     all_metrics[classifier_slug].append(metrics)
                 else:
                     pending_evaluate_model_jobs.append(
-                        (random_state, classifier_slug, sampling_strategy)
+                        (random_state, classifier_slug)
                     )
 
         return (
@@ -651,6 +651,7 @@ class EvaluationTrainer(BaseModelTrainer):
             self.shared_all_features_dir,
             self.shared_figures_dir,
             self.shared_tests_dir,
+            self.shared_resampled_dir,
             self.classifier_dirs,
             self.models_dirs,
             self.metrics_dirs,
@@ -687,7 +688,7 @@ class EvaluationTrainer(BaseModelTrainer):
             _rs = job[0]
             for classifier_model in self.classifier_models:
                 new_evaluate_model_jobs.append(
-                    (_rs, classifier_model.slug_name, sampling_strategy)
+                    (_rs, classifier_model.slug_name)
                 )
 
         # ===== PHASE 2: Parallel (seed × classifier) training + evaluation =====

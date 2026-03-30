@@ -1,9 +1,25 @@
-"""Time window operations for seismic data processing.
+"""Time-window construction and per-window metric computation for seismic data.
 
-This module provides functions for creating time windows, extracting window
-information from seismic traces, and calculating window-based metrics for
-tremor analysis.
+This module is the core engine for dividing continuous seismic traces into
+fixed-duration analysis windows and computing statistical metrics over each
+window.  It is used by ``RSAM``, ``DSAR``, ``ShannonEntropy``, and
+``LabelBuilder`` throughout the pipeline.
+
+Key functions
+-------------
+- ``construct_windows`` — build a sliding ``pd.DataFrame`` index from start/end date
+  and step size; used by ``LabelBuilder`` to generate label windows
+- ``calculate_window_metrics`` — divide an ObsPy ``Trace`` into windows and apply an
+  arbitrary metric function (e.g. ``np.nanmean`` for RSAM); supports outlier removal,
+  zero-masking, data-completeness filtering, and overlapping windows
+- ``chunk_daily_data`` — split a raw 1-D daily array into a 2-D window matrix with
+  optional overlap and NaN padding
+- ``get_windows_information`` — extract sample-count and window-count statistics from
+  a ``Trace``
+- ``shannon_entropy`` — compute Gaussian differential entropy for a single window
+- ``to_safe_array`` — convert masked arrays to plain float64 arrays with NaN fill
 """
+
 from typing import Literal
 from datetime import datetime, timedelta
 from collections.abc import Callable
@@ -180,7 +196,7 @@ def chunk_daily_data(
 
     # Pad data so the last incomplete window is filled with NaN
     difference_samples = int(samples_per_day) - len(data)
-    if difference_samples != 0:
+    if difference_samples > 0:
         data = np.concatenate([data, np.full(difference_samples, np.nan)])
 
     if debug:

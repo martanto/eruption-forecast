@@ -1,16 +1,29 @@
 """Model evaluation plots with Nature/Science journal styling.
 
-This module provides publication-quality visualizations for ML model evaluation:
-- Confusion matrices
-- ROC and Precision-Recall curves
-- Threshold analysis
-- Feature importance
-- Calibration curves
-- Prediction distributions
-- Classifier comparison heatmaps
-- Seed stability violin plots
+Provides a comprehensive suite of per-seed and aggregate classifier evaluation
+charts. Single-seed functions accept pre-computed arrays or dicts; aggregate
+functions accept lists of per-seed results and plot mean ± std envelopes.
 
-All plots follow Nature/Science journal standards with consistent styling.
+Key functions (single-seed):
+
+- ``plot_confusion_matrix`` — annotated normalised confusion matrix heatmap.
+- ``plot_roc_curve`` — ROC curve with AUC annotation.
+- ``plot_precision_recall_curve`` — precision-recall curve with average precision.
+- ``plot_calibration`` — calibration (reliability) diagram.
+- ``plot_threshold_analysis`` — precision/recall/F1 vs. decision threshold.
+- ``plot_feature_importance`` — horizontal bar chart of top-N features.
+- ``plot_prediction_distribution`` — histogram of predicted probabilities by class.
+- ``plot_learning_curve`` — training vs. validation score against training set size.
+- ``plot_seed_stability`` — scatter/box plot of metric values across seeds.
+- ``plot_classifier_comparison`` — side-by-side metric bars across classifiers.
+
+Key functions (aggregate / multi-seed):
+
+- ``plot_aggregate_roc_curve``, ``plot_aggregate_precision_recall_curve``,
+  ``plot_aggregate_calibration``, ``plot_aggregate_confusion_matrix``,
+  ``plot_aggregate_threshold_analysis``, ``plot_aggregate_feature_importance``,
+  ``plot_aggregate_prediction_distribution``, ``plot_aggregate_learning_curve``,
+  ``plot_learning_curve_grid`` — ensemble-level variants with mean ± std shading.
 """
 
 import os

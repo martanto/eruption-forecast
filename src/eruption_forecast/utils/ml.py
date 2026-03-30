@@ -1,11 +1,36 @@
-"""Machine learning utilities for model training and evaluation.
+"""Machine learning utilities for model training, inference, and ensemble management.
 
-This module provides functions for data balancing, feature selection, metrics
-computation, and eruption probability prediction.
+This module centralises the ML-specific helpers that are shared across
+``ModelTrainer``, ``ModelPredictor``, and the ensemble classes.  It covers
+the full lifecycle from data preparation through prediction and model merging.
+
+Key functions
+-------------
+- ``random_under_sampler`` — apply ``RandomUnderSampler`` to balance training data;
+  returns resampled ``(X, y)`` and the fitted sampler
+- ``get_significant_features`` — run tsfresh ``FeatureSelector`` (and optionally a
+  RandomForest importance filter) to reduce the feature matrix to the most
+  relevant columns
+- ``compute_threshold_metrics`` — sweep decision thresholds and record precision,
+  recall, F1, and balanced accuracy at each step
+- ``compute_seed_eruption_probability`` — run one seed model on a feature matrix,
+  aggregate per-seed statistics, and optionally persist a CSV
+- ``compute_model_probabilities`` — iterate over all seeds in a ``SeedEnsemble`` or
+  dict thereof and return a consensus probability DataFrame
+- ``merge_seed_models`` — load all per-seed model files recorded in a registry CSV
+  and bundle them into a ``SeedEnsemble``
+- ``merge_all_classifiers`` — combine multiple ``SeedEnsemble`` objects into a single
+  ``ClassifierEnsemble``
+- ``get_classifier_models`` — instantiate ``ClassifierModel`` objects for a given
+  classifier name and CV strategy
+- ``load_labels_from_csv`` — thin wrapper around ``load_label_csv`` kept for
+  backward compatibility
+- ``get_classifier_label`` — translate an internal classifier key to a
+  human-readable display label
 """
 
 import os
-from typing import Literal, cast
+from typing import Literal
 
 import numpy as np
 import joblib
@@ -22,16 +47,12 @@ from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
-    _save_seed_proba_csv,
-    aggregate_seed_probabilities,
+    save_forecast_seed,
     predict_proba_from_estimator,
 )
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series, load_label_csv
-from eruption_forecast.config.constants import (
-    THRESHOLD_RESOLUTION,
-    ERUPTION_PROBABILITY_THRESHOLD,
-)
+from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
@@ -235,17 +256,18 @@ def compute_seed_eruption_probability(
         debug (bool, optional): If True, log detailed debug information. Defaults to False.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Tuple containing:
+        tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing:
             - probabilities_eruption (np.ndarray): 1D array of eruption probabilities (P(class=1)).
             - probabilities_scores (np.ndarray): 2D array of shape (n_windows, 2) with
               columns [P(non-eruption), P(eruption)].
+            - predictions_eruption (np.ndarray): 1D array of binary predictions (0 or 1).
 
     Raises:
         ValueError: If model output is 1-dimensional.
         RuntimeError: If model supports neither predict_proba nor decision_function.
 
     Examples:
-        >>> proba_1d, proba_2d = compute_seed_eruption_probability(
+        >>> proba_1d, proba_2d, pred_1d = compute_seed_eruption_probability(
         ...     random_state=42,
         ...     features_df=features,
         ...     significant_features_csv="sig_features.csv",
@@ -298,118 +320,16 @@ def compute_seed_eruption_probability(
         )
 
     if save:
-        _save_seed_proba_csv(
-            output_dir, random_state, probabilities_eruption, predictions_eruption,
-            overwrite=overwrite, verbose=verbose,
+        save_forecast_seed(
+            output_dir,
+            random_state,
+            probabilities_eruption,
+            predictions_eruption,
+            overwrite=overwrite,
+            verbose=verbose,
         )
 
     return probabilities_eruption, probabilities_scores, predictions_eruption
-
-
-def compute_model_probabilities(
-    df_models: pd.DataFrame,
-    features_df: pd.DataFrame,
-    features_csv_column: str = "significant_features_csv",
-    trained_model_filepath_column: str = "trained_model_filepath",
-    classifier_name: str = "model",
-    threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
-    number_of_seeds: int | None = None,
-    output_dir: str | None = None,
-    save_predictions: bool = False,
-    overwrite: bool = False,
-    verbose: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Aggregate eruption probabilities across all seeds of a single classifier.
-
-    Computes consensus predictions by averaging probabilities from multiple models
-    trained with different random seeds. This reduces variance and improves prediction
-    reliability. Calculates mean probability, uncertainty (std), confidence, and
-    binary predictions.
-
-    Args:
-        df_models (pd.DataFrame): Model registry DataFrame with random_state as index.
-            Must contain columns specified by features_csv_column and
-            trained_model_filepath_column.
-        features_df (pd.DataFrame): Extracted feature matrix for the prediction windows.
-        features_csv_column (str, optional): Column name containing paths to significant
-            features CSVs. Defaults to "significant_features_csv".
-        trained_model_filepath_column (str, optional): Column name containing paths to
-            trained model files. Defaults to "trained_model_filepath".
-        classifier_name (str, optional): Classifier name for logging. Defaults to "model".
-        threshold (float, optional): Minimum mean probability threshold to classify as
-            eruption (0.0-1.0). Defaults to 0.5.
-        number_of_seeds (int | None, optional): Maximum number of seeds to use. If None,
-            uses all seeds. Defaults to None.
-        output_dir (str | None, optional): Directory to save per-seed predictions.
-            Defaults to None.
-        save_predictions (bool, optional): If True, save per-seed predictions to CSV.
-            Defaults to False.
-        overwrite (bool, optional): If True, overwrite existing cached predictions.
-            Defaults to False.
-        verbose (bool, optional): If True, log save operations. Defaults to False.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Tuple containing arrays
-            of shape (n_windows,):
-            - mean_probability (np.ndarray): Mean eruption probability across seeds.
-            - std_proba (np.ndarray): Standard deviation of probabilities (uncertainty).
-            - confidence (np.ndarray): Voting agreement fraction (0.5-1.0).
-            - prediction (np.ndarray): Binary predictions (0 or 1) based on threshold.
-
-    Examples:
-        >>> mean_p, std_p, conf, pred = compute_model_probabilities(
-        ...     df_models=model_registry,
-        ...     features_df=features,
-        ...     threshold=0.6,
-        ...     number_of_seeds=100
-        ... )
-        >>> print(f"Mean eruption probability: {mean_p.mean():.3f}")
-        Mean eruption probability: 0.450
-    """
-    seed_eruption_probabilities: list[np.ndarray] = []
-    seed_eruption_predictions: list[np.ndarray] = []
-
-    for seed_count, (random_state, row) in enumerate(df_models.iterrows(), start=1):
-        random_state_int = int(cast(int, random_state))
-        significant_features_csv: str = row[features_csv_column]
-        model_filepath: str = row[trained_model_filepath_column]
-
-        probabilities_eruption, _, predictions_eruption = (
-            compute_seed_eruption_probability(
-                random_state=random_state_int,
-                significant_features_csv=significant_features_csv,
-                model_filepath=model_filepath,
-                features_df=features_df,
-                output_dir=output_dir,
-                overwrite=overwrite,
-                save=save_predictions,
-                verbose=verbose,
-            )
-        )
-
-        seed_eruption_probabilities.append(probabilities_eruption)
-        seed_eruption_predictions.append(predictions_eruption)
-
-        logger.debug(
-            f"[{classifier_name}] Seed {random_state:05d} — "
-            f"vote prediction: {predictions_eruption.mean():.4f}, "
-            f"mean P(eruption): {probabilities_eruption.mean():.4f}"
-        )
-
-        if number_of_seeds is not None and seed_count >= number_of_seeds:
-            break
-
-    probabilities_eruption_matrix = np.stack(
-        seed_eruption_probabilities, axis=1
-    )  # (n_windows, n_seeds)
-
-    predictions_eruption_matrix = np.stack(
-        seed_eruption_predictions, axis=1
-    )  # (n_windows, n_seeds)
-
-    return aggregate_seed_probabilities(
-        probabilities_eruption_matrix, predictions_eruption_matrix, threshold=threshold
-    )
 
 
 def _extract_trained_model_suffix(csv_path: str) -> str:
@@ -590,3 +510,38 @@ def get_classifier_models(
     ]
 
     return classifier_models
+
+
+def get_classifier_label(classifier_name: str) -> str:
+    """Return a human-readable label for a classifier given its scikit-learn class name.
+
+    Looks up ``classifier_name`` in a fixed mapping of class names to display labels.
+    If the name is not found (e.g., an unrecognised or custom classifier), the input
+    string is returned unchanged.
+
+    Args:
+        classifier_name (str): Scikit-learn class name of the classifier, e.g.
+            ``"RandomForestClassifier"`` or ``"XGBClassifier"``.
+
+    Returns:
+        str: Human-readable display label, e.g. ``"Random Forest"`` or ``"XGBoost"``.
+            Returns ``classifier_name`` unchanged if not found in the mapping.
+    """
+    classifier_slugs = {
+        "SVC": "svm",
+        "KNeighborsClassifier": "KNN",
+        "DecisionTreeClassifier": "Decision Tree",
+        "RandomForestClassifier": "Random Forest",
+        "LiteRandomForestClassifier": "(lite) Random Forest",
+        "GradientBoostingClassifier": "Gradient Boosting",
+        "XGBClassifier": "XGBoost",
+        "MLPClassifier": "Neural Network",
+        "GaussianNB": "Naive Bayes",
+        "LogisticRegression": "Logistic Regression",
+        "VotingClassifier": "Voting Classifier",
+    }
+
+    if classifier_name not in classifier_slugs:
+        return classifier_name
+
+    return classifier_slugs[classifier_name]

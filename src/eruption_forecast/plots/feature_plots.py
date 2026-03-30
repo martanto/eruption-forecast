@@ -1,4 +1,21 @@
-"""Feature importance and selection visualization with Nature/Science styling."""
+"""Feature importance and selection visualisation with Nature/Science styling.
+
+Provides plotting functions for inspecting the tsfresh features selected during
+training, including bar charts of top features ranked by importance score and
+frequency-band contribution summaries. Supports both single-seed and batch
+(multi-seed) workflows.
+
+Key functions:
+
+- ``plot_significant_features(features_df, ...)`` — horizontal bar chart of the
+  top-N significant features for a single seed, coloured by tremor column origin
+  (RSAM, DSAR, entropy).
+- ``replot_significant_features(features_dir, ...)`` — batch replot all feature
+  importance CSVs in a directory, with optional parallel processing via ``n_jobs``.
+- ``plot_frequency_band_contribution(features_df, ...)`` — stacked bar chart showing
+  what proportion of selected features comes from each frequency band, broken down
+  by metric type (RSAM vs. DSAR vs. entropy).
+"""
 
 import os
 import re
@@ -161,21 +178,6 @@ def plot_significant_features(
 
         # Set y-axis limits
         ax.set_ylim(-0.5, number_of_features - 0.5)
-
-        # Add value labels for top features (optional, for clarity)
-        # if number_of_features <= 20:  # Only for smaller plots
-        #     for i, (_idx, row) in enumerate(df.iterrows()):
-        #         if i >= (number_of_features - top_features):
-        #             value = row[values_column]
-        #             ax.text(
-        #                 value,
-        #                 i,
-        #                 f"  {value:.3f}",
-        #                 va="center",
-        #                 ha="left",
-        #                 fontsize=7,
-        #                 color=NATURE_COLORS["blue"],
-        #             )
 
         # Note: tight_layout() is not called here because savefig.bbox='tight'
         # (configured in styles.py) handles layout automatically and is more

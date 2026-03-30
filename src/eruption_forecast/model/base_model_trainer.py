@@ -68,6 +68,7 @@ class BaseModelTrainer:
         shared_all_features_dir (str): Shared directory for all features.
         shared_figures_dir (str): Shared directory for feature importance plots.
         shared_tests_dir (str): Shared directory for per-seed held-out test splits.
+        shared_resampled_dir (str): Shared directory for per-seed resampled training data.
         classifier_dirs (dict[str, str]): Per-classifier output directories keyed by slug.
         models_dirs (dict[str, str]): Per-classifier model directories keyed by slug.
         metrics_dirs (dict[str, str]): Per-classifier metrics directories keyed by slug.
@@ -251,6 +252,7 @@ class BaseModelTrainer:
             self.shared_all_features_dir,
             self.shared_figures_dir,
             self.shared_tests_dir,
+            self.shared_resampled_dir,
             self.classifier_dirs,
             self.models_dirs,
             self.metrics_dirs,
@@ -386,10 +388,10 @@ class BaseModelTrainer:
             output_dir (str): Base trainings directory (e.g. ``output/trainings``).
 
         Returns:
-            tuple: A 9-tuple of
+            tuple: A 10-tuple of
                 ``(output_dir, shared_features_dir, shared_significant_dir,
                 shared_all_features_dir, shared_figures_dir, shared_tests_dir,
-                classifier_dirs, models_dirs, metrics_dirs)``.
+                shared_resampled_dir, classifier_dirs, models_dirs, metrics_dirs)``.
         """
         sub_output_dir = "evaluations" if self.with_evaluation else "predictions"
         output_dir = os.path.join(output_dir, sub_output_dir)
@@ -401,6 +403,7 @@ class BaseModelTrainer:
         shared_all_features_dir = os.path.join(shared_features_dir, "all_features")
         shared_figures_dir = os.path.join(shared_features_dir, "figures", "significant")
         shared_tests_dir = os.path.join(shared_features_dir, "tests")
+        shared_resampled_dir = os.path.join(shared_features_dir, "resampled")
 
         classifier_dirs: dict[str, str] = {}
         models_dirs: dict[str, str] = {}
@@ -421,6 +424,7 @@ class BaseModelTrainer:
             shared_all_features_dir,
             shared_figures_dir,
             shared_tests_dir,
+            shared_resampled_dir,
             classifier_dirs,
             models_dirs,
             metrics_dirs,
@@ -480,6 +484,7 @@ class BaseModelTrainer:
         """
         ensure_dir(self.output_dir)
         ensure_dir(self.shared_significant_dir)
+        ensure_dir(self.shared_resampled_dir)
 
         # Always ensure per-classifier output and models directories so that
         # later writes (e.g., joblib.dump and model registry CSVs) do not fail
@@ -631,7 +636,7 @@ class BaseModelTrainer:
             )
             return None
 
-        # Series indexed by feature name; values are p-values or importance score sorted by it's value.
+        # Series indexed by feature name; values are p-values or importance score sorted by its value.
         all_selected_features = selector.selected_features_
 
         # Handle if columns in df_selected_features has less than number_of_significant_features
@@ -647,9 +652,8 @@ class BaseModelTrainer:
             number_of_significant_features
         )
 
-        # Save TOP-N significant features
-        # significant_filepath Will be used in ModelEvaluator.from_files(...) method
-        # as selected_features_path paramater
+        # Save TOP-N significant features — used by ModelEvaluator.from_files()
+        # as selected_features_path parameter
         top_selected_features.to_csv(significant_filepath, index=True)
 
         # Save all SELECTED features if requested
@@ -708,12 +712,13 @@ class BaseModelTrainer:
         random_state: int,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[str, str, str | None, str | None, str, str, bool]:
+    ) -> tuple[str, str, str | None, str | None, str, str, str, bool]:
         """Generate shared filepaths that are the same for all classifiers in a seed.
 
-        These paths cover feature selection outputs, test data, and learning curve prefix.
-        All classifiers in the same seed share the same under-sampling and feature
-        selection results, so these paths are written once.
+        These paths cover feature selection outputs, test data, resampled training
+        data, and learning curve prefix. All classifiers in the same seed share the
+        same under-sampling and feature selection results, so these paths are written
+        once.
 
         Args:
             random_state (int): Random seed for this training run.
@@ -723,7 +728,7 @@ class BaseModelTrainer:
                 Defaults to False.
 
         Returns:
-            tuple: A 7-tuple of:
+            tuple: An 8-tuple of:
 
                 - **filename** (str): Base filename stem for this seed.
                 - **significant_filepath** (str): Path to significant features CSV.
@@ -731,6 +736,7 @@ class BaseModelTrainer:
                 - **all_figures_filepath** (str | None): Path to feature plot PNG, or None.
                 - **X_test_filepath** (str): Path to held-out X_test CSV.
                 - **y_test_filepath** (str): Path to held-out y_test CSV.
+                - **resampled_filepath** (str): Path to resampled training data CSV.
                 - **can_skip_shared** (bool): True if all shared outputs already exist.
         """
         filename = (
@@ -754,8 +760,9 @@ class BaseModelTrainer:
         )
         X_test_filepath = os.path.join(self.shared_tests_dir, f"{filename}_X_test.csv")
         y_test_filepath = os.path.join(self.shared_tests_dir, f"{filename}_y_test.csv")
+        resampled_filepath = os.path.join(self.shared_resampled_dir, f"{filename}.csv")
 
-        shared_required = [significant_filepath]
+        shared_required = [significant_filepath, resampled_filepath]
         can_skip_shared = not self.overwrite and all(
             os.path.isfile(p) for p in shared_required
         )
@@ -767,6 +774,7 @@ class BaseModelTrainer:
             all_figures_filepath,
             X_test_filepath,
             y_test_filepath,
+            resampled_filepath,
             can_skip_shared,
         )
 

@@ -1,29 +1,21 @@
-"""Feature extraction and selection module for volcanic eruption forecasting.
+"""Feature extraction and selection package for volcanic eruption forecasting.
 
-This module provides tools for building tremor matrices, extracting time-series
-features using tsfresh, and performing two-stage feature selection combining
-statistical testing and machine learning importance.
+Transforms windowed tremor time-series into machine-learning-ready
+feature matrices using tsfresh automated feature extraction followed by
+two-stage feature selection.  It covers three distinct steps in the pipeline:
+building the windowed tremor matrix, extracting features, and selecting the most
+informative subset.
 
-Classes:
-    TremorMatrixBuilder: Slices tremor data into windowed matrices aligned with labels.
-    FeaturesBuilder: Extracts tsfresh features from tremor matrices.
-    FeatureSelector: Two-stage feature selection (tsfresh + RandomForest).
-
-Constants:
-    ID_COLUMN: Column name for window identifiers.
-    DATETIME_COLUMN: Column name for datetime values.
-    ERUPTED_COLUMN: Column name for eruption labels.
-
-Examples:
-    >>> # Build tremor matrix
-    >>> matrix_builder = TremorMatrixBuilder(tremor_df, label_df)
-    >>> matrix_builder.build(select_tremor_columns=["rsam_f0", "rsam_f1"])
-    >>>
-    >>> # Extract features
-    >>> features_builder = FeaturesBuilder(matrix_builder.df, label_df=label_df)
-    >>> features = features_builder.extract_features()
-    >>>
-    >>> # Select features
-    >>> selector = FeatureSelector(method="combined")
-    >>> X_selected = selector.fit_transform(features, y_train)
+Key classes:
+    - ``TremorMatrixBuilder``: Slices a tremor DataFrame into fixed-size windows
+      aligned with label windows and concatenates them into a matrix with ``id``,
+      ``datetime``, and tremor metric columns ready for tsfresh input.
+    - ``FeaturesBuilder``: Runs tsfresh feature extraction on each tremor column
+      independently. Operates in training mode (with labels, relevance filtering)
+      or prediction mode (all features, no filtering). Saves extracted features
+      and aligned label CSVs to the ``features/`` output directory.
+    - ``FeatureSelector``: Two-stage selection combining tsfresh FDR-controlled
+      statistical testing (Stage 1) with RandomForest permutation importance
+      (Stage 2). Supports methods ``"tsfresh"``, ``"random_forest"``, and
+      ``"combined"``.
 """

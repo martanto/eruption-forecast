@@ -1,3 +1,21 @@
+"""FDSN web service adapter with transparent local SDS caching.
+
+This module provides the ``FDSN`` class, which retrieves seismic waveform data
+from any FDSN-compliant web service using the ObsPy FDSN client. To avoid
+repeated network requests, each successfully downloaded day is written to a
+local SDS archive and served from cache on subsequent runs.
+
+Key class:
+    - ``FDSN``: Implements ``SeismicDataSource.get(date)`` — checks the local SDS
+      cache first, downloads from the FDSN endpoint if not cached, saves the result
+      as a miniSEED file in SDS format, and returns the ObsPy ``Stream``.
+    - ``download_dir`` is created automatically if it does not exist.
+    - Configurable via ``client_url`` (defaults to IRIS), ``network``, ``station``,
+      ``location``, and ``channel`` parameters.
+
+Reference: https://www.fdsn.org/about/
+"""
+
 import os
 from datetime import datetime
 
@@ -42,6 +60,7 @@ class FDSN(SeismicDataSource):
         channel (str): Channel code.
         network (str): Network code.
         location (str): Location code.
+        channel_type (str): str = Channel type. Defaults to "D".,
         download_dir (str): Local directory used as the SDS cache root.
         overwrite (bool): Whether cached files are overwritten on each download.
         verbose (bool): Whether verbose logging is enabled.
@@ -60,8 +79,9 @@ class FDSN(SeismicDataSource):
         self,
         station: str,
         channel: str,
-        network: str = "VG",
-        location: str = "00",
+        network: str,
+        location: str,
+        channel_type: str = "D",
         client_url: str | None = None,
         download_dir: str | None = None,
         overwrite: bool = False,
@@ -79,6 +99,7 @@ class FDSN(SeismicDataSource):
             channel (str): Channel code (e.g., "EHZ").
             network (str, optional): Seismic network code. Defaults to "VG".
             location (str, optional): Location code. Defaults to "00".
+            channel_type (str, optional): Set channel type. Defaults to "D".
             client_url (str | None, optional): FDSN web service base URL.
                 Defaults to "https://service.iris.edu".
             download_dir (str | None, optional): Local directory used as the SDS
@@ -101,6 +122,7 @@ class FDSN(SeismicDataSource):
         self.channel = channel
         self.network = network
         self.location = location
+        self.channel_type = channel_type
         self.download_dir = download_dir
         self.overwrite = overwrite
         self.verbose = verbose
@@ -113,6 +135,7 @@ class FDSN(SeismicDataSource):
             channel=self.channel,
             network=self.network,
             location=self.location,
+            channel_type=self.channel_type,
             verbose=verbose,
             debug=debug,
         )

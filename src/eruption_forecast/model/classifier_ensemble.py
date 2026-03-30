@@ -1,9 +1,27 @@
-"""ClassifierEnsemble: wraps multiple SeedEnsemble objects for cross-classifier consensus.
+"""Wrap multiple SeedEnsemble objects for cross-classifier consensus inference.
 
-This module provides the ``ClassifierEnsemble`` class, which bundles one
-``SeedEnsemble`` per classifier into a single, serialisable object and owns
-the cross-classifier consensus logic previously inline in
-``ModelPredictor.predict_proba()``.
+Provides :class:`ClassifierEnsemble`, a serialisable sklearn-compatible
+estimator that bundles one :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`
+per classifier type.
+
+Each :class:`SeedEnsemble` already averages predictions across random seeds for
+a single classifier.  ``ClassifierEnsemble`` adds a second aggregation layer:
+it collects the per-classifier mean probabilities and computes a consensus
+prediction (mean of means) together with an uncertainty estimate (standard
+deviation across classifiers).
+
+Key capabilities:
+    - ``from_seed_ensembles(ensembles)``: Construct from an existing dict of
+      ``SeedEnsemble`` objects.
+    - ``from_registry_dict(registry_dict)``: Load from a mapping of classifier
+      names to registry CSV paths (delegates to ``SeedEnsemble.from_registry()``).
+    - ``predict_proba(X)``: Return per-classifier probabilities and consensus
+      probability array.
+    - ``predict_with_uncertainty(X)``: Return mean probability, standard
+      deviation, mean binary vote, confidence, and a per-classifier breakdown
+      dict.
+    - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
+      from :class:`~eruption_forecast.model.base_ensemble.BaseEnsemble`).
 """
 
 import os
@@ -13,7 +31,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 from eruption_forecast.logger import logger
-from eruption_forecast.config.constants import ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.utils.array import compute_model_probabilities
 from eruption_forecast.model.base_ensemble import BaseEnsemble
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 
@@ -118,16 +136,20 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             np.ndarray: Array of shape ``(n_samples, 2)`` where column 1 is the
                 consensus mean eruption probability.
         """
-        _, _, _, _, per_clf = self.predict_with_uncertainty(X)
-        consensus_mean: np.ndarray = np.stack(
-            [v["mean"] for v in per_clf.values()], axis=0
-        ).mean(axis=0)
-        return np.column_stack([1.0 - consensus_mean, consensus_mean])
+        _, _, _, _, clf_results = self.predict_with_uncertainty(X)
+
+        classifier_probability_means = np.stack(
+            [v["probability"] for v in clf_results.values()], axis=0
+        )
+
+        return np.column_stack(
+            [1.0 - classifier_probability_means, classifier_probability_means]
+        )
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Return binary predictions using 0.5 threshold on consensus probability.
+        """Return binary predictions using a 0.5 threshold on the consensus probability.
 
-        Applies 0.5 threshold to the consensus mean P(eruption).
+        Applies a 0.5 threshold to the consensus mean P(eruption).
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
@@ -141,7 +163,6 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     def predict_with_uncertainty(
         self,
         X: pd.DataFrame,
-        threshold: float = ERUPTION_PROBABILITY_THRESHOLD,
         save: bool = False,
         output_dir: str | None = None,
         overwrite: bool = False,
@@ -153,14 +174,12 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         to obtain per-seed-aggregated statistics, then computes cross-classifier
         consensus by averaging mean probabilities across classifiers.
 
-        Confidence is defined as the fraction of classifiers whose binary
-        prediction agrees with the consensus prediction.
+        Confidence is a CI-like metric computed as
+        ``1.96 * sqrt(p * (1 - p) / n_classifiers)``, where ``p`` is the mean
+        binary vote across classifiers.
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
-            threshold (float, optional): Probability threshold for binary
-                eruption classification.  Defaults to
-                ``ERUPTION_PROBABILITY_THRESHOLD``.
             save (bool, optional): If ``True``, save per-seed predictions to CSV
                 files under ``{output_dir}/{classifier_name}/``. Defaults to ``False``.
             output_dir (str | None, optional): Base directory for per-seed CSV output.
@@ -173,55 +192,68 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]: A 5-tuple:
 
-                - ``consensus_mean`` (np.ndarray): Shape ``(n_samples,)`` — mean
-                  P(eruption) averaged across all classifiers.
-                - ``consensus_std`` (np.ndarray): Shape ``(n_samples,)`` — std of
-                  per-classifier mean probabilities (inter-classifier uncertainty).
-                - ``consensus_confidence`` (np.ndarray): Shape ``(n_samples,)`` —
-                  fraction of classifiers agreeing with the consensus prediction.
+                - ``consensus_probability`` (np.ndarray): Shape ``(n_samples,)`` —
+                  mean P(eruption) averaged across all classifiers.
+                - ``consensus_uncertainty`` (np.ndarray): Shape ``(n_samples,)`` —
+                  std of per-classifier mean probabilities (inter-classifier
+                  uncertainty).
                 - ``consensus_prediction`` (np.ndarray): Shape ``(n_samples,)`` —
-                  binary predictions (0 or 1).
+                  mean of per-classifier binary votes (continuous, ``[0, 1]``).
+                - ``consensus_confidence`` (np.ndarray): Shape ``(n_samples,)`` —
+                  CI-like metric: ``1.96 * sqrt(p * (1 - p) / n_classifiers)``.
                 - ``per_classifier_results`` (dict): Mapping from classifier name to
-                  a dict with keys ``"mean"``, ``"std"``, ``"confidence"``,
-                  ``"prediction"`` — each a 1-D ``np.ndarray`` of shape
-                  ``(n_samples,)``.
+                  a dict with keys ``"probability"``, ``"uncertainty"``,
+                  ``"prediction"``, ``"confidence"`` — each a 1-D ``np.ndarray``
+                  of shape ``(n_samples,)``.
         """
         clf_results: dict[str, dict[str, np.ndarray]] = {}
         for name, seed_ensemble in self.ensembles.items():
-            clf_output_dir = os.path.join(output_dir, name) if (save and output_dir) else None
-            mean, std, conf, pred = seed_ensemble.predict_with_uncertainty(
-                X, threshold,
+            clf_output_dir = (
+                os.path.join(output_dir, name) if (save and output_dir) else None
+            )
+
+            (
+                seed_probability,
+                seed_uncertainty,
+                seed_prediction,
+                seed_confidence,
+            ) = seed_ensemble.predict_with_uncertainty(
+                X,
                 save=save,
                 output_dir=clf_output_dir,
                 overwrite=overwrite,
                 verbose=verbose,
             )
+
             clf_results[name] = {
-                "mean": mean,
-                "std": std,
-                "confidence": conf,
-                "prediction": pred,
+                "probability": seed_probability,
+                "uncertainty": seed_uncertainty,
+                "prediction": seed_prediction,
+                "confidence": seed_confidence,
             }
 
         # Cross-classifier consensus
-        all_proba_means = np.stack([v["mean"] for v in clf_results.values()], axis=0)
-        all_predict_means = np.stack(
-            [v["prediction"] for v in clf_results.values()], axis=0
-        )
-        consensus_mean: np.ndarray = all_proba_means.mean(axis=0)
-        consensus_std: np.ndarray = all_proba_means.std(axis=0)
-        consensus_pred: np.ndarray = all_predict_means.mean(axis=0)
+        classifier_probability_means = np.stack(
+            [v["probability"] for v in clf_results.values()], axis=1
+        )  # (n_samples, n_classifiers)
+        classifier_prediction_means = np.stack(
+            [v["prediction"] for v in clf_results.values()], axis=1
+        )  # (n_samples, n_classifiers)
 
-        n_classifiers = all_predict_means.shape[0]
-        consensus_conf: np.ndarray = 1.96 * (
-            np.sqrt(consensus_pred * (1 - consensus_pred) / n_classifiers)
+        (
+            consensus_probability,
+            consensus_uncertainty,
+            consensus_prediction,
+            consensus_confidence,
+        ) = compute_model_probabilities(
+            classifier_probability_means, classifier_prediction_means
         )
 
         return (
-            consensus_mean,
-            consensus_std,
-            consensus_conf,
-            consensus_pred,
+            consensus_probability,
+            consensus_uncertainty,
+            consensus_prediction,
+            consensus_confidence,
             clf_results,
         )
 

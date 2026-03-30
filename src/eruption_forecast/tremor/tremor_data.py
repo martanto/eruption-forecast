@@ -1,3 +1,17 @@
+"""Container for loaded tremor time-series data.
+
+A lightweight wrapper around a pandas DataFrame of tremor metrics (RSAM, DSAR)
+produced by ``CalculateTremor``. It inherits from ``BaseDataContainer``
+and adds sampling-rate validation, start/end date properties,
+and support for loading data directly from a CSV file.
+
+Key class:
+    - ``TremorData``: Accepts a pre-loaded DataFrame or loads one from a CSV path
+      via ``from_csv()``. Validates that the sampling interval matches the expected
+      frequency and exposes ``start_date_str`` / ``end_date_str`` for downstream
+      pipeline stages.
+"""
+
 import os
 from datetime import datetime
 from functools import cached_property

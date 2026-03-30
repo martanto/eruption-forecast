@@ -1,3 +1,22 @@
+"""Shannon entropy calculator for seismic streams.
+
+Measures the information complexity of a seismic signal by computing
+Shannon entropy over fixed-duration time windows after applying a bandpass
+filter. High entropy values indicate irregular, complex signals
+(e.g., volcanic tremor), while low values correspond
+to more regular or quiescent background noise.
+
+Key class:
+    - ``ShannonEntropy``: Accepts an ObsPy ``Stream``, applies a bandpass filter
+      via ``filter(freqmin, freqmax)``, and computes per-window Shannon entropy
+      via ``calculate()``. Returns a ``pd.Series`` indexed by window start times.
+    - Default frequency range: 1–16 Hz (configurable via ``filter()``).
+
+Usage::
+
+    entropy = ShannonEntropy(stream=stream).filter(1.0, 16.0).calculate()
+"""
+
 from typing import Self, Literal
 
 import pandas as pd
@@ -12,7 +31,7 @@ from eruption_forecast.config.constants import (
 
 
 class ShannonEntropy:
-    """Calculate Shannon entropy from a seismic stream.
+    """Compute Shannon entropy from a seismic stream.
 
     Computes Shannon entropy from seismic waveform data by applying a bandpass
     filter and computing the entropy metric over fixed-duration time windows.
@@ -118,7 +137,12 @@ class ShannonEntropy:
                 ``window_duration_minutes`` intervals.
         """
         trace: Trace = self.trace.copy()
-        trace.filter("bandpass", freqmin=self.freqmin, freqmax=self.freqmax, corners=BANDPASS_FILTER_CORNERS)
+        trace.filter(
+            "bandpass",
+            freqmin=self.freqmin,
+            freqmax=self.freqmax,
+            corners=BANDPASS_FILTER_CORNERS,
+        )
 
         series = calculate_window_metrics(
             trace=trace,

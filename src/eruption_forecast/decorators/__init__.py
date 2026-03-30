@@ -1,3 +1,32 @@
+"""Decorator utilities for parameter persistence, timing, and notifications.
+
+This package provides function and class decorators used across the
+pipeline for auditing, debugging, and operational monitoring.
+
+Key exports:
+    - ``save_parameters``: Decorator factory that captures all arguments
+      passed to a function and writes them to a JSON or YAML file before the
+      function executes. Useful for call-auditing and reproducibility.
+    - ``save_properties``: Class decorator that injects ``save_properties()``
+      and ``enable_auto_save()`` methods into the decorated class, enabling
+      attribute state persistence to disk on demand or on change.
+    - ``snapshot``: Decorator factory that records both the call parameters
+      and the return value of a function to a JSON or YAML file.
+    - ``timer``: Decorator factory that measures wall-clock execution time and
+      prints a formatted ``HH hours MM minutes SS seconds`` summary.
+    - ``notify``: Decorator factory that sends Telegram MarkdownV2 messages on
+      function success or failure, with optional file attachments. Credentials
+      are resolved from arguments or the ``TELEGRAM_BOT_TOKEN`` /
+      ``TELEGRAM_CHAT_ID`` environment variables (via python-dotenv).
+
+Supporting classes (from ``decorator_class.py``):
+    - ``SerializationWrapper``: Static helper that recursively converts
+      arbitrary Python objects to JSON/YAML-compatible types and writes them
+      to disk with automatic directory creation.
+    - ``AutoSaveDict``: A ``dict`` subclass that persists itself to disk after
+      every mutation (``__setitem__``, ``__delitem__``, ``update``).
+"""
+
 import time
 import inspect
 import functools

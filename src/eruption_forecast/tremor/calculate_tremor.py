@@ -1,3 +1,31 @@
+"""Orchestrator for calculating tremor metrics from raw seismic data.
+
+This module provides the ``CalculateTremor`` class, which coordinates the full
+tremor calculation workflow: reading seismic streams day-by-day from an SDS
+archive or FDSN web service, computing RSAM, DSAR, and Shannon entropy across
+configurable frequency bands, and saving the results as time-series CSV files.
+
+Key class:
+    - ``CalculateTremor``: Reads seismic data via ``from_sds()`` or ``from_fdsn()``,
+      runs parallel daily calculations via multiprocessing (``n_jobs``), merges
+      per-day CSV outputs into a single file, and optionally plots and saves daily
+      tremor figures.
+
+Typical usage::
+
+    calculate = (
+        CalculateTremor(
+            station="OJN",
+            channel="EHZ",
+            start_date="2025-01-01",
+            end_date="2025-01-03",
+            n_jobs=4,
+        )
+        .from_sds(sds_dir="/path/to/sds")
+        .run()
+    )
+"""
+
 import os
 import glob
 import shutil
@@ -49,8 +77,8 @@ class CalculateTremor:
         channel (str): Seismic channel code in uppercase.
         start_date (datetime): Start date for data processing.
         end_date (datetime): End date for data processing.
-        network (str): Seismic network code.
-        location (str): Seismic location code.
+        network (str): Seismic network code (uppercase).
+        location (str): Seismic location code (uppercase). Empty string accepted.
         methods (list[str]): Calculation methods to apply (rsam, dsar).
         output_dir (str): Root output directory.
         station_dir (str): Station-specific output directory.
@@ -83,8 +111,8 @@ class CalculateTremor:
         end_date (str | datetime): End date for data processing (YYYY-MM-DD).
         station (str): Seismic station code (e.g., "OJN").
         channel (str): Seismic channel code (e.g., "EHZ").
-        network (str): Seismic network code. Defaults to "VG".
-        location (str): Seismic location code. Defaults to "00".
+        network (str): Seismic network code (e.g., ``"VG"``).
+        location (str): Seismic location code (e.g., ``"00"``). Empty string accepted.
         methods (list[str] | None): Calculation methods to apply
             (e.g., ``["rsam", "dsar", "entropy"]``). If None, defaults to all
             three methods. Defaults to None.
@@ -136,8 +164,9 @@ class CalculateTremor:
         end_date: str | datetime,
         station: str,
         channel: str,
-        network: str = "VG",
-        location: str = "00",
+        network: str,
+        location: str,
+        channel_type: str = "D",
         methods: list[str] | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -169,8 +198,9 @@ class CalculateTremor:
                 or as a datetime object.
             station (str): Seismic station code (e.g., "OJN").
             channel (str): Channel code (e.g., "EHZ").
-            network (str, optional): Seismic network code. Defaults to "VG".
-            location (str, optional): Location code. Defaults to "00".
+            network (str): Seismic network code (e.g., ``"VG"``).
+            location (str): Seismic location code (e.g., ``"00"``). Empty string accepted.
+            channel_type (str, optional): Set channel type. Defaults to "D".
             methods (list[str] | None, optional): Tremor metrics to compute.
                 Defaults to ["rsam", "dsar", "entropy"].
             output_dir (str | None, optional): Base output directory. Defaults to
@@ -205,8 +235,6 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         start_date = to_datetime(start_date)
         end_date = to_datetime(end_date)
-        network = network or "VG"
-        location = location or "00"
         nslc = f"{network}.{station}.{location}.{channel}"
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         station_dir = os.path.join(output_dir, nslc)
@@ -219,10 +247,11 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         self.station = station.upper()
         self.channel = channel.upper()
+        self.network = network.upper()
+        self.location = location.upper()
+        self.channel_type = channel_type.upper()
         self.start_date: datetime = start_date
         self.end_date: datetime = end_date
-        self.network = network or "VG"
-        self.location = location or "00"
 
         # TODO: Add kurtosis
         self.methods: list[str] = methods or CALCULATE_METHODS
@@ -255,7 +284,6 @@ class CalculateTremor:
         self.end_date_utc_datetime = UTCDateTime(self.end_date)
         self.freq_bands: list[tuple[float, float]] = list(DEFAULT_FREQUENCY_BANDS)
         self.figures_dir = figures_dir
-        self.current_datetime = datetime.now()
         self.dates: pd.DatetimeIndex = pd.date_range(
             start=self.start_date, end=self.end_date
         )
@@ -609,6 +637,7 @@ class CalculateTremor:
             station=self.station,
             channel=self.channel,
             location=self.location,
+            channel_type=self.channel_type,
             verbose=self.verbose,
             interpolate=self.interpolate,
             debug=self.debug,
@@ -892,7 +921,10 @@ class CalculateTremor:
 
         # Build tremor DataFrame index
         datetime_index = pd.date_range(
-            start=date, end=date + timedelta(days=1), freq=DEFAULT_SAMPLING_FREQUENCY, inclusive="left"
+            start=date,
+            end=date + timedelta(days=1),
+            freq=DEFAULT_SAMPLING_FREQUENCY,
+            inclusive="left",
         )
 
         # Init tremor DataFrame without tremor values
@@ -994,9 +1026,6 @@ class CalculateTremor:
                 absolute_value=True,
                 value_multiplier=1.0,  # Don't multiply yet, do it once on ratio
             )
-
-            # Interpolate missing values
-            # current_series = current_series.interpolate(method="time")
 
             # Free filtered stream immediately to reduce memory footprint
             del filtered_stream
@@ -1214,6 +1243,7 @@ class CalculateTremor:
             pd.DataFrame | None: Filtered tremor DataFrame for the day, or None
                 if no rows fall within the gap after filtering.
         """
+        date_str = date.strftime("%Y-%m-%d")
         day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1) - timedelta(minutes=10)
 
@@ -1223,6 +1253,9 @@ class CalculateTremor:
         day_df = self.calculate(date)
 
         if day_df.empty or day_df.isna().all(axis=None):
+            logger.warning(
+                f"{date_str} :: No seismic data available. Return NaN-filled DataFrame"
+            )
             return None
 
         if self.remove_tremor_anomalies:
@@ -1233,7 +1266,7 @@ class CalculateTremor:
         # Restrict to rows inside the gap
         day_df = day_df[(day_df.index >= gap_start) & (day_df.index <= gap_end)]
 
-        # Check agian after anomalies removal
+        # Check again after anomalies removal
         if day_df.empty or day_df.isna().all(axis=None):
             return None
 

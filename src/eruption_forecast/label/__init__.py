@@ -1,27 +1,21 @@
-"""Label building module for volcanic eruption forecasting.
+"""Label builder.
 
-This module provides tools for generating binary labels for supervised learning
-by creating time windows from seismic data and marking them as erupted (1) or
-not erupted (0) based on known eruption dates.
+Generates binary classification labels by constructing sliding time
+windows over a date range and marking each window as "erupted" (1) or "not erupted"
+(0) based on known eruption dates and a configurable lead-time parameter
+(``day_to_forecast``). Labels are saved as standardised CSV files whose filenames
+encode all window configuration parameters for reproducibility.
 
-Classes:
-    LabelBuilder: Creates labeled datasets with sliding time windows
-    LabelData: Loads and parses pre-built label CSV files
+Key classes:
+    - ``LabelBuilder``: Builds a single label set over a global ``start_date`` to
+      ``end_date`` range using fixed ``window_size`` and ``window_step`` parameters.
+    - ``DynamicLabelBuilder``: Subclass of ``LabelBuilder`` that generates one
+      per-eruption window spanning ``days_before_eruption`` days before each eruption,
+      then concatenates all windows into one DataFrame with unique IDs.
+    - ``LabelData``: Loads an existing label CSV and parses all window-configuration
+      parameters from the standardised filename (dates, step, unit, day_to_forecast).
 
-Constants:
-    See constants.py for label filename format prefixes, validation thresholds,
-    and default parameter values.
+Label filename format::
 
-Examples:
-    >>> from eruption_forecast.label import LabelBuilder
-    >>> builder = LabelBuilder(
-    ...     start_date="2020-01-01",
-    ...     end_date="2020-12-31",
-    ...     window_step=12,
-    ...     window_step_unit="hours",
-    ...     day_to_forecast=2,
-    ...     eruption_dates=["2020-06-15"],
-    ...     volcano_id="VOLCANO_001"
-    ... )
-    >>> builder.build().save()
+    label_{start_date}_{end_date}_ws-{window_size}_step-{window_step}-{unit}_dtf-{day_to_forecast}.csv
 """

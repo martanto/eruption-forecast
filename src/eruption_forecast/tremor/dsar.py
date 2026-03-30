@@ -1,3 +1,18 @@
+"""Displacement Seismic Amplitude Ratio (DSAR) calculator.
+
+This module provides the ``DSAR`` class, which computes the ratio of mean absolute
+seismic amplitudes between two consecutive frequency bands. DSAR highlights spectral
+changes in volcanic tremor associated with fluid migration and pressurisation, making
+it a sensitive precursor indicator for eruption forecasting.
+
+Key class:
+    - ``DSAR``: Accepts two ObsPy ``Stream`` objects (one per band), computes mean
+      absolute amplitude for each via ``RSAM``-style windowing, and returns their
+      ratio as a ``pd.Series`` via ``calculate()``.
+    - Supports optional outlier removal via ``remove_outlier_method`` (``"maximum"``
+      or ``"all"``).
+"""
+
 from typing import Literal
 
 import numpy as np
