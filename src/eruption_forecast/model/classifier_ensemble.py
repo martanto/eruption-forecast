@@ -234,11 +234,11 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         # Cross-classifier consensus
         classifier_probability_means = np.stack(
-            [v["probability"] for v in clf_results.values()], axis=0
-        )
+            [v["probability"] for v in clf_results.values()], axis=1
+        )  # (n_samples, n_classifiers)
         classifier_prediction_means = np.stack(
-            [v["prediction"] for v in clf_results.values()], axis=0
-        )
+            [v["prediction"] for v in clf_results.values()], axis=1
+        )  # (n_samples, n_classifiers)
 
         (
             consensus_probability,
