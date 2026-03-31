@@ -273,7 +273,7 @@ def notify(
     name: str | None = None,
     on_success: bool = True,
     on_error: bool = True,
-    timeout: float = 10.0,
+    timeout: float = 3.0,
     bot_token: str | None = None,
     chat_id: str | int | None = None,
     include_elapsed: bool = True,
@@ -298,7 +298,7 @@ def notify(
         on_error (bool): Whether to send a notification when an exception is
             raised. Defaults to True.
         timeout (float): Socket timeout in seconds passed to the Telegram HTTP
-            requests. Defaults to 10.0.
+            requests. Defaults to 3.0.
         bot_token (str | None): Telegram bot token. Falls back to the
             ``TELEGRAM_BOT_TOKEN`` environment variable. Defaults to None.
         chat_id (str | int | None): Telegram chat ID or username. Falls back
@@ -311,12 +311,8 @@ def notify(
             and returns a list of paths. Defaults to None.
 
     Returns:
-        Callable: Decorator function that wraps the target function.
-
-    Raises:
-        ValueError: If ``bot_token`` or ``chat_id`` cannot be resolved from
-            arguments or environment variables at decoration time.
-        ValueError: If ``bot_token`` or ``chat_id`` contains whitespace.
+        Callable: Decorator function that wraps the target function, or a
+            no-op decorator if credentials are missing or invalid.
 
     Examples:
         >>> @notify(bot_token="TOKEN", chat_id="123", name="Training")
@@ -336,23 +332,38 @@ def notify(
     resolved_token: str = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
     resolved_chat: str | int = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
 
+    def _noop(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapper
+
     if not resolved_token:
-        raise ValueError(
-            "notify: bot_token not provided and TELEGRAM_BOT_TOKEN not set in environment."
+        logger.warning(
+            "notify: bot_token not provided and TELEGRAM_BOT_TOKEN not set in environment. "
+            "Notifications disabled."
         )
-    if any(c.isspace() for c in resolved_token):
-        raise ValueError(
-            f"notify: bot_token contains whitespace — got {resolved_token!r}. "
-            "Ensure TELEGRAM_BOT_TOKEN is set to the raw token from BotFather."
+        return _noop
+    if any(char.isspace() for char in resolved_token):
+        logger.warning(
+            f"notify: bot_token contains whitespace (length {len(resolved_token)}). "
+            "Ensure TELEGRAM_BOT_TOKEN is set to the raw token from BotFather. "
+            "Notifications disabled."
         )
+        return _noop
     if not resolved_chat:
-        raise ValueError(
-            "notify: chat_id not provided and TELEGRAM_CHAT_ID not set in environment."
+        logger.warning(
+            "notify: chat_id not provided and TELEGRAM_CHAT_ID not set in environment. "
+            "Notifications disabled."
         )
-    if isinstance(resolved_chat, str) and any(c.isspace() for c in resolved_chat):
-        raise ValueError(
-            f"notify: chat_id contains whitespace — got {resolved_chat!r}."
+        return _noop
+    if isinstance(resolved_chat, str) and any(char.isspace() for char in resolved_chat):
+        logger.warning(
+            f"notify: chat_id contains whitespace — got {resolved_chat!r}. "
+            "Notifications disabled."
         )
+        return _noop
 
     hostname = socket.gethostname()
 
@@ -393,7 +404,9 @@ def notify(
                         elapsed if include_elapsed else None,
                     )
                     try:
-                        _send_telegram_message(resolved_token, resolved_chat, msg, timeout)
+                        _send_telegram_message(
+                            resolved_token, resolved_chat, msg, timeout
+                        )
                     except Exception as notify_exc:
                         logger.warning(
                             f"Failed to send error notification: {notify_exc}"
