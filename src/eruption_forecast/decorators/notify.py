@@ -311,12 +311,8 @@ def notify(
             and returns a list of paths. Defaults to None.
 
     Returns:
-        Callable: Decorator function that wraps the target function.
-
-    Raises:
-        ValueError: If ``bot_token`` or ``chat_id`` cannot be resolved from
-            arguments or environment variables at decoration time.
-        ValueError: If ``bot_token`` or ``chat_id`` contains whitespace.
+        Callable: Decorator function that wraps the target function, or a
+            no-op decorator if credentials are missing or invalid.
 
     Examples:
         >>> @notify(bot_token="TOKEN", chat_id="123", name="Training")
@@ -337,22 +333,30 @@ def notify(
     resolved_chat: str | int = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
 
     if not resolved_token:
-        raise ValueError(
-            "notify: bot_token not provided and TELEGRAM_BOT_TOKEN not set in environment."
+        logger.warning(
+            "notify: bot_token not provided and TELEGRAM_BOT_TOKEN not set in environment. "
+            "Notifications disabled."
         )
+        return lambda func: func
     if any(c.isspace() for c in resolved_token):
-        raise ValueError(
+        logger.warning(
             f"notify: bot_token contains whitespace — got {resolved_token!r}. "
-            "Ensure TELEGRAM_BOT_TOKEN is set to the raw token from BotFather."
+            "Ensure TELEGRAM_BOT_TOKEN is set to the raw token from BotFather. "
+            "Notifications disabled."
         )
+        return lambda func: func
     if not resolved_chat:
-        raise ValueError(
-            "notify: chat_id not provided and TELEGRAM_CHAT_ID not set in environment."
+        logger.warning(
+            "notify: chat_id not provided and TELEGRAM_CHAT_ID not set in environment. "
+            "Notifications disabled."
         )
+        return lambda func: func
     if isinstance(resolved_chat, str) and any(c.isspace() for c in resolved_chat):
-        raise ValueError(
-            f"notify: chat_id contains whitespace — got {resolved_chat!r}."
+        logger.warning(
+            f"notify: chat_id contains whitespace — got {resolved_chat!r}. "
+            "Notifications disabled."
         )
+        return lambda func: func
 
     hostname = socket.gethostname()
 
