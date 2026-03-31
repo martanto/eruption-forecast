@@ -102,7 +102,7 @@ Raw Seismic Data (SDS / FDSN)
 │  │   or        │   │ (10 classifiers,     │ │
 │  │  combined   │   │  3 CV strategies)    │ │
 │  └─────────────┘   └──────────────────────┘ │
-│         ↓  evaluate()  ↓ train()  │
+│         ↓  evaluate()  ↓ train()            │
 │    80/20 split + metrics   Full dataset     │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
@@ -113,15 +113,10 @@ Raw Seismic Data (SDS / FDSN)
 ┌─────────────────────────────────────────────┐
 │               ModelPredictor                │
 │  ┌──────────────────────────────────────┐   │
-│  │ predict() / predict_best()           │   │
-│  │ (evaluation mode — requires labels)  │   │
-│  └──────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────┐   │
 │  │ predict_proba()                      │   │
 │  │ (forecast mode — no labels needed)   │   │
 │  └──────────────────────────────────────┘   │
-│  Single model, merged pkl, or multi-model   │
-│  consensus                                  │
+│  Single model or multi-model consensus      │
 └─────────────────────────────────────────────┘
 ```
 
@@ -134,9 +129,9 @@ sequential branches — train-with-evaluation and train-for-prediction — both
 operating on the same `ForecastModel` instance.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             main.py  —  Stage Flow                          │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        main.py  —  Stage Flow                        │
+└──────────────────────────────────────────────────────────────────────┘
 
   fm = ForecastModel(root_dir, station, channel, …, n_jobs=6)
        │
@@ -216,7 +211,7 @@ operating on the same `ForecastModel` instance.
 - `CalculateTremor`: Main orchestrator (`calculate_tremor.py`)
 - `RSAM`: Mean amplitude metrics (`rsam.py`)
 - `DSAR`: Amplitude ratios between bands (`dsar.py`)
-- `ShanonEntropy`: Signal complexity metric (`shannon_entropy.py`)
+- `ShannonEntropy`: Signal complexity metric (`shannon_entropy.py`)
 - `TremorData`: Loads and validates tremor CSV files (`tremor_data.py`)
 - `SDS`: Reads SeisComP Data Structure files (`sources/sds.py`)
 - `FDSN`: Downloads seismic data from FDSN web services with local SDS caching (`sources/fdsn.py`)
@@ -332,7 +327,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 - Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
 - CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
 - Uses `RandomUnderSampler` to handle class imbalance
-- Feature selection runs once per seed and is shared across classifiers; results are written to `features/{cv-slug}/` rather than inside each classifier directory
+- Feature selection and resampled training data are cached per seed to `features/{cv-slug}/` (resampled data in `features/{cv-slug}/resampled/`) for deterministic two-phase parallel dispatch
 - Two training modes:
   - `evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
   - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
@@ -347,8 +342,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
   - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/classifiers/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
 - `MultiModelEvaluator`: Aggregate evaluation across all seeds (`multi_model_evaluator.py`)
   - Methods: `plot_all()`, `plot_roc()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
-- `ModelPredictor`: Runs inference in evaluation or forecast mode (`model_predictor.py`)
-  - `predict()` / `predict_best()`: Requires labels (evaluation mode)
+- `ModelPredictor`: Runs forecast inference (`model_predictor.py`)
   - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
 - `PipelineConfig`: Serialisable pipeline configuration (`src/eruption_forecast/config/pipeline_config.py`)
 
@@ -460,7 +454,7 @@ These classes are exported from the package root (`from eruption_forecast import
 | `TremorMatrixBuilder` | tremor DataFrame + label DataFrame | `tremor_matrix_*.csv` — long-format with `id`, `datetime`, tremor columns |
 | `FeaturesBuilder` | tremor matrix + labels | `all_extracted_features_*.csv`, `label_features_*.csv` |
 | `ModelTrainer` | features CSV + labels CSV | `models/*.pkl`, `trained_model_*.csv`, metrics files |
-| `ModelPredictor` | `trained_model_*.csv` + new tremor | `predictions.csv`, `eruption_forecast.png` |
+| `ModelPredictor` | `*.pkl` (SeedEnsemble / ClassifierEnsemble) + new tremor | `predictions.csv`, `eruption_forecast.png` |
 
 ---
 
@@ -468,9 +462,9 @@ These classes are exported from the package root (`from eruption_forecast import
 
 | Module | Key Functions |
 |--------|---------------|
-| `utils/array.py` | `detect_maximum_outlier()`, `remove_outliers()` — Z-score based |
+| `utils/array.py` | `detect_maximum_outlier()`, `remove_outliers()`, `detect_anomalies_zscore()`, `predict_proba_from_estimator()`, `aggregate_seed_probabilities()` |
 | `utils/window.py` | `construct_windows()`, `calculate_window_metrics()` |
-| `utils/date_utils.py` | `to_datetime()`, `normalize_dates()`, `parse_label_filename()` |
+| `utils/date_utils.py` | `to_datetime()`, `normalize_dates()`, `sort_dates()`, `parse_label_filename()`, `set_datetime_index()` |
 | `utils/ml.py` | `random_under_sampler()`, `get_significant_features()`, `load_labels_from_csv()`, `merge_seed_models()`, `merge_all_classifiers()` |
 | `utils/validation.py` | `validate_random_state()`, `validate_date_ranges()`, `validate_window_step()`, `validate_columns()`, `check_sampling_consistency()` |
 | `utils/pathutils.py` | `resolve_output_dir()` — resolves relative paths against `root_dir`; `ensure_dir()` — canonical directory-creation helper |

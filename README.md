@@ -101,7 +101,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, frequency band contribution charts, and **learning curve plots** (`plot_learning_curve_grid`) via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
 - **Two Training Workflows**: `evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
-- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables sklearn-compatible `predict_proba()` / `predict()` calls directly on the ensemble
+- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables `predict_proba()` directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function — no external dependencies except an optional `weasyprint` for PDF export
 - **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
@@ -171,15 +171,10 @@ Raw Seismic Data (SDS / FDSN)
 ┌─────────────────────────────────────────────┐
 │               ModelPredictor                │
 │  ┌──────────────────────────────────────┐   │
-│  │ predict() / predict_best()           │   │
-│  │ (evaluation mode — requires labels)  │   │
-│  └──────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────┐   │
 │  │ predict_proba()                      │   │
 │  │ (forecast mode — no labels needed)   │   │
 │  └──────────────────────────────────────┘   │
-│  Single model, merged pkl, or multi-model   │
-│  consensus                                  │
+│  Single model or multi-model consensus      │
 └──────────────────────┬──────────────────────┘
                        │
                        ▼
@@ -438,7 +433,7 @@ path = ComparatorReport(
 path = PredictionReport(
     prediction_df=fm.prediction_df,
     eruption_dates=["2025-03-20"],
-    threshold=0.5,
+    threshold=0.7,
 ).save()
 ```
 
