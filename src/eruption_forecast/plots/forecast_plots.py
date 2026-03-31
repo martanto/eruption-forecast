@@ -38,7 +38,7 @@ from eruption_forecast.utils.date_utils import (
 
 def plot_forecast(
     df: pd.DataFrame,
-    label_df: pd.DataFrame | pd.Series,
+    label_df: pd.DataFrame | pd.Series | None = None,
     title: str | None = None,
     fig_width: float = 12,
     fig_height: float = 3,
@@ -96,7 +96,12 @@ def plot_forecast(
         }
     )
 
-    if label_df is not None:
+    # Ensure df have pd.DatetimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        if label_df is None or len(label_df) == 0:
+            raise ValueError(
+                "label_df is needed since concensus dataframe does not have pd.DatetimeIndex."
+            )
         df = set_datetime_index(label_df, df)
 
     # Maintain backward compatibility
@@ -253,7 +258,7 @@ def plot_forecast(
 
 def plot_forecast_from_file(
     consensus_file: str,
-    label_file: str,
+    label_file: str | None = None,
     title: str | None = None,
     fig_width: float = 12,
     fig_height: float = 3,
@@ -285,10 +290,12 @@ def plot_forecast_from_file(
     Returns:
         plt.Figure: Matplotlib figure object with three vertically stacked subplots.
     """
-    df = pd.read_csv(consensus_file, index_col="id")
-    label_df = pd.read_csv(label_file, index_col=0, parse_dates=True)
-
-    df = set_datetime_index(label_df, df)
+    df = pd.read_csv(consensus_file, index_col=0, parse_dates=True)
+    label_df = (
+        pd.read_csv(label_file, index_col=0, parse_dates=True)
+        if label_file
+        else pd.DataFrame()
+    )
 
     return plot_forecast(
         df,
