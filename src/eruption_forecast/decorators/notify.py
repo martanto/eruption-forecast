@@ -340,7 +340,7 @@ def notify(
         return lambda func: func
     if any(c.isspace() for c in resolved_token):
         logger.warning(
-            f"notify: bot_token contains whitespace — got {resolved_token!r}. "
+            f"notify: bot_token contains whitespace (length {len(resolved_token)}). "
             "Ensure TELEGRAM_BOT_TOKEN is set to the raw token from BotFather. "
             "Notifications disabled."
         )
