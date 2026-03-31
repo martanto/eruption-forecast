@@ -102,6 +102,7 @@ def plot_forecast(
             raise ValueError(
                 "df must have a DatetimeIndex; provide label_df (id→datetime mapping) so "
                 "set_datetime_index() can construct and align the forecast index."
+                "set_datetime_index() can construct and align the forecast index."
             )
         df = set_datetime_index(label_df, df)
 
