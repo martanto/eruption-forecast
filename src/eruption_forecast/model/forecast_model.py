@@ -154,9 +154,9 @@ class ForecastModel:
         station: str,
         channel: str,
         network: str,
-        location: str,
         window_size: int,
         volcano_id: str,
+        location: str | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
@@ -193,6 +193,7 @@ class ForecastModel:
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
         root_dir = os.path.abspath(root_dir) if root_dir is not None else None
+        location = location if location is not None else ""
         nslc, output_dir, station_dir, features_dir = self._setup_directories(
             network, station, location, channel, output_dir, root_dir
         )
@@ -693,9 +694,6 @@ class ForecastModel:
 
         if not self.network.strip():
             raise ValueError("network cannot be empty")
-
-        if not self.location.strip():
-            raise ValueError("location cannot be empty")
 
         if self.n_jobs <= 0:
             raise ValueError(f"n_jobs must be greater than 0. Got: {self.n_jobs}")

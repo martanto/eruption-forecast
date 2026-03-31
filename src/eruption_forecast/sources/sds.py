@@ -47,7 +47,7 @@ class SDS(SeismicDataSource):
         station (str): Station code (e.g., "OJN").
         channel (str): Channel code (e.g., "EHZ").
         network (str, optional): Network code. (e.g., "VG").
-        location (str): Location code (e.g., "00"). Empty string accepted.
+        location (str | None): Location code (e.g., "00"). ``None`` and empty string accepted.
         interpolate (bool, optional): Interpolate missing data. Defaults to True.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
         debug (bool, optional): Enable debug logging. Defaults to False.
@@ -78,7 +78,7 @@ class SDS(SeismicDataSource):
         station: str,
         channel: str,
         network: str,
-        location: str,
+        location: str | None = None,
         channel_type: str = "D",
         interpolate: bool = True,
         verbose: bool = False,
@@ -94,8 +94,8 @@ class SDS(SeismicDataSource):
             station (str): Seismic station code (e.g., "OJN"). Must be non-empty.
             channel (str): Channel code (e.g., "EHZ"). Must be non-empty.
             network (str, optional): Seismic network code (e.g., "VG"). Cannot be empty.
-            location (str): Location code (e.g., "00"). Empty string is accepted;
-                pass ``""`` when no location code is assigned. Cannot be None.
+            location (str | None): Location code (e.g., ``"00"``). Both ``None`` and
+                ``""`` are accepted and treated as an empty location code.
             channel_type (str, optional): Set channel type. Defaults to "D".
             interpolate (bool, optional): Apply linear interpolation to fill gaps
                 in loaded streams. Defaults to True.
@@ -114,8 +114,9 @@ class SDS(SeismicDataSource):
             raise ValueError("Channel code must be a non-empty string")
         if not network or not isinstance(network, str):
             raise ValueError("Network must be a non-empty string")
-        if location is None or not isinstance(location, str):
-            raise ValueError("Location code must be not None")
+        if location is not None and not isinstance(location, str):
+            raise ValueError("Location code must be a string or None")
+        location = location if location is not None else ""
 
         # Check if SDS directory exists
         sds_path = Path(sds_dir)

@@ -78,7 +78,7 @@ class CalculateTremor:
         start_date (datetime): Start date for data processing.
         end_date (datetime): End date for data processing.
         network (str): Seismic network code (uppercase).
-        location (str): Seismic location code (uppercase). Empty string accepted.
+        location (str | None): Seismic location code (uppercase). ``None`` and empty string accepted.
         methods (list[str]): Calculation methods to apply (rsam, dsar).
         output_dir (str): Root output directory.
         station_dir (str): Station-specific output directory.
@@ -112,7 +112,7 @@ class CalculateTremor:
         station (str): Seismic station code (e.g., "OJN").
         channel (str): Seismic channel code (e.g., "EHZ").
         network (str): Seismic network code (e.g., ``"VG"``).
-        location (str): Seismic location code (e.g., ``"00"``). Empty string accepted.
+        location (str | None): Seismic location code (e.g., ``"00"``). ``None`` and empty string accepted.
         methods (list[str] | None): Calculation methods to apply
             (e.g., ``["rsam", "dsar", "entropy"]``). If None, defaults to all
             three methods. Defaults to None.
@@ -165,7 +165,7 @@ class CalculateTremor:
         station: str,
         channel: str,
         network: str,
-        location: str,
+        location: str | None = None,
         channel_type: str = "D",
         methods: list[str] | None = None,
         output_dir: str | None = None,
@@ -199,7 +199,7 @@ class CalculateTremor:
             station (str): Seismic station code (e.g., "OJN").
             channel (str): Channel code (e.g., "EHZ").
             network (str): Seismic network code (e.g., ``"VG"``).
-            location (str): Seismic location code (e.g., ``"00"``). Empty string accepted.
+            location (str | None): Seismic location code (e.g., ``"00"``). ``None`` and empty string accepted.
             channel_type (str, optional): Set channel type. Defaults to "D".
             methods (list[str] | None, optional): Tremor metrics to compute.
                 Defaults to ["rsam", "dsar", "entropy"].
@@ -235,6 +235,7 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         start_date = to_datetime(start_date)
         end_date = to_datetime(end_date)
+        location = location if location is not None else ""
         nslc = f"{network}.{station}.{location}.{channel}"
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         station_dir = os.path.join(output_dir, nslc)
@@ -1334,7 +1335,7 @@ class CalculateTremor:
             station (str): Seismic station code (e.g. ``"OJN"``).
             channel (str): Seismic channel code (e.g. ``"EHZ"``).
             network (str): Seismic network code. Defaults to ``"VG"``.
-            location (str): Seismic location code. Defaults to ``"00"``.
+            location (str | None): Seismic location code. ``None`` and empty string accepted. Defaults to ``None``.
             methods (list[str] | None): Calculation methods to apply
                 (``"rsam"``, ``"dsar"``, ``"entropy"``). Must match those used
                 when the original CSV was created. Defaults to None (all three).

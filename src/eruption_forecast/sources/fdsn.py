@@ -44,7 +44,7 @@ class FDSN(SeismicDataSource):
         station (str): Station code (e.g., "OJN").
         channel (str): Channel code (e.g., "EHZ").
         network (str, optional): Network code. Defaults to "VG".
-        location (str, optional): Location code. Defaults to "00".
+        location (str | None, optional): Location code. ``None`` and empty string accepted. Defaults to ``None``.
         client_url (str, optional): FDSN web-service URL. Defaults to
             ``"https://service.iris.edu"``.
         download_dir (str, optional): Local directory for caching downloaded
@@ -59,7 +59,7 @@ class FDSN(SeismicDataSource):
         station (str): Station code.
         channel (str): Channel code.
         network (str): Network code.
-        location (str): Location code.
+        location (str | None): Location code. ``None`` and empty string accepted.
         channel_type (str): str = Channel type. Defaults to "D".,
         download_dir (str): Local directory used as the SDS cache root.
         overwrite (bool): Whether cached files are overwritten on each download.
@@ -80,7 +80,7 @@ class FDSN(SeismicDataSource):
         station: str,
         channel: str,
         network: str,
-        location: str,
+        location: str | None = None,
         channel_type: str = "D",
         client_url: str | None = None,
         download_dir: str | None = None,
@@ -98,7 +98,7 @@ class FDSN(SeismicDataSource):
             station (str): Seismic station code (e.g., "OJN").
             channel (str): Channel code (e.g., "EHZ").
             network (str, optional): Seismic network code. Defaults to "VG".
-            location (str, optional): Location code. Defaults to "00".
+            location (str | None, optional): Location code. ``None`` and empty string accepted. Defaults to ``None``.
             channel_type (str, optional): Set channel type. Defaults to "D".
             client_url (str | None, optional): FDSN web service base URL.
                 Defaults to "https://service.iris.edu".
@@ -110,6 +110,7 @@ class FDSN(SeismicDataSource):
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
+        location = location if location is not None else ""
         client_url = client_url or "https://service.iris.edu"
         client = FDSNClient(client_url)
         download_dir = download_dir or os.path.join(os.getcwd(), "downloads")
