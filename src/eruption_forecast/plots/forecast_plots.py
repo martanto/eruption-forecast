@@ -245,7 +245,7 @@ def plot_forecast(
         bbox_to_anchor=(0.05, -0.075),
     )
 
-    plt.suptitle(title or "Forecast Results", fontsize=14)
+    fig.suptitle(title or "Forecast Results", fontsize=14)
     plt.tight_layout()
 
     return fig
