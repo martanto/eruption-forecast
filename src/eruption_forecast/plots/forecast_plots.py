@@ -100,7 +100,8 @@ def plot_forecast(
     if not isinstance(df.index, pd.DatetimeIndex):
         if label_df is None or len(label_df) == 0:
             raise ValueError(
-                "label_df is needed since concensus dataframe does not have pd.DatetimeIndex."
+                "df must have a DatetimeIndex; provide label_df (id→datetime mapping) so "
+                "set_datetime_index() can construct and align the forecast index."
             )
         df = set_datetime_index(label_df, df)
 
