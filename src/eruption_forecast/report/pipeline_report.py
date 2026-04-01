@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from eruption_forecast.model.forecast_model import ForecastModel
 
 
-
 class PipelineReport(BaseReport):
     """Generate a combined pipeline HTML report with sidebar navigation.
 
@@ -286,7 +285,9 @@ class PipelineReport(BaseReport):
         features_csv = _find("features_")
         prediction_csv = _find("prediction")
 
-        tremor_rpt = TremorReport(tremor_csv, output_dir=report_out) if tremor_csv else None
+        tremor_rpt = (
+            TremorReport(tremor_csv, output_dir=report_out) if tremor_csv else None
+        )
         label_rpt = LabelReport(label_csv, output_dir=report_out) if label_csv else None
         features_rpt = (
             FeaturesReport(features_csv, label_csv=label_csv, output_dir=report_out)

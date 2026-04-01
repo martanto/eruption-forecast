@@ -61,7 +61,9 @@ def to_datetime(date: str | datetime, variable_name: str | None = None) -> datet
         )
 
 
-def sort_dates(dates: list[str], as_datetime: bool = False) -> list[str] | list[datetime]:
+def sort_dates(
+    dates: list[str], as_datetime: bool = False
+) -> list[str] | list[datetime]:
     """Sort a list of date strings chronologically.
 
     Converts date strings to datetime objects, sorts them chronologically,

@@ -130,9 +130,7 @@ class TrainingReport(BaseReport):
         if not rows:
             return {}
         numeric_keys = [
-            k
-            for k, v in rows[0].items()
-            if isinstance(v, (int, float)) and k != "seed"
+            k for k, v in rows[0].items() if isinstance(v, (int, float)) and k != "seed"
         ]
         result: dict[str, Any] = {}
         for k in numeric_keys:

@@ -156,4 +156,3 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     else:
         joblib.dump(data, full_path)
     logger.info(f"Saved: {full_path}")
-

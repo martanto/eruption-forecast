@@ -490,7 +490,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("confusion_matrix", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("confusion_matrix", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -525,7 +530,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("roc_curve", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("roc_curve", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -559,7 +569,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("pr_curve", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("pr_curve", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -659,7 +674,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("threshold_analysis", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("threshold_analysis", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -705,7 +725,12 @@ class ModelEvaluator:
             )
             return None
 
-        save_figure(fig, self._get_plot_filepath("feature_importance", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("feature_importance", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -746,7 +771,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("calibration", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("calibration", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -785,7 +815,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("prediction_distribution", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("prediction_distribution", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -879,7 +914,12 @@ class ModelEvaluator:
             ensure_dir(os.path.dirname(self._shap_explanation_filepath))
             joblib.dump(explanation, self._shap_explanation_filepath)
 
-        save_figure(fig, self._get_plot_filepath("shap_summary", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("shap_summary", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
         return fig
 
     def plot_learning_curve(

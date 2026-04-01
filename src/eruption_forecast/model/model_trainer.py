@@ -342,9 +342,7 @@ class ModelTrainer(EvaluationTrainer):
                         }
                     )
                 else:
-                    pending_training_model_jobs.append(
-                        (random_state, classifier_slug)
-                    )
+                    pending_training_model_jobs.append((random_state, classifier_slug))
 
         return (
             pending_feature_selection_jobs,
@@ -423,9 +421,7 @@ class ModelTrainer(EvaluationTrainer):
                 continue  # Feature selection produced 0 features — skip all classifiers.
             _rs = job[0]
             for classifier_model in self.classifier_models:
-                new_training_model_jobs.append(
-                    (_rs, classifier_model.slug_name)
-                )
+                new_training_model_jobs.append((_rs, classifier_model.slug_name))
 
         # ===== PHASE 2: Parallel (seed × classifier) training =====
         all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs

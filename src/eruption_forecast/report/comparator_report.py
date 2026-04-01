@@ -109,9 +109,7 @@ class ComparatorReport(BaseReport):
             result[m] = f"{vals.mean():.4f} ± {vals.std():.4f}"
         return result
 
-    def _comparison_chart_json(
-        self, agg_data: dict[str, dict[str, str]]
-    ) -> str:
+    def _comparison_chart_json(self, agg_data: dict[str, dict[str, str]]) -> str:
         """Build Plotly grouped bar chart for all classifiers × metrics.
 
         Args:

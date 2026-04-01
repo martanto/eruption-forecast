@@ -107,7 +107,10 @@ class RSAM:
             >>> print(rsam.is_filtered)  # True
         """
         self.trace = self.trace.filter(
-            "bandpass", freqmin=freq_min, freqmax=freq_max, corners=BANDPASS_FILTER_CORNERS
+            "bandpass",
+            freqmin=freq_min,
+            freqmax=freq_max,
+            corners=BANDPASS_FILTER_CORNERS,
         )
 
         # Set is_filtered to True
