@@ -864,8 +864,7 @@ class BaseModelTrainer:
             verbose=0,
         )
 
-        # Force loky backend to avoid the threading backend that Intel's
-        # scikit-learn extension (sklearnex) does not support.
+        # Force loky backend for nested-parallelism safety when n_jobs > 1.
         with joblib.parallel_backend("loky"):
             grid_search.fit(features[top_n_features], labels)
 

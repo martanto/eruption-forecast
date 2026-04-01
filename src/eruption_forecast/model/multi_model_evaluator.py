@@ -8,7 +8,6 @@ CSV — and generates ensemble-level statistics and plots.
 import os
 import glob
 import json
-import warnings
 import functools
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -851,24 +850,15 @@ class MultiModelEvaluator:
         }
 
         results: dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None] = {}
-        with warnings.catch_warnings():
-            # sklearnex (Intel Extension for scikit-learn) does not support the
-            # threading parallel backend and emits a UserWarning when called from
-            # a thread pool. The fallback behaviour is correct, so suppress it.
-            warnings.filterwarnings(
-                "ignore",
-                message=".*Threading.*parallel backend.*not supported.*",
-                category=UserWarning,
-            )
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(fn): name for name, fn in plot_tasks.items()}
-                for future in as_completed(futures):
-                    name = futures[future]
-                    try:
-                        results[name] = future.result()
-                    except Exception as exc:
-                        logger.warning(f"Plot {name!r} failed: {exc}")
-                        results[name] = None
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(fn): name for name, fn in plot_tasks.items()}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    results[name] = future.result()
+                except Exception as exc:
+                    logger.warning(f"Plot {name!r} failed: {exc}")
+                    results[name] = None
         return results
 
     # ------------------------------------------------------------------

@@ -16,21 +16,9 @@ Public API:
     - ``ClassifierComparator``: Accepts a mapping of classifier names to registry
       CSV paths and produces side-by-side comparison tables and plots.
 
-On import the package silences the ``sklearnex`` logger and, when Intel
-scikit-learn-intelex is available, patches sklearn for accelerated CPU execution.
+All classifiers use the standard scikit-learn implementations.
+GridSearchCV is always run under the ``loky`` parallel backend for nested-parallelism safety.
 """
-
-import logging
-
-
-logging.getLogger("sklearnex").setLevel(logging.WARNING)
-
-try:
-    from sklearnex import patch_sklearn  # type: ignore[import-untyped]
-
-    patch_sklearn(verbose=False)
-except (ImportError, RuntimeError):
-    pass
 
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.model_evaluator import ModelEvaluator
