@@ -1335,7 +1335,7 @@ class CalculateTremor:
             station (str): Seismic station code (e.g. ``"OJN"``).
             channel (str): Seismic channel code (e.g. ``"EHZ"``).
             network (str): Seismic network code. Defaults to ``"VG"``.
-            location (str | None): Seismic location code. ``None`` and empty string accepted. Defaults to ``None``.
+            location (str): Seismic location code (e.g. ``"00"``). Defaults to ``"00"``.
             methods (list[str] | None): Calculation methods to apply
                 (``"rsam"``, ``"dsar"``, ``"entropy"``). Must match those used
                 when the original CSV was created. Defaults to None (all three).
