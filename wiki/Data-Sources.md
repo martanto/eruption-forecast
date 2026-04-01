@@ -69,7 +69,7 @@ tremor = CalculateTremor(
 ).from_sds(sds_dir="/data/sds").run()
 ```
 
-`network` defaults to `"VG"` and `location` defaults to `"00"` in both `ForecastModel` and `CalculateTremor`. Pass explicit values when your data uses a different network or location code.
+`network` defaults to `"VG"` in both `ForecastModel` and `CalculateTremor`. `location` defaults to `None` (treated as an empty string `""`). Pass an explicit value when your data uses a location code such as `"00"`.
 
 ---
 

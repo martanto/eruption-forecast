@@ -32,7 +32,7 @@ from eruption_forecast import ForecastModel
 | `window_size` | `int` | — | Duration (days) of each tremor window fed into tsfresh |
 | `volcano_id` | `str` | — | Identifier used in output filenames (e.g. `"Lewotobi Laki-laki"`) |
 | `network` | `str` | `"VG"` | Seismic network code |
-| `location` | `str` | `"00"` | Seismic location code |
+| `location` | `str \| None` | `None` | Seismic location code. `None` and `""` are both accepted and treated as an empty location code |
 | `output_dir` | `str \| None` | `None` | Base output directory; relative paths are resolved against `root_dir`. Defaults to `root_dir/output` |
 | `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir`. Relative values are normalised to an absolute path immediately. Defaults to `os.getcwd()` |
 | `overwrite` | `bool` | `False` | Re-run and overwrite existing output files |

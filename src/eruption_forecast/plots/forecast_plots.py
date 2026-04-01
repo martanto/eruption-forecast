@@ -23,6 +23,7 @@ Internal helpers (not exported):
 from typing import Any
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -44,6 +45,7 @@ def plot_forecast(
     fig_height: float = 3,
     threshold: float = 0.7,
     rolling_window: str = "6h",
+    x_days_interval: int = 2,
     eruption_dates: list[str] | None = None,
 ) -> plt.Figure:
     """Plot eruption forecast probability and prediction time-series with Nature/Science styling.
@@ -77,6 +79,7 @@ def plot_forecast(
             line on every panel and used for fill-between coloring. Defaults to ``0.7``.
         rolling_window (str, optional): Pandas-compatible window string passed to
             ``DataFrame.rolling()`` for smoothing before plotting. Defaults to ``"6h"``.
+        x_days_interval (int, optional): X-axis days interval. Defaults to ``2``.
         eruption_dates (list[str] | None, optional): Eruption dates to annotate on
             every panel as vertical dashed lines. Each entry is passed to
             :func:`to_datetime`. Defaults to ``None``.
@@ -162,7 +165,7 @@ def plot_forecast(
                 threshold=threshold,
             )
 
-            ax.set_ylabel("Consensus", fontsize=12)
+            ax.set_ylabel("Consensus", fontsize=10)
 
         # Per Classifiers Consensus Prediction
         if index == 1:
@@ -183,7 +186,7 @@ def plot_forecast(
                 threshold=threshold,
             )
 
-            ax.set_ylabel("Cons. Prediction", fontsize=12)
+            ax.set_ylabel("Cons. Prediction", fontsize=10)
 
         # Per Classifiers Consensus Probability
         if index == 2:
@@ -204,12 +207,14 @@ def plot_forecast(
                 threshold=threshold,
             )
 
-            ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=x_days_interval))
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-            for label in ax.get_xticklabels(which="major"):
-                label.set(rotation=30, horizontalalignment="right")
 
-            ax.set_ylabel("Cons. Probability", fontsize=12)
+            tick_labels = ax.get_xticklabels(which="major")
+            for label in tick_labels:
+                label.set(rotation=-15, horizontalalignment="left")
+
+            ax.set_ylabel("Cons. Probability", fontsize=10)
 
         if eruption_dates is not None and len(eruption_dates) > 0:
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
@@ -229,7 +234,7 @@ def plot_forecast(
 
         ax.set_xlim(df.index[0], df.index[-1])
         ax.set_ylim(0, 1.0)
-        ax.tick_params(labelsize=12)
+        ax.tick_params(labelsize=10)
         ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
     # Collect unique handles/labels from all panels into one shared legend
@@ -245,11 +250,12 @@ def plot_forecast(
     fig.legend(
         handles,
         labels,
-        loc="lower left",
+        loc="lower center",
         ncol=5,
-        fontsize=12,
+        fontsize=10,
         frameon=False,
-        bbox_to_anchor=(0.05, -0.075),
+        fancybox=False,
+        bbox_to_anchor=(0.5, -0.05),
     )
 
     fig.suptitle(title or "Forecast Results", fontsize=14)
@@ -266,6 +272,7 @@ def plot_forecast_from_file(
     fig_height: float = 3,
     threshold: float = 0.7,
     rolling_window: str = "6h",
+    x_days_interval: int = 2,
     eruption_dates: list[str] | None = None,
 ) -> plt.Figure:
     """Load consensus and label CSVs from disk and plot the forecast.
@@ -286,6 +293,7 @@ def plot_forecast_from_file(
             Defaults to ``0.7``.
         rolling_window (str, optional): Pandas-compatible window string for
             smoothing before plotting. Defaults to ``"6h"``.
+        x_days_interval (int, optional): X-axis days interval. Defaults to ``2``.
         eruption_dates (list[str] | None, optional): Eruption dates to annotate
             as vertical dashed lines on every panel. Defaults to ``None``.
 
@@ -307,6 +315,7 @@ def plot_forecast_from_file(
         fig_height,
         threshold,
         rolling_window,
+        x_days_interval,
         eruption_dates,
     )
 
@@ -388,7 +397,7 @@ def _ax_forecast(
             "alpha": 0.5,
         },
         {
-            "name": f"(0.6<p<={threshold})",
+            "name": f"0.6<p<{threshold}",
             "where": (max_value >= (threshold - threshold_tolerance))
             & (max_value < threshold),
             "color": "#fee090",
@@ -433,12 +442,23 @@ def _ax_eruption(
     Returns:
         plt.Axes: The modified axes object.
     """
+    start_eruption = eruption_date.replace(hour=0, minute=0, second=0)
+    end_eruption = eruption_date.replace(hour=23, minute=59, second=0)
+
     ax.axvline(
         x=eruption_date,  # ty:ignore[invalid-argument-type]
         color="red",
         linewidth=2.5,
         linestyle="--",
         label=label,
+    )
+
+    ax.fill_between(
+        np.array([start_eruption, end_eruption]),
+        0.0,
+        1.0,
+        color="#a50026",
+        alpha=0.1,
     )
 
     ax.text(
