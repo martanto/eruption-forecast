@@ -575,8 +575,8 @@ class BaseModelTrainer:
             score_col = score_cols[0]
             combined_features_df = (
                 combined_features_df.groupby(by="features")
-                .count()
-                .sort_values(by=score_col, ascending=False)
+                .agg(score=(score_col, "count"), mean_score=(score_col, "mean"))
+                .sort_values(by=["score", "mean_score"], ascending=[False, True])
             )
             combined_features_df.index.name = "features"
             combined_features_df.to_csv(
@@ -589,7 +589,7 @@ class BaseModelTrainer:
                     df=combined_features_df.reset_index(),
                     filepath=os.path.join(self.shared_features_dir, filename),
                     overwrite=True,
-                    values_column=score_col,
+                    values_column="score",
                 )
 
         return combined_features_df
