@@ -902,17 +902,14 @@ class ModelEvaluator:
             >>> fig.savefig("custom_shap.png")
         """
 
-        fig, explanation = _plot_shap_summary(
+        fig = _plot_shap_summary(
             model=self.model,
             X=self.X_test,
             max_display=max_display,
-            title=f"SHAP Summary — {self.model_name}",
+            title=f"SHAP {self.model_name}",
             dpi=dpi,
+            shap_filepath=self._shap_explanation_filepath,
         )
-
-        if self._shap_explanation_filepath:
-            ensure_dir(os.path.dirname(self._shap_explanation_filepath))
-            joblib.dump(explanation, self._shap_explanation_filepath)
 
         save_figure(
             fig,
@@ -920,6 +917,7 @@ class ModelEvaluator:
             dpi,
             verbose=self.verbose,
         )
+
         return fig
 
     def plot_learning_curve(
