@@ -39,6 +39,7 @@ ignore = [
     "B904",
     "SIM108",  # Use ternary operator
     "PLR0915", # Too many statements
+    "PD011", # https://docs.astral.sh/ruff/rules/pandas-use-of-dot-values/
 ]
 
 [lint.pydoclint]

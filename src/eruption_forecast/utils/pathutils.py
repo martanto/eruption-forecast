@@ -124,9 +124,14 @@ def save_figure(
     """
     full_path = f"{filepath}.{filetype}"
     ensure_dir(os.path.dirname(full_path))
-    fig.savefig(full_path, dpi=dpi, bbox_inches="tight")
+
+    fig.savefig(
+        full_path, dpi=dpi, bbox_inches="tight", facecolor="white", edgecolor="none"
+    )
+
     if verbose:
         logger.info(f"Saved: {full_path}")
+
     plt.close(fig)
 
 
@@ -156,4 +161,3 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     else:
         joblib.dump(data, full_path)
     logger.info(f"Saved: {full_path}")
-

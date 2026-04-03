@@ -193,6 +193,7 @@ class FeatureSelector:
         X: pd.DataFrame,
         y: pd.Series,
         fdr_level: float = 0.05,
+        top_n: int = 20,
     ) -> tuple[pd.DataFrame, pd.Series]:
         """Stage 1: tsfresh statistical feature selection with FDR control.
 
@@ -226,7 +227,7 @@ class FeatureSelector:
 
         # Get p-values using get_significant_features utility
         X_filtered, p_values = get_significant_features(
-            X, y, fdr_level=fdr_level, n_jobs=self.n_jobs
+            X, y, fdr_level=fdr_level, top_n=top_n, n_jobs=self.n_jobs
         )
 
         self.n_features_tsfresh = X_filtered.shape[1]
@@ -442,7 +443,9 @@ class FeatureSelector:
                 logger.info("Running two-stage feature selection...")
 
             # Stage 1: tsfresh
-            X_filtered, p_values = self._select_tsfresh(X, y, fdr_level=fdr_level)
+            X_filtered, p_values = self._select_tsfresh(
+                X, y, fdr_level=fdr_level, top_n=top_n
+            )
 
             # Stage 2: RandomForest on filtered features
             X_selected, importance_scores = self._select_random_forest(

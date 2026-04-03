@@ -14,12 +14,101 @@ import numpy as np
 import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
+from shap.maskers import Independent
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.pathutils import ensure_dir
 
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
+
+
+def compute_shap_explanation(
+    model: Any,
+    X: pd.DataFrame,
+    feature_names: list[str] | None = None,
+    filepath: str | None = None,
+    overwrite: bool = False,
+) -> shap.Explanation:
+    """Compute a SHAP ``Explanation`` object for the positive class.
+
+    Tree-based ensemble models (detected via ``hasattr(model, "estimators_")``)
+    use ``shap.TreeExplainer`` for fast, exact SHAP values. XGBoost models
+    (detected via ``hasattr(model, "get_booster")``) and all other classifiers
+    (SVM, LR, etc.) use ``shap.Explainer(model.predict_proba, masker)`` with
+    an ``Independent`` masker — required for XGBoost ≥ 3.x where
+    ``TreeExplainer`` fails with a string-to-float error, and avoids the slow
+    ``KernelExplainer`` fallback for non-tree models.
+
+    The positive-class slice is taken automatically for binary classifiers.
+
+    Args:
+        model (Any): A fitted scikit-learn compatible estimator with a
+            ``predict_proba`` method.
+        X (pd.DataFrame): Feature matrix used as both background masker and
+            evaluation set.
+        feature_names (list[str] | None, optional): Column names used when
+            ``X`` is not a DataFrame. Defaults to None.
+        filepath (str | None, optional): If provided, the file exists, and
+            ``overwrite`` is False, loads and returns the cached
+            ``shap.Explanation`` from this path. Otherwise computes fresh
+            values and saves them to this path. Defaults to None.
+        overwrite (bool, optional): When True, recomputes SHAP values even if
+            ``filepath`` already exists. Defaults to False.
+
+    Returns:
+        shap.Explanation: SHAP Explanation object with shape
+        ``(n_samples, n_features)`` for the positive class.
+    """
+    if filepath is not None and not overwrite and os.path.isfile(filepath):
+        logger.info(f"Loading cached SHAP from {filepath}")
+        return joblib.load(filepath)
+
+    cols = list(X.columns) if isinstance(X, pd.DataFrame) else feature_names
+
+    logger.info(
+        f"Computing SHAP values for {len(X)} samples and {len(cols)} features..."
+    )
+
+    # Tree-based models (RF, GBM, etc.) use the fast exact TreeExplainer.
+    is_voting = type(model).__name__ == "VotingClassifier"
+    if (
+        hasattr(model, "estimators_")
+        and not hasattr(model, "get_booster")
+        and not is_voting
+    ):
+        explainer = shap.TreeExplainer(model, X)
+        explanation: shap.Explanation = explainer(X)
+    else:
+        masker = Independent(X, max_samples=len(X))
+        explainer = shap.Explainer(model.predict_proba, masker)
+        explanation: shap.Explanation = explainer(X, silent=True)
+
+    # Binary classifier: shape (n, features, 2) — take positive-class slice.
+    if explanation.values.ndim == 3:  # noqa: PD011
+        base = getattr(explanation, "base_values", None)
+        # base_values may be (n, 2) for binary classifiers — take class-1 slice.
+        if base is not None:
+            base = np.asarray(base)
+            if base.ndim == 2:
+                base = base[:, 1]
+
+        explanation = shap.Explanation(
+            values=explanation.values[:, :, 1],  # noqa: PD011
+            base_values=base,
+            data=explanation.data,
+            feature_names=cols,
+        )
+
+    if filepath:
+        ensure_dir(os.path.dirname(filepath))
+        joblib.dump(explanation, filepath)
+        logger.info(
+            f"SHAP explanation saved to {filepath}",
+        )
+
+    return explanation
 
 
 def plot_shap_summary(
@@ -29,7 +118,8 @@ def plot_shap_summary(
     max_display: int = 20,
     title: str | None = None,
     dpi: int = 150,
-) -> tuple[plt.Figure, shap.Explanation]:
+    shap_filepath: str | None = None,
+) -> plt.Figure:
     """Plot a SHAP beeswarm summary for a single fitted model.
 
     Renders a beeswarm dot plot showing both direction and magnitude of
@@ -50,13 +140,12 @@ def plot_shap_summary(
             to 150.
 
     Returns:
-        tuple[plt.Figure, shap.Explanation]: Matplotlib figure with the SHAP
-        beeswarm plot and the SHAP Explanation object used to produce it.
+        plt.Figure: Matplotlib figure with the SHAP beeswarm plot.
 
     Examples:
         >>> from sklearn.ensemble import RandomForestClassifier
         >>> rf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
-        >>> fig, explanation = plot_shap_summary(rf, X_test)
+        >>> fig = plot_shap_summary(rf, X_test)
         >>> fig.savefig("shap_summary.png")
     """
     if selected_features is not None:
@@ -68,19 +157,29 @@ def plot_shap_summary(
     # The masker is built from X itself (all rows as background).
     # shap.Explainer(model) without a masker raises "not callable" for some
     # model types, so the masker is always passed explicitly here.
-    shap_explanation = compute_shap_explanation(model, X)
+    explanation = compute_shap_explanation(model, X, filepath=shap_filepath)
 
     fig = plt.figure(figsize=(16, max(8, max_display * 0.5)), dpi=dpi)
+
     shap.plots.beeswarm(
-        shap_explanation,
+        explanation,
         max_display=max_display,
         s=32,  # Default 16
         plot_size=None,
         show=False,
     )
-    fig.suptitle(title or "SHAP Summary Plot", y=1.02)
 
-    return fig, shap_explanation
+    # Centering title
+    ax = fig.axes[0]
+    pos = ax.get_position()
+    fig.suptitle(
+        title or "SHAP Summary Plot",
+        x=(pos.x0 + pos.x1) / 2,
+        y=0.9,
+        ha="center",
+    )
+
+    return fig
 
 
 def plot_shap_from_file(
@@ -131,57 +230,69 @@ def plot_shap_from_file(
         plot_size=None,
         show=False,
     )
-    fig.suptitle(title or "SHAP Summary Plot", y=1.02)
+    fig.suptitle(title or "SHAP Summary Plot", y=0.9)
 
     return fig, explanation
 
 
-def compute_shap_explanation(
+def plot_shap_waterfall(
     model: Any,
     X: pd.DataFrame,
-    feature_names: list[str] | None = None,
-) -> shap.Explanation:
-    """Compute a SHAP ``Explanation`` object for the positive class.
+    y_proba: np.ndarray,
+    max_display: int = 20,
+    title: str | None = None,
+    dpi: int = 150,
+    shap_filepath: str | None = None,
+) -> plt.Figure:
+    """Plot a SHAP waterfall chart for the highest-probability eruption prediction.
 
-    Uses ``shap.Explainer(model.predict_proba, masker)`` with an
-    ``Independent`` masker built from ``X``. This path works for any
-    scikit-learn compatible classifier, including ``XGBClassifier`` with
-    XGBoost ≥ 3.x where ``shap.TreeExplainer`` fails with a string-to-float
-    conversion error, and avoids the "not callable" error raised by
-    ``shap.Explainer(model)`` when no masker is supplied.
-
-    For binary classifiers the explainer returns shape ``(n, features, 2)``;
-    the positive-class slice ``[:, :, 1]`` is taken automatically.
+    Computes (or loads from cache) SHAP values for ``X``, selects the single
+    sample with the highest predicted eruption probability, and renders a
+    waterfall showing how each feature contributed to that specific prediction.
 
     Args:
         model (Any): A fitted scikit-learn compatible estimator with a
             ``predict_proba`` method.
-        X (pd.DataFrame): Feature matrix used as both background masker and
-            evaluation set.
-        feature_names (list[str] | None, optional): Column names used when
-            ``X`` is not a DataFrame. Defaults to None.
+        X (pd.DataFrame): Feature matrix used to compute SHAP values.
+            Should be the test set or a representative sample.
+        y_proba (np.ndarray): 1-D array of predicted eruption probabilities
+            aligned with ``X``. Used to select the highest-probability sample.
+        max_display (int, optional): Maximum number of features to display;
+            less impactful features collapse into an "other" term.
+            Defaults to 20.
+        title (str | None, optional): Plot title. If None, uses
+            ``"SHAP Waterfall Plot"``. Defaults to None.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to 150.
+        shap_filepath (str | None, optional): Path to cache or load the
+            ``shap.Explanation`` pickle. Passed directly to
+            ``compute_shap_explanation``. Defaults to None.
 
     Returns:
-        shap.Explanation: SHAP Explanation object with shape
-        ``(n_samples, n_features)`` for the positive class.
+        plt.Figure: Matplotlib figure with the SHAP waterfall plot.
+
+    Examples:
+        >>> from sklearn.ensemble import RandomForestClassifier
+        >>> rf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+        >>> fig = plot_shap_waterfall(rf, X_test, y_proba=proba[:, 1])
+        >>> fig.savefig("shap_waterfall.png")
     """
-    cols = list(X.columns) if isinstance(X, pd.DataFrame) else feature_names
-    masker = shap.maskers.Independent(X, max_samples=len(X))  # ty:ignore[possibly-missing-attribute]
-    explainer = shap.Explainer(model.predict_proba, masker)
-    logger.info("Computing SHAP values for %d samples ...", len(X))
-    shap_output = explainer(X, silent=True)
-    logger.info("SHAP computation complete.")
-    # Binary classifier: shape (n, features, 2) — take positive-class slice.
-    if shap_output.values.ndim == 3:  # noqa: PD011
-        return shap.Explanation(
-            values=shap_output.values[:, :, 1],  # noqa: PD011
-            data=shap_output.data,
-            feature_names=cols,
-        )
-    return shap_output
+    explanation = compute_shap_explanation(model, X, filepath=shap_filepath)
+
+    top_idx = int(np.argmax(y_proba))
+    prob = float(y_proba[top_idx])
+
+    fig = plt.figure(dpi=dpi)
+    shap.plots.waterfall(explanation[top_idx], max_display=max_display, show=False)
+    fig.suptitle(
+        title or f"SHAP Waterfall Plot (p={prob:.3f})",
+        y=0.9,
+    )
+
+    return fig
 
 
-def _extract_shap_array(shap_output: Any) -> np.ndarray:
+def _extract_shap_array(shap_values: Any) -> np.ndarray:
     """Extract a 2-D SHAP value array from a SHAP Explanation object or ndarray.
 
     Handles both raw ``np.ndarray`` returns and ``shap.Explanation`` objects.
@@ -189,19 +300,19 @@ def _extract_shap_array(shap_output: Any) -> np.ndarray:
     — the positive-class slice ``[:, :, 1]`` is taken automatically.
 
     Args:
-        shap_output (Any): Return value of ``shap.Explainer.__call__``,
+        shap_values (Any): Return value of ``shap.Explainer.__call__``,
             either a ``shap.Explanation`` object or a plain ``np.ndarray``.
 
     Returns:
         np.ndarray: 2-D array of shape ``(n_samples, n_features)`` containing
         raw SHAP values for the positive class.
     """
-    if isinstance(shap_output, np.ndarray):
-        raw = shap_output
-    elif hasattr(shap_output, "values"):
-        raw = np.asarray(shap_output.values)  # noqa: PD011
+    if isinstance(shap_values, np.ndarray):
+        raw = shap_values
+    elif hasattr(shap_values, "values"):
+        raw = np.asarray(shap_values.values)  # noqa: PD011
     else:
-        raw = np.array(shap_output)
+        raw = np.array(shap_values)
 
     # Binary classifier: (n, features, 2) → class-1 slice
     if raw.ndim == 3:
@@ -242,11 +353,11 @@ def _build_aggregate_explanation(
     all_values: list[np.ndarray] = []
     all_data: list[np.ndarray] = []
 
-    for exp, seed_names in zip(explanations, per_seed_names, strict=True):
-        if exp is None:
+    for explanation, seed_names in zip(explanations, per_seed_names, strict=True):
+        if explanation is None:
             continue
-        vals = np.asarray(exp.values)  # noqa: PD011
-        raw_data = getattr(exp, "data", None)
+        vals = np.asarray(explanation.values)  # noqa: PD011
+        raw_data = getattr(explanation, "data", None)
         data = np.asarray(raw_data) if raw_data is not None else np.zeros_like(vals)
         n_samples = vals.shape[0]
 
@@ -365,6 +476,151 @@ def plot_aggregate_shap_summary(
         plot_size=None,
         show=False,
     )
-    fig.suptitle(title or "Aggregate SHAP Beeswarm", y=1.02)
+    fig.suptitle(title or "Aggregate SHAP Beeswarm", y=0.9)
 
     return fig, agg_explanation
+
+
+def plot_aggregate_shap_waterfall(
+    models: list[Any],
+    X_tests: list[pd.DataFrame],
+    feature_names: list[list[str]] | list[str],
+    y_probas: list[np.ndarray],
+    max_display: int = 20,
+    title: str | None = None,
+    dpi: int = 150,
+    explanations: list[shap.Explanation | None] | None = None,
+) -> tuple[plt.Figure, shap.Explanation]:
+    """Plot a SHAP waterfall for the mean top-sample explanation across seeds.
+
+    For each seed, selects the sample with the highest predicted eruption
+    probability, zero-pads its SHAP values to the union feature space, then
+    averages across seeds to produce a single representative waterfall. Seeds
+    whose SHAP computation fails are skipped with a warning.
+
+    Args:
+        models (list[Any]): Fitted estimators, one per seed.
+        X_tests (list[pd.DataFrame]): Test feature DataFrames, one per seed.
+        feature_names (list[list[str]] | list[str]): Per-seed feature name
+            lists, or a flat list shared by all seeds.
+        y_probas (list[np.ndarray]): Per-seed 1-D predicted eruption
+            probability arrays, aligned with each seed's ``X_test``.
+        max_display (int, optional): Maximum number of features to display.
+            Defaults to 20.
+        title (str | None, optional): Plot title. If None, uses
+            ``"Aggregate SHAP Waterfall"``. Defaults to None.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to 150.
+        explanations (list[shap.Explanation | None] | None, optional):
+            Pre-computed per-seed Explanation objects. When a slot is not
+            None the cached values are used directly. Defaults to None.
+
+    Returns:
+        tuple[plt.Figure, shap.Explanation]: Matplotlib figure with the
+        waterfall plot and the mean single-row ``shap.Explanation`` used to
+        produce it.
+
+    Raises:
+        ValueError: If no seeds produced valid SHAP values.
+
+    Examples:
+        >>> fig, explanation = plot_aggregate_shap_waterfall(
+        ...     models=trained_models,
+        ...     X_tests=test_sets,
+        ...     feature_names=per_seed_feature_names,
+        ...     y_probas=per_seed_probas,
+        ... )
+        >>> fig.savefig("aggregate_shap_waterfall.png")
+    """
+    # Normalise feature_names to per-seed lists.
+    per_seed_names: list[list[str]]
+    if feature_names and isinstance(feature_names[0], list):
+        per_seed_names = feature_names  # type: ignore[assignment]
+    else:
+        per_seed_names = [feature_names] * len(models)  # type: ignore[list-item]
+
+    if not (len(models) == len(X_tests) == len(per_seed_names) == len(y_probas)):
+        raise ValueError(
+            f"models ({len(models)}), X_tests ({len(X_tests)}), "
+            f"feature_names ({len(per_seed_names)}), and y_probas ({len(y_probas)}) "
+            "must have equal length."
+        )
+
+    # Build union feature space (insertion-ordered).
+    all_names: list[str] = list(
+        dict.fromkeys(name for names in per_seed_names for name in names)
+    )
+    n_features = len(all_names)
+    feat_idx: dict[str, int] = {name: i for i, name in enumerate(all_names)}
+
+    # Compute or collect per-seed explanations.
+    seed_explanations: list[shap.Explanation | None] = []
+    for i, (model, X) in enumerate(zip(models, X_tests, strict=True)):
+        cached = explanations[i] if explanations is not None else None
+        if cached is not None:
+            seed_explanations.append(cached)
+        else:
+            try:
+                seed_explanations.append(compute_shap_explanation(model, X))
+            except Exception as e:
+                logger.warning(f"Skipping seed {i} in SHAP waterfall aggregation: {e}")
+                seed_explanations.append(None)
+
+    # For each seed, pick the top-probability sample and zero-pad to union space.
+    top_values: list[np.ndarray] = []
+    top_data: list[np.ndarray] = []
+    top_bases: list[float] = []
+
+    for explanation, seed_names, y_proba in zip(
+        seed_explanations, per_seed_names, y_probas, strict=True
+    ):
+        if explanation is None:
+            continue
+        top_idx = int(np.argmax(y_proba))
+        vals = np.asarray(explanation.values)[top_idx]
+
+        raw_data = getattr(explanation, "data", None)
+        data = (
+            np.asarray(raw_data)[top_idx]
+            if raw_data is not None
+            else np.zeros_like(vals)
+        )
+
+        base = getattr(explanation, "base_values", None)
+        if base is not None:
+            base_arr = np.asarray(base)
+            # base_values may be a scalar (TreeExplainer) or 1-D array (n_samples,).
+            base_val = (
+                float(base_arr[top_idx])
+                if base_arr.ndim > 0 and len(base_arr) > 1
+                else float(base_arr.flat[0])
+            )
+        else:
+            base_val = 0.0
+
+        padded_vals = np.zeros(n_features)
+        padded_data = np.zeros(n_features)
+        for j, name in enumerate(seed_names):
+            if name in feat_idx:
+                padded_vals[feat_idx[name]] = vals[j]
+                padded_data[feat_idx[name]] = data[j]
+
+        top_values.append(padded_vals)
+        top_data.append(padded_data)
+        top_bases.append(base_val)
+
+    if not top_values:
+        raise ValueError("No valid seeds to build aggregate waterfall explanation.")
+
+    mean_explanation = shap.Explanation(
+        values=np.mean(top_values, axis=0),
+        base_values=float(np.mean(top_bases)),
+        data=np.mean(top_data, axis=0),
+        feature_names=all_names,
+    )
+
+    fig = plt.figure(dpi=dpi)
+    shap.plots.waterfall(mean_explanation, max_display=max_display, show=False)
+    fig.suptitle(title or "Aggregate SHAP Waterfall", y=0.9)
+
+    return fig, mean_explanation

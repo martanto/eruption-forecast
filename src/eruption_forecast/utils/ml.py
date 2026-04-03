@@ -167,6 +167,7 @@ def get_significant_features(
     features: pd.DataFrame,
     labels: pd.Series | pd.DataFrame,
     fdr_level: float = 0.05,
+    top_n: int = 20,
     n_jobs: int = 1,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Get significant features ranked by p-value using tsfresh FeatureSelector.
@@ -213,13 +214,13 @@ def get_significant_features(
     _significant_features.name = "p_values"
     _significant_features.index.name = "features"
 
-    # If no relevant features found, fall back to the 50 most significant
+    # If no relevant features found, fall back to the 20 most significant
     # features ranked by p-value rather than FDR threshold.
-    if len(features_filtered.columns) == 0:
+    if len(features_filtered.columns) < top_n:
         logger.warning(
-            f"No significant features found (FDR: {fdr_level}). Use top 50 features (p_values based)"
+            f"Significant features {len(features_filtered.columns)} less than {top_n}. Use top {top_n} features (p_values based)"
         )
-        selected_features: list[str] = _significant_features.head(50).index.tolist()
+        selected_features: list[str] = _significant_features.head(top_n).index.tolist()
         features_filtered = features[selected_features]
 
     return features_filtered, _significant_features

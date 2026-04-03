@@ -190,7 +190,9 @@ class LabelReport(BaseReport):
         total = len(df)
         n_eruption = int(df["is_erupted"].sum())
         n_non_eruption = total - n_eruption
-        ratio = round(n_non_eruption / n_eruption, 2) if n_eruption > 0 else float("inf")
+        ratio = (
+            round(n_non_eruption / n_eruption, 2) if n_eruption > 0 else float("inf")
+        )
 
         return {
             "params": self._label.parameters,

@@ -16,8 +16,9 @@ Key sub-modules and their public exports:
   precision-recall, calibration, confusion matrix, learning curves, threshold
   analysis, feature importance, prediction distribution, seed stability, and
   classifier comparison.
-- ``shap_plots``: ``plot_shap_summary``, ``plot_aggregate_shap_summary`` — SHAP
-  beeswarm explainability plots (XGBoost >= 3.x compatible via Independent masker).
+- ``shap_plots``: ``plot_shap_summary``, ``plot_aggregate_shap_summary``,
+  ``plot_shap_waterfall`` — SHAP beeswarm and waterfall explainability plots
+  (XGBoost >= 3.x compatible via Independent masker).
 - ``forecast_plots``: ``plot_forecast``, ``plot_forecast_from_file`` — eruption
   probability time-series with per-classifier panels and consensus band.
 """
@@ -36,7 +37,9 @@ from eruption_forecast.plots.styles import (
 # SHAP plots
 from eruption_forecast.plots.shap_plots import (
     plot_shap_summary,
+    plot_shap_waterfall,
     plot_aggregate_shap_summary,
+    plot_aggregate_shap_waterfall,
 )
 
 # Tremor plotting
@@ -100,7 +103,9 @@ __all__ = [
     "plot_aggregate_learning_curve",
     # SHAP plots
     "plot_shap_summary",
+    "plot_shap_waterfall",
     "plot_aggregate_shap_summary",
+    "plot_aggregate_shap_waterfall",
     # Forecast plotting
     "plot_forecast",
     "plot_forecast_from_file",

@@ -28,7 +28,10 @@ from eruption_forecast.config.constants import (
     PLOT_SEPARATOR_LENGTH,
     LEARNING_CURVE_SCORINGS,
 )
-from eruption_forecast.plots.shap_plots import plot_shap_summary as _plot_shap_summary
+from eruption_forecast.plots.shap_plots import (
+    plot_shap_summary as _plot_shap_summary,
+    plot_shap_waterfall as _plot_shap_waterfall,
+)
 from eruption_forecast.utils.formatting import slugify_class_name
 from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
@@ -490,7 +493,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("confusion_matrix", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("confusion_matrix", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -525,7 +533,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("roc_curve", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("roc_curve", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -559,7 +572,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("pr_curve", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("pr_curve", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -659,7 +677,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("threshold_analysis", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("threshold_analysis", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -705,7 +728,12 @@ class ModelEvaluator:
             )
             return None
 
-        save_figure(fig, self._get_plot_filepath("feature_importance", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("feature_importance", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -746,7 +774,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("calibration", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("calibration", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -785,7 +818,12 @@ class ModelEvaluator:
             dpi=dpi,
         )
 
-        save_figure(fig, self._get_plot_filepath("prediction_distribution", filename=filename), dpi, verbose=self.verbose)
+        save_figure(
+            fig,
+            self._get_plot_filepath("prediction_distribution", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
         return fig
 
@@ -867,19 +905,73 @@ class ModelEvaluator:
             >>> fig.savefig("custom_shap.png")
         """
 
-        fig, explanation = _plot_shap_summary(
+        fig = _plot_shap_summary(
             model=self.model,
             X=self.X_test,
             max_display=max_display,
-            title=f"SHAP Summary — {self.model_name}",
+            title=f"SHAP {self.model_name}",
             dpi=dpi,
+            shap_filepath=self._shap_explanation_filepath,
         )
 
-        if self._shap_explanation_filepath:
-            ensure_dir(os.path.dirname(self._shap_explanation_filepath))
-            joblib.dump(explanation, self._shap_explanation_filepath)
+        save_figure(
+            fig,
+            self._get_plot_filepath("shap_summary", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
 
-        save_figure(fig, self._get_plot_filepath("shap_summary", filename=filename), dpi, verbose=self.verbose)
+        return fig
+
+    def plot_shap_waterfall(
+        self,
+        max_display: int = 20,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot a SHAP waterfall chart for the highest-probability eruption prediction.
+
+        Reuses the cached SHAP Explanation written by ``plot_shap_summary``
+        (loaded from ``self._shap_explanation_filepath`` when it exists) so SHAP
+        values are never recomputed. Selects the single test sample with the
+        highest predicted eruption probability and explains that prediction.
+
+        Args:
+            max_display (int, optional): Maximum number of features to display.
+                Defaults to 20.
+            filename (str | None, optional): Output filename. If None, defaults
+                to ``"<model_name>_shap_waterfall.png"``. Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the SHAP waterfall plot.
+
+        Examples:
+            >>> fig = evaluator.plot_shap_waterfall()
+            >>> fig.savefig("shap_waterfall.png")
+        """
+        if self._y_proba is None:
+            logger.warning(
+                "No probability estimates available; skipping waterfall plot."
+            )
+            return None
+
+        fig = _plot_shap_waterfall(
+            model=self.model,
+            X=self.X_test,
+            y_proba=self._y_proba,
+            max_display=max_display,
+            dpi=dpi,
+            shap_filepath=self._shap_explanation_filepath,
+        )
+
+        save_figure(
+            fig,
+            self._get_plot_filepath("shap_waterfall", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
+
         return fig
 
     def plot_learning_curve(
@@ -935,9 +1027,9 @@ class ModelEvaluator:
             ``"pr_curve"``, ``"threshold_analysis"``,
             ``"feature_importance"``, ``"calibration"``,
             ``"prediction_distribution"``, ``"shap_summary"``,
-            ``"learning_curve"``. Values are None when a plot could not be
-            generated (e.g. probabilities unavailable or no learning-curve
-            JSON supplied).
+            ``"shap_waterfall"``, ``"learning_curve"``. Values are None when a
+            plot could not be generated (e.g. probabilities unavailable or no
+            learning-curve JSON supplied).
 
         Examples:
             >>> figs = evaluator.plot_all(dpi=200)
@@ -953,4 +1045,7 @@ class ModelEvaluator:
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
             "learning_curve": self.plot_learning_curve(dpi=dpi),
             "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
+            "shap_waterfall": (
+                self.plot_shap_waterfall(dpi=dpi) if self.plot_shap else None
+            ),
         }

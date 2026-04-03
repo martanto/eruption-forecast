@@ -573,10 +573,18 @@ class BaseModelTrainer:
                     "(e.g. 'score') besides the 'features' index."
                 )
             score_col = score_cols[0]
+
+            # tsfresh scores are p-values (lower = better);
+            # RandomForest scores are importances (higher = better).
+            # Combined uses RF importances.
+            mean_score_ascending = self.feature_selection_method == "tsfresh"
             combined_features_df = (
                 combined_features_df.groupby(by="features")
-                .count()
-                .sort_values(by=score_col, ascending=False)
+                .agg(score=(score_col, "count"), mean_score=(score_col, "mean"))
+                .sort_values(
+                    by=["score", "mean_score"],
+                    ascending=[False, mean_score_ascending],
+                )
             )
             combined_features_df.index.name = "features"
             combined_features_df.to_csv(
@@ -589,7 +597,7 @@ class BaseModelTrainer:
                     df=combined_features_df.reset_index(),
                     filepath=os.path.join(self.shared_features_dir, filename),
                     overwrite=True,
-                    values_column=score_col,
+                    values_column="score",
                 )
 
         return combined_features_df
@@ -864,8 +872,7 @@ class BaseModelTrainer:
             verbose=0,
         )
 
-        # Force loky backend to avoid the threading backend that Intel's
-        # scikit-learn extension (sklearnex) does not support.
+        # Force loky backend for nested-parallelism safety when n_jobs > 1.
         with joblib.parallel_backend("loky"):
             grid_search.fit(features[top_n_features], labels)
 

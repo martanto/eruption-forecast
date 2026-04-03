@@ -34,8 +34,6 @@ from importlib.metadata import version
 if os.getenv("ERUPTION_FORECAST_DISABLE_NUMBA_CUDA", "1") == "1":
     os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
 
-logging.getLogger("sklearnex").setLevel(logging.WARNING)
-
 from eruption_forecast.logger import enable_logging, disable_logging
 from eruption_forecast.report import (
     LabelReport,

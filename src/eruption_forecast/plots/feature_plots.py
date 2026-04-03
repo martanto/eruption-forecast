@@ -455,8 +455,8 @@ _BAND_PREFIX_RE = re.compile(r"^((?:rsam|dsar|entropy)_[^_]+)")
 
 # Color map: each calculate method → Okabe-Ito color (matches tremor_plots.py)
 _METHOD_COLORS: dict[str, str] = {
-    "rsam": OKABE_ITO[4],     # Blue
-    "dsar": OKABE_ITO[0],     # Orange
+    "rsam": OKABE_ITO[4],  # Blue
+    "dsar": OKABE_ITO[0],  # Orange
     "entropy": OKABE_ITO[6],  # Reddish purple
 }
 
@@ -548,7 +548,11 @@ def plot_frequency_band_contribution(
 
         bar_colors = [
             next(
-                (color for method, color in _METHOD_COLORS.items() if b.startswith(method)),
+                (
+                    color
+                    for method, color in _METHOD_COLORS.items()
+                    if b.startswith(method)
+                ),
                 OKABE_ITO[-1],  # Fallback for unknown prefix
             )
             for b in display_bands
@@ -597,7 +601,11 @@ def plot_frequency_band_contribution(
 
         bar_colors = [
             next(
-                (color for method, color in _METHOD_COLORS.items() if b.startswith(method)),
+                (
+                    color
+                    for method, color in _METHOD_COLORS.items()
+                    if b.startswith(method)
+                ),
                 OKABE_ITO[-1],  # Fallback for unknown prefix
             )
             for b in display_bands

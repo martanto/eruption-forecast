@@ -590,9 +590,7 @@ class EvaluationTrainer(BaseModelTrainer):
                     )
                     all_metrics[classifier_slug].append(metrics)
                 else:
-                    pending_evaluate_model_jobs.append(
-                        (random_state, classifier_slug)
-                    )
+                    pending_evaluate_model_jobs.append((random_state, classifier_slug))
 
         return (
             pending_feature_selection_jobs,
@@ -687,9 +685,7 @@ class EvaluationTrainer(BaseModelTrainer):
                 continue  # Feature selection produced 0 features — skip all classifiers.
             _rs = job[0]
             for classifier_model in self.classifier_models:
-                new_evaluate_model_jobs.append(
-                    (_rs, classifier_model.slug_name)
-                )
+                new_evaluate_model_jobs.append((_rs, classifier_model.slug_name))
 
         # ===== PHASE 2: Parallel (seed × classifier) training + evaluation =====
         all_evaluate_model_jobs = pending_evaluate_model_jobs + new_evaluate_model_jobs
