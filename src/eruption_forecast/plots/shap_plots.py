@@ -72,10 +72,12 @@ def compute_shap_explanation(
     )
 
     # Tree-based models (RF, GBM, etc.) use the fast exact TreeExplainer.
-    # XGBoost ≥ 3.x breaks TreeExplainer with a string-to-float error, so it
-    # gets the Independent masker path instead. All other models (SVM, LR,
-    # etc.) also use the masker to avoid the slow KernelExplainer fallback.
-    if hasattr(model, "estimators_") and not hasattr(model, "get_booster"):
+    is_voting = type(model).__name__ == "VotingClassifier"
+    if (
+        hasattr(model, "estimators_")
+        and not hasattr(model, "get_booster")
+        and not is_voting
+    ):
         explainer = shap.TreeExplainer(model, X)
         explanation: shap.Explanation = explainer(X)
     else:
@@ -89,7 +91,7 @@ def compute_shap_explanation(
         # base_values may be (n, 2) for binary classifiers — take class-1 slice.
         if base is not None:
             base = np.asarray(base)
-            if base.ndim == 2:  # noqa: PD011
+            if base.ndim == 2:
                 base = base[:, 1]
 
         explanation = shap.Explanation(
