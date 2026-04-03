@@ -573,10 +573,18 @@ class BaseModelTrainer:
                     "(e.g. 'score') besides the 'features' index."
                 )
             score_col = score_cols[0]
+
+            # tsfresh scores are p-values (lower = better);
+            # RandomForest scores are importances (higher = better).
+            # Combined uses RF importances.
+            mean_score_ascending = self.feature_selection_method == "tsfresh"
             combined_features_df = (
                 combined_features_df.groupby(by="features")
                 .agg(score=(score_col, "count"), mean_score=(score_col, "mean"))
-                .sort_values(by=["score", "mean_score"], ascending=[False, True])
+                .sort_values(
+                    by=["score", "mean_score"],
+                    ascending=[False, mean_score_ascending],
+                )
             )
             combined_features_df.index.name = "features"
             combined_features_df.to_csv(
