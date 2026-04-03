@@ -30,6 +30,7 @@ from eruption_forecast.utils.pathutils import (
 from eruption_forecast.plots.shap_plots import (
     compute_shap_explanation,
     plot_aggregate_shap_summary,
+    plot_aggregate_shap_waterfall,
 )
 from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
 from eruption_forecast.plots.evaluation_plots import (
@@ -844,9 +845,6 @@ class MultiModelEvaluator:
                 self.plot_frequency_band_contribution(dpi=dpi)
             ),
             "learning_curve": lambda: self.plot_learning_curve(dpi=dpi),
-            "shap_summary": (
-                lambda: self.plot_shap_summary(dpi=dpi) if self.plot_shap else None
-            ),
         }
 
         results: dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None] = {}
@@ -859,6 +857,23 @@ class MultiModelEvaluator:
                 except Exception as exc:
                     logger.warning(f"Plot {name!r} failed: {exc}")
                     results[name] = None
+
+        # SHAP plots use matplotlib global state and are not thread-safe.
+        # Run them sequentially after the parallel block to prevent figures
+        # from being drawn onto each other's canvas.
+        for shap_name, shap_fn in (
+            ("shap_summary", lambda: self.plot_shap_summary(dpi=dpi)),
+            ("shap_waterfall", lambda: self.plot_shap_waterfall(dpi=dpi)),
+        ):
+            if not self.plot_shap:
+                results[shap_name] = None
+                continue
+            try:
+                results[shap_name] = shap_fn()
+            except Exception as exc:
+                logger.warning(f"Plot {shap_name!r} failed: {exc}")
+                results[shap_name] = None
+
         return results
 
     # ------------------------------------------------------------------
@@ -987,6 +1002,62 @@ class MultiModelEvaluator:
             data,
             filename or f"{self.classifier_name}_aggregate_shap_summary",
             f"{self.classifier_name}_aggregate_shap_summary",
+            dpi,
+            save,
+        )
+        return fig
+
+    def plot_shap_waterfall(
+        self,
+        max_display: int = 20,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure:
+        """Plot an aggregate SHAP waterfall across all seeds.
+
+        For each seed, selects the sample with the highest predicted eruption
+        probability, zero-pads its SHAP values to the union feature space, then
+        averages across seeds to produce a single representative waterfall.
+        Reuses cached SHAP Explanation objects from disk when available.
+
+        Args:
+            max_display (int, optional): Maximum number of features to display.
+                Defaults to 20.
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename.
+                Defaults to ``"{classifier_name}_aggregate_shap_waterfall"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the aggregate SHAP waterfall.
+
+        Examples:
+            >>> fig = evaluator.plot_shap_waterfall()
+        """
+        models, x_tests, _, y_probas = self._predictions
+        per_seed_feature_names: list[list[str]] = [
+            X_test.columns.tolist() for X_test in x_tests
+        ]
+
+        explanations = self._collect_shap_explanations(models, x_tests)
+
+        fig, data = plot_aggregate_shap_waterfall(
+            models=models,
+            X_tests=x_tests,
+            feature_names=per_seed_feature_names,
+            y_probas=y_probas,
+            max_display=max_display,
+            title=f"Aggregate SHAP Waterfall — {self.classifier_name}",
+            dpi=dpi,
+            explanations=explanations,
+        )
+
+        self._save_outputs(
+            fig,
+            data,
+            filename or f"{self.classifier_name}_aggregate_shap_waterfall",
+            f"{self.classifier_name}_aggregate_shap_waterfall",
             dpi,
             save,
         )
