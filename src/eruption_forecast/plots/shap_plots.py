@@ -351,11 +351,11 @@ def _build_aggregate_explanation(
     all_values: list[np.ndarray] = []
     all_data: list[np.ndarray] = []
 
-    for exp, seed_names in zip(explanations, per_seed_names, strict=True):
-        if exp is None:
+    for explanation, seed_names in zip(explanations, per_seed_names, strict=True):
+        if explanation is None:
             continue
-        vals = np.asarray(exp.values)  # noqa: PD011
-        raw_data = getattr(exp, "data", None)
+        vals = np.asarray(explanation.values)  # noqa: PD011
+        raw_data = getattr(explanation, "data", None)
         data = np.asarray(raw_data) if raw_data is not None else np.zeros_like(vals)
         n_samples = vals.shape[0]
 
@@ -522,7 +522,7 @@ def plot_aggregate_shap_waterfall(
         ValueError: If no seeds produced valid SHAP values.
 
     Examples:
-        >>> fig, exp = plot_aggregate_shap_waterfall(
+        >>> fig, explanation = plot_aggregate_shap_waterfall(
         ...     models=trained_models,
         ...     X_tests=test_sets,
         ...     feature_names=per_seed_feature_names,
@@ -569,22 +569,22 @@ def plot_aggregate_shap_waterfall(
     top_data: list[np.ndarray] = []
     top_bases: list[float] = []
 
-    for exp, seed_names, y_proba in zip(
+    for explanation, seed_names, y_proba in zip(
         seed_explanations, per_seed_names, y_probas, strict=True
     ):
-        if exp is None:
+        if explanation is None:
             continue
         top_idx = int(np.argmax(y_proba))
-        vals = np.asarray(exp.values)[top_idx]
+        vals = np.asarray(explanation.values)[top_idx]
 
-        raw_data = getattr(exp, "data", None)
+        raw_data = getattr(explanation, "data", None)
         data = (
             np.asarray(raw_data)[top_idx]
             if raw_data is not None
             else np.zeros_like(vals)
         )
 
-        base = getattr(exp, "base_values", None)
+        base = getattr(explanation, "base_values", None)
         if base is not None:
             base_arr = np.asarray(base)
             # base_values may be a scalar (TreeExplainer) or 1-D array (n_samples,).
