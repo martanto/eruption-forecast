@@ -71,8 +71,10 @@ class StationData:
             raise ValueError("channel must be a non-empty string")
         if not self.network or not isinstance(self.network, str):
             raise ValueError("network must be a non-empty string")
-        if not self.location or not isinstance(self.location, str):
-            raise ValueError("location must be a non-empty string")
+        if self.location is None:
+            self.location = ""
+        elif not isinstance(self.location, str):
+            raise ValueError("location must be a string or None")
 
         self.station = self.station.upper()
         self.channel = self.channel.upper()
