@@ -27,7 +27,7 @@ class StationData:
             input is coerced to ``""``.
         channel_type (str): Channel type (uppercase).
         nslc (str): Standard ``Network.Station.Location.Channel`` identifier
-        nslct (str): Standart``Network.Station.Location.Channel.ChannelType``
+        nslct (str): Standard ``Network.Station.Location.Channel.ChannelType``
             identifier, used by some legacy SDS filename conventions.
 
     Raises:
@@ -58,7 +58,7 @@ class StationData:
         Called automatically by the dataclass machinery after ``__init__``.
         Raises ``ValueError`` for any empty or wrongly-typed code, coerces
         ``location=None`` to ``""``, uppercases all codes, then builds
-        ``nslc`` and ``snlc``.
+        ``nslc`` and ``nslct``.
 
         Raises:
             ValueError: If ``station``, ``channel``, or ``network`` is empty or
