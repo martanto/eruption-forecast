@@ -214,7 +214,7 @@ def get_significant_features(
     _significant_features.name = "p_values"
     _significant_features.index.name = "features"
 
-    # If no relevant features found, fall back to the 50 most significant
+    # If no relevant features found, fall back to the 20 most significant
     # features ranked by p-value rather than FDR threshold.
     if len(features_filtered.columns) < top_n:
         logger.warning(
