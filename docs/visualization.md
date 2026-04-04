@@ -107,6 +107,7 @@ The `ModelEvaluator` class provides 7 evaluation plot types for single-seed and 
 - `evaluator.plot_threshold_analysis()` — mean metrics vs threshold ± std
 - `evaluator.plot_feature_importance()` — mean importance ± std error bars
 - `evaluator.plot_shap_summary()` — beeswarm showing feature contributions across seeds
+- `evaluator.plot_shap_waterfall()` — waterfall for the highest-probability prediction, averaged across seeds
 - `evaluator.plot_seed_stability()` — violin plot of a metric across seeds
 - `evaluator.plot_frequency_band_contribution()` — feature counts per seismic band
 
@@ -156,6 +157,7 @@ evaluator.plot_feature_importance()
 evaluator.plot_calibration()
 evaluator.plot_prediction_distribution()
 evaluator.plot_shap_summary(max_display=20)
+evaluator.plot_shap_waterfall(max_display=20)  # waterfall for highest-prob sample
 
 # Save metrics to JSON
 path = evaluator.save_metrics()
@@ -174,6 +176,10 @@ trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_
 # Plots from registry CSV
 evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
 figs = evaluator.plot_all(dpi=150, show_individual=True)
+# Keys include: roc_curve, pr_curve, calibration, prediction_distribution,
+#               confusion_matrix, threshold_analysis, feature_importance,
+#               shap_summary, shap_waterfall, seed_stability,
+#               frequency_band_contribution, learning_curve
 
 # Aggregate stats from JSON metrics files
 evaluator = MultiModelEvaluator(metrics_dir=f"{base}/metrics")
@@ -215,29 +221,48 @@ print(summary_df.loc[("xgb", "f1_score")])
 
 ### SHAP Explainability Plots
 
-Understand *why* the model makes predictions using SHAP (SHapley Additive exPlanations). The beeswarm plot shows both the direction (positive/negative) and magnitude of each feature's contribution.
+Understand *why* the model makes predictions using SHAP (SHapley Additive exPlanations). Two plot types are available:
+
+- **Beeswarm** — shows direction and magnitude of each feature's contribution across all test samples.
+- **Waterfall** — shows how each feature contributed to a single prediction (the highest-probability eruption sample). Tree-based models (RF, GBM) use the fast `TreeExplainer`; XGBoost and other classifiers use `shap.Explainer` with an `Independent` masker.
 
 ```python
 from eruption_forecast import ModelEvaluator, MultiModelEvaluator
 
-# Single-seed beeswarm plot
+# Single-seed: beeswarm + waterfall
 evaluator = ModelEvaluator.from_files(
     model_path="output/.../models/00042.pkl",
     X_test="output/.../tests/00042_X_test.csv",
     y_test="output/.../tests/00042_y_test.csv",
     model_name="xgb_seed_42",
+    plot_shap=True,  # required to enable SHAP plots
 )
 fig = evaluator.plot_shap_summary(max_display=20)
-fig.savefig("shap_single.png", bbox_inches="tight")
+fig.savefig("shap_beeswarm.png", bbox_inches="tight")
 
-# Aggregate SHAP beeswarm across all seeds
-ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
-fig = ev.plot_shap_summary(max_display=20)  # saves automatically
+fig = evaluator.plot_shap_waterfall(max_display=20)
+fig.savefig("shap_waterfall.png", bbox_inches="tight")
+
+# Aggregate SHAP across all seeds (beeswarm + waterfall)
+ev = MultiModelEvaluator(
+    trained_model_csv="output/.../trained_model_registry.csv",
+    plot_shap=True,
+)
+fig = ev.plot_shap_summary(max_display=20)    # saves automatically
+fig = ev.plot_shap_waterfall(max_display=20)  # mean waterfall across seeds
 
 # Low-level standalone functions
-from eruption_forecast.plots.shap_plots import plot_shap_summary, plot_aggregate_shap_summary
+from eruption_forecast.plots.shap_plots import (
+    plot_shap_summary,
+    plot_shap_waterfall,
+    plot_aggregate_shap_summary,
+    plot_aggregate_shap_waterfall,
+    plot_shap_from_file,
+)
 
-fig, explanation = plot_shap_summary(model, X_test, feature_names=features, max_display=15)
+fig = plot_shap_summary(model, X_test, max_display=15)
+
+fig = plot_shap_waterfall(model, X_test, y_proba=proba[:, 1], max_display=20)
 
 fig, agg_exp = plot_aggregate_shap_summary(
     models=trained_models,
@@ -247,9 +272,16 @@ fig, agg_exp = plot_aggregate_shap_summary(
 )
 # agg_exp is a shap.Explanation with shape (total_samples, n_union_features)
 
-# Load a saved SHAP Explanation from disk and plot directly
-from eruption_forecast.plots.shap_plots import plot_shap_from_file
+fig, mean_exp = plot_aggregate_shap_waterfall(
+    models=trained_models,
+    X_tests=x_test_list,
+    feature_names=feature_names,
+    y_probas=per_seed_probas,   # list of 1-D arrays, one per seed
+    max_display=20,
+)
+# mean_exp is a single-row shap.Explanation averaged across seeds
 
+# Load a saved SHAP Explanation from disk and plot directly
 fig, explanation = plot_shap_from_file(
     "output/.../shap_values.pkl",
     max_display=20,
@@ -550,7 +582,9 @@ from eruption_forecast.plots import (
 # SHAP explainability plots
 from eruption_forecast.plots.shap_plots import (
     plot_shap_summary,
+    plot_shap_waterfall,
     plot_aggregate_shap_summary,
+    plot_aggregate_shap_waterfall,
     plot_shap_from_file,
 )
 ```
