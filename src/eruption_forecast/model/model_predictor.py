@@ -313,6 +313,7 @@ class ModelPredictor:
 
         # Will be set after predict_proba() is called
         self.df: pd.DataFrame | None = None
+        self.forecast_plot_path: str | None = None
 
         if verbose:
             logger.info(f"Models registered: {total_models}")
@@ -776,4 +777,5 @@ class ModelPredictor:
             path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none"
         )
         plt.close(fig)
+        self.forecast_plot_path = path
         logger.info(f"Forecast plot saved to: {path}")

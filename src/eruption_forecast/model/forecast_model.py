@@ -280,6 +280,7 @@ class ForecastModel:
         # ------------------------------------------------------------------
         self.ModelPredictor: ModelPredictor | None = None
         self.prediction_df: pd.DataFrame = pd.DataFrame()
+        self.forecast_plot_path: str | None = None
 
         # ------------------------------------------------------------------
         # Pipeline configuration (accumulates params as each stage is called)
@@ -1602,6 +1603,7 @@ class ForecastModel:
 
         self.ModelPredictor = model_predictor
         self.prediction_df = df_prediction
+        self.forecast_plot_path = model_predictor.forecast_plot_path
 
         self._config.forecast = ForecastConfig(
             start_date=str(to_datetime(start_date).date()),
