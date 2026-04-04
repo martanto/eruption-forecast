@@ -236,6 +236,7 @@ from eruption_forecast import ModelEvaluator
 | `selected_features` | `list[str] \| None` | `None` | Filter `X_test` to these columns before predicting |
 | `random_state` | `int \| None` | `None` | Seed for filename prefix |
 | `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir` |
+| `plot_shap` | `bool` | `False` | Enable SHAP plots in `plot_all()` |
 | `verbose` | `bool` | `False` | Emit progress log messages |
 
 ### Key Methods
@@ -245,7 +246,9 @@ from eruption_forecast import ModelEvaluator
 | `ModelEvaluator.from_files(model_path, X_test, y_test, ...)` | Load from disk |
 | `get_metrics()` | Returns dict with all metrics |
 | `summary()` | Prints formatted summary |
-| `plot_all()` | Generates all 7–8 evaluation plots |
+| `plot_all()` | Generates all evaluation plots (SHAP plots require `plot_shap=True`) |
+| `plot_shap_summary(max_display)` | SHAP beeswarm for the test set |
+| `plot_shap_waterfall(max_display)` | SHAP waterfall for the highest-probability sample |
 | `save_metrics(path=None)` | Saves metrics dict to JSON |
 | `optimize_threshold(criterion="f1")` | Returns optimal threshold and metrics at that threshold |
 
@@ -287,6 +290,7 @@ ev = MultiModelEvaluator(
 | `plot_threshold_analysis()` | `trained_model_csv` | Mean metrics vs threshold ± std |
 | `plot_feature_importance()` | `trained_model_csv` | Mean importance ± std error bars |
 | `plot_shap_summary()` | `trained_model_csv` | Aggregate SHAP beeswarm across seeds |
+| `plot_shap_waterfall()` | `trained_model_csv` | Mean SHAP waterfall for highest-prob sample |
 | `plot_seed_stability()` | `trained_model_csv` | Violin plot of a metric across seeds |
 | `plot_frequency_band_contribution()` | `trained_model_csv` | Feature counts per seismic band |
 | `get_aggregate_metrics()` | `metrics_dir` | DataFrame: metric × mean/std/min/max |

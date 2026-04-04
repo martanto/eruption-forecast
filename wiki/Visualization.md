@@ -113,7 +113,8 @@ evaluator.plot_threshold_analysis()
 evaluator.plot_feature_importance()
 evaluator.plot_calibration()
 evaluator.plot_prediction_distribution()
-evaluator.plot_shap_summary(max_display=20)  # Requires shap>=0.46
+evaluator.plot_shap_summary(max_display=20)   # beeswarm — requires plot_shap=True
+evaluator.plot_shap_waterfall(max_display=20) # waterfall — highest-prob sample
 ```
 
 ### Aggregate (`MultiModelEvaluator`)
@@ -131,8 +132,8 @@ ev = MultiModelEvaluator(
 figs = ev.plot_all(dpi=150, show_individual=True)
 # Keys: roc_curve, pr_curve, calibration, prediction_distribution,
 #       confusion_matrix, threshold_analysis, feature_importance,
-#       shap_summary, seed_stability, frequency_band_contribution,
-#       learning_curve
+#       shap_summary, shap_waterfall, seed_stability,
+#       frequency_band_contribution, learning_curve
 ```
 
 ### Aggregation Strategy
@@ -212,35 +213,61 @@ Output files are written to `output/comparison/figures/` and the ranking CSV to
 
 ## SHAP Explainability
 
-Understand which features drive predictions and in which direction.
+Understand which features drive predictions and in which direction. Two plot types are available:
+
+- **Beeswarm** — direction and magnitude across all test samples.
+- **Waterfall** — contribution breakdown for the single highest-probability eruption sample. Averaged across seeds in the multi-seed case.
+
+Tree-based models (RF, GBM) use the fast `TreeExplainer`; XGBoost and others use `shap.Explainer` with an `Independent` masker.
 
 ```python
 from eruption_forecast import ModelEvaluator, MultiModelEvaluator
 
-# Single-seed beeswarm
+# Single-seed beeswarm + waterfall
 evaluator = ModelEvaluator.from_files(
     model_path="output/.../models/00042.pkl",
     X_test="output/.../tests/00042_X_test.csv",
     y_test="output/.../tests/00042_y_test.csv",
     model_name="xgb_seed_42",
+    plot_shap=True,
 )
 fig = evaluator.plot_shap_summary(max_display=20)
+fig = evaluator.plot_shap_waterfall(max_display=20)
 
-# Aggregate SHAP beeswarm across seeds
-ev = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
+# Aggregate SHAP beeswarm + waterfall across seeds
+ev = MultiModelEvaluator(
+    trained_model_csv="output/.../trained_model_registry.csv",
+    plot_shap=True,
+)
 fig = ev.plot_shap_summary(max_display=20)
+fig = ev.plot_shap_waterfall(max_display=20)
+
+# Standalone low-level functions
+from eruption_forecast.plots.shap_plots import (
+    plot_shap_summary,
+    plot_shap_waterfall,
+    plot_aggregate_shap_summary,
+    plot_aggregate_shap_waterfall,
+    plot_shap_from_file,
+)
+
+fig = plot_shap_waterfall(model, X_test, y_proba=proba[:, 1], max_display=20)
+
+fig, mean_exp = plot_aggregate_shap_waterfall(
+    models=trained_models,
+    X_tests=x_test_list,
+    feature_names=per_seed_feature_names,
+    y_probas=per_seed_probas,
+    max_display=20,
+)
 
 # Plot directly from a saved SHAP Explanation pickle
-from eruption_forecast.plots.shap_plots import plot_shap_from_file
-
 fig, explanation = plot_shap_from_file(
     "output/.../shap_values.pkl",
     max_display=20,
     title="SHAP Summary",
 )
 ```
-
-> Requires `shap >= 0.46`.
 
 ---
 

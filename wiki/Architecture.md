@@ -338,10 +338,11 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
-  - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`
+  - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`, `plot_shap_summary()`, `plot_shap_waterfall()`
   - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/classifiers/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
+  - `plot_shap=True` required to enable SHAP plots in `plot_all()`
 - `MultiModelEvaluator`: Aggregate evaluation across all seeds (`multi_model_evaluator.py`)
-  - Methods: `plot_all()`, `plot_roc()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
+  - Methods: `plot_all()`, `plot_roc()`, `plot_shap_summary()`, `plot_shap_waterfall()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
 - `ModelPredictor`: Runs forecast inference (`model_predictor.py`)
   - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
 - `PipelineConfig`: Serialisable pipeline configuration (`src/eruption_forecast/config/pipeline_config.py`)
@@ -400,7 +401,7 @@ DynamicLabelBuilder — one window per eruption, overlaps handled
 │  │                          │    │                                │    │                        │   │
 │  │  .get_metrics()          │    │  .get_aggregate_metrics()      │    │  .get_ranking_table()  │   │
 │  │  .summary()              │    │  .save_aggregate_metrics()     │    │  .save_ranking_table() │   │
-│  │  .plot_all()   (8 plots) │    │  .plot_all()    (10 plots)     │    │  .plot_all()           │   │
+│  │  .plot_all()   (9 plots) │    │  .plot_all()    (11 plots)     │    │  .plot_all()           │   │
 │  │  .from_files()           │    │  ───────────────────────────   │    │  ────────────────────  │   │
 │  │  ─────────────────────── │    │  reads: metrics/*.json         │    │  wraps N instances of  │   │
 │  │  inputs:                 │    │         registry.csv           │    │  MultiModelEvaluator   │   │
