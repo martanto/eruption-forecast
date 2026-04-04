@@ -45,7 +45,7 @@ from eruption_forecast.report import (
     PredictionReport,
     generate_report,
 )
-from eruption_forecast.decorators import notify
+from eruption_forecast.decorators import notify, send_telegram_notification
 from eruption_forecast.data_container import BaseDataContainer
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.tremor.tremor_data import TremorData
@@ -88,6 +88,7 @@ __all__ = [
     "disable_logging",
     "enable_logging",
     "notify",
+    "send_telegram_notification",
     "generate_report",
     "TremorReport",
     "LabelReport",

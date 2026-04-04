@@ -35,7 +35,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from collections.abc import Callable
 
-from eruption_forecast.decorators.notify import notify
+from eruption_forecast.decorators.notify import notify, send_telegram_notification
 from eruption_forecast.decorators.decorator_class import (
     AutoSaveDict,
     SerializationWrapper,
@@ -456,4 +456,5 @@ __all__ = [
     "snapshot",
     "timer",
     "notify",
+    "send_telegram_notification",
 ]
