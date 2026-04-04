@@ -2,7 +2,12 @@
 
 ## notify — Telegram Notifications
 
-The `notify` decorator sends a structured Telegram message when a decorated function completes (success) or raises an exception (error). Useful for long-running steps like multi-seed training.
+The package provides two Telegram notification APIs:
+
+- `notify`: decorator for function success/error notifications.
+- `send_telegram_notification`: direct function call for one-off messages (with optional file attachments).
+
+Both are useful for long-running steps like multi-seed training.
 
 ### Setup
 
@@ -19,7 +24,7 @@ Credentials are loaded automatically from `.env` via `python-dotenv`.
 ### Basic Usage
 
 ```python
-from eruption_forecast.decorators import notify
+from eruption_forecast.decorators import notify, send_telegram_notification
 
 # Credentials read from .env automatically
 @notify(name="Training Run")
@@ -30,6 +35,13 @@ def train_model():
 @notify(bot_token="TOKEN", chat_id="CHAT_ID", name="Training Run")
 def train_model():
     ...
+
+# Direct function-style call (no decorator)
+send_telegram_notification(
+    message="Training run finished successfully.",
+    files=["output/forecast.png", "output/metrics.csv"],
+    file_caption="Training artifacts",
+)
 ```
 
 ### Message Format
