@@ -13,7 +13,9 @@ from sklearn.metrics import (
     accuracy_score,
     precision_score,
     confusion_matrix,
+    matthews_corrcoef,
     precision_recall_curve,
+    average_precision_score,
     balanced_accuracy_score,
 )
 
@@ -64,7 +66,8 @@ class MetricsComputer:
                 - ``accuracy``, ``balanced_accuracy``
                 - ``precision``, ``recall``, ``f1_score``
                 - ``sensitivity``, ``specificity``
-                - ``roc_auc``, ``pr_auc``
+                - ``roc_auc``, ``pr_auc``, ``average_precision``
+                - ``mcc``
                 - ``true_positives``, ``true_negatives``, ``false_positives``, ``false_negatives``
                 - ``optimal_threshold``, ``f1_at_optimal``, ``recall_at_optimal``, ``precision_at_optimal``
         """
@@ -95,6 +98,10 @@ class MetricsComputer:
             self.y_true, self.y_proba
         )
         metrics["pr_auc"] = auc(recall_curve, precision_curve)
+        metrics["average_precision"] = average_precision_score(self.y_true, self.y_proba)
+
+        # MCC — best single metric for imbalanced binary classification
+        metrics["mcc"] = matthews_corrcoef(self.y_true, self.y_pred)
 
         # Optimal threshold metrics
         optimal_metrics = self.optimize_threshold()
