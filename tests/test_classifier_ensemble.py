@@ -138,9 +138,10 @@ def test_getitem_missing_key_raises(clf_ensemble: ClassifierEnsemble) -> None:
 def test_predict_proba_shape(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """predict_proba returns a 2D array."""
+    """predict_proba returns a (n_samples, 2) array with rows summing to 1."""
     proba = clf_ensemble.predict_proba(X)
-    assert proba.ndim == 2
+    assert proba.shape == (N_SAMPLES, 2)
+    np.testing.assert_allclose(proba.sum(axis=1), np.ones(N_SAMPLES))
 
 
 def test_predict_proba_values_in_range(
