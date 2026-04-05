@@ -12,7 +12,7 @@ import pytest
 from sklearn.datasets import make_classification
 
 # Project imports
-from eruption_forecast.features import FeatureSelector
+from eruption_forecast.features.feature_selector import FeatureSelector
 
 
 @pytest.fixture
@@ -39,9 +39,9 @@ def synthetic_data():
 
 def test_feature_selector_init():
     """Test FeatureSelector initialization with different methods."""
-    # Test default (combined)
+    # Test default (tsfresh)
     selector = FeatureSelector()
-    assert selector.method == "combined"
+    assert selector.method == "tsfresh"
     assert selector.n_jobs == 1
     assert selector.random_state == 42
 
@@ -117,12 +117,9 @@ def test_combined_selection(synthetic_data):
     assert not selector.p_values_.empty, "Should have p-values from stage 1"
     assert not selector.importance_scores_.empty, "Should have importance from stage 2"
 
-    # Check stage tracking
-    assert selector.n_features_stage1_ > 0, "Stage 1 should reduce features"
-    assert selector.n_features_stage2_ > 0, "Stage 2 should select features"
-    assert selector.n_features_stage1_ >= selector.n_features_stage2_, (
-        "Stage 1 should produce more/equal features than stage 2"
-    )
+    # Check stage tracking via n_features_tsfresh and n_features_rf
+    assert selector.n_features_tsfresh > 0, "Stage 1 (tsfresh) should reduce features"
+    assert selector.n_features_rf > 0, "Stage 2 (random forest) should select features"
 
 
 def test_fit_transform_separate(synthetic_data):

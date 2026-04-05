@@ -104,7 +104,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables `predict_proba()` directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
 - **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function — no external dependencies except an optional `weasyprint` for PDF export
-- **Telegram Notifications**: `notify` decorator sends structured Telegram messages (success/error, elapsed time, file attachments) on function completion
+- **Telegram Notifications**: `notify` decorator and `send_telegram_notification` direct function send structured Telegram messages (success/error, elapsed time, file attachments)
 - **Modular Architecture**: Clean separation of concerns with focused utility modules
 
 ## Package Architecture
@@ -731,7 +731,7 @@ output/
 - matplotlib
 - seaborn
 - loguru
-- python-dotenv (Telegram notify decorator credential loading)
+- python-dotenv (Telegram notification credential loading)
 
 ### Development Dependencies
 

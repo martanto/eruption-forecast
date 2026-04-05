@@ -135,7 +135,6 @@ DEFAULT_GRID_PARAMS: dict[str, dict[str, Any] | list[dict[str, Any]]] = {
         "subsample": [0.8, 1.0],
         "colsample_bytree": [0.8, 1.0],
         "min_child_weight": [1, 3],
-        "scale_pos_weight": [1],  # RandomUnderSampler already balances classes
     },
     "nn": {
         "activation": [

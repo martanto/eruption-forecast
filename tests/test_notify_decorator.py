@@ -149,11 +149,11 @@ def test_on_error_false_no_message():
         silent_failing_task()
 
 
-def test_missing_credentials_raises(monkeypatch):
-    """Verify that omitting credentials raises ValueError at decoration time.
+def test_missing_credentials_disables_notifications(monkeypatch):
+    """Verify that missing credentials disables notifications without raising.
 
     Clears the env vars so the .env fallback is also unavailable, then
-    passes empty strings to confirm the credential-validation guard fires.
+    passes empty strings to confirm the decorator still wraps the function.
 
     Args:
         monkeypatch: pytest fixture for safely patching environment variables.
@@ -161,6 +161,6 @@ def test_missing_credentials_raises(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     # Prevent load_dotenv() inside notify() from re-populating the env from .env
-    with patch("eruption_forecast.decorators.load_dotenv"):
-        with pytest.raises(ValueError, match="bot_token"):
-            notify(bot_token="", chat_id="")
+    with patch("eruption_forecast.decorators.notify.load_dotenv"):
+        decorator = notify(bot_token="", chat_id="")
+        assert callable(decorator)

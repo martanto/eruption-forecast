@@ -6,7 +6,7 @@ import functools
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
+from typing import Any, cast
 from pathlib import Path
 from datetime import datetime
 from collections.abc import Callable
@@ -194,13 +194,19 @@ def _send_telegram_message(
 
 
 def _send_telegram_file(
-    token: str, chat_id: str | int, path: Path, caption: str = "", timeout: float = 30.0
+    token: str,
+    chat_id: str | int,
+    path: Path,
+    caption: str = "",
+    timeout: float = 30.0,
+    send_as_document: bool = False,
 ) -> None:
     """Send a single file or photo to a Telegram chat via the Bot API.
 
-    Uploads the file at ``path`` using ``sendDocument`` for generic files, or
-    ``sendPhoto`` for PNG/JPEG images. Missing files are skipped with a warning.
-    Network errors are caught and logged rather than propagated.
+    Uploads the file at ``path`` using ``sendPhoto`` for PNG/JPEG images and
+    ``sendDocument`` for all other files. When ``send_as_document`` is True,
+    image files are also sent via ``sendDocument``. Missing files are skipped
+    with a warning. Network errors are caught and logged rather than propagated.
 
     Args:
         token (str): Telegram bot token.
@@ -208,12 +214,16 @@ def _send_telegram_file(
         path (Path): Local filesystem path to the file to upload.
         caption (str): Optional caption to attach to the file. Defaults to "".
         timeout (float): Socket timeout in seconds for the HTTP request. Defaults to 30.0.
+        send_as_document (bool): Force files (including images) to be sent via
+            ``sendDocument`` instead of ``sendPhoto``. Defaults to False.
     """
     if not path.exists():
         logger.warning(f"Telegram notify: file not found, skipping: {path}")
         return
 
-    is_photo = path.suffix.lower() in {".png", ".jpg", ".jpeg"}
+    is_photo = (
+        path.suffix.lower() in {".png", ".jpg", ".jpeg"}
+    ) and not send_as_document
     endpoint = "sendPhoto" if is_photo else "sendDocument"
     field = "photo" if is_photo else "document"
     url = f"https://api.telegram.org/bot{token}/{endpoint}"
@@ -429,9 +439,14 @@ def notify(
                 # Send attached files if any
                 if files is not None:
                     try:
-                        resolved_files: list[str | Path] = (
-                            files(result) if callable(files) else files
-                        )
+                        if callable(files):
+                            files_callable = cast(
+                                Callable[[Any], list[str | Path]],
+                                files,
+                            )
+                            resolved_files = files_callable(result)
+                        else:
+                            resolved_files = files
                         for fp in resolved_files:
                             _send_telegram_file(
                                 resolved_token, resolved_chat, Path(fp), timeout=timeout
@@ -446,4 +461,75 @@ def notify(
     return decorator
 
 
-__all__ = ["notify"]
+def send_telegram_notification(
+    message: str,
+    bot_token: str | None = None,
+    chat_id: str | int | None = None,
+    timeout: float = 10.0,
+    escape_markdown: bool = True,
+    files: list[str | Path] | None = None,
+    file_caption: str = "",
+    send_as_document: bool = False,
+) -> None:
+    """Send a direct Telegram notification without using the ``notify`` decorator.
+
+    Credentials can be supplied explicitly via ``bot_token`` / ``chat_id`` or
+    loaded from ``TELEGRAM_BOT_TOKEN`` / ``TELEGRAM_CHAT_ID`` in the environment
+    (including values loaded from a ``.env`` file via python-dotenv).
+
+    Args:
+        message (str): Message body to send.
+        bot_token (str | None): Telegram bot token. Falls back to environment.
+            Defaults to None.
+        chat_id (str | int | None): Telegram chat ID. Falls back to environment.
+            Defaults to None.
+        timeout (float): Socket timeout in seconds for HTTP requests.
+            Defaults to 10.0.
+        escape_markdown (bool): Escape Telegram MarkdownV2 special characters in
+            ``message`` before sending. Defaults to True.
+        files (list[str | Path] | None): Optional list of file paths to attach
+            after the text message is sent. Defaults to None.
+        file_caption (str): Optional caption for attached files. Defaults to "".
+        send_as_document (bool): Force attachments (including PNG/JPG) to be
+            sent via ``sendDocument``. Defaults to False.
+
+    Raises:
+        ValueError: If ``message`` is empty, credentials are missing, or
+            credentials contain whitespace.
+    """
+    load_dotenv()
+
+    resolved_token: str = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    resolved_chat: str | int = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
+
+    if not message:
+        raise ValueError("message must not be empty.")
+    if not resolved_token:
+        raise ValueError(
+            "bot_token not provided and TELEGRAM_BOT_TOKEN not set in environment."
+        )
+    if any(char.isspace() for char in resolved_token):
+        raise ValueError("bot_token contains whitespace.")
+    if not resolved_chat:
+        raise ValueError(
+            "chat_id not provided and TELEGRAM_CHAT_ID not set in environment."
+        )
+    if isinstance(resolved_chat, str) and any(char.isspace() for char in resolved_chat):
+        raise ValueError("chat_id contains whitespace.")
+
+    text = _truncate(message) if escape_markdown else message
+    _send_telegram_message(resolved_token, resolved_chat, text, timeout)
+
+    if files:
+        for file_path in files:
+            _send_telegram_file(
+                resolved_token,
+                resolved_chat,
+                Path(file_path),
+                caption=file_caption,
+                timeout=timeout,
+                send_as_document=send_as_document,
+            )
+
+
+__all__ = ["notify", "send_telegram_notification"]

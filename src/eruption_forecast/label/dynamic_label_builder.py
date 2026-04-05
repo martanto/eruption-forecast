@@ -113,10 +113,10 @@ class DynamicLabelBuilder(LabelBuilder):
             day_to_forecast,
             eruption_dates,
             volcano_id,
-            output_dir,
-            root_dir,
-            verbose,
-            debug,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            verbose=verbose,
+            debug=debug,
         )
 
         # Set DynamicLabelBuilder-specific attributes after super.

@@ -68,7 +68,7 @@ uv run python main.py
 
 ## Telegram Notifications (Optional)
 
-The `notify` decorator can send Telegram messages when long-running pipeline steps finish. To enable it, copy `.env.example` to `.env` and fill in your credentials:
+The package provides both the `notify` decorator and a direct function `send_telegram_notification(...)` for Telegram messages when long-running pipeline steps finish. To enable them, copy `.env.example` to `.env` and fill in your credentials:
 
 ```
 TELEGRAM_BOT_TOKEN=your_bot_token_here

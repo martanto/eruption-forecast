@@ -219,32 +219,37 @@ class TestGridProperty:
     """Test that grid property returns a non-empty dict for every classifier."""
 
     @pytest.mark.parametrize("classifier", ALL_CLASSIFIERS)
-    def test_grid_is_non_empty_dict(self, classifier: str) -> None:
-        """grid property returns a non-empty dict for every supported classifier."""
+    def test_grid_is_non_empty(self, classifier: str) -> None:
+        """grid property returns a non-empty list or dict for every supported classifier."""
         clf = ClassifierModel(classifier)
         grid = clf.grid
-        assert isinstance(grid, dict)
-        assert len(grid) > 0
+        assert grid  # truthy: non-empty list or dict
+
+    def _all_grid_keys(self, grid) -> set:
+        """Collect all keys across list-of-dicts or plain dict grid."""
+        if isinstance(grid, dict):
+            return set(grid.keys())
+        return {k for d in grid for k in d.keys()}
 
     def test_rf_grid_contains_n_estimators(self) -> None:
         """RF grid includes 'n_estimators' key."""
         clf = ClassifierModel("rf")
-        assert "n_estimators" in clf.grid
+        assert "n_estimators" in self._all_grid_keys(clf.grid)
 
     def test_svm_grid_contains_c(self) -> None:
         """SVM grid includes 'C' key."""
         clf = ClassifierModel("svm")
-        assert "C" in clf.grid
+        assert "C" in self._all_grid_keys(clf.grid)
 
     def test_xgb_grid_contains_learning_rate(self) -> None:
         """XGB grid includes 'learning_rate' key."""
         clf = ClassifierModel("xgb")
-        assert "learning_rate" in clf.grid
+        assert "learning_rate" in self._all_grid_keys(clf.grid)
 
     def test_lr_grid_contains_penalty(self) -> None:
         """LR grid includes 'penalty' key."""
         clf = ClassifierModel("lr")
-        assert "penalty" in clf.grid
+        assert "penalty" in self._all_grid_keys(clf.grid)
 
     def test_grid_setter_overrides_default(self) -> None:
         """Assigning a custom grid replaces the default."""

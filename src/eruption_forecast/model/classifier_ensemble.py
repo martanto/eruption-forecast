@@ -142,9 +142,8 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             [v["probability"] for v in clf_results.values()], axis=0
         )
 
-        return np.column_stack(
-            [1.0 - classifier_probability_means, classifier_probability_means]
-        )
+        mean_proba = classifier_probability_means.mean(axis=0)
+        return np.column_stack([1.0 - mean_proba, mean_proba])
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Return binary predictions using a 0.5 threshold on the consensus probability.

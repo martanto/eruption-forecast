@@ -22,7 +22,7 @@ This package produces **probabilistic predictions**, not deterministic guarantee
 | [Classifiers and CV](Classifiers-and-CV) | Supported classifiers, hyperparameter grids, cross-validation strategies |
 | [Evaluation and Forecasting](Evaluation-and-Forecasting) | ModelEvaluator, MultiModelEvaluator, ModelPredictor |
 | [Visualization](Visualization) | All plot types with code examples |
-| [Configuration](Configuration) | Telegram notify decorator, pipeline config save/replay, logging |
+| [Configuration](Configuration) | Telegram notify decorator + direct send function, pipeline config save/replay, logging |
 | [Output Structure](Output-Structure) | Full output directory tree |
 | [Architecture](Architecture) | Package design, module responsibilities, key classes |
 | [API Reference](API-Reference) | Constructor and method parameter tables |

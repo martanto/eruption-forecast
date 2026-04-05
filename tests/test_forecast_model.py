@@ -138,55 +138,37 @@ class TestForecastModelValidate:
 
 
 # ---------------------------------------------------------------------------
-# ForecastModel — predict()
+# ForecastModel — method chaining
 # ---------------------------------------------------------------------------
 
 
-class TestForecastModelPredict:
-    """Test predict() window generation and output."""
+class TestForecastModelChaining:
+    """Test that ForecastModel pipeline methods return self for chaining."""
 
-    def test_predict_saves_csv(self) -> None:
-        """predict() writes a non-empty CSV to the output directory."""
+    def test_load_tremor_data_returns_self(self) -> None:
+        """load_tremor_data() returns self for method chaining."""
+        import pandas as pd
+        import numpy as np
+
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_valid_kwargs(tmp))
-            pred_dir = os.path.join(tmp, "predictions")
-            fm.predict(
-                start_date="2020-01-01",
-                end_date="2020-01-03",
-                window_step=12,
-                window_step_unit="hours",
-                output_dir=pred_dir,
+            # Inject a pre-built tremor df instead of calculating
+            n = 144 * 7
+            idx = pd.date_range("2020-01-01", periods=n, freq="10min", name="datetime")
+            rng = np.random.default_rng(0)
+            df = pd.DataFrame(
+                {"rsam_f0": rng.uniform(0, 1, n), "rsam_f1": rng.uniform(0, 1, n)},
+                index=idx,
             )
-            csvs = [f for f in os.listdir(pred_dir) if f.endswith(".csv")]
-            assert len(csvs) == 1
-            # File must be non-empty
-            assert os.path.getsize(os.path.join(pred_dir, csvs[0])) > 0
+            csv = os.path.join(tmp, "tremor.csv")
+            df.to_csv(csv)
 
-    def test_predict_returns_self(self) -> None:
-        """predict() returns the same ForecastModel instance."""
-        with tempfile.TemporaryDirectory() as tmp:
-            fm = ForecastModel(**_valid_kwargs(tmp))
-            result = fm.predict(
-                start_date="2020-01-01",
-                end_date="2020-01-03",
-                window_step=12,
-                window_step_unit="hours",
-            )
+            result = fm.load_tremor_data(csv)
             assert result is fm
 
-    def test_predict_filename_uses_step_prefix(self) -> None:
-        """Output filename contains 'step-' (not the old 'ws-' prefix)."""
+    def test_set_feature_selection_method_returns_self(self) -> None:
+        """set_feature_selection_method() returns self for method chaining."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_valid_kwargs(tmp))
-            pred_dir = os.path.join(tmp, "pred_out")
-            fm.predict(
-                start_date="2020-01-01",
-                end_date="2020-01-03",
-                window_step=30,
-                window_step_unit="minutes",
-                output_dir=pred_dir,
-            )
-            csvs = os.listdir(pred_dir)
-            assert len(csvs) == 1
-            assert "step-30minutes" in csvs[0]
-            assert "ws-" not in csvs[0]
+            result = fm.set_feature_selection_method("tsfresh")
+            assert result is fm

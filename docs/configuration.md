@@ -12,7 +12,12 @@ The `decorators` package provides utilities for wrapping functions with cross-cu
 
 ### notify — Telegram Notifications
 
-`notify` sends a structured Telegram message when the decorated function finishes (success) or raises an exception (error). Useful for long-running pipeline steps such as tremor calculation or multi-seed training.
+The package provides two Telegram notification APIs:
+
+- `notify`: decorator for function success/error notifications.
+- `send_telegram_notification`: direct function call for one-off messages (with optional file attachments).
+
+Both are useful for long-running pipeline steps such as tremor calculation or multi-seed training.
 
 #### Setup
 
@@ -28,7 +33,7 @@ TELEGRAM_CHAT_ID=your_chat_id_here
 #### Basic Usage
 
 ```python
-from eruption_forecast.decorators import notify
+from eruption_forecast.decorators import notify, send_telegram_notification
 
 # Credentials read automatically from .env
 @notify(name="Training Run")
@@ -39,6 +44,13 @@ def train_model():
 @notify(bot_token="TOKEN", chat_id="CHAT_ID", name="Training Run")
 def train_model():
     ...
+
+# Direct function-style call (no decorator)
+send_telegram_notification(
+    message="Training run finished successfully.",
+    files=["output/forecast.png", "output/metrics.csv"],
+    file_caption="Training artifacts",
+)
 ```
 
 #### Message Format

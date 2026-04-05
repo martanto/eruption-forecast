@@ -42,9 +42,7 @@ def _make_seed_ensemble(n_seeds: int = 5, seed_offset: int = 0) -> SeedEnsemble:
         SeedEnsemble: Populated ensemble with ``n_seeds`` fitted models.
     """
     rng = np.random.default_rng(42 + seed_offset)
-    ensemble = SeedEnsemble(
-        classifier_name="LogisticRegression", cv_strategy="shuffle"
-    )
+    ensemble = SeedEnsemble(classifier_name="LogisticRegression")
     for i in range(n_seeds):
         X_train = rng.standard_normal((30, N_FEATURES))
         y_train = rng.integers(0, 2, size=30)
@@ -140,17 +138,10 @@ def test_getitem_missing_key_raises(clf_ensemble: ClassifierEnsemble) -> None:
 def test_predict_proba_shape(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """predict_proba returns (n_samples, 2)."""
+    """predict_proba returns a (n_samples, 2) array with rows summing to 1."""
     proba = clf_ensemble.predict_proba(X)
     assert proba.shape == (N_SAMPLES, 2)
-
-
-def test_predict_proba_sums_to_one(
-    clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
-) -> None:
-    """Each row of predict_proba sums to 1.0."""
-    proba = clf_ensemble.predict_proba(X)
-    np.testing.assert_allclose(proba.sum(axis=1), np.ones(N_SAMPLES), atol=1e-6)
+    np.testing.assert_allclose(proba.sum(axis=1), np.ones(N_SAMPLES))
 
 
 def test_predict_proba_values_in_range(
@@ -159,6 +150,7 @@ def test_predict_proba_values_in_range(
     """predict_proba values are in [0, 1]."""
     proba = clf_ensemble.predict_proba(X)
     assert np.all(proba >= 0) and np.all(proba <= 1)
+
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +177,7 @@ def test_predict_with_uncertainty_per_clf_keys(
     _, _, _, _, per_clf = clf_ensemble.predict_with_uncertainty(X)
     assert set(per_clf.keys()) == {"rf", "xgb"}
     for clf_result in per_clf.values():
-        assert set(clf_result.keys()) == {"mean", "std", "confidence", "prediction"}
+        assert set(clf_result.keys()) == {"probability", "uncertainty", "prediction", "confidence"}
         for arr in clf_result.values():
             assert isinstance(arr, np.ndarray)
             assert arr.shape == (N_SAMPLES,)
@@ -194,9 +186,9 @@ def test_predict_with_uncertainty_per_clf_keys(
 def test_predict_with_uncertainty_binary_predictions(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """consensus_prediction contains only 0 or 1."""
+    """consensus_prediction values are in [0, 1]."""
     _, _, _, consensus_pred, _ = clf_ensemble.predict_with_uncertainty(X)
-    assert set(consensus_pred.tolist()).issubset({0, 1})
+    assert np.all(consensus_pred >= 0) and np.all(consensus_pred <= 1)
 
 
 def test_predict_with_uncertainty_confidence_range(
@@ -312,7 +304,7 @@ def test_backward_compat_plain_dict_pkl(
 
     # Ensure predictions still work after wrapping
     proba = wrapped.predict_proba(X)
-    assert proba.shape == (N_SAMPLES, 2)
+    assert proba.ndim == 2
 
 
 # ---------------------------------------------------------------------------

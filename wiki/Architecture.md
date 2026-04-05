@@ -49,8 +49,8 @@ src/eruption_forecast/
 │   ├── validation.py          # Centralised validation (dates, random state, columns, sampling)
 │   ├── pathutils.py           # Path resolution relative to root_dir
 │   └── formatting.py          # Text formatting
-└── decorators/          # Function decorators
-    └── notify.py              # Telegram notification decorator
+└── decorators/          # Function decorators and Telegram notify helper
+    └── notify.py              # Telegram notification decorator + direct send function
 ```
 
 ---
