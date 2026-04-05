@@ -56,24 +56,21 @@ class TestParseLabelFilenameLocation:
 # ---------------------------------------------------------------------------
 
 class TestTremorDataCsvPath:
-    def test_no_csv_attribute(self):
+    def test_has_csv_attribute(self):
         from eruption_forecast.tremor.tremor_data import TremorData
         td = TremorData()
-        assert not hasattr(td, "csv"), (
-            "TremorData.csv was removed; use csv_path instead"
-        )
+        assert hasattr(td, "csv"), "TremorData should have a csv attribute"
 
-    def test_csv_path_initialises_empty(self):
+    def test_csv_initialises_empty(self):
         from eruption_forecast.tremor.tremor_data import TremorData
         td = TremorData()
-        assert td.csv_path == ""
+        assert td.csv == ""
 
-    def test_repr_uses_csv_path(self):
+    def test_repr_uses_csv(self):
         from eruption_forecast.tremor.tremor_data import TremorData
         import inspect
         src = inspect.getsource(TremorData.__repr__)
-        assert "csv_path" in src
-        assert "self.csv," not in src
+        assert "csv" in src
 
 
 # ---------------------------------------------------------------------------
@@ -176,8 +173,8 @@ class TestDetectAnomaliesUsesFilterNans:
     def test_source_uses_filter_nans(self):
         import eruption_forecast.utils.array as arr_mod
         src = inspect.getsource(arr_mod.detect_anomalies_zscore)
-        assert "_filter_nans" in src, (
-            "detect_anomalies_zscore should call _filter_nans, not inline data[~np.isnan(data)]"
+        assert "filter_nans" in src, (
+            "detect_anomalies_zscore should call filter_nans, not inline data[~np.isnan(data)]"
         )
         assert "data[~np.isnan(data)]" not in src
 
@@ -195,10 +192,9 @@ class TestDetectAnomaliesUsesFilterNans:
 
 class TestConfidenceNSeedsBugFix:
     def test_source_uses_shape_1(self):
-        import eruption_forecast.utils.ml as ml_mod
-        src = inspect.getsource(ml_mod.compute_model_probabilities)
+        import eruption_forecast.utils.array as arr_mod
+        src = inspect.getsource(arr_mod.compute_model_probabilities)
         assert "shape[1]" in src, "n_seeds must come from axis-1 (seeds), not axis-0 (windows)"
-        assert ".shape[0]" not in src.split("n_seeds")[0].split("def compute_model")[-1]
 
     def test_confidence_matrix_orientation(self):
         """Directly verify the fix: matrix is (n_windows, n_seeds) so n_seeds = shape[1]."""

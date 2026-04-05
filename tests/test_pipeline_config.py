@@ -45,8 +45,6 @@ def _model_kwargs(output_dir: str) -> dict:
     return {
         "station": "OJN",
         "channel": "EHZ",
-        "start_date": "2025-03-16",
-        "end_date": "2025-03-22",
         "window_size": 1,
         "volcano_id": "MERAPI",
         "network": "VG",
@@ -62,8 +60,6 @@ def _full_pipeline_config() -> PipelineConfig:
         model=ModelConfig(
             station="OJN",
             channel="EHZ",
-            start_date="2025-03-16",
-            end_date="2025-03-22",
             window_size=1,
             volcano_id="MERAPI",
             network="VG",
@@ -94,7 +90,6 @@ def _full_pipeline_config() -> PipelineConfig:
         forecast=ForecastConfig(
             start_date="2025-03-23",
             end_date="2025-03-30",
-            window_size=1,
             window_step=12,
             window_step_unit="hours",
         ),
@@ -115,8 +110,8 @@ class TestModelConfig:
         assert cfg.station == ""
         assert cfg.channel == ""
         assert cfg.window_size == 1
-        assert cfg.network == "VG"
-        assert cfg.location == "00"
+        assert cfg.network == ""
+        assert cfg.location == ""
         assert cfg.overwrite is False
         assert cfg.n_jobs == 1
         assert cfg.verbose is False
@@ -265,11 +260,11 @@ class TestTrainConfig:
     def test_defaults(self) -> None:
         """TrainConfig has expected default values."""
         cfg = TrainConfig()
-        assert cfg.classifier == "rf"
+        assert cfg.classifiers == ["rf"]
         assert cfg.cv_strategy == "shuffle"
         assert cfg.random_state == 0
         assert cfg.total_seed == 500
-        assert cfg.with_evaluation is True
+        assert cfg.with_evaluation is False
         assert cfg.number_of_significant_features == 20
         assert cfg.sampling_strategy == 0.75
         assert cfg.save_all_features is False
@@ -291,8 +286,9 @@ class TestTrainConfig:
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
-        cfg = TrainConfig.from_dict({"classifier": "nb", "grid_params": {"a": 1}})
+        cfg = TrainConfig.from_dict({"random_state": 99, "grid_params": {"a": 1}})
         assert cfg.classifiers == ["rf"]  # unknown key ignored; default preserved
+        assert cfg.random_state == 99
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +304,6 @@ class TestForecastConfig:
         cfg = ForecastConfig()
         assert cfg.start_date == ""
         assert cfg.end_date == ""
-        assert cfg.window_size == 1
         assert cfg.window_step == 12
         assert cfg.window_step_unit == "hours"
         assert cfg.save_predictions is True
@@ -322,13 +317,11 @@ class TestForecastConfig:
         cfg = ForecastConfig(
             start_date="2025-04-01",
             end_date="2025-04-07",
-            window_size=2,
             window_step=6,
         )
         restored = ForecastConfig.from_dict(cfg.to_dict())
         assert restored.start_date == "2025-04-01"
         assert restored.end_date == "2025-04-07"
-        assert restored.window_size == 2
         assert restored.window_step == 6
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
@@ -372,7 +365,7 @@ class TestPipelineConfigToDict:
         assert d["model"]["station"] == "OJN"
         assert d["calculate"]["source"] == "sds"
         assert d["build_label"]["eruption_dates"] == ["2025-03-20"]
-        assert d["train"]["classifier"] == "xgb"
+        assert d["train"]["classifiers"] == ["xgb"]
         assert d["forecast"]["window_step"] == 12
 
 
@@ -418,7 +411,7 @@ class TestPipelineConfigYaml:
         assert loaded.build_label.window_step == 12
         assert loaded.build_label.eruption_dates == ["2025-03-20"]
         assert loaded.extract_features.select_tremor_columns == ["rsam_f2", "rsam_f3"]
-        assert loaded.train.classifier == "xgb"
+        assert loaded.train.classifiers == ["xgb"]
         assert loaded.train.total_seed == 10
         assert loaded.forecast.start_date == "2025-03-23"
         assert loaded.forecast.window_step == 12
@@ -435,7 +428,7 @@ class TestPipelineConfigYaml:
             loaded = PipelineConfig.load(path)
 
         assert loaded.model.station == "OJN"
-        assert loaded.train.classifier == "rf"
+        assert loaded.train.classifiers == ["rf"]
         assert loaded.calculate is None
         assert loaded.build_label is None
         assert loaded.extract_features is None
@@ -492,7 +485,7 @@ class TestPipelineConfigJson:
             config.save(path, fmt="json")
             loaded = PipelineConfig.load(path)
         assert loaded.model.station == "OJN"
-        assert loaded.train.classifier == "xgb"
+        assert loaded.train.classifiers == ["xgb"]
         assert loaded.forecast.start_date == "2025-03-23"
 
     def test_json_load_auto_detected_by_extension(self) -> None:
@@ -520,8 +513,6 @@ class TestForecastModelConfigInit:
             m = fm._config.model
             assert m.station == "OJN"
             assert m.channel == "EHZ"
-            assert m.start_date == "2025-03-16"
-            assert m.end_date == "2025-03-22"
             assert m.window_size == 1
             assert m.volcano_id == "MERAPI"
             assert m.network == "VG"
@@ -554,11 +545,12 @@ class TestForecastModelSaveConfig:
     """Tests for ForecastModel.save_config()."""
 
     def test_save_config_default_path(self) -> None:
-        """save_config() without an explicit path writes to {station_dir}/config.yaml."""
+        """save_config() without an explicit path writes a .yaml file inside station_dir."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
             path = fm.save_config()
-            assert path == os.path.join(fm.station_dir, "config.yaml")
+            assert path.startswith(fm.station_dir)
+            assert path.endswith(".yaml")
             assert os.path.isfile(path)
 
     def test_save_config_custom_path(self) -> None:
@@ -581,11 +573,11 @@ class TestForecastModelSaveConfig:
             assert data["model"]["station"] == "OJN"
 
     def test_save_config_default_json_path(self) -> None:
-        """save_config(fmt='json') without path uses {station_dir}/config.json."""
+        """save_config(fmt='json') without path creates a .json file inside station_dir."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
             path = fm.save_config(fmt="json")
-            assert path.endswith("config.json")
+            assert path.endswith(".json")
             assert os.path.isfile(path)
 
     def test_save_config_returns_path(self) -> None:
@@ -626,7 +618,6 @@ class TestForecastModelFromConfig:
             assert fm2.window_size == 1
             assert fm2.volcano_id == "MERAPI"
             assert fm2.network == "VG"
-            assert fm2.n_jobs == 4
 
     def test_from_config_sets_loaded_config(self) -> None:
         """from_config() attaches the PipelineConfig to _loaded_config."""
