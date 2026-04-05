@@ -89,6 +89,8 @@ class EvaluationTrainer(BaseModelTrainer):
                 train_sizes=np.linspace(0.1, 1.0, 10),
                 n_jobs=1,
                 error_score=np.nan,
+                shuffle=True,
+                random_state=random_state,
             )
 
         return {
