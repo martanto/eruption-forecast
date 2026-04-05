@@ -149,7 +149,6 @@ class TestForecastModelChaining:
         """load_tremor_data() returns self for method chaining."""
         import pandas as pd
         import numpy as np
-        import tempfile as tf
 
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_valid_kwargs(tmp))
