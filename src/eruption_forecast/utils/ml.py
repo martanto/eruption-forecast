@@ -39,6 +39,7 @@ from sklearn.metrics import (
     f1_score,
     recall_score,
     precision_score,
+    confusion_matrix,
     balanced_accuracy_score,
 )
 from tsfresh.transformers import FeatureSelector
@@ -80,7 +81,8 @@ def compute_threshold_metrics(
         tuple[np.ndarray, dict[str, list[float]]]: A 2-tuple of:
             - thresholds: 1-D array of length ``resolution`` from 0.0 to 1.0.
             - metrics_dict: dict with keys ``"precision"``, ``"recall"``,
-              ``"f1"``, and ``"balanced_accuracy"``, each a list of floats.
+              ``"f1"``, ``"balanced_accuracy"``, and ``"specificity"``,
+              each a list of floats.
     """
     thresholds = np.linspace(0.0, 1.0, resolution)
     metrics: dict[str, list[float]] = {
@@ -88,6 +90,7 @@ def compute_threshold_metrics(
         "recall": [],
         "f1": [],
         "balanced_accuracy": [],
+        "specificity": [],
     }
     for threshold in thresholds:
         y_pred_thresh = (y_proba >= threshold).astype(int)
@@ -99,7 +102,27 @@ def compute_threshold_metrics(
         metrics["balanced_accuracy"].append(
             balanced_accuracy_score(y_true, y_pred_thresh)
         )
+        tn, fp, _, _ = confusion_matrix(y_true, y_pred_thresh, labels=[0, 1]).ravel()
+        metrics["specificity"].append(tn / (tn + fp) if (tn + fp) > 0 else 0.0)
     return thresholds, metrics
+
+
+def compute_g_mean(metrics: dict[str, list[float]]) -> np.ndarray:
+    """Compute G-mean from threshold metrics.
+
+    G-mean is the geometric mean of sensitivity (recall) and specificity.
+    It is preferred over F1 for rare-event forecasting because it equally
+    penalizes missing eruptions and false alarms without class-imbalance inflation.
+
+    Args:
+        metrics (dict[str, list[float]]): Metrics dict returned by
+            ``compute_threshold_metrics``, must contain ``"recall"`` and
+            ``"specificity"`` keys.
+
+    Returns:
+        np.ndarray: G-mean values, one per threshold step.
+    """
+    return np.sqrt(np.array(metrics["recall"]) * np.array(metrics["specificity"]))
 
 
 def load_labels_from_csv(label_features_csv: str) -> pd.Series:

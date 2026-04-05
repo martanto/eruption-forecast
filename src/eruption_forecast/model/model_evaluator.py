@@ -18,13 +18,13 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
 from eruption_forecast.utils.pathutils import (
     ensure_dir,
     save_figure,
     resolve_output_dir,
 )
 from eruption_forecast.config.constants import (
-    THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
     LEARNING_CURVE_SCORINGS,
 )
@@ -583,33 +583,34 @@ class ModelEvaluator:
 
     def optimize_threshold(
         self,
-        criterion: Literal["f1", "balanced_accuracy", "recall", "precision"] = "f1",
+        criterion: Literal["g_mean", "f1", "balanced_accuracy", "recall", "precision"] = "g_mean",
     ) -> tuple[float, dict[str, float]]:
         """Find the decision threshold that maximizes the given criterion.
 
-        Sweeps through thresholds from 0.0 to 1.0 in 0.01 increments and
-        evaluates each one against the specified metric. Returns the optimal
-        threshold and corresponding metric values.
+        Delegates to ``compute_threshold_metrics`` so the sweep logic is not
+        duplicated. The default criterion is ``"g_mean"`` (geometric mean of
+        sensitivity and specificity), which is preferred for rare-event
+        forecasting over F1.
 
         Args:
-            criterion (Literal["f1", "balanced_accuracy", "recall", "precision"], optional):
-                Metric to optimize. Defaults to "f1".
+            criterion (Literal["g_mean", "f1", "balanced_accuracy", "recall", "precision"], optional):
+                Metric to optimize. Defaults to ``"g_mean"``.
 
         Returns:
             tuple[float, dict[str, float]]: A 2-tuple containing:
 
                 - **threshold** (float): Optimal decision threshold (0.0 to 1.0).
-                - **metrics_at_threshold** (dict): Dictionary with keys "f1",
-                  "balanced_accuracy", "recall", "precision" evaluated at the
-                  optimal threshold.
+                - **metrics_at_threshold** (dict): Dictionary with keys ``"f1"``,
+                  ``"balanced_accuracy"``, ``"recall"``, ``"precision"``, and
+                  ``"g_mean"`` evaluated at the optimal threshold.
 
         Raises:
             ValueError: If probability predictions are not available.
 
         Examples:
-            >>> thresh, metrics = evaluator.optimize_threshold(criterion="f1")
+            >>> thresh, metrics = evaluator.optimize_threshold()
             >>> print(f"Optimal threshold: {thresh:.3f}")
-            >>> print(f"F1 at optimal: {metrics['f1']:.3f}")
+            >>> print(f"G-mean at optimal: {metrics['g_mean']:.3f}")
 
             >>> # Optimize for recall instead
             >>> thresh, metrics = evaluator.optimize_threshold(criterion="recall")
@@ -617,33 +618,28 @@ class ModelEvaluator:
         if self._y_proba is None:
             raise ValueError("optimize_threshold requires probability predictions")
 
-        thresholds = np.linspace(0.0, 1.0, THRESHOLD_RESOLUTION)
-        best_thresh = 0.5
-        best_score = -1.0
+        thresholds, metrics = compute_threshold_metrics(
+            self.y_test.to_numpy(), self._y_proba
+        )
+        g_mean = compute_g_mean(metrics)
 
-        for t in thresholds:
-            y_pred_t = (self._y_proba >= t).astype(int)
-            if criterion == "f1":
-                score = f1_score(self.y_test, y_pred_t, zero_division=0)
-            elif criterion == "balanced_accuracy":
-                score = balanced_accuracy_score(self.y_test, y_pred_t)
-            elif criterion == "recall":
-                score = recall_score(self.y_test, y_pred_t, zero_division=0)
-            else:  # precision
-                score = precision_score(self.y_test, y_pred_t, zero_division=0)
-
-            if score > best_score:
-                best_score = score
-                best_thresh = float(t)
-
-        y_pred_best = (self._y_proba >= best_thresh).astype(int)
-        metrics_at = {
-            "f1": f1_score(self.y_test, y_pred_best, zero_division=0),
-            "balanced_accuracy": balanced_accuracy_score(self.y_test, y_pred_best),
-            "recall": recall_score(self.y_test, y_pred_best, zero_division=0),
-            "precision": precision_score(self.y_test, y_pred_best, zero_division=0),
+        scores = {
+            "g_mean": g_mean,
+            "f1": np.array(metrics["f1"]),
+            "balanced_accuracy": np.array(metrics["balanced_accuracy"]),
+            "recall": np.array(metrics["recall"]),
+            "precision": np.array(metrics["precision"]),
         }
-        return best_thresh, metrics_at
+        optimal_idx = np.argmax(scores[criterion])
+        best_thresh = float(thresholds[optimal_idx])
+
+        return best_thresh, {
+            "g_mean": float(g_mean[optimal_idx]),
+            "f1": float(metrics["f1"][optimal_idx]),
+            "balanced_accuracy": float(metrics["balanced_accuracy"][optimal_idx]),
+            "recall": float(metrics["recall"][optimal_idx]),
+            "precision": float(metrics["precision"][optimal_idx]),
+        }
 
     def plot_threshold_analysis(
         self,

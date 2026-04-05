@@ -36,21 +36,17 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
 from sklearn.metrics import (
-    f1_score,
     roc_curve,
-    recall_score,
     roc_auc_score,
-    precision_score,
     confusion_matrix,
     precision_recall_curve,
     average_precision_score,
-    balanced_accuracy_score,
 )
 from sklearn.ensemble import VotingClassifier
 from sklearn.calibration import calibration_curve
 
 from eruption_forecast.config import CLASS_LABELS, ERUPTION_PROBABILITY_THRESHOLD
-from eruption_forecast.utils.ml import compute_threshold_metrics
+from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -269,11 +265,13 @@ def plot_threshold_analysis(
     figsize: tuple[float, float] = (10, 6),
     dpi: int = 150,
 ) -> plt.Figure:
-    """Plot precision, recall, F1, and balanced accuracy vs. decision threshold.
+    """Plot precision, recall, F1, balanced accuracy, and G-mean vs. decision threshold.
 
     Creates a multi-metric threshold analysis plot showing how classification metrics
-    vary across decision thresholds from 0 to 1. Marks default threshold ``ERUPTION_PROBABILITY_THRESHOLD`` and
-    optimal F1 threshold with vertical lines.
+    vary across decision thresholds from 0 to 1. Marks default threshold
+    ``ERUPTION_PROBABILITY_THRESHOLD`` and the optimal G-mean threshold with vertical
+    lines. G-mean (geometric mean of sensitivity and specificity) is used as the
+    optimization criterion because it is better suited to rare-event forecasting than F1.
 
     Args:
         y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
@@ -287,8 +285,8 @@ def plot_threshold_analysis(
 
     Returns:
         plt.Figure: Matplotlib figure object with threshold analysis plot showing
-            precision (blue), recall (orange), F1 score (green), and balanced
-            accuracy (pink) curves.
+            precision (blue), recall (orange), F1 score (green), balanced accuracy
+            (pink), and G-mean (purple) curves.
 
     Examples:
         >>> import numpy as np
@@ -299,8 +297,8 @@ def plot_threshold_analysis(
     """
     thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
 
-    # Find optimal threshold (max F1)
-    optimal_idx = np.argmax(metrics["f1"])
+    g_mean = compute_g_mean(metrics)
+    optimal_idx = np.argmax(g_mean)
     optimal_threshold = thresholds[optimal_idx]
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
@@ -333,6 +331,13 @@ def plot_threshold_analysis(
             color=OKABE_ITO[6],  # Pink
             linewidth=2.0,
         )
+        ax.plot(
+            thresholds,
+            g_mean,
+            label="G-mean",
+            color=OKABE_ITO[3],  # Purple
+            linewidth=2.0,
+        )
 
         # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.5)
         ax.axvline(
@@ -344,13 +349,13 @@ def plot_threshold_analysis(
             alpha=0.7,
         )
 
-        # Mark optimal threshold
+        # Mark optimal threshold by G-mean
         ax.axvline(
             optimal_threshold,
             color=NATURE_COLORS["red"],
             linestyle="--",
             linewidth=1.5,
-            label=f"Optimal F1 ({optimal_threshold:.2f})",
+            label=f"Optimal G-mean ({optimal_threshold:.2f})",
             alpha=0.8,
         )
 
@@ -1116,9 +1121,10 @@ def plot_aggregate_threshold_analysis(
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Plot mean metric curves vs. decision threshold across multiple seeds.
 
-    Sweeps thresholds from 0 to 1 and computes F1, precision, recall, and
-    balanced accuracy per seed. Plots the mean of each metric with a ±1 std
-    confidence band.
+    Sweeps thresholds from 0 to 1 and computes precision, recall, F1, balanced
+    accuracy, and G-mean per seed via ``compute_threshold_metrics``. Plots the
+    mean of each metric with a ±1 std confidence band and marks the optimal
+    G-mean threshold.
 
     Args:
         y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
@@ -1137,26 +1143,28 @@ def plot_aggregate_threshold_analysis(
         tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
             with columns ``threshold``, ``mean_precision``, ``std_precision``,
             ``mean_recall``, ``std_recall``, ``mean_f1``, ``std_f1``,
-            ``mean_balanced_accuracy``, ``std_balanced_accuracy``.
+            ``mean_balanced_accuracy``, ``std_balanced_accuracy``,
+            ``mean_g_mean``, ``std_g_mean``.
 
     Examples:
         >>> fig, data = plot_aggregate_threshold_analysis(y_true, y_probas_list)
         >>> fig.savefig("aggregate_threshold.png")
         >>> data.to_csv("threshold_data.csv", index=False)
     """
-    thresholds = np.linspace(0, 1, 101)
-    metric_keys = ["precision", "recall", "f1", "balanced_accuracy"]
+    metric_keys = ["precision", "recall", "f1", "balanced_accuracy", "g_mean"]
     colors = {
         "precision": OKABE_ITO[4],
         "recall": OKABE_ITO[0],
         "f1": OKABE_ITO[2],
         "balanced_accuracy": OKABE_ITO[6],
+        "g_mean": OKABE_ITO[3],  # Purple
     }
     labels_map = {
         "precision": "Precision",
         "recall": "Recall",
         "f1": "F1 Score",
         "balanced_accuracy": "Balanced Accuracy",
+        "g_mean": "G-mean",
     }
 
     if isinstance(y_trues, np.ndarray):
@@ -1164,29 +1172,27 @@ def plot_aggregate_threshold_analysis(
 
     # all_curves[key] is a list of 1-D arrays, one per seed
     all_curves: dict[str, list[np.ndarray]] = {k: [] for k in metric_keys}
+    thresholds: np.ndarray | None = None
 
     for y_true, y_proba in zip(y_trues, y_probas, strict=False):
-        curves: dict[str, list[float]] = {k: [] for k in metric_keys}
-        for t in thresholds:
-            y_pred_t = (y_proba >= t).astype(int)
-            curves["precision"].append(
-                precision_score(y_true, y_pred_t, zero_division=0)
-            )
-            curves["recall"].append(recall_score(y_true, y_pred_t, zero_division=0))
-            curves["f1"].append(f1_score(y_true, y_pred_t, zero_division=0))
-            curves["balanced_accuracy"].append(
-                balanced_accuracy_score(y_true, y_pred_t)
-            )
-        for k in metric_keys:
-            all_curves[k].append(np.array(curves[k]))
+        thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
+        g_mean = compute_g_mean(metrics)
+        for k in ["precision", "recall", "f1", "balanced_accuracy"]:
+            all_curves[k].append(np.array(metrics[k]))
+        all_curves["g_mean"].append(g_mean)
 
-    # Compute mean and std per metric for the data DataFrame
+    # Compute mean and std per metric
     mean_curves: dict[str, np.ndarray] = {}
     std_curves: dict[str, np.ndarray] = {}
     for key in metric_keys:
         matrix = np.stack(all_curves[key], axis=0)
         mean_curves[key] = matrix.mean(axis=0)
         std_curves[key] = matrix.std(axis=0)
+
+    # Optimal threshold from mean G-mean curve
+    assert thresholds is not None
+    optimal_idx = int(np.argmax(mean_curves["g_mean"]))
+    optimal_threshold = float(thresholds[optimal_idx])
 
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
@@ -1225,8 +1231,16 @@ def plot_aggregate_threshold_analysis(
             color=NATURE_COLORS["gray"],
             linestyle=":",
             linewidth=1.5,
-            label=r"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
+            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
             alpha=0.7,
+        )
+        ax.axvline(
+            optimal_threshold,
+            color=NATURE_COLORS["red"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
         )
 
         configure_spine(ax)
@@ -1248,6 +1262,8 @@ def plot_aggregate_threshold_analysis(
             "std_f1": std_curves["f1"],
             "mean_balanced_accuracy": mean_curves["balanced_accuracy"],
             "std_balanced_accuracy": std_curves["balanced_accuracy"],
+            "mean_g_mean": mean_curves["g_mean"],
+            "std_g_mean": std_curves["g_mean"],
         }
     )
     return fig, data
