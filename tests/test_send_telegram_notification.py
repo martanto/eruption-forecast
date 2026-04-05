@@ -122,6 +122,3 @@ def test_send_telegram_notification_validates_inputs(monkeypatch):
 
     with pytest.raises(ValueError, match="whitespace"):
         send_telegram_notification(message="ok", bot_token="TOKEN", chat_id="12 3")
-
-    monkeypatch.setattr(notify_module, "load_dotenv", lambda: None)
-    monkeypatch.setattr(notify_module, "load_dotenv", lambda: None)
