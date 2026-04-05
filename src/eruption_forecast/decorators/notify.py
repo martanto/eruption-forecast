@@ -517,7 +517,7 @@ def send_telegram_notification(
     if isinstance(resolved_chat, str) and any(char.isspace() for char in resolved_chat):
         raise ValueError("chat_id contains whitespace.")
 
-    text = _escape_md(message) if escape_markdown else message
+    text = _truncate(message) if escape_markdown else message
     _send_telegram_message(resolved_token, resolved_chat, text, timeout)
 
     if files:
