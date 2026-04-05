@@ -50,6 +50,8 @@ class TestComputeAllMetrics:
         "specificity",
         "roc_auc",
         "pr_auc",
+        "average_precision",
+        "mcc",
         "optimal_threshold",
         "f1_at_optimal",
         "recall_at_optimal",
@@ -85,3 +87,11 @@ class TestComputeAllMetrics:
     def test_sensitivity_equals_recall(self, computer):
         metrics = computer.compute_all_metrics()
         assert abs(metrics["sensitivity"] - metrics["recall"]) < 1e-9
+
+    def test_average_precision_in_range(self, computer):
+        metrics = computer.compute_all_metrics()
+        assert 0.0 <= metrics["average_precision"] <= 1.0
+
+    def test_mcc_in_range(self, computer):
+        metrics = computer.compute_all_metrics()
+        assert -1.0 <= metrics["mcc"] <= 1.0
