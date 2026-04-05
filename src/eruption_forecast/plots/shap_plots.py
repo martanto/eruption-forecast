@@ -79,7 +79,7 @@ def compute_shap_explanation(
         and not is_voting
     ):
         explainer = shap.TreeExplainer(model, X)
-        explanation: shap.Explanation = explainer(X)
+        explanation: shap.Explanation = explainer(X, check_additivity=False)
     else:
         masker = Independent(X, max_samples=len(X))
         explainer = shap.Explainer(model.predict_proba, masker)
