@@ -19,7 +19,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 
-from eruption_forecast.utils.ml import compute_threshold_metrics
+from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
 
 
 class MetricsComputer:
@@ -98,7 +98,9 @@ class MetricsComputer:
             self.y_true, self.y_proba
         )
         metrics["pr_auc"] = auc(recall_curve, precision_curve)
-        metrics["average_precision"] = average_precision_score(self.y_true, self.y_proba)
+        metrics["average_precision"] = average_precision_score(
+            self.y_true, self.y_proba
+        )
 
         # MCC — best single metric for imbalanced binary classification
         metrics["mcc"] = matthews_corrcoef(self.y_true, self.y_pred)
@@ -110,11 +112,16 @@ class MetricsComputer:
         return metrics
 
     def optimize_threshold(self) -> dict[str, float]:
-        """Find optimal classification threshold by maximizing F1 score.
+        """Find optimal classification threshold by maximizing G-mean.
+
+        G-mean (geometric mean of sensitivity and specificity) is the preferred
+        objective for eruption forecasting — it equally penalizes missing eruptions
+        and false alarms without being inflated by class imbalance, unlike F1.
 
         Returns:
             dict[str, float]: Dictionary with keys:
-                - ``optimal_threshold`` (float): Threshold that maximizes F1.
+                - ``optimal_threshold`` (float): Threshold that maximizes G-mean.
+                - ``g_mean_at_optimal`` (float): G-mean at optimal threshold.
                 - ``f1_at_optimal`` (float): F1 score at optimal threshold.
                 - ``recall_at_optimal`` (float): Recall at optimal threshold.
                 - ``precision_at_optimal`` (float): Precision at optimal threshold.
@@ -122,11 +129,13 @@ class MetricsComputer:
         """
         thresholds, metrics = compute_threshold_metrics(self.y_true, self.y_proba)
 
-        # Find optimal threshold
-        optimal_idx = np.argmax(metrics["f1"])
+        g_mean = compute_g_mean(metrics)
+        optimal_idx = np.argmax(g_mean)
+        optimal_threshold = float(thresholds[optimal_idx])
 
         return {
-            "optimal_threshold": float(thresholds[optimal_idx]),
+            "optimal_threshold": optimal_threshold,
+            "g_mean_at_optimal": float(g_mean[optimal_idx]),
             "f1_at_optimal": float(metrics["f1"][optimal_idx]),
             "recall_at_optimal": float(metrics["recall"][optimal_idx]),
             "precision_at_optimal": float(metrics["precision"][optimal_idx]),

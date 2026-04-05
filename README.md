@@ -76,6 +76,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - [Advanced Usage](#advanced-usage)
 - [Supported Classifiers](#supported-classifiers)
 - [Cross-Validation Strategies](#cross-validation-strategies)
+- [Threshold Optimization & Scoring](#threshold-optimization--scoring)
 - [Output Directory Structure](#output-directory-structure)
 - [Requirements](#requirements)
 - [Development](#development)
@@ -83,12 +84,12 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - [License](#license)
 
 **Detailed documentation:**
-- [Step-by-Step Usage Guide](docs/step-by-step-guide.md) — Sections 1–12, per-stage code examples
-- [API Reference](docs/api-reference.md) — Constructor and method parameter tables
-- [Visualization & Plotting](docs/visualization.md) — All plot types and usage
-- [Configuration](docs/configuration.md) — notify decorator, pipeline config save/replay, logging
-- [Output Directory Structure](docs/output-structure.md) — Full directory tree
-- [Architecture](docs/architecture.md) — Component details, design principles, key classes
+- [Step-by-Step Usage Guide](docs/step-by-step-guide.md); Sections 1–12, per-stage code examples
+- [API Reference](docs/api-reference.md); Constructor and method parameter tables
+- [Visualization & Plotting](docs/visualization.md); All plot types and usage
+- [Configuration](docs/configuration.md); notify decorator, pipeline config save/replay, logging
+- [Output Directory Structure](docs/output-structure.md); Full directory tree
+- [Architecture](docs/architecture.md); Component details, design principles, key classes
 
 ---
 
@@ -97,13 +98,13 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - **Tremor Calculation**: Process raw seismic data (SDS/FDSN) to calculate RSAM, DSAR, and Shannon Entropy metrics across multiple frequency bands
 - **Label Building**: Generate training labels from eruption dates with configurable forecast horizons
 - **Feature Extraction**: Extract 700+ time-series features using tsfresh for machine learning
-- **Enhanced Feature Selection**: Three-method feature selection — tsfresh statistical, RandomForest permutation importance, or combined two-stage
+- **Enhanced Feature Selection**: Three-method feature selection; tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, frequency band contribution charts, and **learning curve plots** (`plot_learning_curve_grid`) via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
 - **Two Training Workflows**: `evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
-- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()` — eliminates per-seed I/O at prediction time and enables `predict_proba()` directly on the ensemble
+- **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()`; eliminates per-seed I/O at prediction time and enables `predict_proba()` directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
-- **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function — no external dependencies except an optional `weasyprint` for PDF export
+- **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function; no external dependencies except an optional `weasyprint` for PDF export
 - **Telegram Notifications**: `notify` decorator and `send_telegram_notification` direct function send structured Telegram messages (success/error, elapsed time, file attachments)
 - **Modular Architecture**: Clean separation of concerns with focused utility modules
 
@@ -112,7 +113,7 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 ```
 eruption-forecast/
 ├── src/eruption_forecast/
-│   ├── data_container.py    # BaseDataContainer — shared ABC for TremorData & LabelData
+│   ├── data_container.py    # BaseDataContainer; shared ABC for TremorData & LabelData
 │   ├── tremor/              # Seismic tremor processing
 │   ├── label/               # Training label generation
 │   ├── features/            # Feature extraction & selection
@@ -172,7 +173,7 @@ Raw Seismic Data (SDS / FDSN)
 │               ModelPredictor                │
 │  ┌──────────────────────────────────────┐   │
 │  │ predict_proba()                      │   │
-│  │ (forecast mode — no labels needed)   │   │
+│  │ (forecast mode; no labels needed)   │   │
 │  └──────────────────────────────────────┘   │
 │  Single model or multi-model consensus      │
 └──────────────────────┬──────────────────────┘
@@ -207,7 +208,7 @@ uv sync --group dev
 
 The package reads seismic data from two sources, both routed through `CalculateTremor`.
 
-### SDS — SeisComP Data Structure
+### SDS; SeisComP Data Structure
 
 SDS is a standardized directory and file layout used by [SeisComP](https://www.seiscomp.de/) to store waveform data portably across data servers and analysis tools. See the [official SDS specification](https://www.seiscomp.de/seiscomp3/doc/applications/slarchive/SDS.html) for full details.
 
@@ -242,7 +243,7 @@ SDS is a standardized directory and file layout used by [SeisComP](https://www.s
 | `STA` | Station code (≤ 8 chars) | `OJN` |
 | `CHAN` | Channel code (≤ 8 chars) | `EHZ` |
 | `LOC` | Location code (≤ 8 chars, may be empty) | `00` |
-| `TYPE` | Data type — `D` = waveform data (most common) | `D` |
+| `TYPE` | Data type; `D` = waveform data (most common) | `D` |
 | `DAY` | Three-digit day-of-year, zero-padded | `075` |
 
 Files are miniSEED format. Periods in filenames are always present even when a field is empty.
@@ -261,7 +262,7 @@ tremor = CalculateTremor(
 ).from_sds(sds_dir="/data/sds").run()
 ```
 
-### FDSN — Web Service
+### FDSN; Web Service
 
 FDSN downloads waveform data from any FDSN-compatible web service (IRIS, GEOFON, etc.) and caches it locally as SDS miniSEED so subsequent runs skip the network.
 
@@ -356,9 +357,9 @@ See `main.py` in the repository for the complete working example.
 
 ## Reports (beta)
 
-The `report/` package generates self-contained, interactive HTML reports (powered by Plotly, loaded from CDN) for every pipeline stage. No image files are produced — each report is a single `.html` file you can open in any browser or share by email.
+The `report/` package generates self-contained, interactive HTML reports (powered by Plotly, loaded from CDN) for every pipeline stage. No image files are produced; each report is a single `.html` file you can open in any browser or share by email.
 
-### Integrated — chain after any pipeline stage
+### Integrated; chain after any pipeline stage
 
 ```python
 fm.calculate(...).build_label(...).train(...).generate_report()
@@ -371,7 +372,7 @@ fm.generate_report(sections=["tremor", "label"])
 fm.generate_report(fmt="pdf")
 ```
 
-### Standalone — from an existing output directory
+### Standalone; from an existing output directory
 
 ```python
 from eruption_forecast.report import generate_report
@@ -526,7 +527,7 @@ ModelTrainer.fit()
 └── [inner, per seed] grid_search_n_jobs
     │
     ├── FeatureSelector  → tsfresh/RandomForest, CPU-only
-    │   GPU: unchanged — safe to parallelise
+    │   GPU: unchanged; safe to parallelise
     │
     └── GridSearchCV  → runs XGBoost CV folds
         GPU: forced to 1 (fold workers share one GPU device)
@@ -536,9 +537,9 @@ ModelTrainer.fit()
 
 | Parameter | Normal (CPU) | GPU (`use_gpu=True`) |
 |---|---|---|
-| `n_jobs` (outer seed workers) | Configurable | Forced to `1` — multiple seeds sharing one GPU causes VRAM contention |
-| `grid_search_n_jobs` in `GridSearchCV` | Configurable | Forced to `1` — parallel CV fold workers each try to use the GPU simultaneously |
-| `grid_search_n_jobs` in `FeatureSelector` | Configurable | **Unchanged** — feature selection is CPU-only (tsfresh/RandomForest) and is safe to parallelise |
+| `n_jobs` (outer seed workers) | Configurable | Forced to `1`; multiple seeds sharing one GPU causes VRAM contention |
+| `grid_search_n_jobs` in `GridSearchCV` | Configurable | Forced to `1`; parallel CV fold workers each try to use the GPU simultaneously |
+| `grid_search_n_jobs` in `FeatureSelector` | Configurable | **Unchanged**; feature selection is CPU-only (tsfresh/RandomForest) and is safe to parallelise |
 
 > `use_gpu=True` has no effect on non-XGBoost classifiers (`rf`, `gb`, `svm`, etc.). Passing it with those classifiers emits a warning and training proceeds on CPU as normal.
 
@@ -587,7 +588,7 @@ comparator = ClassifierComparator.from_json(
 # Ranked by recall (default), saved to metrics/ranking_recall.csv
 ranking = comparator.get_ranking()
 
-# All plots — saved to figures/
+# All plots; saved to figures/
 results = comparator.plot_all()
 # results["metric_bar"]      → dict[str, Figure]  (one per metric + "all" overview)
 # results["seed_stability"]  → dict[str, Figure]  (one per metric + "all" overview)
@@ -628,13 +629,13 @@ predictor = ModelPredictor(
 
 ### Disable logging
 
-Silence all console and file output — useful for batch jobs or when embedding the package:
+Silence all console and file output; useful for batch jobs or when embedding the package:
 
 ```python
 from eruption_forecast import disable_logging, enable_logging
 
 disable_logging()
-fm.calculate(...).build_label(...).train(...)  # Silent — no output
+fm.calculate(...).build_label(...).train(...)  # Silent; no output
 enable_logging()   # Restore output
 
 # Fine-grained control
@@ -688,6 +689,46 @@ fm3.forecast(start_date="2025-04-01", end_date="2025-04-07",
 | `shuffle` | `StratifiedShuffleSplit` | Random splits with stratification (default) |
 | `stratified` | `StratifiedKFold` | Preserves class distribution across folds |
 | `timeseries` | `TimeSeriesSplit` | Temporal data, strict no-future-leakage |
+
+---
+
+## Threshold Optimization & Scoring
+
+### Why G-mean?
+
+Volcanic eruption datasets are severely imbalanced; eruptions are rare events that may represent less than 5% of all windows. Choosing the right optimization criterion for the decision threshold is therefore critical.
+
+This package uses **G-mean** (geometric mean of sensitivity and specificity) as the default threshold optimization criterion across all evaluation components (`MetricsComputer`, `ModelEvaluator`, `plot_threshold_analysis`, `plot_aggregate_threshold_analysis`, and `_best_seed_idx` in reports).
+
+**G-mean is defined as:**
+
+```
+G-mean = √(Sensitivity × Specificity)
+       = √(Recall × (TN / (TN + FP)))
+```
+
+### Scoring Criterion Comparison
+
+| Criterion | Formula | Penalizes Missed Eruptions | Penalizes False Alarms | Robust to Imbalance |
+|-----------|---------|:--------------------------:|:----------------------:|:-------------------:|
+| **Accuracy** | (TP + TN) / N | No; dominated by majority class | No | No |
+| **F1 Score** | 2·P·R / (P + R) | Partially | Partially | No |
+| **Recall** | TP / (TP + FN) | Yes | No; can hit 1.0 by predicting all positive | No |
+| **Precision** | TP / (TP + FP) | No | Yes | No |
+| **Balanced Accuracy** | (Sensitivity + Specificity) / 2 | Partially | Partially | Yes |
+| **G-mean** ✓ | √(Sensitivity × Specificity) | Yes | Yes | Yes |
+
+### Why Not F1?
+
+F1 equally weights precision and recall, which implicitly treats a missed eruption (false negative) as equally costly as a false alarm (false positive). For volcanic eruption forecasting this is the wrong trade-off; missing an eruption has far higher consequences than issuing an unnecessary alert.
+
+F1 is also inflated when one class dominates: a model that never predicts eruption can still achieve a non-trivial F1 on a 95/5 dataset.
+
+### Why G-mean Works Here
+
+G-mean rewards models that correctly identify eruptions (high sensitivity) **and** correctly identify non-eruption periods (high specificity). It reaches its maximum only when both classes are classified well, and it degrades symmetrically when either class is poorly handled. Unlike recall alone, it cannot be gamed by predicting every window as positive.
+
+> `GridSearchCV` uses `scoring="balanced_accuracy"` (not G-mean) because G-mean requires per-threshold evaluation and is not a standard sklearn scorer. Balanced accuracy is the closest single-value proxy available inside cross-validation. G-mean is applied at the post-training threshold selection stage, which is where it matters most.
 
 ---
 
@@ -785,7 +826,7 @@ pytest tests/test_train_model.py
 
 ## License
 
-MIT License — see LICENSE file for details.
+MIT License; see LICENSE file for details.
 
 **Disclaimer of Liability**: This software is provided "as is" without warranty of any kind, express or implied. The authors and contributors shall not be liable for any damages or losses arising from the use of this software. Volcanic eruption forecasting is inherently uncertain, and this software should be used only as a research tool, not for operational volcano monitoring or public safety decisions.
 
@@ -793,4 +834,4 @@ MIT License — see LICENSE file for details.
 
 **Version:** 0.1.0
 **Status:** Active Development
-**Last Updated:** 2026-03-23
+**Last Updated:** 2026-04-05

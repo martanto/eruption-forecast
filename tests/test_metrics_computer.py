@@ -53,6 +53,7 @@ class TestComputeAllMetrics:
         "average_precision",
         "mcc",
         "optimal_threshold",
+        "g_mean_at_optimal",
         "f1_at_optimal",
         "recall_at_optimal",
         "precision_at_optimal",
