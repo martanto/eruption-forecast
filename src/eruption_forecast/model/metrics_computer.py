@@ -66,6 +66,7 @@ class MetricsComputer:
                 - ``accuracy``, ``balanced_accuracy``
                 - ``precision``, ``recall``, ``f1_score``
                 - ``sensitivity``, ``specificity``
+                - ``g_mean`` (float): G-mean at the default 0.5 threshold.
                 - ``roc_auc``, ``pr_auc``, ``average_precision``
                 - ``mcc``
                 - ``true_positives``, ``true_negatives``, ``false_positives``, ``false_negatives``
@@ -91,6 +92,16 @@ class MetricsComputer:
         # Sensitivity and specificity
         metrics["sensitivity"] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         metrics["specificity"] = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+
+        # G-mean at default (0.5) threshold
+        metrics["g_mean"] = float(
+            compute_g_mean(
+                {
+                    "recall": [metrics["sensitivity"]],
+                    "specificity": [metrics["specificity"]],
+                }
+            )[0]
+        )
 
         # AUC metrics
         metrics["roc_auc"] = roc_auc_score(self.y_true, self.y_proba)
