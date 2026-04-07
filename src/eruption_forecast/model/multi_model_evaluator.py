@@ -170,7 +170,7 @@ class MultiModelEvaluator:
         if self._metrics_files is not None:
             return list(self._metrics_files)
         if self._metrics_dir is not None:
-            paths = sorted(glob.glob(os.path.join(self._metrics_dir, "*.json")))
+            paths = sorted(glob.glob(os.path.join(self._metrics_dir, "json", "*.json")))
             return paths
         raise ValueError("No metrics source: provide metrics_files or metrics_dir.")
 

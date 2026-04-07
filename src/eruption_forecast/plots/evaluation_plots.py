@@ -302,6 +302,8 @@ def plot_threshold_analysis(
     g_mean = compute_g_mean(metrics)
     optimal_idx = np.argmax(g_mean)
     optimal_threshold = thresholds[optimal_idx]
+    f1_optimal_idx = np.argmax(metrics["f1"])
+    f1_optimal_threshold = thresholds[f1_optimal_idx]
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
         # Plot metrics with distinct colors from Okabe-Ito palette
@@ -358,6 +360,16 @@ def plot_threshold_analysis(
             linestyle="--",
             linewidth=1.5,
             label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        # Mark optimal threshold by f1
+        ax.axvline(
+            f1_optimal_threshold,
+            color=NATURE_COLORS["purple"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal f1 ({f1_optimal_threshold:.2f})",
             alpha=0.8,
         )
 
@@ -1287,6 +1299,8 @@ def plot_aggregate_threshold_analysis(
     assert thresholds is not None
     optimal_idx = int(np.argmax(mean_curves["g_mean"]))
     optimal_threshold = float(thresholds[optimal_idx])
+    f1_optimal_idx = int(np.argmax(mean_curves["f1"]))
+    f1_optimal_threshold = float(thresholds[f1_optimal_idx])
 
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
@@ -1334,6 +1348,14 @@ def plot_aggregate_threshold_analysis(
             linestyle="--",
             linewidth=1.5,
             label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+        ax.axvline(
+            f1_optimal_threshold,
+            color=NATURE_COLORS["purple"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal f1 ({f1_optimal_threshold:.2f})",
             alpha=0.8,
         )
 

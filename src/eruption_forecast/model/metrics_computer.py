@@ -137,15 +137,18 @@ class MetricsComputer:
                 - ``recall_at_optimal`` (float): Recall at optimal threshold.
                 - ``precision_at_optimal`` (float): Precision at optimal threshold.
                 - ``balanced_accuracy_at_optimal`` (float): Balanced accuracy at optimal threshold.
+                - ``optimal_threshold_f1`` (float): Threshold that maximizes F1 score.
         """
         thresholds, metrics = compute_threshold_metrics(self.y_true, self.y_proba)
 
         g_mean = compute_g_mean(metrics)
         optimal_idx = np.argmax(g_mean)
-        optimal_threshold = float(thresholds[optimal_idx])
+        g_mean_optimal_threshold = float(thresholds[optimal_idx])
+
+        f1_optimal_idx = np.argmax(metrics["f1"])
 
         return {
-            "optimal_threshold": optimal_threshold,
+            "optimal_threshold": g_mean_optimal_threshold,
             "g_mean_at_optimal": float(g_mean[optimal_idx]),
             "f1_at_optimal": float(metrics["f1"][optimal_idx]),
             "recall_at_optimal": float(metrics["recall"][optimal_idx]),
@@ -153,4 +156,5 @@ class MetricsComputer:
             "balanced_accuracy_at_optimal": float(
                 metrics["balanced_accuracy"][optimal_idx]
             ),
+            "optimal_threshold_f1": float(thresholds[f1_optimal_idx]),
         }
