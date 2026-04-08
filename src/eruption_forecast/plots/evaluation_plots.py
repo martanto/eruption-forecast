@@ -779,7 +779,7 @@ def plot_aggregate_roc_curve(
         >>> fig.savefig("aggregate_roc.png")
         >>> data.to_csv("roc_data.csv", index=False)
     """
-    fpr_grid = np.linspace(0, 1, 200)
+    fpr_grid = np.linspace(0, 1, 100)
     tprs: list[np.ndarray] = []
     aucs: list[float] = []
 
