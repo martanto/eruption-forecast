@@ -404,7 +404,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate ROC curve across all seeds.
 
@@ -449,7 +449,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate Precision-Recall curve across all seeds.
 
@@ -626,7 +626,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate threshold analysis plot across all seeds.
 
@@ -670,7 +670,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate G-mean curve across all seeds.
 
@@ -837,7 +837,7 @@ class MultiModelEvaluator:
     def plot_all(
         self,
         dpi: int = 150,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None]:
         """Generate and save all aggregate evaluation plots.
 
