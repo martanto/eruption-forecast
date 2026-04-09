@@ -7,6 +7,7 @@ per classifier, and produces side-by-side comparison plots and a ranking table.
 
 import os
 import json
+import math
 from typing import Any, Self, cast
 
 import numpy as np
@@ -994,12 +995,12 @@ class ClassifierComparator:
         dpi: int = 150,
         show_individual: bool = False,
     ) -> plt.Figure:
-        """Plot overlaid mean ROC curves for every classifier.
+        """Plot one ROC subplot per classifier in a grid (≤4 columns).
 
         Loads per-seed ROC data via each ``MultiModelEvaluator._load_seed_data()``,
         interpolates to a common FPR grid, and plots mean AUC curves. A gray
-        diagonal chance line is also drawn. Curves are coloured with the
-        OKABE_ITO palette.
+        diagonal chance line is drawn on every subplot. The grid has at most
+        four columns; unused cells are hidden.
 
         Args:
             save (bool, optional): Whether to save the figure. Defaults to True.
@@ -1018,30 +1019,45 @@ class ClassifierComparator:
         colors = self._color_cycle()
         mean_fpr = np.linspace(0, 1, 200)
 
-        with apply_nature_style():
-            fig, ax = plt.subplots(figsize=(4.0, 4.0))
+        n = len(self._evaluators)
+        ncols = min(4, n)
+        nrows = math.ceil(n / ncols)
 
-            # Diagonal chance line
-            ax.plot(
-                [0, 1],
-                [0, 1],
-                color="gray",
-                linestyle="--",
-                linewidth=0.8,
-                label="Chance",
+        with apply_nature_style():
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(ncols * 3.2, nrows * 3.2),
+                squeeze=False,
             )
 
             for i, (name, evaluator) in enumerate(self._evaluators.items()):
+                ax = axes.flat[i]
+
+                # Diagonal chance line
+                ax.plot(
+                    [0, 1],
+                    [0, 1],
+                    color="gray",
+                    linestyle="--",
+                    linewidth=0.8,
+                    label="Chance",
+                )
+
                 self._compute_classifier_roc(
                     evaluator, name, mean_fpr, colors[i], ax, show_individual
                 )
 
-            ax.set_xlabel("False Positive Rate")
-            ax.set_ylabel("True Positive Rate")
-            ax.set_title("ROC Curve Comparison")
-            ax.legend(fontsize=7, loc="lower right")
+                ax.set_xlabel("False Positive Rate")
+                ax.set_ylabel("True Positive Rate")
+                ax.set_title(name)
+                ax.legend(fontsize=6, loc="lower right")
+                configure_spine(ax)
 
-            configure_spine(ax)
+            for ax in axes.flat[n:]:
+                ax.set_visible(False)
+
+            fig.set_layout_engine("tight")
 
         if save:
             fname = filename or "comparison_roc.png"

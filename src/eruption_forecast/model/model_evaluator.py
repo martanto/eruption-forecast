@@ -18,13 +18,13 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
 from eruption_forecast.utils.pathutils import (
     ensure_dir,
     save_figure,
     resolve_output_dir,
 )
 from eruption_forecast.config.constants import (
-    THRESHOLD_RESOLUTION,
     PLOT_SEPARATOR_LENGTH,
     LEARNING_CURVE_SCORINGS,
 )
@@ -37,6 +37,7 @@ from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve as _plot_roc_styled,
     plot_calibration as _plot_cal_styled,
+    plot_g_mean_curve as _plot_gmean_styled,
     plot_confusion_matrix as _plot_cm_styled,
     plot_feature_importance as _plot_fi_styled,
     plot_threshold_analysis as _plot_threshold_styled,
@@ -334,8 +335,10 @@ class ModelEvaluator:
             - ``sensitivity`` (float): Same as recall (binary labels only).
             - ``specificity`` (float): True negative rate (binary labels
               only).
+            - ``g_mean`` (float): Geometric mean of sensitivity and
+              specificity at the default 0.5 threshold.
             - ``optimal_threshold`` (float): Decision threshold that
-              maximises F1 (nan if probabilities unavailable).
+              maximises G-mean (nan if probabilities unavailable).
             - ``f1_at_optimal`` (float): F1 at the optimal threshold.
             - ``recall_at_optimal`` (float): Recall at the optimal threshold.
             - ``precision_at_optimal`` (float): Precision at the optimal
@@ -377,14 +380,24 @@ class ModelEvaluator:
             cm = confusion_matrix(self.y_test, self._y_pred)
             if cm.shape == (2, 2):
                 tn, fp, fn, tp = cm.ravel()
+                sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+                specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
                 metrics.update(
                     {
                         "true_positives": int(tp),
                         "true_negatives": int(tn),
                         "false_positives": int(fp),
                         "false_negatives": int(fn),
-                        "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0.0,
-                        "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0.0,
+                        "sensitivity": sensitivity,
+                        "specificity": specificity,
+                        "g_mean": float(
+                            compute_g_mean(
+                                {
+                                    "recall": [sensitivity],
+                                    "specificity": [specificity],
+                                }
+                            )[0]
+                        ),
                     }
                 )
 
@@ -418,6 +431,8 @@ class ModelEvaluator:
             f"  Recall:            {m['recall']:.4f}",
             f"  F1 Score:          {m['f1_score']:.4f}",
         ]
+        if "g_mean" in m:
+            lines.append(f"  G-mean:            {m['g_mean']:.4f}")
         if not np.isnan(m["roc_auc"]):
             lines += [
                 f"  ROC-AUC:           {m['roc_auc']:.4f}",
@@ -583,33 +598,36 @@ class ModelEvaluator:
 
     def optimize_threshold(
         self,
-        criterion: Literal["f1", "balanced_accuracy", "recall", "precision"] = "f1",
+        criterion: Literal[
+            "g_mean", "f1", "balanced_accuracy", "recall", "precision"
+        ] = "g_mean",
     ) -> tuple[float, dict[str, float]]:
         """Find the decision threshold that maximizes the given criterion.
 
-        Sweeps through thresholds from 0.0 to 1.0 in 0.01 increments and
-        evaluates each one against the specified metric. Returns the optimal
-        threshold and corresponding metric values.
+        Delegates to ``compute_threshold_metrics`` so the sweep logic is not
+        duplicated. The default criterion is ``"g_mean"`` (geometric mean of
+        sensitivity and specificity), which is preferred for rare-event
+        forecasting over F1.
 
         Args:
-            criterion (Literal["f1", "balanced_accuracy", "recall", "precision"], optional):
-                Metric to optimize. Defaults to "f1".
+            criterion (Literal["g_mean", "f1", "balanced_accuracy", "recall", "precision"], optional):
+                Metric to optimize. Defaults to ``"g_mean"``.
 
         Returns:
             tuple[float, dict[str, float]]: A 2-tuple containing:
 
                 - **threshold** (float): Optimal decision threshold (0.0 to 1.0).
-                - **metrics_at_threshold** (dict): Dictionary with keys "f1",
-                  "balanced_accuracy", "recall", "precision" evaluated at the
-                  optimal threshold.
+                - **metrics_at_threshold** (dict): Dictionary with keys ``"f1"``,
+                  ``"balanced_accuracy"``, ``"recall"``, ``"precision"``, and
+                  ``"g_mean"`` evaluated at the optimal threshold.
 
         Raises:
             ValueError: If probability predictions are not available.
 
         Examples:
-            >>> thresh, metrics = evaluator.optimize_threshold(criterion="f1")
+            >>> thresh, metrics = evaluator.optimize_threshold()
             >>> print(f"Optimal threshold: {thresh:.3f}")
-            >>> print(f"F1 at optimal: {metrics['f1']:.3f}")
+            >>> print(f"G-mean at optimal: {metrics['g_mean']:.3f}")
 
             >>> # Optimize for recall instead
             >>> thresh, metrics = evaluator.optimize_threshold(criterion="recall")
@@ -617,33 +635,28 @@ class ModelEvaluator:
         if self._y_proba is None:
             raise ValueError("optimize_threshold requires probability predictions")
 
-        thresholds = np.linspace(0.0, 1.0, THRESHOLD_RESOLUTION)
-        best_thresh = 0.5
-        best_score = -1.0
+        thresholds, metrics = compute_threshold_metrics(
+            self.y_test.to_numpy(), self._y_proba
+        )
+        g_mean = compute_g_mean(metrics)
 
-        for t in thresholds:
-            y_pred_t = (self._y_proba >= t).astype(int)
-            if criterion == "f1":
-                score = f1_score(self.y_test, y_pred_t, zero_division=0)
-            elif criterion == "balanced_accuracy":
-                score = balanced_accuracy_score(self.y_test, y_pred_t)
-            elif criterion == "recall":
-                score = recall_score(self.y_test, y_pred_t, zero_division=0)
-            else:  # precision
-                score = precision_score(self.y_test, y_pred_t, zero_division=0)
-
-            if score > best_score:
-                best_score = score
-                best_thresh = float(t)
-
-        y_pred_best = (self._y_proba >= best_thresh).astype(int)
-        metrics_at = {
-            "f1": f1_score(self.y_test, y_pred_best, zero_division=0),
-            "balanced_accuracy": balanced_accuracy_score(self.y_test, y_pred_best),
-            "recall": recall_score(self.y_test, y_pred_best, zero_division=0),
-            "precision": precision_score(self.y_test, y_pred_best, zero_division=0),
+        scores = {
+            "g_mean": g_mean,
+            "f1": np.array(metrics["f1"]),
+            "balanced_accuracy": np.array(metrics["balanced_accuracy"]),
+            "recall": np.array(metrics["recall"]),
+            "precision": np.array(metrics["precision"]),
         }
-        return best_thresh, metrics_at
+        optimal_idx = np.argmax(scores[criterion])
+        best_thresh = float(thresholds[optimal_idx])
+
+        return best_thresh, {
+            "g_mean": float(g_mean[optimal_idx]),
+            "f1": float(metrics["f1"][optimal_idx]),
+            "balanced_accuracy": float(metrics["balanced_accuracy"][optimal_idx]),
+            "recall": float(metrics["recall"][optimal_idx]),
+            "precision": float(metrics["precision"][optimal_idx]),
+        }
 
     def plot_threshold_analysis(
         self,
@@ -680,6 +693,48 @@ class ModelEvaluator:
         save_figure(
             fig,
             self._get_plot_filepath("threshold_analysis", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
+
+        return fig
+
+    def plot_g_mean_curve(
+        self,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot G-mean, sensitivity, and specificity vs. decision threshold.
+
+        Produces a standalone G-mean curve showing how the geometric mean of
+        sensitivity and specificity varies across thresholds, with the default
+        0.5 threshold and optimal G-mean threshold marked.
+
+        Args:
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<random_state:05d>_g_mean_curve.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
+        """
+        if self._y_proba is None:
+            logger.warning("plot_g_mean_curve requires probability predictions")
+            return None
+
+        fig = _plot_gmean_styled(
+            y_true=np.asarray(self.y_test),
+            y_proba=self._y_proba,
+            title=f"G-mean Curve — {self.model_name}",
+            figsize=(10, 6),
+            dpi=dpi,
+        )
+
+        save_figure(
+            fig,
+            self._get_plot_filepath("g_mean_curve", filename=filename),
             dpi,
             verbose=self.verbose,
         )
@@ -1024,7 +1079,7 @@ class ModelEvaluator:
         Returns:
             dict[str, plt.Figure | None]: Mapping of plot name to figure
             object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
-            ``"pr_curve"``, ``"threshold_analysis"``,
+            ``"pr_curve"``, ``"threshold_analysis"``, ``"g_mean_curve"``,
             ``"feature_importance"``, ``"calibration"``,
             ``"prediction_distribution"``, ``"shap_summary"``,
             ``"shap_waterfall"``, ``"learning_curve"``. Values are None when a
@@ -1040,6 +1095,7 @@ class ModelEvaluator:
             "roc_curve": self.plot_roc_curve(dpi=dpi),
             "pr_curve": self.plot_precision_recall_curve(dpi=dpi),
             "threshold_analysis": self.plot_threshold_analysis(dpi=dpi),
+            "g_mean_curve": self.plot_g_mean_curve(dpi=dpi),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),

@@ -11,6 +11,7 @@ Key functions (single-seed):
 - ``plot_precision_recall_curve`` — precision-recall curve with average precision.
 - ``plot_calibration`` — calibration (reliability) diagram.
 - ``plot_threshold_analysis`` — precision/recall/F1 vs. decision threshold.
+- ``plot_g_mean_curve`` — G-mean with sensitivity/specificity vs. threshold.
 - ``plot_feature_importance`` — horizontal bar chart of top-N features.
 - ``plot_prediction_distribution`` — histogram of predicted probabilities by class.
 - ``plot_learning_curve`` — training vs. validation score against training set size.
@@ -21,7 +22,8 @@ Key functions (aggregate / multi-seed):
 
 - ``plot_aggregate_roc_curve``, ``plot_aggregate_precision_recall_curve``,
   ``plot_aggregate_calibration``, ``plot_aggregate_confusion_matrix``,
-  ``plot_aggregate_threshold_analysis``, ``plot_aggregate_feature_importance``,
+  ``plot_aggregate_threshold_analysis``, ``plot_aggregate_g_mean_curve``,
+  ``plot_aggregate_feature_importance``,
   ``plot_aggregate_prediction_distribution``, ``plot_aggregate_learning_curve``,
   ``plot_learning_curve_grid`` — ensemble-level variants with mean ± std shading.
 """
@@ -36,21 +38,17 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator
 from sklearn.metrics import (
-    f1_score,
     roc_curve,
-    recall_score,
     roc_auc_score,
-    precision_score,
     confusion_matrix,
     precision_recall_curve,
     average_precision_score,
-    balanced_accuracy_score,
 )
 from sklearn.ensemble import VotingClassifier
 from sklearn.calibration import calibration_curve
 
 from eruption_forecast.config import CLASS_LABELS, ERUPTION_PROBABILITY_THRESHOLD
-from eruption_forecast.utils.ml import compute_threshold_metrics
+from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -269,11 +267,13 @@ def plot_threshold_analysis(
     figsize: tuple[float, float] = (10, 6),
     dpi: int = 150,
 ) -> plt.Figure:
-    """Plot precision, recall, F1, and balanced accuracy vs. decision threshold.
+    """Plot precision, recall, F1, balanced accuracy, and G-mean vs. decision threshold.
 
     Creates a multi-metric threshold analysis plot showing how classification metrics
-    vary across decision thresholds from 0 to 1. Marks default threshold ``ERUPTION_PROBABILITY_THRESHOLD`` and
-    optimal F1 threshold with vertical lines.
+    vary across decision thresholds from 0 to 1. Marks default threshold
+    ``ERUPTION_PROBABILITY_THRESHOLD`` and the optimal G-mean threshold with vertical
+    lines. G-mean (geometric mean of sensitivity and specificity) is used as the
+    optimization criterion because it is better suited to rare-event forecasting than F1.
 
     Args:
         y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
@@ -287,8 +287,8 @@ def plot_threshold_analysis(
 
     Returns:
         plt.Figure: Matplotlib figure object with threshold analysis plot showing
-            precision (blue), recall (orange), F1 score (green), and balanced
-            accuracy (pink) curves.
+            precision (blue), recall (orange), F1 score (green), balanced accuracy
+            (pink), and G-mean (purple) curves.
 
     Examples:
         >>> import numpy as np
@@ -299,9 +299,11 @@ def plot_threshold_analysis(
     """
     thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
 
-    # Find optimal threshold (max F1)
-    optimal_idx = np.argmax(metrics["f1"])
+    g_mean = compute_g_mean(metrics)
+    optimal_idx = np.argmax(g_mean)
     optimal_threshold = thresholds[optimal_idx]
+    f1_optimal_idx = np.argmax(metrics["f1"])
+    f1_optimal_threshold = thresholds[f1_optimal_idx]
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
         # Plot metrics with distinct colors from Okabe-Ito palette
@@ -333,6 +335,13 @@ def plot_threshold_analysis(
             color=OKABE_ITO[6],  # Pink
             linewidth=2.0,
         )
+        ax.plot(
+            thresholds,
+            g_mean,
+            label="G-mean",
+            color=OKABE_ITO[3],  # Purple
+            linewidth=2.0,
+        )
 
         # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.5)
         ax.axvline(
@@ -344,13 +353,23 @@ def plot_threshold_analysis(
             alpha=0.7,
         )
 
-        # Mark optimal threshold
+        # Mark optimal threshold by G-mean
         ax.axvline(
             optimal_threshold,
             color=NATURE_COLORS["red"],
             linestyle="--",
             linewidth=1.5,
-            label=f"Optimal F1 ({optimal_threshold:.2f})",
+            label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        # Mark optimal threshold by f1
+        ax.axvline(
+            f1_optimal_threshold,
+            color=NATURE_COLORS["purple"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal f1 ({f1_optimal_threshold:.2f})",
             alpha=0.8,
         )
 
@@ -359,6 +378,98 @@ def plot_threshold_analysis(
         ax.set_ylabel("Score")
         ax.set_title(title or "Threshold Analysis")
         ax.legend(loc="best", frameon=False, ncol=2)
+        ax.set_xlim((0.0, 1.0))
+        ax.set_ylim((0.0, 1.05))
+
+    return fig
+
+
+def plot_g_mean_curve(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    title: str | None = None,
+    figsize: tuple[float, float] = (10, 6),
+    dpi: int = 150,
+) -> plt.Figure:
+    """Plot G-mean, sensitivity, and specificity vs. decision threshold.
+
+    Creates a standalone G-mean curve showing how the geometric mean of
+    sensitivity and specificity varies across decision thresholds from 0 to 1.
+    Sensitivity and specificity are plotted as lighter supporting curves.
+    Marks the default ``ERUPTION_PROBABILITY_THRESHOLD`` and the optimal
+    G-mean threshold with vertical lines.
+
+    Args:
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class.
+            Values should be in [0, 1]. Shape: (n_samples,).
+        title (str | None, optional): Plot title. If None, uses
+            "G-mean Curve". Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (10, 6).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+
+    Returns:
+        plt.Figure: Matplotlib figure with the G-mean curve plot showing
+            G-mean (purple, bold), sensitivity (orange), and specificity (blue).
+
+    Examples:
+        >>> fig = plot_g_mean_curve(y_true, y_proba)
+        >>> fig.savefig("g_mean_curve.png")
+    """
+    thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
+
+    g_mean = compute_g_mean(metrics)
+    optimal_idx = np.argmax(g_mean)
+    optimal_threshold = thresholds[optimal_idx]
+
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
+        ax.plot(
+            thresholds,
+            metrics["recall"],
+            label="Sensitivity",
+            color=OKABE_ITO[0],
+            linewidth=1.5,
+            alpha=0.7,
+        )
+        ax.plot(
+            thresholds,
+            metrics["specificity"],
+            label="Specificity",
+            color=OKABE_ITO[4],
+            linewidth=1.5,
+            alpha=0.7,
+        )
+        ax.plot(
+            thresholds,
+            g_mean,
+            label="G-mean",
+            color=OKABE_ITO[3],
+            linewidth=2.5,
+        )
+
+        ax.axvline(
+            ERUPTION_PROBABILITY_THRESHOLD,
+            color=NATURE_COLORS["gray"],
+            linestyle=":",
+            linewidth=1.5,
+            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
+            alpha=0.7,
+        )
+        ax.axvline(
+            optimal_threshold,
+            color=NATURE_COLORS["red"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Decision Threshold")
+        ax.set_ylabel("Score")
+        ax.set_title(title or "G-mean Curve")
+        ax.legend(loc="best", frameon=False)
         ax.set_xlim((0.0, 1.0))
         ax.set_ylim((0.0, 1.05))
 
@@ -668,7 +779,7 @@ def plot_aggregate_roc_curve(
         >>> fig.savefig("aggregate_roc.png")
         >>> data.to_csv("roc_data.csv", index=False)
     """
-    fpr_grid = np.linspace(0, 1, 200)
+    fpr_grid = np.linspace(0, 1, 100)
     tprs: list[np.ndarray] = []
     aucs: list[float] = []
 
@@ -1116,9 +1227,10 @@ def plot_aggregate_threshold_analysis(
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Plot mean metric curves vs. decision threshold across multiple seeds.
 
-    Sweeps thresholds from 0 to 1 and computes F1, precision, recall, and
-    balanced accuracy per seed. Plots the mean of each metric with a ±1 std
-    confidence band.
+    Sweeps thresholds from 0 to 1 and computes precision, recall, F1, balanced
+    accuracy, and G-mean per seed via ``compute_threshold_metrics``. Plots the
+    mean of each metric with a ±1 std confidence band and marks the optimal
+    G-mean threshold.
 
     Args:
         y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
@@ -1137,26 +1249,28 @@ def plot_aggregate_threshold_analysis(
         tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
             with columns ``threshold``, ``mean_precision``, ``std_precision``,
             ``mean_recall``, ``std_recall``, ``mean_f1``, ``std_f1``,
-            ``mean_balanced_accuracy``, ``std_balanced_accuracy``.
+            ``mean_balanced_accuracy``, ``std_balanced_accuracy``,
+            ``mean_g_mean``, ``std_g_mean``.
 
     Examples:
         >>> fig, data = plot_aggregate_threshold_analysis(y_true, y_probas_list)
         >>> fig.savefig("aggregate_threshold.png")
         >>> data.to_csv("threshold_data.csv", index=False)
     """
-    thresholds = np.linspace(0, 1, 101)
-    metric_keys = ["precision", "recall", "f1", "balanced_accuracy"]
+    metric_keys = ["precision", "recall", "f1", "balanced_accuracy", "g_mean"]
     colors = {
         "precision": OKABE_ITO[4],
         "recall": OKABE_ITO[0],
         "f1": OKABE_ITO[2],
         "balanced_accuracy": OKABE_ITO[6],
+        "g_mean": OKABE_ITO[3],  # Purple
     }
     labels_map = {
         "precision": "Precision",
         "recall": "Recall",
         "f1": "F1 Score",
         "balanced_accuracy": "Balanced Accuracy",
+        "g_mean": "G-mean",
     }
 
     if isinstance(y_trues, np.ndarray):
@@ -1164,29 +1278,29 @@ def plot_aggregate_threshold_analysis(
 
     # all_curves[key] is a list of 1-D arrays, one per seed
     all_curves: dict[str, list[np.ndarray]] = {k: [] for k in metric_keys}
+    thresholds: np.ndarray | None = None
 
     for y_true, y_proba in zip(y_trues, y_probas, strict=False):
-        curves: dict[str, list[float]] = {k: [] for k in metric_keys}
-        for t in thresholds:
-            y_pred_t = (y_proba >= t).astype(int)
-            curves["precision"].append(
-                precision_score(y_true, y_pred_t, zero_division=0)
-            )
-            curves["recall"].append(recall_score(y_true, y_pred_t, zero_division=0))
-            curves["f1"].append(f1_score(y_true, y_pred_t, zero_division=0))
-            curves["balanced_accuracy"].append(
-                balanced_accuracy_score(y_true, y_pred_t)
-            )
-        for k in metric_keys:
-            all_curves[k].append(np.array(curves[k]))
+        thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
+        g_mean = compute_g_mean(metrics)
+        for k in ["precision", "recall", "f1", "balanced_accuracy"]:
+            all_curves[k].append(np.array(metrics[k]))
+        all_curves["g_mean"].append(g_mean)
 
-    # Compute mean and std per metric for the data DataFrame
+    # Compute mean and std per metric
     mean_curves: dict[str, np.ndarray] = {}
     std_curves: dict[str, np.ndarray] = {}
     for key in metric_keys:
         matrix = np.stack(all_curves[key], axis=0)
         mean_curves[key] = matrix.mean(axis=0)
         std_curves[key] = matrix.std(axis=0)
+
+    # Optimal threshold from mean G-mean curve
+    assert thresholds is not None
+    optimal_idx = int(np.argmax(mean_curves["g_mean"]))
+    optimal_threshold = float(thresholds[optimal_idx])
+    f1_optimal_idx = int(np.argmax(mean_curves["f1"]))
+    f1_optimal_threshold = float(thresholds[f1_optimal_idx])
 
     with apply_nature_style():
         fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
@@ -1225,8 +1339,24 @@ def plot_aggregate_threshold_analysis(
             color=NATURE_COLORS["gray"],
             linestyle=":",
             linewidth=1.5,
-            label=r"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
+            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
             alpha=0.7,
+        )
+        ax.axvline(
+            optimal_threshold,
+            color=NATURE_COLORS["red"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+        ax.axvline(
+            f1_optimal_threshold,
+            color=NATURE_COLORS["purple"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal f1 ({f1_optimal_threshold:.2f})",
+            alpha=0.8,
         )
 
         configure_spine(ax)
@@ -1248,6 +1378,157 @@ def plot_aggregate_threshold_analysis(
             "std_f1": std_curves["f1"],
             "mean_balanced_accuracy": mean_curves["balanced_accuracy"],
             "std_balanced_accuracy": std_curves["balanced_accuracy"],
+            "mean_g_mean": mean_curves["g_mean"],
+            "std_g_mean": std_curves["g_mean"],
+        }
+    )
+    return fig, data
+
+
+def plot_aggregate_g_mean_curve(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    show_individual: bool = True,
+    title: str | None = None,
+    figsize: tuple[float, float] = (10, 6),
+    dpi: int = 150,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Plot the aggregate G-mean curve across multiple seeds using median and IQR.
+
+    Computes per-seed G-mean, sensitivity, and specificity curves across decision
+    thresholds, then aggregates using the median and IQR (25th–75th percentile)
+    for robustness against outlier seeds. Marks the default threshold and the
+    threshold at median peak G-mean.
+
+    Args:
+        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
+            single array broadcast to all seeds, or a list of per-seed arrays.
+        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
+            for the positive class.
+        show_individual (bool, optional): Draw individual seed G-mean curves as
+            thin background lines. Defaults to True.
+        title (str | None, optional): Plot title. Defaults to
+            "Aggregate G-mean Curve".
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to (10, 6).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``threshold``, ``median_g_mean``, ``q25_g_mean``,
+            ``q75_g_mean``, ``median_sensitivity``, ``median_specificity``.
+
+    Examples:
+        >>> fig, data = plot_aggregate_g_mean_curve(y_true, y_probas_list)
+        >>> fig.savefig("aggregate_g_mean_curve.png")
+        >>> data.to_csv("g_mean_data.csv", index=False)
+    """
+    if isinstance(y_trues, np.ndarray):
+        y_trues = [y_trues] * len(y_probas)
+
+    all_g_mean: list[np.ndarray] = []
+    all_sensitivity: list[np.ndarray] = []
+    all_specificity: list[np.ndarray] = []
+    thresholds: np.ndarray | None = None
+
+    for y_true, y_proba in zip(y_trues, y_probas, strict=False):
+        thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
+        all_g_mean.append(compute_g_mean(metrics))
+        all_sensitivity.append(np.array(metrics["recall"]))
+        all_specificity.append(np.array(metrics["specificity"]))
+
+    assert thresholds is not None
+    g_mean_matrix = np.stack(all_g_mean, axis=0)
+    sens_matrix = np.stack(all_sensitivity, axis=0)
+    spec_matrix = np.stack(all_specificity, axis=0)
+
+    median_g_mean = np.median(g_mean_matrix, axis=0)
+    q25_g_mean = np.percentile(g_mean_matrix, 25, axis=0)
+    q75_g_mean = np.percentile(g_mean_matrix, 75, axis=0)
+    median_sensitivity = np.median(sens_matrix, axis=0)
+    median_specificity = np.median(spec_matrix, axis=0)
+
+    optimal_idx = int(np.argmax(median_g_mean))
+    optimal_threshold = float(thresholds[optimal_idx])
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+        if show_individual:
+            for seed_curve in all_g_mean:
+                ax.plot(
+                    thresholds,
+                    seed_curve,
+                    color=OKABE_ITO[3],
+                    alpha=0.10,
+                    linewidth=0.5,
+                )
+
+        ax.plot(
+            thresholds,
+            median_sensitivity,
+            label="Sensitivity (median)",
+            color=OKABE_ITO[0],
+            linewidth=1.5,
+            alpha=0.7,
+        )
+        ax.plot(
+            thresholds,
+            median_specificity,
+            label="Specificity (median)",
+            color=OKABE_ITO[4],
+            linewidth=1.5,
+            alpha=0.7,
+        )
+        ax.plot(
+            thresholds,
+            median_g_mean,
+            label="G-mean (median)",
+            color=OKABE_ITO[3],
+            linewidth=2.5,
+        )
+        ax.fill_between(
+            thresholds,
+            np.clip(q25_g_mean, 0, 1),
+            np.clip(q75_g_mean, 0, 1),
+            color=OKABE_ITO[3],
+            alpha=0.2,
+            label="IQR (25th–75th)",
+        )
+
+        ax.axvline(
+            ERUPTION_PROBABILITY_THRESHOLD,
+            color=NATURE_COLORS["gray"],
+            linestyle=":",
+            linewidth=1.5,
+            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
+            alpha=0.7,
+        )
+        ax.axvline(
+            optimal_threshold,
+            color=NATURE_COLORS["red"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Decision Threshold")
+        ax.set_ylabel("Score")
+        ax.set_title(title or "Aggregate G-mean Curve")
+        ax.legend(loc="best", frameon=False)
+        ax.set_xlim((0.0, 1.0))
+        ax.set_ylim((0.0, 1.05))
+
+    data = pd.DataFrame(
+        {
+            "threshold": thresholds,
+            "median_g_mean": median_g_mean,
+            "q25_g_mean": q25_g_mean,
+            "q75_g_mean": q75_g_mean,
+            "median_sensitivity": median_sensitivity,
+            "median_specificity": median_specificity,
         }
     )
     return fig, data

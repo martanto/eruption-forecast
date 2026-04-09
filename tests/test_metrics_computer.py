@@ -51,6 +51,7 @@ class TestComputeAllMetrics:
         "roc_auc",
         "pr_auc",
         "average_precision",
+        "g_mean",
         "mcc",
         "optimal_threshold",
         "g_mean_at_optimal",
@@ -71,6 +72,10 @@ class TestComputeAllMetrics:
     def test_roc_auc_in_range(self, computer):
         metrics = computer.compute_all_metrics()
         assert 0.0 <= metrics["roc_auc"] <= 1.0
+
+    def test_g_mean_in_range(self, computer):
+        metrics = computer.compute_all_metrics()
+        assert 0.0 <= metrics["g_mean"] <= 1.0
 
     def test_perfect_classifier_accuracy(self):
         y_true = np.array([0, 0, 1, 1])

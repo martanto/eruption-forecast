@@ -77,7 +77,10 @@ class _FakeExplainer:
 
 
 def _fake_beeswarm(*args, **kwargs):
-    """No-op replacement for shap.plots.beeswarm during tests."""
+    """Replacement for shap.plots.beeswarm that adds a dummy axes to the current figure."""
+    fig = plt.gcf()
+    if not fig.axes:
+        fig.add_subplot(111)
 
 
 @pytest.fixture
@@ -461,7 +464,7 @@ class TestLoadSeedData:
             tmp_path, bad_model, X_test, y_test, X_test.columns.tolist()
         )
 
-        with pytest.raises(AttributeError, match="has neither predict_proba nor decision_function"):
+        with pytest.raises((AttributeError, RuntimeError), match="neither predict_proba nor decision_function"):
             MultiModelEvaluator._load_seed_data(row)
 
     def test_significant_features_filtering(self, tmp_path):
@@ -516,7 +519,7 @@ class TestModelEvaluatorPlotShapSummary:
             model_name="test_rf",
             output_dir=str(tmp_path),
         )
-        fig = evaluator.plot_shap_summary(save=False)
+        fig = evaluator.plot_shap_summary()
         assert isinstance(fig, plt.Figure)
 
     def test_title_contains_model_name(self, tmp_path, rf_and_data):
@@ -529,7 +532,7 @@ class TestModelEvaluatorPlotShapSummary:
             model_name="my_model",
             output_dir=str(tmp_path),
         )
-        fig = evaluator.plot_shap_summary(save=False)
+        fig = evaluator.plot_shap_summary()
 
         # suptitle text is stored in fig.texts or accessed via _suptitle
         all_text = " ".join(t.get_text() for t in fig.texts)

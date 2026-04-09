@@ -502,7 +502,9 @@ class BaseModelTrainer:
         if with_evaluation:
             ensure_dir(self.shared_tests_dir)
             for classifier_model in self.classifier_models:
-                ensure_dir(self.metrics_dirs[classifier_model.slug_name])
+                ensure_dir(
+                    os.path.join(self.metrics_dirs[classifier_model.slug_name], "json")
+                )
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
@@ -819,7 +821,7 @@ class BaseModelTrainer:
         metrics_dir = self.metrics_dirs[classifier_slug]
 
         model_filepath = os.path.join(models_dir, f"{filename}.pkl")
-        metrics_filepath = os.path.join(metrics_dir, f"{filename}.json")
+        metrics_filepath = os.path.join(metrics_dir, "json", f"{filename}.json")
         shap_explanation_filepath = os.path.join(
             metrics_dir, "shap", f"{random_state:05d}.pkl"
         )

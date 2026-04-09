@@ -142,20 +142,30 @@ class TrainingReport(BaseReport):
         return result
 
     def _best_seed_idx(self, rows: list[dict[str, Any]]) -> int:
-        """Find the index of the best seed by F1 score.
+        """Find the index of the best seed by G-mean score.
+
+        G-mean (geometric mean of sensitivity and specificity) is preferred
+        over F1 for rare-event forecasting as it equally penalizes missed
+        eruptions and false alarms. Falls back to ``g_mean_at_optimal`` if
+        ``g_mean`` is not present, then to balanced accuracy.
 
         Args:
             rows (list[dict[str, Any]]): Per-seed metric dicts.
 
         Returns:
-            int: Index of the row with the highest F1 score, or -1 if none.
+            int: Index of the row with the highest G-mean score, or -1 if none.
         """
         best_idx = -1
-        best_f1 = -1.0
+        best_score = -1.0
         for i, row in enumerate(rows):
-            f1 = row.get("f1", row.get("f1_score", 0.0)) or 0.0
-            if f1 > best_f1:
-                best_f1 = float(f1)
+            score = (
+                row.get("g_mean")
+                or row.get("g_mean_at_optimal")
+                or row.get("balanced_accuracy")
+                or 0.0
+            )
+            if float(score) > best_score:
+                best_score = float(score)
                 best_idx = i
         return best_idx
 

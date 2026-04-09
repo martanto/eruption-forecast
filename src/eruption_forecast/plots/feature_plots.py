@@ -21,6 +21,7 @@ import os
 import re
 from pathlib import Path
 from multiprocessing import Pool
+from typing import Any, cast
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -451,7 +452,7 @@ def replot_significant_features(
 # Frequency band contribution plot
 # ---------------------------------------------------------------------------
 
-_BAND_PREFIX_RE = re.compile(r"^((?:rsam|dsar|entropy)_[^_]+)")
+_BAND_PREFIX_RE = re.compile(r"^((?:rsam|dsar)_[^_]+|entropy)")
 
 # Color map: each calculate method → Okabe-Ito color (matches tremor_plots.py)
 _METHOD_COLORS: dict[str, str] = {
@@ -477,6 +478,70 @@ def _extract_band_prefix(feature_name: str) -> str:
     """
     match = _BAND_PREFIX_RE.match(feature_name)
     return match.group(1) if match else feature_name
+
+
+def _annotate_bar_percentages(
+    ax: plt.Axes,
+    counts: pd.Series | list,
+    total: float,
+) -> None:
+    """Annotate each horizontal bar with its percentage of the total count.
+
+    Writes ``"X.X%"`` just to the right of each bar end, vertically centered
+    on the bar.
+
+    Args:
+        ax (plt.Axes): Axes containing the horizontal bar chart.
+        counts (pd.Series | list): Count values in the same order as the bars
+            (bottom to top).
+        total (float): Total count used as the denominator for percentages.
+    """
+    xmax = float(ax.get_xlim()[1])
+    pad = xmax * 0.02
+    x_right_limit = xmax * 0.98
+
+    for i, count in enumerate(counts):
+        pct = count / total * 100 if total > 0 else 0.0
+        x_text = float(count) + pad
+        ha = "left"
+        if x_text > x_right_limit:
+            x_text = x_right_limit
+            ha = "right"
+        ax.text(
+            x_text,
+            i,
+            f" {int(count)} ({pct:.1f}%)",
+            va="center",
+            ha=ha,
+            fontsize=8,
+            clip_on=True,
+        )
+
+
+def _finalize_frequency_band_layout(fig: plt.Figure, ax: plt.Axes) -> None:
+    """Adjust subplot margins to keep all labels visible in saved figures."""
+    fig.canvas.draw()
+    renderer = cast(Any, fig.canvas).get_renderer()
+    tight_bbox = ax.get_tightbbox(renderer)
+    if tight_bbox is None:
+        fig.subplots_adjust(left=0.22, right=0.95)
+        return
+    bbox = tight_bbox.transformed(fig.transFigure.inverted())
+
+    left = fig.subplotpars.left
+    right = fig.subplotpars.right
+    min_outer_margin = 0.01
+    target_left_edge = 0.04
+    target_right_edge = 1.0 - min_outer_margin
+
+    if bbox.x0 < target_left_edge:
+        left += target_left_edge - bbox.x0
+    if bbox.x1 > target_right_edge:
+        right -= bbox.x1 - target_right_edge
+
+    left = min(max(left, 0.22), 0.5)
+    right = max(min(right, 0.98), left + 0.3)
+    fig.subplots_adjust(left=left, right=right)
 
 
 def plot_frequency_band_contribution(
@@ -507,10 +572,9 @@ def plot_frequency_band_contribution(
             "Feature Count by Frequency Band". Defaults to None.
 
     Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame.
-            For single-seed input: columns ``band`` and ``count``.
-            For multi-seed input: columns ``band``, ``mean_count``, and
-            ``std_count``.
+        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
+            with columns ``band`` and ``count``. For multi-seed input,
+            ``count`` is the total across all seeds.
 
     Examples:
         >>> # Single seed
@@ -525,6 +589,9 @@ def plot_frequency_band_contribution(
     is_multi_seed = feature_names and isinstance(feature_names[0], list)
 
     if is_multi_seed:
+        # Count unique feature names across all seeds for the title
+        unique_feature_count = len({f for seed_feats in feature_names for f in seed_feats})
+
         # Build count DataFrame per seed then aggregate
         seed_counts: list[pd.Series] = []
         for seed_features in feature_names:
@@ -533,18 +600,12 @@ def plot_frequency_band_contribution(
             seed_counts.append(counts)
 
         count_df = pd.DataFrame(seed_counts).fillna(0)
-        mean_counts = count_df.mean()
-        std_counts = count_df.std().fillna(0)
+        total_counts = count_df.sum()
 
-        # Sort by mean count descending
-        order = mean_counts.sort_values(ascending=False).index.tolist()
-        display_mean = mean_counts[order]
-        display_std = std_counts[order]
-
-        # Reverse for bottom-to-top bar display
+        # Sort by total count descending
+        order = total_counts.sort_values(ascending=False).index.tolist()
+        display_counts = total_counts[order].iloc[::-1]
         display_bands = order[::-1]
-        display_mean = display_mean.iloc[::-1]
-        display_std = display_std.iloc[::-1]
 
         bar_colors = [
             next(
@@ -559,40 +620,40 @@ def plot_frequency_band_contribution(
         ]
 
         with apply_nature_style():
-            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+            fig, ax = plt.subplots(figsize=figsize, dpi=dpi, constrained_layout=False)
             ax.barh(
                 range(len(display_bands)),
-                display_mean,
-                xerr=display_std,
+                display_counts,
                 color=bar_colors,
                 alpha=0.8,
-                error_kw={"ecolor": "gray", "capsize": 3, "linewidth": 1.0},
             )
+            max_count = float(display_counts.max()) if len(display_counts) > 0 else 0.0
+            ax.set_xlim(0.0, max(max_count * 1.35, 1.0))
             ax.set_yticks(range(len(display_bands)))
             ax.set_yticklabels(display_bands)
             configure_spine(ax)
-            ax.set_xlabel("Mean Feature Count ± Std")
-            ax.set_ylabel("Frequency Band")
-            ax.set_title(title or "Feature Count by Frequency Band")
-            # Legend
+            ax.set_xlabel("Feature Count")
+            ax.set_ylabel("Frequency Band", labelpad=10)
+            ax.set_title(title or f"Feature Count ({unique_feature_count} unique)")
             legend_handles = [
                 Patch(facecolor=color, alpha=0.8, label=method.upper())
                 for method, color in _METHOD_COLORS.items()
             ]
             ax.legend(handles=legend_handles, frameon=False)
-            fig.set_layout_engine("tight")
+            _annotate_bar_percentages(ax, display_counts, total_counts.sum())
+            _finalize_frequency_band_layout(fig, ax)
 
         data = pd.DataFrame(
             {
                 "band": order,
-                "mean_count": mean_counts[order].to_numpy(),
-                "std_count": std_counts[order].to_numpy(),
+                "count": total_counts[order].to_numpy(),
             }
         )
 
     else:
         # Single seed
-        prefixes = [_extract_band_prefix(f) for f in feature_names]  # type: ignore[arg-type]
+        single_seed_features = cast(list[str], feature_names)
+        prefixes = [_extract_band_prefix(f) for f in single_seed_features]
         counts = pd.Series(prefixes).value_counts()
 
         order = counts.index.tolist()
@@ -612,25 +673,29 @@ def plot_frequency_band_contribution(
         ]
 
         with apply_nature_style():
-            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+            fig, ax = plt.subplots(figsize=figsize, dpi=dpi, constrained_layout=False)
             ax.barh(
                 range(len(display_bands)),
                 display_counts,
                 color=bar_colors,
                 alpha=0.8,
             )
+            max_count = float(display_counts.max()) if len(display_counts) > 0 else 0.0
+            ax.set_xlim(0.0, max(max_count * 1.35, 1.0))
             ax.set_yticks(range(len(display_bands)))
             ax.set_yticklabels(display_bands)
             configure_spine(ax)
             ax.set_xlabel("Feature Count")
-            ax.set_ylabel("Frequency Band")
-            ax.set_title(title or "Feature Count by Frequency Band")
+            ax.set_ylabel("Frequency Band", labelpad=10)
+            total = int(display_counts.sum())
+            ax.set_title(title or f"Feature Count ({total})")
             legend_handles = [
                 Patch(facecolor=color, alpha=0.8, label=method.upper())
                 for method, color in _METHOD_COLORS.items()
             ]
             ax.legend(handles=legend_handles, frameon=False)
-            fig.set_layout_engine("tight")
+            _annotate_bar_percentages(ax, display_counts, counts.sum())
+            _finalize_frequency_band_layout(fig, ax)
 
         data = pd.DataFrame({"band": order, "count": counts[order].to_numpy()})
 

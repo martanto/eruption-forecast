@@ -66,6 +66,7 @@ class MetricsComputer:
                 - ``accuracy``, ``balanced_accuracy``
                 - ``precision``, ``recall``, ``f1_score``
                 - ``sensitivity``, ``specificity``
+                - ``g_mean`` (float): G-mean at the default 0.5 threshold.
                 - ``roc_auc``, ``pr_auc``, ``average_precision``
                 - ``mcc``
                 - ``true_positives``, ``true_negatives``, ``false_positives``, ``false_negatives``
@@ -91,6 +92,16 @@ class MetricsComputer:
         # Sensitivity and specificity
         metrics["sensitivity"] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         metrics["specificity"] = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+
+        # G-mean at default (0.5) threshold
+        metrics["g_mean"] = float(
+            compute_g_mean(
+                {
+                    "recall": [metrics["sensitivity"]],
+                    "specificity": [metrics["specificity"]],
+                }
+            )[0]
+        )
 
         # AUC metrics
         metrics["roc_auc"] = roc_auc_score(self.y_true, self.y_proba)
@@ -126,15 +137,18 @@ class MetricsComputer:
                 - ``recall_at_optimal`` (float): Recall at optimal threshold.
                 - ``precision_at_optimal`` (float): Precision at optimal threshold.
                 - ``balanced_accuracy_at_optimal`` (float): Balanced accuracy at optimal threshold.
+                - ``optimal_threshold_f1`` (float): Threshold that maximizes F1 score.
         """
         thresholds, metrics = compute_threshold_metrics(self.y_true, self.y_proba)
 
         g_mean = compute_g_mean(metrics)
         optimal_idx = np.argmax(g_mean)
-        optimal_threshold = float(thresholds[optimal_idx])
+        g_mean_optimal_threshold = float(thresholds[optimal_idx])
+
+        f1_optimal_idx = np.argmax(metrics["f1"])
 
         return {
-            "optimal_threshold": optimal_threshold,
+            "optimal_threshold": g_mean_optimal_threshold,
             "g_mean_at_optimal": float(g_mean[optimal_idx]),
             "f1_at_optimal": float(metrics["f1"][optimal_idx]),
             "recall_at_optimal": float(metrics["recall"][optimal_idx]),
@@ -142,4 +156,5 @@ class MetricsComputer:
             "balanced_accuracy_at_optimal": float(
                 metrics["balanced_accuracy"][optimal_idx]
             ),
+            "optimal_threshold_f1": float(thresholds[f1_optimal_idx]),
         }

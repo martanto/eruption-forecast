@@ -37,6 +37,7 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_seed_stability,
     plot_aggregate_roc_curve as _plot_roc_styled,
     plot_aggregate_calibration as _plot_cal_styled,
+    plot_aggregate_g_mean_curve as _plot_gmean_styled,
     plot_aggregate_learning_curve as _plot_agg_lc_styled,
     plot_aggregate_confusion_matrix as _plot_cm_styled,
     plot_aggregate_feature_importance as _plot_fi_styled,
@@ -169,7 +170,7 @@ class MultiModelEvaluator:
         if self._metrics_files is not None:
             return list(self._metrics_files)
         if self._metrics_dir is not None:
-            paths = sorted(glob.glob(os.path.join(self._metrics_dir, "*.json")))
+            paths = sorted(glob.glob(os.path.join(self._metrics_dir, "json", "*.json")))
             return paths
         raise ValueError("No metrics source: provide metrics_files or metrics_dir.")
 
@@ -403,7 +404,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate ROC curve across all seeds.
 
@@ -448,7 +449,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate Precision-Recall curve across all seeds.
 
@@ -625,7 +626,7 @@ class MultiModelEvaluator:
         filename: str | None = None,
         dpi: int = 150,
         title: str | None = None,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> plt.Figure:
         """Generate an aggregate threshold analysis plot across all seeds.
 
@@ -658,6 +659,52 @@ class MultiModelEvaluator:
             data,
             filename or f"{self.classifier_name}_aggregate_threshold_analysis",
             f"{self.classifier_name}_aggregate_threshold_analysis",
+            dpi,
+            save,
+        )
+        return fig
+
+    def plot_g_mean_curve(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+        title: str | None = None,
+        show_individual: bool = False,
+    ) -> plt.Figure:
+        """Generate an aggregate G-mean curve across all seeds.
+
+        Computes per-seed G-mean, sensitivity, and specificity curves, then
+        aggregates using the median and IQR (25th–75th percentile shading)
+        for robustness against outlier seeds. Marks the default threshold and
+        the threshold at peak median G-mean.
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename. Defaults to
+                ``"{classifier_name}_aggregate_g_mean_curve"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+            title (str | None, optional): Plot title. Defaults to None.
+            show_individual (bool, optional): Draw per-seed G-mean curves as thin
+                background lines. Defaults to True.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the aggregate G-mean curve.
+        """
+        _, _, y_trues, y_probas = self._predictions
+
+        fig, data = _plot_gmean_styled(
+            y_trues=y_trues,
+            y_probas=y_probas,
+            show_individual=show_individual,
+            title=title,
+            dpi=dpi,
+        )
+        self._save_outputs(
+            fig,
+            data,
+            filename or f"{self.classifier_name}_aggregate_g_mean_curve",
+            f"{self.classifier_name}_aggregate_g_mean_curve",
             dpi,
             save,
         )
@@ -790,7 +837,7 @@ class MultiModelEvaluator:
     def plot_all(
         self,
         dpi: int = 150,
-        show_individual: bool = True,
+        show_individual: bool = False,
     ) -> dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None]:
         """Generate and save all aggregate evaluation plots.
 
@@ -809,7 +856,7 @@ class MultiModelEvaluator:
             dict[str, plt.Figure | None]: Mapping of plot name to figure.
                 Keys: ``"roc_curve"``, ``"pr_curve"``, ``"calibration"``,
                 ``"prediction_distribution"``, ``"confusion_matrix"``,
-                ``"threshold_analysis"``, ``"feature_importance"``,
+                ``"threshold_analysis"``, ``"g_mean_curve"``, ``"feature_importance"``,
                 ``"shap_summary"``, ``"seed_stability"``,
                 ``"frequency_band_contribution"``, ``"learning_curve"``.
                 Values are None when a plot cannot be generated (e.g.,
@@ -837,6 +884,9 @@ class MultiModelEvaluator:
             ),
             "confusion_matrix": lambda: self.plot_confusion_matrix(dpi=dpi),
             "threshold_analysis": lambda: self.plot_threshold_analysis(
+                dpi=dpi, show_individual=show_individual
+            ),
+            "g_mean_curve": lambda: self.plot_g_mean_curve(
                 dpi=dpi, show_individual=show_individual
             ),
             "feature_importance": lambda: self.plot_feature_importance(dpi=dpi),
