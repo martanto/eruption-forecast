@@ -19,9 +19,9 @@ Key functions:
 
 import os
 import re
+from typing import Any, cast
 from pathlib import Path
 from multiprocessing import Pool
-from typing import Any, cast
 
 import pandas as pd
 import matplotlib.pyplot as plt

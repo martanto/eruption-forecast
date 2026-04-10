@@ -35,6 +35,7 @@ from eruption_forecast.plots.shap_plots import (
 from eruption_forecast.utils.formatting import slugify_class_name
 from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
+    plot_mcc_curve as _plot_mcc_styled,
     plot_roc_curve as _plot_roc_styled,
     plot_calibration as _plot_cal_styled,
     plot_g_mean_curve as _plot_gmean_styled,
@@ -741,6 +742,48 @@ class ModelEvaluator:
 
         return fig
 
+    def plot_mcc_curve(
+        self,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot MCC, sensitivity, and specificity vs. decision threshold.
+
+        Produces a standalone MCC curve showing how Matthews Correlation
+        Coefficient varies across thresholds, with the default 0.5 threshold
+        and optimal MCC threshold marked.
+
+        Args:
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<random_state:05d>_mcc_curve.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
+        """
+        if self._y_proba is None:
+            logger.warning("plot_mcc_curve requires probability predictions")
+            return None
+
+        fig = _plot_mcc_styled(
+            y_true=np.asarray(self.y_test),
+            y_proba=self._y_proba,
+            title=f"MCC Curve — {self.model_name}",
+            figsize=(10, 6),
+            dpi=dpi,
+        )
+
+        save_figure(
+            fig,
+            self._get_plot_filepath("mcc_curve", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
+
+        return fig
+
     def plot_feature_importance(
         self,
         top_n: int = 20,
@@ -1080,7 +1123,7 @@ class ModelEvaluator:
             dict[str, plt.Figure | None]: Mapping of plot name to figure
             object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
             ``"pr_curve"``, ``"threshold_analysis"``, ``"g_mean_curve"``,
-            ``"feature_importance"``, ``"calibration"``,
+            ``"mcc_curve"``, ``"feature_importance"``, ``"calibration"``,
             ``"prediction_distribution"``, ``"shap_summary"``,
             ``"shap_waterfall"``, ``"learning_curve"``. Values are None when a
             plot could not be generated (e.g. probabilities unavailable or no
@@ -1096,6 +1139,7 @@ class ModelEvaluator:
             "pr_curve": self.plot_precision_recall_curve(dpi=dpi),
             "threshold_analysis": self.plot_threshold_analysis(dpi=dpi),
             "g_mean_curve": self.plot_g_mean_curve(dpi=dpi),
+            "mcc_curve": self.plot_mcc_curve(dpi=dpi),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
