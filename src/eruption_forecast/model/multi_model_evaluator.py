@@ -939,12 +939,12 @@ class MultiModelEvaluator:
             "mcc_curve": lambda: self.plot_mcc_curve(
                 dpi=dpi, show_individual=show_individual
             ),
-            "feature_importance": lambda: self.plot_feature_importance(dpi=dpi),
             "seed_stability": lambda: self.plot_seed_stability(dpi=dpi),
             "frequency_band_contribution": lambda: (
                 self.plot_frequency_band_contribution(dpi=dpi)
             ),
             "learning_curve": lambda: self.plot_learning_curve(dpi=dpi),
+            "feature_importance": lambda: self.plot_feature_importance(dpi=dpi),
         }
 
         results: dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None] = {}
