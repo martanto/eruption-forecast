@@ -390,7 +390,7 @@ def plot_g_mean_curve(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     title: str | None = None,
-    figsize: tuple[float, float] = (10, 6),
+    figsize: tuple[float, float] = (5, 5),
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot G-mean, sensitivity, and specificity vs. decision threshold.
@@ -482,7 +482,7 @@ def plot_mcc_curve(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     title: str | None = None,
-    figsize: tuple[float, float] = (10, 6),
+    figsize: tuple[float, float] = (5, 5),
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot MCC, sensitivity, and specificity vs. decision threshold.
@@ -565,7 +565,7 @@ def plot_mcc_curve(
         ax.set_title(title or "MCC Curve")
         ax.legend(loc="best", frameon=False)
         ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((-1.0, 1.05))
+        ax.set_ylim((0.0, 1.0))
 
     return fig
 
@@ -1484,15 +1484,15 @@ def plot_aggregate_g_mean_curve(
     y_probas: list[np.ndarray],
     show_individual: bool = True,
     title: str | None = None,
-    figsize: tuple[float, float] = (10, 6),
+    figsize: tuple[float, float] = (5, 5),
     dpi: int = 150,
 ) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot the aggregate G-mean curve across multiple seeds using median and IQR.
+    """Plot the aggregate G-mean curve across multiple seeds using mean and IQR.
 
     Computes per-seed G-mean, sensitivity, and specificity curves across decision
-    thresholds, then aggregates using the median and IQR (25th–75th percentile)
+    thresholds, then aggregates using the mean and IQR (25th–75th percentile)
     for robustness against outlier seeds. Marks the default threshold and the
-    threshold at median peak G-mean.
+    threshold at mean peak G-mean.
 
     Args:
         y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
@@ -1509,8 +1509,8 @@ def plot_aggregate_g_mean_curve(
 
     Returns:
         tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
-            with columns ``threshold``, ``median_g_mean``, ``q25_g_mean``,
-            ``q75_g_mean``, ``median_sensitivity``, ``median_specificity``.
+            with columns ``threshold``, ``mean_g_mean``, ``q25_g_mean``,
+            ``q75_g_mean``, ``mean_sensitivity``, ``mean_specificity``.
 
     Examples:
         >>> fig, data = plot_aggregate_g_mean_curve(y_true, y_probas_list)
@@ -1536,13 +1536,13 @@ def plot_aggregate_g_mean_curve(
     sens_matrix = np.stack(all_sensitivity, axis=0)
     spec_matrix = np.stack(all_specificity, axis=0)
 
-    median_g_mean = np.median(g_mean_matrix, axis=0)
+    mean_g_mean = np.mean(g_mean_matrix, axis=0)
     q25_g_mean = np.percentile(g_mean_matrix, 25, axis=0)
     q75_g_mean = np.percentile(g_mean_matrix, 75, axis=0)
-    median_sensitivity = np.median(sens_matrix, axis=0)
-    median_specificity = np.median(spec_matrix, axis=0)
+    mean_sensitivity = np.mean(sens_matrix, axis=0)
+    mean_specificity = np.mean(spec_matrix, axis=0)
 
-    optimal_idx = int(np.argmax(median_g_mean))
+    optimal_idx = int(np.argmax(mean_g_mean))
     optimal_threshold = float(thresholds[optimal_idx])
 
     with apply_nature_style():
@@ -1560,24 +1560,24 @@ def plot_aggregate_g_mean_curve(
 
         ax.plot(
             thresholds,
-            median_sensitivity,
-            label="Sensitivity (median)",
+            mean_sensitivity,
+            label="Sensitivity (mean)",
             color=OKABE_ITO[0],
             linewidth=1.5,
             alpha=0.7,
         )
         ax.plot(
             thresholds,
-            median_specificity,
-            label="Specificity (median)",
+            mean_specificity,
+            label="Specificity (mean)",
             color=OKABE_ITO[4],
             linewidth=1.5,
             alpha=0.7,
         )
         ax.plot(
             thresholds,
-            median_g_mean,
-            label="G-mean (median)",
+            mean_g_mean,
+            label="G-mean (mean)",
             color=OKABE_ITO[3],
             linewidth=2.5,
         )
@@ -1618,11 +1618,11 @@ def plot_aggregate_g_mean_curve(
     data = pd.DataFrame(
         {
             "threshold": thresholds,
-            "median_g_mean": median_g_mean,
+            "mean_g_mean": mean_g_mean,
             "q25_g_mean": q25_g_mean,
             "q75_g_mean": q75_g_mean,
-            "median_sensitivity": median_sensitivity,
-            "median_specificity": median_specificity,
+            "mean_sensitivity": mean_sensitivity,
+            "mean_specificity": mean_specificity,
         }
     )
     return fig, data
@@ -1633,14 +1633,14 @@ def plot_aggregate_mcc_curve(
     y_probas: list[np.ndarray],
     show_individual: bool = True,
     title: str | None = None,
-    figsize: tuple[float, float] = (10, 6),
+    figsize: tuple[float, float] = (5, 5),
     dpi: int = 150,
 ) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot the aggregate MCC curve across multiple seeds using median and IQR.
+    """Plot the aggregate MCC curve across multiple seeds using mean and IQR.
 
     Computes per-seed MCC curves across decision thresholds, then aggregates
-    using the median and IQR (25th–75th percentile) for robustness against
-    outlier seeds. Marks the default threshold and the threshold at median
+    using the mean and IQR (25th–75th percentile) for robustness against
+    outlier seeds. Marks the default threshold and the threshold at mean
     peak MCC.
 
     Args:
@@ -1658,8 +1658,8 @@ def plot_aggregate_mcc_curve(
 
     Returns:
         tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
-            with columns ``threshold``, ``median_mcc``, ``q25_mcc``,
-            ``q75_mcc``, ``median_sensitivity``, ``median_specificity``.
+            with columns ``threshold``, ``mean_mcc``, ``q25_mcc``,
+            ``q75_mcc``, ``mean_sensitivity``, ``mean_specificity``.
 
     Examples:
         >>> fig, data = plot_aggregate_mcc_curve(y_true, y_probas_list)
@@ -1685,13 +1685,13 @@ def plot_aggregate_mcc_curve(
     sens_matrix = np.stack(all_sensitivity, axis=0)
     spec_matrix = np.stack(all_specificity, axis=0)
 
-    median_mcc = np.median(mcc_matrix, axis=0)
+    mean_mcc = np.mean(mcc_matrix, axis=0)
     q25_mcc = np.percentile(mcc_matrix, 25, axis=0)
     q75_mcc = np.percentile(mcc_matrix, 75, axis=0)
-    median_sensitivity = np.median(sens_matrix, axis=0)
-    median_specificity = np.median(spec_matrix, axis=0)
+    mean_sensitivity = np.mean(sens_matrix, axis=0)
+    mean_specificity = np.mean(spec_matrix, axis=0)
 
-    optimal_idx = int(np.argmax(median_mcc))
+    optimal_idx = int(np.argmax(np.max(mcc_matrix, axis=0)))
     optimal_threshold = float(thresholds[optimal_idx])
 
     with apply_nature_style():
@@ -1709,31 +1709,31 @@ def plot_aggregate_mcc_curve(
 
         ax.plot(
             thresholds,
-            median_sensitivity,
-            label="Sensitivity (median)",
+            mean_sensitivity,
+            label="Sensitivity (mean)",
             color=OKABE_ITO[0],
             linewidth=1.5,
             alpha=0.7,
         )
         ax.plot(
             thresholds,
-            median_specificity,
-            label="Specificity (median)",
+            mean_specificity,
+            label="Specificity (mean)",
             color=OKABE_ITO[4],
             linewidth=1.5,
             alpha=0.7,
         )
         ax.plot(
             thresholds,
-            median_mcc,
-            label="MCC (median)",
+            mean_mcc,
+            label="MCC (mean)",
             color=OKABE_ITO[5],
-            linewidth=2.5,
+            linewidth=1.5,
         )
         ax.fill_between(
             thresholds,
-            np.clip(q25_mcc, -1, 1),
-            np.clip(q75_mcc, -1, 1),
+            np.clip(q25_mcc, 0, 1),
+            np.clip(q75_mcc, 0, 1),
             color=OKABE_ITO[5],
             alpha=0.2,
             label="IQR (25th–75th)",
@@ -1762,16 +1762,16 @@ def plot_aggregate_mcc_curve(
         ax.set_title(title or "Aggregate MCC Curve")
         ax.legend(loc="best", frameon=False)
         ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((-1.0, 1.05))
+        ax.set_ylim((0.0, 1.0))
 
     data = pd.DataFrame(
         {
             "threshold": thresholds,
-            "median_mcc": median_mcc,
+            "mean_mcc": mean_mcc,
             "q25_mcc": q25_mcc,
             "q75_mcc": q75_mcc,
-            "median_sensitivity": median_sensitivity,
-            "median_specificity": median_specificity,
+            "mean_sensitivity": mean_sensitivity,
+            "mean_specificity": mean_specificity,
         }
     )
     return fig, data
@@ -1977,7 +1977,7 @@ def plot_classifier_comparison(
             float: Mean F1 score, or 0.0 if the entry is missing.
         """
         try:
-            return float(summary_df.loc[(classifier, "f1_score"), "mean"])
+            return float(summary_df.loc[(classifier, "f1_score"), "mean"])  # ty:ignore[invalid-argument-type]
         except KeyError:
             return 0.0
 
@@ -2333,7 +2333,7 @@ def plot_seed_stability(
     """Plot a violin plot showing metric stability across random seeds per classifier.
 
     Renders one violin per classifier with individual seed dots overlaid as a
-    jittered strip plot. Classifiers are sorted by median descending. The mean
+    jittered strip plot. Classifiers are sorted by mean descending. The mean
     across seeds is marked with a horizontal white line.
 
     Args:
@@ -2375,10 +2375,10 @@ def plot_seed_stability(
                 )
     long_df = pd.DataFrame(rows)
 
-    # Sort classifiers by median descending
+    # Sort classifiers by mean descending
     order = (
         long_df.groupby("classifier")["value"]
-        .median()
+        .mean()
         .sort_values(ascending=False)
         .index.tolist()
     )
