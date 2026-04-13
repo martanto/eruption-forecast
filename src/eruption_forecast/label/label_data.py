@@ -305,14 +305,14 @@ class LabelData(BaseDataContainer):
         return df
 
     @cached_property
-    def parameters(self) -> dict[str, str | datetime | int]:
+    def parameters(self) -> dict[str, str | datetime | int | bool]:
         """Extract all parameters from the label filename.
 
         Assembles the parsed attributes (set during ``__init__``) into a single
         dictionary for convenient downstream access.
 
         Returns:
-            dict[str, str | datetime | int]: Dictionary containing all parsed parameters:
+            dict[str, str | datetime | int | bool]: Dictionary containing all parsed parameters:
                 - start_date (datetime.datetime): Start date object
                 - end_date (datetime.datetime): End date object
                 - start_date_str (str): Start date in YYYY-MM-DD format
