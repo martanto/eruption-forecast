@@ -4,18 +4,19 @@ from typing import Any
 from dotenv import load_dotenv
 
 from eruption_forecast import ForecastModel, send_telegram_notification
-from eruption_forecast.decorators import timer, notify
 from eruption_forecast.logger import logger
+from eruption_forecast.decorators import timer, notify
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
-from eruption_forecast.utils.formatting import slugify
+
 
 load_dotenv()
 DEBUG = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
 
 ROOT_DIR = r"D:\Projects\eruption-forecast"
-SDS_DIR = r"G:\OJN\Converted\SDS"
-N_JOBS = 24
+SDS_DIR = r"D:\Data\OJN"
+N_JOBS = 8
 CLASSIFIER = ["lite-rf", "rf"] if DEBUG else ["lite-rf", "rf", "gb", "xgb"]
 TRAINING_SEEDS = 25 if DEBUG else 500
 
@@ -82,10 +83,10 @@ TRAINING_PARAMETERS: dict[str, Any] = {
     "sampling_strategy": 0.75,
     "save_all_features": False,
     "plot_significant_features": False,
-    "n_jobs": 6,
+    "n_jobs": 4 if N_JOBS > 1 else 1,
     "grid_search_n_jobs": 4,
     "overwrite": False,
-    "plot_shap": True,  # SHAP Explanation plot
+    "plot_shap": False,  # SHAP Explanation plot
     "verbose": True,
 }
 
@@ -167,7 +168,11 @@ def scenarios(forecast_model: ForecastModel) -> None:
             f"\n\n\n[workflow] Scenario {scenario['name']}: {scenario['description']}\n\n\n"
         )
         output_dir = os.path.join(
-            ROOT_DIR, "output", forecast_model.nslc, "scenarios", slugify(scenario["name"])
+            ROOT_DIR,
+            "output",
+            forecast_model.nslc,
+            "scenarios",
+            slugify(scenario["name"]),
         )
 
         plot_forecast_path = predict(
@@ -183,7 +188,7 @@ def scenarios(forecast_model: ForecastModel) -> None:
             send_telegram_notification(
                 message=f"{scenario['name']}: {scenario['description']}",
                 files=[plot_forecast_path],
-                file_caption=scenario['name'],
+                file_caption=scenario["name"],
                 send_as_document=True,
             )
 
@@ -203,7 +208,9 @@ def evaluate(forecast_model: ForecastModel) -> None:
         forecast_model (ForecastModel): A configured ForecastModel instance.
     """
     forecast_model.build_label(
-        start_date=EVALUATION_START_DATE, end_date=EVALUATION_END_DATE, **LABEL_PARAMETERS
+        start_date=EVALUATION_START_DATE,
+        end_date=EVALUATION_END_DATE,
+        **LABEL_PARAMETERS,
     ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
         with_evaluation=True, **TRAINING_PARAMETERS
     )
@@ -275,18 +282,22 @@ def predict(
         prediction_end_date: str | None: The prediction end date for prediction.
         output_dir: str | None: The output directory for prediction.
     """
-    forecast_plot_path = forecast_model.build_label(
-        start_date=training_start_date or TRAINING_PREDICTION_START_DATE,
-        end_date=training_end_date or TRAINING_PREDICTION_END_DATE,
-        **LABEL_PARAMETERS,
-    ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
-        with_evaluation=False, output_dir=output_dir, **TRAINING_PARAMETERS
-    ).forecast(
-        start_date=prediction_start_date or PREDICTION_START_DATE,
-        end_date=prediction_end_date or PREDICTION_END_DATE,
-        output_dir=output_dir,
-        **PREDICTION_PARAMETERS,
-    ).forecast_plot_path
+    forecast_plot_path = (
+        forecast_model.build_label(
+            start_date=training_start_date or TRAINING_PREDICTION_START_DATE,
+            end_date=training_end_date or TRAINING_PREDICTION_END_DATE,
+            **LABEL_PARAMETERS,
+        )
+        .extract_features(**EXTRACT_FEATURES_PARAMETERS)
+        .train(with_evaluation=False, output_dir=output_dir, **TRAINING_PARAMETERS)
+        .forecast(
+            start_date=prediction_start_date or PREDICTION_START_DATE,
+            end_date=prediction_end_date or PREDICTION_END_DATE,
+            output_dir=output_dir,
+            **PREDICTION_PARAMETERS,
+        )
+        .forecast_plot_path
+    )
 
     return forecast_plot_path
 
