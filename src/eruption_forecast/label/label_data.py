@@ -195,7 +195,26 @@ class LabelData(BaseDataContainer):
             )
 
         if len(parts) == 6:
-            _, start_date, end_date, window_step, day_to_forecast, _ = parts
+            (
+                _,
+                start_date,
+                end_date,
+                window_step,
+                day_to_forecast,
+                include_eruption_date,
+            ) = parts
+            if not include_eruption_date.startswith("ie-"):
+                raise ValueError(
+                    f"Include eruption date segment is invalid. "
+                    f"Expected format: ie-{{0|1}}. Got: {include_eruption_date}"
+                )
+
+            include_eruption_date_value = include_eruption_date.split("ie-", maxsplit=1)[1]
+            if include_eruption_date_value not in {"0", "1"}:
+                raise ValueError(
+                    f"Include eruption date value is invalid. "
+                    f"Expected 'ie-0' or 'ie-1'. Got: {include_eruption_date}"
+                )
         else:
             _, start_date, end_date, window_step, day_to_forecast = parts
 
@@ -286,14 +305,14 @@ class LabelData(BaseDataContainer):
         return df
 
     @cached_property
-    def parameters(self) -> dict[str, str | datetime | int]:
+    def parameters(self) -> dict[str, str | datetime | int | bool]:
         """Extract all parameters from the label filename.
 
         Assembles the parsed attributes (set during ``__init__``) into a single
         dictionary for convenient downstream access.
 
         Returns:
-            dict[str, str | datetime | int]: Dictionary containing all parsed parameters:
+            dict[str, str | datetime | int | bool]: Dictionary containing all parsed parameters:
                 - start_date (datetime.datetime): Start date object
                 - end_date (datetime.datetime): End date object
                 - start_date_str (str): Start date in YYYY-MM-DD format
