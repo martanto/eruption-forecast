@@ -173,7 +173,7 @@ Raw Seismic Data (SDS / FDSN)
 │               ModelPredictor                │
 │  ┌──────────────────────────────────────┐   │
 │  │ predict_proba()                      │   │
-│  │ (forecast mode; no labels needed)   │   │
+│  │ (forecast mode; no labels needed)    │   │
 │  └──────────────────────────────────────┘   │
 │  Single model or multi-model consensus      │
 └──────────────────────┬──────────────────────┘
@@ -694,18 +694,7 @@ fm3.forecast(start_date="2025-04-01", end_date="2025-04-07",
 
 ## Threshold Optimization & Scoring
 
-### Why G-mean?
-
-Volcanic eruption datasets are severely imbalanced; eruptions are rare events that may represent less than 5% of all windows. Choosing the right optimization criterion for the decision threshold is therefore critical.
-
-This package uses **G-mean** (geometric mean of sensitivity and specificity) as the default threshold optimization criterion across all evaluation components (`MetricsComputer`, `ModelEvaluator`, `plot_threshold_analysis`, `plot_aggregate_threshold_analysis`, and `_best_seed_idx` in reports).
-
-**G-mean is defined as:**
-
-```
-G-mean = √(Sensitivity × Specificity)
-       = √(Recall × (TN / (TN + FP)))
-```
+Volcanic eruption datasets are severely imbalanced; eruptions are rare events that may represent less than 5-10% of all windows. Choosing the right optimization criterion for the decision threshold is therefore critical.
 
 ### Scoring Criterion Comparison
 
@@ -716,19 +705,7 @@ G-mean = √(Sensitivity × Specificity)
 | **Recall** | TP / (TP + FN) | Yes | No; can hit 1.0 by predicting all positive | No |
 | **Precision** | TP / (TP + FP) | No | Yes | No |
 | **Balanced Accuracy** | (Sensitivity + Specificity) / 2 | Partially | Partially | Yes |
-| **G-mean** ✓ | √(Sensitivity × Specificity) | Yes | Yes | Yes |
-
-### Why Not F1?
-
-F1 equally weights precision and recall, which implicitly treats a missed eruption (false negative) as equally costly as a false alarm (false positive). For volcanic eruption forecasting this is the wrong trade-off; missing an eruption has far higher consequences than issuing an unnecessary alert.
-
-F1 is also inflated when one class dominates: a model that never predicts eruption can still achieve a non-trivial F1 on a 95/5 dataset.
-
-### Why G-mean Works Here
-
-G-mean rewards models that correctly identify eruptions (high sensitivity) **and** correctly identify non-eruption periods (high specificity). It reaches its maximum only when both classes are classified well, and it degrades symmetrically when either class is poorly handled. Unlike recall alone, it cannot be gamed by predicting every window as positive.
-
-> `GridSearchCV` uses `scoring="balanced_accuracy"` (not G-mean) because G-mean requires per-threshold evaluation and is not a standard sklearn scorer. Balanced accuracy is the closest single-value proxy available inside cross-validation. G-mean is applied at the post-training threshold selection stage, which is where it matters most.
+| **G-mean** | √(Sensitivity × Specificity) | Yes | Yes | Yes |
 
 ---
 
