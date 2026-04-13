@@ -131,11 +131,14 @@ def parse_label_filename(basename: str) -> dict:
     """Parse label parameters from a label file basename (without extension).
 
     Extracts all structured parameters encoded in the standardised label filename
-    format: ``label_{start}_{end}_step-{X}-{unit}_dtf-{X}``.
+    format: ``label_{start}_{end}_step-{X}-{unit}_dtf-{X}_ie-{0|1}``.
+
+    Legacy filenames without the ``_ie-`` segment are accepted; they default to
+    ``include_eruption_date=False``.
 
     Args:
         basename (str): Filename without the ``.csv`` extension, e.g.
-            ``"label_2020-01-01_2020-12-31_step-12-hours_dtf-2"``.
+            ``"label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0"``.
 
     Returns:
         dict: Parsed parameters with keys:
@@ -146,34 +149,53 @@ def parse_label_filename(basename: str) -> dict:
             - ``window_step`` (int): Window step numeric value.
             - ``window_step_unit`` (str): Window step unit (``"hours"`` or ``"minutes"``).
             - ``day_to_forecast`` (int): Days before eruption for positive label.
+            - ``include_eruption_date`` (bool): Whether the eruption date itself counts
+              as a positive day. Defaults to ``False`` for legacy filenames.
 
     Raises:
-        ValueError: If ``basename`` does not match the expected
-            ``label_{start}_{end}_step-{X}-{unit}_dtf-{X}`` format, including
+        ValueError: If ``basename`` does not match the expected format, including
             wrong number of underscore-separated parts, missing ``step-`` or
-            ``dtf-`` prefixes, non-integer step or day values, or an unrecognised
-            window step unit.
+            ``dtf-`` prefixes, non-integer step or day values, an unrecognised
+            window step unit, or a malformed ``ie-`` segment.
 
     Examples:
-        >>> params = parse_label_filename("label_2020-01-01_2020-12-31_step-12-hours_dtf-2")
+        >>> params = parse_label_filename("label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0")
         >>> params["window_step"]
         12
         >>> params["window_step_unit"]
         'hours'
         >>> params["day_to_forecast"]
         2
+        >>> params["include_eruption_date"]
+        False
     """
-    _EXPECTED_FORMAT = "label_{start}_{end}_step-{X}-{unit}_dtf-{X}"
+    _EXPECTED_FORMAT = "label_{start}_{end}_step-{X}-{unit}_dtf-{X}_ie-{0|1}"
     _VALID_UNITS = ("minutes", "hours")
 
     parts = basename.split("_")
-    if len(parts) != 5:
+    # Accept 5-part legacy format (no ie segment) or 6-part new format.
+    if len(parts) not in (5, 6):
         raise ValueError(
             f"Label filename has {len(parts)} underscore-separated part(s); "
-            f"expected 5. Got: '{basename}'. Expected format: {_EXPECTED_FORMAT}"
+            f"expected 5 (legacy) or 6 (current). Got: '{basename}'. "
+            f"Expected format: {_EXPECTED_FORMAT}"
         )
 
-    _, start_date_str, end_date_str, window_step_and_unit, day_to_forecast_part = parts
+    has_ie_segment = len(parts) == 6
+    if has_ie_segment:
+        (
+            _,
+            start_date_str,
+            end_date_str,
+            window_step_and_unit,
+            day_to_forecast_part,
+            ie_part,
+        ) = parts
+    else:
+        _, start_date_str, end_date_str, window_step_and_unit, day_to_forecast_part = (
+            parts
+        )
+        ie_part = None
 
     if not window_step_and_unit.startswith("step-"):
         raise ValueError(
@@ -224,6 +246,24 @@ def parse_label_filename(basename: str) -> dict:
             f"Got: '{dtf_parts[1]}'. Expected format: {_EXPECTED_FORMAT}"
         )
 
+    # Parse include_eruption_date from optional ie- segment.
+    if ie_part is not None:
+        if not ie_part.startswith("ie-"):
+            raise ValueError(
+                f"Include-eruption-date segment must start with 'ie-'. "
+                f"Got: '{ie_part}'. Expected format: {_EXPECTED_FORMAT}"
+            )
+        ie_value = ie_part[3:]
+        if ie_value not in ("0", "1"):
+            raise ValueError(
+                f"Include-eruption-date value must be '0' or '1'. "
+                f"Got: '{ie_value}'. Expected format: {_EXPECTED_FORMAT}"
+            )
+        include_eruption_date = ie_value == "1"
+    else:
+        # Legacy filename — default to False.
+        include_eruption_date = False
+
     start_date = to_datetime(start_date_str)
     end_date = to_datetime(end_date_str)
 
@@ -235,6 +275,7 @@ def parse_label_filename(basename: str) -> dict:
         "window_step": window_step,
         "window_step_unit": window_step_unit,
         "day_to_forecast": day_to_forecast,
+        "include_eruption_date": include_eruption_date,
     }
 
 

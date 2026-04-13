@@ -105,6 +105,41 @@ class TestParseLabelFilename:
         assert result["window_step_unit"] == "minutes"
         assert result["window_step"] == 30
 
+    def test_ie_0_sets_include_eruption_date_false(self):
+        from eruption_forecast.utils.date_utils import parse_label_filename
+        result = parse_label_filename(
+            "label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0"
+        )
+        assert result["include_eruption_date"] is False
+
+    def test_ie_1_sets_include_eruption_date_true(self):
+        from eruption_forecast.utils.date_utils import parse_label_filename
+        result = parse_label_filename(
+            "label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-1"
+        )
+        assert result["include_eruption_date"] is True
+
+    def test_legacy_filename_defaults_include_eruption_date_false(self):
+        from eruption_forecast.utils.date_utils import parse_label_filename
+        result = parse_label_filename(
+            "label_2020-01-01_2020-12-31_step-12-hours_dtf-2"
+        )
+        assert result["include_eruption_date"] is False
+
+    def test_malformed_ie_prefix_raises(self):
+        from eruption_forecast.utils.date_utils import parse_label_filename
+        with pytest.raises(ValueError, match="ie-"):
+            parse_label_filename(
+                "label_2020-01-01_2020-12-31_step-12-hours_dtf-2_x-0"
+            )
+
+    def test_malformed_ie_value_raises(self):
+        from eruption_forecast.utils.date_utils import parse_label_filename
+        with pytest.raises(ValueError, match="'0' or '1'"):
+            parse_label_filename(
+                "label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-2"
+            )
+
 
 # ---------------------------------------------------------------------------
 # validation.py

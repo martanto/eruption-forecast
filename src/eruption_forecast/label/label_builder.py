@@ -36,6 +36,7 @@ from eruption_forecast.utils.date_utils import (
     normalize_dates,
 )
 from eruption_forecast.utils.formatting import slugify
+from eruption_forecast.label.label_plots import plot_label_distribution
 
 
 class LabelBuilder:
@@ -191,7 +192,7 @@ class LabelBuilder:
         self.window_step = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
-        self.eruption_dates: list[str] = sort_dates(eruption_dates)
+        self.eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
         self.volcano_id: str = str(volcano_id)
         self.include_eruption_date = include_eruption_date
         self.verbose: bool = bool(verbose)
@@ -211,7 +212,8 @@ class LabelBuilder:
         self.filename = (
             f"label_{start_date_str}_{end_date_str}"
             f"_step-{window_step}-{window_step_unit}"
-            f"_dtf-{day_to_forecast}.csv"
+            f"_dtf-{day_to_forecast}"
+            f"_ie-{int(include_eruption_date)}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
 
@@ -811,7 +813,7 @@ class LabelBuilder:
 
         Args:
             csv (str): Path to the label CSV file. Filename must follow the
-                standard format: label_{start}_{end}_step-{X}-{unit}_dtf-{X}.csv
+                standard format: label_{start}_{end}_step-{X}-{unit}_dtf-{X}_ie-{0|1}.csv
 
         Returns:
             pd.DataFrame: Loaded label DataFrame with DatetimeIndex and columns
@@ -822,7 +824,7 @@ class LabelBuilder:
                 (raised by LabelData).
 
         Examples:
-            >>> df = builder.from_csv("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
+            >>> df = builder.from_csv("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv")
             >>> print(df.columns.tolist())
             ['id', 'is_erupted']
         """
@@ -833,7 +835,7 @@ class LabelBuilder:
 
         return label_data.df
 
-    def build(self) -> Self:
+    def build(self, overwrite: bool = True) -> Self:
         """Build labels based on eruption dates and window configuration.
 
         Main orchestration method that performs the complete label building workflow:
@@ -846,6 +848,9 @@ class LabelBuilder:
 
         Windows are marked as erupted (is_erupted=1) when their end time (index)
         falls within [eruption_date - day_to_forecast, eruption_date].
+
+        Args:
+            overwrite (bool): Whether to overwrite existing label file
 
         Returns:
             Self: Instance with populated df, df_eruption, and df_eruptions properties.
@@ -880,20 +885,17 @@ class LabelBuilder:
         file_exists = os.path.isfile(self.csv)
 
         # Load or initiate the dataframe
-        if file_exists:
+        if file_exists and not overwrite:
             if self.verbose:
-                logger.info(f"Loading existing labels from {self.csv}")
+                logger.info(f"Load existing labels from {self.csv}")
             df = self.from_csv(self.csv)
         else:
             if self.verbose:
                 logger.info("Initiating new label DataFrame")
-            df = self.initiate_label()
 
-        if not file_exists:
             # Create id column to use as data ID reference with tremor data
             # such as RSAM, DSAR or MSNoise
-            if self.debug:
-                logger.debug(f"Creating ID column with {len(df)} rows")
+            df = self.initiate_label()
             df["id"] = range(len(df))
             df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
 
@@ -918,7 +920,7 @@ class LabelBuilder:
 
         self.df_eruption = df_eruption
 
-        if not file_exists:
+        if not file_exists or overwrite:
             self.validate_eruption_dates()
             self.save()
 
@@ -928,7 +930,7 @@ class LabelBuilder:
         """Save labels DataFrame to disk in CSV or Excel format.
 
         Saves the built labels DataFrame to a file with standardized filename:
-        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}.{ext}
+        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.{ext}
 
         Also saves a separate 'eruption_dates.csv' reference file.
 
@@ -944,11 +946,11 @@ class LabelBuilder:
         Examples:
             >>> # Save as CSV (default)
             >>> builder.build().save()
-            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv
+            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv
 
             >>> # Save as Excel
             >>> builder.build().save(file_type="xlsx")
-            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.xlsx
+            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.xlsx
 
             >>> # Method chaining
             >>> builder.build().save().save(file_type="xlsx")
@@ -972,5 +974,54 @@ class LabelBuilder:
 
         # Save eruption dates
         self.save_eruption_dates()
+
+        try:
+            self.plot_distribution()
+        except Exception as exc:
+            logger.warning(f"Label distribution plot could not be saved: {exc}")
+
+        return self
+
+    def plot_distribution(
+        self,
+        *,
+        filetype: str = "png",
+    ) -> "Self":
+        """Plot is_erupted class distribution as a bar chart and save next to the label file.
+
+        Generates a two-bar chart showing counts and percentages for each class
+        (erupted vs. non-erupted) and saves it to the same directory as the label CSV,
+        using the same base filename with a ``_distribution`` suffix.
+
+        The method delegates to ``plot_label_distribution()`` from
+        ``eruption_forecast.label.label_plots`` and follows the project's
+        Nature/Science journal styling conventions.
+
+        Args:
+            filetype (str): Image format for the saved figure (e.g. "png", "pdf").
+                Defaults to "png".
+
+        Returns:
+            Self: Instance for method chaining.
+
+        Raises:
+            RuntimeError: If ``build()`` has not been called yet (``self.df`` is ``None``).
+
+        Examples:
+            >>> builder.build().plot_distribution()
+            >>> builder.build().plot_distribution(filetype="pdf")
+        """
+        if self.df is None:
+            raise RuntimeError("Call build() before plot_distribution().")
+
+        base = os.path.splitext(self.csv)[0]
+        filepath = f"{base}_distribution"
+
+        plot_label_distribution(
+            self.df,
+            filepath,
+            filetype=filetype,
+            verbose=self.verbose,
+        )
 
         return self

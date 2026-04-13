@@ -53,7 +53,7 @@ class TremorMatrixBuilder:
         label_df (pd.DataFrame): Label dataframe with DatetimeIndex and columns
             'id' and/or 'is_erupted'. Index must be pd.DatetimeIndex. Can be built
             using LabelBuilder or loaded from label CSV.
-            Example location: output/labels/label_2025-01-01_2025-07-24_ws-2_step-6-hours_dtf-2.csv
+            Example location: output/labels/label_2025-01-01_2025-07-24_ws-2_step-6-hours_dtf-2_ie-0.csv
         output_dir (str | None, optional): Output directory path for saved CSVs.
             If None, defaults to ``root_dir/output/features``. Relative paths are
             resolved against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is

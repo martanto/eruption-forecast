@@ -60,7 +60,6 @@ class DynamicLabelBuilder(LabelBuilder):
         output_dir: str | None = None,
         root_dir: str | None = None,
         prefix_filename: str | None = None,
-        overwrite: bool = False,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -81,7 +80,6 @@ class DynamicLabelBuilder(LabelBuilder):
                 relative output_dir paths. Defaults to None.
             prefix_filename (str | None, optional): Custom prefix for the output
                 filename. Defaults to ``"label"``.
-            overwrite (bool, optional): Overwrite existing output files. Defaults to False.
             verbose (bool, optional): Enable informational logging. Defaults to False.
             debug (bool, optional): Enable debug-level logging. Defaults to False.
 
@@ -89,7 +87,7 @@ class DynamicLabelBuilder(LabelBuilder):
             ValueError: If any LabelBuilder validation fails (date range too short,
                 invalid window_step_unit, etc.).
         """
-        eruption_dates = sort_dates(eruption_dates)
+        eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
         prefix_filename = prefix_filename or "label"
 
         # Compute overall data range from eruption dates + look-back window.
@@ -126,10 +124,10 @@ class DynamicLabelBuilder(LabelBuilder):
         self.filename = (
             f"{prefix_filename}_{overall_start_str}_{overall_end_str}"
             f"_step-{window_step}-{window_step_unit}"
-            f"_dtf-{day_to_forecast}.csv"
+            f"_dtf-{day_to_forecast}"
+            f"_ie-{int(self.include_eruption_date)}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
-        self.overwrite = overwrite
 
     @property
     def _eruption_dates(self) -> list[datetime]:
@@ -223,7 +221,7 @@ class DynamicLabelBuilder(LabelBuilder):
         return df
 
     @logger.catch
-    def build(self) -> Self:
+    def build(self, overwrite: bool = True) -> Self:
         """Build per-eruption label windows and concatenate into one DataFrame.
 
         For each eruption, creates a windowed DataFrame spanning
@@ -233,6 +231,9 @@ class DynamicLabelBuilder(LabelBuilder):
 
         If the label CSV already exists on disk it is loaded instead of
         recomputed.
+
+        Args:
+            overwrite (bool): Whether to overwrite existing label file
 
         Returns:
             Self: Instance with populated ``df``, ``df_eruption``, and
@@ -258,7 +259,7 @@ class DynamicLabelBuilder(LabelBuilder):
 
         file_exists = os.path.isfile(self.csv)
 
-        if file_exists and not self.overwrite:
+        if file_exists and not overwrite:
             if self.verbose:
                 logger.info(f"Loading existing labels from {self.csv}")
             _df = self.from_csv(self.csv)
