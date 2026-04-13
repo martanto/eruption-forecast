@@ -13,6 +13,9 @@ import pandas as pd
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import random_under_sampler
+from eruption_forecast.plots.feature_plots import (
+    plot_feature_correlations as _plot_feature_correlations,
+)
 from eruption_forecast.model.evaluation_trainer import EvaluationTrainer
 
 
@@ -61,6 +64,7 @@ class ModelTrainer(EvaluationTrainer):
         sampling_strategy: str | float = 0.75,
         save_features: bool = False,
         plot_features: bool = False,
+        plot_correlations: bool = False,
     ) -> str | None:
         """Phase 1 - Feature Selection worker: resample the full dataset and select features for train mode.
 
@@ -89,6 +93,8 @@ class ModelTrainer(EvaluationTrainer):
                 Defaults to False.
             plot_features (bool, optional): Generate feature importance plots.
                 Defaults to False.
+            plot_correlations (bool, optional): Generate a per-seed correlation
+                heatmap for the top-N significant features. Defaults to False.
 
         Returns:
             str: Path to the significant features CSV if feature selection
@@ -156,6 +162,25 @@ class ModelTrainer(EvaluationTrainer):
 
         if result is None:
             return None
+
+        if plot_correlations:
+            filename = (
+                f"{self.prefix_filename}_{random_state:05d}"
+                if self.prefix_filename
+                else f"{random_state:05d}"
+            )
+            correlations_filepath = os.path.join(
+                self.shared_correlations_figures_dir, f"{filename}.png"
+            )
+            _, top_selected_features, _, _ = result
+            sig_df = pd.DataFrame(top_selected_features).reset_index()
+            sig_df.columns = ["features", "score"]
+            _plot_feature_correlations(
+                resampled_df=features_resampled,
+                significant_features_df=sig_df,
+                filepath=correlations_filepath,
+                overwrite=self.overwrite,
+            )
 
         return significant_filepath
 
@@ -253,6 +278,7 @@ class ModelTrainer(EvaluationTrainer):
         sampling_strategy: str | float,
         save_all_features: bool,
         plot_significant_features: bool,
+        plot_feature_correlations: bool = False,
     ) -> tuple[list[tuple], list[tuple], dict[str, list[dict]]]:
         """Identify seeds and (seed, classifier) pairs that still need work for train mode.
 
@@ -269,13 +295,15 @@ class ModelTrainer(EvaluationTrainer):
             save_all_features (bool): Whether to save all ranked features per seed.
             plot_significant_features (bool): Whether to generate feature importance
                 plots.
+            plot_feature_correlations (bool, optional): Whether to generate per-seed
+                feature correlation heatmaps. Defaults to False.
 
         Returns:
             tuple: A 3-tuple of:
 
                 - **pending_feature_selection_jobs** (list[tuple]): Seeds missing shared work,
                   each as ``(random_state, sampling_strategy, save_all_features,
-                  plot_significant_features)``.
+                  plot_significant_features, plot_feature_correlations)``.
                 - **pending_training_model_jobs** (list[tuple]): (seed, classifier) pairs
                   missing model files, each as ``(random_state, classifier_slug)``.
                 - **records_per_classifier** (dict[str, list[dict]]): Already-completed
@@ -306,7 +334,7 @@ class ModelTrainer(EvaluationTrainer):
             # If additional shared artifacts were requested, ensure they also exist
             # before considering Phase 1 - Feature Selection complete for this seed.
             if not feature_selection_incomplete and (
-                save_all_features or plot_significant_features
+                save_all_features or plot_significant_features or plot_feature_correlations
             ):
                 for _path in _optional_shared_paths:
                     if _path is None:
@@ -322,6 +350,7 @@ class ModelTrainer(EvaluationTrainer):
                         sampling_strategy,
                         save_all_features,
                         plot_significant_features,
+                        plot_feature_correlations,
                     )
                 )
                 continue
@@ -357,6 +386,7 @@ class ModelTrainer(EvaluationTrainer):
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
+        plot_feature_correlations: bool = False,
     ) -> None:
         """Train on the full dataset across multiple seeds (no train/test split).
 
@@ -382,6 +412,8 @@ class ModelTrainer(EvaluationTrainer):
                 not just top-N. Defaults to False.
             plot_significant_features (bool, optional): Generate feature importance
                 plots. Defaults to False.
+            plot_feature_correlations (bool, optional): Generate a per-seed correlation
+                heatmap for the top-N significant features. Defaults to False.
 
         Example:
             >>> trainer = ModelTrainer(
@@ -393,7 +425,11 @@ class ModelTrainer(EvaluationTrainer):
         """
         # Ensure train-only runs use the predictions output tree, even after evaluate().
         self.with_evaluation = False
-        self.create_directories(save_all_features, plot_significant_features)
+        self.create_directories(
+            save_all_features,
+            plot_significant_features,
+            plot_feature_correlations=plot_feature_correlations,
+        )
 
         random_states: list[int] = [random_state + seed for seed in range(total_seed)]
         (
@@ -405,6 +441,7 @@ class ModelTrainer(EvaluationTrainer):
             sampling_strategy,
             save_all_features,
             plot_significant_features,
+            plot_feature_correlations,
         )
 
         # ===== PHASE 1: Parallel feature selection across seeds =====

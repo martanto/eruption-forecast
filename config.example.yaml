@@ -75,6 +75,7 @@ train:
   sampling_strategy: 0.75   # RandomUnderSampler ratio (minority / majority)
   save_all_features: false  # Save all ranked features (not just top-N) per seed
   plot_significant_features: false      # Plot feature importances per seed
+  plot_feature_correlations: false      # Plot per-seed correlation heatmap for top-N features
   n_jobs: null              # Outer seed-level parallel workers (null = model.n_jobs)
   grid_search_n_jobs: 1     # Inner GridSearchCV workers (n_jobs × grid_search_n_jobs ≤ cpu_count)
   overwrite: false

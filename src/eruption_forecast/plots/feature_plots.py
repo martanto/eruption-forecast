@@ -15,11 +15,17 @@ Key functions:
 - ``plot_frequency_band_contribution(features_df, ...)`` — stacked bar chart showing
   what proportion of selected features comes from each frequency band, broken down
   by metric type (RSAM vs. DSAR vs. entropy).
+- ``plot_feature_correlations(resampled_df, significant_features_df, ...)`` — heatmap
+  of Spearman (or Pearson) correlations among the top-N selected features for a
+  single seed.
+- ``replot_feature_correlations(significant_dir, resampled_dir, ...)`` — batch version
+  that pairs per-seed significant-features CSVs with their resampled training matrices
+  and produces one heatmap PNG per seed.
 """
 
 import os
 import re
-from typing import Any, cast
+from typing import Any, Literal, cast
 from pathlib import Path
 from multiprocessing import Pool
 
@@ -590,7 +596,9 @@ def plot_frequency_band_contribution(
 
     if is_multi_seed:
         # Count unique feature names across all seeds for the title
-        unique_feature_count = len({f for seed_feats in feature_names for f in seed_feats})
+        unique_feature_count = len(
+            {f for seed_feats in feature_names for f in seed_feats}
+        )
 
         # Build count DataFrame per seed then aggregate
         seed_counts: list[pd.Series] = []
@@ -700,3 +708,265 @@ def plot_frequency_band_contribution(
         data = pd.DataFrame({"band": order, "count": counts[order].to_numpy()})
 
     return fig, data
+
+
+def plot_feature_correlations(
+    resampled_df: pd.DataFrame,
+    significant_features_df: pd.DataFrame,
+    filepath: str,
+    *,
+    method: Literal["pearson", "spearman"] = "spearman",
+    features_column: str = "features",
+    top_features: int = 20,
+    figsize: tuple[float, float] = (6, 6),
+    cmap: str = "RdYlBu_r",
+    dpi: int = 150,
+    title: str | None = None,
+    overwrite: bool = True,
+) -> None:
+    """Plot a correlation heatmap for the top-N significant features of a single seed.
+
+    Subsets the resampled training matrix to the top-``top_features`` feature names
+    listed in ``significant_features_df``, computes a pairwise correlation matrix using
+    the requested ``method``, and renders it as a colour-mapped heatmap with annotated
+    cell values.
+
+    Args:
+        resampled_df (pd.DataFrame): Resampled training feature matrix. Must contain
+            the feature columns named in ``significant_features_df``. Any non-feature
+            columns (e.g. ``id``, ``is_erupted``) are ignored automatically.
+        significant_features_df (pd.DataFrame): DataFrame of selected features. Must
+            contain a column named ``features_column`` with tsfresh feature names sorted
+            by ascending score (most significant first).
+        filepath (str): Full path (including filename and extension) where the figure
+            is saved. Parent directory must exist.
+        method (Literal["pearson", "spearman"], optional): Correlation method passed
+            directly to ``pd.DataFrame.corr()``. Defaults to ``"spearman"``.
+        features_column (str, optional): Name of the column in ``significant_features_df``
+            that contains feature names. Defaults to ``"features"``.
+        top_features (int, optional): Number of top features to include in the heatmap.
+            Defaults to 20.
+        figsize (tuple[float, float], optional): Figure dimensions in inches.
+            Defaults to (6, 6).
+        cmap (str, optional): Matplotlib colormap name for the heatmap. Defaults to
+            ``"RdYlBu_r"`` (diverging, colourblind-friendly).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, defaults to
+            ``"Feature Correlations (spearman)"`` (or pearson). Defaults to None.
+        overwrite (bool, optional): If False, skip saving when ``filepath`` already
+            exists. Defaults to True.
+
+    Returns:
+        None
+
+    Examples:
+        >>> sig_df = pd.read_csv("significant_features/00000.csv")
+        >>> res_df = pd.read_csv("resampled/00000.csv", index_col=0)
+        >>> plot_feature_correlations(res_df, sig_df, "figures/correlations/00000.png")
+    """
+    if not overwrite and os.path.isfile(filepath):
+        return
+
+    # Resolve feature names from significant_features_df.
+    if features_column in significant_features_df.columns:
+        feature_names = significant_features_df[features_column].tolist()
+    else:
+        # Fall back to the DataFrame index (e.g. when loaded with index_col=0).
+        feature_names = significant_features_df.index.tolist()
+
+    feature_names = feature_names[:top_features]
+
+    # Keep only columns that actually exist in resampled_df.
+    available = [f for f in feature_names if f in resampled_df.columns]
+    missing = len(feature_names) - len(available)
+    if missing:
+        logger.warning(
+            f"plot_feature_correlations: {missing} feature(s) not found in "
+            "resampled_df and will be skipped."
+        )
+    if not available:
+        logger.warning("plot_feature_correlations: no features to plot; skipping.")
+        return
+
+    corr: pd.DataFrame = resampled_df[available].corr(method=method)
+
+    # Shorten tsfresh names for tick labels — keep last ~35 characters.
+    _max_label_len = 35
+    labels = [
+        f"…{n[-_max_label_len:]}" if len(n) > _max_label_len + 1 else n
+        for n in available
+    ]
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi, constrained_layout=True)
+        im = ax.imshow(corr.to_numpy(), cmap=cmap, vmin=-1, vmax=1, aspect="auto")
+        fig.colorbar(im, ax=ax, label=f"{method} correlation")
+
+        ax.set_xticks(range(len(available)))
+        ax.set_xticklabels(labels, rotation=90, fontsize=5)
+        ax.set_yticks(range(len(available)))
+        ax.set_yticklabels(labels, fontsize=5)
+        configure_spine(ax)
+        ax.set_title(title or f"Feature Correlations ({method})")
+
+        # Annotate cells with 2-decimal values when the matrix is small enough.
+        if len(available) <= 20:
+            for i in range(len(available)):
+                for j in range(len(available)):
+                    val = corr.values[i, j]
+                    # Choose white or black text based on absolute correlation strength.
+                    text_color = "white" if abs(val) > 0.6 else "black"
+                    ax.text(
+                        j,
+                        i,
+                        f"{val:.2f}",
+                        ha="center",
+                        va="center",
+                        fontsize=4,
+                        color=text_color,
+                    )
+
+        plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+
+
+def _replot_correlation_worker(args: tuple) -> tuple[str, str]:
+    """Worker function for parallel replot_feature_correlations execution.
+
+    Unpacks a single job tuple, calls plot_feature_correlations, and returns
+    a (status, filepath) result pair consumed by the parent process.
+
+    Args:
+        args (tuple): A 3-tuple of (significant_csv, resampled_csv, output_filepath)
+            followed by keyword arguments packed as a dict.
+
+    Returns:
+        tuple[str, str]: A 2-tuple of (status, filepath) where status is one of
+            ``"success"``, ``"skipped"``, or ``"failed"``.
+    """
+    significant_csv, resampled_csv, output_filepath, kwargs = args
+    try:
+        overwrite = kwargs.get("overwrite", True)
+        if not overwrite and os.path.isfile(output_filepath):
+            return ("skipped", output_filepath)
+
+        sig_df = pd.read_csv(significant_csv)
+        res_df = pd.read_csv(resampled_csv, index_col=0)
+        plot_feature_correlations(
+            resampled_df=res_df,
+            significant_features_df=sig_df,
+            filepath=output_filepath,
+            **kwargs,
+        )
+        return ("success", output_filepath)
+    except Exception as exc:
+        logger.error(
+            f"replot_feature_correlations: failed for {significant_csv}: {exc}"
+        )
+        return ("failed", output_filepath)
+
+
+def replot_feature_correlations(
+    significant_dir: str,
+    resampled_dir: str,
+    output_dir: str | None = None,
+    overwrite: bool = True,
+    top_features: int = 20,
+    method: Literal["pearson", "spearman"] = "spearman",
+    dpi: int = 150,
+    n_jobs: int = 1,
+    **kwargs: Any,
+) -> dict[str, int]:
+    """Batch-produce correlation heatmaps for all seeds in a directory pair.
+
+    Pairs each CSV in ``significant_dir`` with a same-stem CSV in ``resampled_dir``
+    and calls :func:`plot_feature_correlations` for every matched pair. Results are
+    saved to ``output_dir`` (defaulting to a ``figures/correlations/`` sibling of
+    ``significant_dir``). Parallel execution is supported via ``n_jobs``.
+
+    Args:
+        significant_dir (str): Directory containing per-seed significant-feature CSVs
+            (e.g. ``…/significant_features/``).
+        resampled_dir (str): Directory containing per-seed resampled training CSVs
+            (e.g. ``…/resampled/``). Each file must share the same stem as its
+            counterpart in ``significant_dir``.
+        output_dir (str | None, optional): Directory for output PNGs. If None,
+            defaults to ``{significant_dir.parent}/figures/correlations/``.
+            Defaults to None.
+        overwrite (bool, optional): If False, skip files that already exist.
+            Defaults to True.
+        top_features (int, optional): Number of top features per seed.
+            Defaults to 20.
+        method (Literal["pearson", "spearman"], optional): Correlation method.
+            Defaults to ``"spearman"``.
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        n_jobs (int, optional): Number of parallel worker processes. 1 runs
+            sequentially in the calling process. Defaults to 1.
+        **kwargs (Any): Additional keyword arguments forwarded to
+            :func:`plot_feature_correlations`.
+
+    Returns:
+        dict[str, int]: Counts with keys ``"success"``, ``"failed"``, and
+            ``"skipped"``.
+
+    Examples:
+        >>> replot_feature_correlations(
+        ...     "output/features/stratified-shuffle-split/significant_features",
+        ...     "output/features/stratified-shuffle-split/resampled",
+        ...     n_jobs=4,
+        ... )
+        {"success": 500, "failed": 0, "skipped": 0}
+    """
+    significant_path = Path(significant_dir)
+    resampled_path = Path(resampled_dir)
+
+    if output_dir is None:
+        out_path = significant_path.parent / "figures" / "correlations"
+    else:
+        out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    sig_files = {p.stem: p for p in significant_path.glob("*.csv")}
+    res_files = {p.stem: p for p in resampled_path.glob("*.csv")}
+
+    common_stems = sorted(set(sig_files) & set(res_files))
+    if not common_stems:
+        logger.warning(
+            f"replot_feature_correlations: no matching file pairs found "
+            f"in '{significant_dir}' and '{resampled_dir}'."
+        )
+        return {"success": 0, "failed": 0, "skipped": 0}
+
+    job_kwargs: dict[str, Any] = {
+        "overwrite": overwrite,
+        "top_features": top_features,
+        "method": method,
+        "dpi": dpi,
+        **kwargs,
+    }
+    jobs = [
+        (
+            str(sig_files[stem]),
+            str(res_files[stem]),
+            str(out_path / f"{stem}.png"),
+            job_kwargs,
+        )
+        for stem in common_stems
+    ]
+
+    counts: dict[str, int] = {"success": 0, "failed": 0, "skipped": 0}
+
+    if n_jobs == 1:
+        for job in jobs:
+            status, _ = _replot_correlation_worker(job)
+            counts[status] += 1
+    else:
+        with Pool(processes=n_jobs) as pool:
+            for status, _ in pool.map(_replot_correlation_worker, jobs):
+                counts[status] += 1
+
+    logger.info(
+        f"replot_feature_correlations: {counts['success']} success, "
+        f"{counts['failed']} failed, {counts['skipped']} skipped."
+    )
+    return counts

@@ -67,6 +67,7 @@ class BaseModelTrainer:
         shared_significant_dir (str): Shared directory for significant features.
         shared_all_features_dir (str): Shared directory for all features.
         shared_figures_dir (str): Shared directory for feature importance plots.
+        shared_correlations_figures_dir (str): Shared directory for per-seed correlation heatmaps.
         shared_tests_dir (str): Shared directory for per-seed held-out test splits.
         shared_resampled_dir (str): Shared directory for per-seed resampled training data.
         classifier_dirs (dict[str, str]): Per-classifier output directories keyed by slug.
@@ -430,6 +431,18 @@ class BaseModelTrainer:
             metrics_dirs,
         )
 
+    @property
+    def shared_correlations_figures_dir(self) -> str:
+        """Return the directory path for per-seed correlation heatmap PNGs.
+
+        Derived as a sibling of ``shared_figures_dir`` at ``figures/correlations/``
+        under the shared features directory.
+
+        Returns:
+            str: Absolute path to the correlations figures directory.
+        """
+        return os.path.join(os.path.dirname(self.shared_figures_dir), "correlations")
+
     def update_grid_params(
         self, classifier: ClassifierModel, grid_params: dict[str, Any]
     ) -> ClassifierModel:
@@ -463,6 +476,7 @@ class BaseModelTrainer:
         save_all_features: bool = False,
         plot_significant_features: bool = False,
         with_evaluation: bool = False,
+        plot_feature_correlations: bool = False,
     ) -> None:
         """Create all required output directories for the current training run.
 
@@ -478,6 +492,8 @@ class BaseModelTrainer:
             with_evaluation (bool, optional): Create the held-out test-split and
                 per-classifier metrics directories needed by the evaluation pipeline.
                 Defaults to False.
+            plot_feature_correlations (bool, optional): Create the correlations figures
+                directory for per-seed correlation heatmaps. Defaults to False.
 
         Returns:
             None
@@ -498,6 +514,9 @@ class BaseModelTrainer:
 
         if plot_significant_features:
             ensure_dir(self.shared_figures_dir)
+
+        if plot_feature_correlations:
+            ensure_dir(self.shared_correlations_figures_dir)
 
         if with_evaluation:
             ensure_dir(self.shared_tests_dir)

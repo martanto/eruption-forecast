@@ -1326,6 +1326,7 @@ class ForecastModel:
         sampling_strategy: str | float = 0.75,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
+        plot_feature_correlations: bool = False,
         extracted_features_csv: str | None = None,
         output_dir: str | None = None,
         n_jobs: int | None = None,
@@ -1373,6 +1374,7 @@ class ForecastModel:
                 classes. Defaults to 0.75.
             save_all_features (bool, optional): Whether to save ALL features. Defaults to False.
             plot_significant_features (bool, optional): Whether to plot each significant feature. Defaults to False.
+            plot_feature_correlations (bool, optional): Whether to generate a per-seed correlation heatmap for the top-N significant features. Defaults to False.
             extracted_features_csv (str | None): Path to extracted features.
             output_dir (str, optional): Path to output directory. Defaults to None.
             n_jobs (int, optional): Number of jobs. Defaults to None.
@@ -1445,6 +1447,7 @@ class ForecastModel:
             "sampling_strategy": sampling_strategy,
             "save_all_features": save_all_features,
             "plot_significant_features": plot_significant_features,
+            "plot_feature_correlations": plot_feature_correlations,
         }
 
         # Train all classifiers together — shared under-sampling and feature selection
@@ -1498,6 +1501,7 @@ class ForecastModel:
             else 0.75,
             save_all_features=save_all_features,
             plot_significant_features=plot_significant_features,
+            plot_feature_correlations=plot_feature_correlations,
             n_jobs=n_jobs,
             grid_search_n_jobs=grid_search_n_jobs,
             overwrite=overwrite,

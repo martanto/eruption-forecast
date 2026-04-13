@@ -266,6 +266,8 @@ class TrainConfig(_ConfigBase):
             in addition to the top-N. Defaults to ``False``.
         plot_significant_features (bool): Whether to save a feature-importance
             plot per seed. Defaults to ``False``.
+        plot_feature_correlations (bool): Whether to generate a per-seed correlation
+            heatmap for the top-N significant features. Defaults to ``False``.
         n_jobs (int | None): Parallel workers for multi-seed dispatch. ``None``
             inherits from ``ForecastModel.n_jobs``. Defaults to ``None``.
         grid_search_n_jobs (int): Parallel jobs inside each ``GridSearchCV``
@@ -295,6 +297,7 @@ class TrainConfig(_ConfigBase):
     sampling_strategy: float = 0.75
     save_all_features: bool = False
     plot_significant_features: bool = False
+    plot_feature_correlations: bool = False
     n_jobs: int | None = None
     grid_search_n_jobs: int = 1
     overwrite: bool = False

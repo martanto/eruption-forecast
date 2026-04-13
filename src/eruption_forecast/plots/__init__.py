@@ -11,7 +11,8 @@ Key sub-modules and their public exports:
   (``get_color``, ``configure_spine``, ``get_figure_size``).
 - ``tremor_plots``: ``plot_tremor`` — multi-panel RSAM/DSAR/entropy time-series.
 - ``feature_plots``: ``plot_significant_features``, ``replot_significant_features``,
-  ``plot_frequency_band_contribution`` — tsfresh feature importance visualisation.
+  ``plot_frequency_band_contribution``, ``plot_feature_correlations``,
+  ``replot_feature_correlations`` — tsfresh feature importance visualisation.
 - ``evaluation_plots``: full suite of classifier evaluation charts including ROC,
   precision-recall, calibration, confusion matrix, learning curves, threshold
   analysis, feature importance, prediction distribution, seed stability, and
@@ -50,7 +51,9 @@ from eruption_forecast.plots.tremor_plots import plot_tremor
 
 # Feature plotting
 from eruption_forecast.plots.feature_plots import (
+    plot_feature_correlations,
     plot_significant_features,
+    replot_feature_correlations,
     replot_significant_features,
     plot_frequency_band_contribution,
 )
@@ -92,6 +95,8 @@ __all__ = [
     "plot_significant_features",
     "replot_significant_features",
     "plot_frequency_band_contribution",
+    "plot_feature_correlations",
+    "replot_feature_correlations",
     # Evaluation plotting
     "plot_confusion_matrix",
     "plot_roc_curve",
