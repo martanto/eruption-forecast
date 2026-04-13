@@ -192,7 +192,7 @@ class LabelBuilder:
         self.window_step = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
-        self.eruption_dates: list[str] = sort_dates(eruption_dates)
+        self.eruption_dates: list = sort_dates(eruption_dates)
         self.volcano_id: str = str(volcano_id)
         self.include_eruption_date = include_eruption_date
         self.verbose: bool = bool(verbose)
@@ -212,7 +212,8 @@ class LabelBuilder:
         self.filename = (
             f"label_{start_date_str}_{end_date_str}"
             f"_step-{window_step}-{window_step_unit}"
-            f"_dtf-{day_to_forecast}.csv"
+            f"_dtf-{day_to_forecast}"
+            f"_ie-{int(include_eruption_date)}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
 
@@ -812,7 +813,7 @@ class LabelBuilder:
 
         Args:
             csv (str): Path to the label CSV file. Filename must follow the
-                standard format: label_{start}_{end}_step-{X}-{unit}_dtf-{X}.csv
+                standard format: label_{start}_{end}_step-{X}-{unit}_dtf-{X}_ie-{0|1}.csv
 
         Returns:
             pd.DataFrame: Loaded label DataFrame with DatetimeIndex and columns
@@ -823,7 +824,7 @@ class LabelBuilder:
                 (raised by LabelData).
 
         Examples:
-            >>> df = builder.from_csv("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv")
+            >>> df = builder.from_csv("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv")
             >>> print(df.columns.tolist())
             ['id', 'is_erupted']
         """
@@ -929,7 +930,7 @@ class LabelBuilder:
         """Save labels DataFrame to disk in CSV or Excel format.
 
         Saves the built labels DataFrame to a file with standardized filename:
-        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}.{ext}
+        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.{ext}
 
         Also saves a separate 'eruption_dates.csv' reference file.
 
@@ -945,11 +946,11 @@ class LabelBuilder:
         Examples:
             >>> # Save as CSV (default)
             >>> builder.build().save()
-            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.csv
+            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv
 
             >>> # Save as Excel
             >>> builder.build().save(file_type="xlsx")
-            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2.xlsx
+            >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.xlsx
 
             >>> # Method chaining
             >>> builder.build().save().save(file_type="xlsx")
