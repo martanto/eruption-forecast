@@ -70,7 +70,8 @@ class MetricsComputer:
                 - ``roc_auc``, ``pr_auc``, ``average_precision``
                 - ``mcc``
                 - ``true_positives``, ``true_negatives``, ``false_positives``, ``false_negatives``
-                - ``optimal_threshold``, ``f1_at_optimal``, ``recall_at_optimal``, ``precision_at_optimal``
+                - ``optimal_threshold``, ``f1_at_optimal``, ``recall_at_optimal``, ``precision_at_optimal``,
+                  ``optimal_threshold_mcc``, ``mcc_at_optimal``
         """
         metrics = {
             "accuracy": accuracy_score(self.y_true, self.y_pred),
@@ -138,6 +139,8 @@ class MetricsComputer:
                 - ``precision_at_optimal`` (float): Precision at optimal threshold.
                 - ``balanced_accuracy_at_optimal`` (float): Balanced accuracy at optimal threshold.
                 - ``optimal_threshold_f1`` (float): Threshold that maximizes F1 score.
+                - ``optimal_threshold_mcc`` (float): Threshold that maximizes MCC.
+                - ``mcc_at_optimal`` (float): MCC at optimal MCC threshold.
         """
         thresholds, metrics = compute_threshold_metrics(self.y_true, self.y_proba)
 
@@ -146,6 +149,9 @@ class MetricsComputer:
         g_mean_optimal_threshold = float(thresholds[optimal_idx])
 
         f1_optimal_idx = np.argmax(metrics["f1"])
+
+        mcc = np.array(metrics["mcc"])
+        mcc_optimal_idx = np.argmax(mcc)
 
         return {
             "optimal_threshold": g_mean_optimal_threshold,
@@ -157,4 +163,6 @@ class MetricsComputer:
                 metrics["balanced_accuracy"][optimal_idx]
             ),
             "optimal_threshold_f1": float(thresholds[f1_optimal_idx]),
+            "optimal_threshold_mcc": float(thresholds[mcc_optimal_idx]),
+            "mcc_at_optimal": float(mcc[mcc_optimal_idx]),
         }

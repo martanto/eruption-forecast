@@ -12,7 +12,7 @@ Key functions
   RandomForest importance filter) to reduce the feature matrix to the most
   relevant columns
 - ``compute_threshold_metrics`` — sweep decision thresholds and record precision,
-  recall, F1, and balanced accuracy at each step
+  recall, F1, balanced accuracy, and MCC at each step
 - ``compute_seed_eruption_probability`` — run one seed model on a feature matrix,
   aggregate per-seed statistics, and optionally persist a CSV
 - ``compute_model_probabilities`` — iterate over all seeds in a ``SeedEnsemble`` or
@@ -40,6 +40,7 @@ from sklearn.metrics import (
     recall_score,
     precision_score,
     confusion_matrix,
+    matthews_corrcoef,
     balanced_accuracy_score,
 )
 from tsfresh.transformers import FeatureSelector
@@ -68,7 +69,7 @@ def compute_threshold_metrics(
 
     Iterates over ``resolution`` evenly-spaced thresholds from 0.0 to 1.0,
     binarises ``y_proba`` at each step, and records precision, recall, F1,
-    and balanced accuracy. This is the single source of truth for threshold
+    balanced accuracy, and MCC. This is the single source of truth for threshold
     analysis used by both ``MetricsComputer`` and ``plot_threshold_analysis``.
 
     Args:
@@ -81,8 +82,8 @@ def compute_threshold_metrics(
         tuple[np.ndarray, dict[str, list[float]]]: A 2-tuple of:
             - thresholds: 1-D array of length ``resolution`` from 0.0 to 1.0.
             - metrics_dict: dict with keys ``"precision"``, ``"recall"``,
-              ``"f1"``, ``"balanced_accuracy"``, and ``"specificity"``,
-              each a list of floats.
+              ``"f1"``, ``"balanced_accuracy"``, ``"specificity"``, and
+              ``"mcc"``, each a list of floats.
     """
     thresholds = np.linspace(0.0, 1.0, resolution)
     metrics: dict[str, list[float]] = {
@@ -91,6 +92,7 @@ def compute_threshold_metrics(
         "f1": [],
         "balanced_accuracy": [],
         "specificity": [],
+        "mcc": [],
     }
     for threshold in thresholds:
         y_pred_thresh = (y_proba >= threshold).astype(int)
@@ -104,6 +106,7 @@ def compute_threshold_metrics(
         )
         tn, fp, _, _ = confusion_matrix(y_true, y_pred_thresh, labels=[0, 1]).ravel()
         metrics["specificity"].append(tn / (tn + fp) if (tn + fp) > 0 else 0.0)
+        metrics["mcc"].append(matthews_corrcoef(y_true, y_pred_thresh))
     return thresholds, metrics
 
 

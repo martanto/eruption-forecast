@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Any, Self, Literal
+from typing import Any, Self
 
 import numpy as np
 import joblib
@@ -18,7 +18,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
+from eruption_forecast.utils.ml import compute_g_mean
 from eruption_forecast.utils.pathutils import (
     ensure_dir,
     save_figure,
@@ -35,6 +35,7 @@ from eruption_forecast.plots.shap_plots import (
 from eruption_forecast.utils.formatting import slugify_class_name
 from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.plots.evaluation_plots import (
+    plot_mcc_curve as _plot_mcc_styled,
     plot_roc_curve as _plot_roc_styled,
     plot_calibration as _plot_cal_styled,
     plot_g_mean_curve as _plot_gmean_styled,
@@ -449,10 +450,6 @@ class ModelEvaluator:
         lines.append("=" * PLOT_SEPARATOR_LENGTH)
         return "\n".join(lines)
 
-    # -------------------------------------------------------------------------
-    # Plots
-    # -------------------------------------------------------------------------
-
     def _get_plot_filepath(self, plot_type: str, filename: str | None = None) -> str:
         """Resolve and create the output filepath for a named plot type.
 
@@ -596,68 +593,6 @@ class ModelEvaluator:
 
         return fig
 
-    def optimize_threshold(
-        self,
-        criterion: Literal[
-            "g_mean", "f1", "balanced_accuracy", "recall", "precision"
-        ] = "g_mean",
-    ) -> tuple[float, dict[str, float]]:
-        """Find the decision threshold that maximizes the given criterion.
-
-        Delegates to ``compute_threshold_metrics`` so the sweep logic is not
-        duplicated. The default criterion is ``"g_mean"`` (geometric mean of
-        sensitivity and specificity), which is preferred for rare-event
-        forecasting over F1.
-
-        Args:
-            criterion (Literal["g_mean", "f1", "balanced_accuracy", "recall", "precision"], optional):
-                Metric to optimize. Defaults to ``"g_mean"``.
-
-        Returns:
-            tuple[float, dict[str, float]]: A 2-tuple containing:
-
-                - **threshold** (float): Optimal decision threshold (0.0 to 1.0).
-                - **metrics_at_threshold** (dict): Dictionary with keys ``"f1"``,
-                  ``"balanced_accuracy"``, ``"recall"``, ``"precision"``, and
-                  ``"g_mean"`` evaluated at the optimal threshold.
-
-        Raises:
-            ValueError: If probability predictions are not available.
-
-        Examples:
-            >>> thresh, metrics = evaluator.optimize_threshold()
-            >>> print(f"Optimal threshold: {thresh:.3f}")
-            >>> print(f"G-mean at optimal: {metrics['g_mean']:.3f}")
-
-            >>> # Optimize for recall instead
-            >>> thresh, metrics = evaluator.optimize_threshold(criterion="recall")
-        """
-        if self._y_proba is None:
-            raise ValueError("optimize_threshold requires probability predictions")
-
-        thresholds, metrics = compute_threshold_metrics(
-            self.y_test.to_numpy(), self._y_proba
-        )
-        g_mean = compute_g_mean(metrics)
-
-        scores = {
-            "g_mean": g_mean,
-            "f1": np.array(metrics["f1"]),
-            "balanced_accuracy": np.array(metrics["balanced_accuracy"]),
-            "recall": np.array(metrics["recall"]),
-            "precision": np.array(metrics["precision"]),
-        }
-        optimal_idx = np.argmax(scores[criterion])
-        best_thresh = float(thresholds[optimal_idx])
-
-        return best_thresh, {
-            "g_mean": float(g_mean[optimal_idx]),
-            "f1": float(metrics["f1"][optimal_idx]),
-            "balanced_accuracy": float(metrics["balanced_accuracy"][optimal_idx]),
-            "recall": float(metrics["recall"][optimal_idx]),
-            "precision": float(metrics["precision"][optimal_idx]),
-        }
-
     def plot_threshold_analysis(
         self,
         filename: str | None = None,
@@ -728,13 +663,55 @@ class ModelEvaluator:
             y_true=np.asarray(self.y_test),
             y_proba=self._y_proba,
             title=f"G-mean Curve — {self.model_name}",
-            figsize=(10, 6),
+            figsize=(5, 5),
             dpi=dpi,
         )
 
         save_figure(
             fig,
             self._get_plot_filepath("g_mean_curve", filename=filename),
+            dpi,
+            verbose=self.verbose,
+        )
+
+        return fig
+
+    def plot_mcc_curve(
+        self,
+        filename: str | None = None,
+        dpi: int = 150,
+    ) -> plt.Figure | None:
+        """Plot MCC, sensitivity, and specificity vs. decision threshold.
+
+        Produces a standalone MCC curve showing how Matthews Correlation
+        Coefficient varies across thresholds, with the default 0.5 threshold
+        and optimal MCC threshold marked.
+
+        Args:
+            filename (str | None, optional): Output filename. If None,
+                defaults to ``"<random_state:05d>_mcc_curve.png"``.
+                Defaults to None.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+
+        Returns:
+            plt.Figure | None: Matplotlib figure, or None if probability
+            predictions are unavailable.
+        """
+        if self._y_proba is None:
+            logger.warning("plot_mcc_curve requires probability predictions")
+            return None
+
+        fig = _plot_mcc_styled(
+            y_true=np.asarray(self.y_test),
+            y_proba=self._y_proba,
+            title=f"MCC Curve — {self.model_name}",
+            figsize=(5, 5),
+            dpi=dpi,
+        )
+
+        save_figure(
+            fig,
+            self._get_plot_filepath("mcc_curve", filename=filename),
             dpi,
             verbose=self.verbose,
         )
@@ -1080,7 +1057,7 @@ class ModelEvaluator:
             dict[str, plt.Figure | None]: Mapping of plot name to figure
             object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
             ``"pr_curve"``, ``"threshold_analysis"``, ``"g_mean_curve"``,
-            ``"feature_importance"``, ``"calibration"``,
+            ``"mcc_curve"``, ``"feature_importance"``, ``"calibration"``,
             ``"prediction_distribution"``, ``"shap_summary"``,
             ``"shap_waterfall"``, ``"learning_curve"``. Values are None when a
             plot could not be generated (e.g. probabilities unavailable or no
@@ -1096,6 +1073,7 @@ class ModelEvaluator:
             "pr_curve": self.plot_precision_recall_curve(dpi=dpi),
             "threshold_analysis": self.plot_threshold_analysis(dpi=dpi),
             "g_mean_curve": self.plot_g_mean_curve(dpi=dpi),
+            "mcc_curve": self.plot_mcc_curve(dpi=dpi),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
             "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),

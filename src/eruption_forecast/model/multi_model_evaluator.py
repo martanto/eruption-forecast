@@ -35,6 +35,7 @@ from eruption_forecast.plots.shap_plots import (
 from eruption_forecast.plots.feature_plots import plot_frequency_band_contribution
 from eruption_forecast.plots.evaluation_plots import (
     plot_seed_stability,
+    plot_aggregate_mcc_curve as _plot_mcc_styled,
     plot_aggregate_roc_curve as _plot_roc_styled,
     plot_aggregate_calibration as _plot_cal_styled,
     plot_aggregate_g_mean_curve as _plot_gmean_styled,
@@ -710,6 +711,52 @@ class MultiModelEvaluator:
         )
         return fig
 
+    def plot_mcc_curve(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+        title: str | None = None,
+        show_individual: bool = False,
+    ) -> plt.Figure:
+        """Generate an aggregate MCC curve across all seeds.
+
+        Computes per-seed MCC curves, then aggregates using the median and
+        IQR (25th–75th percentile shading) for robustness against outlier
+        seeds. Marks the default threshold and the threshold at peak median
+        MCC.
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override figure filename. Defaults to
+                ``"{classifier_name}_aggregate_mcc_curve"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+            title (str | None, optional): Plot title. Defaults to None.
+            show_individual (bool, optional): Draw per-seed MCC curves as thin
+                background lines. Defaults to False.
+
+        Returns:
+            plt.Figure: Matplotlib figure with the aggregate MCC curve.
+        """
+        _, _, y_trues, y_probas = self._predictions
+
+        fig, data = _plot_mcc_styled(
+            y_trues=y_trues,
+            y_probas=y_probas,
+            show_individual=show_individual,
+            title=title,
+            dpi=dpi,
+        )
+        self._save_outputs(
+            fig,
+            data,
+            filename or f"{self.classifier_name}_aggregate_mcc_curve",
+            f"{self.classifier_name}_aggregate_mcc_curve",
+            dpi,
+            save,
+        )
+        return fig
+
     def plot_feature_importance(
         self,
         save: bool = True,
@@ -856,7 +903,7 @@ class MultiModelEvaluator:
             dict[str, plt.Figure | None]: Mapping of plot name to figure.
                 Keys: ``"roc_curve"``, ``"pr_curve"``, ``"calibration"``,
                 ``"prediction_distribution"``, ``"confusion_matrix"``,
-                ``"threshold_analysis"``, ``"g_mean_curve"``, ``"feature_importance"``,
+                ``"threshold_analysis"``, ``"g_mean_curve"``, ``"mcc_curve"``, ``"feature_importance"``,
                 ``"shap_summary"``, ``"seed_stability"``,
                 ``"frequency_band_contribution"``, ``"learning_curve"``.
                 Values are None when a plot cannot be generated (e.g.,
@@ -889,12 +936,15 @@ class MultiModelEvaluator:
             "g_mean_curve": lambda: self.plot_g_mean_curve(
                 dpi=dpi, show_individual=show_individual
             ),
-            "feature_importance": lambda: self.plot_feature_importance(dpi=dpi),
+            "mcc_curve": lambda: self.plot_mcc_curve(
+                dpi=dpi, show_individual=show_individual
+            ),
             "seed_stability": lambda: self.plot_seed_stability(dpi=dpi),
             "frequency_band_contribution": lambda: (
                 self.plot_frequency_band_contribution(dpi=dpi)
             ),
             "learning_curve": lambda: self.plot_learning_curve(dpi=dpi),
+            "feature_importance": lambda: self.plot_feature_importance(dpi=dpi),
         }
 
         results: dict[str, plt.Figure | tuple[plt.Figure, pd.DataFrame] | None] = {}
