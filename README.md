@@ -7,6 +7,11 @@
 A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
 
 ## References and Acknowledgments
+> Dempsey, D. E., Cronin, S. J., Mei, S., & Kempa-Liehr, A. W. (2020). Automatic precursor recognition and real-time forecasting 
+> of sudden explosive volcanic eruptions at Whakaari, New Zealand. Nature Communications, 11(1), 1–8. https://doi.org/10.1038/s41467-020-17375-2
+> This model implements a time series feature engineering and classification workflow that issues eruption alerts 
+> based on real-time tremor data. https://github.com/ddempsey/whakaari
+
 > Ardid, A., Dempsey, D., Caudron, C., Cronin, S., Kennedy, B., Girona, T., Roman, D., Miller, C., Potter, 
 > S., Lamb, O. D., Martanto, A., Cubuk-Sabuncu, Y., Cabrera, L., Ruiz, S., Contreras, R., Pacheco, J., Mora, 
 > M. M., & De Angelis, S. (2025). Ergodic seismic precursors and transfer learning for short term eruption 
@@ -36,11 +41,6 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 > volcanic tremor for eruption forecasting at White Island volcano (Whakaari), New Zealand.
 > Journal of Volcanology and Geothermal Research, 302, 11–23.
 > https://doi.org/10.1016/j.jvolgeores.2015.06.001
-
-> Time-series feature analysis and eruption forecasting for volcano data. 
-> Eruption forecast model for Whakaari (White Island, New Zealand). This model implements a time series 
-> feature engineering and classification workflow that issues eruption alerts based on real-time tremor data.
-> https://github.com/ddempsey/whakaari
 
 > Time-series feature analysis and eruption forecasting for volcano data. Successor package to Whakaari.
 > This model implements a time series feature engineering and classification workflow that issues eruption 
