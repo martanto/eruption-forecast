@@ -42,6 +42,9 @@ from eruption_forecast.plots.shap_plots import (
     plot_aggregate_shap_waterfall,
 )
 
+# Label plotting — imported last to avoid triggering model/utils circular chains
+from eruption_forecast.label.label_plots import plot_label_distribution
+
 # Tremor plotting
 from eruption_forecast.plots.tremor_plots import plot_tremor
 
@@ -109,4 +112,6 @@ __all__ = [
     # Forecast plotting
     "plot_forecast",
     "plot_forecast_from_file",
+    # Label plotting
+    "plot_label_distribution",
 ]
