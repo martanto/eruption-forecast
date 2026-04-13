@@ -192,7 +192,7 @@ class LabelBuilder:
         self.window_step = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
-        self.eruption_dates: list = sort_dates(eruption_dates)
+        self.eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
         self.volcano_id: str = str(volcano_id)
         self.include_eruption_date = include_eruption_date
         self.verbose: bool = bool(verbose)
@@ -994,7 +994,7 @@ class LabelBuilder:
         using the same base filename with a ``_distribution`` suffix.
 
         The method delegates to ``plot_label_distribution()`` from
-        ``eruption_forecast.plots.label_plots`` and follows the project's
+        ``eruption_forecast.label.label_plots`` and follows the project's
         Nature/Science journal styling conventions.
 
         Args:
