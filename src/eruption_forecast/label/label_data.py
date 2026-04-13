@@ -195,7 +195,26 @@ class LabelData(BaseDataContainer):
             )
 
         if len(parts) == 6:
-            _, start_date, end_date, window_step, day_to_forecast, _ = parts
+            (
+                _,
+                start_date,
+                end_date,
+                window_step,
+                day_to_forecast,
+                include_eruption_date,
+            ) = parts
+            if not include_eruption_date.startswith("ie-"):
+                raise ValueError(
+                    f"Include eruption date segment is invalid. "
+                    f"Expected format: ie-{{0|1}}. Got: {include_eruption_date}"
+                )
+
+            include_eruption_date_value = include_eruption_date.split("ie-", maxsplit=1)[1]
+            if include_eruption_date_value not in {"0", "1"}:
+                raise ValueError(
+                    f"Include eruption date value is invalid. "
+                    f"Expected 'ie-0' or 'ie-1'. Got: {include_eruption_date}"
+                )
         else:
             _, start_date, end_date, window_step, day_to_forecast = parts
 
