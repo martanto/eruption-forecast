@@ -6,6 +6,7 @@ the full lifecycle from data preparation through prediction and model merging.
 
 Key functions
 -------------
+- ``resample`` — central dispatcher for class-balancing strategies (under, over, none, auto);
 - ``random_under_sampler`` — apply ``RandomUnderSampler`` to balance training data;
   returns resampled ``(X, y)`` and the fitted sampler
 - ``get_significant_features`` — run tsfresh ``FeatureSelector`` (and optionally a
@@ -44,6 +45,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 from tsfresh.transformers import FeatureSelector
+from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
@@ -53,7 +55,7 @@ from eruption_forecast.utils.array import (
     predict_proba_from_estimator,
 )
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
-from eruption_forecast.utils.dataframe import to_series, load_label_csv
+from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
@@ -128,25 +130,6 @@ def compute_g_mean(metrics: dict[str, list[float]]) -> np.ndarray:
     return np.sqrt(np.array(metrics["recall"]) * np.array(metrics["specificity"]))
 
 
-def load_labels_from_csv(label_features_csv: str) -> pd.Series:
-    """Load a label CSV and return a Series indexed by window ID.
-
-    Delegates to :func:`eruption_forecast.utils.dataframe.load_label_csv`.
-    Kept here for backward compatibility with existing call sites.
-
-    Args:
-        label_features_csv (str): Path to the label CSV file. Must contain
-            an ``id`` column and an ``is_erupted`` column.
-
-    Returns:
-        pd.Series: Binary eruption labels indexed by window ID.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
-    """
-    return load_label_csv(label_features_csv)
-
-
 def random_under_sampler(
     features: pd.DataFrame,
     labels: pd.Series,
@@ -189,6 +172,69 @@ def random_under_sampler(
     return features, labels
 
 
+def resample(
+    features: pd.DataFrame,
+    labels: pd.Series,
+    method: Literal["under", "over", "none"] = "under",
+    sampling_strategy: str | float = "auto",
+    random_state: int = 42,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Resample features and labels according to the chosen balancing method.
+
+    Dispatches to the appropriate resampling strategy based on ``method``.
+    Use ``"none"`` when the dataset is already balanced to avoid discarding
+    majority-class samples or introducing duplicates.
+
+    Args:
+        features (pd.DataFrame): Feature matrix with training samples.
+        labels (pd.Series): Binary labels Series (0=non-eruption, 1=eruption).
+        method (Literal["under", "over", "none"], optional): Resampling strategy.
+            ``"under"`` applies ``RandomUnderSampler``, ``"over"`` applies
+            ``RandomOverSampler``, and ``"none"`` returns the data unchanged.
+            Defaults to ``"under"``.
+        sampling_strategy (str | float, optional): Sampling ratio forwarded to
+            the chosen sampler. Ignored when ``method="none"``. Defaults to ``"auto"``.
+        random_state (int, optional): Random seed for reproducibility.
+            Defaults to 42.
+
+    Returns:
+        tuple[pd.DataFrame, pd.Series]: Tuple of (features, labels) after resampling.
+
+    Examples:
+        >>> X, y = resample(features, labels, method="none")
+        >>> X, y = resample(features, labels, method="under", sampling_strategy=0.75)
+        >>> X, y = resample(features, labels, method="over", random_state=0)
+    """
+    if method == "none":
+        logger.info("Resampling skipped (method='none') — dataset treated as balanced.")
+        return features, labels
+
+    if method == "under":
+        logger.info(
+            f"Applying RandomUnderSampler (sampling_strategy={sampling_strategy})."
+        )
+        return random_under_sampler(
+            features=features,
+            labels=labels,
+            sampling_strategy=sampling_strategy,
+            random_state=random_state,
+        )
+
+    if method == "over":
+        logger.info(
+            f"Applying RandomOverSampler (sampling_strategy={sampling_strategy})."
+        )
+        sampler = RandomOverSampler(
+            sampling_strategy=sampling_strategy, random_state=random_state
+        )
+        features, labels = sampler.fit_resample(features, labels)
+        return features, labels
+
+    raise ValueError(
+        f"Unknown resample method '{method}'. Choose from 'under', 'over', 'none'."
+    )
+
+
 def get_significant_features(
     features: pd.DataFrame,
     labels: pd.Series | pd.DataFrame,
@@ -208,6 +254,7 @@ def get_significant_features(
             will extract "is_erupted" column.
         fdr_level (float, optional): False discovery rate threshold (0.0-1.0).
             Lower values are more conservative. Defaults to 0.05.
+        top_n (int, optional): Number of top features to return. Defaults to 20.
         n_jobs (int, optional): Number of parallel jobs for computation. Defaults to 1.
 
     Returns:
@@ -235,7 +282,9 @@ def get_significant_features(
     # Extracted features with potentially reduced column
     features_filtered: pd.DataFrame = selector.fit_transform(X=features, y=labels)
 
-    _significant_features = pd.Series(selector.p_values, index=selector.features)
+    _significant_features: pd.Series = pd.Series(
+        selector.p_values, index=selector.features
+    )
     _significant_features = _significant_features.sort_values()
     _significant_features.name = "p_values"
     _significant_features.index.name = "features"
@@ -314,7 +363,7 @@ def compute_seed_eruption_probability(
     # and overwrite is False, we skip inference entirely and serve the cache.
     # `save=True` here means "persist if not already cached", not "always write".
     if os.path.exists(filepath) and not overwrite:
-        seed_df = pd.read_csv(filepath, index_col=0)
+        seed_df: pd.DataFrame = pd.read_csv(filepath, index_col=0)
         eruption_probabilities = seed_df["p_eruption"]
         eruption_predictions = seed_df["prediction"]
         return (
