@@ -248,7 +248,11 @@ calculate = CalculateTremor(
 
 **`DynamicLabelBuilder`** (extends `LabelBuilder`) generates one window per eruption:
 - Each window spans `days_before_eruption` days ending on the eruption date
-- Handles overlapping eruptions: when a secondary eruption's `day_to_forecast` period falls inside another eruption's window, both positive regions are marked (a warning is logged)
+- Build proceeds in three phases:
+  1. **Initiate** — create one all-zero label DataFrame per eruption window
+  2. **Deduplicate** — concat all windows, drop duplicate datetimes from overlapping windows, sort by datetime
+  3. **Label** — iterate eruption dates and mark the `day_to_forecast` positive region on the unified frame
+- Overlapping windows are handled cleanly: duplicate datetimes are removed before labeling, so positive labels from multiple eruptions accumulate correctly in the shared frame
 - All per-eruption windows are concatenated into one DataFrame with globally unique IDs
 
 ```
@@ -277,26 +281,31 @@ LabelBuilder — one global window over the full date range
  │                                    (counted in dtf)      │
  │  → exactly day_to_forecast days ending on eruption day   │
 
-DynamicLabelBuilder — one window per eruption, overlaps handled
+DynamicLabelBuilder — three-phase build, overlapping windows deduped
 ─────────────────────────────────────────────────────────────────────
- Eruption A  (2025-03-20)        Eruption B  (2025-03-23)
- ┌───────────────────────────┐   ┌───────────────────────────┐
- │ days_before_eruption = 10 │   │ days_before_eruption = 10 │
- │                           │   │                           │
- │ 0  0  0  0  0  0  1  1  E │   │ 0  1  1  1  1  1  1  1  E │
- │                   ↑       │   │    ↑           ↑          │
- │                dtf start  │   │ overlap from  dtf start   │
- │                (Mar 18)   │   │ Eruption A    (Mar 20)    │
- └───────────────────────────┘   └───────────────────────────┘
-                                   ↑ secondary overlap → warning logged
-   E = eruption date (is_erupted = 1)
-   1 = positive label within day_to_forecast window
-   0 = negative label
+ Phase 1: initiate (all zeros)
+   Eruption A window           Eruption B window
+   [0 0 0 0 0 0 0 0 0 0]      [0 0 0 0 0 0 0 0 0 0]
+
+ Phase 2: concat + deduplicate datetimes
+   [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  ← unified, sorted, no duplicates
+
+ Phase 3: mark positive labels per eruption
+   Eruption A (2025-03-20, dtf=2):  mark Mar 18–20 → 1
+   Eruption B (2025-03-23, dtf=2):  mark Mar 21–23 → 1
+   [0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1]
+                              ↑     ↑
+                          Erup A  Erup B
+
+   dtf = days_to_forecast
+   E   = eruption date (is_erupted = 1)
+   1   = positive label within day_to_forecast window
+   0   = negative label
 ```
 
 **Key classes:**
 - `LabelBuilder`: Creates labeled windows over a global date range (`label_builder.py`)
-- `DynamicLabelBuilder`: Per-eruption windows with overlap handling (`dynamic_label_builder.py`)
+- `DynamicLabelBuilder`: Per-eruption windows with three-phase build and overlap deduplication (`dynamic_label_builder.py`)
 - `LabelData`: Loads label CSV and parses parameters from filename (`label_data.py`)
 
 ### 3. Tremor Matrix Building (`src/eruption_forecast/features/`)
