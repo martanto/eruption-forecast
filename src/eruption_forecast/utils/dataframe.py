@@ -80,7 +80,7 @@ def remove_anomalies(
             )
 
     for column in columns:
-        anomalies = detect_anomalies_zscore(_df[column].values, threshold=threshold)
+        anomalies = detect_anomalies_zscore(_df[column].to_numpy(), threshold=threshold)
         anomalies_removed = anomalies.sum()
         percentage_removed = anomalies_removed / total_data * 100
 
