@@ -175,25 +175,25 @@ def random_under_sampler(
 def resample(
     features: pd.DataFrame,
     labels: pd.Series,
-    method: Literal["under", "over", "none"] = "under",
+    method: Literal["under", "over"] | None = "under",
     sampling_strategy: str | float = "auto",
     random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Resample features and labels according to the chosen balancing method.
 
     Dispatches to the appropriate resampling strategy based on ``method``.
-    Use ``"none"`` when the dataset is already balanced to avoid discarding
+    Pass ``None`` when the dataset is already balanced to avoid discarding
     majority-class samples or introducing duplicates.
 
     Args:
         features (pd.DataFrame): Feature matrix with training samples.
         labels (pd.Series): Binary labels Series (0=non-eruption, 1=eruption).
-        method (Literal["under", "over", "none"], optional): Resampling strategy.
+        method (Literal["under", "over"] | None, optional): Resampling strategy.
             ``"under"`` applies ``RandomUnderSampler``, ``"over"`` applies
-            ``RandomOverSampler``, and ``"none"`` returns the data unchanged.
+            ``RandomOverSampler``, and ``None`` returns the data unchanged.
             Defaults to ``"under"``.
         sampling_strategy (str | float, optional): Sampling ratio forwarded to
-            the chosen sampler. Ignored when ``method="none"``. Defaults to ``"auto"``.
+            the chosen sampler. Ignored when ``method=None``. Defaults to ``"auto"``.
         random_state (int, optional): Random seed for reproducibility.
             Defaults to 42.
 
@@ -201,12 +201,12 @@ def resample(
         tuple[pd.DataFrame, pd.Series]: Tuple of (features, labels) after resampling.
 
     Examples:
-        >>> X, y = resample(features, labels, method="none")
+        >>> X, y = resample(features, labels, method=None)
         >>> X, y = resample(features, labels, method="under", sampling_strategy=0.75)
         >>> X, y = resample(features, labels, method="over", random_state=0)
     """
-    if method == "none":
-        logger.info("Resampling skipped (method='none') — dataset treated as balanced.")
+    if method is None:
+        logger.info("Resampling skipped (method=None) — dataset treated as balanced.")
         return features, labels
 
     if method == "under":
@@ -231,7 +231,7 @@ def resample(
         return features, labels
 
     raise ValueError(
-        f"Unknown resample method '{method}'. Choose from 'under', 'over', 'none'."
+        f"Unknown resample method '{method}'. Choose from 'under', 'over', or None."
     )
 
 
