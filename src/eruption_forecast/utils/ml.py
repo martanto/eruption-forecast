@@ -178,6 +178,7 @@ def resample(
     method: Literal["under", "over"] | None = "under",
     sampling_strategy: str | float = "auto",
     random_state: int = 42,
+    verbose: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Resample features and labels according to the chosen balancing method.
 
@@ -196,6 +197,7 @@ def resample(
             the chosen sampler. Ignored when ``method=None``. Defaults to ``"auto"``.
         random_state (int, optional): Random seed for reproducibility.
             Defaults to 42.
+        verbose (bool, optional): Verbose mode. Defaults to ``False``.
 
     Returns:
         tuple[pd.DataFrame, pd.Series]: Tuple of (features, labels) after resampling.
@@ -206,13 +208,18 @@ def resample(
         >>> X, y = resample(features, labels, method="over", random_state=0)
     """
     if method is None:
-        logger.info("Resampling skipped (method=None) — dataset treated as balanced.")
+        if verbose:
+            logger.info(
+                "Resampling skipped (method=None) — dataset treated as balanced."
+            )
         return features, labels
 
-    if method == "under":
+    if verbose:
         logger.info(
             f"Applying RandomUnderSampler (sampling_strategy={sampling_strategy})."
         )
+
+    if method == "under":
         return random_under_sampler(
             features=features,
             labels=labels,
@@ -221,9 +228,6 @@ def resample(
         )
 
     if method == "over":
-        logger.info(
-            f"Applying RandomOverSampler (sampling_strategy={sampling_strategy})."
-        )
         sampler = RandomOverSampler(
             sampling_strategy=sampling_strategy, random_state=random_state
         )
