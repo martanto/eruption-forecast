@@ -72,7 +72,8 @@ train:
   total_seed: 500           # Number of seeds (random_state … random_state + total_seed - 1)
   with_evaluation: false    # true = 80/20 split + metrics; false = train on full dataset
   number_of_significant_features: 20   # Top-N features to keep after selection
-  sampling_strategy: 0.75   # RandomUnderSampler ratio (minority / majority)
+  sampling_strategy: 0.75   # Sampling ratio passed to the resampler (minority / majority)
+  resample_method: auto     # Resampling strategy: 'under', 'over', null, 'auto' (auto uses under when minority < 10%)
   save_all_features: false  # Save all ranked features (not just top-N) per seed
   plot_significant_features: false      # Plot feature importances per seed
   n_jobs: null              # Outer seed-level parallel workers (null = model.n_jobs)
