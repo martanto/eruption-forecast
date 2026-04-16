@@ -447,13 +447,8 @@ predictor = ModelPredictor(
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",  # or pd.DataFrame
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 ### Forecast Mode — Multi-Model Consensus
@@ -465,19 +460,14 @@ predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
     trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "rf": "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 **Output columns (multi-model):**
@@ -632,15 +622,10 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 predictor = ModelPredictor(
     start_date="2025-07-28",
     end_date="2025-08-04",
-    trained_models=merged_path,   # or bundle_path for multi-classifier
+    trained_models=merged_path,  # or bundle_path for multi-classifier
 )
-df_forecast = predictor.predict_proba(
-    tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_*.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_*.csv", window_size=2,
+                                      window_step=12, window_step_unit="hours")
 ```
 
 For full details see [Training Workflows](Training-Workflows) and [Evaluation and Forecasting](Evaluation-and-Forecasting).

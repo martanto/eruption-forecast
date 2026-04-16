@@ -280,13 +280,8 @@ evaluator = predictor.predict_best(
 When no ground-truth labels are available. Aggregates within each classifier (across seeds) and then across classifiers (consensus) for multi-model mode.
 
 ```python
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",  # or pd.DataFrame
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 ### Multi-Model Output Columns

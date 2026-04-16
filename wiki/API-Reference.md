@@ -204,13 +204,8 @@ Returns a `ModelEvaluator` for the best-performing seed.
 ### `predict_proba()` — Forecast Mode
 
 ```python
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",   # or pd.DataFrame
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 ---

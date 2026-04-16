@@ -575,13 +575,8 @@ predictor = ModelPredictor(
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",  # or pd.DataFrame
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 #### Multi-model consensus
@@ -594,19 +589,14 @@ predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
     trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "rf": "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 **Output columns (multi-model):**
@@ -894,22 +884,17 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 predictor = ModelPredictor(
     start_date="2025-07-28",
     end_date="2025-08-04",
-    trained_models=merged_path,   # path ending in .pkl
+    trained_models=merged_path,  # path ending in .pkl
 )
 
 # Multi-classifier bundle
 predictor = ModelPredictor(
     start_date="2025-07-28",
     end_date="2025-08-04",
-    trained_models=bundle_path,   # dict[str, SeedEnsemble] inside
+    trained_models=bundle_path,  # dict[str, SeedEnsemble] inside
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-12-31.csv",
+                                      window_size=2, window_step=12, window_step_unit="hours")
 print(df_forecast[["model_eruption_probability", "model_uncertainty"]].head())
 ```

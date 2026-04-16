@@ -446,13 +446,8 @@ df_metrics = predictor.predict(
 )
 
 # Without labels (forecasting mode)
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 **Plot Features:**
