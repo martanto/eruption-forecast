@@ -42,13 +42,14 @@ def plot_forecast(
     label_df: pd.DataFrame | pd.Series | None = None,
     title: str | None = None,
     fig_width: float = 12,
-    fig_height: float = 3,
+    fig_height: float = 1.5,
     threshold: float = 0.7,
     rolling_window: str = "6h",
     x_days_interval: int = 2,
     eruption_dates: list[str] | None = None,
+    y_max: float = 1.05,
 ) -> plt.Figure:
-    """Plot eruption forecast probability and prediction time-series with Nature/Science styling.
+    """Plot eruption forecast probability and prediction time-series.
 
     Creates a three-panel plot from a multi-model consensus DataFrame:
     - Panel 1 (top): Consensus max-envelope prediction and probability, with threshold line.
@@ -83,6 +84,7 @@ def plot_forecast(
         eruption_dates (list[str] | None, optional): Eruption dates to annotate on
             every panel as vertical dashed lines. Each entry is passed to
             :func:`to_datetime`. Defaults to ``None``.
+        y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
 
     Returns:
         plt.Figure: Matplotlib figure object with three vertically stacked subplots.
@@ -165,7 +167,7 @@ def plot_forecast(
                 threshold=threshold,
             )
 
-            ax.set_ylabel("Consensus", fontsize=10)
+            ax.set_ylabel("Consensus", fontsize=8)
 
         # Per Classifiers Consensus Prediction
         if index == 1:
@@ -186,7 +188,7 @@ def plot_forecast(
                 threshold=threshold,
             )
 
-            ax.set_ylabel("Cons. Prediction", fontsize=10)
+            ax.set_ylabel("Cons. Prediction", fontsize=8)
 
         # Per Classifiers Consensus Probability
         if index == 2:
@@ -212,9 +214,9 @@ def plot_forecast(
 
             tick_labels = ax.get_xticklabels(which="major")
             for label in tick_labels:
-                label.set(rotation=-15, horizontalalignment="left")
+                label.set(rotation=-15, horizontalalignment="left", fontsize=8)
 
-            ax.set_ylabel("Cons. Probability", fontsize=10)
+            ax.set_ylabel("Cons. Probability", fontsize=8)
 
         if eruption_dates is not None and len(eruption_dates) > 0:
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
@@ -228,13 +230,14 @@ def plot_forecast(
             y=threshold,
             color="black",
             linestyle="--",
-            linewidth=2,
+            linewidth=1.0,
+            alpha=0.5,
             label=f"Threshold {threshold}",
         )
 
         ax.set_xlim(df.index[0], df.index[-1])
-        ax.set_ylim(0, 1.0)
-        ax.tick_params(labelsize=10)
+        ax.set_ylim(0, y_max)
+        ax.tick_params(labelsize=6)
         ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
     # Collect unique handles/labels from all panels into one shared legend
@@ -252,13 +255,13 @@ def plot_forecast(
         labels,
         loc="lower center",
         ncol=5,
-        fontsize=10,
+        fontsize=8,
         frameon=False,
         fancybox=False,
-        bbox_to_anchor=(0.5, -0.05),
+        bbox_to_anchor=(0.5, -0.1),
     )
 
-    fig.suptitle(title or "Forecast Results", fontsize=14)
+    fig.suptitle(title or "Forecast Results", fontsize=10)
     plt.tight_layout()
 
     return fig
@@ -427,7 +430,7 @@ def _ax_forecast(
 
 
 def _ax_eruption(
-    ax: plt.Axes, eruption_date: datetime, label: str | None = None
+    ax: plt.Axes, eruption_date: datetime, label: str | None = None, y_max: float = 1.05
 ) -> plt.Axes:
     """Annotate a single eruption date on the given axes as a vertical dashed line.
 
@@ -438,6 +441,7 @@ def _ax_eruption(
         eruption_date (datetime): Eruption date to mark.
         label (str | None, optional): Legend label for the line. Pass ``None`` to
             suppress the legend entry for subsequent eruptions. Defaults to ``None``.
+        y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
 
     Returns:
         plt.Axes: The modified axes object.
@@ -448,7 +452,7 @@ def _ax_eruption(
     ax.axvline(
         x=eruption_date,  # ty:ignore[invalid-argument-type]
         color="red",
-        linewidth=2.5,
+        linewidth=1.0,
         linestyle="--",
         label=label,
     )
@@ -456,7 +460,7 @@ def _ax_eruption(
     ax.fill_between(
         np.array([start_eruption, end_eruption]),
         0.0,
-        1.0,
+        y_max,
         color="#a50026",
         alpha=0.1,
     )
@@ -469,8 +473,8 @@ def _ax_eruption(
         rotation=90,
         va="bottom",
         ha="right",
-        fontsize=10,
-        fontweight="bold",
+        fontsize=8,
+        fontweight="light",
         color="black",
         zorder=100,
     )
