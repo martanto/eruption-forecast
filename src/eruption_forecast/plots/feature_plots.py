@@ -1,4 +1,4 @@
-"""Feature importance and selection visualisation with Nature/Science styling.
+"""Feature importance and selection visualisation.
 
 Provides plotting functions for inspecting the tsfresh features selected during
 training, including bar charts of top features ranked by importance score and

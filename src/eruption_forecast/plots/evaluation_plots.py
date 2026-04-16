@@ -69,7 +69,7 @@ def plot_confusion_matrix(
     figsize: tuple[float, float] = (6, 5),
     dpi: int = 150,
 ) -> plt.Figure:
-    """Plot a confusion matrix heatmap with Nature/Science styling.
+    """Plot a confusion matrix heatmap.
 
     Creates a 2×2 heatmap showing classification results with optional normalization.
     Labels are "Not Erupted" (0) and "Erupted" (1). Uses blue colormap.
@@ -577,7 +577,7 @@ def plot_feature_importance(
     title: str | None = None,
     dpi: int = 150,
 ) -> plt.Figure | None:
-    """Plot horizontal bar chart of feature importances with Nature/Science styling.
+    """Plot horizontal bar chart of feature importances.
 
     Creates a horizontal bar chart showing the top-N most important features from
     a trained model. Features are sorted by importance (highest to lowest from top
@@ -616,7 +616,7 @@ def plot_feature_importance(
     # Extract importances
     importances: np.ndarray
     if hasattr(model, "feature_importances_"):
-        importances = model.feature_importances_  # type: ignore[assignment]
+        importances = model.feature_importances_  # ty:ignore[invalid-assignment]
     elif isinstance(model, VotingClassifier):
         # Average importances from voting estimators
         all_importances = []
@@ -680,7 +680,7 @@ def plot_calibration(
     figsize: tuple[float, float] = (6, 5),
     dpi: int = 150,
 ) -> plt.Figure:
-    """Plot calibration curve with Nature/Science styling.
+    """Plot calibration curve.
 
     Creates a calibration plot showing predicted probability vs. observed frequency.
     Well-calibrated models have points along the diagonal. Bins probabilities into
@@ -755,7 +755,7 @@ def plot_prediction_distribution(
     figsize: tuple[float, float] = (8, 5),
     dpi: int = 150,
 ) -> plt.Figure:
-    """Plot histogram of predicted probabilities by true class with Nature/Science styling.
+    """Plot histogram of predicted probabilities by true class.
 
     Creates overlapping histograms showing the distribution of predicted probabilities
     for each true class. Well-separated distributions indicate good model discrimination.
@@ -1821,7 +1821,7 @@ def plot_aggregate_feature_importance(
     for model in models:
         importances: np.ndarray | None = None
         if hasattr(model, "feature_importances_"):
-            importances = model.feature_importances_  # type: ignore[assignment]
+            importances = model.feature_importances_  # ty:ignore[invalid-assignment]
         elif isinstance(model, VotingClassifier):
             sub_imps = [
                 est.feature_importances_
@@ -1990,8 +1990,8 @@ def plot_classifier_comparison(
     for clf in classifiers:
         for metric in metrics_to_show:
             try:
-                m = float(summary_df.loc[(clf, metric), "mean"])
-                s = float(summary_df.loc[(clf, metric), "std"])
+                m = float(summary_df.loc[(clf, metric), "mean"])  # ty:ignore[invalid-argument-type]
+                s = float(summary_df.loc[(clf, metric), "std"])  # ty:ignore[invalid-argument-type]
             except KeyError:
                 m, s = float("nan"), 0.0
             mean_matrix.loc[clf, metric] = m
