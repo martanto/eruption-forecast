@@ -28,7 +28,7 @@ Design notes:
 """
 
 import os
-from typing import Literal
+from typing import Any, Literal
 from datetime import datetime, timedelta
 
 import joblib
@@ -594,12 +594,13 @@ class ModelPredictor:
         tremor_data: str | pd.DataFrame,
         window_size: int,
         window_step: int,
+        *,
         window_step_unit: Literal["minutes", "hours"],
         use_relevant_features: bool = True,
         select_tremor_columns: list[str] | None = None,
-        threshold: float = 0.7,
         save_predictions: bool = True,
-        plot: bool = True,
+        threshold: float = 0.7,
+        **plot_kwargs: Any,
     ) -> pd.DataFrame:
         """Forecast eruption probability for UNLABELLED future windows.
 
@@ -619,10 +620,8 @@ class ModelPredictor:
 
         When only a single classifier was registered (``trained_models`` was a
         plain string), per-classifier columns use the prefix ``"model_"`` and
-        the consensus columns equal those values exactly.
-
-        The result is saved as ``predictions.csv``.  If *plot* is True a
-        time-series figure is also saved.
+        the consensus columns equal those values exactly. The result is
+        saved as ``predictions.csv``.
 
         Args:
             tremor_data (str | pd.DataFrame): Tremor data in CSV or dataframe.
@@ -634,8 +633,10 @@ class ModelPredictor:
             threshold (float, optional): Probability threshold use in forecast plot for eruption classification.
                 Defaults to 0.7.
             save_predictions (bool, optional): Save predictions result. Defaults to True.
-            plot (bool, optional): Save a probability time-series plot.
-                Defaults to True.
+            **plot_kwargs: Additional keyword arguments forwarded to
+                :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
+                (e.g. ``title``, ``fig_width``, ``fig_height``, ``rolling_window``,
+                ``x_days_interval``, ``eruption_dates``, ``y_max``, ``legend_n_cols``).
 
         Returns:
             pd.DataFrame: Index matches the future features index.  Columns
@@ -693,8 +694,7 @@ class ModelPredictor:
         df_forecast.to_csv(csv_path)
         logger.info(f"Predictions saved to: {csv_path}")
 
-        if plot:
-            self._plot_forecast(df_forecast, threshold)
+        self._plot_forecast(df_forecast, threshold, **plot_kwargs)
 
         self.df = df_forecast
         return df_forecast
@@ -758,7 +758,12 @@ class ModelPredictor:
             consensus_confidence,
         )
 
-    def _plot_forecast(self, df: pd.DataFrame, threshold: float) -> None:
+    def _plot_forecast(
+        self,
+        df: pd.DataFrame,
+        threshold: float,
+        **plot_kwargs: Any,
+    ) -> None:
         """Save a time-series probability + confidence plot.
 
         Delegates to :func:`eruption_forecast.plots.forecast_plots.plot_forecast`
@@ -766,11 +771,17 @@ class ModelPredictor:
 
         Args:
             df (pd.DataFrame): Forecast consensus dataframe with predictions and confidence.
+            threshold (float): Probability threshold for the eruption classification line.
+            **plot_kwargs: Extra keyword arguments forwarded verbatim to
+                :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
+                (e.g. ``title``, ``eruption_dates``, ``fig_width``).
         """
         if self.labels_df is None:
             raise ValueError("No labels dataframe provided.")
 
-        fig = plot_forecast(df=df, label_df=self.labels_df, threshold=threshold)
+        fig = plot_forecast(
+            df=df, label_df=self.labels_df, threshold=threshold, **plot_kwargs
+        )
 
         path = os.path.join(self.figures_dir, f"forecast_{self.basename}.png")
         fig.savefig(

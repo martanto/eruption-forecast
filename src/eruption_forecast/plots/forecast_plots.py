@@ -48,6 +48,7 @@ def plot_forecast(
     x_days_interval: int = 2,
     eruption_dates: list[str] | None = None,
     y_max: float = 1.05,
+    legend_n_cols: int = 5,
 ) -> plt.Figure:
     """Plot eruption forecast probability and prediction time-series.
 
@@ -85,6 +86,7 @@ def plot_forecast(
             every panel as vertical dashed lines. Each entry is passed to
             :func:`to_datetime`. Defaults to ``None``.
         y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
+        legend_n_cols (int, optional): Number of column for legend. Defaults to ``5``.
 
     Returns:
         plt.Figure: Matplotlib figure object with three vertically stacked subplots.
@@ -126,7 +128,11 @@ def plot_forecast(
 
     # Plot figure
     fig, axs = plt.subplots(
-        nrows=3, ncols=1, figsize=(fig_width, 3 * fig_height), sharex=True
+        nrows=3,
+        ncols=1,
+        figsize=(fig_width, 3 * fig_height),
+        sharex=True,
+        tight_layout=True,
     )
 
     for index in range(3):
@@ -222,7 +228,7 @@ def plot_forecast(
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
 
             for _index, eruption_date in enumerate(_eruption_dates):
-                label = "Eruption" if _index == 0 else None
+                label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
                 if df.index[0] <= eruption_date <= df.index[-1]:
                     ax = _ax_eruption(ax, eruption_date, label=label)
 
@@ -254,15 +260,14 @@ def plot_forecast(
         handles,
         labels,
         loc="lower center",
-        ncol=5,
+        ncol=legend_n_cols,
         fontsize=8,
         frameon=False,
         fancybox=False,
-        bbox_to_anchor=(0.5, -0.1),
+        bbox_to_anchor=(0.5, -0.05),
     )
 
-    fig.suptitle(title or "Forecast Results", fontsize=10)
-    plt.tight_layout()
+    fig.suptitle(title or "Forecast Results", fontsize=8)
 
     return fig
 
@@ -394,20 +399,20 @@ def _ax_forecast(
 
     labels: list[dict[str, Any]] = [
         {
-            "name": f"p>={threshold}",
+            "name": f"p>={threshold}",  # eruption
             "where": max_value >= threshold,
             "color": "#d73027",
             "alpha": 0.5,
         },
         {
-            "name": f"0.6<p<{threshold}",
+            "name": f"0.6<p<{threshold}",  # pre-eruption
             "where": (max_value >= (threshold - threshold_tolerance))
             & (max_value < threshold),
             "color": "#fee090",
             "alpha": 0.5,
         },
         {
-            "name": f"p<={threshold - threshold_tolerance}",
+            "name": f"p<={threshold - threshold_tolerance}",  # no eruption
             "where": max_value <= (threshold - threshold_tolerance),
             "color": "#009E73",
             "alpha": 0.2,
