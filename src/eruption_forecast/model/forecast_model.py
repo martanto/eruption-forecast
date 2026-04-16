@@ -1542,6 +1542,7 @@ class ForecastModel:
         window_step_unit: Literal["minutes", "hours"],
         save_predictions: bool = True,
         threshold: float = 0.7,
+        title: str | None = None,
         output_dir: str | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
@@ -1564,7 +1565,7 @@ class ForecastModel:
                 to a CSV file. Defaults to True.
             threshold (float, optional): Threshold for classifying eruption
                 probability as positive. Defaults to 0.7.
-            title (str | None): Figure title. Defaults to ``None``.
+            title (str | None, optional): Forecast plot title. Defaults to None.
             output_dir (str | None, optional): Directory for forecast output files.
                 Defaults to ``self.station_dir``.
             n_jobs (int | None, optional): Parallel workers for feature extraction.
@@ -1574,7 +1575,7 @@ class ForecastModel:
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
             **plot_kwargs: Additional keyword arguments forwarded to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
-                (e.g. ``title``, ``fig_width``, ``fig_height``, ``rolling_window``,
+                (e.g. ``fig_width``, ``fig_height``, ``rolling_window``,
                 ``x_days_interval``, ``eruption_dates``, ``y_max``, ``legend_n_cols``).
 
         Returns:
@@ -1616,6 +1617,7 @@ class ForecastModel:
             select_tremor_columns=self.select_tremor_columns,
             threshold=threshold,
             save_predictions=save_predictions,
+            title=title,
             eruption_dates=self.LabelBuilder.eruption_dates
             if self.LabelBuilder
             else None,
