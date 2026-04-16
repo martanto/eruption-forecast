@@ -16,13 +16,13 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
+    resample,
     merge_seed_models,
-    load_labels_from_csv,
-    random_under_sampler,
     get_classifier_models,
     merge_all_classifiers,
 )
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
+from eruption_forecast.utils.dataframe import load_label_csv
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.config.constants import (
     TRAIN_TEST_SPLIT,
@@ -58,6 +58,8 @@ class BaseModelTrainer:
         cv_splits (int): Number of CV splits.
         number_of_significant_features (int): Number of top features to save separately.
         feature_selection_method (str): Feature selection method.
+        resample_method (Literal["under", "over"] | None): Effective resampling strategy
+            after ``"auto"`` resolution — ``"under"``, ``"over"``, or ``None``.
         overwrite (bool): Whether to overwrite existing output files.
         verbose (bool): Enable verbose logging.
         debug (bool): Enable debug mode.
@@ -126,6 +128,7 @@ class BaseModelTrainer:
             "tsfresh", "random_forest", "combined"
         ] = "tsfresh",
         prefix_filename: str | None = None,
+        resample_method: Literal["under", "over", "auto"] | None = "auto",
         overwrite: bool = False,
         plot_shap: bool = False,
         n_jobs: int = 1,
@@ -164,6 +167,13 @@ class BaseModelTrainer:
                 to retain after selection. Defaults to DEFAULT_N_SIGNIFICANT_FEATURES.
             feature_selection_method (Literal["tsfresh", "random_forest", "combined"],
                 optional): Feature selection method. Defaults to "tsfresh".
+            resample_method (Literal["under", "over", "auto"] | None, optional):
+                Resampling strategy for class balancing. ``"under"`` applies
+                ``RandomUnderSampler``, ``"over"`` applies ``RandomOverSampler``,
+                ``None`` skips resampling, and ``"auto"`` inspects the class ratio
+                from the loaded labels — if the minority (eruption) class is below 10 %
+                of all samples, ``"under"`` is used; otherwise resampling is skipped.
+                Defaults to ``"auto"``.
             overwrite (bool, optional): Overwrite existing output files. Defaults to False.
             n_jobs (int, optional): Number of parallel seed workers (outer loop).
                 Defaults to 1.
@@ -177,7 +187,24 @@ class BaseModelTrainer:
             plot_shap (bool, optional): Compute and save SHAP summary plots. Defaults to False.
         """
         df_features = pd.read_csv(extracted_features_csv, index_col=0)
-        df_labels = load_labels_from_csv(label_features_csv)
+        df_labels = load_label_csv(label_features_csv)
+
+        # Resolve "auto" once so every seed worker uses the same effective method.
+        # Minority share < 10 % → imbalanced dataset → under-sample.
+        if resample_method == "auto":
+            minority_share = df_labels.value_counts(normalize=True).min()
+            if minority_share < 0.10:
+                resample_method = "under"
+                logger.info(
+                    f"resample_method='auto': minority class is {minority_share:.1%} "
+                    "(<10%) — using 'under' (RandomUnderSampler)."
+                )
+            else:
+                resample_method = None
+                logger.info(
+                    f"resample_method='auto': minority class is {minority_share:.1%} "
+                    "(>=10%) — skipping resampling."
+                )
 
         classifiers: list[str] = (
             [classifiers] if isinstance(classifiers, str) else classifiers
@@ -222,6 +249,7 @@ class BaseModelTrainer:
         self.number_of_significant_features = number_of_significant_features
         self.feature_selection_method: str = feature_selection_method
         self.prefix_filename = prefix_filename
+        self.resample_method: Literal["under", "over"] | None = resample_method  # type: ignore[assignment]
         self.overwrite = overwrite
         self.plot_shap = plot_shap
         self.n_jobs = n_jobs
@@ -982,29 +1010,32 @@ class BaseModelTrainer:
 
         return suffix
 
-    @staticmethod
     def _split_and_resample(
+        self,
         X: pd.DataFrame,
         y: pd.Series,
         random_state: int,
         sampling_strategy: str | float = 0.75,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-        """Steps 1-2: stratified train/test split then RandomUnderSampler on train.
+        """Steps 1-2: stratified train/test split then optional resampling on train.
 
-        Saves the held-out test split to disk for later aggregate evaluation.
+        Applies the resampling strategy determined at construction time
+        (``self.resample_method``) to the training split only. The held-out test
+        set is never resampled.
 
         Args:
             X (pd.DataFrame): Full feature matrix.
             y (pd.Series): Full label series.
             random_state (int): Random seed for both split and sampler.
-            sampling_strategy (str | float, optional): Under-sampling ratio.
+            sampling_strategy (str | float, optional): Sampling ratio forwarded to
+                the resampler. Ignored when ``self.resample_method`` is ``"none"``.
                 Defaults to 0.75.
 
         Returns:
             tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]: A 4-tuple of
                 (X_train_resampled, X_test, y_train_resampled, y_test) where
-                X_train_resampled and y_train_resampled are under-sampled training
-                data and X_test / y_test are the held-out test split.
+                X_train_resampled and y_train_resampled are the (optionally resampled)
+                training data and X_test / y_test are the held-out test split.
         """
         X_train, X_test, y_train, y_test = train_test_split(
             X,
@@ -1014,11 +1045,13 @@ class BaseModelTrainer:
             stratify=y,
         )
 
-        X_train_resampled, y_train_resampled = random_under_sampler(
+        X_train_resampled, y_train_resampled = resample(
             features=X_train,
             labels=y_train,
+            method=self.resample_method,
             sampling_strategy=sampling_strategy,
             random_state=random_state,
+            verbose=self.verbose,
         )
         return X_train_resampled, X_test, y_train_resampled, y_test
 

@@ -12,7 +12,7 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import random_under_sampler
+from eruption_forecast.utils.ml import resample
 from eruption_forecast.model.evaluation_trainer import EvaluationTrainer
 
 
@@ -134,11 +134,13 @@ class ModelTrainer(EvaluationTrainer):
             logger.info(f"Seed {random_state:05d}: shared work already done, skipping.")
             return significant_filepath
 
-        features_resampled, labels_resampled = random_under_sampler(
+        features_resampled, labels_resampled = resample(
             features=self.df_features,
             labels=self.df_labels,
+            method=self.resample_method,
             sampling_strategy=sampling_strategy,
             random_state=random_state,
+            verbose=self.verbose,
         )
 
         pd.concat([features_resampled, labels_resampled], axis=1).to_csv(
