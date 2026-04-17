@@ -1227,6 +1227,7 @@ class ForecastModel:
         with_evaluation: bool = False,
         number_of_significant_features: int = 20,
         grid_params: dict[str, Any] | None = None,
+        resample_method: Literal["under", "over", "auto"] | None = "auto",
         n_jobs: int = 1,
         grid_search_n_jobs: int = 1,
         overwrite: bool = False,
@@ -1234,9 +1235,9 @@ class ForecastModel:
         gpu_id: int = 0,
         verbose: bool = False,
     ) -> dict[str, str]:
-        """Train all classifiers with shared under-sampling and feature selection.
+        """Train all classifiers with shared resampling and feature selection.
 
-        Creates a single ``ModelTrainer`` for all classifiers so that under-sampling
+        Creates a single ``ModelTrainer`` for all classifiers so that resampling
         and feature selection are performed once per seed and reused across classifiers,
         eliminating redundant computation. Runs ``fit()`` on the shared trainer, then
         builds and persists per-classifier training results in ``self.trained_models``
@@ -1259,6 +1260,13 @@ class ForecastModel:
             grid_params (dict[str, Any] | None, optional): Custom hyperparameter grid
                 for GridSearchCV applied to all classifiers. If None, each classifier's
                 default grid is used. Defaults to None.
+            resample_method (Literal["under", "over", "auto"] | None, optional):
+                Resampling strategy for class balancing. ``"under"`` applies
+                ``RandomUnderSampler``, ``"over"`` applies ``RandomOverSampler``,
+                ``None`` skips resampling, and ``"auto"`` inspects the class ratio
+                from the loaded labels — if the minority (eruption) class is below 10 %
+                of all samples, ``"under"`` is used; otherwise resampling is skipped.
+                Defaults to ``"auto"``.
             n_jobs (int, optional): Parallel workers for the outer seed loop.
                 Defaults to 1.
             grid_search_n_jobs (int, optional): Number of parallel jobs inside each
@@ -1281,6 +1289,7 @@ class ForecastModel:
             cv_strategy=cv_strategy,
             number_of_significant_features=number_of_significant_features,
             feature_selection_method=self.feature_selection_method,
+            resample_method=resample_method,
             overwrite=overwrite,
             plot_shap=self._plot_shap,
             n_jobs=n_jobs,
@@ -1324,6 +1333,7 @@ class ForecastModel:
         grid_params: dict[str, Any] | None = None,
         number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
+        resample_method: Literal["under", "over", "auto"] | None = "auto",
         save_all_features: bool = False,
         plot_significant_features: bool = False,
         extracted_features_csv: str | None = None,
@@ -1369,8 +1379,12 @@ class ForecastModel:
                 for GridSearchCV. Defaults to None.
             number_of_significant_features (int, optional): Number of top features to retain
                 per seed. Defaults to 20.
-            sampling_strategy (str | float, optional): Under-sampling ratio for balancing
-                classes. Defaults to 0.75.
+            sampling_strategy (str | float, optional): Sampling ratio forwarded to the
+                resampler (used by ``"under"`` and ``"over"`` methods). Defaults to 0.75.
+            resample_method (Literal["under", "over", "auto"] | None, optional):
+                Resampling strategy. ``"auto"`` (default) inspects the class ratio
+                from the label data — minority class below 10 % triggers under-sampling,
+                otherwise resampling is skipped (``None``).
             save_all_features (bool, optional): Whether to save ALL features. Defaults to False.
             plot_significant_features (bool, optional): Whether to plot each significant feature. Defaults to False.
             extracted_features_csv (str | None): Path to extracted features.
@@ -1460,6 +1474,7 @@ class ForecastModel:
             with_evaluation=with_evaluation,
             number_of_significant_features=number_of_significant_features,
             grid_params=grid_params,
+            resample_method=resample_method,
             n_jobs=n_jobs or self.n_jobs,
             grid_search_n_jobs=grid_search_n_jobs,
             overwrite=overwrite or self.overwrite,
@@ -1527,11 +1542,12 @@ class ForecastModel:
         window_step_unit: Literal["minutes", "hours"],
         save_predictions: bool = True,
         threshold: float = 0.7,
-        save_plot: bool = True,
+        title: str | None = None,
         output_dir: str | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
         verbose: bool = False,
+        **plot_kwargs: Any,
     ) -> Self:
         """Generate probabilistic eruption forecasts for a future date range.
 
@@ -1549,8 +1565,7 @@ class ForecastModel:
                 to a CSV file. Defaults to True.
             threshold (float, optional): Threshold for classifying eruption
                 probability as positive. Defaults to 0.7.
-            save_plot (bool, optional): If True, saves the forecast probability plot.
-                Defaults to True.
+            title (str | None, optional): Forecast plot title. Defaults to None.
             output_dir (str | None, optional): Directory for forecast output files.
                 Defaults to ``self.station_dir``.
             n_jobs (int | None, optional): Parallel workers for feature extraction.
@@ -1558,6 +1573,10 @@ class ForecastModel:
             overwrite (bool, optional): If True, overwrites existing output files.
                 Defaults to False.
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
+            **plot_kwargs: Additional keyword arguments forwarded to
+                :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
+                (e.g. ``fig_width``, ``fig_height``, ``rolling_window``,
+                ``x_days_interval``, ``eruption_dates``, ``y_max``, ``legend_n_cols``).
 
         Returns:
             Self: ForecastModel instance for method chaining.
@@ -1598,7 +1617,11 @@ class ForecastModel:
             select_tremor_columns=self.select_tremor_columns,
             threshold=threshold,
             save_predictions=save_predictions,
-            plot=save_plot,
+            title=title,
+            eruption_dates=self.LabelBuilder.eruption_dates
+            if self.LabelBuilder
+            else None,
+            **plot_kwargs,
         )
 
         self.ModelPredictor = model_predictor
@@ -1612,7 +1635,6 @@ class ForecastModel:
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,
             threshold=threshold,
-            save_plot=save_plot,
             n_jobs=n_jobs,
             overwrite=overwrite,
             verbose=verbose,

@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
+from matplotlib.pylab import plot
 
 from eruption_forecast import ForecastModel, send_telegram_notification
 from eruption_forecast.logger import logger
@@ -11,7 +12,7 @@ from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 
 
-load_dotenv()
+load_dotenv(override=True)
 DEBUG = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
 
 ROOT_DIR = r"D:\Projects\eruption-forecast"
@@ -27,8 +28,8 @@ ERUPTION_DATES = [
     "2025-05-18",
     "2025-06-17",
     "2025-07-07",
-    "2025-08-01",
-    "2025-08-17",
+    "2025-08-02",
+    "2025-08-18",
 ]
 
 CALCULATE_START_DATE = "2025-01-01"
@@ -106,12 +107,28 @@ PREDICTION_PARAMETERS: dict[str, Any] = {
 def scenarios(forecast_model: ForecastModel) -> None:
     _scenarios = [
         {
-            "name": "Scenario 8",
-            "description": "Training using 1, 2, 3, 4 and 5 eruption to forecast 6, 7",
+            "name": "Scenario 1",
+            "description": "Training using 1 eruption to forecast eruption 1",
             "train_start_date": "2025-01-01",
-            "train_end_date": "2025-07-26",
-            "prediction_start_date": "2025-07-27",
-            "prediction_end_date": "2025-08-22",
+            "train_end_date": "2025-03-31",
+            "prediction_start_date": "2025-04-01",
+            "prediction_end_date": "2025-04-30",
+        },
+        {
+            "name": "Scenario 2",
+            "description": "Training using 1 eruption to forecast eruption 3",
+            "train_start_date": "2025-01-01",
+            "train_end_date": "2025-03-31",
+            "prediction_start_date": "2025-05-01",
+            "prediction_end_date": "2025-05-31",
+        },
+        {
+            "name": "Scenario 3",
+            "description": "Training using 1 eruption to forecast eruption 4",
+            "train_start_date": "2025-01-01",
+            "train_end_date": "2025-03-31",
+            "prediction_start_date": "2025-06-01",
+            "prediction_end_date": "2025-06-30",
         },
         {
             "name": "Scenario 5",
@@ -138,41 +155,94 @@ def scenarios(forecast_model: ForecastModel) -> None:
             "prediction_end_date": "2025-07-13",
         },
         {
-            "name": "Scenario 1",
-            "description": "Training using 1 eruption to forecast eruption 1",
+            "name": "Scenario 8",
+            "description": "Training using 1, 2, 3, 4 and 5 eruption to forecast 6, 7",
             "train_start_date": "2025-01-01",
-            "train_end_date": "2025-03-31",
-            "prediction_start_date": "2025-04-01",
-            "prediction_end_date": "2025-04-30",
+            "train_end_date": "2025-07-26",
+            "prediction_start_date": "2025-07-27",
+            "prediction_end_date": "2025-08-22",
+            "prediction_parameter": PREDICTION_PARAMETERS,
+            "plot_kwargs": {
+                "legend_n_cols": 4,
+            },
         },
         {
-            "name": "Scenario 2",
-            "description": "Training using 1 eruption to forecast eruption 3",
+            "name": "Scenario 9",
+            "description": "Training using ALL",
             "train_start_date": "2025-01-01",
-            "train_end_date": "2025-03-31",
-            "prediction_start_date": "2025-05-01",
-            "prediction_end_date": "2025-05-31",
+            "train_end_date": "2025-08-22",
+            "prediction_start_date": "2025-01-01",
+            "prediction_end_date": "2025-08-22",
+            "prediction_parameter": {
+                "window_step": LABEL_PARAMETERS["window_step"],
+                "window_step_unit": LABEL_PARAMETERS["window_step_unit"],
+            },
+            "plot_kwargs": {
+                "rolling_window": "12h",
+                "x_days_interval": 14,
+                "legend_n_cols": 4,
+            },
         },
         {
-            "name": "Scenario 3",
-            "description": "Training using 1 eruption to forecast eruption 4",
+            "name": "Scenario 10",
+            "description": "Training using ALL",
             "train_start_date": "2025-01-01",
-            "train_end_date": "2025-03-31",
-            "prediction_start_date": "2025-06-01",
-            "prediction_end_date": "2025-06-30",
+            "train_end_date": "2025-07-26",
+            "prediction_start_date": "2025-07-27",
+            "prediction_end_date": "2025-08-22",
+            "prediction_parameter": {
+                "window_step": LABEL_PARAMETERS["window_step"],
+                "window_step_unit": LABEL_PARAMETERS["window_step_unit"],
+            },
+            "plot_kwargs": {
+                "rolling_window": "12h",
+                "x_days_interval": 2,
+                "legend_n_cols": 4,
+            },
         },
     ]
 
     for scenario in _scenarios:
-        print(
-            f"\n\n\n[workflow] Scenario {scenario['name']}: {scenario['description']}\n\n\n"
+        name = scenario["name"]
+        prediction_parameter = scenario.get("prediction_parameter", {})
+        plot_kwargs = scenario.get("plot_kwargs", {})
+
+        rolling_window = (
+            scenario["plot_kwargs"]["rolling_window"]  # ty:ignore[invalid-argument-type]
+            if hasattr(plot_kwargs, "rolling_window")
+            else "6h"  # ty:ignore[invalid-argument-type]
         )
+        window_step, window_step_unit = (
+            (
+                prediction_parameter["window_step"],  # ty:ignore[invalid-argument-type]
+                prediction_parameter["window_step_unit"],  # ty:ignore[invalid-argument-type]
+            )
+            if len(prediction_parameter) > 0
+            else (
+                LABEL_PARAMETERS["window_step"],
+                LABEL_PARAMETERS["window_step_unit"],
+            )
+        )
+        window = f"{window_step} {window_step_unit}"
+        window_train = (
+            f"{LABEL_PARAMETERS['window_step']} {LABEL_PARAMETERS['window_step_unit']}"
+        )
+
+        title = (
+            f"{name} - Plot Rolling Window: {rolling_window}.\n "
+            f"Training date: {scenario['train_start_date']} - {scenario['train_end_date']}. "
+            f"Training Window Size: {window_train}.\n"
+            f"Prediction date: {scenario['prediction_start_date']} - {scenario['prediction_end_date']} "
+            f"Prediction Window Size: {window}"
+        )
+
+        print(f"\n\n\n[workflow] Scenario {name}: {scenario['description']}\n\n\n")
         output_dir = os.path.join(
             ROOT_DIR,
             "output",
             forecast_model.nslc,
             "scenarios",
-            slugify(scenario["name"]),
+            slugify(name),  # ty:ignore[invalid-argument-type]
         )
 
         plot_forecast_path = predict(
@@ -181,14 +251,17 @@ def scenarios(forecast_model: ForecastModel) -> None:
             training_end_date=scenario["train_end_date"],
             prediction_start_date=scenario["prediction_start_date"],
             prediction_end_date=scenario["prediction_end_date"],
+            title=title,
             output_dir=output_dir,
+            **scenario.get("prediction_parameter", PREDICTION_PARAMETERS),  # ty:ignore[invalid-argument-type]
+            **scenario.get("plot_kwargs", {}),  # ty:ignore[invalid-argument-type]
         )
 
         if plot_forecast_path:
             send_telegram_notification(
                 message=f"{scenario['name']}: {scenario['description']}",
                 files=[plot_forecast_path],
-                file_caption=scenario["name"],
+                file_caption=title,  # ty:ignore[invalid-argument-type]
                 send_as_document=True,
             )
 
@@ -268,6 +341,7 @@ def predict(
     prediction_start_date: str | None = None,
     prediction_end_date: str | None = None,
     output_dir: str | None = None,
+    **plot_kwargs,
 ) -> str | None:
     """Run the prediction (no-evaluation) training and forecast stages.
 
@@ -294,7 +368,7 @@ def predict(
             start_date=prediction_start_date or PREDICTION_START_DATE,
             end_date=prediction_end_date or PREDICTION_END_DATE,
             output_dir=output_dir,
-            **PREDICTION_PARAMETERS,
+            **plot_kwargs,
         )
         .forecast_plot_path
     )
@@ -343,7 +417,7 @@ if __name__ == "__main__":
     logger.info("Start forecasting..")
     main(
         run_prediction=False,
-        run_evaluation=True,
-        run_scenarios=False,
+        run_evaluation=False,
+        run_scenarios=True,
     )
     logger.info("Finish forecasting..")

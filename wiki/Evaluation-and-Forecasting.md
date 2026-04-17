@@ -426,13 +426,8 @@ predictor = ModelPredictor(
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",  # or a pd.DataFrame
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 Results are saved to `predictions.csv` in `output_dir`. When `plot=True`, an eruption forecast plot is saved to `figures/eruption_forecast.png`.
@@ -451,13 +446,8 @@ predictor = ModelPredictor(
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 **Multi-classifier bundle** (all ensembles in one file):
@@ -468,7 +458,7 @@ predictor = ModelPredictor(
     end_date="2025-03-28",
     trained_models="output/.../trainings/merged_classifiers_rf_xgb_rs-0_ts-500_top-20.pkl",
 )
-df_forecast = predictor.predict_proba(...)
+df_forecast = predictor.predict_proba(...,,
 ```
 
 You can also use `SeedEnsemble` directly without going through `ModelPredictor`:
@@ -491,19 +481,14 @@ predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-22",
     trained_models={
-        "rf":  "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
+        "rf": "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
     },
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(
-    tremor_data="path/to/tremor.csv",
-    window_size=2,
-    window_step=12,
-    window_step_unit="hours",
-    plot=True,
-)
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 The plot shows each classifier as a dashed line and the consensus as a solid black line with a shaded uncertainty band.

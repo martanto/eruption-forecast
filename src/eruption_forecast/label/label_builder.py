@@ -255,12 +255,189 @@ class LabelBuilder:
         )
 
     def __str__(self) -> str:
-        """Return a human-readable string representation of this LabelBuilder instance.
+        """Return a concise one-line summary of this LabelBuilder for logs and REPL.
+
+        Produces a short, stable string suitable for log output and quick visual
+        inspection. For a human-readable prose description use ``describe()``,
+        for a structured LLM/MCP prompt use ``to_prompt()``, and for programmatic
+        access use ``to_dict()``.
 
         Returns:
-            str: The same string produced by __repr__.
+            str: One-line summary of the key configuration parameters.
         """
-        return self.__repr__()
+        return (
+            f"LabelBuilder(volcano='{self.volcano_id}', "
+            f"{self.start_date_str} \u2192 {self.end_date_str}, "
+            f"step={self.window_step} {self.window_step_unit}, "
+            f"day_to_forecast={self.day_to_forecast}, "
+            f"include_eruption_date={self.include_eruption_date}, "
+            f"n_eruptions={len(self.eruption_dates)})"
+        )
+
+    def to_dict(self) -> dict:
+        """Return a structured dictionary of all configuration and derived fields.
+
+        Produces a stable, JSON-serializable schema suitable for MCP tool responses
+        and downstream LLM consumption. Raw parameters and derived values are both
+        included so callers do not need to recompute them.
+
+        The ``is_built`` flag indicates whether ``build()`` has been called.
+        Window statistics (``n_windows``, ``n_positive``, ``n_negative``) are
+        ``None`` when not built.
+
+        Returns:
+            dict: Dictionary with the following keys:
+                - volcano_id (str): Volcano identifier.
+                - start_date (str): Start date in YYYY-MM-DD format.
+                - end_date (str): End date in YYYY-MM-DD format.
+                - n_days (int): Total days in the date range.
+                - window_step (int): Step size between consecutive windows.
+                - window_step_unit (str): Unit for window_step ("minutes" or "hours").
+                - window_step_minutes (int): window_step expressed in minutes.
+                - day_to_forecast (int): Days before eruption to start positive labeling.
+                - include_eruption_date (bool): Whether eruption date counts as a
+                  forecast day.
+                - positive_days_per_eruption (int): Total positive-label days per
+                  eruption (day_to_forecast + 1 when include_eruption_date is False).
+                - eruption_dates (list[str]): Sorted list of eruption dates.
+                - n_eruptions (int): Number of known eruptions.
+                - output_csv (str): Full path to the label CSV file.
+                - is_built (bool): Whether build() has been called.
+                - n_windows (int | None): Total number of windows (None if not built).
+                - n_positive (int | None): Positive window count (None if not built).
+                - n_negative (int | None): Negative window count (None if not built).
+        """
+        is_built = not self._df.empty
+        minutes_per_unit = 60 if self.window_step_unit == "hours" else 1
+        positive_days = self.day_to_forecast + (0 if self.include_eruption_date else 1)
+
+        result: dict = {
+            "volcano_id": self.volcano_id,
+            "start_date": self.start_date_str,
+            "end_date": self.end_date_str,
+            "n_days": self.n_days,
+            "window_step": self.window_step,
+            "window_step_unit": self.window_step_unit,
+            "window_step_minutes": self.window_step * minutes_per_unit,
+            "day_to_forecast": self.day_to_forecast,
+            "include_eruption_date": self.include_eruption_date,
+            "positive_days_per_eruption": positive_days,
+            "eruption_dates": self.eruption_dates,
+            "n_eruptions": len(self.eruption_dates),
+            "output_csv": self.csv,
+            "is_built": is_built,
+            "n_windows": len(self._df) if is_built else None,
+            "n_positive": int(self._df["is_erupted"].sum()) if is_built else None,
+            "n_negative": int((self._df["is_erupted"] == 0).sum()) if is_built else None,
+        }
+        return result
+
+    def describe(self) -> str:
+        """Return a natural, human-readable prose description of this LabelBuilder.
+
+        Summarises the configuration and, when ``build()`` has been called, the
+        resulting window statistics in plain narrative sentences. Suitable for CLI
+        output, human reports, and anywhere a concise paragraph is preferred over
+        structured data.
+
+        For a structured LLM/MCP prompt use ``to_prompt()``. For raw data use
+        ``to_dict()``.
+
+        Returns:
+            str: Two to four sentence prose description of configuration and
+                optional build statistics.
+        """
+        d = self.to_dict()
+        eruption_clause = (
+            "treating the eruption day itself as one of the forecast days"
+            if d["include_eruption_date"]
+            else "treating the eruption day itself as an additional positive day"
+        )
+        eruption_dates_str = ", ".join(d["eruption_dates"])
+        step = (
+            f"{d['window_step']} {d['window_step_unit']}"
+        )
+
+        sentences = [
+            f"LabelBuilder for volcano '{d['volcano_id']}' spans "
+            f"{d['start_date']} to {d['end_date']} ({d['n_days']} days), "
+            f"stepping every {step}.",
+            f"It forecasts {d['day_to_forecast']} day(s) before each eruption, "
+            f"{eruption_clause}, across {d['n_eruptions']} known eruption(s) "
+            f"({eruption_dates_str}).",
+        ]
+
+        if d["is_built"]:
+            sentences.append(
+                f"Built dataset contains {d['n_windows']} windows "
+                f"({d['n_positive']} eruption, {d['n_negative']} non-eruption); "
+                f"saved to {os.path.basename(d['output_csv'])}."
+            )
+        else:
+            sentences.append("The label file has not been built yet.")
+
+        return " ".join(sentences)
+
+    def to_prompt(self) -> str:
+        """Return a structured labeled text block for LLM and MCP prompt input.
+
+        Builds a deterministic, template-driven bullet-list block from ``to_dict()``
+        that is stable across calls and suitable for direct inclusion in MCP tool
+        responses or LLM context. Paths are reduced to filenames only to avoid
+        leaking absolute system paths into prompts.
+
+        For a human-readable prose description use ``describe()``. For raw data
+        use ``to_dict()``.
+
+        Returns:
+            str: Multi-line labeled description of all configuration parameters
+                and, when ``build()`` has been called, window statistics.
+        """
+        d = self.to_dict()
+
+        step_minutes = d["window_step_minutes"]
+        step_label = (
+            f"{d['window_step']} {d['window_step_unit']} ({step_minutes} minutes)"
+            if d["window_step_unit"] == "hours"
+            else f"{d['window_step']} minutes"
+        )
+
+        include = d["include_eruption_date"]
+        pos_days = d["positive_days_per_eruption"]
+        if include:
+            pos_days_label = (
+                f"{pos_days} (all on or before eruption date, inclusive)"
+            )
+        else:
+            pos_days_label = (
+                f"{pos_days} ({d['day_to_forecast']} pre-eruption day(s) + eruption date)"
+            )
+
+        eruption_dates_str = ", ".join(d["eruption_dates"])
+
+        lines = [
+            "LabelBuilder configuration:",
+            f"- Volcano ID: {d['volcano_id']}",
+            f"- Date range: {d['start_date']} to {d['end_date']} ({d['n_days']} days)",
+            f"- Window step: {step_label}",
+            f"- Forecast lead time: {d['day_to_forecast']} day(s) before eruption",
+            f"- Eruption date counted as forecast day: {'yes' if include else 'no'}",
+            f"- Positive-label days per eruption: {pos_days_label}",
+            f"- Number of eruptions: {d['n_eruptions']}",
+            f"- Eruption dates: {eruption_dates_str}",
+        ]
+
+        if d["is_built"]:
+            lines += [
+                "- Built: yes",
+                f"- Total windows: {d['n_windows']} "
+                f"(eruption: {d['n_positive']}, non-eruption: {d['n_negative']})",
+                f"- Output file: {os.path.basename(d['output_csv'])}",
+            ]
+        else:
+            lines.append("- Built: no")
+
+        return "\n".join(lines)
 
     @property
     def df(self) -> pd.DataFrame:
@@ -986,7 +1163,7 @@ class LabelBuilder:
         self,
         *,
         filetype: str = "png",
-    ) -> "Self":
+    ) -> Self:
         """Plot is_erupted class distribution as a bar chart and save next to the label file.
 
         Generates a two-bar chart showing counts and percentages for each class

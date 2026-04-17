@@ -260,8 +260,15 @@ class TrainConfig(_ConfigBase):
             full dataset without metrics. Defaults to ``False``.
         number_of_significant_features (int): Top-N features retained per seed
             after feature selection. Defaults to ``20``.
-        sampling_strategy (float): Under-sampling ratio passed to
-            ``RandomUnderSampler`` to balance classes. Defaults to ``0.75``.
+        sampling_strategy (float): Sampling ratio forwarded to the resampler.
+            Defaults to ``0.75``.
+        resample_method (Literal["under", "over", "auto"] | None): Resampling
+            strategy for class balancing. ``"under"`` applies
+            ``RandomUnderSampler``, ``"over"`` applies ``RandomOverSampler``,
+            ``None`` skips resampling, and ``"auto"`` inspects the class ratio
+            from the loaded labels — if the minority (eruption) class is below 10 %
+            of all samples, ``"under"`` is used; otherwise resampling is skipped.
+            Defaults to ``"auto"``.
         save_all_features (bool): Whether to save all ranked features per seed
             in addition to the top-N. Defaults to ``False``.
         plot_significant_features (bool): Whether to save a feature-importance
@@ -293,6 +300,7 @@ class TrainConfig(_ConfigBase):
     with_evaluation: bool = False
     number_of_significant_features: int = 20
     sampling_strategy: float = 0.75
+    resample_method: Literal["under", "over", "auto"] | None = "auto"
     save_all_features: bool = False
     plot_significant_features: bool = False
     n_jobs: int | None = None
@@ -325,8 +333,6 @@ class ForecastConfig(_ConfigBase):
             Defaults to ``True``.
         threshold (float, optional): Threshold for classifying eruption
             probability as positive. Defaults to ``0.5``.
-        save_plot (bool): Whether to save the forecast probability plot.
-            Defaults to ``True``.
         n_jobs (int | None): Parallel workers for feature extraction during
             forecasting. ``None`` inherits from ``ForecastModel.n_jobs``.
             Defaults to ``None``.
@@ -341,7 +347,6 @@ class ForecastConfig(_ConfigBase):
     window_step_unit: str = "hours"
     save_predictions: bool = True
     threshold: float = 0.5
-    save_plot: bool = True
     n_jobs: int | None = None
     overwrite: bool = False
     verbose: bool = False

@@ -56,6 +56,7 @@ from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.config.pipeline_config import PipelineConfig
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
@@ -75,6 +76,7 @@ __all__ = [
     "__copyright__",
     "CalculateTremor",
     "LabelBuilder",
+    "DynamicLabelBuilder",
     "FeaturesBuilder",
     "TremorMatrixBuilder",
     "ForecastModel",

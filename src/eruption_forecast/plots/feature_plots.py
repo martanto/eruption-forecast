@@ -1,4 +1,4 @@
-"""Feature importance and selection visualisation with Nature/Science styling.
+"""Feature importance and selection visualisation.
 
 Provides plotting functions for inspecting the tsfresh features selected during
 training, including bar charts of top features ranked by importance score and
@@ -19,7 +19,7 @@ Key functions:
 
 import os
 import re
-from typing import Any, cast
+from typing import Any, Literal, cast
 from pathlib import Path
 from multiprocessing import Pool
 
@@ -375,13 +375,13 @@ def replot_significant_features(
           ``<parent>`` is the parent directory of ``all_features_dir``.
     """
     # Convert paths to Path objects
-    all_features_dir = Path(all_features_dir)
+    all_features_dir: Path = Path(all_features_dir)
     if output_dir is None:
         # Default: create sibling directory called 'figures/significant'
         # Example: .../features/all_features -> .../features/figures/significant
-        output_dir = all_features_dir.parent / "figures" / "significant"
+        output_dir: Path = all_features_dir.parent / "figures" / "significant"
     else:
-        output_dir = Path(output_dir)
+        output_dir: Path = Path(output_dir)
 
     # Validate input directory
     if not all_features_dir.exists():
@@ -590,7 +590,9 @@ def plot_frequency_band_contribution(
 
     if is_multi_seed:
         # Count unique feature names across all seeds for the title
-        unique_feature_count = len({f for seed_feats in feature_names for f in seed_feats})
+        unique_feature_count = len(
+            {f for seed_feats in feature_names for f in seed_feats}
+        )
 
         # Build count DataFrame per seed then aggregate
         seed_counts: list[pd.Series] = []
@@ -700,3 +702,120 @@ def plot_frequency_band_contribution(
         data = pd.DataFrame({"band": order, "count": counts[order].to_numpy()})
 
     return fig, data
+
+
+def plot_feature_correlations(
+    resampled_df: pd.DataFrame,
+    significant_features_df: pd.DataFrame,
+    filepath: str,
+    *,
+    method: Literal["pearson", "spearman"] = "spearman",
+    features_column: str = "features",
+    top_features: int = 20,
+    figsize: tuple[float, float] = (6, 6),
+    cmap: str = "RdYlBu_r",
+    dpi: int = 150,
+    title: str | None = None,
+    overwrite: bool = True,
+) -> None:
+    """Plot a correlation heatmap for the top-N significant features of a single seed.
+    Subsets the resampled training matrix to the top-``top_features`` feature names
+    listed in ``significant_features_df``, computes a pairwise correlation matrix using
+    the requested ``method``, and renders it as a colour-mapped heatmap with annotated
+    cell values.
+    Args:
+        resampled_df (pd.DataFrame): Resampled training feature matrix. Must contain
+            the feature columns named in ``significant_features_df``. Any non-feature
+            columns (e.g. ``id``, ``is_erupted``) are ignored automatically.
+        significant_features_df (pd.DataFrame): DataFrame of selected features. Must
+            contain a column named ``features_column`` with tsfresh feature names sorted
+            by ascending score (most significant first).
+        filepath (str): Full path (including filename and extension) where the figure
+            is saved. Parent directory must exist.
+        method (Literal["pearson", "spearman"], optional): Correlation method passed
+            directly to ``pd.DataFrame.corr()``. Defaults to ``"spearman"``.
+        features_column (str, optional): Name of the column in ``significant_features_df``
+            that contains feature names. Defaults to ``"features"``.
+        top_features (int, optional): Number of top features to include in the heatmap.
+            Defaults to 20.
+        figsize (tuple[float, float], optional): Figure dimensions in inches.
+            Defaults to (6, 6).
+        cmap (str, optional): Matplotlib colormap name for the heatmap. Defaults to
+            ``"RdYlBu_r"`` (diverging, colourblind-friendly).
+        dpi (int, optional): Figure resolution. Defaults to 150.
+        title (str | None, optional): Plot title. If None, defaults to
+            ``"Feature Correlations (spearman)"`` (or pearson). Defaults to None.
+        overwrite (bool, optional): If False, skip saving when ``filepath`` already
+            exists. Defaults to True.
+    Returns:
+        None
+    Examples:
+        >>> sig_df = pd.read_csv("significant_features/00000.csv")
+        >>> res_df = pd.read_csv("resampled/00000.csv", index_col=0)
+        >>> plot_feature_correlations(res_df, sig_df, "figures/correlations/00000.png")
+    """
+    if not overwrite and os.path.isfile(filepath):
+        logger.info(f"Correlation features plot {filepath} already exists.")
+        return
+
+    # Resolve feature names from significant_features_df.
+    if features_column in significant_features_df.columns:
+        feature_names = significant_features_df[features_column].tolist()
+    else:
+        # Fall back to the DataFrame index (e.g. when loaded with index_col=0).
+        feature_names = significant_features_df.index.tolist()
+
+    feature_names = feature_names[:top_features]
+
+    # Keep only columns that actually exist in resampled_df.
+    available = [f for f in feature_names if f in resampled_df.columns]
+    missing = len(feature_names) - len(available)
+    if missing:
+        logger.warning(
+            f"plot_feature_correlations: {missing} feature(s) not found in "
+            "resampled_df and will be skipped."
+        )
+    if not available:
+        logger.warning("plot_feature_correlations: no features to plot; skipping.")
+        return
+
+    corr: pd.DataFrame = resampled_df[available].corr(method=method)
+
+    # Shorten tsfresh names for tick labels — keep last ~35 characters.
+    _max_label_len = 35
+    labels = [
+        f"…{n[-_max_label_len:]}" if len(n) > _max_label_len + 1 else n
+        for n in available
+    ]
+
+    with apply_nature_style():
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi, constrained_layout=True)
+        im = ax.imshow(corr.to_numpy(), cmap=cmap, vmin=-1, vmax=1, aspect="auto")
+        fig.colorbar(im, ax=ax, label=f"{method} correlation")
+
+        ax.set_xticks(range(len(available)))
+        ax.set_xticklabels(labels, rotation=90, fontsize=5)
+        ax.set_yticks(range(len(available)))
+        ax.set_yticklabels(labels, fontsize=5)
+        configure_spine(ax)
+        ax.set_title(title or f"Feature Correlations ({method})")
+
+        # Annotate cells with 2-decimal values when the matrix is small enough.
+        if len(available) <= 20:
+            for i in range(len(available)):
+                for j in range(len(available)):
+                    val = corr.values[i, j]
+                    # Choose white or black text based on absolute correlation strength.
+                    text_color = "white" if abs(val) > 0.6 else "black"
+                    ax.text(
+                        j,
+                        i,
+                        f"{val:.2f}",
+                        ha="center",
+                        va="center",
+                        fontsize=4,
+                        color=text_color,
+                    )
+
+        plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)

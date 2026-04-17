@@ -337,7 +337,7 @@ def notify(
         ... def make_plot():
         ...     return {"plot_path": "output/plot.png"}
     """
-    load_dotenv()
+    load_dotenv(override=True)
 
     resolved_token: str = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
     resolved_chat: str | int = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -497,7 +497,7 @@ def send_telegram_notification(
         ValueError: If ``message`` is empty, credentials are missing, or
             credentials contain whitespace.
     """
-    load_dotenv()
+    load_dotenv(override=True)
 
     resolved_token: str = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
     resolved_chat: str | int = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")

@@ -213,7 +213,7 @@ class EvaluationTrainer(BaseModelTrainer):
             logger.warning(
                 f"Seed {random_state:05d}: learning curve computation failed. Reason: {e}"
             )
-            learning_curve_path = None  # type: ignore[assignment]
+            learning_curve_path = None  # ty:ignore[invalid-assignment]
 
         # Evaluating model
         model_evaluator = ModelEvaluator(
