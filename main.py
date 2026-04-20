@@ -2,7 +2,6 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from matplotlib.pylab import plot
 
 from eruption_forecast import ForecastModel, send_telegram_notification
 from eruption_forecast.logger import logger
@@ -82,6 +81,7 @@ TRAINING_PARAMETERS: dict[str, Any] = {
     "total_seed": TRAINING_SEEDS,
     "number_of_significant_features": 20,
     "sampling_strategy": 0.75,
+    "resample_method": "under",
     "save_all_features": False,
     "plot_significant_features": False,
     "n_jobs": 4 if N_JOBS > 1 else 1,
@@ -106,54 +106,54 @@ PREDICTION_PARAMETERS: dict[str, Any] = {
 @notify("Run Multiple Scenarios")
 def scenarios(forecast_model: ForecastModel) -> None:
     _scenarios = [
-        {
-            "name": "Scenario 1",
-            "description": "Training using 1 eruption to forecast eruption 1",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-03-31",
-            "prediction_start_date": "2025-04-01",
-            "prediction_end_date": "2025-04-30",
-        },
-        {
-            "name": "Scenario 2",
-            "description": "Training using 1 eruption to forecast eruption 3",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-03-31",
-            "prediction_start_date": "2025-05-01",
-            "prediction_end_date": "2025-05-31",
-        },
-        {
-            "name": "Scenario 3",
-            "description": "Training using 1 eruption to forecast eruption 4",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-03-31",
-            "prediction_start_date": "2025-06-01",
-            "prediction_end_date": "2025-06-30",
-        },
-        {
-            "name": "Scenario 5",
-            "description": "Training using 1 and 2 eruptions to forecast eruption 3",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-04-30",
-            "prediction_start_date": "2025-05-01",
-            "prediction_end_date": "2025-05-31",
-        },
-        {
-            "name": "Scenario 6",
-            "description": "Training using 1, 2 and 3 eruptions to forecast eruption 4",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-05-31",
-            "prediction_start_date": "2025-06-01",
-            "prediction_end_date": "2025-06-30",
-        },
-        {
-            "name": "Scenario 7",
-            "description": "Training using 1, 2, 3 and 4 eruption to forecast 5",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-06-30",
-            "prediction_start_date": "2025-07-01",
-            "prediction_end_date": "2025-07-13",
-        },
+        # {
+        #     "name": "Scenario 1",
+        #     "description": "Training using 1 eruption to forecast eruption 1",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-03-31",
+        #     "prediction_start_date": "2025-04-01",
+        #     "prediction_end_date": "2025-04-30",
+        # },
+        # {
+        #     "name": "Scenario 2",
+        #     "description": "Training using 1 eruption to forecast eruption 3",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-03-31",
+        #     "prediction_start_date": "2025-05-01",
+        #     "prediction_end_date": "2025-05-31",
+        # },
+        # {
+        #     "name": "Scenario 3",
+        #     "description": "Training using 1 eruption to forecast eruption 4",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-03-31",
+        #     "prediction_start_date": "2025-06-01",
+        #     "prediction_end_date": "2025-06-30",
+        # },
+        # {
+        #     "name": "Scenario 5",
+        #     "description": "Training using 1 and 2 eruptions to forecast eruption 3",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-04-30",
+        #     "prediction_start_date": "2025-05-01",
+        #     "prediction_end_date": "2025-05-31",
+        # },
+        # {
+        #     "name": "Scenario 6",
+        #     "description": "Training using 1, 2 and 3 eruptions to forecast eruption 4",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-05-31",
+        #     "prediction_start_date": "2025-06-01",
+        #     "prediction_end_date": "2025-06-30",
+        # },
+        # {
+        #     "name": "Scenario 7",
+        #     "description": "Training using 1, 2, 3 and 4 eruption to forecast 5",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-06-30",
+        #     "prediction_start_date": "2025-07-01",
+        #     "prediction_end_date": "2025-07-13",
+        # },
         {
             "name": "Scenario 8",
             "description": "Training using 1, 2, 3, 4 and 5 eruption to forecast 6, 7",
@@ -166,40 +166,40 @@ def scenarios(forecast_model: ForecastModel) -> None:
                 "legend_n_cols": 4,
             },
         },
-        {
-            "name": "Scenario 9",
-            "description": "Training using ALL",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-08-22",
-            "prediction_start_date": "2025-01-01",
-            "prediction_end_date": "2025-08-22",
-            "prediction_parameter": {
-                "window_step": LABEL_PARAMETERS["window_step"],
-                "window_step_unit": LABEL_PARAMETERS["window_step_unit"],
-            },
-            "plot_kwargs": {
-                "rolling_window": "12h",
-                "x_days_interval": 14,
-                "legend_n_cols": 4,
-            },
-        },
-        {
-            "name": "Scenario 10",
-            "description": "Training using ALL",
-            "train_start_date": "2025-01-01",
-            "train_end_date": "2025-07-26",
-            "prediction_start_date": "2025-07-27",
-            "prediction_end_date": "2025-08-22",
-            "prediction_parameter": {
-                "window_step": LABEL_PARAMETERS["window_step"],
-                "window_step_unit": LABEL_PARAMETERS["window_step_unit"],
-            },
-            "plot_kwargs": {
-                "rolling_window": "12h",
-                "x_days_interval": 2,
-                "legend_n_cols": 4,
-            },
-        },
+        # {
+        #     "name": "Scenario 9",
+        #     "description": "Training using ALL",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-08-22",
+        #     "prediction_start_date": "2025-01-01",
+        #     "prediction_end_date": "2025-08-22",
+        #     "prediction_parameter": {
+        #         "window_step": LABEL_PARAMETERS["window_step"],
+        #         "window_step_unit": LABEL_PARAMETERS["window_step_unit"],
+        #     },
+        #     "plot_kwargs": {
+        #         "rolling_window": "12h",
+        #         "x_days_interval": 14,
+        #         "legend_n_cols": 4,
+        #     },
+        # },
+        # {
+        #     "name": "Scenario 10",
+        #     "description": "Training using ALL",
+        #     "train_start_date": "2025-01-01",
+        #     "train_end_date": "2025-07-26",
+        #     "prediction_start_date": "2025-07-27",
+        #     "prediction_end_date": "2025-08-22",
+        #     "prediction_parameter": {
+        #         "window_step": LABEL_PARAMETERS["window_step"],
+        #         "window_step_unit": LABEL_PARAMETERS["window_step_unit"],
+        #     },
+        #     "plot_kwargs": {
+        #         "rolling_window": "12h",
+        #         "x_days_interval": 2,
+        #         "legend_n_cols": 4,
+        #     },
+        # },
     ]
 
     for scenario in _scenarios:
@@ -273,7 +273,7 @@ def scenarios(forecast_model: ForecastModel) -> None:
 def evaluate(forecast_model: ForecastModel) -> None:
     """Run training, evaluation, and comparison stages of the pipeline.
 
-    Trains the model with an 80/20 split and evaluation, then evaluates each
+    Trains the model on the full training dataset, then evaluates each
     trained classifier with MultiModelEvaluator and compares all classifiers
     with ClassifierComparator when more than one classifier is trained.
 
@@ -284,9 +284,7 @@ def evaluate(forecast_model: ForecastModel) -> None:
         start_date=EVALUATION_START_DATE,
         end_date=EVALUATION_END_DATE,
         **LABEL_PARAMETERS,
-    ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(
-        with_evaluation=True, **TRAINING_PARAMETERS
-    )
+    ).extract_features(**EXTRACT_FEATURES_PARAMETERS).train(**TRAINING_PARAMETERS)
 
     # Evaluate model per seed
     if not forecast_model.trained_models:
@@ -363,7 +361,7 @@ def predict(
             **LABEL_PARAMETERS,
         )
         .extract_features(**EXTRACT_FEATURES_PARAMETERS)
-        .train(with_evaluation=False, output_dir=output_dir, **TRAINING_PARAMETERS)
+        .train(output_dir=output_dir, **TRAINING_PARAMETERS)
         .forecast(
             start_date=prediction_start_date or PREDICTION_START_DATE,
             end_date=prediction_end_date or PREDICTION_END_DATE,

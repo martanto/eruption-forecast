@@ -69,7 +69,6 @@ fm.calculate(
     cv_strategy="stratified",
     random_state=0,
     total_seed=500,
-    with_evaluation=False,           # Train on full dataset (no 80/20 split)
     number_of_significant_features=20,
     sampling_strategy=0.75,
     save_all_features=True,
@@ -136,22 +135,11 @@ fm.train(
     classifier=["rf", "xgb", "gb"],
     cv_strategy="stratified",
     total_seed=500,
-    with_evaluation=False,
 ).forecast(
     start_date="2025-07-28",
     end_date="2025-08-04",
     window_step=10,
     window_step_unit="minutes",
-)
-```
-
-### Train with in-sample evaluation (80/20 split)
-
-```python
-fm.train(
-    classifier="xgb",
-    with_evaluation=True,   # 80/20 split + metrics per seed
-    total_seed=100,
 )
 ```
 

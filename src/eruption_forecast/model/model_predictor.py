@@ -1,4 +1,4 @@
-"""Forecast inference using trained classifier ensembles.
+"""Forecast inference and temporal out-of-sample evaluation using trained classifier ensembles.
 
 Provides :class:`ModelPredictor`, the production inference component of the
 eruption forecasting pipeline.  It accepts a trained
@@ -8,12 +8,17 @@ mapping of classifier names to registry CSV paths, and produces eruption
 probability forecasts over a specified date range.
 
 Key capabilities:
-    - ``predict_proba(tremor_data, start_date, end_date, ...)``: Slice tremor
-      data into sliding windows, extract features, run inference through every
-      loaded ensemble, and return a DataFrame with per-classifier columns
-      (``{name}_eruption_probability``, ``{name}_uncertainty``,
+    - ``predict_proba(tremor_data, ...)``: Slice tremor data into sliding
+      windows, extract features, run inference through every loaded ensemble,
+      and return a DataFrame with per-classifier columns
+      (``{name}_probability``, ``{name}_uncertainty``,
       ``{name}_confidence``, ``{name}_prediction``) plus ``consensus_*``
       aggregates across classifiers.
+    - ``build_forecast_labels(window_step, window_step_unit, eruption_dates)``:
+      Build labeled windows for the forecast period using known eruption dates.
+    - ``evaluate(X_forecast, y_forecast)``: Evaluate each seed ensemble on
+      forecast-period features and labels.  Called automatically by
+      ``predict_proba()`` when ``eruption_dates`` is provided.
     - Automatically constructs sliding windows aligned to the requested step
       size (in minutes or hours).
     - Saves forecast CSV and optional plot to the configured output directory.
@@ -23,6 +28,10 @@ Design notes:
       is the single inference entry point.
     - The ``model_name`` constructor parameter is used to label output columns
       and file names (defaults to ``"model"``).
+    - Evaluation uses the forecast period as the test set — no 80/20 split is
+      performed.  Training data can be supplied via ``train_features_csv`` and
+      ``train_labels_csv`` for future reference but is not used by
+      ``predict_proba()`` or ``evaluate()``.
     - The non-interactive matplotlib backend is set at module import time to
       ensure safe use in background worker threads.
 """
@@ -33,10 +42,12 @@ from datetime import datetime, timedelta
 
 import joblib
 import matplotlib
+from cycler import V
 
 from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.utils.formatting import slugify
+from eruption_forecast.label.label_builder import LabelBuilder
 
 
 matplotlib.use(
@@ -53,26 +64,36 @@ from eruption_forecast.utils.date_utils import normalize_dates
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.plots.forecast_plots import plot_forecast
+from eruption_forecast.model.metrics_computer import MetricsComputer
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 class ModelPredictor:
-    """Evaluate or forecast with one or more sets of trained full-dataset models.
+    """Forecast and temporal out-of-sample evaluation with trained classifier ensembles.
 
     Loads models produced by ``ModelTrainer.train()`` and runs forecast
     inference. Supports single-model or multi-model consensus predictions by
     aggregating across classifiers and seeds with uncertainty quantification.
-    Use :meth:`predict_proba` for unlabelled forecast mode.
+
+    Evaluation is temporal: when known eruption dates are passed to
+    ``predict_proba()``, forecast-period labels are built via
+    :class:`~eruption_forecast.label.label_builder.LabelBuilder` and
+    ``evaluate()`` is called automatically to measure out-of-sample performance.
+    No 80/20 training split is involved.
+
+    Use :meth:`predict_proba` for unlabelled forecast mode; supply
+    ``eruption_dates`` for automatic out-of-sample evaluation.
 
     Attributes:
-        start_date (datetime): Start of the prediction window.
-        end_date (datetime): End of the prediction window.
+        start_date (datetime): Start of the forecast window.
+        end_date (datetime): End of the forecast window.
         start_date_str (str): Start date as "YYYY-MM-DD" string.
         end_date_str (str): End date as "YYYY-MM-DD" string.
-        trained_models (dict[str, str]): Dictionary mapping classifier names
-            to their trained model registry CSV paths.
+        trained_models (dict[str, SeedEnsemble]): Loaded SeedEnsemble objects
+            keyed by classifier name.
         overwrite (bool): Whether to re-compute cached files.
         n_jobs (int): Number of parallel jobs for feature extraction.
         output_dir (str): Root directory for prediction outputs.
@@ -82,21 +103,39 @@ class ModelPredictor:
         figures_dir (str): Directory for plots.
         verbose (bool): Enable verbose logging.
         debug (bool): Enable debug mode.
+        train_features_csv (str | None): Path to training features CSV (optional
+            reference — not used by ``predict_proba``).
+        train_labels_csv (str | None): Path to training labels CSV (optional
+            reference — not used by ``predict_proba``).
+        features_df (pd.DataFrame | None): Forecast-period features extracted
+            during the last ``predict_proba()`` call.
+        forecast_labels_df (pd.DataFrame | None): Forecast-period labels built
+            during the last ``predict_proba()`` call when ``eruption_dates``
+            was provided.
+        evaluation_df (pd.DataFrame | None): Aggregate evaluation metrics from
+            the last ``evaluate()`` call.
+        forecast_plot_path (str | None): Path to the saved forecast plot.
 
     Args:
-        start_date (str | datetime): Start of the prediction window (YYYY-MM-DD).
-        end_date (str | datetime): End of the prediction window (YYYY-MM-DD).
+        forecast_start_date (str | datetime): Start of the forecast window (YYYY-MM-DD).
+        forecast_end_date (str | datetime): End of the forecast window (YYYY-MM-DD).
         trained_models (str | dict[str, str]): Either a single path to a
             ``trained_model_{suffix}.csv`` file produced by ``ModelTrainer.train()``
             or a merged ``.pkl`` file produced by ``ModelTrainer.merge_models()``;
             or a dict mapping classifier name to its CSV or ``.pkl`` path
             (e.g., ``{"rf": "...", "xgb": "...", "voting": "..."}``).
+        train_features_csv (str | None, optional): Path to training features CSV.
+            Stored for external reference; not used internally. Defaults to None.
+        train_labels_csv (str | None, optional): Path to training labels CSV.
+            Stored for external reference; not used internally. Defaults to None.
         overwrite (bool, optional): Re-compute cached files if True.
             Defaults to False.
+        model_name (str, optional): Name for labelling output columns and files.
+            Defaults to ``"model"``.
         n_jobs (int, optional): Number of parallel jobs for feature extraction.
             Defaults to 1.
         output_dir (str | None, optional): Root directory for outputs.
-            Defaults to ``<cwd>/output/predictions``.
+            Defaults to ``<root_dir>/output/predictions``.
         root_dir (str | None, optional): Project root used to resolve relative
             ``output_dir`` paths. Defaults to None.
         verbose (bool, optional): Print extra progress information.
@@ -104,35 +143,35 @@ class ModelPredictor:
         debug (bool, optional): Enable debug mode. Defaults to False.
 
     Raises:
-        ValueError: If start_date >= end_date.
+        ValueError: If forecast_start_date >= forecast_end_date.
         FileNotFoundError: If any trained model registry CSV does not exist.
 
     Examples:
         >>> predictor = ModelPredictor(
-        ...     start_date="2025-03-20",
-        ...     end_date="2025-03-22",
+        ...     forecast_start_date="2025-07-27",
+        ...     forecast_end_date="2025-08-22",
         ...     trained_models={
-        ...         "rf":     "output/trainings/rf/trained_model_rf.csv",
-        ...         "xgb":    "output/trainings/xgb/trained_model_xgb.csv",
-        ...         "voting": "output/trainings/voting/trained_model_voting.csv",
+        ...         "rf":  "output/trainings/rf/trained_model_rf.csv",
+        ...         "xgb": "output/trainings/xgb/trained_model_xgb.csv",
         ...     },
         ... )
         >>> df_forecast = predictor.predict_proba(
         ...     tremor_data="output/tremor/tremor.csv",
         ...     window_size=2,
-        ...     window_step=6,
-        ...     window_step_unit="hours",
+        ...     window_step=10,
+        ...     window_step_unit="minutes",
+        ...     eruption_dates=["2025-08-02", "2025-08-18"],  # triggers auto-evaluation
         ... )
-        >>> # Columns: rf_eruption_probability, xgb_eruption_probability, ...,
-        >>> #          consensus_eruption_probability, consensus_confidence, ...
         >>> print(df_forecast[["consensus_probability", "consensus_confidence"]])
     """
 
     def __init__(
         self,
-        start_date: str | datetime,
-        end_date: str | datetime,
         trained_models: str | dict[str, str],
+        forecast_start_date: str | datetime,
+        forecast_end_date: str | datetime,
+        train_features_csv: str | None = None,
+        train_labels_csv: str | None = None,
         overwrite: bool = False,
         model_name: str = "model",
         n_jobs: int = 1,
@@ -141,46 +180,54 @@ class ModelPredictor:
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        """Initialize the ModelPredictor with date range, trained model registry, and output settings.
+        """Initialize the ModelPredictor with forecast date range, trained models, and output settings.
 
-        Normalises dates to cover full calendar days, resolves output directory structure,
-        and stores the trained model registry path(s). No models are loaded until
-        predict(), predict_best(), or predict_proba() is called.
+        Normalises dates to cover full calendar days, resolves the output directory
+        structure, and stores the trained model registry path(s) or pre-loaded
+        ensemble objects. No feature extraction or inference occurs until
+        :meth:`predict_proba` is called.
 
         Args:
-            start_date (str | datetime): Start of the prediction window in "YYYY-MM-DD"
-                format or as a datetime. Time is normalised to 00:00:00.
-            end_date (str | datetime): End of the prediction window in "YYYY-MM-DD"
-                format or as a datetime. Time is normalised to 23:59:59.
             trained_models (str | dict[str, str]): Path to a single trained model
                 registry CSV or merged ``.pkl`` file; or a dict mapping classifier
-                names to their registry CSV paths or per-classifier ``.pkl`` paths
-                for multi-model consensus mode. Accepted ``.pkl`` types are
-                ``ClassifierEnsemble`` (all classifiers bundled), ``SeedEnsemble``
-                (single classifier), and plain ``dict[str, SeedEnsemble]``
-                (backward-compatible, auto-wrapped into ``ClassifierEnsemble``).
+                names to their registry CSV or per-classifier ``.pkl`` paths.
+                Accepted ``.pkl`` types: ``ClassifierEnsemble`` (all classifiers
+                bundled), ``SeedEnsemble`` (single classifier), or a plain
+                ``dict[str, SeedEnsemble]`` (auto-wrapped into ``ClassifierEnsemble``).
+            forecast_start_date (str | datetime): Start of the forecast window in
+                "YYYY-MM-DD" format or as a datetime. Time is normalised to 00:00:00.
+            forecast_end_date (str | datetime): End of the forecast window in
+                "YYYY-MM-DD" format or as a datetime. Time is normalised to 23:59:59.
+            train_features_csv (str | None, optional): Path to the training-period
+                features CSV produced by ``FeaturesBuilder``.  Stored for external
+                reference; not used internally by ``predict_proba`` or ``evaluate``.
+                Defaults to None.
+            train_labels_csv (str | None, optional): Path to the training-period
+                aligned label CSV.  Stored for external reference only.
+                Defaults to None.
             overwrite (bool, optional): Re-compute cached intermediate files.
                 Defaults to False.
-            model_name (str, optional): Model name related to trained models.
-                Defaults to "model".
+            model_name (str, optional): Name used to label output columns and
+                filenames when a single CSV registry is supplied.
+                Defaults to ``"model"``.
             n_jobs (int, optional): Number of parallel jobs for feature extraction.
                 Defaults to 1.
             output_dir (str | None, optional): Root directory for prediction outputs.
-                Defaults to ``<root_dir>/output/predictions``. Defaults to None.
+                Defaults to ``<root_dir>/output/predictions``.
             root_dir (str | None, optional): Anchor directory for relative path
                 resolution. Defaults to None.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
 
         Raises:
-            ValueError: If start_date >= end_date.
-            FileNotFoundError: If any trained model registry CSV does not exist.
+            ValueError: If forecast_start_date >= forecast_end_date.
+            ValueError: If the ``.pkl`` file contains an unrecognised object type.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
         start_date, end_date, start_date_str, end_date_str = normalize_dates(
-            start_date, end_date
+            forecast_start_date, forecast_end_date
         )
 
         # Output training dir: ``<root_dir>/output/trainings``
@@ -218,6 +265,12 @@ class ModelPredictor:
         self.features_dir = features_dir
         self.extracted_dir = extracted_dir
         self.figures_dir = figures_dir
+
+        # ------------------------------------------------------------------
+        # Training data references for evaluation (optional)
+        # ------------------------------------------------------------------
+        self.train_features_csv: str | None = train_features_csv
+        self.train_labels_csv: str | None = train_labels_csv
 
         # ------------------------------------------------------------------
         # Will be set after get_features_dataframe() method called
@@ -259,6 +312,7 @@ class ModelPredictor:
         if isinstance(trained_models, str):
             if trained_models.endswith(".pkl"):
                 loaded = joblib.load(trained_models)
+                logger.info(f"Loaded model from .pkl: {trained_models}")
                 if isinstance(loaded, ClassifierEnsemble):
                     # Multi-classifier merged pkl
                     self._classifier_ensemble: ClassifierEnsemble = loaded
@@ -277,10 +331,11 @@ class ModelPredictor:
                 else:
                     raise ValueError(f"Unrecognised object type in pkl: {type(loaded)}")
             else:
-                # CSV registry path — defer merging to predict_proba()
+                # CSV registry path, defer merging to predict_proba()
                 self.trained_models = {}
                 self._registry_csv_paths = {model_name: trained_models}
         elif isinstance(trained_models, dict):
+            logger.info(f"Loaded model from dict: {trained_models}")
             first_val = next(iter(trained_models.values()))
             if isinstance(first_val, str) and first_val.endswith(".pkl"):
                 # Values are paths to per-classifier merged pkl files
@@ -314,6 +369,10 @@ class ModelPredictor:
         # Will be set after predict_proba() is called
         self.df: pd.DataFrame | None = None
         self.forecast_plot_path: str | None = None
+
+        # Will be set after evaluate() is called
+        self.evaluation_df: pd.DataFrame | None = None
+        self.forecast_labels_df: pd.DataFrame | None = None
 
         if verbose:
             logger.info(f"Models registered: {total_models}")
@@ -364,7 +423,9 @@ class ModelPredictor:
         futures_labels_df["id"] = range(len(futures_labels_df))
 
         self.labels_df = futures_labels_df
-        self.labels_df.to_csv(futures_labels_filepath, index=True)
+
+        if isinstance(self.labels_df, pd.DataFrame):
+            self.labels_df.to_csv(futures_labels_filepath, index=True)
 
         return futures_labels_df
 
@@ -601,6 +662,8 @@ class ModelPredictor:
         save_predictions: bool = True,
         threshold: float = 0.7,
         title: str | None = None,
+        eruption_dates: list[str] | None = None,
+        day_to_forecast: int | None = None,
         **plot_kwargs: Any,
     ) -> pd.DataFrame:
         """Forecast eruption probability for UNLABELLED future windows.
@@ -625,16 +688,27 @@ class ModelPredictor:
         saved as ``predictions.csv``.
 
         Args:
-            tremor_data (str | pd.DataFrame): Tremor data in CSV or dataframe.
-            window_size (int): Window size to use.
-            window_step (int): Window step size to use.
-            window_step_unit (Literal["minutes", "hours"]): Window step unit to use.
-            use_relevant_features (bool, optional): Whether to use relevant features. Defaults to True.
-            select_tremor_columns (list[str] | None): List of tremor columns to use. Defaults to None.
-            save_predictions (bool, optional): Save predictions result. Defaults to True.
-            threshold (float, optional): Probability threshold for eruption classification in the
-                forecast plot. Defaults to 0.7.
+            tremor_data (str | pd.DataFrame): Tremor data as a filepath or pre-loaded DataFrame.
+            window_size (int): Window size in days.
+            window_step (int): Step size between consecutive forecast windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of ``window_step``.
+            use_relevant_features (bool, optional): Filter to statistically relevant
+                features only. Defaults to True.
+            select_tremor_columns (list[str] | None, optional): Subset of tremor
+                columns to include. Defaults to None (all columns).
+            save_predictions (bool, optional): Save per-seed prediction CSVs.
+                Defaults to True.
+            threshold (float, optional): Probability threshold used to draw the
+                eruption classification line on the forecast plot. Defaults to 0.7.
             title (str | None, optional): Forecast plot title. Defaults to None.
+            eruption_dates (list[str] | None, optional): Known eruption dates in
+                ``YYYY-MM-DD`` format.  When provided, :meth:`build_forecast_labels`
+                is called to construct forecast-period labels and :meth:`evaluate`
+                is called automatically to produce out-of-sample metrics.
+                Defaults to None.
+            day_to_forecast (int | None, optional): Days before each eruption to
+                start labelling windows as positive. Forwarded to
+                :meth:`build_forecast_labels`. Defaults to None (uses 1).
             **plot_kwargs: Additional keyword arguments forwarded to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
                 (e.g. ``fig_width``, ``fig_height``, ``rolling_window``,
@@ -699,7 +773,119 @@ class ModelPredictor:
         self._plot_forecast(df_forecast, threshold, title=title, **plot_kwargs)
 
         self.df = df_forecast
+
+        if eruption_dates and self.features_df is not None:
+            forecast_labels = self.build_forecast_labels(
+                window_step=window_step,
+                window_step_unit=window_step_unit,
+                eruption_dates=eruption_dates,
+                day_to_forecast=day_to_forecast,
+            )
+            self.evaluate(
+                X_forecast=self.features_df,
+                y_forecast=forecast_labels["is_erupted"],
+            )
+
         return df_forecast
+
+    def build_forecast_labels(
+        self,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+        eruption_dates: list[str],
+        day_to_forecast: int | None = None,
+    ) -> pd.DataFrame:
+        """Build labeled windows for the forecast period using known eruption dates.
+
+        Args:
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of ``window_step``.
+            eruption_dates (list[str]): Known eruption dates in ``YYYY-MM-DD`` format.
+            day_to_forecast (int | None, optional): Days before eruption to label positive.
+                If None, defaults to 1. Defaults to None.
+
+        Returns:
+            pd.DataFrame: Labels DataFrame with ``id`` and ``is_erupted`` columns.
+        """
+        dtf = day_to_forecast if day_to_forecast is not None else 1
+        label_builder = LabelBuilder(
+            start_date=self.start_date,
+            end_date=self.end_date,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            day_to_forecast=dtf,
+            eruption_dates=eruption_dates,
+            volcano_id="forecast",
+        ).build()
+        self.forecast_labels_df = label_builder.df
+        return label_builder.df
+
+    def evaluate(
+        self,
+        X_forecast: pd.DataFrame,
+        y_forecast: pd.Series,
+        threshold: float = 0.7,
+    ) -> pd.DataFrame:
+        """Evaluate trained models on forecast-period features and labels.
+
+        For each seed ensemble, predicts on ``X_forecast`` and computes
+        classification metrics against ``y_forecast``. Aggregates metrics
+        across seeds and stores results in ``self.evaluation_df``.
+
+        Args:
+            X_forecast (pd.DataFrame): Forecast-period feature matrix.
+            y_forecast (pd.Series): True labels for the forecast period.
+
+        Returns:
+            pd.DataFrame: Evaluation metrics aggregated across seeds and classifiers.
+        """
+        assert self._classifier_ensemble is not None, "No ensemble loaded."
+
+        records: list[dict] = []
+        for classifier_name, seeds in self._classifier_ensemble.ensembles.items():
+            registry_csv = self._registry_csv_paths.get(classifier_name)
+
+            if registry_csv is not None:
+                # CSV registry path available — use MultiModelEvaluator if JSON metrics exist
+                metrics_dir_candidate = os.path.join(
+                    os.path.dirname(registry_csv), "json"
+                )
+                if os.path.isdir(metrics_dir_candidate):
+                    evaluator = MultiModelEvaluator(
+                        trained_model_csv=registry_csv,
+                        metrics_dir=os.path.dirname(registry_csv),
+                        X_test=X_forecast,
+                        y_test=y_forecast,
+                        classifier_name=classifier_name,
+                        output_dir=os.path.join(
+                            self.output_dir, "evaluation", classifier_name
+                        ),
+                        verbose=self.verbose,
+                    )
+                    agg_df = evaluator.get_aggregate_metrics()
+                    row: dict = agg_df["mean"].to_dict()
+                    row["classifier"] = classifier_name
+                    records.append(row)
+                    continue
+
+            # Fallback: compute ensemble metrics directly from the SeedEnsemble.
+            # predict_proba() handles per-seed feature selection internally.
+            proba = seeds.predict_proba(X_forecast)[:, 1]
+            pred = (proba >= 0.5).astype(int)
+            y_true = np.asarray(y_forecast)
+            row = MetricsComputer(y_true, proba, pred).compute_all_metrics()
+            row["classifier"] = classifier_name  # ty:ignore[invalid-assignment]
+            records.append(row)
+
+        if records:
+            self.evaluation_df = pd.DataFrame(records)
+            csv_path = os.path.join(self.output_dir, f"evaluation_{self.basename}.csv")
+            self.evaluation_df.to_csv(csv_path, index=False)
+            logger.info(f"Evaluation metrics saved to: {csv_path}")
+        else:
+            self.evaluation_df = pd.DataFrame()
+
+        return self.evaluation_df
 
     def _forecast_with_classifier_ensemble(
         self,
@@ -784,7 +970,11 @@ class ModelPredictor:
             raise ValueError("No labels dataframe provided.")
 
         fig = plot_forecast(
-            df=df, label_df=self.labels_df, threshold=threshold, title=title, **plot_kwargs
+            df=df,
+            label_df=self.labels_df,
+            threshold=threshold,
+            title=title,
+            **plot_kwargs,
         )
 
         path = os.path.join(self.figures_dir, f"forecast_{self.basename}.png")

@@ -233,82 +233,34 @@ print(scores.head(10))
 
 ### 6. Train Models with Multiple Seeds
 
-Two training workflows are available depending on your evaluation strategy.
+`ModelTrainer.train()` trains on the **entire dataset** across multiple seeds — no internal split.
+Evaluation is deferred to `ModelPredictor` using the forecast period as a true out-of-sample test set.
 
 ```
-        evaluate()                          train()
-   ──────────────────────────────           ──────────────────────────
-         Full Dataset                             Full Dataset
-               │                                       │
-               ▼                                       ▼
-     80/20 Stratified Split                   RandomUnderSampler
-        ┌──────┴───────┐                        (full dataset)
-      Train           Test                            │
-   (imbalanced)   (imbalanced,                 Feature Selection
-        │          never touched)               (resampled data)
-        ▼               │                            │
-  RandomUnderSampler    │                            ▼
-  (training set only)   │                       GridSearchCV
-        │               │                   (CV folds on resampled
-        ▼               │                       balanced data)
-  Feature Selection     │                            │
-  (resampled data)      │                     ┌──────┴──────┐
-        │               │                 model.pkl   registry.csv
-        ▼               │
-   GridSearchCV         │
-  (CV folds on          │
-   resampled data)      │
-        │               │
-        └───► Evaluate ◄┘
-              on Test set
-                  │
-       ┌──────────┴──────────┐
-   model.pkl  metrics.json  registry.csv
-```
-
-#### Which workflow should I use?
-
-- **`evaluate()`** — uses the **all calculated tremor dataset**, splits it 80/20 internally, trains on the 80% and evaluates on the held-out 20%. Both train and test come from the same date range.
-- **`train()`** — treats data as two separate time periods: a **current/present dataset** used for training (passed via `extracted_features_csv`) and a **future dataset** evaluated separately via `ModelPredictor`. No internal split; the model is trained on 100% of the current data.
-
-| Question | `evaluate()` | `train()` |
-|---|---|---|
-| Do I want to measure in-sample performance? | Yes — evaluates each seed on held-out 20% | No metrics computed |
-| Do I have a separate future dataset to evaluate on? | — | Use with `ModelPredictor` |
-| Am I exploring classifiers and hyperparameters? | Quick feedback per run | Not suitable |
-| Am I training the final production model? | Wastes 20% of data | Uses 100% of data |
-
-#### `evaluate()` — with held-out test set (80/20 split)
-
-Splits data **before** resampling and feature selection to prevent data leakage.
-Evaluates each seed on the held-out 20% and aggregates metrics across seeds.
-
-```python
-from eruption_forecast.model.model_trainer import ModelTrainer
-
-trainer = ModelTrainer(
-    extracted_features_csv="output/features/all_features.csv",
-    label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings",
-    classifier="xgb",
-    cv_strategy="stratified",
-    number_of_significant_features=20,
-    feature_selection_method="combined",
-    n_jobs=4,
-)
-
-trainer.evaluate(
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
-)
+                             train()
+                   ──────────────────────────
+                         Full Dataset
+                               │
+                               ▼
+                       RandomUnderSampler
+                        (full dataset)
+                               │
+                        Feature Selection
+                        (resampled data)
+                               │
+                               ▼
+                          GridSearchCV
+                      (CV folds on resampled
+                          balanced data)
+                               │
+                        ┌──────┴──────┐
+                    model.pkl   registry.csv
 ```
 
 #### `train()` — full dataset training (no split)
 
-Trains on the **entire current/present dataset** across multiple seeds — no internal 80/20 split.
-The dataset passed here represents your known historical period. Evaluation is deferred to
-`ModelPredictor` using a **separate future dataset** that was not seen during training.
+Trains on the **entire current/present dataset** across multiple seeds — no internal split.
+Evaluation is performed separately by `ModelPredictor.evaluate()` on the forecast period.
 
 ```python
 trainer = ModelTrainer(
@@ -326,33 +278,17 @@ trainer.train(
 )
 ```
 
-#### `fit()` — Unified entry point
+#### `fit()` — Thin wrapper
 
-`fit()` dispatches to `evaluate()` or `train()` based on the
-`with_evaluation` flag. Use it when the calling code needs a single method
-regardless of which workflow is active.
+`fit()` calls `train()` and returns `self` for chaining. All kwargs are forwarded verbatim to `train()`.
 
 ```python
-# Equivalent to evaluate()
 trainer.fit(
-    with_evaluation=True,
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
-)
-
-# Equivalent to train()
-trainer.fit(
-    with_evaluation=False,
     random_state=0,
     total_seed=500,
     sampling_strategy=0.75,
 )
 ```
-
-`ForecastModel.train()` calls `fit()` internally and exposes `with_evaluation`
-as a direct parameter, so you can control the workflow from the high-level API
-without dropping down to `ModelTrainer`.
 
 #### ModelTrainer constructor parameters
 
@@ -376,16 +312,6 @@ without dropping down to `ModelTrainer`.
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
-#### `evaluate()` method parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `random_state` | `int` | `0` | Starting random seed; seeds are `random_state, random_state+1, …, random_state+total_seed−1` |
-| `total_seed` | `int` | `500` | Number of seeds (independent train/test splits) to run |
-| `sampling_strategy` | `str \| float` | `0.75` | Under-sampling ratio for `RandomUnderSampler` on training data only |
-| `save_all_features` | `bool` | `False` | Save all ranked features per seed (can produce many files) |
-| `plot_significant_features` | `bool` | `False` | Save a feature-importance plot per seed |
-
 #### `train()` method parameters
 
 | Parameter | Type | Default | Description |
@@ -400,8 +326,7 @@ without dropping down to `ModelTrainer`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `evaluate()` (80/20 split + metrics); `False` → `train()` (full dataset, no metrics) |
-| `**kwargs` | — | — | Forwarded to `evaluate()` or `train()` (same parameters as those methods) |
+| `**kwargs` | — | — | Forwarded verbatim to `train()` (same parameters as above) |
 
 ### 7. Supported Classifiers
 
@@ -514,80 +439,80 @@ clf.grid = {
 
 ### 10. Predict on Future Data with ModelPredictor
 
-`ModelPredictor` supports two modes after `train()`:
-
-#### Single model — evaluation mode (labelled data)
-
-Evaluates each seed model against known eruption labels and aggregates metrics across seeds.
-
-```python
-from eruption_forecast.model.model_predictor import ModelPredictor
-
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,  # trained_model_*.csv from train()
-    output_dir="output/predictions",
-)
-
-# One row per (classifier, seed)
-df_metrics = predictor.predict(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-)
-print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
-
-# Best (classifier, seed) overall
-evaluator = predictor.predict_best(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-    criterion="balanced_accuracy",
-)
-print(evaluator.summary())
-evaluator.plot_all()
-```
-
-`predict_best()` accepts any metric column as `criterion`:
-`"accuracy"`, `"balanced_accuracy"`, `"f1_score"`, `"precision"`, `"recall"`, `"roc_auc"`, `"pr_auc"`.
+`ModelPredictor` runs forecast inference and optionally performs temporal out-of-sample evaluation.
+When known eruption dates are supplied to `predict_proba()`, labels for the forecast period are
+built automatically and `evaluate()` is called to produce per-seed metrics.
 
 #### ModelPredictor constructor parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `start_date` | `str \| datetime` | — | Start date for prediction period (format: YYYY-MM-DD) |
-| `end_date` | `str \| datetime` | — | End date for prediction period (format: YYYY-MM-DD) |
+| `forecast_start_date` | `str \| datetime` | — | Start date for the forecast period (format: YYYY-MM-DD) |
+| `forecast_end_date` | `str \| datetime` | — | End date for the forecast period (format: YYYY-MM-DD) |
 | `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path (from `train()`) or a merged `.pkl` path (from `merge_models()`); or a `{name: path}` dict for multi-model consensus (paths may be `.csv` or `.pkl`) |
+| `train_features_csv` | `str \| None` | `None` | Path to training features CSV (stored for reference) |
+| `train_labels_csv` | `str \| None` | `None` | Path to training labels CSV (stored for reference) |
+| `model_name` | `str` | `"model"` | Label used for output columns and filenames (single-model mode) |
 | `overwrite` | `bool` | `False` | Overwrite existing output files |
 | `n_jobs` | `int` | `1` | Number of parallel jobs for feature extraction |
 | `output_dir` | `str \| None` | `None` | Output directory; defaults to `<root_dir>/output/predictions` |
 | `root_dir` | `str \| None` | `None` | Root directory for resolving output paths |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
-#### Single model — forecast mode (unlabelled data)
-
-When no ground-truth labels are available, use `predict_proba()`.
+#### Single model — forecast mode
 
 ```python
+from eruption_forecast.model.model_predictor import ModelPredictor
+
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models=trainer.csv,
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+)
+```
+
+#### Forecast + automatic out-of-sample evaluation
+
+Supply `eruption_dates` to trigger automatic evaluation on the forecast period:
+
+```python
+predictor = ModelPredictor(
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
+    trained_models=trainer.csv,
+    output_dir="output/predictions",
+)
+
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    eruption_dates=["2025-03-20"],
+    day_to_forecast=2,
+)
+
+# Aggregate evaluation metrics
+df_eval = predictor.evaluation_df
 ```
 
 #### Multi-model consensus
 
-Pass a dict of classifier registries.  `predict_proba()` aggregates within
+Pass a dict of classifier registries. `predict_proba()` aggregates within
 each classifier (across seeds) and then across classifiers (consensus).
 
 ```python
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models={
         "rf": "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
@@ -595,8 +520,12 @@ predictor = ModelPredictor(
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+)
 ```
 
 **Output columns (multi-model):**
@@ -677,16 +606,26 @@ print(f"Saved: {path}")
 
 #### Aggregate Evaluation (All Seeds) with MultiModelEvaluator
 
-When training with `with_evaluation=True`, each seed's held-out test split is saved to a `tests/`
-directory alongside per-seed `metrics/*.json` files. Use `MultiModelEvaluator` to aggregate across all seeds:
+After `ModelPredictor.evaluate()` runs, per-seed metrics JSON files are written alongside the registry CSV.
+Use `MultiModelEvaluator` to aggregate across all seeds and generate ensemble-level plots.
+
+In temporal evaluation mode, pass `X_test` and `y_test` (forecast-period features and labels) directly
+instead of relying on CSV paths from the registry:
 
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/evaluations/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/predictions/xgb-classifier/stratified-shuffle-split"
 trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 
-# --- From a model registry CSV (enables plots) ---
+# --- From a model registry CSV + forecast-period test data ---
+evaluator = MultiModelEvaluator(
+    trained_model_csv=trained_model_csv,
+    X_test=features_df,        # forecast-period features
+    y_test=labels["is_erupted"],  # forecast-period labels
+)
+
+# --- From a model registry CSV only (uses JSON metrics files) ---
 evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
 
 # Generate all 7 aggregate plots at once (saved to <registry_dir>/figures/)

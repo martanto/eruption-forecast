@@ -1,8 +1,10 @@
-"""Top-level ModelTrainer that composes EvaluationTrainer and train-only logic.
+"""Top-level ModelTrainer for full-dataset training without a train/test split.
 
-Exposes :meth:`ModelTrainer.fit` as the single entry point that dispatches to
-:meth:`evaluate` (80/20 split + metrics) or :meth:`train` (full
-dataset, no metrics) depending on the ``with_evaluation`` flag.
+Exposes :meth:`ModelTrainer.fit` as the single public entry point, which
+delegates to :meth:`train`.  ``train()`` resamples the full dataset, selects
+features, and fits each classifier via GridSearchCV — no held-out test set is
+created.  Out-of-sample evaluation is handled separately by
+``ModelPredictor.evaluate()`` using the forecast-period data as the test set.
 """
 
 import os
@@ -13,35 +15,28 @@ import pandas as pd
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import resample
-from eruption_forecast.model.evaluation_trainer import EvaluationTrainer
+from eruption_forecast.model.base_model_trainer import BaseModelTrainer
 
 
-class ModelTrainer(EvaluationTrainer):
+class ModelTrainer(BaseModelTrainer):
     """Train feature-selection and classifier models over multiple random seeds.
 
     Loads pre-extracted features and labels, then for each random seed performs:
 
-    1. Train/test split (80/20, stratified) to prevent data leakage
-    2. Random under-sampling on training set only to balance classes
-    3. Feature selection on training set using tsfresh relevance filtering (ONCE per seed)
-    4. For each classifier: GridSearchCV training and cross-validation
-    5. Evaluation on held-out test set (when using evaluate)
+    1. Random under-sampling on the full dataset to balance classes
+    2. Feature selection using tsfresh relevance filtering (ONCE per seed)
+    3. For each classifier: GridSearchCV training
 
-    Both ``evaluate`` and ``train`` use a two-phase parallel dispatch:
+    Uses a two-phase parallel dispatch:
 
-    - **Phase 1 - Feature Selection** (parallel across seeds): shared per-seed work (split/resample +
-      feature selection). Results are saved to disk.
+    - **Phase 1 - Feature Selection** (parallel across seeds): resample + feature
+      selection on the full dataset. Results are saved to disk.
     - **Phase 2** (parallel across seed × classifier pairs): one GridSearchCV job
       per (seed, classifier) combination. Training data is reconstructed
       deterministically via the fixed ``random_state``.
 
-    Use :meth:`evaluate` for 80/20 split with held-out evaluation metrics,
-    or :meth:`train` for full-dataset training (no metrics) intended for production.
-    Call :meth:`fit` to dispatch between the two modes via the ``with_evaluation`` flag.
-
-    All constructor arguments are forwarded to :class:`EvaluationTrainer` and
-    :class:`BaseModelTrainer`. See :class:`BaseModelTrainer` for the full parameter
-    and attribute documentation.
+    All constructor arguments are forwarded to :class:`BaseModelTrainer`.
+    See :class:`BaseModelTrainer` for the full parameter and attribute documentation.
 
     Examples:
         >>> # Train with shared feature selection across rf and xgb
@@ -52,7 +47,7 @@ class ModelTrainer(EvaluationTrainer):
         ...     output_dir="output/trainings",
         ...     n_jobs=4,
         ... )
-        >>> trainer.fit(with_evaluation=True, random_state=0, total_seed=100)
+        >>> trainer.fit(random_state=0, total_seed=100)
     """
 
     def _run_shared_train(
@@ -103,8 +98,6 @@ class ModelTrainer(EvaluationTrainer):
             significant_filepath,
             all_features_filepath,
             all_figures_filepath,
-            _,
-            _,
             resampled_filepath,
             can_skip_shared,
         ) = self._generate_shared_filepaths(
@@ -193,8 +186,6 @@ class ModelTrainer(EvaluationTrainer):
         (
             _,
             significant_filepath,
-            _,
-            _,
             _,
             _,
             resampled_filepath,
@@ -293,7 +284,7 @@ class ModelTrainer(EvaluationTrainer):
             # Generate all shared filepaths for this seed (significant features,
             # optional all-features CSV, plots, etc.).
             _shared_paths = self._generate_shared_filepaths(random_state)
-            # _generate_shared_filepaths returns a trailing boolean flag; exclude it from path checks.
+            # _generate_shared_filepaths returns a trailing boolean flag; exclude it.
             _shared_paths_without_flag = _shared_paths[:-1]
             _, _significant_filepath, *_optional_shared_paths, _resampled_filepath = (
                 _shared_paths_without_flag
@@ -393,8 +384,6 @@ class ModelTrainer(EvaluationTrainer):
             ... )
             >>> trainer.train(random_state=0, total_seed=5)
         """
-        # Ensure train-only runs use the predictions output tree, even after evaluate().
-        self.with_evaluation = False
         self.create_directories(save_all_features, plot_significant_features)
 
         random_states: list[int] = [random_state + seed for seed in range(total_seed)]
@@ -485,20 +474,18 @@ class ModelTrainer(EvaluationTrainer):
 
         return None
 
-    def fit(self, with_evaluation: bool = True, **kwargs) -> Self:
-        """Dispatch to ``evaluate()`` or ``train()`` based on ``with_evaluation``.
+    def fit(self, **kwargs) -> Self:
+        """Train on the full dataset and return self for chaining.
+
+        Thin wrapper around :meth:`train` that returns the instance so
+        callers can chain further method calls.
 
         Args:
-            with_evaluation (bool, optional): If True, calls ``evaluate()``
-                (80/20 split + metrics). If False, calls ``train()`` (full dataset,
-                no metrics). Defaults to True.
-            **kwargs: Additional keyword arguments forwarded to the chosen method.
+            **kwargs: Keyword arguments forwarded verbatim to :meth:`train`
+                (e.g. ``random_state``, ``total_seed``, ``sampling_strategy``).
 
         Returns:
-            Self: The ModelTrainer instance for method chaining.
+            Self: The ModelTrainer instance after training completes.
         """
-        if with_evaluation:
-            self.evaluate(**kwargs)
-        else:
-            self.train(**kwargs)
+        self.train(**kwargs)
         return self

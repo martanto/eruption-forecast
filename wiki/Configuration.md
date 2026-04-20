@@ -164,7 +164,6 @@ train:
   classifiers: [xgb]
   cv_strategy: stratified
   total_seed: 500
-  with_evaluation: false
   number_of_significant_features: 20
 
 forecast:

@@ -255,9 +255,6 @@ class TrainConfig(_ConfigBase):
             Defaults to ``0``.
         total_seed (int): Number of independent training runs (seeds).
             Defaults to ``500``.
-        with_evaluation (bool): If ``True``, performs an 80/20 train/test split
-            and computes per-seed evaluation metrics. If ``False``, trains on the
-            full dataset without metrics. Defaults to ``False``.
         number_of_significant_features (int): Top-N features retained per seed
             after feature selection. Defaults to ``20``.
         sampling_strategy (float): Sampling ratio forwarded to the resampler.
@@ -297,7 +294,6 @@ class TrainConfig(_ConfigBase):
     cv_strategy: str = "shuffle"
     random_state: int = 0
     total_seed: int = 500
-    with_evaluation: bool = False
     number_of_significant_features: int = 20
     sampling_strategy: float = 0.75
     resample_method: Literal["under", "over", "auto"] | None = "auto"

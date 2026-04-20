@@ -308,62 +308,10 @@ Feature selection runs inside `ModelTrainer` automatically — you do not need t
 
 `ModelTrainer` trains a classifier across multiple random seeds to produce a robust ensemble of models. Because volcanic datasets are heavily imbalanced (eruption windows are rare), each seed independently resamples the training data with `RandomUnderSampler` before fitting.
 
-### Two Training Workflows
+### Training Workflow
 
-Two workflows are available depending on your evaluation strategy:
-
-```
-   evaluate()                  train()
-  ─────────────────────            ────────────────────
-      Full Dataset                      Full Dataset
-           │                                │
-           ▼                                ▼
-      80/20 Split                    RandomUnderSampler
-      (stratified)                     (full dataset)
-      ┌────┴────┐                           │
-    Train     Test                   Feature Selection
-      │         │                      (full dataset)
-    RandomUnder │                           │
-    Sampler     │                      GridSearchCV
-      │         │                       + CV folds
-    Feature     │                           │
-    Selection   │                    ┌──────┴──────┐
-      │         │                model.pkl   registry.csv
-    GridSearchCV│
-    + CV folds  │
-      │         │
-    Evaluate ◄──┘
-      │
-    Save model + metrics
-```
-
-- **`evaluate()`** — splits the full dataset 80/20 internally. Trains on the 80% split and evaluates each seed on the held-out 20%. Use this when you want per-seed metrics and an in-sample accuracy estimate to compare classifiers or tune hyperparameters.
-- **`train()`** — treats the entire dataset as the training set with no internal split. Evaluation is deferred to `ModelPredictor` using a separate future dataset. Use this for final production models where no data should be withheld.
-
-For full detail on both workflows, see the [Training Workflows](Training-Workflows) wiki page.
-
-### `evaluate()` — with held-out test set
-
-```python
-from eruption_forecast.model.model_trainer import ModelTrainer
-
-trainer = ModelTrainer(
-    extracted_features_csv="output/features/all_features.csv",
-    label_features_csv="output/features/label_features.csv",
-    output_dir="output/trainings",
-    classifier="xgb",
-    cv_strategy="stratified",
-    number_of_significant_features=20,
-    feature_selection_method="combined",
-    n_jobs=4,
-)
-
-trainer.evaluate(
-    random_state=0,
-    total_seed=500,
-    sampling_strategy=0.75,
-)
-```
+`ModelTrainer.train()` trains on the **entire dataset** — no internal split. Evaluation is performed
+separately by `ModelPredictor.evaluate()` on the forecast period. See [Training Workflows](Training-Workflows).
 
 ### `train()` — full dataset training
 
@@ -383,82 +331,42 @@ trainer.train(
 )
 ```
 
-`fit()` is a unified entry point that dispatches to either workflow based on the `with_evaluation` flag:
-
-```python
-# Equivalent to evaluate()
-trainer.fit(with_evaluation=True, random_state=0, total_seed=500, sampling_strategy=0.75)
-
-# Equivalent to train()
-trainer.fit(with_evaluation=False, random_state=0, total_seed=500, sampling_strategy=0.75)
-```
-
-`ForecastModel.train()` calls `fit()` internally and exposes `with_evaluation` as a direct parameter, so you can control the workflow from the high-level API without dropping down to `ModelTrainer`.
+`fit()` is a thin wrapper that calls `train()` and returns `self` for chaining.
 
 ---
 
 ## Stage 7 — Forecast
 
-`ModelPredictor` applies trained models to new data and produces per-window eruption probability estimates. It supports two modes:
+`ModelPredictor` applies trained models to new data and produces per-window eruption probability estimates.
+When `eruption_dates` is provided to `predict_proba()`, the forecast period is automatically labeled
+and temporal out-of-sample evaluation is performed.
 
-- **Evaluation mode** (`predict()` / `predict_best()`): Requires ground-truth labels. Evaluates each seed model against known eruption labels and aggregates metrics across seeds. Used when you have a labelled future dataset and want to measure out-of-sample performance.
-- **Forecast mode** (`predict_proba()`): No labels required. Produces a time series of eruption probabilities. Used for operational forecasting when ground truth is unavailable.
-
-Both modes support single-model and multi-model consensus inference.
-
-### Evaluation Mode (labelled data)
+### Forecast Mode — Single Model
 
 ```python
 from eruption_forecast.model.model_predictor import ModelPredictor
 
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,  # trained_model_*.csv or merged .pkl from merge_models()
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
+    trained_models=trainer.csv,
     output_dir="output/predictions",
 )
 
-# Metrics for every (classifier, seed) combination
-df_metrics = predictor.predict(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2, window_step=12, window_step_unit="hours",
+    eruption_dates=["2025-03-20"],  # triggers automatic evaluation
+    day_to_forecast=2,
 )
-print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
-
-# Best single seed by a chosen criterion
-evaluator = predictor.predict_best(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-    criterion="balanced_accuracy",
-)
-print(evaluator.summary())
-evaluator.plot_all()
-```
-
-`predict_best()` accepts any metric column as `criterion`: `"accuracy"`, `"balanced_accuracy"`, `"f1_score"`, `"precision"`, `"recall"`, `"roc_auc"`, `"pr_auc"`.
-
-### Forecast Mode — Single Model (unlabelled data)
-
-```python
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,  # trained_model_*.csv or merged .pkl from merge_models()
-    output_dir="output/predictions",
-)
-
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
 ```
 
 ### Forecast Mode — Multi-Model Consensus
 
-Pass a dict of model registry paths to aggregate across classifiers. `predict_proba()` first aggregates within each classifier across seeds, then averages across classifiers to produce a consensus probability:
-
 ```python
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models={
         "rf": "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
@@ -470,20 +378,6 @@ df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_s
                                       window_step_unit="hours")
 ```
 
-**Output columns (multi-model):**
-
-| Column | Description |
-|--------|-------------|
-| `{name}_eruption_probability` | Mean P(eruption) across seeds of that classifier |
-| `{name}_uncertainty` | Std across seeds of that classifier |
-| `{name}_confidence` | Seed-level agreement fraction (0.5–1.0) |
-| `{name}_prediction` | Hard label for that classifier |
-| `consensus_eruption_probability` | Mean P(eruption) averaged across all classifiers |
-| `consensus_uncertainty` | Std of per-classifier means (inter-model disagreement) |
-| `consensus_confidence` | Fraction of classifiers voting with consensus majority |
-| `consensus_prediction` | Hard label — `1` if `consensus_eruption_probability >= 0.5` |
-
-Results are saved to `predictions.csv`. The plot shows each classifier as a dashed line and the consensus as a solid black line with a shaded uncertainty band (`eruption_forecast.png` in `figures/`).
 
 ---
 
@@ -538,7 +432,6 @@ fm.calculate(
     cv_strategy="stratified",
     random_state=0,
     total_seed=500,
-    with_evaluation=False,
     number_of_significant_features=20,
     sampling_strategy=0.75,
     save_all_features=True,
@@ -556,7 +449,7 @@ fm.calculate(
 1. **Calculate tremor** — computes RSAM, DSAR, and Shannon Entropy from raw SDS waveforms with maximum-outlier removal and daily plots saved
 2. **Build labels** — creates binary labels for January 1 through July 24, marking 2-day windows before each known eruption as positive
 3. **Extract features** — builds the tremor matrix for selected columns, runs tsfresh, and retains statistically relevant features
-4. **Train models** — trains a Random Forest across 500 random seeds on the full dataset (`with_evaluation=False`), saving models and significant feature lists
+4. **Train models** — trains a Random Forest across 500 random seeds on the full dataset, saving models and significant feature lists
 5. **Forecast** — runs the trained ensemble on July 28 through August 4 and writes a probability time series with a consensus plot
 
 If pre-computed tremor data already exists, skip the `calculate()` call:

@@ -252,7 +252,6 @@ train:
   cv_strategy: stratified
   random_state: 0
   total_seed: 500
-  with_evaluation: false
   number_of_significant_features: 20
   sampling_strategy: 0.75
   save_all_features: false

@@ -1,8 +1,14 @@
 """Multi-seed aggregate model evaluation for volcanic eruption forecasting.
 
-This module provides ``MultiModelEvaluator``, which aggregates per-seed
-evaluation results — either from JSON metrics files or from a model registry
-CSV — and generates ensemble-level statistics and plots.
+Provides ``MultiModelEvaluator``, which aggregates per-seed evaluation results
+— either from JSON metrics files or from a model registry CSV — and generates
+ensemble-level statistics and plots.
+
+When ``X_test`` and ``y_test`` are supplied at construction time (temporal
+out-of-sample evaluation mode), they are used directly instead of reading
+test-split paths from the registry.  This supports the new evaluation flow
+where ``ModelPredictor`` evaluates models on the forecast period without any
+80/20 split.
 """
 
 import os
@@ -53,11 +59,23 @@ class MultiModelEvaluator:
 
     Accepts per-seed JSON metrics files (written by
     ``ModelEvaluator.save_metrics()``) and/or a model registry CSV (written
-    by ``ModelTrainer.evaluate()``) to compute ensemble-level
-    statistics and generate aggregate plots.
+    by ``ModelTrainer.train()``) to compute ensemble-level statistics and
+    generate aggregate plots.
+
+    Supports two evaluation modes:
+
+    - **Historical / JSON mode** — supply ``metrics_dir`` or ``metrics_files``
+      pointing to pre-computed per-seed JSON metrics files.
+    - **Temporal out-of-sample mode** — supply ``trained_model_csv``,
+      ``X_test``, and ``y_test``.  Each seed model is loaded from the registry,
+      run on ``X_test``, and its predictions are compared to ``y_test``.
+      No 80/20 split is performed; the forecast period is the test set.
 
     Attributes:
         output_dir (str): Directory where figures and CSVs are saved.
+        X_test (pd.DataFrame | None): Forecast-period feature matrix, when
+            using temporal out-of-sample evaluation mode.
+        y_test (pd.Series | None): True labels for the forecast period.
 
     Args:
         metrics_dir (str | None, optional): Directory containing per-seed
@@ -67,18 +85,23 @@ class MultiModelEvaluator:
             per-seed JSON metrics files. Takes precedence over
             ``metrics_dir``. Defaults to None.
         trained_model_csv (str | None, optional): Path to the model registry CSV
-            produced by ``ModelTrainer.evaluate()``. Required for
-            plot methods. Defaults to None.
+            produced by ``ModelTrainer.train()``. Required for plot methods and
+            temporal evaluation. Defaults to None.
+        X_test (pd.DataFrame | None, optional): Forecast-period feature matrix
+            for temporal out-of-sample evaluation. When provided together with
+            ``y_test``, overrides reading test-split paths from the registry.
+            Defaults to None.
+        y_test (pd.Series | None, optional): True labels for the forecast period.
+            Required alongside ``X_test``. Defaults to None.
         root_dir (str | None, optional): Root directory used to anchor
             output_dir resolution. Defaults to None.
         output_dir (str | None, optional): Directory for saved figures and
-            CSVs. If None, resolved in priority order: (1) when
-            ``trained_model_csv`` is given →
-            ``<trained_model_csv_dir>/figures/`` (e.g.
-            ``output/{station_dir}/trainings/evaluations/{classifier}/{cv}/figures/``);
-            (2) when ``metrics_dir`` is given →
-            ``<parent_of_metrics_dir>/figures/``; (3) fallback →
-            ``<cwd>/output/evaluation/figures/``. Defaults to None.
+            CSVs. Defaults to None (resolved from the supplied source path).
+        classifier_name (str, optional): Classifier name used as filename
+            prefix. Defaults to ``"model"``.
+        plot_shap (bool, optional): Generate aggregate SHAP summary plots.
+            Defaults to False.
+        verbose (bool, optional): Emit progress log messages. Defaults to False.
 
     Raises:
         ValueError: If none of ``metrics_dir``, ``metrics_files``, or
@@ -88,11 +111,14 @@ class MultiModelEvaluator:
         >>> # Aggregate from JSON metrics files
         >>> evaluator = MultiModelEvaluator(metrics_dir="output/eval/")
         >>> df = evaluator.get_aggregate_metrics()
-        >>> evaluator.save_aggregate_metrics()
 
-        >>> # Aggregate plots from registry CSV
-        >>> evaluator = MultiModelEvaluator(trained_model_csv="output/.../trained_model_registry.csv")
-        >>> figs = evaluator.plot_all()
+        >>> # Temporal out-of-sample evaluation from registry + forecast data
+        >>> evaluator = MultiModelEvaluator(
+        ...     trained_model_csv="output/.../trained_model_registry.csv",
+        ...     X_test=forecast_features_df,
+        ...     y_test=forecast_labels_series,
+        ... )
+        >>> evaluator.plot_all()
     """
 
     def __init__(
@@ -100,6 +126,8 @@ class MultiModelEvaluator:
         metrics_dir: str | None = None,
         metrics_files: list[str] | None = None,
         trained_model_csv: str | None = None,
+        X_test: pd.DataFrame | None = None,
+        y_test: pd.Series | None = None,
         classifier_name: str = "model",
         plot_shap: bool = False,
         root_dir: str | None = None,
@@ -120,6 +148,11 @@ class MultiModelEvaluator:
             trained_model_csv (str | None, optional): Path to a trained model registry
                 CSV produced by ModelTrainer. Used for aggregate plot generation.
                 Defaults to None.
+            X_test (pd.DataFrame | None, optional): Forecast-period feature matrix for
+                out-of-sample evaluation. When provided, used instead of reading
+                ``X_test_filepath`` from the registry. Defaults to None.
+            y_test (pd.Series | None, optional): True labels for the forecast period.
+                Required alongside ``X_test`` for evaluation. Defaults to None.
             classifier_name (str): Classifier name used as prefix filename.
                 Defaults to "model".
             plot_shap (bool, optional): If ``True``, generate aggregate SHAP
@@ -144,6 +177,8 @@ class MultiModelEvaluator:
         self._metrics_dir = metrics_dir
         self._metrics_files = metrics_files
         self._trained_model_csv = trained_model_csv
+        self.X_test = X_test
+        self.y_test = y_test
 
         output_dir = resolve_output_dir(
             output_dir, root_dir, os.path.join("output", "evaluations")
@@ -178,18 +213,25 @@ class MultiModelEvaluator:
     @staticmethod
     def _load_seed_data(
         row: pd.Series,
+        X_test: pd.DataFrame | None = None,
+        y_test: pd.Series | None = None,
     ) -> tuple[BaseEstimator, pd.DataFrame, np.ndarray, np.ndarray]:
         """Load model, filtered test features, true labels, and probabilities for one seed.
 
-        Reads the trained model, X_test, y_test, and significant-features
-        list from paths stored in a registry row, then runs ``predict_proba``
-        (or ``decision_function`` as fallback) to produce probability estimates.
+        When ``X_test`` and ``y_test`` are provided directly (forecast-period evaluation),
+        they are used instead of reading ``X_test_filepath``/``y_test_filepath`` from
+        the registry row. Significant features from the registry are used to filter columns.
 
         Args:
             row (pd.Series): A single row from the model registry DataFrame
-                with at least the keys ``trained_model_filepath``,
-                ``X_test_filepath``, ``y_test_filepath``, and
+                with at least the keys ``trained_model_filepath`` and
                 ``significant_features_csv``.
+            X_test (pd.DataFrame | None, optional): Forecast-period feature matrix.
+                When provided, overrides reading from the registry filepath.
+                Defaults to None.
+            y_test (pd.Series | None, optional): True labels for the forecast period.
+                When provided, overrides reading from the registry filepath.
+                Defaults to None.
 
         Returns:
             tuple[BaseEstimator, pd.DataFrame, np.ndarray, np.ndarray]: A 4-tuple of
@@ -198,16 +240,25 @@ class MultiModelEvaluator:
                 significant features selected for this seed.
         """
         model = joblib.load(row["trained_model_filepath"])
-        X_test = pd.read_csv(row["X_test_filepath"], index_col=0)
-        y_true = pd.read_csv(row["y_test_filepath"], index_col=0).iloc[:, 0].to_numpy()
+
+        if X_test is None:
+            X_test = pd.read_csv(row["X_test_filepath"], index_col=0)
+        if y_test is None:
+            y_true = (
+                pd.read_csv(row["y_test_filepath"], index_col=0).iloc[:, 0].to_numpy()
+            )
+        else:
+            y_true = y_test.to_numpy()
 
         sig_features = pd.read_csv(
             row["significant_features_csv"], index_col=0
         ).index.tolist()
 
-        # Checking if X_test_filtered columns has all significant features
+        # Filter X_test to only the significant features for this seed.
+        # Intersect with available columns to handle any column mismatch.
+        available = [f for f in sig_features if f in X_test.columns]
         try:
-            X_test_filtered = X_test[sig_features]
+            X_test_filtered = X_test[available]
         except KeyError as e:
             raise KeyError(
                 f"{e}. significant_features_csv: {row['significant_features_csv']}"
@@ -314,7 +365,9 @@ class MultiModelEvaluator:
         y_trues: list[np.ndarray] = []
         y_probas: list[np.ndarray] = []
         for _, row in registry.iterrows():
-            model, X_test, y_true, y_proba = self._load_seed_data(row)
+            model, X_test, y_true, y_proba = self._load_seed_data(
+                row, X_test=self.X_test, y_test=self.y_test
+            )
             models.append(model)
             x_tests.append(X_test)
             y_trues.append(y_true)
@@ -600,7 +653,8 @@ class MultiModelEvaluator:
         """
         models, x_tests, y_trues, _ = self._predictions
         y_preds: list[np.ndarray] = [
-            model.predict(X_test) for model, X_test in zip(models, x_tests, strict=True)
+            model.predict(X_test)  # ty:ignore[unresolved-attribute]
+            for model, X_test in zip(models, x_tests, strict=True)
         ]
 
         fig, data = _plot_cm_styled(
@@ -788,7 +842,9 @@ class MultiModelEvaluator:
         models: list[BaseEstimator] = []
         feature_names: list[str] = []
         for _, row in registry.iterrows():
-            model, _, _, _ = self._load_seed_data(row)
+            model, _, _, _ = self._load_seed_data(
+                row, X_test=self.X_test, y_test=self.y_test
+            )
             models.append(model)
             if not feature_names:
                 feature_names = pd.read_csv(

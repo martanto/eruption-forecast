@@ -1,8 +1,12 @@
 """Base infrastructure shared by all model-trainer subclasses.
 
 Provides the constructor, validation, directory management, feature selection,
-grid-search setup, and model-registry utilities that are reused by both
-:class:`EvaluationTrainer` and :class:`ModelTrainer`.
+grid-search setup, and model-registry utilities that are reused by
+:class:`ModelTrainer`.
+
+Training always operates on the full dataset (no 80/20 split).  Out-of-sample
+evaluation is handled separately by :class:`ModelPredictor` using the
+forecast-period data as the test set.
 """
 
 import os
@@ -12,11 +16,10 @@ from collections.abc import Callable
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
-    resample,
     merge_seed_models,
     get_classifier_models,
     merge_all_classifiers,
@@ -25,7 +28,6 @@ from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import load_label_csv
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.config.constants import (
-    TRAIN_TEST_SPLIT,
     DEFAULT_CV_SPLITS,
     DEFAULT_N_SIGNIFICANT_FEATURES,
 )
@@ -44,7 +46,7 @@ class BaseModelTrainer:
 
     Provides the constructor, validation, directory management, feature
     selection, grid-search setup, and model-registry utilities that are
-    reused by both :class:`EvaluationTrainer` and :class:`ModelTrainer`.
+    reused by :class:`ModelTrainer`.
 
     Attributes:
         df_features (pd.DataFrame): Loaded features DataFrame.
@@ -69,7 +71,6 @@ class BaseModelTrainer:
         shared_significant_dir (str): Shared directory for significant features.
         shared_all_features_dir (str): Shared directory for all features.
         shared_figures_dir (str): Shared directory for feature importance plots.
-        shared_tests_dir (str): Shared directory for per-seed held-out test splits.
         shared_resampled_dir (str): Shared directory for per-seed resampled training data.
         classifier_dirs (dict[str, str]): Per-classifier output directories keyed by slug.
         models_dirs (dict[str, str]): Per-classifier model directories keyed by slug.
@@ -268,10 +269,6 @@ class BaseModelTrainer:
             method=feature_selection_method, verbose=verbose, n_jobs=grid_search_n_jobs
         )
 
-        # Must be initialised before set_directories() because that method
-        # reads this flag to choose the "evaluations" vs "predictions" sub-path.
-        self.with_evaluation = False
-
         # Set directories
         (
             self.output_dir,
@@ -279,7 +276,6 @@ class BaseModelTrainer:
             self.shared_significant_dir,
             self.shared_all_features_dir,
             self.shared_figures_dir,
-            self.shared_tests_dir,
             self.shared_resampled_dir,
             self.classifier_dirs,
             self.models_dirs,
@@ -408,21 +404,19 @@ class BaseModelTrainer:
         """Build and store the full directory hierarchy for training outputs.
 
         Derives all shared (feature-selection) and per-classifier output paths
-        from ``output_dir``, appending ``evaluations/`` or ``predictions/``
-        depending on ``self.with_evaluation``.  The returned paths are assigned
-        to the corresponding instance attributes by the caller.
+        from ``output_dir``, appending ``predictions/``. The returned paths are
+        assigned to the corresponding instance attributes by the caller.
 
         Args:
             output_dir (str): Base trainings directory (e.g. ``output/trainings``).
 
         Returns:
-            tuple: A 10-tuple of
+            tuple: A 9-tuple of
                 ``(output_dir, shared_features_dir, shared_significant_dir,
-                shared_all_features_dir, shared_figures_dir, shared_tests_dir,
+                shared_all_features_dir, shared_figures_dir,
                 shared_resampled_dir, classifier_dirs, models_dirs, metrics_dirs)``.
         """
-        sub_output_dir = "evaluations" if self.with_evaluation else "predictions"
-        output_dir = os.path.join(output_dir, sub_output_dir)
+        output_dir = os.path.join(output_dir, "predictions")
 
         shared_features_dir = os.path.join(output_dir, "features", self.cv_slug_name)
         shared_significant_dir = os.path.join(
@@ -430,7 +424,6 @@ class BaseModelTrainer:
         )
         shared_all_features_dir = os.path.join(shared_features_dir, "all_features")
         shared_figures_dir = os.path.join(shared_features_dir, "figures", "significant")
-        shared_tests_dir = os.path.join(shared_features_dir, "tests")
         shared_resampled_dir = os.path.join(shared_features_dir, "resampled")
 
         classifier_dirs: dict[str, str] = {}
@@ -451,7 +444,6 @@ class BaseModelTrainer:
             shared_significant_dir,
             shared_all_features_dir,
             shared_figures_dir,
-            shared_tests_dir,
             shared_resampled_dir,
             classifier_dirs,
             models_dirs,
@@ -490,21 +482,16 @@ class BaseModelTrainer:
         self,
         save_all_features: bool = False,
         plot_significant_features: bool = False,
-        with_evaluation: bool = False,
     ) -> None:
         """Create all required output directories for the current training run.
 
         Always creates the base output and significant-features directories.
-        Optionally creates the all-features, figures, test-split, and per-classifier
-        metrics directories when the corresponding flags are set.
+        Optionally creates the all-features and figures directories.
 
         Args:
             save_all_features (bool, optional): Create the all-features directory.
                 Defaults to False.
             plot_significant_features (bool, optional): Create the figures directory.
-                Defaults to False.
-            with_evaluation (bool, optional): Create the held-out test-split and
-                per-classifier metrics directories needed by the evaluation pipeline.
                 Defaults to False.
 
         Returns:
@@ -526,13 +513,6 @@ class BaseModelTrainer:
 
         if plot_significant_features:
             ensure_dir(self.shared_figures_dir)
-
-        if with_evaluation:
-            ensure_dir(self.shared_tests_dir)
-            for classifier_model in self.classifier_models:
-                ensure_dir(
-                    os.path.join(self.metrics_dirs[classifier_model.slug_name], "json")
-                )
 
     def concat_significant_features(self, plot: bool = False) -> pd.DataFrame:
         """Concatenate significant features from all training seeds.
@@ -750,7 +730,7 @@ class BaseModelTrainer:
         random_state: int,
         save_features: bool = False,
         plot_features: bool = False,
-    ) -> tuple[str, str, str | None, str | None, str, str, str, bool]:
+    ) -> tuple[str, str, str | None, str | None, str, bool]:
         """Generate shared filepaths that are the same for all classifiers in a seed.
 
         These paths cover feature selection outputs, test data, resampled training
@@ -766,14 +746,12 @@ class BaseModelTrainer:
                 Defaults to False.
 
         Returns:
-            tuple: An 8-tuple of:
+            tuple: A 6-tuple of:
 
                 - **filename** (str): Base filename stem for this seed.
                 - **significant_filepath** (str): Path to significant features CSV.
                 - **all_features_filepath** (str | None): Path to all features CSV, or None.
                 - **all_figures_filepath** (str | None): Path to feature plot PNG, or None.
-                - **X_test_filepath** (str): Path to held-out X_test CSV.
-                - **y_test_filepath** (str): Path to held-out y_test CSV.
                 - **resampled_filepath** (str): Path to resampled training data CSV.
                 - **can_skip_shared** (bool): True if all shared outputs already exist.
         """
@@ -796,8 +774,6 @@ class BaseModelTrainer:
             if plot_features
             else None
         )
-        X_test_filepath = os.path.join(self.shared_tests_dir, f"{filename}_X_test.csv")
-        y_test_filepath = os.path.join(self.shared_tests_dir, f"{filename}_y_test.csv")
         resampled_filepath = os.path.join(self.shared_resampled_dir, f"{filename}.csv")
 
         shared_required = [significant_filepath, resampled_filepath]
@@ -810,8 +786,6 @@ class BaseModelTrainer:
             significant_filepath,
             all_features_filepath,
             all_figures_filepath,
-            X_test_filepath,
-            y_test_filepath,
             resampled_filepath,
             can_skip_shared,
         )
@@ -963,17 +937,20 @@ class BaseModelTrainer:
     ) -> str:
         """Build and save the trained-models registry CSV for one classifier.
 
-        Save model registry DataFrame with filename format:
-        trained_model_{classifier_name}_rs-{random_state}_ts-{total_seed}_top-{number_of_significant_features}.csv
+        Each registry row contains exactly three columns: ``random_state``
+        (index), ``significant_features_csv``, and ``trained_model_filepath``.
+        No test-split paths are stored.
 
-        Example Filename:
-            trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv
+        Filename format:
+        ``trained_model_{classifier_id}_rs-{random_state}_ts-{total_seed}_top-{n}.csv``
+
+        Example filename:
+            ``trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv``
 
         Args:
             records (list[dict]): One dict per seed with keys
-                ``random_state``, ``significant_features_csv``,
-                ``trained_model_filepath``, and (for ``evaluate`` only)
-                ``X_test_filepath`` and ``y_test_filepath``.
+                ``random_state``, ``significant_features_csv``, and
+                ``trained_model_filepath``.
             random_state (int): Initial random state used for this run.
             total_seed (int): Total number of seeds used for this run.
             classifier_slug (str): Slugified classifier name used to locate the correct
@@ -1009,51 +986,6 @@ class BaseModelTrainer:
         self.csv[classifier_slug] = csv
 
         return suffix
-
-    def _split_and_resample(
-        self,
-        X: pd.DataFrame,
-        y: pd.Series,
-        random_state: int,
-        sampling_strategy: str | float = 0.75,
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-        """Steps 1-2: stratified train/test split then optional resampling on train.
-
-        Applies the resampling strategy determined at construction time
-        (``self.resample_method``) to the training split only. The held-out test
-        set is never resampled.
-
-        Args:
-            X (pd.DataFrame): Full feature matrix.
-            y (pd.Series): Full label series.
-            random_state (int): Random seed for both split and sampler.
-            sampling_strategy (str | float, optional): Sampling ratio forwarded to
-                the resampler. Ignored when ``self.resample_method`` is ``"none"``.
-                Defaults to 0.75.
-
-        Returns:
-            tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]: A 4-tuple of
-                (X_train_resampled, X_test, y_train_resampled, y_test) where
-                X_train_resampled and y_train_resampled are the (optionally resampled)
-                training data and X_test / y_test are the held-out test split.
-        """
-        X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y,
-            test_size=TRAIN_TEST_SPLIT,
-            random_state=random_state,
-            stratify=y,
-        )
-
-        X_train_resampled, y_train_resampled = resample(
-            features=X_train,
-            labels=y_train,
-            method=self.resample_method,
-            sampling_strategy=sampling_strategy,
-            random_state=random_state,
-            verbose=self.verbose,
-        )
-        return X_train_resampled, X_test, y_train_resampled, y_test
 
     def merge_models(self, output_path: str | None = None) -> dict[str, str]:
         """Merge all seed models for each classifier into a single SeedEnsemble pkl.

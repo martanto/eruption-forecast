@@ -102,8 +102,7 @@ Raw Seismic Data (SDS / FDSN)
 │  │   or        │   │ (10 classifiers,     │ │
 │  │  combined   │   │  3 CV strategies)    │ │
 │  └─────────────┘   └──────────────────────┘ │
-│         ↓  evaluate()  ↓ train()            │
-│    80/20 split + metrics   Full dataset     │
+│         ↓  train()  (full dataset, no split) │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
           │
@@ -162,9 +161,9 @@ operating on the same `ForecastModel` instance.
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
 │  train()        │  ModelTrainer                              │  train()        │  ModelTrainer
-│  with_eval=True │  classifiers: lite-rf, rf, gb, xgb         │  with_eval=False│  (same classifiers)
-│                 │  cv: stratified, seeds: 500                │                 │  cv: stratified, seeds: 500
-│                 │  80/20 split → metrics JSON per seed       │                 │  full dataset → no metrics
+|  train()        |  ModelTrainer                              |  train()        |  ModelTrainer
+|  classifiers:   |  lite-rf, rf, gb, xgb                      |  (same config)  |  (same classifiers)
+|  cv: stratified, seeds: 500, full dataset  |  cv: stratified, seeds: 500, full dataset  |
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
          ▼                                                              ▼
@@ -336,13 +335,13 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 - CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
 - Uses `RandomUnderSampler` to handle class imbalance
 - Feature selection and resampled training data are cached per seed to `features/{cv-slug}/` (resampled data in `features/{cv-slug}/resampled/`) for deterministic two-phase parallel dispatch
-- Two training modes:
-  - `evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
-  - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
+- Single training mode:
+  - `train()`: Resample full dataset → feature selection → CV → save (no metrics; evaluation handled by ModelPredictor)
+
 
 **Key classes:**
 - `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
-  - `fit(with_evaluation=True)`: Dispatches to `evaluate()` or `train()` based on flag
+  - `fit()`: thin wrapper that calls `train()` and returns self
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
 - `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
@@ -361,15 +360,13 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                         TRAINING PHASE                                              │
 │                                                                                                     │
-│   ┌──────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│   │                              ModelTrainer  (one classifier)                                  │  │
-│   │                                                                                              │  │
-│   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
-│   │           │                                                   │                              │  │
-│   │       evaluate()                                            train()                          │  │
-│   │   80/20 split → resample                            full dataset → resample                  │  │
-│   │   → feature select → CV                              → feature select → CV                   │  │
-│   │   → eval on test set                                    (no evaluation)                      │  │
+|   |                              ModelTrainer  (one classifier)                                  |  |
+|   |                                                                                              |  |
+|   |   .fit() → train()                                                                          |  |
+|   |              |                                                                               |  |
+|   |           train()                                                                            |  |
+|   |   full dataset → resample → feature select → CV → save model                               |  |
+|   |                                                                                              |  |
 │   └───────────────────┬──────────────────────────────────────────────────────────────────────────┘  │
 │                       │ produces (per seed)                                                         │
 │                       ▼                                                                             │

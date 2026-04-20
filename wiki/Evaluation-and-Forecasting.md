@@ -2,16 +2,16 @@
 
 This page covers how to evaluate trained models and run inference on new seismic data. Four classes are involved:
 
-- **`ModelEvaluator`** — evaluates a single trained model (one seed) against a held-out test set.
-- **`MultiModelEvaluator`** — aggregates metrics and plots across all seeds produced by `evaluate()`.
+- **`ModelEvaluator`** — evaluates a single trained model (one seed) against a test set.
+- **`MultiModelEvaluator`** — aggregates metrics and plots across all seeds; supports temporal evaluation mode via `X_test`/`y_test`.
 - **`ClassifierComparator`** — compares multiple classifiers side-by-side with ranking tables and comparison plots.
-- **`ModelPredictor`** — runs inference using models trained by `ModelTrainer.train()`, in either evaluation or forecast mode.
+- **`ModelPredictor`** — runs forecast inference using models trained by `ModelTrainer.train()`; evaluates automatically on the forecast period when `eruption_dates` is provided.
 
 ---
 
 ## ModelEvaluator — Single-Seed Evaluation
 
-`ModelEvaluator` computes classification metrics and generates diagnostic plots for a single trained model evaluated on a held-out test set. Use it after `evaluate()` (which saves per-seed test splits automatically) or after calling `ModelPredictor.predict_best()` (which returns a ready-made evaluator for the best-performing seed).
+`ModelEvaluator` computes classification metrics and generates diagnostic plots for a single trained model evaluated on a test set. Pass model, `X_test`, and `y_test` directly — either from in-memory objects or loaded from files.
 
 ### Creating an evaluator
 
@@ -54,7 +54,7 @@ evaluator = ModelEvaluator.from_files(
 | `"RandomForestClassifier"` | `"StratifiedKFold"` | `<cwd>/output/trainings/evaluations/classifiers/random-forest-classifier/stratified-k-fold/` |
 | `"XGBClassifier"` | `"ShuffleSplit"` | `<cwd>/output/trainings/evaluations/classifiers/xgb-classifier/shuffle-split/` |
 
-Both names are passed through `slugify_class_name()` — `CamelCase` → `kebab-case`. This convention matches the directory structure produced by `ModelTrainer.evaluate()`.
+Both names are passed through `slugify_class_name()` — `CamelCase` → `kebab-case`.
 
 Once created, inspect the model with:
 
@@ -139,16 +139,16 @@ path = evaluator.save_metrics("results/xgb_42_metrics.json")
 
 ## MultiModelEvaluator — Aggregate Across All Seeds
 
-`MultiModelEvaluator` aggregates evaluation results across all seeds produced by `evaluate()`. It can work from a model registry CSV (enabling aggregate plots), from per-seed JSON metrics files (enabling aggregate statistics), or from both at once.
+`MultiModelEvaluator` aggregates evaluation results across all seeds. It can work from a model registry CSV (enabling aggregate plots), from per-seed JSON metrics files (enabling aggregate statistics), or in temporal evaluation mode with `X_test`/`y_test` directly.
 
 ### Creating an evaluator
 
-Three construction modes are available:
+Several construction modes are available:
 
 ```python
 from eruption_forecast import MultiModelEvaluator
 
-base = "output/trainings/evaluations/classifiers/xgb-classifier/stratified-shuffle-split"
+base = "output/trainings/predictions/xgb-classifier/stratified-shuffle-split"
 trained_model_csv = f"{base}/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv"
 
 # Mode 1: registry CSV only — enables aggregate plots
@@ -157,7 +157,14 @@ evaluator = MultiModelEvaluator(trained_model_csv=trained_model_csv)
 # Mode 2: metrics directory only — enables aggregate statistics
 evaluator = MultiModelEvaluator(metrics_dir=f"{base}/metrics")
 
-# Mode 3: both combined — enables plots and statistics together
+# Mode 3: temporal evaluation — pass forecast-period test data directly
+evaluator = MultiModelEvaluator(
+    trained_model_csv=trained_model_csv,
+    X_test=features_df,          # forecast-period features
+    y_test=labels["is_erupted"], # forecast-period labels
+)
+
+# Mode 4: both combined — enables plots and statistics together
 evaluator = MultiModelEvaluator(
     trained_model_csv=trained_model_csv,
     metrics_dir=f"{base}/metrics",
@@ -351,14 +358,9 @@ output/comparison/
 
 ---
 
-## ModelPredictor — Inference on New Data
+## ModelPredictor — Inference and Temporal Evaluation
 
-`ModelPredictor` runs inference using models trained by `ModelTrainer.train()`. It supports two modes:
-
-- **Evaluation mode** — ground-truth labels are available; useful for benchmarking on a future labelled dataset.
-- **Forecast mode** — no labels; outputs eruption probability, uncertainty, and confidence per time window.
-
-Both single-model and multi-model consensus workflows are supported.
+`ModelPredictor` runs forecast inference using models trained by `ModelTrainer.train()`. When known eruption dates are supplied to `predict_proba()`, labels for the forecast period are built automatically and `evaluate()` is called to produce temporal out-of-sample metrics — no 80/20 split is involved.
 
 ```python
 from eruption_forecast.model.model_predictor import ModelPredictor
@@ -368,69 +370,59 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `start_date` | `str \| datetime` | — | Start of the prediction period (format: YYYY-MM-DD) |
-| `end_date` | `str \| datetime` | — | End of the prediction period (format: YYYY-MM-DD) |
+| `forecast_start_date` | `str \| datetime` | — | Start of the forecast period (format: YYYY-MM-DD) |
+| `forecast_end_date` | `str \| datetime` | — | End of the forecast period (format: YYYY-MM-DD) |
 | `trained_models` | `str \| dict[str, str]` | — | Single `trained_model_*.csv` path, a merged `SeedEnsemble` `.pkl` path, a multi-classifier bundle `.pkl` path, or a `{name: path}` dict for multi-model consensus |
+| `train_features_csv` | `str \| None` | `None` | Path to training features CSV (stored for reference) |
+| `train_labels_csv` | `str \| None` | `None` | Path to training labels CSV (stored for reference) |
+| `model_name` | `str` | `"model"` | Label used for output columns and filenames (single-model mode) |
 | `overwrite` | `bool` | `False` | Overwrite existing output files |
 | `n_jobs` | `int` | `1` | Number of parallel jobs for feature extraction |
 | `output_dir` | `str \| None` | `None` | Output directory; defaults to `<root_dir>/output/predictions` |
 | `root_dir` | `str \| None` | `None` | Root directory for resolving output paths |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
-### Evaluation mode — predict() and predict_best()
-
-Use evaluation mode when ground-truth eruption labels are available for the prediction period. Both methods require pre-extracted feature CSVs.
-
-**`predict()`** evaluates every seed model against the labels and returns a DataFrame with one row per `(classifier, seed)`:
-
-```python
-predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
-    trained_models=trainer.csv,
-    output_dir="output/predictions",
-)
-
-df_metrics = predictor.predict(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-)
-print(df_metrics[["balanced_accuracy", "f1_score"]].describe())
-```
-
-**`predict_best()`** selects the single best-performing seed according to a chosen criterion and returns a `ModelEvaluator` for that seed:
-
-```python
-evaluator = predictor.predict_best(
-    future_features_csv="output/features/future_all_features.csv",
-    future_labels_csv="output/features/future_label_features.csv",
-    criterion="balanced_accuracy",
-)
-print(evaluator.summary())
-evaluator.plot_all()
-```
-
-The `criterion` parameter accepts any of: `"accuracy"`, `"balanced_accuracy"`, `"f1_score"`, `"precision"`, `"recall"`, `"roc_auc"`, `"pr_auc"`.
-
 ### Forecast mode — predict_proba()
 
-Use forecast mode when no ground-truth labels are available. Pass raw tremor data directly; `ModelPredictor` handles windowing and feature extraction internally.
+Pass raw tremor data directly; `ModelPredictor` handles windowing and feature extraction internally.
 
 **Single model:**
 
 ```python
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models=trainer.csv,
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+)
 ```
 
 Results are saved to `predictions.csv` in `output_dir`. When `plot=True`, an eruption forecast plot is saved to `figures/eruption_forecast.png`.
+
+**With automatic out-of-sample evaluation:**
+
+Supply `eruption_dates` to trigger temporal evaluation on the forecast period:
+
+```python
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    eruption_dates=["2025-03-20"],
+    day_to_forecast=2,
+)
+
+# Aggregate evaluation metrics (per-seed)
+df_eval = predictor.evaluation_df
+```
 
 ### Using a merged SeedEnsemble pkl
 
@@ -440,25 +432,30 @@ Instead of passing a CSV registry (which loads 500 `.pkl` files on every call), 
 
 ```python
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-28",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models="output/.../merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl",
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+)
 ```
 
 **Multi-classifier bundle** (all ensembles in one file):
 
 ```python
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-28",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models="output/.../trainings/merged_classifiers_rf_xgb_rs-0_ts-500_top-20.pkl",
 )
-df_forecast = predictor.predict_proba(...,,
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2,
+                                      window_step=12, window_step_unit="hours")
 ```
 
 You can also use `SeedEnsemble` directly without going through `ModelPredictor`:
@@ -478,8 +475,8 @@ Pass a `{name: path}` dict to `trained_models` to enable multi-model consensus. 
 
 ```python
 predictor = ModelPredictor(
-    start_date="2025-03-16",
-    end_date="2025-03-22",
+    forecast_start_date="2025-03-23",
+    forecast_end_date="2025-03-30",
     trained_models={
         "rf": "output/VG.OJN.00.EHZ/trainings/predictions/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
         "xgb": "output/VG.OJN.00.EHZ/trainings/predictions/xgb-classifier/stratified-shuffle-split/trained_model_XGBClassifier-StratifiedShuffleSplit_rs-0_ts-500_top-20.csv",
@@ -487,8 +484,12 @@ predictor = ModelPredictor(
     output_dir="output/predictions",
 )
 
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+)
 ```
 
 The plot shows each classifier as a dashed line and the consensus as a solid black line with a shaded uncertainty band.

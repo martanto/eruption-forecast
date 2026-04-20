@@ -280,6 +280,7 @@ class ForecastModel:
         # ------------------------------------------------------------------
         self.ModelPredictor: ModelPredictor | None = None
         self.prediction_df: pd.DataFrame = pd.DataFrame()
+        self.evaluation_df: pd.DataFrame = pd.DataFrame()
         self.forecast_plot_path: str | None = None
 
         # ------------------------------------------------------------------
@@ -1224,7 +1225,6 @@ class ForecastModel:
         label_csv: str,
         output_dir: str,
         train_params: dict[str, Any],
-        with_evaluation: bool = False,
         number_of_significant_features: int = 20,
         grid_params: dict[str, Any] | None = None,
         resample_method: Literal["under", "over", "auto"] | None = "auto",
@@ -1253,8 +1253,6 @@ class ForecastModel:
             output_dir (str): Root directory for training outputs.
             train_params (dict[str, Any]): Keyword arguments forwarded to
                 ``ModelTrainer.fit()`` (e.g. ``random_state``, ``total_seed``).
-            with_evaluation (bool, optional): If True, performs an 80/20 train/test
-                split and computes evaluation metrics. Defaults to False.
             number_of_significant_features (int, optional): Top-N features retained
                 per seed. Defaults to 20.
             grid_params (dict[str, Any] | None, optional): Custom hyperparameter grid
@@ -1304,9 +1302,7 @@ class ForecastModel:
             for clf_model in train_model.classifier_models:
                 clf_model.grid = grid_params
 
-        merged_models = train_model.fit(
-            with_evaluation=with_evaluation, **train_params
-        ).merge_models()
+        merged_models = train_model.fit(**train_params).merge_models()
 
         # Build result mapping: classifier_name -> registry CSV path
         trained_models: dict[str, str] = {}
@@ -1329,7 +1325,6 @@ class ForecastModel:
         ] = "shuffle-stratified",
         random_state: int = 0,
         total_seed: int = 500,
-        with_evaluation: bool = False,
         grid_params: dict[str, Any] | None = None,
         number_of_significant_features: int = 20,
         sampling_strategy: str | float = 0.75,
@@ -1372,9 +1367,6 @@ class ForecastModel:
                 "shuffle-stratified", "timeseries"). Defaults to "shuffle-stratified".
             random_state (int, optional): Initial random seed. Defaults to 0.
             total_seed (int, optional): Total number of random seeds. Defaults to 500.
-            with_evaluation (bool, optional): If True, performs an 80/20 train/test split
-                and computes evaluation metrics per seed. Requires labels. Set to False
-                to train on the full dataset without metrics. Defaults to False.
             grid_params (dict[str, Any], optional): Override default hyperparameter grid
                 for GridSearchCV. Defaults to None.
             number_of_significant_features (int, optional): Number of top features to retain
@@ -1428,14 +1420,7 @@ class ForecastModel:
             logger.info(f"| Training model using: {classifier}")
             if self.use_relevant_features:
                 logger.info("|- Relevant Features selected.")
-            # Model evaluation only works if self.label_data is not empty
-            if not self.label_data.empty and with_evaluation:
-                logger.info("|- Training model for evaluation.")
-            if self.label_data.empty and with_evaluation:
-                logger.info("|- Label is empty. Model evaluation will be set to False.")
-                with_evaluation = False
-            if not with_evaluation:
-                logger.info("|- Training for prediction.")
+            logger.info("|- Training on full dataset (no train/test split).")
             logger.info("=" * 50)
 
         features_csv = extracted_features_csv or self.features_csv
@@ -1471,7 +1456,6 @@ class ForecastModel:
             label_csv=label_csv,
             output_dir=output_dir,
             train_params=train_params,
-            with_evaluation=with_evaluation,
             number_of_significant_features=number_of_significant_features,
             grid_params=grid_params,
             resample_method=resample_method,
@@ -1483,10 +1467,8 @@ class ForecastModel:
             gpu_id=gpu_id,
         )
 
-        prefix = "evaluations" if with_evaluation else "predictions"
-
-        # `<cwd>/output/<station_dir>/trainings/<prefix>
-        trainings_dir = os.path.join(output_dir, "trainings", prefix)
+        # `<cwd>/output/<station_dir>/trainings/predictions
+        trainings_dir = os.path.join(output_dir, "trainings", "predictions")
         ensure_dir(trainings_dir)
 
         # Save trained models JSON
@@ -1496,7 +1478,7 @@ class ForecastModel:
         #     "XGBClassifier": "/path/to/trained_model_xgb.csv"
         # }
         trained_models_filepath = os.path.join(
-            trainings_dir, f"{prefix}_trained_models.json"
+            trainings_dir, "predictions_trained_models.json"
         )
         with open(trained_models_filepath, "w") as f:
             json.dump(trained_models, f, indent=4)
@@ -1506,7 +1488,6 @@ class ForecastModel:
             cv_strategy=cv_strategy,
             random_state=random_state,
             total_seed=total_seed,
-            with_evaluation=with_evaluation,
             number_of_significant_features=number_of_significant_features,
             sampling_strategy=float(sampling_strategy)
             if isinstance(sampling_strategy, (int, float))
@@ -1526,10 +1507,10 @@ class ForecastModel:
         self.trained_models = trained_models
 
         if save_model:
-            self.save_config(os.path.join(trainings_dir, f"{prefix}_config.yaml"))
+            self.save_config(os.path.join(trainings_dir, "predictions_config.yaml"))
 
             self.save_model(
-                path=os.path.join(trainings_dir, f"{prefix}_forecast_model.pkl")
+                path=os.path.join(trainings_dir, "predictions_forecast_model.pkl")
             )
 
         return self
@@ -1553,8 +1534,16 @@ class ForecastModel:
 
         Constructs a ``ModelPredictor`` from the trained model registry, runs
         ``predict_proba()`` on the provided tremor data for the specified future
-        window, and stores results in ``self.prediction_df``. Saves the pipeline
-        configuration to ``config.yaml`` after completion.
+        window, and stores results in ``self.prediction_df``.
+
+        When ``self.LabelBuilder.eruption_dates`` is available (i.e.,
+        :meth:`build_label` was called with eruption dates), the forecast period
+        is used as the out-of-sample test set: ``ModelPredictor.build_forecast_labels()``
+        builds labeled windows for the forecast period and
+        ``ModelPredictor.evaluate()`` computes metrics against them.  The result
+        is stored in ``self.evaluation_df``.  No 80/20 split is performed.
+
+        Saves the pipeline configuration to ``config.yaml`` after completion.
 
         Args:
             start_date (str | datetime): Start date for forecasting windows.
@@ -1600,9 +1589,11 @@ class ForecastModel:
             logger.info("Starting Prediction...")
 
         model_predictor = ModelPredictor(
-            start_date=start_date,
-            end_date=end_date,
+            forecast_start_date=start_date,
+            forecast_end_date=end_date,
             trained_models=trained_models,
+            train_features_csv=self.features_csv,
+            train_labels_csv=self.label_features_csv,
             output_dir=output_dir,
             n_jobs=n_jobs,
             verbose=verbose,
@@ -1618,11 +1609,26 @@ class ForecastModel:
             threshold=threshold,
             save_predictions=save_predictions,
             title=title,
-            eruption_dates=self.LabelBuilder.eruption_dates
-            if self.LabelBuilder
-            else None,
+            eruption_dates=(
+                self.LabelBuilder.eruption_dates if self.LabelBuilder else None
+            ),
+            day_to_forecast=(
+                self.LabelBuilder.day_to_forecast if self.LabelBuilder else None
+            ),
             **plot_kwargs,
         )
+
+        # if (
+        #     self.LabelBuilder
+        #     and self.LabelBuilder.eruption_dates
+        #     and model_predictor.features_df is not None
+        #     and model_predictor.forecast_labels_df is not None
+        # ):
+        #     model_predictor.evaluate(
+        #         X_forecast=model_predictor.features_df,
+        #         y_forecast=model_predictor.forecast_labels_df["is_erupted"],
+        #     )
+        #     self.evaluation_df = model_predictor.evaluation_df  # ty:ignore[invalid-assignment]
 
         self.ModelPredictor = model_predictor
         self.prediction_df = df_prediction

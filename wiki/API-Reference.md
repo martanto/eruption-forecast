@@ -75,17 +75,9 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 | `verbose` | `bool` | `False` | Print progress messages |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 
-### `evaluate()` Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `random_state` | `int` | `0` | Starting seed; runs `random_state … random_state + total_seed − 1` |
-| `total_seed` | `int` | `500` | Number of seeds to run |
-| `sampling_strategy` | `str \| float` | `0.75` | `RandomUnderSampler` ratio (training data only) |
-| `save_all_features` | `bool` | `False` | Save all ranked features per seed |
-| `plot_significant_features` | `bool` | `False` | Save feature-importance plot per seed |
-
 ### `train()` Parameters
+
+Trains on the **entire dataset** across multiple seeds — no internal split. Evaluation is handled by `ModelPredictor.evaluate()` on the forecast period.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -97,10 +89,11 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 
 ### `fit()` Parameters
 
+`fit()` is a thin wrapper that calls `train()` and returns `self` for chaining.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `evaluate()`; `False` → `train()` |
-| `**kwargs` | — | — | Forwarded to the dispatched method |
+| `**kwargs` | — | — | Forwarded verbatim to `train()` |
 
 ### Merge Methods
 
@@ -158,7 +151,7 @@ from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
 
 ## ModelPredictor
 
-Inference on new data — evaluation mode or forecast mode.
+Forecast inference and temporal out-of-sample evaluation.
 
 ```python
 from eruption_forecast.model.model_predictor import ModelPredictor
@@ -168,44 +161,51 @@ from eruption_forecast.model.model_predictor import ModelPredictor
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `start_date` | `str \| datetime` | — | Start of prediction period |
-| `end_date` | `str \| datetime` | — | End of prediction period |
+| `forecast_start_date` | `str \| datetime` | — | Start of the forecast period |
+| `forecast_end_date` | `str \| datetime` | — | End of the forecast period |
 | `trained_models` | `str \| dict[str, str]` | — | Single registry CSV path, path to a merged `.pkl` (`SeedEnsemble` or `dict[str, SeedEnsemble]`), or `{name: path}` dict for multi-model consensus |
+| `train_features_csv` | `str \| None` | `None` | Path to training features CSV (stored for reference) |
+| `train_labels_csv` | `str \| None` | `None` | Path to training labels CSV (stored for reference) |
+| `model_name` | `str` | `"model"` | Label for output columns and filenames |
 | `overwrite` | `bool` | `False` | Overwrite existing output files |
 | `n_jobs` | `int` | `1` | Parallel jobs |
 | `output_dir` | `str \| None` | `None` | Output directory |
 | `root_dir` | `str \| None` | `None` | Root directory for path resolution |
 | `verbose` | `bool` | `False` | Verbose logging |
 
-### `predict()` — Evaluation Mode
+### `predict_proba()` — Forecast Inference
 
 ```python
-df_metrics = predictor.predict(
-    future_features_csv="path/to/features.csv",
-    future_labels_csv="path/to/labels.csv",
-    plot=False,
+# Forecast only
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+)
+
+# Forecast + automatic out-of-sample evaluation
+df_forecast = predictor.predict_proba(
+    tremor_data="path/to/tremor.csv",
+    window_size=2,
+    window_step=12,
+    window_step_unit="hours",
+    eruption_dates=["2025-03-20"],
+    day_to_forecast=2,
 )
 ```
 
-Returns a DataFrame with one row per (classifier, seed) and columns: `accuracy`, `balanced_accuracy`, `f1_score`, `precision`, `recall`, `roc_auc`, `pr_auc`.
+### `build_forecast_labels()` — Label the Forecast Period
 
-### `predict_best()` — Best Seed
+Builds labeled windows for the forecast period using known eruption dates. Called automatically by `predict_proba()` when `eruption_dates` is provided.
 
-```python
-evaluator = predictor.predict_best(
-    future_features_csv="path/to/features.csv",
-    future_labels_csv="path/to/labels.csv",
-    criterion="balanced_accuracy",   # any metric column
-)
-```
+### `evaluate()` — Temporal Out-of-Sample Evaluation
 
-Returns a `ModelEvaluator` for the best-performing seed.
-
-### `predict_proba()` — Forecast Mode
+Evaluates each seed ensemble against forecast-period features and labels. Called automatically by `predict_proba()` after `build_forecast_labels()`.
 
 ```python
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
+predictor.evaluate(X_forecast=features_df, y_forecast=labels["is_erupted"])
+df_metrics = predictor.evaluation_df
 ```
 
 ---

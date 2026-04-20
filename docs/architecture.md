@@ -104,8 +104,7 @@ Raw Seismic Data (SDS / FDSN)
 │  │   or        │   │ (10 classifiers,     │ │
 │  │  combined   │   │  3 CV strategies)    │ │
 │  └─────────────┘   └──────────────────────┘ │
-│         ↓  evaluate()  ↓ train()            │
-│    80/20 split + metrics   Full dataset     │
+│       train() — full dataset, no split      │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
           ▼
@@ -114,6 +113,8 @@ Raw Seismic Data (SDS / FDSN)
 │  ┌──────────────────────────────────────┐   │
 │  │ predict_proba()                      │   │
 │  │ (forecast mode — no labels needed)   │   │
+│  │ → auto-evaluates when eruption_dates │   │
+│  │   provided (temporal out-of-sample)  │   │
 │  └──────────────────────────────────────┘   │
 │  Single model or multi-model consensus      │
 └─────────────────────────────────────────────┘
@@ -123,9 +124,9 @@ Raw Seismic Data (SDS / FDSN)
 
 ## Research Workflow (`main.py`)
 
-`main.py` is the top-level research script. It runs the full pipeline in two
-sequential branches — train-with-evaluation and train-for-prediction — both
-operating on the same `ForecastModel` instance.
+`main.py` is the top-level research script. It runs three independent branches
+— evaluate, predict, and scenarios — all operating on the same `ForecastModel`
+instance.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -147,8 +148,9 @@ operating on the same `ForecastModel` instance.
          │                                                              │
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
-│  build_label()  │  2025-01-01 → 2025-08-24                   │  build_label()  │  2025-07-28 → 2025-08-20
+│  build_label()  │  2025-01-01 → 2025-07-26                   │  build_label()  │  2025-01-01 → 2025-07-26
 │                 │  window_step=6h, dtf=2                     │                 │  window_step=6h, dtf=2
+│                 │  eruption_dates=[…]                        │                 │  eruption_dates=[…]
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
          ▼                                                              ▼
@@ -161,19 +163,19 @@ operating on the same `ForecastModel` instance.
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
 │  train()        │  ModelTrainer                              │  train()        │  ModelTrainer
-│  with_eval=True │  classifiers: lite-rf, rf, gb, xgb         │  with_eval=False│  (same classifiers)
+│                 │  classifiers: lite-rf, rf, gb, xgb         │                 │  (same classifiers)
 │                 │  cv: stratified, seeds: 500                │                 │  cv: stratified, seeds: 500
-│                 │  80/20 split → metrics JSON per seed       │                 │  full dataset → no metrics
+│                 │  full dataset → models/*.pkl               │                 │  full dataset → models/*.pkl
 └────────┬────────┘                                            └────────┬────────┘
          │                                                              │
          ▼                                                              ▼
 ┌─────────────────┐                                            ┌─────────────────┐
 │ MultiModel      │  per-classifier aggregate plots            │  forecast()     │  ModelPredictor
 │ Evaluator       │  ROC, PR, calibration, confusion,          │                 │  predict_proba
-│ (loop per clf)  │  SHAP, seed stability, …                   │                 │  2025-07-28 → 2025-08-20
-└────────┬────────┘                                            └─────────────────┘
-         │
-         ▼
+│ (loop per clf)  │  SHAP, seed stability, …                   │                 │  2025-07-27 → 2025-08-22
+└────────┬────────┘                                            │                 │  → auto-evaluates on
+         │                                                     │                 │    forecast period
+         ▼  (when ≥ 2 classifiers)                            └─────────────────┘
 ┌─────────────────┐
 │ Classifier      │  cross-classifier comparison
 │ Comparator      │  metric bar, ROC overlay,
@@ -183,10 +185,10 @@ operating on the same `ForecastModel` instance.
 
   Runtime flags (top-level constants in main.py):
   ┌──────────────────────────┬─────────────────────────────────────────────┐
-  │ DEBUG                    │ Read from .env; reduces seeds to 10,        │
+  │ DEBUG                    │ Read from .env; reduces seeds to 25,        │
   │                          │ classifiers to [lite-rf, rf]                │
-  │ N_JOBS                   │ 6 (outer parallelism)                       │
-  │ TRAINING_SEEDS           │ 500 (or 10 in DEBUG mode)                   │
+  │ N_JOBS                   │ 8 (outer parallelism)                       │
+  │ TRAINING_SEEDS           │ 500 (or 25 in DEBUG mode)                   │
   │ CLASSIFIER               │ ["lite-rf", "rf", "gb", "xgb"]              │
   └──────────────────────────┴─────────────────────────────────────────────┘
 ```
@@ -330,32 +332,37 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 
 ### 5. Model Training (`src/eruption_forecast/model/`)
 
-**`ModelTrainer`** trains classifiers across multiple random seeds:
+**`ModelTrainer`** trains classifiers across multiple random seeds on the full dataset:
 - Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
 - CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
 - Uses `RandomUnderSampler` to handle class imbalance
 - Feature selection and resampled training data are cached per seed to `features/{cv-slug}/` (resampled data in `features/{cv-slug}/resampled/`) for deterministic two-phase parallel dispatch
-- Two training modes:
-  - `evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
-  - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
+- One training mode: `train()` — resample full dataset → feature selection → CV → save models; no internal 80/20 split
+- Out-of-sample evaluation is handled by `ModelPredictor.evaluate()` on the forecast period
 
 **Key classes:**
-- `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
-  - `fit(with_evaluation=True)`: Dispatches to `evaluate()` or `train()` based on flag
+- `ModelTrainer`: Multi-seed full-dataset training (`model_trainer.py`)
+  - `train()`: Resample full dataset → feature selection → GridSearchCV → save models
+  - `fit(**kwargs)`: Thin wrapper around `train()` for method chaining
   - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers
+- `BaseModelTrainer`: Constructor, validation, directory management, registry utilities (`base_model_trainer.py`)
+  - Registry CSV columns: `random_state` (index), `significant_features_csv`, `trained_model_filepath`
 - `BaseEnsemble`: Shared persistence mixin (`base_ensemble.py`)
   - `save(path)`: Joblib-dumps the ensemble to `.pkl`, creating parent directories
   - `load(path)` (classmethod): Restores instance from `.pkl`; raises `FileNotFoundError` if absent
   - Inherited by both `SeedEnsemble` and `ClassifierEnsemble` — no duplicated boilerplate
 - `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
-- `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
+- `ModelEvaluator`: Computes metrics and plots for a single fitted model (`model_evaluator.py`)
   - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`, `plot_shap_summary()`, `plot_shap_waterfall()`
-  - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/classifiers/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
+  - `cv_name` parameter (default `"cv"`): slugified into the default output path when `output_dir` is `None`
   - `plot_shap=True` required to enable SHAP plots in `plot_all()`
 - `MultiModelEvaluator`: Aggregate evaluation across all seeds (`multi_model_evaluator.py`)
-  - Methods: `plot_all()`, `plot_roc()`, `plot_shap_summary()`, `plot_shap_waterfall()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
-- `ModelPredictor`: Runs forecast inference (`model_predictor.py`)
-  - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
+  - Two modes: (1) from per-seed JSON metrics files; (2) from registry CSV + `X_test`/`y_test` for temporal out-of-sample evaluation
+  - Methods: `plot_all()`, `plot_roc()`, `plot_shap_summary()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
+- `ModelPredictor`: Runs forecast inference and temporal evaluation (`model_predictor.py`)
+  - `predict_proba()`: Forecast mode — no labels needed; auto-evaluates when `eruption_dates` provided
+  - `build_forecast_labels()`: Build labeled windows for the forecast period from known eruption dates
+  - `evaluate(X_forecast, y_forecast)`: Per-seed evaluation on forecast-period features and labels
 - `PipelineConfig`: Serialisable pipeline configuration (`src/eruption_forecast/config/pipeline_config.py`)
 
 ### 5.1 Model Class Relationships
@@ -367,17 +374,17 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 │   ┌──────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │   │                              ModelTrainer  (one classifier)                                  │  │
 │   │                                                                                              │  │
-│   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
-│   │           │                                                   │                              │  │
-│   │       evaluate()                                            train()                          │  │
-│   │   80/20 split → resample                            full dataset → resample                  │  │
-│   │   → feature select → CV                              → feature select → CV                   │  │
-│   │   → eval on test set                                    (no evaluation)                      │  │
+│   │                        .fit(**kwargs)  →  .train(**kwargs)                                   │  │
+│   │                                                   │                                          │  │
+│   │                                               train()                                        │  │
+│   │                                        full dataset → resample                               │  │
+│   │                                         → feature select → CV                               │  │
+│   │                                            (no internal split)                               │  │
 │   └───────────────────┬──────────────────────────────────────────────────────────────────────────┘  │
 │                       │ produces (per seed)                                                         │
 │                       ▼                                                                             │
 │          ┌────────────────────────┐                                                                 │
-│          │  trained_model_*.pkl   │   metrics/*.json   features/*.csv   registry.csv                │
+│          │  trained_model_*.pkl   │   features/*.csv   registry.csv (3 cols: rs, sig_feat, model)  │
 │          └────────────┬───────────┘                                                                 │
 │                       │                                                                             │
 │          ┌────────────┴─────────────────────────────────────────────┐                               │
@@ -406,6 +413,7 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                        EVALUATION PHASE                                             │
+│                        (temporal out-of-sample — forecast period is the test set)                  │
 │                                                                                                     │
 │  ┌──────────────────────────┐    ┌────────────────────────────────┐    ┌────────────────────────┐   │
 │  │      ModelEvaluator      │    │      MultiModelEvaluator       │    │  ClassifierComparator  │   │
@@ -415,19 +423,21 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 │  │  .summary()              │    │  .save_aggregate_metrics()     │    │  .save_ranking_table() │   │
 │  │  .plot_all()   (9 plots) │    │  .plot_all()    (11 plots)     │    │  .plot_all()           │   │
 │  │  .from_files()           │    │  ───────────────────────────   │    │  ────────────────────  │   │
-│  │  ─────────────────────── │    │  reads: metrics/*.json         │    │  wraps N instances of  │   │
-│  │  inputs:                 │    │         registry.csv           │    │  MultiModelEvaluator   │   │
-│  │    fitted model          │    │                                │    │  (one per classifier)  │   │
-│  │    X_test, y_test        │    │  outputs:                      │    │                        │   │
-│  │    selected_features     │    │    aggregate_metrics.csv       │    │  outputs:              │   │
-│  │                          │    │    aggregate_*.png/.csv        │    │    ranking_table.csv   │   │
-│  │  called internally by    │    │    seed_stability_*.png        │    │    comparison plots    │   │
-│  │  ModelTrainer per seed   │    │    freq_band_contribution.png  │    │                        │   │
-│  └──────────────────────────┘    └────────────────────────────────┘    └────────────────────────┘   │
-│               ▲                                  ▲                                  ▲               │
-│               │                                  │                                  │               │
-│         called per seed                 reads per-seed metrics                reads per-clf         │
-│         during training                     & registry CSV                  metrics/registries      │
+│  │  ─────────────────────── │    │  inputs:                       │    │  wraps N instances of  │   │
+│  │  inputs:                 │    │    registry.csv                │    │  MultiModelEvaluator   │   │
+│  │    fitted model          │    │    X_test (forecast features)  │    │  (one per classifier)  │   │
+│  │    X_test, y_test        │    │    y_test (forecast labels)    │    │                        │   │
+│  │    selected_features     │    │    — OR — metrics/*.json       │    │  outputs:              │   │
+│  │                          │    │                                │    │    ranking_table.csv   │   │
+│  │  called by               │    │  outputs:                      │    │    comparison plots    │   │
+│  │  ModelPredictor.evaluate │    │    aggregate_metrics.csv       │    │                        │   │
+│  └──────────────────────────┘    │    aggregate_*.png/.csv        │    └────────────────────────┘   │
+│               ▲                  │    seed_stability_*.png        │                  ▲               │
+│               │                  │    freq_band_contribution.png  │                  │               │
+│   called per seed by             └────────────────────────────────┘          reads per-clf          │
+│   ModelPredictor.evaluate()                   ▲                              metrics/registries     │
+│   on forecast-period data          called by ModelPredictor.evaluate()                              │
+│   (no training split needed)       for temporal out-of-sample metrics                               │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 

@@ -261,7 +261,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     # ------------------------------------------------------------------
 
     @classmethod
-    def _load_log_msg(cls, obj: "ClassifierEnsemble") -> str:  # type: ignore[override]
+    def _load_log_msg(cls, obj: "ClassifierEnsemble") -> str:  # ty:ignore[invalid-method-override]
         """Return a classifier-count suffix for the load log message.
 
         Args:

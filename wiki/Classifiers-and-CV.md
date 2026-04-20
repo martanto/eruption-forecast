@@ -27,7 +27,6 @@ fm.train(
     classifier=["rf", "xgb", "gb"],
     cv_strategy="stratified",
     total_seed=500,
-    with_evaluation=False,
 )
 
 print(fm.trained_models)
@@ -138,7 +137,7 @@ Set via `cv_strategy` in `ModelTrainer` or `ForecastModel.train()`. Number of fo
 
 ## Comparing Classifiers
 
-After training multiple classifiers with `with_evaluation=True`, compare their aggregate metrics:
+After training multiple classifiers, compare their aggregate metrics using `ClassifierComparator`:
 
 ```python
 import pandas as pd
