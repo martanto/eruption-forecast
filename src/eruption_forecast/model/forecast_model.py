@@ -209,10 +209,10 @@ class ForecastModel:
         self.location = location
         self.output_dir = output_dir
         self.root_dir = root_dir
-        self.overwrite = overwrite
+        self.overwrite: bool = overwrite
         self.n_jobs = n_jobs
-        self.verbose = verbose
-        self.debug = debug
+        self.verbose: bool = verbose
+        self.debug: bool = debug
 
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
@@ -366,151 +366,9 @@ class ForecastModel:
 
         return nslc, output_dir, station_dir, features_dir
 
-    def _setup_calculate_tremor(
-        self,
-        methods: list[str] | None,
-        filename_prefix: str | None,
-        remove_outlier_method: Literal["all", "maximum"],
-        interpolate: bool,
-        value_multiplier: float | None,
-        cleanup_daily_dir: bool,
-        plot_daily: bool,
-        save_plot: bool,
-        overwrite_plot: bool,
-        remove_tremor_anomalies: bool = False,
-        n_jobs: int | None = None,
-        verbose: bool = False,
-        debug: bool = False,
-    ) -> CalculateTremor:
-        """Set up CalculateTremor instance with configuration.
-
-        Creates and configures a CalculateTremor instance with all necessary
-        parameters. Automatically adjusts start_date to include window_size buffer.
-
-        Args:
-            methods (list[str] | None): Calculation methods to apply (e.g., "rsam,dsar").
-            filename_prefix (str | None): Prefix for generated filenames.
-            remove_outlier_method (Literal["all", "maximum"]): Method for outlier removal.
-            interpolate (bool): Whether to interpolate missing data.
-            value_multiplier (float | None): Scaling factor for tremor values.
-            cleanup_daily_dir (bool): Whether to clean up daily temporary directory.
-            plot_daily (bool): Whether to plot daily results.
-            save_plot (bool): Whether to save plots to disk.
-            overwrite_plot (bool): Whether to overwrite existing plots.
-            remove_tremor_anomalies (bool, optional): Remove anomalies after tremor calculated.
-                Using Z-score analysis to determine the anomalies. Defaults to False.
-            n_jobs (int | None, optional): Number of jobs to run in parallel.
-                Isolated to this method only. If None, uses ``self.n_jobs``.
-                Defaults to None.
-            verbose (bool, optional): Enable verbose logging. Defaults to False.
-            debug (bool, optional): Enable debug mode. Defaults to False.
-
-        Returns:
-            CalculateTremor: Configured CalculateTremor instance ready for use.
-
-        Examples:
-            >>> calc = model._setup_calculate_tremor(
-            ...     methods=["rsam","dsar","entropy"]
-            ...     filename_prefix="tremor",
-            ...     remove_outlier_method="maximum",
-            ...     interpolate=True,
-            ...     value_multiplier=None,
-            ...     cleanup_daily_dir=True,
-            ...     plot_daily=False,
-            ...     save_plot=False,
-            ...     overwrite_plot=False,
-            ... )
-        """
-        verbose = verbose or self.verbose
-        debug = debug or self.debug
-
-        if self.start_date_minus_window_size is None:
-            raise ValueError("self.start_date_minus_window_size cannot be None")
-        if self.end_date is None:
-            raise ValueError("self.end_date cannot be None")
-
-        # Create CalculateTremor with explicit parameters for type safety
-        calculate = CalculateTremor(
-            station=self.station,
-            channel=self.channel,
-            network=self.network,
-            location=self.location,
-            start_date=self.start_date_minus_window_size,
-            end_date=self.end_date,
-            output_dir=self.output_dir,
-            overwrite=self.overwrite,
-            n_jobs=n_jobs or self.n_jobs,
-            methods=methods,
-            filename_prefix=filename_prefix,
-            remove_outlier_method=remove_outlier_method,
-            remove_tremor_anomalies=remove_tremor_anomalies,
-            interpolate=interpolate,
-            value_multiplier=value_multiplier,
-            cleanup_daily_dir=cleanup_daily_dir,
-            plot_daily=plot_daily,
-            save_plot=save_plot,
-            overwrite_plot=overwrite_plot,
-        )
-
-        if verbose:
-            calculate.verbose = True
-
-        if debug:
-            calculate.debug = True
-
-        return calculate
-
-    @staticmethod
-    def _calculate_from_sds(
-        calculate: CalculateTremor, sds_dir: str
-    ) -> CalculateTremor:
-        """Calculate tremor from an SDS archive.
-
-        Configures the calculator for SDS mode, validates the directory, and
-        runs the full tremor calculation workflow.
-
-        Args:
-            calculate (CalculateTremor): Pre-configured CalculateTremor instance.
-            sds_dir (str): Root path to the SDS archive directory.
-
-        Returns:
-            CalculateTremor: The same instance after running the calculation.
-
-        Raises:
-            ValueError: If sds_dir is None or does not exist on disk.
-        """
-        if sds_dir is None:
-            raise ValueError(
-                "You chose 'sds' as source, please provide 'sds_dir' parameter. "
-                "Example: calculate(source='sds', sds_dir='converted')"
-            )
-
-        if not os.path.isdir(sds_dir):
-            raise ValueError(f"SDS dir {sds_dir} not exists.")
-
-        return calculate.from_sds(sds_dir=sds_dir).run()
-
-    def _calculate_from_fdsn(
-        self, calculate: CalculateTremor, client_url: str
-    ) -> CalculateTremor:
-        """Calculate tremor from an FDSN web service.
-
-        Configures the calculator for FDSN mode and runs the full tremor
-        calculation workflow, downloading and caching data as needed.
-
-        Args:
-            calculate (CalculateTremor): Pre-configured CalculateTremor instance.
-            client_url (str): FDSN web-service base URL.
-
-        Returns:
-            CalculateTremor: The same instance after running the calculation.
-        """
-        if self.verbose:
-            logger.info(f"Calculating tremor using FDSN with client URL: {client_url}")
-
-        return calculate.from_fdsn(client_url=client_url).run()
-
-    def _adjust_dates_to_tremor_range(self, tremor_data: TremorData) -> None:
+    def _adjust_dates_to_tremor_range(
+        self, tremor_data: TremorData, verbose: bool = False
+    ) -> None:
         """Adjust start_date and end_date to match available tremor data.
 
         Updates self.start_date, self.end_date, and their string representations
@@ -519,6 +377,7 @@ class ForecastModel:
 
         Args:
             tremor_data (TremorData): Loaded tremor data wrapper with date range info.
+            verbose (bool, optional): If True, logs date adjustments. Defaults to False.
         """
         # Adjust start date if earlier than tremor start
         if (
@@ -527,7 +386,7 @@ class ForecastModel:
         ):
             self.start_date = tremor_data.start_date
             self.start_date_str = tremor_data.start_date_str
-            if self.verbose:
+            if verbose:
                 logger.info(
                     f"start_date parameter: {self.start_date_minus_window_size} updated to "
                     f"tremor start date: {self.start_date_str}"
@@ -537,7 +396,7 @@ class ForecastModel:
         if isinstance(self.end_date, datetime) and self.end_date > tremor_data.end_date:
             self.end_date = tremor_data.end_date
             self.end_date_str = tremor_data.end_date_str
-            if self.verbose:
+            if verbose:
                 logger.info(
                     f"end_date parameter: {self.end_date} updated to "
                     f"tremor end date: {self.end_date_str}"
@@ -636,6 +495,7 @@ class ForecastModel:
     def _calculate_eruption_statistics(
         self,
         label_builder: LabelBuilder,
+        verbose: bool = False,
     ) -> None:
         """Calculate and log eruption class statistics.
 
@@ -646,16 +506,15 @@ class ForecastModel:
 
         Args:
             label_builder (LabelBuilder): Fully built LabelBuilder instance.
+            verbose (bool, optional): If True, logs eruption class statistics. Defaults to False.
         """
-        self.total_eruption_class = len(label_builder.df_eruption)
-        self.total_non_eruption_class = (
-            len(label_builder.df) - self.total_eruption_class
-        )
-        self.class_ratio: float = (
-            self.total_eruption_class / self.total_non_eruption_class
-        )
+        total_eruption = len(label_builder.df_eruption)
+        total_non_eruption = len(label_builder.df) - total_eruption
+        self.total_eruption_class: int = total_eruption
+        self.total_non_eruption_class: int = total_non_eruption
+        self.class_ratio: float = total_eruption / total_non_eruption
 
-        if self.verbose:
+        if verbose:
             logger.info(
                 f"Total number of eruptions: {self.total_eruption_class}. "
                 f"Total number of non-eruptions: {self.total_non_eruption_class}. "
@@ -750,11 +609,14 @@ class ForecastModel:
         self.TremorData.csv = tremor_csv
         self.tremor_csv = tremor_csv
 
-        self.start_date = self.tremor_data.index[0].to_pydatetime()
-        self.end_date = self.tremor_data.index[-1].to_pydatetime()
-        self.start_date_str = self.start_date.strftime("%Y-%m-%d")
-        self.end_date_str = self.end_date.strftime("%Y-%m-%d")
-        self.start_date_minus_window_size = self.start_date - timedelta(
+        _start_date = self.tremor_data.index[0].to_pydatetime()
+        _end_date = self.tremor_data.index[-1].to_pydatetime()
+
+        self.start_date: datetime = _start_date
+        self.end_date: datetime = _end_date
+        self.start_date_str = _start_date.strftime("%Y-%m-%d")
+        self.end_date_str = _end_date.strftime("%Y-%m-%d")
+        self.start_date_minus_window_size = _start_date - timedelta(
             days=self.window_size
         )
 
@@ -778,8 +640,8 @@ class ForecastModel:
         sds_dir: str | None = None,
         client_url: str = "https://service.iris.edu",
         n_jobs: int | None = None,
-        verbose: bool = False,
-        debug: bool = False,
+        verbose: bool | None = None,
+        debug: bool | None = None,
     ) -> Self:
         """Calculate tremor metrics from a seismic data source.
 
@@ -814,8 +676,10 @@ class ForecastModel:
                 ``"https://service.iris.edu"``.
             n_jobs (int | None): Parallel workers for this call only. Overrides the
                 instance-level ``n_jobs`` when provided. Defaults to None.
-            verbose (bool): If True, enables verbose logging. Defaults to False.
-            debug (bool): If True, enables debug mode. Defaults to False.
+            verbose (bool | None): If True, enables verbose logging. Overrides the
+                instance-level ``verbose`` when provided. Defaults to None.
+            debug (bool | None): If True, enables debug mode. Overrides the
+                instance-level ``debug`` when provided. Defaults to None.
 
         Returns:
             Self: ForecastModel instance for method chaining.
@@ -823,18 +687,31 @@ class ForecastModel:
         # Normalise and store dates on self
         _start, _end, _start_str, _end_str = normalize_dates(start_date, end_date)
         validate_date_ranges(_start, _end)
+        verbose = verbose if verbose is not None else self.verbose
+        debug = debug if debug is not None else self.debug
+
         self.start_date = _start
         self.end_date = _end
         self.start_date_str = _start_str
         self.end_date_str = _end_str
         self.start_date_minus_window_size = _start - timedelta(days=self.window_size)
 
-        if verbose or self.verbose:
-            logger.info(f"Start Date: {_start_str}")
-            logger.info(f"End Date: {_end_str}")
+        if self.start_date_minus_window_size is None:
+            raise ValueError("self.start_date_minus_window_size cannot be None")
+        if self.end_date is None:
+            raise ValueError("self.end_date cannot be None")
 
-        # Setup CalculateTremor instance
-        calculate = self._setup_calculate_tremor(
+        # Create CalculateTremor
+        calculate = CalculateTremor(
+            station=self.station,
+            channel=self.channel,
+            network=self.network,
+            location=self.location,
+            start_date=self.start_date_minus_window_size,
+            end_date=self.end_date,
+            output_dir=self.output_dir,
+            overwrite=self.overwrite,
+            n_jobs=n_jobs or self.n_jobs,
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
@@ -845,18 +722,25 @@ class ForecastModel:
             plot_daily=plot_daily,
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
-            n_jobs=n_jobs or self.n_jobs,
-            verbose=verbose or self.verbose,
-            debug=debug or self.debug,
+            verbose=verbose,
+            debug=debug,
         )
 
         self.CalculateTremor = calculate
 
-        # Calculate from appropriate source
+        if verbose:
+            logger.info(f"Calculate Tremor from {_start_str} to {_end_str}")
+
+        # Calculate from source
         if source == "sds" and sds_dir is not None:
-            calculate = self._calculate_from_sds(calculate, sds_dir)
+            if sds_dir is None:
+                raise ValueError(
+                    "You chose 'sds' as source, please provide 'sds_dir' parameter. "
+                    "Example: calculate(source='sds', sds_dir='converted')"
+                )
+            calculate = calculate.from_sds(sds_dir=sds_dir).run()
         elif source == "fdsn":
-            calculate = self._calculate_from_fdsn(calculate, client_url)
+            calculate = calculate.from_fdsn(client_url=client_url).run()
         else:
             raise ValueError(f"Unknown source '{source}'. Choose 'sds' or 'fdsn'.")
 
@@ -867,7 +751,7 @@ class ForecastModel:
         self.tremor_csv = calculate.csv
 
         # Adjust dates to match tremor data availability
-        self._adjust_dates_to_tremor_range(tremor_data)
+        self._adjust_dates_to_tremor_range(tremor_data, verbose=verbose)
 
         # Slice tremor data to adjusted date range
         self.tremor_data = tremor_data.df.loc[self.start_date : self.end_date]
@@ -934,6 +818,8 @@ class ForecastModel:
         Returns:
             Self: ForecastModel instance for method chaining.
         """
+        verbose = verbose if verbose is not None else self.verbose
+
         output_dir = output_dir or self.features_dir
         ensure_dir(output_dir)
 
@@ -943,7 +829,7 @@ class ForecastModel:
             output_dir=output_dir,
             window_size=self.window_size,
             overwrite=overwrite or self.overwrite,
-            verbose=verbose or self.verbose,
+            verbose=verbose,
         ).build(
             select_tremor_columns=select_tremor_columns,
             save_tremor_matrix_per_method=save_tremor_matrix_per_method,
@@ -959,7 +845,7 @@ class ForecastModel:
             output_dir=self.features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs or self.n_jobs,
-            verbose=verbose or self.verbose,
+            verbose=verbose,
         )
 
         extracted_features_df = features_builder.extract_features(
@@ -1115,11 +1001,12 @@ class ForecastModel:
             ValueError: If ``builder="dynamic"`` and ``days_before_eruption`` is None.
         """
         # Setup parameters
+        verbose = verbose if verbose is not None else self.verbose
+        debug = debug if debug is not None else self.debug
+
         tremor_data = self.tremor_data
         train_start_date = start_date or self.start_date
         train_end_date = end_date or self.end_date
-        verbose = verbose or self.verbose
-        debug = debug or self.debug
 
         output_dir = output_dir or self.station_dir
         ensure_dir(output_dir)
@@ -1172,7 +1059,7 @@ class ForecastModel:
         self.label_data = df_label
 
         # Calculate and log statistics
-        self._calculate_eruption_statistics(label_builder)
+        self._calculate_eruption_statistics(label_builder, verbose=verbose)
 
         self._config.build_label = BuildLabelConfig(
             window_step=window_step,
@@ -1344,7 +1231,7 @@ class ForecastModel:
         overwrite: bool = False,
         use_gpu: bool = False,
         gpu_id: int = 0,
-        verbose: bool = False,
+        verbose: bool | None = None,
         save_model: bool = True,
     ) -> Self:
         """Training model using extracted features and labels.
@@ -1397,7 +1284,8 @@ class ForecastModel:
                 ``n_jobs × grid_search_n_jobs ≤ total_cores``. Defaults to 1.
             plot_shap (bool, optional): Plot SHAP explanation value. Defaults to False.
             overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
-            verbose (bool, optional): Whether to enable verbose mode. Defaults to False.
+            verbose (bool | None, optional): If True, enables verbose logging. Overrides
+                the instance-level ``verbose`` when provided. Defaults to None.
             save_model (bool, optional): If True, serialises the full ``ForecastModel``
                 instance to ``{station_dir}/trainings/{evaluations/predictions_dir}/forecast_model.pkl`` via ``save_model()``.
                 Defaults to True.
@@ -1409,6 +1297,8 @@ class ForecastModel:
         Returns:
             Self: ForecastModel instance for method chaining.
         """
+        verbose = verbose if verbose is not None else self.verbose
+
         if isinstance(classifier, str):
             classifiers: list[str] = list(classifier.split(","))
         elif isinstance(classifier, list):
@@ -1478,7 +1368,7 @@ class ForecastModel:
             n_jobs=n_jobs or self.n_jobs,
             grid_search_n_jobs=grid_search_n_jobs,
             overwrite=overwrite or self.overwrite,
-            verbose=verbose or self.verbose,
+            verbose=verbose,
             use_gpu=use_gpu,
             gpu_id=gpu_id,
         )
@@ -1581,7 +1471,7 @@ class ForecastModel:
         Returns:
             Self: ForecastModel instance for method chaining.
         """
-        verbose = verbose or self.verbose
+        verbose = verbose if verbose is not None else self.verbose
         output_dir = output_dir or self.station_dir
         overwrite = overwrite or self.overwrite
         n_jobs = n_jobs or self.n_jobs
@@ -1710,7 +1600,12 @@ class ForecastModel:
         Returns:
             str: The path where the file was written.
         """
-        path = path or os.path.join(self.station_dir, "forecast_model.pkl")
+        path = (
+            path
+            if path is not None
+            else os.path.join(self.station_dir, "forecast_model.pkl")
+        )
+
         joblib.dump(self, path)
         return path
 
