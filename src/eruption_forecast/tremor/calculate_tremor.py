@@ -632,6 +632,10 @@ class CalculateTremor:
         """
         self._source = "sds"
         self._sds_dir = sds_dir
+
+        if not os.path.isdir(sds_dir):
+            raise ValueError(f"SDS dir {sds_dir} not exists.")
+
         self.SDS = SDS(
             sds_dir,
             network=self.network,
@@ -665,6 +669,10 @@ class CalculateTremor:
         """
         self._source = "fdsn"
         self._client_url = client_url or self._client_url
+
+        if self.verbose:
+            logger.info(f"Calculating tremor using FDSN with client URL: {client_url}")
+
         self.FDSN = FDSN(
             client_url=self._client_url,
             network=self.network,
