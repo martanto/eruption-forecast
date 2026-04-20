@@ -696,11 +696,6 @@ class ForecastModel:
         self.end_date_str = _end_str
         self.start_date_minus_window_size = _start - timedelta(days=self.window_size)
 
-        if self.start_date_minus_window_size is None:
-            raise ValueError("self.start_date_minus_window_size cannot be None")
-        if self.end_date is None:
-            raise ValueError("self.end_date cannot be None")
-
         # Create CalculateTremor
         calculate = CalculateTremor(
             station=self.station,
@@ -711,7 +706,7 @@ class ForecastModel:
             end_date=self.end_date,
             output_dir=self.output_dir,
             overwrite=self.overwrite,
-            n_jobs=n_jobs or self.n_jobs,
+            n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             methods=methods,
             filename_prefix=filename_prefix,
             remove_outlier_method=remove_outlier_method,
@@ -732,7 +727,7 @@ class ForecastModel:
             logger.info(f"Calculate Tremor from {_start_str} to {_end_str}")
 
         # Calculate from source
-        if source == "sds" and sds_dir is not None:
+        if source == "sds":
             if sds_dir is None:
                 raise ValueError(
                     "You chose 'sds' as source, please provide 'sds_dir' parameter. "
@@ -844,7 +839,7 @@ class ForecastModel:
             label_features_basename=self.basename,
             output_dir=self.features_dir,
             overwrite=overwrite or self.overwrite,
-            n_jobs=n_jobs or self.n_jobs,
+            n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             verbose=verbose,
         )
 
@@ -1313,7 +1308,7 @@ class ForecastModel:
                 f"Classifier ({classifier}) type `{type(classifier)}` not supported."
             )
 
-        if verbose or self.verbose:
+        if verbose:
             logger.info("=" * 50)
             logger.info(f"| Training model using: {classifier}")
             if self.use_relevant_features:
@@ -1365,7 +1360,7 @@ class ForecastModel:
             number_of_significant_features=number_of_significant_features,
             grid_params=grid_params,
             resample_method=resample_method,
-            n_jobs=n_jobs or self.n_jobs,
+            n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             grid_search_n_jobs=grid_search_n_jobs,
             overwrite=overwrite or self.overwrite,
             verbose=verbose,
@@ -1474,7 +1469,7 @@ class ForecastModel:
         verbose = verbose if verbose is not None else self.verbose
         output_dir = output_dir or self.station_dir
         overwrite = overwrite or self.overwrite
-        n_jobs = n_jobs or self.n_jobs
+        n_jobs = n_jobs if n_jobs is not None else self.n_jobs
 
         trained_models = self.trained_models
         if len(self.merged_models) > 0:
