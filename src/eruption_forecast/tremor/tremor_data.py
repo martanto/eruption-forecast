@@ -37,9 +37,16 @@ class TremorData(BaseDataContainer):
     Attributes:
         csv (str | None): Path to the source CSV file. Set externally after
             :meth:`from_csv` is used; ``None`` until assigned.
+        start_date (datetime.datetime): Start date extracted from filename.
+        end_date (datetime.datetime): End date extracted from filename.
+        start_date_str (str): Start date string in YYYY-MM-DD format.
+        end_date_str (str): End date string in YYYY-MM-DD format.
+        data (pd.DataFrame): Alias for :attr:`df` — satisfies the
+            :class:`BaseDataContainer` interface.
+        filename (str): Basename of the CSV file with extension.
+        basename (str): Filename without extension.
         verbose (bool): If True, emit informational log messages.
         debug (bool): If True, emit debug-level log messages.
-        _df (pd.DataFrame): The underlying internal tremor DataFrame.
 
     Args:
         df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
