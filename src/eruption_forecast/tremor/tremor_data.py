@@ -119,32 +119,6 @@ class TremorData(BaseDataContainer):
 
         return tremor_data
 
-    @property
-    def df(self) -> pd.DataFrame:
-        """Get the tremor DataFrame.
-
-        Returns:
-            pd.DataFrame: Tremor DataFrame with a DatetimeIndex and columns
-                such as ``rsam_f0``, ``dsar_f0-f1``, ``entropy``, etc.
-
-        Raises:
-            ValueError: If the DataFrame is empty (no data has been loaded).
-        """
-        if len(self._df) == 0:
-            raise ValueError(
-                "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
-            )
-        return self._df
-
-    @df.setter
-    def df(self, df: pd.DataFrame) -> None:
-        """Set the tremor DataFrame.
-
-        Args:
-            df (pd.DataFrame): Tremor DataFrame to set.
-        """
-        self._df = df
-
     @cached_property
     def columns(self) -> list[str]:
         """Return the list of DataFrame column names.
