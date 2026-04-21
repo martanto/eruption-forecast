@@ -63,7 +63,6 @@ class ForecastModel:
         overwrite (bool): Whether to overwrite existing files.
         n_jobs (int): Number of parallel jobs.
         verbose (bool): Enable verbose logging.
-        debug (bool): Enable debug mode.
         start_date_minus_window_size (datetime): Adjusted start date for tremor calculation.
         start_date_str (str): Start date as "YYYY-MM-DD".
         end_date_str (str): End date as "YYYY-MM-DD".
@@ -114,7 +113,6 @@ class ForecastModel:
             Defaults to False.
         n_jobs (int, optional): Number of parallel jobs to use. Defaults to 1.
         verbose (bool, optional): If True, enables verbose logging. Defaults to False.
-        debug (bool, optional): If True, enables debug mode. Defaults to False.
 
     Raises:
         ValueError: If window_size < 1 or network/location are empty.
@@ -162,7 +160,6 @@ class ForecastModel:
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
-        debug: bool = False,
     ) -> None:
         """Initialize the ForecastModel pipeline orchestrator.
 
@@ -187,7 +184,6 @@ class ForecastModel:
             n_jobs (int, optional): Number of parallel jobs for tremor calculation
                 and feature extraction. Defaults to 1.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
-            debug (bool, optional): Emit debug log messages. Defaults to False.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
@@ -212,7 +208,6 @@ class ForecastModel:
         self.overwrite: bool = overwrite
         self.n_jobs = n_jobs
         self.verbose: bool = verbose
-        self.debug: bool = debug
 
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
@@ -298,7 +293,6 @@ class ForecastModel:
                 overwrite=overwrite,
                 n_jobs=n_jobs,
                 verbose=verbose,
-                debug=debug,
             )
         )
         # Set when the instance is restored via from_config()
@@ -313,9 +307,6 @@ class ForecastModel:
         # ------------------------------------------------------------------
         # Verbose and logging
         # ------------------------------------------------------------------
-        if debug:
-            logger.info("⚠️ Forecast Model :: Debug mode is ON")
-
         if verbose:
             logger.info(f"Volcano ID: {self.volcano_id}")
             logger.info(f"NSLC: {self.nslc}")
@@ -641,7 +632,6 @@ class ForecastModel:
         client_url: str = "https://service.iris.edu",
         n_jobs: int | None = None,
         verbose: bool | None = None,
-        debug: bool | None = None,
     ) -> Self:
         """Calculate tremor metrics from a seismic data source.
 
@@ -678,8 +668,6 @@ class ForecastModel:
                 instance-level ``n_jobs`` when provided. Defaults to None.
             verbose (bool | None): If True, enables verbose logging. Overrides the
                 instance-level ``verbose`` when provided. Defaults to None.
-            debug (bool | None): If True, enables debug mode. Overrides the
-                instance-level ``debug`` when provided. Defaults to None.
 
         Returns:
             Self: ForecastModel instance for method chaining.
@@ -688,7 +676,6 @@ class ForecastModel:
         _start, _end, _start_str, _end_str = normalize_dates(start_date, end_date)
         validate_date_ranges(_start, _end)
         verbose = verbose if verbose is not None else self.verbose
-        debug = debug if debug is not None else self.debug
 
         self.start_date = _start
         self.end_date = _end
@@ -718,7 +705,6 @@ class ForecastModel:
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
             verbose=verbose,
-            debug=debug,
         )
 
         self.CalculateTremor = calculate
@@ -769,7 +755,6 @@ class ForecastModel:
             client_url=client_url,
             n_jobs=n_jobs,
             verbose=verbose,
-            debug=debug,
         )
 
         return self
@@ -955,7 +940,6 @@ class ForecastModel:
         builder: Literal["standard", "dynamic"] = "standard",
         days_before_eruption: int | None = None,
         verbose: bool | None = None,
-        debug: bool | None = None,
     ) -> Self:
         """Build labels for eruption forecasting.
 
@@ -987,7 +971,6 @@ class ForecastModel:
             days_before_eruption (int | None): Days before each eruption to start its
                 window. Required when ``builder="dynamic"``. Defaults to None.
             verbose (bool | None, optional): If True, enables verbose logging. Defaults to None.
-            debug (bool | None, optional): If True, enables debug mode. Defaults to None.
 
         Returns:
             Self: ForecastModel instance for method chaining.
@@ -997,7 +980,6 @@ class ForecastModel:
         """
         # Setup parameters
         verbose = verbose if verbose is not None else self.verbose
-        debug = debug if debug is not None else self.debug
 
         tremor_data = self.tremor_data
         train_start_date = start_date or self.start_date
@@ -1020,7 +1002,6 @@ class ForecastModel:
             "output_dir": output_dir,
             "root_dir": self.root_dir,
             "verbose": verbose,
-            "debug": debug,
         }
 
         # Build labels
@@ -1068,7 +1049,6 @@ class ForecastModel:
             builder=builder,
             days_before_eruption=days_before_eruption,
             verbose=bool(verbose),
-            debug=bool(debug),
         )
 
         return self
