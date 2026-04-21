@@ -35,7 +35,7 @@ class LabelData(BaseDataContainer):
     ``include_eruption_date=False``.
 
     Attributes:
-        label_csv (str): Path to the label CSV file.
+        csv (str): Path to the label CSV file.
         start_date (datetime.datetime): Start date extracted from filename.
         end_date (datetime.datetime): End date extracted from filename.
         start_date_str (str): Start date string in YYYY-MM-DD format.
@@ -76,14 +76,14 @@ class LabelData(BaseDataContainer):
         '2020-01-01'
     """
 
-    def __init__(self, label_csv: str) -> None:
+    def __init__(self, csv: str) -> None:
         """Initialize LabelData with a label CSV file path.
 
         Loads and validates the label CSV file, then parses all metadata from the
         filename according to the standard format.
 
         Args:
-            label_csv (str): Path to the label CSV file. Filename must follow
+            csv (str): Path to the label CSV file. Filename must follow
                 the format: label_{start}_{end}_step-{X}-{unit}_dtf-{X}.csv
                 where start and end are YYYY-MM-DD dates, X are integers,
                 and unit is 'hours' or 'minutes'.
@@ -102,8 +102,8 @@ class LabelData(BaseDataContainer):
                 ...
             ValueError: Label file not found at nonexistent.csv
         """
-        super().__init__(csv=label_csv)
-        self.label_csv = label_csv
+        super().__init__()
+        self.csv: str = csv
 
         self.validate()
 
@@ -170,8 +170,8 @@ class LabelData(BaseDataContainer):
                 ...
             ValueError: Label filename is invalid. Filename should start with 'label_'...
         """
-        if not os.path.exists(self.label_csv):
-            raise ValueError(f"Label file not found at {self.label_csv}")
+        if self.csv is not None and not os.path.exists(self.csv):
+            raise ValueError(f"Label file not found at {self.csv}")
 
         if not self.basename.startswith(LABEL_PREFIX):
             raise ValueError(
@@ -209,7 +209,9 @@ class LabelData(BaseDataContainer):
                     f"Expected format: ie-{{0|1}}. Got: {include_eruption_date}"
                 )
 
-            include_eruption_date_value = include_eruption_date.split("ie-", maxsplit=1)[1]
+            include_eruption_date_value = include_eruption_date.split(
+                "ie-", maxsplit=1
+            )[1]
             if include_eruption_date_value not in {"0", "1"}:
                 raise ValueError(
                     f"Include eruption date value is invalid. "
@@ -299,8 +301,8 @@ class LabelData(BaseDataContainer):
             >>> print(df['is_erupted'].unique())
             [0 1]
         """
-        logger.debug(f"Loading label data from {self.label_csv}")
-        df = pd.read_csv(self.label_csv, index_col="datetime", parse_dates=True)
+        logger.debug(f"Loading label data from {self.csv}")
+        df = pd.read_csv(self.csv, index_col="datetime", parse_dates=True)
         logger.debug(f"Loaded {len(df)} label rows")
         return df
 
