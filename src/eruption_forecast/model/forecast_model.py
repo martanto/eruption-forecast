@@ -532,7 +532,7 @@ class ForecastModel:
             ValueError: If window_size is <= 0, or required string parameters
                 (station, channel, volcano_id, network, location) are empty.
 
-        Example:
+        Examples:
             >>> model = ForecastModel(...)
             >>> model.validate()  # Called automatically in __init__
         """
@@ -564,7 +564,7 @@ class ForecastModel:
         Creates the main output directory, station-specific directory,
         and features subdirectory. Called automatically during initialization.
 
-        Example:
+        Examples:
             >>> model = ForecastModel(...)
             >>> model.create_directories()  # Called in __init__
             >>> # Creates: output/, output/VG.OJN.00.EHZ/, output/VG.OJN.00.EHZ/features/
@@ -591,21 +591,21 @@ class ForecastModel:
                 ``self.end_date_str``, and ``self.start_date_minus_window_size``
                 from the loaded tremor DataFrame's datetime index.
 
-        Example:
+        Examples:
             >>> model = ForecastModel(
             ...     station="OJN",
             ...     channel="EHZ",
-            ...     start_date="2025-01-01",
-            ...     end_date="2025-06-30",
+            ...     network="VG",
+            ...     location="00",
             ...     window_size=1,
-            ...     volcano_id="LEWOTOBI"
+            ...     volcano_id="LEWOTOBI",
             ... )
             >>> model.load_tremor_data("output/VG.OJN.00.EHZ/tremor/tremor.csv")
             >>> # Now ready to build labels and extract features
         """
-        tremor_data = TremorData()
+        tremor_data = TremorData.from_csv(tremor_csv)
         self.TremorData = tremor_data
-        self.tremor_data = tremor_data.from_csv(tremor_csv)
+        self.tremor_data = tremor_data.df
         self.TremorData.csv = tremor_csv
         self.tremor_csv = tremor_csv
 

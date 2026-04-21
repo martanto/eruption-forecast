@@ -13,6 +13,7 @@ Key class:
 """
 
 import os
+from typing import Self
 from datetime import datetime
 from functools import cached_property
 
@@ -43,9 +44,8 @@ class TremorData(BaseDataContainer):
             :class:`BaseDataContainer` interface.
 
     Args:
-        df (pd.DataFrame | None): Pre-loaded tremor DataFrame
-            with a DatetimeIndex. If None, an empty DataFrame is used until
-            :meth:`from_csv` is called. Defaults to None.
+        df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
+            and metric columns (``rsam_*``, ``dsar_*``).
         verbose (bool): If True, emit informational log messages.
             Defaults to False.
         debug (bool): If True, emit debug-level log messages.
@@ -59,27 +59,25 @@ class TremorData(BaseDataContainer):
 
     def __init__(
         self,
-        df: pd.DataFrame | None = None,
+        df: pd.DataFrame,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        """Initialize the TremorData container with an optional DataFrame.
+        """Initialize the TremorData container with a pre-loaded DataFrame.
 
-        Stores the provided DataFrame (or an empty one when df is None),
-        initialises ``csv`` to an empty string, and configures logging flags.
+        Stores the provided DataFrame, initialises ``csv`` to ``None`` (via
+        ``BaseDataContainer.__init__``), and configures logging flags.
 
         Args:
-            df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame with
-                DatetimeIndex and metric columns (rsam_*, dsar_*). Pass None to
-                create an empty container and load data later via from_csv().
-                Defaults to None.
+            df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
+                and metric columns (``rsam_*``, ``dsar_*``).
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
-        super().__init__(csv="")
+        super().__init__()
+        self.df = df
         self.verbose = verbose
         self.debug = debug
-        self.df = df if df is not None else pd.DataFrame()
 
     def __repr__(self) -> str:
         """Return a detailed string representation of this TremorData instance.
@@ -92,37 +90,36 @@ class TremorData(BaseDataContainer):
             f"verbose={self.verbose}, debug={self.debug})"
         )
 
-    def from_csv(self, tremor_csv: str) -> pd.DataFrame:
-        """Load tremor data from a CSV file.
+    @classmethod
+    def from_csv(cls, tremor_csv: str) -> Self:
+        """Load tremor data from a CSV file and return a new TremorData instance.
 
-        Reads the CSV, parses the ``datetime`` column as the index, and
-        sorts the index in ascending order. The CSV path is stored in
-        ``self.csv`` for later reference.
+        Reads the CSV, parses the ``datetime`` column as the DatetimeIndex, and
+        sorts the index in ascending order.
 
         Args:
-            tremor_csv (str): Absolute or relative path to the tremor CSV
-                file. The file must contain a ``datetime`` column that will
-                be used as the DatetimeIndex.
+            tremor_csv (str): Absolute or relative path to the tremor CSV file.
+                Must contain a ``datetime`` column used as the DatetimeIndex.
 
         Returns:
-            pd.DataFrame: Tremor DataFrame sorted by DatetimeIndex with
-                columns such as ``rsam_f0``, ``dsar_f0-f1``, etc.
+            Self: A new :class:`TremorData` instance wrapping the loaded
+                DataFrame.
 
         Raises:
             FileNotFoundError: If the file at ``tremor_csv`` does not exist.
 
         Examples:
-            >>> tremor = TremorData()
-            >>> df = tremor.from_csv("output/OJN/tremor/tremor.csv")
+            >>> tremor = TremorData.from_csv("output/OJN/tremor/tremor.csv")
         """
         if not os.path.exists(tremor_csv):
             raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
 
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df = df.sort_index()
-        self._df = df
-        self.csv = tremor_csv
-        return df
+
+        tremor_data = cls(df=df)
+
+        return tremor_data
 
     @property
     def df(self) -> pd.DataFrame:
@@ -152,7 +149,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def columns(self) -> list[str]:
-        """List of DataFrame column names.
+        """Return the list of DataFrame column names.
 
         Returns:
             list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1"]``.
@@ -161,7 +158,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def start_date(self) -> datetime:
-        """First timestamp in the tremor data.
+        """Return the first timestamp in the tremor data.
 
         Returns:
             datetime: Start datetime derived from the first index entry.
@@ -171,7 +168,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def end_date(self) -> datetime:
-        """Last timestamp in the tremor data.
+        """Return the last timestamp in the tremor data.
 
         Returns:
             datetime: End datetime derived from the last index entry.
@@ -181,7 +178,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def start_date_str(self) -> str:
-        """Start date as an ISO-format string.
+        """Return the start date as an ISO-format string.
 
         Returns:
             str: Start date in ``"YYYY-MM-DD"`` format.
@@ -190,7 +187,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def end_date_str(self) -> str:
-        """End date as an ISO-format string.
+        """Return the end date as an ISO-format string.
 
         Returns:
             str: End date in ``"YYYY-MM-DD"`` format.
@@ -199,7 +196,7 @@ class TremorData(BaseDataContainer):
 
     @property
     def n_days(self) -> int:
-        """Number of days spanned by the tremor data.
+        """Return the number of days spanned by the tremor data.
 
         Returns:
             int: Integer number of days between start and end date.
@@ -208,7 +205,9 @@ class TremorData(BaseDataContainer):
 
     @property
     def data(self) -> pd.DataFrame:
-        """Alias for :attr:`df` — satisfies the :class:`BaseDataContainer` interface.
+        """Return the tremor DataFrame, satisfying the :class:`BaseDataContainer` interface.
+
+        Delegates to :attr:`df`.
 
         Returns:
             pd.DataFrame: The tremor DataFrame.

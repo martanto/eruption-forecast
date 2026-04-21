@@ -233,9 +233,9 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
-        start_date = to_datetime(start_date)
-        end_date = to_datetime(end_date)
-        location = location if location is not None else ""
+        start_date: datetime = to_datetime(start_date)
+        end_date: datetime = to_datetime(end_date)
+        location: str = location if location is not None else ""
         nslc = f"{network}.{station}.{location}.{channel}"
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         station_dir = os.path.join(output_dir, nslc)
@@ -344,6 +344,9 @@ class CalculateTremor:
     def __str__(self) -> str:
         """Return a concise human-readable summary of this CalculateTremor instance.
 
+        Intended for display in logs and notebooks; includes enough context to
+        identify the run without requiring access to the object's attributes.
+
         Returns:
             str: A summary string including version, job count, date range, NSLC,
                 frequency bands, and the path to the merged tremor CSV.
@@ -359,9 +362,11 @@ class CalculateTremor:
     def __repr__(self) -> str:
         """Return a detailed string representation of this CalculateTremor instance.
 
+        Lists all constructor parameters with their current values, making the
+        output suitable for debugging or reconstructing the instance.
+
         Returns:
-            str: A string listing all constructor parameters and their current values,
-                suitable for reconstructing or debugging the instance.
+            str: A string listing all constructor parameters and their current values.
         """
         return (
             f"{self.__class__.__name__}(start_date={self.start_date_str}, "
@@ -1045,7 +1050,7 @@ class CalculateTremor:
 
                 # Calculate ratio: low_freq / high_freq
                 # Replace inf and -inf values (from division by zero) with NaN
-                dsar_series = prev_series / current_series
+                dsar_series: pd.Series = prev_series / current_series
                 dsar_series = dsar_series.replace([np.inf, -np.inf], np.nan)
 
                 # Apply value multiplier if specified
