@@ -24,7 +24,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from eruption_forecast.utils import validate_date_ranges
+from eruption_forecast.utils.validation import validate_date_ranges
 
 
 def to_datetime(date: str | datetime, variable_name: str | None = None) -> datetime:
