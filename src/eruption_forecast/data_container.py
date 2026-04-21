@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 
 import pandas as pd
-from statsmodels.regression.mixed_linear_model import VCSpec
 
 
 class BaseDataContainer(ABC):
