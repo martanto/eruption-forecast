@@ -308,9 +308,24 @@ class ForecastModel:
         # Verbose and logging
         # ------------------------------------------------------------------
         if verbose:
-            logger.info(f"Volcano ID: {self.volcano_id}")
-            logger.info(f"NSLC: {self.nslc}")
-            logger.info(f"Output Dir: {self.output_dir}")
+            logger.info(self.__repr__())
+
+    def __repr__(self) -> str:
+        """Return a concise string representation of the ForecastModel instance."""
+        parts = [
+            f"station={self.station!r}",
+            f"channel={self.channel!r}",
+            f"network={self.network!r}",
+            f"window_size={self.window_size}",
+            f"volcano_id={self.volcano_id!r}",
+            f"location={self.location!r}",
+            f"output_dir={self.output_dir!r}",
+            f"root_dir={self.root_dir!r}",
+            f"overwrite={self.overwrite}",
+            f"n_jobs={self.n_jobs}",
+            f"verbose={self.verbose}",
+        ]
+        return f"ForecastModel({', '.join(parts)})"
 
     @staticmethod
     def _setup_directories(
