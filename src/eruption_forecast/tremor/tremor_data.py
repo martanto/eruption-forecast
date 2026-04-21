@@ -80,7 +80,7 @@ class TremorData(BaseDataContainer):
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
         super().__init__()
-        self.df = df
+        self.df: pd.DataFrame = df
         self.verbose = verbose
         self.debug = debug
 
