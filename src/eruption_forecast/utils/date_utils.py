@@ -24,6 +24,8 @@ from datetime import datetime
 
 import pandas as pd
 
+from eruption_forecast.utils import validate_date_ranges
+
 
 def to_datetime(date: str | datetime, variable_name: str | None = None) -> datetime:
     """Ensure date object is a datetime object.
@@ -119,12 +121,15 @@ def normalize_dates(
         >>> print(start_str, end_str)
         2025-01-01 2025-01-31
     """
-    start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
-    end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
+    validate_date_ranges(start_date, end_date)
 
-    return start_date, end_date, start_date_str, end_date_str
+    _start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
+    _end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
+
+    start_date_str = _start_date.strftime("%Y-%m-%d")
+    end_date_str = _end_date.strftime("%Y-%m-%d")
+
+    return _start_date, _end_date, start_date_str, end_date_str
 
 
 def parse_label_filename(basename: str) -> dict:
