@@ -1,9 +1,9 @@
 """Container for loaded tremor time-series data.
 
-A lightweight wrapper around a pandas DataFrame of tremor metrics (RSAM, DSAR)
-produced by ``CalculateTremor``. It inherits from ``BaseDataContainer``
-and adds sampling-rate validation, start/end date properties,
-and support for loading data directly from a CSV file.
+A lightweight wrapper around a pandas DataFrame of tremor metrics (RSAM, DSAR,
+and Shannon Entropy) produced by ``CalculateTremor``. It inherits from
+``BaseDataContainer`` and adds sampling-rate validation, start/end date
+properties, and support for loading data directly from a CSV file.
 
 Key class:
     - ``TremorData``: Accepts a pre-loaded DataFrame or loads one from a CSV path
@@ -27,25 +27,23 @@ from eruption_forecast.utils.validation import check_sampling_consistency
 class TremorData(BaseDataContainer):
     """Container for tremor time-series data.
 
-    Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR) and exposes
-    convenience properties for common metadata. Data can be supplied
-    directly as a DataFrame or loaded from a CSV file.
+    Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR, and Shannon
+    Entropy) and exposes convenience properties for common metadata. Data can
+    be supplied directly as a DataFrame or loaded from a CSV file.
 
     Inherits from :class:`BaseDataContainer`, providing ``csv``, ``start_date_str``,
     ``end_date_str``, and ``data`` as part of the shared data-container interface.
 
     Attributes:
-        csv (str): Path to the source CSV file, set by
-            :meth:`from_csv`. Empty string until data is loaded.
+        csv (str | None): Path to the source CSV file. Set externally after
+            :meth:`from_csv` is used; ``None`` until assigned.
         verbose (bool): If True, emit informational log messages.
         debug (bool): If True, emit debug-level log messages.
         _df (pd.DataFrame): The underlying internal tremor DataFrame.
-        data (pd.DataFrame): Alias for :attr:`df` satisfying the
-            :class:`BaseDataContainer` interface.
 
     Args:
         df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
-            and metric columns (``rsam_*``, ``dsar_*``).
+            and metric columns (``rsam_*``, ``dsar_*``, ``entropy``).
         verbose (bool): If True, emit informational log messages.
             Defaults to False.
         debug (bool): If True, emit debug-level log messages.
@@ -53,7 +51,7 @@ class TremorData(BaseDataContainer):
 
     Examples:
         >>> tremor = TremorData(df=my_df)
-        >>> tremor = TremorData(verbose=True).from_csv("tremor.csv")
+        >>> tremor = TremorData.from_csv("tremor.csv")
         >>> print(tremor.start_date_str, tremor.end_date_str)
     """
 
@@ -70,7 +68,7 @@ class TremorData(BaseDataContainer):
 
         Args:
             df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
-                and metric columns (``rsam_*``, ``dsar_*``).
+                and metric columns (``rsam_*``, ``dsar_*``, ``entropy``).
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
@@ -127,7 +125,7 @@ class TremorData(BaseDataContainer):
 
         Returns:
             pd.DataFrame: Tremor DataFrame with a DatetimeIndex and columns
-                such as ``rsam_f0``, ``dsar_f0-f1``, etc.
+                such as ``rsam_f0``, ``dsar_f0-f1``, ``entropy``, etc.
 
         Raises:
             ValueError: If the DataFrame is empty (no data has been loaded).
@@ -152,7 +150,7 @@ class TremorData(BaseDataContainer):
         """Return the list of DataFrame column names.
 
         Returns:
-            list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1"]``.
+            list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1", "entropy"]``.
         """
         return self.df.columns.tolist()
 
