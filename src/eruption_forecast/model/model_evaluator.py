@@ -191,7 +191,7 @@ class ModelEvaluator:
         self._prefix = (
             f"{random_state:05d}" if random_state is not None else f"{model_name}"
         )
-        self._y_pred: np.ndarray = model.predict(X_test)  # type: ignore[union-attr]
+        self._y_pred: np.ndarray = model.predict(X_test)  # type: ignore[union-attr]  # ty: ignore[unresolved-attribute]
         self._y_proba: np.ndarray | None = self._get_proba()
         self._metrics: dict[str, Any] | None = None
 
@@ -302,10 +302,10 @@ class ModelEvaluator:
             decision scores, or None if the model does not support either.
         """
         if hasattr(self.model, "predict_proba"):
-            y_scores: np.ndarray = self.model.predict_proba(self.X_test)  # type: ignore[union-attr]
+            y_scores: np.ndarray = self.model.predict_proba(self.X_test)  # ty:ignore[call-non-callable]
             return y_scores[:, 1] if y_scores.ndim > 1 else y_scores
         if hasattr(self.model, "decision_function"):
-            return self.model.decision_function(self.X_test)  # type: ignore[union-attr]
+            return self.model.decision_function(self.X_test)  # ty:ignore[call-non-callable]
         return None
 
     def get_metrics(self) -> dict[str, Any]:

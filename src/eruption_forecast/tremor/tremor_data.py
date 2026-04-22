@@ -1,9 +1,9 @@
 """Container for loaded tremor time-series data.
 
-A lightweight wrapper around a pandas DataFrame of tremor metrics (RSAM, DSAR)
-produced by ``CalculateTremor``. It inherits from ``BaseDataContainer``
-and adds sampling-rate validation, start/end date properties,
-and support for loading data directly from a CSV file.
+A lightweight wrapper around a pandas DataFrame of tremor metrics (RSAM, DSAR,
+and Shannon Entropy) produced by ``CalculateTremor``. It inherits from
+``BaseDataContainer`` and adds sampling-rate validation, start/end date
+properties, and support for loading data directly from a CSV file.
 
 Key class:
     - ``TremorData``: Accepts a pre-loaded DataFrame or loads one from a CSV path
@@ -13,6 +13,7 @@ Key class:
 """
 
 import os
+from typing import Self
 from datetime import datetime
 from functools import cached_property
 
@@ -26,26 +27,30 @@ from eruption_forecast.utils.validation import check_sampling_consistency
 class TremorData(BaseDataContainer):
     """Container for tremor time-series data.
 
-    Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR) and exposes
-    convenience properties for common metadata. Data can be supplied
-    directly as a DataFrame or loaded from a CSV file.
+    Wraps a pandas DataFrame of tremor metrics (RSAM, DSAR, and Shannon
+    Entropy) and exposes convenience properties for common metadata. Data can
+    be supplied directly as a DataFrame or loaded from a CSV file.
 
     Inherits from :class:`BaseDataContainer`, providing ``csv``, ``start_date_str``,
     ``end_date_str``, and ``data`` as part of the shared data-container interface.
 
     Attributes:
-        csv (str): Path to the source CSV file, set by
-            :meth:`from_csv`. Empty string until data is loaded.
+        csv (str | None): Path to the source CSV file. Set externally after
+            :meth:`from_csv` is used; ``None`` until assigned.
+        start_date (datetime.datetime): Start date extracted from filename.
+        end_date (datetime.datetime): End date extracted from filename.
+        start_date_str (str): Start date string in YYYY-MM-DD format.
+        end_date_str (str): End date string in YYYY-MM-DD format.
+        data (pd.DataFrame): Alias for :attr:`df` — satisfies the
+            :class:`BaseDataContainer` interface.
+        filename (str): Basename of the CSV file with extension.
+        basename (str): Filename without extension.
         verbose (bool): If True, emit informational log messages.
         debug (bool): If True, emit debug-level log messages.
-        _df (pd.DataFrame): The underlying internal tremor DataFrame.
-        data (pd.DataFrame): Alias for :attr:`df` satisfying the
-            :class:`BaseDataContainer` interface.
 
     Args:
-        df (pd.DataFrame | None): Pre-loaded tremor DataFrame
-            with a DatetimeIndex. If None, an empty DataFrame is used until
-            :meth:`from_csv` is called. Defaults to None.
+        df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
+            and metric columns (``rsam_*``, ``dsar_*``, ``entropy``).
         verbose (bool): If True, emit informational log messages.
             Defaults to False.
         debug (bool): If True, emit debug-level log messages.
@@ -53,33 +58,31 @@ class TremorData(BaseDataContainer):
 
     Examples:
         >>> tremor = TremorData(df=my_df)
-        >>> tremor = TremorData(verbose=True).from_csv("tremor.csv")
+        >>> tremor = TremorData.from_csv("tremor.csv")
         >>> print(tremor.start_date_str, tremor.end_date_str)
     """
 
     def __init__(
         self,
-        df: pd.DataFrame | None = None,
+        df: pd.DataFrame,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
-        """Initialize the TremorData container with an optional DataFrame.
+        """Initialize the TremorData container with a pre-loaded DataFrame.
 
-        Stores the provided DataFrame (or an empty one when df is None),
-        initialises ``csv`` to an empty string, and configures logging flags.
+        Stores the provided DataFrame, initialises ``csv`` to ``None`` (via
+        ``BaseDataContainer.__init__``), and configures logging flags.
 
         Args:
-            df (pd.DataFrame | None, optional): Pre-loaded tremor DataFrame with
-                DatetimeIndex and metric columns (rsam_*, dsar_*). Pass None to
-                create an empty container and load data later via from_csv().
-                Defaults to None.
+            df (pd.DataFrame): Pre-loaded tremor DataFrame with a DatetimeIndex
+                and metric columns (``rsam_*``, ``dsar_*``, ``entropy``).
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
-        super().__init__(csv="")
+        super().__init__()
+        self.df: pd.DataFrame = df
         self.verbose = verbose
         self.debug = debug
-        self.df = df if df is not None else pd.DataFrame()
 
     def __repr__(self) -> str:
         """Return a detailed string representation of this TremorData instance.
@@ -92,76 +95,49 @@ class TremorData(BaseDataContainer):
             f"verbose={self.verbose}, debug={self.debug})"
         )
 
-    def from_csv(self, tremor_csv: str) -> pd.DataFrame:
-        """Load tremor data from a CSV file.
+    @classmethod
+    def from_csv(cls, tremor_csv: str) -> Self:
+        """Load tremor data from a CSV file and return a new TremorData instance.
 
-        Reads the CSV, parses the ``datetime`` column as the index, and
-        sorts the index in ascending order. The CSV path is stored in
-        ``self.csv`` for later reference.
+        Reads the CSV, parses the ``datetime`` column as the DatetimeIndex, and
+        sorts the index in ascending order.
 
         Args:
-            tremor_csv (str): Absolute or relative path to the tremor CSV
-                file. The file must contain a ``datetime`` column that will
-                be used as the DatetimeIndex.
+            tremor_csv (str): Absolute or relative path to the tremor CSV file.
+                Must contain a ``datetime`` column used as the DatetimeIndex.
 
         Returns:
-            pd.DataFrame: Tremor DataFrame sorted by DatetimeIndex with
-                columns such as ``rsam_f0``, ``dsar_f0-f1``, etc.
+            Self: A new :class:`TremorData` instance wrapping the loaded
+                DataFrame.
 
         Raises:
             FileNotFoundError: If the file at ``tremor_csv`` does not exist.
 
         Examples:
-            >>> tremor = TremorData()
-            >>> df = tremor.from_csv("output/OJN/tremor/tremor.csv")
+            >>> tremor = TremorData.from_csv("output/OJN/tremor/tremor.csv")
         """
         if not os.path.exists(tremor_csv):
             raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
 
         df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
         df = df.sort_index()
-        self._df = df
-        self.csv = tremor_csv
-        return df
 
-    @property
-    def df(self) -> pd.DataFrame:
-        """Get the tremor DataFrame.
+        tremor_data = cls(df=df)
 
-        Returns:
-            pd.DataFrame: Tremor DataFrame with a DatetimeIndex and columns
-                such as ``rsam_f0``, ``dsar_f0-f1``, etc.
-
-        Raises:
-            ValueError: If the DataFrame is empty (no data has been loaded).
-        """
-        if len(self._df) == 0:
-            raise ValueError(
-                "Tremor dataframe is empty. Load it using from_csv() or TremorData(df)."
-            )
-        return self._df
-
-    @df.setter
-    def df(self, df: pd.DataFrame) -> None:
-        """Set the tremor DataFrame.
-
-        Args:
-            df (pd.DataFrame): Tremor DataFrame to set.
-        """
-        self._df = df
+        return tremor_data
 
     @cached_property
     def columns(self) -> list[str]:
-        """List of DataFrame column names.
+        """Return the list of DataFrame column names.
 
         Returns:
-            list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1"]``.
+            list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1", "entropy"]``.
         """
         return self.df.columns.tolist()
 
     @cached_property
     def start_date(self) -> datetime:
-        """First timestamp in the tremor data.
+        """Return the first timestamp in the tremor data.
 
         Returns:
             datetime: Start datetime derived from the first index entry.
@@ -171,7 +147,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def end_date(self) -> datetime:
-        """Last timestamp in the tremor data.
+        """Return the last timestamp in the tremor data.
 
         Returns:
             datetime: End datetime derived from the last index entry.
@@ -181,7 +157,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def start_date_str(self) -> str:
-        """Start date as an ISO-format string.
+        """Return the start date as an ISO-format string.
 
         Returns:
             str: Start date in ``"YYYY-MM-DD"`` format.
@@ -190,7 +166,7 @@ class TremorData(BaseDataContainer):
 
     @cached_property
     def end_date_str(self) -> str:
-        """End date as an ISO-format string.
+        """Return the end date as an ISO-format string.
 
         Returns:
             str: End date in ``"YYYY-MM-DD"`` format.
@@ -199,7 +175,7 @@ class TremorData(BaseDataContainer):
 
     @property
     def n_days(self) -> int:
-        """Number of days spanned by the tremor data.
+        """Return the number of days spanned by the tremor data.
 
         Returns:
             int: Integer number of days between start and end date.
@@ -208,7 +184,9 @@ class TremorData(BaseDataContainer):
 
     @property
     def data(self) -> pd.DataFrame:
-        """Alias for :attr:`df` — satisfies the :class:`BaseDataContainer` interface.
+        """Return the tremor DataFrame, satisfying the :class:`BaseDataContainer` interface.
+
+        Delegates to :attr:`df`.
 
         Returns:
             pd.DataFrame: The tremor DataFrame.

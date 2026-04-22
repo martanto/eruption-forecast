@@ -29,7 +29,7 @@ class TremorReport(BaseReport):
 
     def __init__(
         self,
-        tremor_data: "TremorData | str",
+        tremor_data: TremorData | str,
         station: str | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -52,8 +52,7 @@ class TremorReport(BaseReport):
         """
         super().__init__(output_dir=output_dir, root_dir=root_dir)
         if isinstance(tremor_data, str):
-            td = TremorData()
-            td.from_csv(tremor_data)
+            td = TremorData.from_csv(tremor_data)
             self._tremor = td
         else:
             self._tremor = tremor_data

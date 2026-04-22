@@ -14,21 +14,19 @@ class BaseDataContainer(ABC):
     :class:`LabelData`: a CSV path, date-range string properties, and a
     DataFrame accessor.
 
-    Args:
-        csv (str): Path to the source CSV file.
-
     Attributes:
-        csv (str): Path to the source CSV file.
+        csv (str | None): Path to the source CSV file, or ``None`` until
+            assigned by a subclass.
     """
 
-    def __init__(self, csv: str = "") -> None:
-        """Store the CSV path.
+    def __init__(self) -> None:
+        """Initialize the base data container with a null CSV path.
 
-        Args:
-            csv (str, optional): Path to the source CSV file.
-                Defaults to empty string for subclasses that set it later.
+        Sets ``csv`` to ``None``; subclasses assign a valid path before any
+        path-derived properties (``filename``, ``basename``, ``filetype``)
+        are accessed.
         """
-        self.csv = csv
+        self.csv: str | None = None
 
     @cached_property
     def filename(self) -> str:
@@ -40,6 +38,8 @@ class BaseDataContainer(ABC):
         Returns:
             str: Basename of the CSV file including extension.
         """
+        if self.csv is None:
+            raise ValueError("No CSV path provided.")
         return os.path.basename(self.csv)
 
     @cached_property
@@ -69,7 +69,9 @@ class BaseDataContainer(ABC):
     @property
     @abstractmethod
     def start_date_str(self) -> str:
-        """Start date of the data as an ISO-format string.
+        """Return the start date of the data as an ISO-format string.
+
+        Derived from the first timestamp in the underlying data source.
 
         Returns:
             str: Start date in ``"YYYY-MM-DD"`` format.
@@ -78,7 +80,9 @@ class BaseDataContainer(ABC):
     @property
     @abstractmethod
     def end_date_str(self) -> str:
-        """End date of the data as an ISO-format string.
+        """Return the end date of the data as an ISO-format string.
+
+        Derived from the last timestamp in the underlying data source.
 
         Returns:
             str: End date in ``"YYYY-MM-DD"`` format.
@@ -87,9 +91,10 @@ class BaseDataContainer(ABC):
     @property
     @abstractmethod
     def data(self) -> pd.DataFrame:
-        """The fully loaded data as a DataFrame.
+        """Return the fully loaded data as a DataFrame.
+
+        Index type and column names are determined by each concrete subclass.
 
         Returns:
-            pd.DataFrame: The loaded DataFrame. Implementation details (index,
-                columns) are determined by each concrete subclass.
+            pd.DataFrame: The loaded DataFrame.
         """

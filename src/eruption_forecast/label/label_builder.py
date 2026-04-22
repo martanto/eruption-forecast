@@ -328,7 +328,9 @@ class LabelBuilder:
             "is_built": is_built,
             "n_windows": len(self._df) if is_built else None,
             "n_positive": int(self._df["is_erupted"].sum()) if is_built else None,
-            "n_negative": int((self._df["is_erupted"] == 0).sum()) if is_built else None,
+            "n_negative": int((self._df["is_erupted"] == 0).sum())
+            if is_built
+            else None,
         }
         return result
 
@@ -354,9 +356,7 @@ class LabelBuilder:
             else "treating the eruption day itself as an additional positive day"
         )
         eruption_dates_str = ", ".join(d["eruption_dates"])
-        step = (
-            f"{d['window_step']} {d['window_step_unit']}"
-        )
+        step = f"{d['window_step']} {d['window_step_unit']}"
 
         sentences = [
             f"LabelBuilder for volcano '{d['volcano_id']}' spans "
@@ -405,13 +405,9 @@ class LabelBuilder:
         include = d["include_eruption_date"]
         pos_days = d["positive_days_per_eruption"]
         if include:
-            pos_days_label = (
-                f"{pos_days} (all on or before eruption date, inclusive)"
-            )
+            pos_days_label = f"{pos_days} (all on or before eruption date, inclusive)"
         else:
-            pos_days_label = (
-                f"{pos_days} ({d['day_to_forecast']} pre-eruption day(s) + eruption date)"
-            )
+            pos_days_label = f"{pos_days} ({d['day_to_forecast']} pre-eruption day(s) + eruption date)"
 
         eruption_dates_str = ", ".join(d["eruption_dates"])
 
@@ -1005,7 +1001,7 @@ class LabelBuilder:
             >>> print(df.columns.tolist())
             ['id', 'is_erupted']
         """
-        label_data = LabelData(label_csv=csv)
+        label_data = LabelData(csv)
 
         if self.verbose:
             logger.info(f"Label data loaded from {csv}")

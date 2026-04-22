@@ -201,8 +201,8 @@ class ModelPredictor:
         # ------------------------------------------------------------------
         # Set DEFAULT properties
         # ------------------------------------------------------------------
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date: datetime = start_date
+        self.end_date: datetime = end_date
         self.overwrite = overwrite
         self.n_jobs = n_jobs
         self.output_dir = output_dir
@@ -243,7 +243,7 @@ class ModelPredictor:
         self.tremor_matrix_df: pd.DataFrame | None = None
 
         # ------------------------------------------------------------------
-        # Will be set after build_future_labels() method called
+        # Will be set after build_prediction_labels() method called
         # ------------------------------------------------------------------
         self.labels_df: pd.DataFrame | pd.Series | None = None
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
@@ -320,15 +320,24 @@ class ModelPredictor:
 
     @property
     def model_names(self) -> list[str]:
-        """Names of registered classifier types."""
+        """Return the names of all registered classifier types.
+
+        Returns:
+            list[str]: Classifier names drawn from ``trained_models`` keys,
+                or from ``_registry_csv_paths`` keys when no models are loaded yet.
+        """
         return list(self.trained_models.keys()) or list(self._registry_csv_paths.keys())
 
-    def build_future_labels(
+    def build_prediction_labels(
         self,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
     ) -> pd.DataFrame:
-        """Build future labels dataframe with datetime as index and id as columns.
+        """Build a future-labels DataFrame with datetime index and sequential IDs.
+
+        Constructs one row per sliding window between ``self.start_date`` and
+        ``self.end_date`` using ``construct_windows``, assigns a sequential
+        ``id`` column, and saves the result to disk for caching.
 
         Args:
             window_step (int): Step size between consecutive windows.
@@ -345,7 +354,7 @@ class ModelPredictor:
         ensure_dir(self.features_dir)
         futures_labels_filepath = os.path.join(
             self.features_dir,
-            f"future-labels_{filename}.csv",
+            f"prediction-labels_{filename}.csv",
         )
 
         # Skip if file exists
@@ -355,7 +364,7 @@ class ModelPredictor:
             )
             return self.labels_df
 
-        futures_labels_df = construct_windows(
+        futures_labels_df: pd.DataFrame = construct_windows(
             start_date=self.start_date,
             end_date=self.end_date,
             window_step=window_step,
@@ -364,7 +373,7 @@ class ModelPredictor:
         futures_labels_df["id"] = range(len(futures_labels_df))
 
         self.labels_df = futures_labels_df
-        self.labels_df.to_csv(futures_labels_filepath, index=True)
+        futures_labels_df.to_csv(futures_labels_filepath, index=True)
 
         return futures_labels_df
 
@@ -380,7 +389,7 @@ class ModelPredictor:
         Args:
             tremor_df (pd.DataFrame): Tremor dataframe with a ``DatetimeIndex``.
             labels_df (pd.DataFrame): Labels dataframe produced by
-                :meth:`build_future_labels`.
+                :meth:`build_prediction_labels`.
             window_size (int, optional): Window size in days. Defaults to 2.
             select_tremor_columns (list[str] | None, optional): Subset of
                 tremor columns to include.  Defaults to None (all columns).
@@ -404,7 +413,7 @@ class ModelPredictor:
 
         if labels_df is None:
             raise ValueError(
-                "Parameter labels_df not provided. Please run build_future_labels() first."
+                "Parameter labels_df not provided. Please run build_prediction_labels() first."
             )
 
         ensure_dir(self.tremor_dir)
@@ -436,10 +445,10 @@ class ModelPredictor:
             save_tremor_matrix_per_id=False,
         )
 
-        self.tremor_matrix_df = tremor_matrix_builder.df
-        self.tremor_matrix_df.to_csv(filepath, index=False)
+        self.tremor_matrix_df: pd.DataFrame = tremor_matrix_builder.df
+        tremor_matrix_builder.df.to_csv(filepath, index=False)
 
-        return tremor_matrix_builder.df
+        return self.tremor_matrix_df
 
     def extract_features(
         self,
@@ -499,7 +508,8 @@ class ModelPredictor:
                 pre-loaded DataFrame.
 
         Returns:
-            pd.DataFrame: Tremor dataframe sliced to the predictor date range.
+            pd.DataFrame: Full tremor DataFrame loaded from the source, with a
+                DatetimeIndex.
 
         Raises:
             ValueError: If ``tremor_data`` is neither a filepath string nor a
@@ -508,22 +518,18 @@ class ModelPredictor:
             TypeError: If the resulting tremor DataFrame does not have a
                 ``DatetimeIndex``.
         """
-        tremor_df = None
 
-        _tremor_data = TremorData()
         if isinstance(tremor_data, str):
-            tremor_df = _tremor_data.from_csv(tremor_data)
-
-        if isinstance(tremor_data, pd.DataFrame):
-            _tremor_data = TremorData(df=tremor_data)
-            tremor_df = _tremor_data.df
-
-        if tremor_df is None:
+            _tremor_data: TremorData = TremorData.from_csv(tremor_data)
+        elif isinstance(tremor_data, pd.DataFrame):
+            _tremor_data: TremorData = TremorData(df=tremor_data)
+        else:
             raise ValueError(
                 f"Parameter tremor_data only accepts valid tremor data filepath "
                 f"or pandas DataFrame type. Your tremor data type is: {type(tremor_data)}"
             )
 
+        tremor_df = _tremor_data.df
         if not isinstance(tremor_df.index, pd.DatetimeIndex):
             raise TypeError("tremor_df index is not pd.DatetimeIndex")
 
@@ -553,7 +559,11 @@ class ModelPredictor:
         use_relevant_features: bool = True,
         select_tremor_columns: list[str] | None = None,
     ) -> pd.DataFrame:
-        """Get future features dataframe.
+        """Build and extract tsfresh features for unlabelled forecast windows.
+
+        Orchestrates three sequential steps: ``build_prediction_labels`` →
+        ``build_tremor_matrix`` → ``extract_features``, returning the final
+        features DataFrame ready for model inference.
 
         Args:
             tremor_df (pd.DataFrame): Tremor dataframe with a ``DatetimeIndex``,
@@ -569,7 +579,7 @@ class ModelPredictor:
         Returns:
             pd.DataFrame: Extracted features dataframe, one row per window.
         """
-        future_labels = self.build_future_labels(
+        future_labels = self.build_prediction_labels(
             window_step=window_step, window_step_unit=window_step_unit
         )
 
@@ -784,7 +794,11 @@ class ModelPredictor:
             raise ValueError("No labels dataframe provided.")
 
         fig = plot_forecast(
-            df=df, label_df=self.labels_df, threshold=threshold, title=title, **plot_kwargs
+            df=df,
+            label_df=self.labels_df,
+            threshold=threshold,
+            title=title,
+            **plot_kwargs,
         )
 
         path = os.path.join(self.figures_dir, f"forecast_{self.basename}.png")

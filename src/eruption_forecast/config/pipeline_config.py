@@ -332,7 +332,7 @@ class ForecastConfig(_ConfigBase):
         save_predictions (bool): Whether to save the prediction DataFrame as CSV.
             Defaults to ``True``.
         threshold (float, optional): Threshold for classifying eruption
-            probability as positive. Defaults to ``0.5``.
+            probability as positive. Defaults to ``0.7``.
         n_jobs (int | None): Parallel workers for feature extraction during
             forecasting. ``None`` inherits from ``ForecastModel.n_jobs``.
             Defaults to ``None``.
@@ -346,7 +346,7 @@ class ForecastConfig(_ConfigBase):
     window_step: int = 12
     window_step_unit: str = "hours"
     save_predictions: bool = True
-    threshold: float = 0.5
+    threshold: float = 0.7
     n_jobs: int | None = None
     overwrite: bool = False
     verbose: bool = False

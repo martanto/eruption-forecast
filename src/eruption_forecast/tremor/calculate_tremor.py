@@ -233,9 +233,9 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
-        start_date = to_datetime(start_date)
-        end_date = to_datetime(end_date)
-        location = location if location is not None else ""
+        start_date: datetime = to_datetime(start_date)
+        end_date: datetime = to_datetime(end_date)
+        location: str = location if location is not None else ""
         nslc = f"{network}.{station}.{location}.{channel}"
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         station_dir = os.path.join(output_dir, nslc)
@@ -329,20 +329,13 @@ class CalculateTremor:
             logger.info("⚠️ Calculate Tremor :: Debug mode is ON")
 
         if verbose:
-            logger.info(f"Version: {eruption_forecast.__version__}")
-            logger.info(f"Running on {self.n_jobs} job(s)")
-            logger.info(f"NSLC: {self.nslc}")
-            logger.info(f"Start Date: {self.start_date_str}")
-            logger.info(f"End Date: {self.end_date_str}")
-            logger.info(f"Total Days: {self.n_days}")
-            logger.info(f"Output Directory: {self.output_dir}")
-            logger.info(f"Station Directory: {self.station_dir}")
-            logger.info(f"Tremor Directory: {self.tremor_dir}")
-            logger.info(f"Overwrite: {self.overwrite}")
-            logger.info(f"Freq Bands: {self.freq_bands_alias}")
+            logger.info(self.__repr__())
 
     def __str__(self) -> str:
         """Return a concise human-readable summary of this CalculateTremor instance.
+
+        Intended for display in logs and notebooks; includes enough context to
+        identify the run without requiring access to the object's attributes.
 
         Returns:
             str: A summary string including version, job count, date range, NSLC,
@@ -359,20 +352,41 @@ class CalculateTremor:
     def __repr__(self) -> str:
         """Return a detailed string representation of this CalculateTremor instance.
 
+        Lists all constructor parameters with their current values, making the
+        output suitable for debugging or reconstructing the instance.
+
         Returns:
-            str: A string listing all constructor parameters and their current values,
-                suitable for reconstructing or debugging the instance.
+            str: A string listing all constructor parameters and their current values.
         """
-        return (
-            f"{self.__class__.__name__}(start_date={self.start_date_str}, "
-            f"end_date={self.end_date_str}, station={self.station}, network={self.network}, "
-            f"channel={self.channel}, location={self.location}, methods={self.methods}, "
-            f"output_dir={self.output_dir}, overwrite={self.overwrite}, n_jobs={self.n_jobs}, "
-            f"remove_outlier_method={self.remove_outlier_method}, interpolate={self.interpolate}, "
-            f"value_multiplier={self.value_multiplier}, cleanup_daily_dir={self.cleanup_daily_dir}, "
-            f"plot_daily={self.plot_daily}, save_plot={self.save_plot}, overwrite_plot={self.overwrite_plot}, "
-            f"csv={self.csv}, verbose={self.verbose}, debug={self.debug})"
-        )
+        parts = [
+            f"start_date={self.start_date_str!r}",
+            f"end_date={self.end_date_str!r}",
+            f"station={self.station!r}",
+            f"channel={self.channel!r}",
+            f"network={self.network!r}",
+            f"location={self.location!r}",
+            f"channel_type={self.channel_type!r}",
+            f"methods={self.methods!r}",
+            f"output_dir={self.output_dir!r}",
+            f"root_dir={self.root_dir!r}"
+            if hasattr(self, "root_dir")
+            else "root_dir=None",
+            f"overwrite={self.overwrite}",
+            f"remove_outlier_method={self.remove_outlier_method!r}",
+            f"remove_tremor_anomalies={self.remove_tremor_anomalies}",
+            f"interpolate={self.interpolate}",
+            f"value_multiplier={self.value_multiplier!r}",
+            f"cleanup_daily_dir={self.cleanup_daily_dir}",
+            f"plot_daily={self.plot_daily}",
+            f"save_plot={self.save_plot}",
+            f"overwrite_plot={self.overwrite_plot}",
+            f"filename_prefix={self.filename_prefix!r}",
+            f"minimum_completion_ratio={self.minimum_completion_ratio}",
+            f"n_jobs={self.n_jobs}",
+            f"verbose={self.verbose}",
+            f"debug={self.debug}",
+        ]
+        return f"CalculateTremor({', '.join(parts)})"
 
     def change_freq_bands(self, freq_bands: list[tuple[float, float]]) -> Self:
         """Change frequency bands for tremor calculation.
@@ -632,6 +646,10 @@ class CalculateTremor:
         """
         self._source = "sds"
         self._sds_dir = sds_dir
+
+        if not os.path.isdir(sds_dir):
+            raise ValueError(f"SDS dir {sds_dir} not exists.")
+
         self.SDS = SDS(
             sds_dir,
             network=self.network,
@@ -665,6 +683,10 @@ class CalculateTremor:
         """
         self._source = "fdsn"
         self._client_url = client_url or self._client_url
+
+        if self.verbose:
+            logger.info(f"Calculating tremor using FDSN with client URL: {client_url}")
+
         self.FDSN = FDSN(
             client_url=self._client_url,
             network=self.network,
@@ -1037,7 +1059,7 @@ class CalculateTremor:
 
                 # Calculate ratio: low_freq / high_freq
                 # Replace inf and -inf values (from division by zero) with NaN
-                dsar_series = prev_series / current_series
+                dsar_series: pd.Series = prev_series / current_series
                 dsar_series = dsar_series.replace([np.inf, -np.inf], np.nan)
 
                 # Apply value multiplier if specified

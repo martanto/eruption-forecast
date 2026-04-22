@@ -48,7 +48,8 @@ def plot_forecast(
     x_days_interval: int = 2,
     eruption_dates: list[str] | None = None,
     y_max: float = 1.05,
-    legend_n_cols: int = 5,
+    legend_n_cols: int = 6,
+    bbox_to_anchor: tuple[float, float] = (0.5, -0.05),
 ) -> plt.Figure:
     """Plot eruption forecast probability and prediction time-series.
 
@@ -87,6 +88,8 @@ def plot_forecast(
             :func:`to_datetime`. Defaults to ``None``.
         y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
         legend_n_cols (int, optional): Number of column for legend. Defaults to ``5``.
+        bbox_to_anchor (tuple[float, float], optional): Legend position.
+            Defaults to ``(0.5, -0.05)``.
 
     Returns:
         plt.Figure: Matplotlib figure object with three vertically stacked subplots.
@@ -261,7 +264,7 @@ def plot_forecast(
         labels,
         loc="lower center",
         ncol=legend_n_cols,
-        fontsize=8,
+        fontsize=6,
         frameon=False,
         fancybox=False,
         bbox_to_anchor=(0.5, -0.05),
