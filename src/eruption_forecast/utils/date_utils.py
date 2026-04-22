@@ -24,8 +24,6 @@ from datetime import datetime
 
 import pandas as pd
 
-from eruption_forecast.utils.validation import validate_date_ranges
-
 
 def to_datetime(date: str | datetime, variable_name: str | None = None) -> datetime:
     """Ensure date object is a datetime object.
@@ -121,8 +119,6 @@ def normalize_dates(
         >>> print(start_str, end_str)
         2025-01-01 2025-01-31
     """
-    validate_date_ranges(start_date, end_date)
-
     _start_date = to_datetime(start_date).replace(hour=0, minute=0, second=0)
     _end_date = to_datetime(end_date).replace(hour=23, minute=59, second=59)
 
