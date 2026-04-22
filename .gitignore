@@ -38,3 +38,4 @@ tests/output/
 /test_*.py
 /.github/
 output*
+*.html
