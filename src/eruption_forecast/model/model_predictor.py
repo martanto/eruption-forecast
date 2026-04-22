@@ -243,7 +243,7 @@ class ModelPredictor:
         self.tremor_matrix_df: pd.DataFrame | None = None
 
         # ------------------------------------------------------------------
-        # Will be set after build_future_labels() method called
+        # Will be set after build_prediction_labels() method called
         # ------------------------------------------------------------------
         self.labels_df: pd.DataFrame | pd.Series | None = None
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
@@ -328,7 +328,7 @@ class ModelPredictor:
         """
         return list(self.trained_models.keys()) or list(self._registry_csv_paths.keys())
 
-    def build_future_labels(
+    def build_prediction_labels(
         self,
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
@@ -354,7 +354,7 @@ class ModelPredictor:
         ensure_dir(self.features_dir)
         futures_labels_filepath = os.path.join(
             self.features_dir,
-            f"future-labels_{filename}.csv",
+            f"prediction-labels_{filename}.csv",
         )
 
         # Skip if file exists
@@ -389,7 +389,7 @@ class ModelPredictor:
         Args:
             tremor_df (pd.DataFrame): Tremor dataframe with a ``DatetimeIndex``.
             labels_df (pd.DataFrame): Labels dataframe produced by
-                :meth:`build_future_labels`.
+                :meth:`build_prediction_labels`.
             window_size (int, optional): Window size in days. Defaults to 2.
             select_tremor_columns (list[str] | None, optional): Subset of
                 tremor columns to include.  Defaults to None (all columns).
@@ -413,7 +413,7 @@ class ModelPredictor:
 
         if labels_df is None:
             raise ValueError(
-                "Parameter labels_df not provided. Please run build_future_labels() first."
+                "Parameter labels_df not provided. Please run build_prediction_labels() first."
             )
 
         ensure_dir(self.tremor_dir)
@@ -561,7 +561,7 @@ class ModelPredictor:
     ) -> pd.DataFrame:
         """Build and extract tsfresh features for unlabelled forecast windows.
 
-        Orchestrates three sequential steps: ``build_future_labels`` →
+        Orchestrates three sequential steps: ``build_prediction_labels`` →
         ``build_tremor_matrix`` → ``extract_features``, returning the final
         features DataFrame ready for model inference.
 
@@ -579,7 +579,7 @@ class ModelPredictor:
         Returns:
             pd.DataFrame: Extracted features dataframe, one row per window.
         """
-        future_labels = self.build_future_labels(
+        future_labels = self.build_prediction_labels(
             window_step=window_step, window_step_unit=window_step_unit
         )
 
