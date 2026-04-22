@@ -6,6 +6,8 @@
 
 A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
 
+![Forecast example — Scenario 8, rolling 6h window, prediction 2025-07-27 to 2025-08-22](https://raw.githubusercontent.com/martanto/eruption-forecast/dev/unify-model/assets/forecast_2025-07-27_2025-08-22.png)
+
 ## References and Acknowledgments
 > Dempsey, D. E., Cronin, S. J., Mei, S., & Kempa-Liehr, A. W. (2020). Automatic precursor recognition and real-time forecasting 
 > of sudden explosive volcanic eruptions at Whakaari, New Zealand. Nature Communications, 11(1), 1–8. https://doi.org/10.1038/s41467-020-17375-2
