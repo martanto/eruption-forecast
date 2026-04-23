@@ -24,7 +24,6 @@ Examples:
 """
 
 import os
-import logging
 from importlib.metadata import version
 
 
