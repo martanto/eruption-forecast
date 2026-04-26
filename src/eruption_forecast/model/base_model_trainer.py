@@ -931,23 +931,33 @@ class BaseModelTrainer:
         )
         return os.path.join(self.models_dirs[classifier_slug], f"{filename}.pkl")
 
-    def _run_jobs(self, method: Callable, jobs: list[tuple]) -> list:
-        """Dispatch jobs sequentially or in parallel depending on n_jobs.
+    def _run_jobs(
+        self,
+        method: Callable,
+        jobs: list[tuple],
+        job_name: str = "Default",
+    ) -> list:
+        """Dispatch jobs sequentially or in parallel depending on ``self.n_jobs``.
 
-        Uses joblib's loky backend so that nested parallelism inside each worker
-        (e.g. GridSearchCV with grid_search_n_jobs > 1) is safe and free of
-        deadlocks that would occur with multiprocessing.Pool.
+        When ``self.n_jobs`` is 1, jobs are run in a plain Python loop to avoid
+        joblib overhead. When greater than 1, joblib's loky backend is used so
+        that nested parallelism inside each worker (e.g. GridSearchCV with
+        ``grid_search_n_jobs > 1``) is safe and free of deadlocks that would
+        occur with ``multiprocessing.Pool``.
 
         Args:
             method (Callable): The function to call for each job.
-            jobs (list[tuple]): List of argument tuples, one per job.
+            jobs (list[tuple]): List of argument tuples, one per job. Each tuple
+                is unpacked as positional arguments when calling ``method``.
+            job_name (str, optional): Label used in log messages to identify
+                the job batch. Defaults to ``"Default"``.
 
         Returns:
-            list: Collected return values in submission order.
+            list: Collected return values in the same order as ``jobs``.
         """
         if self.n_jobs != 1:
             logger.info(
-                f"Running on {self.n_jobs} job(s). Grid search jobs {self.grid_search_n_jobs}..."
+                f"[{job_name}]: Running on {self.n_jobs} job(s). Grid search jobs {self.grid_search_n_jobs}..."
             )
             return Parallel(n_jobs=self.n_jobs, backend="loky")(
                 delayed(method)(*job) for job in jobs
