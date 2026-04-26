@@ -85,13 +85,13 @@ A Python package for volcanic eruption forecasting using seismic data analysis. 
 - [Contributing](#contributing)
 - [License](#license)
 
-**Detailed documentation:**
-- [Step-by-Step Usage Guide](docs/step-by-step-guide.md); Sections 1–12, per-stage code examples
-- [API Reference](docs/api-reference.md); Constructor and method parameter tables
-- [Visualization & Plotting](docs/visualization.md); All plot types and usage
-- [Configuration](docs/configuration.md); notify decorator, pipeline config save/replay, logging
-- [Output Directory Structure](docs/output-structure.md); Full directory tree
-- [Architecture](docs/architecture.md); Component details, design principles, key classes
+**Detailed documentation (wiki):**
+- [Pipeline Walkthrough](wiki/Pipeline-Walkthrough.md); Sections 1–12, per-stage code examples
+- [API Reference](wiki/API-Reference.md); Constructor and method parameter tables
+- [Visualization & Plotting](wiki/Visualization.md); All plot types and usage
+- [Configuration](wiki/Configuration.md); notify decorator, pipeline config save/replay, logging
+- [Output Directory Structure](wiki/Output-Structure.md); Full directory tree
+- [Architecture](wiki/Architecture.md); Component details, design principles, key classes
 
 ---
 
@@ -128,7 +128,7 @@ eruption-forecast/
 └── tests/                   # Unit tests
 ```
 
-> Full directory tree, design principles, and per-component details: [docs/architecture.md](docs/architecture.md)
+> Full directory tree, design principles, and per-component details: [wiki/Architecture.md](wiki/Architecture.md)
 
 ## Pipeline Overview
 
@@ -353,7 +353,7 @@ fm.calculate(
 
 See `main.py` in the repository for the complete working example.
 
-> Full per-stage guide with code examples: [docs/step-by-step-guide.md](docs/step-by-step-guide.md)
+> Full per-stage guide with code examples: [wiki/Pipeline-Walkthrough.md](wiki/Pipeline-Walkthrough.md)
 
 ---
 
@@ -662,7 +662,7 @@ fm3.forecast(start_date="2025-04-01", end_date="2025-04-07",
              window_step=12, window_step_unit="hours")
 ```
 
-> Full configuration reference: [docs/configuration.md](docs/configuration.md)
+> Full configuration reference: [wiki/Configuration.md](wiki/Configuration.md)
 
 ---
 
@@ -682,7 +682,7 @@ fm3.forecast(start_date="2025-04-01", end_date="2025-04-07",
 | `voting` | Soft VotingClassifier (RF + XGBoost ensemble, GPU-capable) | Combined |
 | `lite-rf` | Random Forest with a smaller grid for faster training | `class_weight="balanced"` |
 
-> Hyperparameter grids and overriding them: [docs/step-by-step-guide.md#8-hyperparameter-grids](docs/step-by-step-guide.md#8-hyperparameter-grids)
+> Hyperparameter grids and overriding them: [wiki/Training-Workflows.md](wiki/Training-Workflows.md)
 
 ## Cross-Validation Strategies
 
@@ -739,7 +739,7 @@ output/
             └── classifiers/       # Per-classifier model outputs (predictions)
 ```
 
-> Full directory tree with all sub-paths: [docs/output-structure.md](docs/output-structure.md)
+> Full directory tree with all sub-paths: [wiki/Output-Structure.md](wiki/Output-Structure.md)
 
 ---
 
@@ -822,4 +822,4 @@ MIT License; see LICENSE file for details.
 
 **Version:** 0.1.0
 **Status:** Active Development
-**Last Updated:** 2026-04-26
+**Last Updated:** 2026-04-26 (docs/ removed; all links now point to wiki/)

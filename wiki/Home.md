@@ -61,8 +61,7 @@ eruption-forecast/
 │   ├── data_container.py    # BaseDataContainer — shared ABC for data wrappers
 │   ├── sources/             # SeismicDataSource ABC + SDS/FDSN adapters
 │   └── ...                  # tremor/, label/, features/, model/, utils/, plots/
-├── docs/                    # Detailed reference documentation
-├── wiki/                    # This wiki (GitHub Wiki pages)
+├── wiki/                    # Reference documentation (GitHub Wiki)
 ├── tests/                   # Unit tests
 ├── main.py                  # Complete working example
 └── config.example.yaml      # Annotated pipeline config template
