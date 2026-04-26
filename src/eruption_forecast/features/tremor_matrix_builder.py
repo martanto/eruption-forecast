@@ -116,7 +116,7 @@ class TremorMatrixBuilder:
             label_df (pd.DataFrame): Label DataFrame with DatetimeIndex and at least
                 an 'id' column.
             output_dir (str | None, optional): Directory for saved matrix CSVs.
-                Defaults to ``root_dir/output/features``. Defaults to None.
+                Defaults to ``root_dir/output/tremor/matrix``. Defaults to None.
             window_size (int, optional): Window size in days. Defaults to 1.
             root_dir (str | None, optional): Anchor directory for relative path resolution.
                 Defaults to None (uses os.getcwd()).
@@ -182,8 +182,9 @@ class TremorMatrixBuilder:
         """Validate label and tremor DataFrame columns and date ranges.
 
         Checks that required label columns exist and adjusts start/end dates
-        to fit within the available tremor data range. Called automatically
-        during __init__.
+        to fit within the available tremor data range. Also derives
+        ``tremor_matrix_filename`` and ``_date_str`` from the validated date
+        bounds. Called automatically during ``__init__``.
 
         Raises:
             ValueError: If 'id' column is missing from the label DataFrame.
@@ -258,10 +259,10 @@ class TremorMatrixBuilder:
         Examples:
             >>> builder = TremorMatrixBuilder(...)
             >>> builder.save_matrix_per_method(tremor_matrix)
-            >>> # Creates files in output_dir/tremor_matrix_per_method/:
-            >>> #   - tremor_matrix_rsam_f0.csv
-            >>> #   - tremor_matrix_rsam_f1.csv
-            >>> #   - tremor_matrix_dsar_f0-f1.csv
+            >>> # Creates files in output_dir/per_method/:
+            >>> #   - tremor_matrix_rsam_f0_2025-01-01_2025-09-28.csv
+            >>> #   - tremor_matrix_rsam_f1_2025-01-01_2025-09-28.csv
+            >>> #   - tremor_matrix_dsar_f0-f1_2025-01-01_2025-09-28.csv
         """
         tremor_matrix_per_method_dir = os.path.join(self.output_dir, "per_method")
         ensure_dir(tremor_matrix_per_method_dir)
@@ -448,7 +449,7 @@ class TremorMatrixBuilder:
                 Defaults to None.
             save_tremor_matrix_per_method (bool, optional): If True, saves
                 individual CSVs for each tremor column method in the subdirectory
-                'tremor_matrix_per_method/'. Useful for debugging individual metrics.
+                ``per_method/``. Useful for debugging individual metrics.
                 Defaults to True.
             save_tremor_matrix_per_id (bool, optional): **WARNING: Generates
                 many files!** If True, saves individual CSV files for each
@@ -470,7 +471,7 @@ class TremorMatrixBuilder:
             >>> builder = TremorMatrixBuilder(
             ...     tremor_df=tremor_data,
             ...     label_df=labels,
-            ...     output_dir="output/features",
+            ...     output_dir="output/tremor/matrix",
             ...     window_size=1
             ... )
             >>> builder.build(
@@ -480,7 +481,7 @@ class TremorMatrixBuilder:
             >>> print(builder.df.shape)
             (14400, 4)  # 100 windows × 144 samples/window
             >>> print(builder.csv)
-            "output/features/tremor_matrix_unified_2025-01-01_2025-09-28_ws-1.csv"
+            "output/tremor/matrix/tremor_matrix_unified_2025-01-01_2025-09-28_ws-1.csv"
             >>>
             >>> # Method chaining example
             >>> matrix = TremorMatrixBuilder(tremor_df, label_df) \

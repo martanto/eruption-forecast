@@ -796,15 +796,17 @@ class ForecastModel:
             select_tremor_columns (list[str] | None): Tremor columns to use for feature
                 extraction. Uses all available columns when None. Defaults to None.
             save_tremor_matrix_per_method (bool): Save a separate tremor-matrix CSV for
-                each tremor column. Defaults to True.
+                each tremor column in ``output/tremor/matrix/per_method/``.
+                Defaults to False.
             save_tremor_matrix_per_id (bool): **WARNING: generates one file per label
                 window** — use only for debugging. Defaults to False.
             exclude_features (list[str] | None): tsfresh feature calculator names to skip.
                 Defaults to None.
             use_relevant_features (bool): If True, run tsfresh with relevance filtering
                 (requires labels). Defaults to False.
-            output_dir (str | None): Output directory for feature files. Defaults to
-                ``self.features_dir``.
+            output_dir (str | None): Output directory for feature files. The tremor
+                matrix is always written to ``{station_dir}/tremor/matrix/`` regardless
+                of this value. Defaults to ``self.features_dir``.
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
             n_jobs (int | None): Parallel workers for tsfresh extraction. Overrides the
                 instance-level ``n_jobs`` when provided. Defaults to None.
@@ -1449,7 +1451,8 @@ class ForecastModel:
                 Defaults to None (uses ``self.n_jobs``).
             overwrite (bool, optional): If True, overwrites existing output files.
                 Defaults to False.
-            verbose (bool, optional): If True, enables verbose logging. Defaults to False.
+            verbose (bool | None, optional): If True, enables verbose logging.
+                If None, falls back to the instance-level ``self.verbose``. Defaults to None.
             **plot_kwargs: Additional keyword arguments forwarded to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
                 (e.g. ``fig_width``, ``fig_height``, ``rolling_window``,

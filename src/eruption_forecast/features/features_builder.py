@@ -532,7 +532,9 @@ class FeaturesBuilder:
         file for downstream use by ModelTrainer.
 
         Args:
-            label_df (pd.DataFrame): Label DataFrame.
+            label_df (pd.DataFrame): Full label DataFrame with DatetimeIndex and
+                at least an ``id`` column. Will be filtered to IDs in
+                ``self.unique_ids``.
 
         Returns:
             tuple[str, pd.DataFrame]: A tuple containing:
@@ -546,7 +548,7 @@ class FeaturesBuilder:
         Examples:
             >>> builder = FeaturesBuilder(tremor_matrix_df, label_df)
             >>> builder.unique_ids = [1, 2, 3]  # Set during extract_features
-            >>> dates_str, filtered_labels = builder._prepare_training_mode()
+            >>> dates_str, filtered_labels = builder._prepare_training_mode(builder.label_df)
             >>> print(dates_str)
             '2025-01-01-2025-03-31'
             >>> print(builder.label_features_csv)
