@@ -230,11 +230,7 @@ class LabelBuilder:
             logger.info("⚠️ Label Builder :: Debug mode is ON")
 
         if verbose:
-            logger.info(f"Start Date: {start_date_str}")
-            logger.info(f"End Date: {end_date_str}")
-            logger.info(f"Window Step ({window_step_unit}): {window_step}")
-            logger.info(f"Day To Forecast (days): {day_to_forecast}")
-            logger.info(f"Volcano ID: {volcano_id}")
+            logger.info(self.__repr__())
 
     def __repr__(self) -> str:
         """Return a detailed string representation of this LabelBuilder instance.
@@ -244,15 +240,17 @@ class LabelBuilder:
                 ``LabelBuilder(start_date, end_date, window_step, window_step_unit,
                 day_to_forecast, eruption_dates), volcano_id``.
         """
-        return (
-            f"LabelBuilder({self.start_date_str}, "
-            f"{self.end_date_str}, "
-            f"{self.window_step}, "
-            f"{self.window_step_unit}, "
-            f"{self.day_to_forecast}, "
-            f"{self.eruption_dates}), "
-            f"{self.volcano_id}"
-        )
+        parts = [
+            f"volcano_id={self.volcano_id!r}",
+            f"start_date={self.start_date_str!r}",
+            f"end_date={self.end_date_str!r}",
+            f"window_step={self.window_step}",
+            f"window_step_unit={self.window_step_unit!r}",
+            f"day_to_forecast={self.day_to_forecast}",
+            f"include_eruption_date={self.include_eruption_date}",
+            f"eruption_dates={self.eruption_dates!r}",
+        ]
+        return f"LabelBuilder({', '.join(parts)})"
 
     def __str__(self) -> str:
         """Return a concise one-line summary of this LabelBuilder for logs and REPL.
@@ -1050,9 +1048,11 @@ class LabelBuilder:
             Balance: 3.33%
         """
         if self.verbose:
-            logger.info(f"Building labels for {self.n_days} days")
-            logger.info(f"Window step: {self.window_step} {self.window_step_unit}")
-            logger.info(f"Day to forecast: {self.day_to_forecast} days")
+            logger.info(
+                f"Building labels for {self.n_days} days. "
+                f"Window step: {self.window_step} {self.window_step_unit}. "
+                f"Day to forecast: {self.day_to_forecast} days."
+            )
 
         # Check if label csv is exists
         file_exists = os.path.isfile(self.csv)
@@ -1064,7 +1064,7 @@ class LabelBuilder:
             df = self.from_csv(self.csv)
         else:
             if self.verbose:
-                logger.info("Initiating new label DataFrame")
+                logger.info("Creating new label DataFrame...")
 
             # Create id column to use as data ID reference with tremor data
             # such as RSAM, DSAR or MSNoise
