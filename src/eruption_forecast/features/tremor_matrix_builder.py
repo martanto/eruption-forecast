@@ -138,11 +138,11 @@ class TremorMatrixBuilder:
         tremor_df = tremor_df.sort_index()
         label_df = label_df.sort_index()
         output_dir = resolve_output_dir(
-            output_dir, root_dir, os.path.join("output", "features")
+            output_dir, root_dir, os.path.join("output", "tremor", "matrix")
         )
         matrix_tmp_dir = os.path.join(output_dir, "tmp")
-        tremor_start_date_str = tremor_df.index[0].strftime("%Y-%m-%d")
-        tremor_end_date_str = tremor_df.index[-1].strftime("%Y-%m-%d")
+        tremor_start_date_str = tremor_df.index.min().strftime("%Y-%m-%d")
+        tremor_end_date_str = tremor_df.index.max().strftime("%Y-%m-%d")
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -170,6 +170,7 @@ class TremorMatrixBuilder:
         self.df: pd.DataFrame = pd.DataFrame()
         self.csv: str | None = None
         self.tremor_matrix_filename: str | None = None
+        self._date_str: str = ""
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -221,7 +222,11 @@ class TremorMatrixBuilder:
 
         start_date_str = self.start_date.strftime("%Y-%m-%d")
         end_date_str = self.end_date.strftime("%Y-%m-%d")
-        tremor_matrix_filename = f"tremor_matrix_unified_{start_date_str}_{end_date_str}_ws-{self.window_size}.csv"
+        date_str = f"{start_date_str}_{end_date_str}"
+        tremor_matrix_filename = (
+            f"tremor_matrix_unified_{date_str}_ws-{self.window_size}.csv"
+        )
+        self._date_str = date_str
         self.tremor_matrix_filename = tremor_matrix_filename
 
     def create_directories(self) -> None:
@@ -258,9 +263,7 @@ class TremorMatrixBuilder:
             >>> #   - tremor_matrix_rsam_f1.csv
             >>> #   - tremor_matrix_dsar_f0-f1.csv
         """
-        tremor_matrix_per_method_dir = os.path.join(
-            self.output_dir, "tremor_matrix_per_method"
-        )
+        tremor_matrix_per_method_dir = os.path.join(self.output_dir, "per_method")
         ensure_dir(tremor_matrix_per_method_dir)
 
         # Skip ID and datetime columns
@@ -268,7 +271,9 @@ class TremorMatrixBuilder:
             if column in [ID_COLUMN, DATETIME_COLUMN]:
                 continue
 
-            tremor_matrix_method_filename = f"tremor_matrix_{column}.csv"
+            tremor_matrix_method_filename = (
+                f"tremor_matrix_{column}_{self._date_str}.csv"
+            )
             tremor_matrix_method_filepath = os.path.join(
                 tremor_matrix_per_method_dir, tremor_matrix_method_filename
             )
@@ -533,6 +538,7 @@ class TremorMatrixBuilder:
         )
 
         # Save all features and labels for training
+        ensure_dir(self.output_dir)
         unified_tremor_matrix.to_csv(tremor_matrix_csv, index=False)
 
         # Save features per method/columns
