@@ -1423,7 +1423,7 @@ class ForecastModel:
         output_dir: str | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
-        verbose: bool = False,
+        verbose: bool | None = None,
         **plot_kwargs: Any,
     ) -> Self:
         """Generate probabilistic eruption forecasts for a future date range.
@@ -1473,9 +1473,6 @@ class ForecastModel:
                 "Example: ForecastModel(...).forecast(trained_models={'rf': 'path to trained model CSV'}"
             )
 
-        if verbose:
-            logger.info("Starting Prediction...")
-
         model_predictor = ModelPredictor(
             start_date=start_date,
             end_date=end_date,
@@ -1485,6 +1482,9 @@ class ForecastModel:
             verbose=verbose,
             overwrite=overwrite,
         )
+
+        if verbose:
+            logger.info("Starting Prediction...")
 
         df_prediction = model_predictor.predict_proba(
             tremor_data=self.tremor_data,
