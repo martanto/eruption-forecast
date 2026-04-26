@@ -23,13 +23,20 @@ output/
     ├── tremor/
     │   ├── daily/                            # Per-day CSV files (removed if cleanup_daily_dir=True)
     │   ├── figures/                          # Daily tremor plots (created if plot_daily=True)
-    │   └── tremor_*.csv                      # Final merged tremor data
+    │   ├── tremor_*.csv                      # Final merged tremor data
+    │   └── matrix/                           # Tremor matrix outputs
+    │       ├── tremor_matrix_unified_*.csv   # Aligned tremor matrix (all columns)
+    │       ├── per_method/                   # Per-column tremor matrices (optional)
+    │       │   ├── tremor_matrix_{col}_{start}_{end}.csv
+    │       │   └── ...
+    │       └── tmp/                          # Per-window CSVs (save_tremor_matrix_per_id=True only)
     │
     ├── features/
-    │   ├── tremor_matrix_*.csv               # Aligned tremor matrix (all columns)
-    │   ├── tremor_matrix_per_method/         # Per-column tremor matrices (optional)
-    │   ├── all_extracted_features_*.csv      # tsfresh output per tremor column
-    │   └── label_features_*.csv             # Labels aligned with features
+    │   ├── extracted/
+    │   │   ├── train/                        # Per-column tsfresh CSVs (training mode)
+    │   │   └── forecast/                     # Per-column tsfresh CSVs (prediction mode)
+    │   ├── all_features_*.csv                # Concatenated features (training)
+    │   └── label-features_*.csv             # Labels aligned with features
     │
     ├── trainings/
     │   │

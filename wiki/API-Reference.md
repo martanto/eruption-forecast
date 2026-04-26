@@ -18,18 +18,15 @@ from eruption_forecast import ForecastModel
 |-----------|------|---------|-------------|
 | `station` | `str` | — | Seismic station code (e.g. `"OJN"`) |
 | `channel` | `str` | — | Seismic channel code (e.g. `"EHZ"`) |
-| `start_date` | `str \| datetime` | — | Training period start (`YYYY-MM-DD`) |
-| `end_date` | `str \| datetime` | — | Training period end (`YYYY-MM-DD`) |
+| `network` | `str` | — | Seismic network code |
 | `window_size` | `int` | — | Duration (days) of each tremor window fed into tsfresh |
 | `volcano_id` | `str` | — | Identifier used in output filenames |
-| `network` | `str` | `"VG"` | Seismic network code |
-| `location` | `str \| None` | `None` | Seismic location code. `None` and `""` are both accepted and treated as an empty location code |
+| `location` | `str \| None` | `None` | Seismic location code. `None` and `""` are both treated as an empty location code |
 | `output_dir` | `str \| None` | `None` | Base output directory (relative → resolved against `root_dir`) |
 | `root_dir` | `str \| None` | `None` | Anchor for path resolution. Defaults to `os.getcwd()` |
 | `overwrite` | `bool` | `False` | Re-run and overwrite existing output files |
 | `n_jobs` | `int` | `1` | Parallel workers propagated to all pipeline stages |
 | `verbose` | `bool` | `False` | Enable verbose logging |
-| `debug` | `bool` | `False` | Enable debug-level logging |
 
 ### Additional Methods
 

@@ -194,7 +194,7 @@ from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 builder = TremorMatrixBuilder(
     tremor_df=tremor.df,
     label_df=labels.df,
-    output_dir="output/features",
+    output_dir="output/tremor/matrix",
     window_size=1,
 ).build(
     select_tremor_columns=["rsam_f0", "rsam_f1", "dsar_f0-f1"],

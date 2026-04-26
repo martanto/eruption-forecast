@@ -220,8 +220,7 @@ from eruption_forecast.config import (
 
 config = PipelineConfig(
     model=ModelConfig(
-        station="OJN", channel="EHZ",
-        start_date="2025-03-16", end_date="2025-03-22",
+        station="OJN", channel="EHZ", network="VG", location="00",
         window_size=1, volcano_id="MERAPI", n_jobs=4,
     ),
     calculate=CalculateConfig(source="sds", sds_dir="D:/Data/OJN"),
@@ -232,7 +231,7 @@ config = PipelineConfig(
     extract_features=ExtractFeaturesConfig(
         select_tremor_columns=["rsam_f2", "rsam_f3"],
     ),
-    train=TrainConfig(classifier="xgb", cv_strategy="stratified", total_seed=500),
+    train=TrainConfig(classifiers=["xgb"], cv_strategy="stratified", total_seed=500),
     forecast=ForecastConfig(
         start_date="2025-03-23", end_date="2025-03-30",
         window_step=12, window_step_unit="hours",
