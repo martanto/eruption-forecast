@@ -759,7 +759,7 @@ class ModelPredictor:
             cols[f"{model_name}_prediction"] = clf_result["prediction"]
             cols[f"{model_name}_confidence"] = clf_result["confidence"]
             logger.info(
-                f"  {model_name} — mean probability: {clf_result['probability'].mean():.4f}, "
+                f"{model_name} — mean probability: {clf_result['probability'].mean():.4f}, "
                 f"mean prediction: {clf_result['prediction'].mean():.4f}"
             )
 
