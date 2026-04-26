@@ -1390,6 +1390,7 @@ class ForecastModel:
             sampling_strategy=float(sampling_strategy)
             if isinstance(sampling_strategy, (int, float))
             else 0.75,
+            resample_method=resample_method,
             save_all_features=save_all_features,
             plot_significant_features=plot_significant_features,
             n_jobs=n_jobs,
