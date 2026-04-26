@@ -15,7 +15,6 @@ model:
   overwrite: false          # Overwrite existing output files
   n_jobs: 4                 # Parallel workers for the outer pipeline
   verbose: false
-  debug: false
 
 calculate:
   start_date: '2025-03-16'  # Start date for tremor calculation (YYYY-MM-DD)
@@ -35,7 +34,6 @@ calculate:
   client_url: https://service.iris.edu  # FDSN client URL (used when source='fdsn')
   n_jobs: null              # Parallel workers for daily tremor calculation (null = model.n_jobs)
   verbose: false
-  debug: false
 
 build_label:
   window_step: 12           # Step between consecutive windows
@@ -50,13 +48,12 @@ build_label:
   builder: standard         # Label builder type: 'standard' or 'dynamic'
   days_before_eruption: null  # Days before eruption window (required when builder='dynamic')
   verbose: false
-  debug: false
 
 extract_features:
   select_tremor_columns:    # Tremor columns to use for feature extraction
     - rsam_f2
     - rsam_f3
-  save_tremor_matrix_per_method: true   # Save a separate tremor matrix per tremor column
+  save_tremor_matrix_per_method: false   # Save a separate tremor matrix per tremor column
   save_tremor_matrix_per_id: false      # Save a separate tremor matrix per window id
   exclude_features: null    # tsfresh feature names to exclude (null = none)
   use_relevant_features: false          # Use only statistically relevant features (tsfresh FDR)
@@ -92,7 +89,6 @@ forecast:
   window_step_unit: hours   # Unit for window_step: 'minutes' or 'hours'
   save_predictions: true    # Save prediction CSV to disk
   threshold: 0.5            # Probability threshold for classifying a window as eruption
-  save_plot: true           # Save forecast probability plot
   n_jobs: null              # Workers for feature extraction during forecast (null = model.n_jobs)
   overwrite: false
   verbose: false

@@ -313,8 +313,10 @@ DynamicLabelBuilder — three-phase build, overlapping windows deduped
 
 **`TremorMatrixBuilder`** slices tremor time-series into windows aligned with labels:
 - Takes tremor DataFrame and label DataFrame as input
-- Validates sample counts per window
+- Validates sample counts per window; start/end dates are derived from the label date range (clamped to available tremor data) inside `validate()`
 - Concatenates all windows into a unified matrix with `id`, `datetime`, and tremor columns
+- Default output directory: `output/tremor/matrix`
+- Per-method matrices saved to `per_method/` subdirectory with date-stamped filenames when `save_tremor_matrix_per_method=True`
 
 ### 4. Feature Extraction (`src/eruption_forecast/features/`)
 

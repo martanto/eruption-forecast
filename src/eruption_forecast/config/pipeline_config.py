@@ -72,7 +72,6 @@ class ModelConfig(_ConfigBase):
         overwrite (bool): Whether to overwrite existing output files. Defaults to ``False``.
         n_jobs (int): Number of parallel workers. Defaults to ``1``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
-        debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
     station: str = ""
@@ -86,7 +85,6 @@ class ModelConfig(_ConfigBase):
     overwrite: bool = False
     n_jobs: int = 1
     verbose: bool = False
-    debug: bool = False
 
 
 @dataclass
@@ -129,7 +127,6 @@ class CalculateConfig(_ConfigBase):
         n_jobs (int | None): Parallel workers for this stage. ``None`` inherits
             from ``ForecastModel.n_jobs``. Defaults to ``None``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
-        debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
     start_date: str = ""
@@ -149,7 +146,6 @@ class CalculateConfig(_ConfigBase):
     client_url: str = "https://service.iris.edu"
     n_jobs: int | None = None
     verbose: bool = False
-    debug: bool = False
 
 
 @dataclass
@@ -182,7 +178,6 @@ class BuildLabelConfig(_ConfigBase):
         days_before_eruption (int | None): Days before each eruption to start
             its window. Required when ``builder="dynamic"``. Defaults to ``None``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
-        debug (bool): Enable debug-level logging. Defaults to ``False``.
     """
 
     window_step: int = 12
@@ -196,7 +191,6 @@ class BuildLabelConfig(_ConfigBase):
     builder: str = "standard"
     days_before_eruption: int | None = None
     verbose: bool = False
-    debug: bool = False
 
 
 @dataclass
@@ -227,7 +221,7 @@ class ExtractFeaturesConfig(_ConfigBase):
     """
 
     select_tremor_columns: list[str] | None = None
-    save_tremor_matrix_per_method: bool = True
+    save_tremor_matrix_per_method: bool = False
     save_tremor_matrix_per_id: bool = False
     exclude_features: list[str] | None = None
     use_relevant_features: bool = False
@@ -294,7 +288,7 @@ class TrainConfig(_ConfigBase):
     """
 
     classifiers: list[str] = field(default_factory=lambda: ["rf"])
-    cv_strategy: str = "shuffle"
+    cv_strategy: str = "shuffle-stratified"
     random_state: int = 0
     total_seed: int = 500
     with_evaluation: bool = False

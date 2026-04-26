@@ -152,7 +152,7 @@ Raw Seismic Data (SDS / FDSN)
            │
            ▼
 ┌─────────────────────┐
-│   FeaturesBuilder   │  700+ features → all_extracted_features_*.csv
+│   FeaturesBuilder   │  700+ features → all_features_*.csv
 └──────────┬──────────┘
            │
            ▼
@@ -286,13 +286,13 @@ Here's a complete end-to-end example from raw seismic data to trained models and
 ```python
 from eruption_forecast import ForecastModel
 
-# Initialize the forecast model with station and time range
+# Initialize the forecast model with station and configuration
 fm = ForecastModel(
     root_dir="output",
     station="OJN",
     channel="EHZ",
-    start_date="2025-01-01",
-    end_date="2025-12-31",
+    network="VG",
+    location="00",
     window_size=2,
     volcano_id="Lewotobi Laki-laki",
     n_jobs=4,
@@ -719,8 +719,17 @@ All outputs are organized under `{output_dir}/{network}.{station}.{location}.{ch
 ```
 output/
 └── VG.OJN.00.EHZ/
-    ├── tremor/          # Merged tremor CSVs + daily plots
-    ├── features/        # Extracted features + aligned labels
+    ├── tremor/
+    │   ├── tremor_*.csv           # Merged tremor data
+    │   └── matrix/                # Tremor matrix outputs (TremorMatrixBuilder)
+    │       ├── tremor_matrix_unified_*.csv
+    │       └── per_method/        # Per-column matrices with date-stamped filenames
+    ├── features/
+    │   ├── extracted/
+    │   │   ├── train/             # Per-column tsfresh CSVs (training mode)
+    │   │   └── forecast/          # Per-column tsfresh CSVs (prediction mode)
+    │   ├── all_features_*.csv     # Concatenated features
+    │   └── label-features_*.csv   # Labels aligned with features
     └── trainings/
         ├── evaluations/
         │   ├── features/          # Shared feature selection outputs
@@ -813,4 +822,4 @@ MIT License; see LICENSE file for details.
 
 **Version:** 0.1.0
 **Status:** Active Development
-**Last Updated:** 2026-04-05
+**Last Updated:** 2026-04-26
