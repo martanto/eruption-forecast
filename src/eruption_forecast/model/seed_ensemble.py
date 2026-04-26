@@ -116,14 +116,14 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
             seeds.append(
                 {
-                    "random_state": int(random_state),  # type: ignore[arg-type]
+                    "random_state": int(random_state),  # ty:ignore[invalid-argument-type]
                     "model": model,
                     "feature_names": feature_names,
                 }
             )
 
             logger.debug(
-                f"[SeedEnsemble] Loaded seed {int(random_state):05d} — "  # type: ignore[arg-type]
+                f"[SeedEnsemble] Loaded seed {int(random_state):05d} — "  # ty:ignore[invalid-argument-type]
                 f"{len(feature_names)} features"
             )
 
@@ -271,7 +271,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     # ------------------------------------------------------------------
 
     @classmethod
-    def _load_log_msg(cls, obj: "SeedEnsemble") -> str:  # type: ignore[override]
+    def _load_log_msg(cls, obj: "SeedEnsemble") -> str:  # ty:ignore[invalid-method-override]
         """Return a seed-count suffix for the load log message.
 
         Args:
