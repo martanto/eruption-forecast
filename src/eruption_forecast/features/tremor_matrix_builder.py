@@ -487,7 +487,7 @@ class TremorMatrixBuilder:
         # Skip if exists
         if not self.overwrite and (os.path.isfile(tremor_matrix_csv)):
             if verbose:
-                logger.info(f"Tremor matrix {tremor_matrix_csv} already exists.")
+                logger.info(f"Tremor matrix already exists: {tremor_matrix_csv}")
             df = pd.read_csv(tremor_matrix_csv)
             columns = df.columns.tolist()
 
