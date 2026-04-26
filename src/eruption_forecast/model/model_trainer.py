@@ -410,8 +410,11 @@ class ModelTrainer(EvaluationTrainer):
         )
 
         # ===== PHASE 1: Parallel feature selection across seeds =====
+        logger.info(f"Running parallel feature selection across {total_seed} seeds..")
         feature_selection_results: list[str | None] = self._run_jobs(
-            self._run_shared_train, pending_feature_selection_jobs
+            self._run_shared_train,
+            pending_feature_selection_jobs,
+            job_name="Feature Selection",
         )
 
         # Build Phase 2 jobs for seeds that completed Phase 1 successfully.
@@ -426,9 +429,12 @@ class ModelTrainer(EvaluationTrainer):
                 new_training_model_jobs.append((_rs, classifier_model.slug_name))
 
         # ===== PHASE 2: Parallel (seed × classifier) training =====
+        logger.info("Running parallel (seed x classifier)..")
         all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs
         training_model_results = self._run_jobs(
-            self._run_train_classifier, all_training_model_jobs
+            self._run_train_classifier,
+            all_training_model_jobs,
+            job_name="Seed per Classifier",
         )
 
         for result in training_model_results:

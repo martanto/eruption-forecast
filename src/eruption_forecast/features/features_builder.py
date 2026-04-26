@@ -501,10 +501,13 @@ class FeaturesBuilder:
             raise FileNotFoundError("Extracted features CSV not found.")
 
         if self.verbose:
-            logger.info("Concatenating extracted features from calculation.")
+            logger.info("Concatenating extracted features from calculation...")
 
         filepath = os.path.join(self.output_dir, f"{filename}.csv")
         features_csv, features_df = utils_concat_features(list(csv_list), filepath)
+
+        if self.verbose:
+            logger.info(f"Features saved to: {filepath}")
 
         if use_relevant_features:
             self.relevant_features_csv = features_csv
@@ -518,13 +521,20 @@ class FeaturesBuilder:
 
         return features_csv, features_df
 
-    def _prepare_training_mode(self) -> tuple[str, pd.DataFrame]:
+    def _prepare_training_mode(
+        self, label_df: pd.DataFrame
+    ) -> tuple[str, pd.DataFrame]:
         """Filter labels to tremor window IDs and save aligned label CSV.
 
         Reads self.unique_ids (populated by extract_features before this helper
         is called) to restrict the label DataFrame to only those windows that
         are present in the tremor matrix. Saves the filtered labels to a CSV
         file for downstream use by ModelTrainer.
+
+        Args:
+            label_df (pd.DataFrame): Full label DataFrame with DatetimeIndex and
+                at least an ``id`` column. Will be filtered to IDs in
+                ``self.unique_ids``.
 
         Returns:
             tuple[str, pd.DataFrame]: A tuple containing:
@@ -538,15 +548,15 @@ class FeaturesBuilder:
         Examples:
             >>> builder = FeaturesBuilder(tremor_matrix_df, label_df)
             >>> builder.unique_ids = [1, 2, 3]  # Set during extract_features
-            >>> dates_str, filtered_labels = builder._prepare_training_mode()
+            >>> dates_str, filtered_labels = builder._prepare_training_mode(builder.label_df)
             >>> print(dates_str)
             '2025-01-01-2025-03-31'
             >>> print(builder.label_features_csv)
             'output/features/label_features_2025-01-01-2025-03-31.csv'
         """
-        label_df = self.label_df[self.label_df[ID_COLUMN].isin(self.unique_ids)]
-        start_date_str = label_df.index[0].strftime("%Y-%m-%d")
-        end_date_str = label_df.index[-1].strftime("%Y-%m-%d")
+        label_df = label_df[label_df[ID_COLUMN].isin(self.unique_ids)]
+        start_date_str = label_df.index.min().strftime("%Y-%m-%d")
+        end_date_str = label_df.index.max().strftime("%Y-%m-%d")
         dates_str = f"{start_date_str}_{end_date_str}"
 
         basename = self.label_features_basename or f"label_{dates_str}"
@@ -680,16 +690,16 @@ class FeaturesBuilder:
 
         # Dispatch to the appropriate mode helper.
         # Prediction mode forces use_relevant_features=False (requires labels).
-        if self.label_df.empty:
+        if isinstance(self.label_df, pd.DataFrame) and self.label_df.empty:
             use_relevant_features = False
             dates_str, label_df = self._prepare_prediction_mode(tremor_matrix_df)
         else:
-            dates_str, label_df = self._prepare_training_mode()
+            dates_str, label_df = self._prepare_training_mode(self.label_df)
 
         # Get params for features extraction
         extract_params = self._prepare_extraction_parameters(exclude_features)
 
-        # Setup extraction directory — mode-specific subdir prevents train/forecast collisions
+        # Setup extraction directory - mode-specific subdir prevents train/forecast collisions
         mode = "train" if not self.label_df.empty else "forecast"
         extract_features_dir = os.path.join(self.output_dir, "extracted", mode)
         ensure_dir(extract_features_dir)

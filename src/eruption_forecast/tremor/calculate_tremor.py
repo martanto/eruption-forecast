@@ -816,7 +816,8 @@ class CalculateTremor:
         daily_file = os.path.join(self.daily_dir, f"{date_str}.csv")
         temp_plot = os.path.join(self.figures_dir, f"{date_str}.png")
 
-        logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
+        if self.verbose:
+            logger.info(f"Running Jobs ID: {job_index}. Date: {date_str}")
 
         can_skip = (
             not self.overwrite
@@ -825,7 +826,8 @@ class CalculateTremor:
         )
 
         if can_skip:
-            logger.info(f"{date_str} :: File Exists: {daily_file}")
+            if self.verbose:
+                logger.info(f"{date_str} :: File Exists: {daily_file}")
             return daily_file
 
         df = self.calculate(date)

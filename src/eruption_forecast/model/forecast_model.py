@@ -777,7 +777,7 @@ class ForecastModel:
     def extract_features(
         self,
         select_tremor_columns: list[str] | None = None,
-        save_tremor_matrix_per_method: bool = True,
+        save_tremor_matrix_per_method: bool = False,
         save_tremor_matrix_per_id: bool = False,
         exclude_features: list[str] | None = None,
         use_relevant_features: bool = False,
@@ -796,15 +796,17 @@ class ForecastModel:
             select_tremor_columns (list[str] | None): Tremor columns to use for feature
                 extraction. Uses all available columns when None. Defaults to None.
             save_tremor_matrix_per_method (bool): Save a separate tremor-matrix CSV for
-                each tremor column. Defaults to True.
+                each tremor column in ``output/tremor/matrix/per_method/``.
+                Defaults to False.
             save_tremor_matrix_per_id (bool): **WARNING: generates one file per label
                 window** — use only for debugging. Defaults to False.
             exclude_features (list[str] | None): tsfresh feature calculator names to skip.
                 Defaults to None.
             use_relevant_features (bool): If True, run tsfresh with relevance filtering
                 (requires labels). Defaults to False.
-            output_dir (str | None): Output directory for feature files. Defaults to
-                ``self.features_dir``.
+            output_dir (str | None): Output directory for feature files. The tremor
+                matrix is always written to ``{station_dir}/tremor/matrix/`` regardless
+                of this value. Defaults to ``self.features_dir``.
             overwrite (bool): If True, overwrite existing feature files. Defaults to False.
             n_jobs (int | None): Parallel workers for tsfresh extraction. Overrides the
                 instance-level ``n_jobs`` when provided. Defaults to None.
@@ -815,13 +817,10 @@ class ForecastModel:
         """
         verbose = verbose if verbose is not None else self.verbose
 
-        output_dir = output_dir or self.features_dir
-        ensure_dir(output_dir)
-
         tremor_matrix_builder = TremorMatrixBuilder(
             tremor_df=self.tremor_data,
             label_df=self.label_data,
-            output_dir=output_dir,
+            output_dir=os.path.join(self.station_dir, "tremor", "matrix"),
             window_size=self.window_size,
             overwrite=overwrite or self.overwrite,
             verbose=verbose,
@@ -1426,7 +1425,7 @@ class ForecastModel:
         output_dir: str | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
-        verbose: bool = False,
+        verbose: bool | None = None,
         **plot_kwargs: Any,
     ) -> Self:
         """Generate probabilistic eruption forecasts for a future date range.
@@ -1452,7 +1451,8 @@ class ForecastModel:
                 Defaults to None (uses ``self.n_jobs``).
             overwrite (bool, optional): If True, overwrites existing output files.
                 Defaults to False.
-            verbose (bool, optional): If True, enables verbose logging. Defaults to False.
+            verbose (bool | None, optional): If True, enables verbose logging.
+                If None, falls back to the instance-level ``self.verbose``. Defaults to None.
             **plot_kwargs: Additional keyword arguments forwarded to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
                 (e.g. ``fig_width``, ``fig_height``, ``rolling_window``,
@@ -1476,9 +1476,6 @@ class ForecastModel:
                 "Example: ForecastModel(...).forecast(trained_models={'rf': 'path to trained model CSV'}"
             )
 
-        if verbose:
-            logger.info("Starting Prediction...")
-
         model_predictor = ModelPredictor(
             start_date=start_date,
             end_date=end_date,
@@ -1488,6 +1485,9 @@ class ForecastModel:
             verbose=verbose,
             overwrite=overwrite,
         )
+
+        if verbose:
+            logger.info("Starting Prediction...")
 
         df_prediction = model_predictor.predict_proba(
             tremor_data=self.tremor_data,
