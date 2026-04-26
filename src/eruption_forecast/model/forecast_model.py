@@ -777,7 +777,7 @@ class ForecastModel:
     def extract_features(
         self,
         select_tremor_columns: list[str] | None = None,
-        save_tremor_matrix_per_method: bool = True,
+        save_tremor_matrix_per_method: bool = False,
         save_tremor_matrix_per_id: bool = False,
         exclude_features: list[str] | None = None,
         use_relevant_features: bool = False,
@@ -815,13 +815,10 @@ class ForecastModel:
         """
         verbose = verbose if verbose is not None else self.verbose
 
-        output_dir = output_dir or self.features_dir
-        ensure_dir(output_dir)
-
         tremor_matrix_builder = TremorMatrixBuilder(
             tremor_df=self.tremor_data,
             label_df=self.label_data,
-            output_dir=output_dir,
+            output_dir=os.path.join(self.station_dir, "tremor", "matrix"),
             window_size=self.window_size,
             overwrite=overwrite or self.overwrite,
             verbose=verbose,

@@ -947,7 +947,7 @@ class BaseModelTrainer:
         """
         if self.n_jobs != 1:
             logger.info(
-                f"Running on {self.n_jobs} job(s). Grid search jobs {self.grid_search_n_jobs}."
+                f"Running on {self.n_jobs} job(s). Grid search jobs {self.grid_search_n_jobs}..."
             )
             return Parallel(n_jobs=self.n_jobs, backend="loky")(
                 delayed(method)(*job) for job in jobs
