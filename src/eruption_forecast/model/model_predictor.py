@@ -790,14 +790,10 @@ class ModelPredictor:
         Returns:
             dict[str, str]: Metadata dict suitable for passing to
             ``matplotlib``'s ``savefig(metadata=...)``.  Keys: ``Title``,
-            ``Author``, ``Subject``, ``Keywords``, ``Creator``, ``URL``.
+            ``Author``, ``Subject``, ``Keywords``, ``Creator``.
         """
         package_metadata = metadata("eruption-forecast")
         version: str = package_metadata["Version"]
-        url: str = (
-            package_metadata["Home-page"]
-            or "https://github.com/martanto/eruption-forecast"
-        )
 
         pdf_metadata = {
             "Title": f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}",
@@ -810,7 +806,6 @@ class ModelPredictor:
             "Subject": "Eruption probability forecast",
             "Keywords": "eruption, forecast, seismic, tremor",
             "Creator": f"eruption-forecast v{version}",
-            "URL": url,
         }
 
         return pdf_metadata
