@@ -327,6 +327,9 @@ class ForecastConfig(_ConfigBase):
             Defaults to ``True``.
         threshold (float, optional): Threshold for classifying eruption
             probability as positive. Defaults to ``0.7``.
+        plot_pdf (bool): Whether to save the forecast plot as a PDF alongside
+            the PNG. Uses TrueType font embedding so text is selectable.
+            Defaults to ``False``.
         n_jobs (int | None): Parallel workers for feature extraction during
             forecasting. ``None`` inherits from ``ForecastModel.n_jobs``.
             Defaults to ``None``.
@@ -341,6 +344,7 @@ class ForecastConfig(_ConfigBase):
     window_step_unit: str = "hours"
     save_predictions: bool = True
     threshold: float = 0.7
+    plot_pdf: bool = False
     n_jobs: int | None = None
     overwrite: bool = False
     verbose: bool = False
