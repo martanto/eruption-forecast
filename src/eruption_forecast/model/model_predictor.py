@@ -30,11 +30,11 @@ Design notes:
 import os
 from typing import Any, Literal
 from datetime import datetime, timedelta
+from importlib.metadata import metadata
 
 import joblib
 import matplotlib
 
-from eruption_forecast import __url__, __version__
 from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.utils.formatting import slugify
@@ -778,6 +778,43 @@ class ModelPredictor:
             consensus_confidence,
         )
 
+    @property
+    def _pdf_metadata(self) -> dict[str, str]:
+        """Build PDF metadata dict from package metadata and environment.
+
+        Reads package version and homepage URL from ``importlib.metadata``.
+        The ``Author`` field is resolved from the environment in priority order:
+        ``GIT_AUTHOR_NAME`` → ``USERNAME`` (Windows) → ``USER`` (Unix) →
+        ``"eruption-forecast"`` as a last-resort fallback.
+
+        Returns:
+            dict[str, str]: Metadata dict suitable for passing to
+            ``matplotlib``'s ``savefig(metadata=...)``.  Keys: ``Title``,
+            ``Author``, ``Subject``, ``Keywords``, ``Creator``, ``URL``.
+        """
+        package_metadata = metadata("eruption-forecast")
+        version: str = package_metadata["Version"]
+        url: str = (
+            package_metadata["Home-page"]
+            or "https://github.com/martanto/eruption-forecast"
+        )
+
+        pdf_metadata = {
+            "Title": f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}",
+            "Author": (
+                os.environ.get("GIT_AUTHOR_NAME")
+                or os.environ.get("USERNAME")
+                or os.environ.get("USER")
+                or "eruption-forecast"
+            ),
+            "Subject": "Eruption probability forecast",
+            "Keywords": "eruption, forecast, seismic, tremor",
+            "Creator": f"eruption-forecast v{version}",
+            "URL": url,
+        }
+
+        return pdf_metadata
+
     def _plot_forecast(
         self,
         df: pd.DataFrame,
@@ -820,19 +857,6 @@ class ModelPredictor:
 
         if plot_pdf:
             path_pdf = os.path.join(self.figures_dir, f"forecast_{self.basename}.pdf")
-            pdf_metadata = {
-                "Title": f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}",
-                "Author": (
-                    os.environ.get("GIT_AUTHOR_NAME")
-                    or os.environ.get("USERNAME")
-                    or os.environ.get("USER")
-                    or "eruption-forecast"
-                ),
-                "Subject": "Eruption probability forecast",
-                "Keywords": "eruption, forecast, seismic, tremor",
-                "Creator": f"eruption-forecast v{__version__}",
-                "URL": __url__,
-            }
 
             # Type 42 embeds TrueType fonts — text stays selectable and
             # renders consistently in all PDF viewers and vector editors.
@@ -842,7 +866,7 @@ class ModelPredictor:
                     bbox_inches="tight",
                     facecolor="white",
                     edgecolor=None,
-                    metadata=pdf_metadata,
+                    metadata=self._pdf_metadata,
                 )
 
         plt.close(fig)
