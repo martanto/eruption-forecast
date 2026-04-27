@@ -855,14 +855,16 @@ class ModelPredictor:
             path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor=None
         )
 
+        logger.info(f"Forecast plot saved to: {path}")
+
         if plot_pdf:
-            path_pdf = os.path.join(self.figures_dir, f"forecast_{self.basename}.pdf")
+            path = os.path.join(self.figures_dir, f"forecast_{self.basename}.pdf")
 
             # Type 42 embeds TrueType fonts — text stays selectable and
             # renders consistently in all PDF viewers and vector editors.
             with matplotlib.rc_context({"pdf.fonttype": 42}):
                 fig.savefig(
-                    path_pdf,
+                    path,
                     bbox_inches="tight",
                     facecolor="white",
                     edgecolor=None,
@@ -871,4 +873,3 @@ class ModelPredictor:
 
         plt.close(fig)
         self.forecast_plot_path = path
-        logger.info(f"Forecast plot saved to: {path}")
