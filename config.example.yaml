@@ -89,6 +89,7 @@ forecast:
   window_step_unit: hours   # Unit for window_step: 'minutes' or 'hours'
   save_predictions: true    # Save prediction CSV to disk
   threshold: 0.5            # Probability threshold for classifying a window as eruption
+  plot_pdf: false           # Also save the forecast plot as a PDF (TrueType fonts, vector output)
   n_jobs: null              # Workers for feature extraction during forecast (null = model.n_jobs)
   overwrite: false
   verbose: false

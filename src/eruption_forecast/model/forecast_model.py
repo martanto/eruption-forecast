@@ -836,7 +836,7 @@ class ForecastModel:
             tremor_matrix_df=tremor_matrix_df,
             label_df=self.label_data,
             label_features_basename=self.basename,
-            output_dir=self.features_dir,
+            output_dir=output_dir if output_dir else self.features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             verbose=verbose,
@@ -1423,6 +1423,7 @@ class ForecastModel:
         save_predictions: bool = True,
         threshold: float = 0.7,
         title: str | None = None,
+        plot_pdf: bool = False,
         output_dir: str | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
@@ -1446,6 +1447,10 @@ class ForecastModel:
             threshold (float, optional): Threshold for classifying eruption
                 probability as positive. Defaults to 0.7.
             title (str | None, optional): Forecast plot title. Defaults to None.
+            plot_pdf (bool, optional): Also save the forecast plot as a PDF alongside
+                the PNG. Uses TrueType font embedding (``pdf.fonttype=42``) so text
+                is selectable in all PDF viewers. ``dpi`` is ignored for PDF (vector
+                format). Defaults to False.
             output_dir (str | None, optional): Directory for forecast output files.
                 Defaults to ``self.station_dir``.
             n_jobs (int | None, optional): Parallel workers for feature extraction.
@@ -1499,6 +1504,7 @@ class ForecastModel:
             threshold=threshold,
             save_predictions=save_predictions,
             title=title,
+            plot_pdf=plot_pdf,
             eruption_dates=self.LabelBuilder.eruption_dates
             if self.LabelBuilder
             else None,
@@ -1516,6 +1522,7 @@ class ForecastModel:
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,
             threshold=threshold,
+            plot_pdf=plot_pdf,
             n_jobs=n_jobs,
             overwrite=overwrite,
             verbose=verbose,
