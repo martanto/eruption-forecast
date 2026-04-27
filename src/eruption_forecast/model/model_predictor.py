@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 import joblib
 import matplotlib
 
+from eruption_forecast import __url__, __version__
 from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.utils.formatting import slugify
@@ -611,6 +612,7 @@ class ModelPredictor:
         save_predictions: bool = True,
         threshold: float = 0.7,
         title: str | None = None,
+        plot_pdf: bool = False,
         **plot_kwargs: Any,
     ) -> pd.DataFrame:
         """Forecast eruption probability for UNLABELLED future windows.
@@ -645,6 +647,10 @@ class ModelPredictor:
             threshold (float, optional): Probability threshold for eruption classification in the
                 forecast plot. Defaults to 0.7.
             title (str | None, optional): Forecast plot title. Defaults to None.
+            plot_pdf (bool, optional): Also save the forecast plot as a PDF file
+                alongside the PNG. ``dpi`` is ignored for PDF (vector format);
+                ``bbox_inches``, ``facecolor``, and ``edgecolor`` still apply.
+                Defaults to False.
             **plot_kwargs: Additional keyword arguments forwarded to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
                 (e.g. ``fig_width``, ``fig_height``, ``rolling_window``,
@@ -706,7 +712,9 @@ class ModelPredictor:
         df_forecast.to_csv(csv_path)
         logger.info(f"Predictions saved to: {csv_path}")
 
-        self._plot_forecast(df_forecast, threshold, title=title, **plot_kwargs)
+        self._plot_forecast(
+            df_forecast, threshold, title=title, plot_pdf=plot_pdf, **plot_kwargs
+        )
 
         self.df = df_forecast
         return df_forecast
@@ -775,6 +783,7 @@ class ModelPredictor:
         df: pd.DataFrame,
         threshold: float,
         title: str | None = None,
+        plot_pdf: bool = False,
         **plot_kwargs: Any,
     ) -> None:
         """Save a time-series probability + confidence plot.
@@ -786,6 +795,9 @@ class ModelPredictor:
             df (pd.DataFrame): Forecast consensus dataframe with predictions and confidence.
             threshold (float): Probability threshold for the eruption classification line.
             title (str | None, optional): Forecast plot title. Defaults to None.
+            plot_pdf (bool, optional): Also save the figure as a PDF alongside the PNG.
+                ``dpi`` is ignored for PDF (vector format); ``bbox_inches``,
+                ``facecolor``, and ``edgecolor`` still apply. Defaults to False.
             **plot_kwargs: Extra keyword arguments forwarded verbatim to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
                 (e.g. ``eruption_dates``, ``fig_width``).
@@ -803,8 +815,36 @@ class ModelPredictor:
 
         path = os.path.join(self.figures_dir, f"forecast_{self.basename}.png")
         fig.savefig(
-            path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none"
+            path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor=None
         )
+
+        if plot_pdf:
+            path_pdf = os.path.join(self.figures_dir, f"forecast_{self.basename}.pdf")
+            pdf_metadata = {
+                "Title": f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}",
+                "Author": (
+                    os.environ.get("GIT_AUTHOR_NAME")
+                    or os.environ.get("USERNAME")
+                    or os.environ.get("USER")
+                    or "eruption-forecast"
+                ),
+                "Subject": "Eruption probability forecast",
+                "Keywords": "eruption, forecast, seismic, tremor",
+                "Creator": f"eruption-forecast v{__version__}",
+                "URL": __url__,
+            }
+
+            # Type 42 embeds TrueType fonts — text stays selectable and
+            # renders consistently in all PDF viewers and vector editors.
+            with matplotlib.rc_context({"pdf.fonttype": 42}):
+                fig.savefig(
+                    path_pdf,
+                    bbox_inches="tight",
+                    facecolor="white",
+                    edgecolor=None,
+                    metadata=pdf_metadata,
+                )
+
         plt.close(fig)
         self.forecast_plot_path = path
         logger.info(f"Forecast plot saved to: {path}")
