@@ -86,6 +86,7 @@ TRAINING_PARAMETERS: dict[str, Any] = {
     "plot_significant_features": False,
     "n_jobs": 4 if N_JOBS > 1 else 1,
     "grid_search_n_jobs": 4,
+    "resample_method": "under",
     "overwrite": False,
     "plot_shap": False,  # SHAP Explanation plot
     "verbose": True,
