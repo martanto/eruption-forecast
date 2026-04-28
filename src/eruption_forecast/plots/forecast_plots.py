@@ -267,7 +267,7 @@ def plot_forecast(
         fontsize=6,
         frameon=False,
         fancybox=False,
-        bbox_to_anchor=(0.5, -0.05),
+        bbox_to_anchor=bbox_to_anchor,
     )
 
     fig.suptitle(title or "Forecast Results", fontsize=8)
