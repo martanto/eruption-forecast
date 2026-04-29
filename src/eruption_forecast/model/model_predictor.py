@@ -30,14 +30,13 @@ Design notes:
 import os
 from typing import Any, Literal
 from datetime import datetime, timedelta
-from importlib.metadata import metadata
 
 import joblib
 import matplotlib
 
 from eruption_forecast.config.constants import MATPLOTLIB_BACKEND
 from eruption_forecast.utils.date_utils import set_datetime_index
-from eruption_forecast.utils.formatting import slugify
+from eruption_forecast.utils.formatting import slugify, pdf_metadata
 
 
 matplotlib.use(
@@ -778,38 +777,6 @@ class ModelPredictor:
             consensus_confidence,
         )
 
-    @property
-    def _pdf_metadata(self) -> dict[str, str]:
-        """Build PDF metadata dict from package metadata and environment.
-
-        Reads package version and homepage URL from ``importlib.metadata``.
-        The ``Author`` field is resolved from the environment in priority order:
-        ``GIT_AUTHOR_NAME`` → ``USERNAME`` (Windows) → ``USER`` (Unix) →
-        ``"eruption-forecast"`` as a last-resort fallback.
-
-        Returns:
-            dict[str, str]: Metadata dict suitable for passing to
-            ``matplotlib``'s ``savefig(metadata=...)``.  Keys: ``Title``,
-            ``Author``, ``Subject``, ``Keywords``, ``Creator``.
-        """
-        package_metadata = metadata("eruption-forecast")
-        version: str = package_metadata["Version"]
-
-        pdf_metadata = {
-            "Title": f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}",
-            "Author": (
-                os.environ.get("GIT_AUTHOR_NAME")
-                or os.environ.get("USERNAME")
-                or os.environ.get("USER")
-                or "eruption-forecast"
-            ),
-            "Subject": "Eruption probability forecast",
-            "Keywords": "eruption, forecast, seismic, tremor",
-            "Creator": f"eruption-forecast v{version}",
-        }
-
-        return pdf_metadata
-
     def _plot_forecast(
         self,
         df: pd.DataFrame,
@@ -863,7 +830,9 @@ class ModelPredictor:
                     bbox_inches="tight",
                     facecolor="white",
                     edgecolor=None,
-                    metadata=self._pdf_metadata,
+                    metadata=pdf_metadata(
+                        title=f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}"
+                    ),
                 )
 
         plt.close(fig)
