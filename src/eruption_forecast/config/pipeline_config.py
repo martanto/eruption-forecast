@@ -330,6 +330,10 @@ class ForecastConfig(_ConfigBase):
         plot_pdf (bool): Whether to save the forecast plot as a PDF alongside
             the PNG. Uses TrueType font embedding so text is selectable.
             Defaults to ``False``.
+        eruption_dates (list[str] | None): Known eruption dates in
+            ``"YYYY-MM-DD"`` format, plotted on the forecast chart.
+            ``None`` falls back to dates stored in ``LabelBuilder``.
+            Defaults to ``None``.
         n_jobs (int | None): Parallel workers for feature extraction during
             forecasting. ``None`` inherits from ``ForecastModel.n_jobs``.
             Defaults to ``None``.
@@ -345,6 +349,7 @@ class ForecastConfig(_ConfigBase):
     save_predictions: bool = True
     threshold: float = 0.7
     plot_pdf: bool = False
+    eruption_dates: list[str] | None = None
     n_jobs: int | None = None
     overwrite: bool = False
     verbose: bool = False

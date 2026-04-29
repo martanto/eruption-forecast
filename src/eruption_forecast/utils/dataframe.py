@@ -245,6 +245,19 @@ def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:
         if (col.endswith("_prediction") and not col.startswith("consensus"))
     ]
 
+    # Ensure model ``_probability`` and ``_prediction`` column exists
+    if not prob_cols:
+        raise ValueError(
+            "No probability columns found. Expected columns ending with '_probability' "
+            "(excluding 'consensus_*')."
+        )
+
+    if not pred_cols:
+        raise ValueError(
+            "No prediction columns found. Expected columns ending with '_prediction' "
+            "(excluding 'consensus_*')."
+        )
+
     df["consensus_probability_max"] = df[prob_cols].max(axis=1)
     df["consensus_probability_min"] = df[prob_cols].min(axis=1)
     df["consensus_probability_min_envelope"] = (
