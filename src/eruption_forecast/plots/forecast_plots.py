@@ -277,13 +277,13 @@ def plot_forecast(
 
 def plot_forecast_from_file(
     consensus_file: str,
-    label_file: str | None = None,
     title: str | None = None,
     fig_width: float = 12,
-    fig_height: float = 3,
+    fig_height: float = 1.5,
     threshold: float = 0.7,
     rolling_window: str = "6h",
     x_days_interval: int = 2,
+    label_file: str | None = None,
     eruption_dates: list[str] | None = None,
 ) -> plt.Figure:
     """Load consensus and label CSVs from disk and plot the forecast.
