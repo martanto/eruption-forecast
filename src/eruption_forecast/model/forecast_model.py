@@ -890,8 +890,11 @@ class ForecastModel:
             builder (Literal["standard", "dynamic"]): Label builder variant.
                 ``"standard"`` uses a single global window; ``"dynamic"``
                 generates one window per eruption event.
-            label_kwargs (dict[str, Any]): Shared keyword arguments forwarded
-                to the builder constructor (e.g. window_step, eruption_dates).
+            label_kwargs (dict[str, Any]): Keyword arguments for the builder.
+                For ``"standard"``, all keys are forwarded via ``**label_kwargs``.
+                For ``"dynamic"``, only ``window_step``, ``window_step_unit``,
+                ``day_to_forecast``, ``eruption_dates``, ``volcano_id``,
+                ``verbose``, and ``output_dir`` are used.
             days_before_eruption (int | None): Days before each eruption to
                 start its window. Required when ``builder="dynamic"``.
                 Defaults to None.
@@ -913,9 +916,16 @@ class ForecastModel:
                 raise ValueError(
                     "days_before_eruption is required when builder='dynamic'."
                 )
+
             label_builder = DynamicLabelBuilder(
                 days_before_eruption=days_before_eruption,
-                **label_kwargs,
+                window_step=label_kwargs["window_step"],
+                window_step_unit=label_kwargs["window_step_unit"],
+                day_to_forecast=label_kwargs["day_to_forecast"],
+                eruption_dates=label_kwargs["eruption_dates"],
+                volcano_id=label_kwargs["volcano_id"],
+                verbose=label_kwargs["verbose"],
+                output_dir=label_kwargs["output_dir"],
             ).build()
 
             return label_builder
@@ -1425,6 +1435,7 @@ class ForecastModel:
         title: str | None = None,
         plot_pdf: bool = False,
         output_dir: str | None = None,
+        eruption_dates: list[str] | None = None,
         n_jobs: int | None = None,
         overwrite: bool = False,
         verbose: bool | None = None,
@@ -1453,6 +1464,8 @@ class ForecastModel:
                 format). Defaults to False.
             output_dir (str | None, optional): Directory for forecast output files.
                 Defaults to ``self.station_dir``.
+            eruption_dates (list[str] | None, optional): Used to plot date of eruption
+                in the forecast plot results. Defaults to None.
             n_jobs (int | None, optional): Parallel workers for feature extraction.
                 Defaults to None (uses ``self.n_jobs``).
             overwrite (bool, optional): If True, overwrites existing output files.
@@ -1495,6 +1508,11 @@ class ForecastModel:
         if verbose:
             logger.info("Starting Prediction...")
 
+        if eruption_dates is None or len(eruption_dates) == 0:
+            eruption_dates = (
+                self.LabelBuilder.eruption_dates if self.LabelBuilder else None
+            )
+
         df_prediction = model_predictor.predict_proba(
             tremor_data=self.tremor_data,
             window_size=self.window_size,
@@ -1505,9 +1523,7 @@ class ForecastModel:
             save_predictions=save_predictions,
             title=title,
             plot_pdf=plot_pdf,
-            eruption_dates=self.LabelBuilder.eruption_dates
-            if self.LabelBuilder
-            else None,
+            eruption_dates=eruption_dates,
             **plot_kwargs,
         )
 
@@ -1523,6 +1539,7 @@ class ForecastModel:
             save_predictions=save_predictions,
             threshold=threshold,
             plot_pdf=plot_pdf,
+            eruption_dates=eruption_dates,
             n_jobs=n_jobs,
             overwrite=overwrite,
             verbose=verbose,
