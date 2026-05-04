@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-active%20development-orange)
 
-A Python package for volcanic eruption forecasting using seismic data analysis. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
+This project is forked from [Eruption forecast model for Whakaari](https://github.com/ddempsey/whakaari]) but has been significantly modified and extended for this specific application. Process raw seismic tremor data, extract time-series features, train machine learning models, and predict volcanic eruptions probability based on seismic patterns.
 
 ![Forecast example — Scenario 8, rolling 6h window, prediction 2025-07-27 to 2025-08-22](https://raw.githubusercontent.com/martanto/eruption-forecast/dev/unify-model/assets/forecast_2025-07-27_2025-08-22.png)
 
