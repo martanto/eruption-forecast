@@ -214,12 +214,12 @@ def resample(
             )
         return features, labels
 
-    if verbose:
-        logger.info(
-            f"Applying RandomUnderSampler (sampling_strategy={sampling_strategy})."
-        )
-
     if method == "under":
+        if verbose:
+            logger.info(
+                f"Applying RandomUnderSampler (sampling_strategy={sampling_strategy})."
+            )
+
         return random_under_sampler(
             features=features,
             labels=labels,
@@ -228,6 +228,11 @@ def resample(
         )
 
     if method == "over":
+        if verbose:
+            logger.info(
+                f"Applying RandomOverSampler (sampling_strategy={sampling_strategy})."
+            )
+
         sampler = RandomOverSampler(
             sampling_strategy=sampling_strategy, random_state=random_state
         )
@@ -296,10 +301,22 @@ def get_significant_features(
     # If no relevant features found, fall back to the 20 most significant
     # features ranked by p-value rather than FDR threshold.
     if len(features_filtered.columns) < top_n:
-        logger.warning(
-            f"Significant features {len(features_filtered.columns)} less than {top_n}. Use top {top_n} features (p_values based)"
-        )
         selected_features: list[str] = _significant_features.head(top_n).index.tolist()
+
+        if not selected_features:
+            raise ValueError(
+                "tsfresh found no significant features and the p-value fallback "
+                "also returned nothing. The feature matrix may be empty, constant, "
+                "or entirely uncorrelated with the labels. "
+                f"Feature matrix shape: {features.shape}, "
+                f"label distribution: {dict(labels.value_counts())}."
+            )
+
+        logger.warning(
+            f"Significant features {len(features_filtered.columns)} less than {top_n}. "
+            f"Using top {len(selected_features)} features (p-value based)."
+        )
+
         features_filtered = features[selected_features]
 
     return features_filtered, _significant_features
