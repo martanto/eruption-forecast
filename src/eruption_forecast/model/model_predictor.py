@@ -261,20 +261,20 @@ class ModelPredictor:
                 loaded = joblib.load(trained_models)
                 if isinstance(loaded, ClassifierEnsemble):
                     # Multi-classifier merged pkl
-                    self._classifier_ensemble: ClassifierEnsemble = loaded
+                    self._classifier_ensemble = loaded
                     self.trained_models: dict[str, SeedEnsemble] = dict(
                         loaded.ensembles.items()
                     )
                 elif isinstance(loaded, SeedEnsemble):
                     # Single-classifier merged pkl
                     self.trained_models = {model_name: loaded}
-                    self._classifier_ensemble: ClassifierEnsemble = (
-                        ClassifierEnsemble.from_seed_ensembles(self.trained_models)
+                    self._classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+                        self.trained_models
                     )
                 elif isinstance(loaded, dict):
                     # Backward-compat: plain dict[str, SeedEnsemble] pkl — auto-wrap
-                    self._classifier_ensemble: ClassifierEnsemble = (
-                        ClassifierEnsemble.from_seed_ensembles(loaded)
+                    self._classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+                        loaded
                     )
                     self.trained_models = loaded
                 else:
@@ -288,10 +288,10 @@ class ModelPredictor:
             if isinstance(first_val, str) and first_val.endswith(".pkl"):
                 # Values are paths to per-classifier merged pkl files
                 self.trained_models = {}
-                for model_name, path in trained_models.items():
+                for clf_name, path in trained_models.items():
                     loaded = joblib.load(path)
                     if isinstance(loaded, SeedEnsemble):
-                        self.trained_models[model_name] = loaded
+                        self.trained_models[clf_name] = loaded
                     elif isinstance(loaded, dict):
                         # Unlikely but handle gracefully
                         self.trained_models.update(loaded)
@@ -748,7 +748,9 @@ class ModelPredictor:
             ``(consensus_probability, consensus_uncertainty, consensus_prediction, consensus_confidence)``.
         """
         if self._classifier_ensemble is None:
-            self._classifier_ensemble = joblib.load(self.trained_models)
+            self._classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+                self.trained_models
+            )
 
         seeds_dir = os.path.join(result_dir, "seeds") if result_dir else None
         (
