@@ -82,7 +82,7 @@ output/
     │   │               │   ├── aggregate_shap_summary.pkl   # shap.Explanation (joblib)
     │   │               │   └── aggregate_metrics.csv
     │   │               ├── trained_model_{suffix}.csv    # Registry of all trained models
-    │   │               ├── merged_model_{suffix}.pkl     # SeedEnsemble (all seeds merged — optional)
+    │   │               ├── SeedEnsemble_{suffix}.pkl     # SeedEnsemble (all seeds merged — optional)
     │   │               ├── all_metrics_{suffix}.csv      # All per-seed metrics
     │   │               └── metrics_summary_{suffix}.csv  # Mean ± std summary
     │   │
@@ -90,6 +90,7 @@ output/
     │       ├── predictions_trained_models.json   # {ClassifierName: trained_model_*.csv} registry
     │       ├── predictions_config.yaml           # Pipeline config snapshot (written by save_model)
     │       ├── predictions_forecast_model.pkl    # Serialised ForecastModel (written by save_model)
+    │       ├── ClassifierEnsembler.pkl           # ClassifierEnsemble (auto-saved by ForecastModel.train())
     │       ├── features/                         # Shared across all classifiers
     │       │   └── {cv-slug}/
     │       │       ├── significant_features/
@@ -106,7 +107,7 @@ output/
     │                   │   ├── 00000.pkl
     │                   │   └── ...
     │                   ├── trained_model_{suffix}.csv    # Registry used by ModelPredictor
-    │                   └── merged_model_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
+    │                   └── SeedEnsemble_{suffix}.pkl     # SeedEnsemble (optional — call merge_models())
     │
     ├── trainings/merged_classifiers_{suffix}.pkl   # Multi-classifier bundle (optional — call merge_classifier_models())
     │

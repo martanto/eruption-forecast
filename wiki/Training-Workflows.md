@@ -175,19 +175,22 @@ After training completes, all 500 seed models can be bundled into a single `.pkl
            │
            ▼  trainer.merge_models()
            │
-    merged_model_{suffix}.pkl
+    SeedEnsemble_{suffix}.pkl
     (SeedEnsemble — all estimators + feature lists in one object)
            │
            ▼  trainer.merge_classifier_models({"rf": ..., "xgb": ...})
            │
     merged_classifiers_{suffix}.pkl
     (ClassifierEnsemble — one SeedEnsemble per classifier)
+
+> **Note:** When using `ForecastModel.train()`, the `ClassifierEnsemble` is saved
+> automatically to `{output_dir}/ClassifierEnsembler.pkl` after all classifiers are merged.
 ```
 
 ```python
 # After trainer.train() completes:
 merged_path = trainer.merge_models()
-# → .../merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
+# → .../SeedEnsemble_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
 
 # Multi-classifier bundle
 bundle_path = trainer.merge_classifier_models(
