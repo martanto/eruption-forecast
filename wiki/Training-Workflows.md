@@ -184,7 +184,7 @@ After training completes, all 500 seed models can be bundled into a single `.pkl
     (ClassifierEnsemble — one SeedEnsemble per classifier)
 
 > **Note:** When using `ForecastModel.train()`, the `ClassifierEnsemble` is saved
-> automatically to `{output_dir}/ClassifierEnsembler.pkl` after all classifiers are merged.
+> automatically to `{output_dir}/ClassifierEnsemble.pkl` after all classifiers are merged.
 ```
 
 ```python

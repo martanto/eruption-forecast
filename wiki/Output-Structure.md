@@ -90,7 +90,7 @@ output/
     │       ├── predictions_trained_models.json   # {ClassifierName: trained_model_*.csv} registry
     │       ├── predictions_config.yaml           # Pipeline config snapshot (written by save_model)
     │       ├── predictions_forecast_model.pkl    # Serialised ForecastModel (written by save_model)
-    │       ├── ClassifierEnsembler.pkl           # ClassifierEnsemble (auto-saved by ForecastModel.train())
+    │       ├── ClassifierEnsemble.pkl           # ClassifierEnsemble (auto-saved by ForecastModel.train())
     │       ├── features/                         # Shared across all classifiers
     │       │   └── {cv-slug}/
     │       │       ├── significant_features/
