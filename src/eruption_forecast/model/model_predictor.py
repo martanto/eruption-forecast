@@ -268,6 +268,9 @@ class ModelPredictor:
                 elif isinstance(loaded, SeedEnsemble):
                     # Single-classifier merged pkl
                     self.trained_models = {model_name: loaded}
+                    self._classifier_ensemble: ClassifierEnsemble = (
+                        ClassifierEnsemble.from_seed_ensembles(self.trained_models)
+                    )
                 elif isinstance(loaded, dict):
                     # Backward-compat: plain dict[str, SeedEnsemble] pkl — auto-wrap
                     self._classifier_ensemble: ClassifierEnsemble = (
@@ -744,7 +747,9 @@ class ModelPredictor:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of
             ``(consensus_probability, consensus_uncertainty, consensus_prediction, consensus_confidence)``.
         """
-        assert self._classifier_ensemble is not None
+        if self._classifier_ensemble is None:
+            self._classifier_ensemble = joblib.load(self.trained_models)
+
         seeds_dir = os.path.join(result_dir, "seeds") if result_dir else None
         (
             consensus_probability,  # mean P(eruption) averaged across all classifiers
