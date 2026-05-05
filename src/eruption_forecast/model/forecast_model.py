@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import joblib
 import pandas as pd
 
+from eruption_forecast.model import SeedEnsemble, ClassifierEnsemble
 from eruption_forecast.logger import logger
 from eruption_forecast.model.constants import CLASSIFIERS
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
@@ -1203,6 +1204,22 @@ class ForecastModel:
             if csv_path is not None:
                 trained_models[clf_name] = csv_path
 
+        classifier_ensembles = {}
+        if len(merged_models) > 0:
+            for model_name, pkl_path in merged_models.items():
+                seed_ensamble: SeedEnsemble = joblib.load(pkl_path)
+                classifier_ensembles[model_name] = seed_ensamble
+
+            classifier_ensamble = ClassifierEnsemble.from_seed_ensembles(
+                classifier_ensembles
+            )
+
+            save_path = os.path.join(output_dir, "ClassifierEnsembler.pkl")
+            classifier_ensamble.save(save_path)
+
+            if verbose:
+                logger.info(f"Classifier ensemble saved to: {save_path}")
+
         self.merged_models = merged_models
 
         return trained_models
@@ -1532,8 +1549,8 @@ class ForecastModel:
         self.forecast_plot_path = model_predictor.forecast_plot_path
 
         self._config.forecast = ForecastConfig(
-            start_date=str(to_datetime(start_date).date()),
-            end_date=str(to_datetime(end_date).date()),
+            start_date=to_datetime(start_date).strftime("%Y-%m-%d"),
+            end_date=to_datetime(end_date).strftime("%Y-%m-%d"),
             window_step=window_step,
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,
