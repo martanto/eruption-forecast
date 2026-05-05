@@ -467,12 +467,12 @@ def merge_seed_models(
     )
 
     suffix = _extract_trained_model_suffix(trained_model_csv)
-    output_path = os.path.join(output_dir, f"merged_model_{suffix}.pkl")
+    output_path = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
 
     ensemble = SeedEnsemble.from_registry(trained_model_csv)
     ensemble.save(output_path)
 
-    logger.info(f"Saved merged seed model to: {output_path}")
+    logger.info(f"Saved SeedEnsemble model to: {output_path}")
 
     return output_path
 
