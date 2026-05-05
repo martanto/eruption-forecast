@@ -581,7 +581,7 @@ After training 500 seeds, each estimator and its feature list live in separate f
            │
            ▼  trainer.merge_models()
            │
-  merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
+  SeedEnsemble_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl
   (SeedEnsemble — one object, one file)
 ```
 

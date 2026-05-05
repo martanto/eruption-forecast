@@ -7,6 +7,7 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import merge_all_classifiers
 from eruption_forecast.model.constants import CLASSIFIERS
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import (
@@ -268,7 +269,7 @@ class ForecastModel:
         # ------------------------------------------------------------------
         self._plot_shap = False
         self.trained_models: dict[str, str] = {}
-        self.merged_models: dict[str, str] = {}
+        self.merged_model_paths: dict[str, str] = {}
 
         # ------------------------------------------------------------------
         # Will be set after predict() called
@@ -1051,7 +1052,7 @@ class ForecastModel:
 
         # Filter labels from start_date onwards
         if builder == "standard" and train_start_date is not None:
-            df_label = df_label.loc[train_start_date:]
+            df_label = df_label.loc[to_datetime(train_start_date):]
 
         if df_label.empty:
             raise ValueError(f"Label from start date {self.start_date} is empty.")
@@ -1066,8 +1067,8 @@ class ForecastModel:
             window_step_unit=window_step_unit,
             day_to_forecast=day_to_forecast,
             eruption_dates=eruption_dates,
-            start_date=str(train_start_date) if start_date is not None else None,
-            end_date=str(train_end_date) if end_date is not None else None,
+            start_date=str(train_start_date) if train_start_date is not None else None,
+            end_date=str(train_end_date) if train_end_date is not None else None,
             include_eruption_date=include_eruption_date,
             tremor_columns=tremor_columns,
             builder=builder,
@@ -1203,7 +1204,15 @@ class ForecastModel:
             if csv_path is not None:
                 trained_models[clf_name] = csv_path
 
-        self.merged_models = merged_models
+        if len(merged_models) > 0:
+            save_path = merge_all_classifiers(
+                trained_models=trained_models,
+                output_path=os.path.join(output_dir, "ClassifierEnsemble.pkl"),
+            )
+            if verbose:
+                logger.info(f"Classifier ensemble saved to: {save_path}")
+
+        self.merged_model_paths = merged_models
 
         return trained_models
 
@@ -1486,8 +1495,8 @@ class ForecastModel:
         n_jobs = n_jobs if n_jobs is not None else self.n_jobs
 
         trained_models = self.trained_models
-        if len(self.merged_models) > 0:
-            trained_models = self.merged_models
+        if len(self.merged_model_paths) > 0:
+            trained_models = self.merged_model_paths
 
         if trained_models is None or len(trained_models) == 0:
             raise ValueError(
@@ -1532,8 +1541,8 @@ class ForecastModel:
         self.forecast_plot_path = model_predictor.forecast_plot_path
 
         self._config.forecast = ForecastConfig(
-            start_date=str(to_datetime(start_date).date()),
-            end_date=str(to_datetime(end_date).date()),
+            start_date=to_datetime(start_date).strftime("%Y-%m-%d"),
+            end_date=to_datetime(end_date).strftime("%Y-%m-%d"),
             window_step=window_step,
             window_step_unit=window_step_unit,
             save_predictions=save_predictions,

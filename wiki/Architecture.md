@@ -108,7 +108,8 @@ Raw Seismic Data (SDS / FDSN)
           │  trained_model_*.csv  +  *.pkl
           │
           │  (optional) trainer.merge_models()
-          │  → merged_model_*.pkl  (SeedEnsemble)
+          │  → SeedEnsemble_*.pkl  (SeedEnsemble)
+          │  → ClassifierEnsemble.pkl  (ClassifierEnsemble, auto-saved by ForecastModel)
           ▼
 ┌─────────────────────────────────────────────┐
 │               ModelPredictor                │

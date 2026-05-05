@@ -442,7 +442,7 @@ Instead of passing a CSV registry (which loads 500 `.pkl` files on every call), 
 predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-28",
-    trained_models="output/.../merged_model_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl",
+    trained_models="output/.../SeedEnsemble_RandomForestClassifier-StratifiedKFold_rs-0_ts-500_top-20.pkl",
     output_dir="output/predictions",
 )
 
@@ -456,9 +456,10 @@ df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_s
 predictor = ModelPredictor(
     start_date="2025-03-16",
     end_date="2025-03-28",
-    trained_models="output/.../trainings/merged_classifiers_rf_xgb_rs-0_ts-500_top-20.pkl",
+    trained_models="output/VG.OJN.00.EHZ/ClassifierEnsemble.pkl",
 )
-df_forecast = predictor.predict_proba(...,,
+df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
+                                      window_step_unit="hours")
 ```
 
 You can also use `SeedEnsemble` directly without going through `ModelPredictor`:
@@ -466,7 +467,7 @@ You can also use `SeedEnsemble` directly without going through `ModelPredictor`:
 ```python
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 
-ensemble = SeedEnsemble.load("merged_model_*.pkl")
+ensemble = SeedEnsemble.load("SeedEnsemble_*.pkl")
 mean_p, std, conf, pred = ensemble.predict_with_uncertainty(features_df)
 # or sklearn-style:
 proba = ensemble.predict_proba(features_df)   # (n_samples, 2)

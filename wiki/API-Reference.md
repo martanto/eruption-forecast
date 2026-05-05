@@ -103,7 +103,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 
 | Method | Description |
 |--------|-------------|
-| `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: same directory as the registry CSV, named `merged_model_{suffix}.pkl`. Requires training to have been run first (`self.csv` must be set). |
+| `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: same directory as the registry CSV, named `SeedEnsemble_{suffix}.pkl`. Requires training to have been run first (`self.csv` must be set). |
 | `merge_classifier_models(trained_models, output_path=None)` | Bundle multiple classifier registry CSVs into one `dict[str, SeedEnsemble]` `.pkl`. Accepts `{"rf": "path/to/rf.csv", "xgb": "path/to/xgb.csv"}`. |
 
 ---
@@ -125,7 +125,7 @@ from eruption_forecast.model import SeedEnsemble
 ensemble = SeedEnsemble.from_registry("path/to/trained_model_*.csv")
 
 # Load a previously saved ensemble
-ensemble = SeedEnsemble.load("path/to/merged_model_*.pkl")
+ensemble = SeedEnsemble.load("path/to/SeedEnsemble_*.pkl")
 ```
 
 ### Methods
@@ -148,7 +148,7 @@ from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
 
 | Function | Description |
 |----------|-------------|
-| `merge_seed_models(registry_csv, output_path=None)` | One classifier → one `SeedEnsemble` `.pkl`. Default name: `merged_model_{suffix}.pkl` alongside the registry CSV. |
+| `merge_seed_models(registry_csv, output_path=None)` | One classifier → one `SeedEnsemble` `.pkl`. Default name: `SeedEnsemble_{suffix}.pkl` alongside the registry CSV. |
 | `merge_all_classifiers(trained_models, output_path=None)` | Multiple classifiers → one `dict[str, SeedEnsemble]` `.pkl`. `trained_models` is `{"rf": "rf_registry.csv", ...}`. Default name: `merged_classifiers_{suffix}.pkl` in the `trainings/` root. |
 
 ---
