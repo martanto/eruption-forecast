@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build"]
+requires = ["uv_build<0.12"]
 build-backend = "uv_build"
 
 [project]
@@ -19,7 +19,7 @@ dependencies = [
     "numba<0.63",
     "loguru",
     "pandas>=3.0.2",
-    "pip>=26.0",
+    "pip>=26.1.1",
     "imbalanced-learn>=0.14.1",
     "scikit-learn>=1.4",
     "seaborn>=0.13.2",
