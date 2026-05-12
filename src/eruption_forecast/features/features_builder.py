@@ -565,6 +565,8 @@ class FeaturesBuilder:
             self.output_dir,
             f"{basename}.csv",
         )
+        ensure_dir(self.output_dir)
+
         label_df.to_csv(label_csv, index=True)
         self.label_features_csv = label_csv
 
@@ -700,14 +702,13 @@ class FeaturesBuilder:
         extract_params = self._prepare_extraction_parameters(exclude_features)
 
         # Setup extraction directory - mode-specific subdir prevents train/forecast collisions
-        mode = "train" if not self.label_df.empty else "forecast"
-        extract_features_dir = os.path.join(self.output_dir, "extracted", mode)
+        extract_features_dir = os.path.join(self.output_dir, "extracted")
         ensure_dir(extract_features_dir)
 
         _prefix_filename = (
-            f"relevant_features_{dates_str}"
+            f"features-matrix_{dates_str}"
             if use_relevant_features
-            else f"all_features_{dates_str}"
+            else f"features-matrix_all_{dates_str}"
         )
         prefix_filename = (
             f"{_prefix_filename}"
