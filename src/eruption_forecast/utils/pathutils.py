@@ -161,3 +161,40 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     else:
         joblib.dump(data, full_path)
     logger.info(f"Saved: {full_path}")
+
+
+def setup_nslc_directories(
+    network: str,
+    station: str,
+    location: str,
+    channel: str,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+) -> tuple[str, str, str]:
+    """Set up directory structure for forecast model outputs.
+
+    Creates the NSLC (Network.Station.Location.Channel) identifier and
+    builds the directory structure for storing model outputs.
+
+    Args:
+        network (str): Network code (e.g., "VG").
+        station (str): Station code (e.g., "OJN").
+        location (str): Location code (e.g., "00").
+        channel (str): Channel code (e.g., "EHZ").
+        output_dir (str | None): Base output directory. If None, defaults to
+            "output" relative to root_dir.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            paths. If None, falls back to ``os.getcwd()``. Defaults to None.
+
+    Returns:
+        tuple[str, str, str]: A 3-tuple containing:
+
+            - **nslc** (str): Combined identifier (e.g., "VG.OJN.00.EHZ")
+            - **output_dir** (str): Resolved output directory path
+            - **station_dir** (str): Station-specific directory path
+    """
+    nslc = f"{network}.{station}.{location}.{channel}"
+    output_dir = resolve_output_dir(output_dir, root_dir, "output")
+    station_dir = os.path.join(output_dir, nslc)
+
+    return nslc, output_dir, station_dir
