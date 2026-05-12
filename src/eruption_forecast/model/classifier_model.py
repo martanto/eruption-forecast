@@ -288,7 +288,7 @@ class ClassifierModel:
             return TimeSeriesSplit(n_splits=self.n_splits)
 
         raise ValueError(
-            "Unknown CV strategy {strategy}. Choose between: shuffle, stratified, shuffle-stratified, timeseries"
+            f"Unknown CV strategy {strategy}. Choose between: shuffle, stratified, shuffle-stratified, timeseries"
         )
 
     @property
