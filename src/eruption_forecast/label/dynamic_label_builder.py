@@ -56,7 +56,7 @@ class DynamicLabelBuilder(LabelBuilder):
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
-        volcano_id: str,
+        volcano_id: str | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         prefix_filename: str | None = None,
@@ -74,7 +74,8 @@ class DynamicLabelBuilder(LabelBuilder):
             window_step_unit (Literal["minutes", "hours"]): Unit for window_step.
             day_to_forecast (int): Days before eruption to start positive labeling.
             eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
-            volcano_id (str): Volcano identifier used in filenames.
+            volcano_id (str, optional): Volcano identifier used in filenames.
+                Defaults to None.
             output_dir (str | None, optional): Output directory path. Defaults to None.
             root_dir (str | None, optional): Anchor directory for resolving
                 relative output_dir paths. Defaults to None.

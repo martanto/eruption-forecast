@@ -104,7 +104,7 @@ class LabelBuilder:
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
-        volcano_id: str,
+        volcano_id: str | None = None,
         include_eruption_date: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -128,7 +128,8 @@ class LabelBuilder:
                 windows as positive. Must be positive and less than total date range.
             eruption_dates (list[str]): List of eruption dates in YYYY-MM-DD format.
                 Dates are automatically sorted.
-            volcano_id (str): Unique identifier for the volcano, used in output filenames.
+            volcano_id (str, optional): Unique identifier for the volcano, used in output filenames.
+                Defaults to None.
             include_eruption_date (bool, optional): Controls whether the eruption
                 date counts as one of the ``day_to_forecast`` positive days.
                 When ``True``, the positive window spans exactly ``day_to_forecast``
@@ -183,6 +184,8 @@ class LabelBuilder:
         )
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         label_dir = os.path.join(output_dir, "labels")
+
+        volcano_id = volcano_id or f"volcano_{start_date_str}_{end_date_str}"
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties
