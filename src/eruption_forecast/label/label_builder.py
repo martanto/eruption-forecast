@@ -219,6 +219,9 @@ class LabelBuilder:
             f"_ie-{int(include_eruption_date)}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
+        self.n_positive: int | None = None
+        self.n_negative: int | None = None
+        self.ratio: float | None = None
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -329,9 +332,9 @@ class LabelBuilder:
             "is_built": is_built,
             "n_windows": len(self._df) if is_built else None,
             "n_positive": int(self._df["is_erupted"].sum()) if is_built else None,
-            "n_negative": int((self._df["is_erupted"] == 0).sum())
-            if is_built
-            else None,
+            "n_negative": (
+                int((self._df["is_erupted"] == 0).sum()) if is_built else None
+            ),
         }
         return result
 
@@ -1077,6 +1080,8 @@ class LabelBuilder:
 
         self.update_df_eruptions(df)
         self.df = df
+        self.n_positive = int(self._df["is_erupted"].sum())
+        self.n_negative = int((self._df["is_erupted"] == 0).sum())
 
         df_eruption = df[df["is_erupted"] > 0]
         if df_eruption.empty:
@@ -1086,12 +1091,14 @@ class LabelBuilder:
                 f"Please change your start_date and end_date parameters."
             )
 
+        erupted_count = len(df_eruption)
+        total_count = len(df)
+        self.ratio = erupted_count / total_count * 100
+
         if self.verbose:
-            erupted_count = len(df_eruption)
-            total_count = len(df)
             logger.info(
                 f"Label building complete: {erupted_count} erupted windows out of {total_count} total "
-                f"({erupted_count / total_count * 100:.2f}%)"
+                f"({self.ratio:.2f}%)"
             )
 
         self.df_eruption = df_eruption
