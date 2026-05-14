@@ -744,6 +744,7 @@ class FeaturesBuilder:
         else:
             self.all_features_csvs.update(extracted_csvs)
 
+        self.label_df = label_df
         self.use_relevant_features = use_relevant_features
         self.csv, self.df = self.concat_features(
             csv_list=list(extracted_csvs),
