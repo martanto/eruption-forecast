@@ -65,7 +65,7 @@ class BaseModel(ABC):
         return self
 
     @abstractmethod
-    def create_directories(self, **kwargs) -> None:
+    def create_directories(self) -> None:
         """Create the directories needed for the model."""
 
     @abstractmethod
