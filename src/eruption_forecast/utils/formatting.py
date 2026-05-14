@@ -70,6 +70,41 @@ def slugify(text: str, hyphen: str = "-") -> str:
     return s.strip(hyphen)
 
 
+def get_classifier_label(classifier_name: str) -> str:
+    """Return a human-readable label for a classifier given its scikit-learn class name.
+
+    Looks up ``classifier_name`` in a fixed mapping of class names to display labels.
+    If the name is not found (e.g., an unrecognised or custom classifier), the input
+    string is returned unchanged.
+
+    Args:
+        classifier_name (str): Scikit-learn class name of the classifier, e.g.
+            ``"RandomForestClassifier"`` or ``"XGBClassifier"``.
+
+    Returns:
+        str: Human-readable display label, e.g. ``"Random Forest"`` or ``"XGBoost"``.
+            Returns ``classifier_name`` unchanged if not found in the mapping.
+    """
+    classifier_slugs = {
+        "SVC": "svm",
+        "KNeighborsClassifier": "KNN",
+        "DecisionTreeClassifier": "Decision Tree",
+        "RandomForestClassifier": "Random Forest",
+        "LiteRandomForestClassifier": "(lite) Random Forest",
+        "GradientBoostingClassifier": "Gradient Boosting",
+        "XGBClassifier": "XGBoost",
+        "MLPClassifier": "Neural Network",
+        "GaussianNB": "Naive Bayes",
+        "LogisticRegression": "Logistic Regression",
+        "VotingClassifier": "Voting Classifier",
+    }
+
+    if classifier_name not in classifier_slugs:
+        return classifier_name
+
+    return classifier_slugs[classifier_name]
+
+
 def pdf_metadata(title: str | None = None) -> dict[str, str]:
     """Build PDF metadata dict from package metadata and environment.
 

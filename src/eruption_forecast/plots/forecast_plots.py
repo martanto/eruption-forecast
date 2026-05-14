@@ -28,7 +28,7 @@ import pandas as pd
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-from eruption_forecast.utils.ml import get_classifier_label
+from eruption_forecast.utils.formatting import get_classifier_label
 from eruption_forecast.plots.styles import DIVERGING_BREWER
 from eruption_forecast.utils.dataframe import get_envelope_values
 from eruption_forecast.utils.date_utils import (

@@ -198,3 +198,36 @@ def setup_nslc_directories(
     station_dir = os.path.join(output_dir, nslc)
 
     return nslc, output_dir, station_dir
+
+
+def generate_features_filepaths(
+    random_state: int,
+    features_seed_dir: str,
+    features_resampled_dir: str,
+    figures_seed_dir: str,
+    plot_features: bool = False,
+    overwrite: bool = False,
+) -> tuple[bool, str, str, str | None]:
+    filename = f"{random_state:05d}"
+
+    # Required
+    features_seed_path = os.path.join(features_seed_dir, f"{filename}.csv")
+    features_resampled_path = os.path.join(features_resampled_dir, f"{filename}.csv")
+
+    filepath_required = [features_seed_path, features_resampled_path]
+
+    can_skip = not overwrite and all(os.path.isfile(p) for p in filepath_required)
+
+    # Optional
+    figures_seed_path = (
+        os.path.join(figures_seed_dir, f"{filename}.png") if plot_features else None
+    )
+    if can_skip and plot_features:
+        can_skip = os.path.isfile(features_seed_path)
+
+    return (
+        can_skip,
+        features_seed_path,
+        features_resampled_path,
+        figures_seed_path,
+    )

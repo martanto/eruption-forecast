@@ -1,37 +1,5 @@
-"""Machine learning utilities for model training, inference, and ensemble management.
-
-This module centralises the ML-specific helpers that are shared across
-``ModelTrainer``, ``ModelPredictor``, and the ensemble classes.  It covers
-the full lifecycle from data preparation through prediction and model merging.
-
-Key functions
--------------
-- ``resample`` — central dispatcher for class-balancing strategies (under, over, none, auto);
-- ``random_under_sampler`` — apply ``RandomUnderSampler`` to balance training data;
-  returns resampled ``(X, y)`` and the fitted sampler
-- ``get_significant_features`` — run tsfresh ``FeatureSelector`` (and optionally a
-  RandomForest importance filter) to reduce the feature matrix to the most
-  relevant columns
-- ``compute_threshold_metrics`` — sweep decision thresholds and record precision,
-  recall, F1, balanced accuracy, and MCC at each step
-- ``compute_seed_eruption_probability`` — run one seed model on a feature matrix,
-  aggregate per-seed statistics, and optionally persist a CSV
-- ``compute_model_probabilities`` — iterate over all seeds in a ``SeedEnsemble`` or
-  dict thereof and return a consensus probability DataFrame
-- ``merge_seed_models`` — load all per-seed model files recorded in a registry CSV
-  and bundle them into a ``SeedEnsemble``
-- ``merge_all_classifiers`` — combine multiple ``SeedEnsemble`` objects into a single
-  ``ClassifierEnsemble``
-- ``get_classifier_models`` — instantiate ``ClassifierModel`` objects for a given
-  classifier name and CV strategy
-- ``load_labels_from_csv`` — thin wrapper around ``load_label_csv`` kept for
-  backward compatibility
-- ``get_classifier_label`` — translate an internal classifier key to a
-  human-readable display label
-"""
-
 import os
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import joblib
@@ -47,6 +15,7 @@ from sklearn.metrics import (
 from tsfresh.transformers import FeatureSelector
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
+from sklearn.model_selection import GridSearchCV
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
@@ -609,36 +578,51 @@ def get_classifier_models(
     return classifier_models
 
 
-def get_classifier_label(classifier_name: str) -> str:
-    """Return a human-readable label for a classifier given its scikit-learn class name.
+def grid_search_cv(
+    random_state: int,
+    features: pd.DataFrame,
+    labels: pd.Series,
+    top_n_features: list[str],
+    classifier_model: ClassifierModel,
+    n_grids: int = 1,
+) -> tuple[ClassifierModel, GridSearchCV, Any]:
+    classifier: ClassifierModel = classifier_model.set_random_state(
+        random_state=random_state
+    )
 
-    Looks up ``classifier_name`` in a fixed mapping of class names to display labels.
-    If the name is not found (e.g., an unrecognised or custom classifier), the input
-    string is returned unchanged.
+    grid_search = GridSearchCV(
+        estimator=classifier.model,
+        param_grid=classifier.grid,
+        cv=classifier.get_cv_splitter(),
+        scoring="balanced_accuracy",
+        n_jobs=n_grids,
+        verbose=0,
+    )
 
-    Args:
-        classifier_name (str): Scikit-learn class name of the classifier, e.g.
-            ``"RandomForestClassifier"`` or ``"XGBClassifier"``.
+    with joblib.parallel_backend("loky"):
+        grid_search.fit(features[top_n_features], labels)
 
-    Returns:
-        str: Human-readable display label, e.g. ``"Random Forest"`` or ``"XGBoost"``.
-            Returns ``classifier_name`` unchanged if not found in the mapping.
-    """
-    classifier_slugs = {
-        "SVC": "svm",
-        "KNeighborsClassifier": "KNN",
-        "DecisionTreeClassifier": "Decision Tree",
-        "RandomForestClassifier": "Random Forest",
-        "LiteRandomForestClassifier": "(lite) Random Forest",
-        "GradientBoostingClassifier": "Gradient Boosting",
-        "XGBClassifier": "XGBoost",
-        "MLPClassifier": "Neural Network",
-        "GaussianNB": "Naive Bayes",
-        "LogisticRegression": "Logistic Regression",
-        "VotingClassifier": "Voting Classifier",
-    }
+    return classifier, grid_search, grid_search.best_estimator_
 
-    if classifier_name not in classifier_slugs:
-        return classifier_name
 
-    return classifier_slugs[classifier_name]
+def save_model_registry(
+    seeds: int,
+    records: list[dict],
+    classifier_dir: str,
+    classifier_model: ClassifierModel,
+    number_of_features: int,
+):
+    """Build and save the trained-models registry CSV for one classifier."""
+    classifier_id = f"{classifier_model.name}-{classifier_model.cv_name}"
+
+    suffix = f"{classifier_id}_rs-{seeds}_top-{number_of_features}"
+    filename = f"trained_model_{suffix}.csv"
+
+    registry_df = pd.DataFrame(records).set_index("random_state")
+    if registry_df.empty:
+        raise ValueError("No significant features or trained models found.")
+
+    csv = os.path.join(classifier_dir, filename)
+    registry_df.to_csv(csv, index=True)
+
+    return csv

@@ -1,23 +1,4 @@
-"""DataFrame manipulation utilities for tremor, label, and feature data.
-
-This module provides DataFrame helpers used at multiple stages of the pipeline:
-cleaning raw tremor data, preparing labels for tsfresh, merging extracted
-feature sets, and computing forecast envelope statistics.
-
-Key functions
--------------
-- ``remove_anomalies`` — apply modified z-score detection column-wise and replace
-  flagged values with NaN; optionally interpolate the result
-- ``to_series`` — extract a value column from a DataFrame and reindex by another
-  column (e.g. convert a label DataFrame to a tsfresh-compatible ``id``-indexed
-  ``Series``)
-- ``load_label_csv`` — read an aligned label CSV produced by ``FeaturesBuilder``
-  and return an ``id``-indexed binary eruption ``Series``
-- ``concat_features`` — horizontally concatenate per-column tsfresh feature CSVs
-  into a single combined feature matrix and persist it to disk
-- ``get_envelope_values`` — compute rolling min/max envelopes for per-classifier
-  probability and prediction columns in a forecast output DataFrame
-"""
+import os
 
 import numpy as np
 import pandas as pd
@@ -285,3 +266,42 @@ def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return df
+
+
+def concat_significant_features(
+    features_csvs: list[str],
+    features_dir: str,
+    number_of_features: int | None = None,
+    filename: str = "significant_features",
+) -> pd.DataFrame:
+
+    combined_features_df = pd.concat(
+        [pd.read_csv(file) for file in features_csvs],
+        ignore_index=True,
+    )
+
+    if combined_features_df.empty:
+        raise ValueError("No data found inside csv files.")
+
+    combined_features_df.to_csv(
+        os.path.join(features_dir, f"{filename}.csv"), index=False
+    )
+
+    if number_of_features is not None and number_of_features > 0:
+        filename = f"top_{number_of_features}_features"
+
+        combined_features_df = (
+            combined_features_df.groupby(by="features")
+            .agg(score=("score", "count"), mean_score=("score", "mean"))
+            .sort_values(
+                by=["score", "mean_score"],
+                ascending=[False, True],
+            )
+        )
+        combined_features_df.index.name = "features"
+        combined_features_df.to_csv(
+            os.path.join(features_dir, f"{filename}.csv"),
+            index=True,
+        )
+
+    return combined_features_df
