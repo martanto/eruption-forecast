@@ -223,7 +223,7 @@ def generate_features_filepaths(
         os.path.join(figures_seed_dir, f"{filename}.png") if plot_features else None
     )
     if can_skip and plot_features:
-        can_skip = os.path.isfile(features_seed_path)
+        can_skip = figures_seed_path is not None and os.path.isfile(figures_seed_path)
 
     return (
         can_skip,
