@@ -169,7 +169,7 @@ class TrainingModel(BaseModel):
         """
         if not isinstance(self._tremor_data, str | pd.DataFrame):
             raise TypeError(
-                f"tremor_data should have an instance of `str` or `pd.DataFramae` "
+                f"tremor_data should have an instance of `str` or `pd.DataFrame` "
                 f"instead of {type(self._tremor_data)}"
             )
 
@@ -230,9 +230,11 @@ class TrainingModel(BaseModel):
         """Validate and reconcile model parameters against system and data constraints.
 
         Clamps ``n_grids`` so that the product ``n_jobs × n_grids`` never
-        exceeds the available CPU count, then aligns the training date range to
-        the actual span of the tremor data. Creates the root training directory
-        as a side effect.
+        exceeds the available CPU count. Creates the root training directory
+        as a side effect. Date range clamping against the tremor data bounds
+        is deferred to ``_clamp_dates_to_tremor()``, which is called lazily
+        from ``build_label()`` to avoid loading the tremor CSV during
+        construction.
 
         Returns:
             Self: The current instance, enabling method chaining.
@@ -246,7 +248,18 @@ class TrainingModel(BaseModel):
         if self.n_jobs == 1 and self.n_grids == 1:
             self.n_grids = self.total_cpu - 2
 
-        # Ensuring training dates under tremor dates
+        ensure_dir(self.training_dir)
+
+        return self
+
+    def _clamp_dates_to_tremor(self) -> None:
+        """Clamp training dates to the actual span of the tremor data.
+
+        Adjusts ``self.start_date`` and ``self.end_date`` when they fall
+        outside the range covered by the loaded tremor CSV. Called lazily
+        from ``build_label()`` so that constructing a ``TrainingModel``
+        instance does not immediately trigger a CSV read.
+        """
         tremor_data: TremorData = self.tremor_data
         tremor_start_date = tremor_data.start_date
         tremor_end_date = tremor_data.end_date
@@ -262,10 +275,6 @@ class TrainingModel(BaseModel):
                 f"Training end date adjusted to tremor end date: "
                 f"{tremor_end_date.strftime('%Y-%m-%d')}"
             )
-
-        ensure_dir(self.training_dir)
-
-        return self
 
     def describe(self) -> str:
         """Return a human-readable summary of the training configuration.
@@ -384,8 +393,9 @@ class TrainingModel(BaseModel):
                 is None.
         """
         if window_step <= 0:
-            raise ValueError("window_step (in day) must be > 0.")
+            raise ValueError("window_step must be > 0.")
 
+        self._clamp_dates_to_tremor()
         verbose = verbose if verbose is not None else self.verbose
 
         if builder == "dynamic":
@@ -588,7 +598,7 @@ class TrainingModel(BaseModel):
         self.create_directories(plot_features=plot_features)
 
         if resample_method == "auto":
-            minority_share = self.LabelBuilder.df.value_counts(normalize=True).min()
+            minority_share = self.LabelBuilder.df["is_erupted"].value_counts(normalize=True).min()
             if minority_share <= minority_threshold:
                 resample_method = "under"
                 logger.info(
@@ -607,6 +617,7 @@ class TrainingModel(BaseModel):
             pending_feature_selection_jobs,
             pending_training_model_jobs,
             records_per_classifier,
+            existing_feature_paths,
         ) = self._collect_pending_train_jobs(
             random_states=random_states,
             resample_method=resample_method,
@@ -639,7 +650,7 @@ class TrainingModel(BaseModel):
         training_model_results: list[str | None] = self._run_jobs(
             self._train,
             all_training_model_jobs,
-            job_name="Pending Feature Selection",
+            job_name="Pending Training",
         )
 
         for result in training_model_results:
@@ -662,11 +673,9 @@ class TrainingModel(BaseModel):
                 }
             )
 
-        for _rs in random_states:
-            filename = f"{_rs:05d}"
-            sf = os.path.join(self.features_seed_dir, f"{filename}.csv")
-            if os.path.isfile(sf) and sf not in self.features_csvs:
-                self.features_csvs.append(sf)
+        for path in existing_feature_paths:
+            if path not in self.features_csvs:
+                self.features_csvs.append(path)
 
         if self.verbose:
             logger.info("Prediction: Concatenating significant features")
@@ -838,6 +847,7 @@ class TrainingModel(BaseModel):
             number_of_features=self.number_of_features,
             features_seed_path=features_seed_path,
             figures_seed_path=figures_seed_path,
+            overwrite=self.overwrite,
         )
 
         if result is None:
@@ -883,7 +893,7 @@ class TrainingModel(BaseModel):
         resample_method: Literal["under", "over", "auto"] | None,
         sampling_strategy: str | float,
         plot_features: bool,
-    ) -> tuple[list[tuple], list[tuple], dict[str, list[dict]]]:
+    ) -> tuple[list[tuple], list[tuple], dict[str, list[dict]], list[str]]:
         """Determine which seeds still require feature selection or model training.
 
         Iterates over every random state and checks whether cached feature and
@@ -902,20 +912,25 @@ class TrainingModel(BaseModel):
                 feature-selection job tuples.
 
         Returns:
-            tuple[list[tuple], list[tuple], dict[str, list[dict]]]: A
-                three-element tuple containing:
+            tuple[list[tuple], list[tuple], dict[str, list[dict]], list[str]]: A
+                four-element tuple containing:
 
                 - pending_feature_selection_jobs: Jobs that still need feature
                   selection, each a tuple of
                   ``(random_state, features_seed_path, features_resampled_path,
                   figures_seed_path, resample_method, sampling_strategy)``.
                 - pending_training_model_jobs: Jobs that still need model
-                  training, each a tuple of ``(random_state, classifier_slug)``.
+                  training for seeds whose feature files already exist on disk.
+                  Each entry is a tuple of ``(random_state, classifier_slug)``.
                 - records_per_classifier: Classifier-slug → list of record
                   dicts for seeds whose models already exist on disk.
+                - existing_feature_paths: Feature CSV paths that already exist
+                  on disk (can_skip seeds), collected here to avoid a post-hoc
+                  filesystem rescan in ``fit()``.
         """
         pending_feature_selection_jobs: list[tuple] = []
         pending_training_model_jobs: list[tuple] = []
+        existing_feature_paths: list[str] = []
 
         records_per_classifier: dict[str, list[dict]] = {
             classifier_model.slug_name: []
@@ -938,6 +953,7 @@ class TrainingModel(BaseModel):
             )
 
             if can_skip:
+                existing_feature_paths.append(features_seed_path)
                 filename = f"{random_state:05d}"
                 for classifier_model in self.classifier_models:
                     classifier_slug = classifier_model.slug_name
@@ -967,13 +983,15 @@ class TrainingModel(BaseModel):
                 )
             )
 
+            # Training for this seed will be scheduled via new_training_model_jobs
+            # in fit() after feature selection completes, so do not add to
+            # pending_training_model_jobs here — that would create duplicate jobs.
             filename = f"{random_state:05d}"
             for classifier_model in self.classifier_models:
                 classifier_slug = classifier_model.slug_name
                 model_seed_path = os.path.join(
                     self.models_dir[classifier_slug], f"{filename}.pkl"
                 )
-
                 if not self.overwrite and os.path.isfile(model_seed_path):
                     records_per_classifier[classifier_slug].append(
                         {
@@ -982,13 +1000,12 @@ class TrainingModel(BaseModel):
                             "model_filepath": model_seed_path,
                         }
                     )
-                else:
-                    pending_training_model_jobs.append((random_state, classifier_slug))
 
         return (
             pending_feature_selection_jobs,
             pending_training_model_jobs,
             records_per_classifier,
+            existing_feature_paths,
         )
 
     def _select_features(
