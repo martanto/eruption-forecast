@@ -32,7 +32,43 @@ from eruption_forecast.features.feature_selector import FeatureSelector
 
 
 class TrainingModel(BaseModel):
-    """TrainingModel"""
+    """Train classifier models across multiple random seeds on tremor feature data.
+
+    Orchestrates the full training pipeline: label building, tremor matrix
+    construction, tsfresh feature extraction, per-seed resampling and feature
+    selection, and parallel GridSearchCV model fitting. Trained models and a
+    model registry CSV are written to the configured output directory.
+
+    Args:
+        tremor_data (str | pd.DataFrame): Path to a tremor CSV file or a
+            pre-loaded tremor DataFrame.
+        start_date (str | datetime): Start of the training period.
+        end_date (str | datetime): End of the training period.
+        classifiers (str | list[str]): One or more classifier keys (e.g.
+            ``"rf"``, ``["rf", "xgb"]``).
+        eruption_dates (list[str]): ISO-format eruption dates used for labelling.
+        window_size (int): Look-ahead window in days for eruption forecasting.
+            Defaults to 2.
+        cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified"]):
+            Cross-validation strategy passed to each ``ClassifierModel``.
+            Defaults to ``"shuffle-stratified"``.
+        cv_splits (int): Number of CV folds. Defaults to 5.
+        number_of_features (int): Top-N features retained after feature
+            selection. Defaults to 20.
+        include_eruption_date (bool): Whether to include the eruption day
+            itself as a positive label. Defaults to False.
+        overwrite (bool): Re-run and overwrite cached feature and model files.
+            Defaults to False.
+        output_dir (str | None): Root output directory. Resolved automatically
+            when None. Defaults to None.
+        root_dir (str | None): Project root used for path resolution. Defaults
+            to None.
+        n_jobs (int): Number of parallel outer workers for seed-level
+            parallelism. Defaults to 1.
+        n_grids (int): Parallel workers used inside ``GridSearchCV`` and
+            ``FeatureSelector``. Defaults to 1.
+        verbose (bool): Emit detailed progress logs. Defaults to False.
+    """
 
     def __init__(
         self,
@@ -120,6 +156,17 @@ class TrainingModel(BaseModel):
 
     @cached_property
     def tremor_data(self) -> TremorData:
+        """Load and return the ``TremorData`` instance from the configured source.
+
+        Accepts either a filesystem path (str) or a pre-loaded DataFrame. The
+        result is cached after the first access so subsequent reads are free.
+
+        Returns:
+            TremorData: Validated tremor data container.
+
+        Raises:
+            TypeError: If ``_tremor_data`` is neither a str nor a DataFrame.
+        """
         if not isinstance(self._tremor_data, str | pd.DataFrame):
             raise TypeError(
                 f"tremor_data should have an instance of `str` or `pd.DataFramae` "
@@ -131,7 +178,22 @@ class TrainingModel(BaseModel):
 
         return TremorData(self._tremor_data)
 
-    def set_directories(self):
+    def set_directories(self) -> tuple:
+        """Build and return all output directory paths used during training.
+
+        Creates classifier-level subdirectories immediately so downstream
+        steps can write files without additional setup calls.
+
+        Returns:
+            tuple: A seven-element tuple containing:
+                - training_dir (str): Root training output path.
+                - features_dir (str): CV-scoped features directory.
+                - features_seed_dir (str): Per-seed selected-feature CSVs.
+                - features_resampled_dir (str): Per-seed resampled-data CSVs.
+                - figures_seed_dir (str): Per-seed feature importance figures.
+                - classifier_dirs (dict[str, str]): Classifier-slug → directory.
+                - models_dir (dict[str, str]): Classifier-slug → model directory.
+        """
         training_dir = os.path.join(self.output_dir, "training")
         features_dir = os.path.join(training_dir, "features", self.cv_name)
         features_seed_dir = os.path.join(features_dir, "seed")
@@ -165,8 +227,16 @@ class TrainingModel(BaseModel):
         )
 
     def validate(self) -> Self:
-        """Validate the model parameters."""
+        """Validate and reconcile model parameters against system and data constraints.
 
+        Clamps ``n_grids`` so that the product ``n_jobs × n_grids`` never
+        exceeds the available CPU count, then aligns the training date range to
+        the actual span of the tremor data. Creates the root training directory
+        as a side effect.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+        """
         # Ensure total grid not over than total CPU
         total_grid = self.n_jobs * self.n_grids
         if total_grid > self.total_cpu:
@@ -198,21 +268,83 @@ class TrainingModel(BaseModel):
         return self
 
     def describe(self) -> str:
-        return "describe"
+        """Return a human-readable summary of the training configuration.
+
+        Returns:
+            str: Descriptive string for this training model instance.
+        """
+        classifier_names = ", ".join(
+            m.slug_name for m in self.classifier_models
+        )
+        return (
+            f"TrainingModel("
+            f"period={self.start_date_str} → {self.end_date_str}, "
+            f"window_size={self.window_size}d, "
+            f"classifiers=[{classifier_names}], "
+            f"cv={self.cv_strategy}/{self.cv_splits}-fold, "
+            f"top_features={self.number_of_features}, "
+            f"eruptions={len(self.eruption_dates) if self.eruption_dates is not None else 0}"
+            f")"
+        )
 
     def to_dict(self) -> dict:
+        """Serialise core training parameters to a plain dictionary.
+
+        Returns:
+            dict: Mapping of parameter names to their current values, including
+                ``start_date``, ``end_date``, ``window_size``,
+                ``eruption_dates``, and ``n_jobs``.
+        """
         result: dict = {
             "start_date": self.start_date_str,
             "end_date": self.end_date_str,
-            "window_size": self.window_size,
+            "classifiers": self.classifiers,
             "eruption_dates": self.eruption_dates,
+            "window_size": self.window_size,
+            "cv_strategy": self.cv_strategy,
+            "cv_splits": self.cv_splits,
+            "number_of_features": self.number_of_features,
+            "include_eruption_date": self.include_eruption_date,
+            "overwrite": self.overwrite,
+            "output_dir": self.output_dir,
+            "root_dir": self.root_dir,
             "n_jobs": self.n_jobs,
+            "n_grids": self.n_grids,
+            "verbose": self.verbose,
         }
+
+        if self.basename is not None:
+            result["basename"] = self.basename
 
         return result
 
     def to_prompt(self) -> str:
-        return "to_prompt"
+        """Return a prompt-ready string representation of the training model.
+
+        Returns:
+            str: Prompt string for this training model instance.
+        """
+        classifier_names = ", ".join(
+            m.slug_name for m in self.classifier_models
+        )
+        eruption_list = ", ".join(self.eruption_dates) if self.eruption_dates is not None else "none"
+        basename_str = f" Basename: {self.basename}." if self.basename is not None else ""
+        return (
+            f"Training period: {self.start_date_str} to {self.end_date_str}. "
+            f"Window size: {self.window_size} day(s). "
+            f"Classifiers: {classifier_names}. "
+            f"CV strategy: {self.cv_strategy} with {self.cv_splits} folds. "
+            f"Top features retained: {self.number_of_features}. "
+            f"Include eruption date: {self.include_eruption_date}. "
+            f"Overwrite: {self.overwrite}. "
+            f"Output dir: {self.output_dir}. "
+            f"Root dir: {self.root_dir}. "
+            f"n_jobs: {self.n_jobs}. "
+            f"n_grids: {self.n_grids}. "
+            f"Verbose: {self.verbose}. "
+            f"Eruption dates: {eruption_list}."
+            f"{basename_str}"
+        )
 
     def build_label(
         self,
@@ -224,16 +356,32 @@ class TrainingModel(BaseModel):
     ) -> Self:
         """Instantiate and build a label builder of the requested type.
 
+        Constructs either a global sliding-window ``LabelBuilder`` or a
+        per-eruption ``DynamicLabelBuilder``, runs its ``build()`` method, and
+        stores the result on ``self.LabelBuilder``. Must be called before
+        ``extract_features()``.
+
         Args:
-            window_step (int): Window size in days for training data windows.
-            window_step_unit (Literal["minutes", "hours"]): Unit of window step.
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of
+                ``window_step``.
             builder (Literal["standard", "dynamic"]): Label builder variant.
                 ``"standard"`` uses a single global window; ``"dynamic"``
-                generates one window per eruption event.
+                generates one window per eruption event. Defaults to
+                ``"standard"``.
             days_before_eruption (int | None): Days before each eruption to
-                start its window. Required when ``builder="dynamic"``.
-                Defaults to None.
-            verbose (bool | None): Override self.verbose. Defaults to None.
+                start its positive window. Required when
+                ``builder="dynamic"``. Defaults to None.
+            verbose (bool | None): Override ``self.verbose`` for this call
+                only. Defaults to None.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If ``window_step`` is not greater than zero.
+            ValueError: If ``builder="dynamic"`` and ``days_before_eruption``
+                is None.
         """
         if window_step <= 0:
             raise ValueError("window_step (in day) must be > 0.")
@@ -289,6 +437,37 @@ class TrainingModel(BaseModel):
         n_jobs: int | None = None,
         verbose: bool | None = None,
     ) -> Self:
+        """Build the tremor matrix and extract tsfresh features from it.
+
+        Slices tremor data into label-aligned windows via
+        ``TremorMatrixBuilder``, then runs ``FeaturesBuilder`` to extract and
+        filter relevant tsfresh features. Stores the result in
+        ``self.extracted_features_df`` and the aligned labels in
+        ``self.labels``. Must be called after ``build_label()``.
+
+        Args:
+            select_tremor_columns (list[str] | None): Subset of tremor columns
+                to include. Uses all columns when None. Defaults to None.
+            save_tremor_matrix_per_method (bool): Write one CSV per tremor
+                column under the ``per_method/`` subdirectory. Defaults to
+                False.
+            exclude_features (list[str] | None): tsfresh feature names to
+                drop before saving. Defaults to None.
+            save_tremor_matrix_per_id (bool): Write one CSV per window ID.
+                Defaults to False.
+            overwrite (bool): Re-extract even when cached files exist.
+                Defaults to False.
+            n_jobs (int | None): Worker count for tsfresh extraction. Falls
+                back to ``self.n_jobs`` when None. Defaults to None.
+            verbose (bool | None): Override ``self.verbose`` for this call
+                only. Defaults to None.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If ``build_label()`` has not been called first.
+        """
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
 
@@ -341,6 +520,12 @@ class TrainingModel(BaseModel):
         self,
         plot_features: bool = False,
     ) -> None:
+        """Create all output directories required before training begins.
+
+        Args:
+            plot_features (bool): Also create the per-seed figures directory
+                when True. Defaults to False.
+        """
         ensure_dir(self.training_dir)
         ensure_dir(self.features_dir)
         ensure_dir(self.features_seed_dir)
@@ -360,7 +545,37 @@ class TrainingModel(BaseModel):
         sampling_strategy: str | float = 0.75,
         plot_features: bool = False,
     ) -> Self:
-        """Train on the full dataset across multiple seeds (no train/test split)."""
+        """Train classifier models on the full dataset across multiple random seeds.
+
+        For each seed, resamples the extracted features, selects the top-N
+        features, and fits every configured classifier via ``GridSearchCV``.
+        Existing feature and model files are reused unless ``overwrite=True``.
+        Populates ``self.csv`` with the registry CSV path for each classifier
+        and ``self.features_selected_df`` with the aggregated top-N feature
+        importance DataFrame.
+
+        Args:
+            seeds (int): Number of random seeds to train over. Defaults to 25.
+            resample_method (Literal["under", "over", "auto"] | None):
+                Resampling strategy applied before feature selection.
+                ``"auto"`` chooses ``"under"`` when the minority class share
+                is below ``minority_threshold``, otherwise skips resampling.
+                Defaults to ``"auto"``.
+            minority_threshold (float): Minority-class share threshold used
+                when ``resample_method="auto"``. Defaults to 0.15.
+            sampling_strategy (str | float): Target class ratio passed to the
+                resampler. Defaults to 0.75.
+            plot_features (bool): Save per-seed feature importance figures.
+                Defaults to False.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If ``build_label()`` has not been called first.
+            ValueError: If ``extracted_features_df`` is empty, meaning
+                ``extract_features()`` has not been called.
+        """
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
 
@@ -496,6 +711,25 @@ class TrainingModel(BaseModel):
         random_state: int,
         classifier_slug: str,
     ) -> tuple | None:
+        """Fit a single classifier for one random seed and persist the model.
+
+        Reads the pre-computed top-N feature list and resampled training data
+        for the given seed, then runs ``grid_search_cv`` to find the best
+        estimator. Skips fitting if the model file already exists and
+        ``overwrite`` is False.
+
+        Args:
+            random_state (int): Seed index identifying the feature and
+                resampled data files to use.
+            classifier_slug (str): Slug name of the classifier to train,
+                e.g. ``"random-forest-classifier"``.
+
+        Returns:
+            tuple | None: A four-element tuple
+                ``(classifier_slug, random_state, features_seed_path,
+                model_seed_path)`` on success, or ``None`` when the feature
+                file is missing or contains no features.
+        """
         filename = f"{random_state:05d}"
         features_seed_path = os.path.join(self.features_seed_dir, f"{filename}.csv")
         features_resampled_path = os.path.join(
@@ -560,6 +794,30 @@ class TrainingModel(BaseModel):
         resample_method: Literal["under", "over"] | None,
         sampling_strategy: str | float,
     ) -> str | None:
+        """Resample the dataset and select the top-N features for one seed.
+
+        Applies the configured resampler, writes the balanced dataset to
+        ``features_resampled_path``, then delegates to ``_select_features``
+        to run tsfresh feature selection and persist the top-N list.
+
+        Args:
+            random_state (int): Seed used for reproducible resampling and
+                feature selection.
+            features_seed_path (str): Destination CSV path for the top-N
+                selected feature list.
+            features_resampled_path (str): Destination CSV path for the
+                resampled feature-and-label DataFrame.
+            figures_seed_path (str | None): Destination path for the feature
+                importance figure, or None to skip plotting.
+            resample_method (Literal["under", "over"] | None): Resampling
+                strategy; None skips resampling.
+            sampling_strategy (str | float): Target minority-to-majority ratio
+                passed to the resampler.
+
+        Returns:
+            str | None: ``features_seed_path`` on success, or ``None`` when
+                feature selection yields zero features.
+        """
         features_resampled, labels_resampled = resample(
             features=self.extracted_features_df,
             labels=self.labels,
@@ -593,6 +851,23 @@ class TrainingModel(BaseModel):
         jobs: list[tuple],
         job_name: str = "Training Model",
     ) -> list:
+        """Execute a list of jobs either sequentially or via joblib Parallel.
+
+        Uses ``Parallel(backend="loky")`` when ``self.n_jobs != 1``, otherwise
+        iterates sequentially to avoid unnecessary process-pool overhead.
+
+        Args:
+            method (Callable): The method to call for each job, accepting
+                unpacked tuple arguments.
+            jobs (list[tuple]): Each tuple is unpacked as positional arguments
+                to ``method``.
+            job_name (str): Label used in progress log messages. Defaults to
+                ``"Training Model"``.
+
+        Returns:
+            list: Results returned by each ``method`` call, in the same order
+                as ``jobs``.
+        """
         if self.n_jobs != 1:
             logger.info(
                 f"[{job_name}]: Running on {self.n_jobs} job(s). Grid search jobs {self.n_grids}..."
@@ -609,6 +884,36 @@ class TrainingModel(BaseModel):
         sampling_strategy: str | float,
         plot_features: bool,
     ) -> tuple[list[tuple], list[tuple], dict[str, list[dict]]]:
+        """Determine which seeds still require feature selection or model training.
+
+        Iterates over every random state and checks whether cached feature and
+        model files already exist. Seeds with complete feature files skip
+        feature selection; seeds with complete model files skip training.
+        Existing model records are collected into ``records_per_classifier``
+        so the registry can be rebuilt even when no new training occurs.
+
+        Args:
+            random_states (list[int]): List of seed indices to evaluate.
+            resample_method (Literal["under", "over", "auto"] | None):
+                Resampling strategy forwarded to each feature-selection job.
+            sampling_strategy (str | float): Target class ratio forwarded to
+                each feature-selection job.
+            plot_features (bool): Whether to include a figure output path in
+                feature-selection job tuples.
+
+        Returns:
+            tuple[list[tuple], list[tuple], dict[str, list[dict]]]: A
+                three-element tuple containing:
+
+                - pending_feature_selection_jobs: Jobs that still need feature
+                  selection, each a tuple of
+                  ``(random_state, features_seed_path, features_resampled_path,
+                  figures_seed_path, resample_method, sampling_strategy)``.
+                - pending_training_model_jobs: Jobs that still need model
+                  training, each a tuple of ``(random_state, classifier_slug)``.
+                - records_per_classifier: Classifier-slug → list of record
+                  dicts for seeds whose models already exist on disk.
+        """
         pending_feature_selection_jobs: list[tuple] = []
         pending_training_model_jobs: list[tuple] = []
 
@@ -633,6 +938,22 @@ class TrainingModel(BaseModel):
             )
 
             if can_skip:
+                filename = f"{random_state:05d}"
+                for classifier_model in self.classifier_models:
+                    classifier_slug = classifier_model.slug_name
+                    model_seed_path = os.path.join(
+                        self.models_dir[classifier_slug], f"{filename}.pkl"
+                    )
+                    if os.path.isfile(model_seed_path):
+                        records_per_classifier[classifier_slug].append(
+                            {
+                                "random_state": random_state,
+                                "features_csv": features_seed_path,
+                                "model_filepath": model_seed_path,
+                            }
+                        )
+                    else:
+                        pending_training_model_jobs.append((random_state, classifier_slug))
                 continue
 
             pending_feature_selection_jobs.append(
@@ -679,7 +1000,36 @@ class TrainingModel(BaseModel):
         number_of_features: int,
         figures_seed_path: str | None,
         overwrite: bool = False,
-    ):
+    ) -> tuple | None:
+        """Run feature selection and persist the top-N feature list to disk.
+
+        Fits ``self.FeatureSelector`` on the provided features and labels,
+        then saves the top-N selected features as a CSV. Optionally writes a
+        feature importance figure. Returns None when selection yields zero
+        features, signalling the caller to skip model training for this seed.
+
+        Args:
+            features (pd.DataFrame): Resampled feature matrix used to fit the
+                selector.
+            labels (pd.Series): Resampled binary labels aligned with
+                ``features``.
+            random_state (int): Seed passed to the feature selector for
+                reproducibility.
+            features_seed_path (str): Destination CSV path for the top-N
+                selected feature scores.
+            number_of_features (int): Maximum number of features to retain.
+                Reduced automatically if fewer features are available.
+            figures_seed_path (str | None): Destination path for the feature
+                importance figure, or None to skip plotting.
+            overwrite (bool): Overwrite an existing figure file. Defaults to
+                False.
+
+        Returns:
+            tuple | None: A four-element tuple
+                ``(df_selected_features, top_selected_features,
+                selected_features, number_of_features)`` on success, or
+                ``None`` when selection reduces features to zero.
+        """
         # Reduced features/columns
         features_selector = self.FeatureSelector.set_random_state(random_state)
 
