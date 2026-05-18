@@ -116,7 +116,6 @@ class FeaturesBuilder:
         output_dir: str | None = None,
         label_df: pd.DataFrame | None = None,
         root_dir: str | None = None,
-        label_features_basename: str | None = None,
         overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
@@ -139,8 +138,6 @@ class FeaturesBuilder:
                 Defaults to None.
             root_dir (str | None, optional): Anchor directory for relative path resolution.
                 Defaults to None (uses os.getcwd()).
-            label_features_basename (str | None, optional): Basename for label features.
-                Defaults to None.
             overwrite (bool, optional): Re-extract even when output files exist.
                 Defaults to False.
             n_jobs (int, optional): Number of parallel jobs for tsfresh. Defaults to 1.
@@ -165,7 +162,6 @@ class FeaturesBuilder:
         self.tremor_matrix_df = tremor_matrix_df
         self.output_dir = output_dir
         self.label_df = label_df
-        self.label_features_basename = label_features_basename
         self.overwrite = overwrite
         self.n_jobs = n_jobs
         self.verbose = verbose
@@ -559,11 +555,9 @@ class FeaturesBuilder:
         end_date_str = label_df.index.max().strftime("%Y-%m-%d")
         dates_str = f"{start_date_str}_{end_date_str}"
 
-        basename = self.label_features_basename or f"label_{dates_str}"
-        basename = basename.replace("label", "label-features")
         label_csv = os.path.join(
             self.output_dir,
-            f"{basename}.csv",
+            f"features-label_{dates_str}.csv",
         )
         ensure_dir(self.output_dir)
 
@@ -705,13 +699,9 @@ class FeaturesBuilder:
         extract_features_dir = os.path.join(self.output_dir, "extracted")
         ensure_dir(extract_features_dir)
 
-        _prefix_filename = (
-            f"features-matrix_{dates_str}"
-            if use_relevant_features
-            else f"features-matrix_all_{dates_str}"
-        )
+        _prefix_filename = f"features-matrix_{dates_str}"
         prefix_filename = (
-            f"{_prefix_filename}"
+            _prefix_filename
             if prefix_filename is None
             else f"{prefix_filename}_{_prefix_filename}"
         )
