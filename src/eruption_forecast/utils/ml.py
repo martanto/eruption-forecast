@@ -300,7 +300,6 @@ def compute_seed_eruption_probability(
     save: bool = False,
     overwrite: bool = False,
     verbose: bool = False,
-    debug: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Compute eruption probability for a single random seed model.
 
@@ -319,7 +318,6 @@ def compute_seed_eruption_probability(
         overwrite (bool, optional): If True, overwrite existing cached predictions.
             Defaults to False.
         verbose (bool, optional): If True, log save operations. Defaults to False.
-        debug (bool, optional): If True, log detailed debug information. Defaults to False.
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing:
@@ -379,11 +377,6 @@ def compute_seed_eruption_probability(
     probabilities_eruption, probabilities_scores, predictions_eruption = (
         predict_proba_from_estimator(model, X, identifier=random_state)
     )
-
-    if debug:
-        logger.debug(
-            f"{random_state:05d} :: probabilities_eruption values: {probabilities_eruption}"
-        )
 
     if save:
         save_forecast_seed(
@@ -586,6 +579,32 @@ def grid_search_cv(
     classifier_model: ClassifierModel,
     n_grids: int = 1,
 ) -> tuple[ClassifierModel, GridSearchCV, Any]:
+    """Run GridSearchCV for a single seed and return the fitted results.
+
+    Seeds the classifier model with ``random_state``, constructs a
+    ``GridSearchCV`` over the model's parameter grid and CV splitter, fits it
+    on the top-N selected features, and returns the configured classifier, the
+    fitted search object, and the best estimator.
+
+    Args:
+        random_state (int): Random seed used to initialise the classifier.
+        features (pd.DataFrame): Full feature matrix; only ``top_n_features``
+            columns are passed to the search.
+        labels (pd.Series): Binary target labels aligned with ``features``.
+        top_n_features (list[str]): Column names of the pre-selected features
+            to use during training.
+        classifier_model (ClassifierModel): Configured classifier wrapper that
+            exposes the estimator, parameter grid, and CV splitter.
+        n_grids (int, optional): Number of parallel jobs for ``GridSearchCV``.
+            Defaults to 1.
+
+    Returns:
+        tuple[ClassifierModel, GridSearchCV, Any]: A 3-tuple of:
+            - classifier: The seeded ``ClassifierModel`` instance.
+            - grid_search: The fitted ``GridSearchCV`` object.
+            - best_estimator: ``grid_search.best_estimator_``, i.e. the
+              estimator retrained on the full training set with optimal params.
+    """
     classifier: ClassifierModel = classifier_model.set_random_state(
         random_state=random_state
     )
@@ -611,8 +630,33 @@ def save_model_registry(
     classifier_dir: str,
     classifier_model: ClassifierModel,
     number_of_features: int,
-):
-    """Build and save the trained-models registry CSV for one classifier."""
+) -> str:
+    """Build and save the trained-models registry CSV for one classifier.
+
+    Constructs a ``pandas.DataFrame`` from ``records``, sets ``random_state``
+    as the index, and writes it to a CSV file inside ``classifier_dir``. The
+    filename encodes the classifier name, CV strategy, total seed count, and
+    feature count so that downstream utilities can reconstruct all metadata
+    from the path alone.
+
+    Args:
+        seeds (int): Total number of random seeds used during training; written
+            into the filename as ``rs-{seeds}``.
+        records (list[dict]): List of per-seed result dicts, each containing at
+            least a ``"random_state"`` key plus model and feature-path fields.
+        classifier_dir (str): Directory in which to write the registry CSV.
+        classifier_model (ClassifierModel): Trained classifier wrapper; its
+            ``name`` and ``cv_name`` attributes form the filename prefix.
+        number_of_features (int): Number of top significant features selected;
+            written into the filename as ``top-{number_of_features}``.
+
+    Returns:
+        str: Absolute path to the saved registry CSV file.
+
+    Raises:
+        ValueError: If ``records`` is empty (no models were successfully
+            trained), which would produce an empty registry.
+    """
     classifier_id = f"{classifier_model.name}-{classifier_model.cv_name}"
 
     suffix = f"{classifier_id}_rs-{seeds}_top-{number_of_features}"

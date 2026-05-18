@@ -1,7 +1,6 @@
 import os
 from typing import Self, Literal
 from datetime import datetime
-from functools import cached_property
 from collections.abc import Callable
 
 import numpy as np
@@ -10,7 +9,6 @@ import pandas as pd
 from joblib import Parallel, delayed
 
 from eruption_forecast import (
-    TremorData,
     LabelBuilder,
     FeaturesBuilder,
     DynamicLabelBuilder,
@@ -68,6 +66,20 @@ class TrainingModel(BaseModel):
         n_grids (int): Parallel workers used inside ``GridSearchCV`` and
             ``FeatureSelector``. Defaults to 1.
         verbose (bool): Emit detailed progress logs. Defaults to False.
+
+    Example:
+        >>> model = TrainingModel(
+        ...     tremor_data="output/tremor.csv",
+        ...     start_date="2025-01-01",
+        ...     end_date="2025-12-31",
+        ...     classifiers=["rf", "xgb"],
+        ...     eruption_dates=["2025-06-15"],
+        ...     window_size=2,
+        ...     n_jobs=4,
+        ... )
+        >>> model.build_label(window_step=6, window_step_unit="hours")
+        >>> model.extract_features()
+        >>> model.fit(seeds=25)
     """
 
     def __init__(
@@ -93,6 +105,7 @@ class TrainingModel(BaseModel):
     ) -> None:
         # Set properties
         super().__init__(
+            tremor_data=tremor_data,
             start_date=start_date,
             end_date=end_date,
             window_size=window_size,
@@ -106,7 +119,6 @@ class TrainingModel(BaseModel):
         classifiers = [classifiers] if isinstance(classifiers, str) else classifiers
 
         # Set default properties
-        self._tremor_data = tremor_data
         self.classifiers = classifiers
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
@@ -151,32 +163,9 @@ class TrainingModel(BaseModel):
 
         # WIll be set after fit() called
         self.csv: dict[str, str] = {}
+        self.model = None
 
         self.validate()
-
-    @cached_property
-    def tremor_data(self) -> TremorData:
-        """Load and return the ``TremorData`` instance from the configured source.
-
-        Accepts either a filesystem path (str) or a pre-loaded DataFrame. The
-        result is cached after the first access so subsequent reads are free.
-
-        Returns:
-            TremorData: Validated tremor data container.
-
-        Raises:
-            TypeError: If ``_tremor_data`` is neither a str nor a DataFrame.
-        """
-        if not isinstance(self._tremor_data, str | pd.DataFrame):
-            raise TypeError(
-                f"tremor_data should have an instance of `str` or `pd.DataFrame` "
-                f"instead of {type(self._tremor_data)}"
-            )
-
-        if isinstance(self._tremor_data, str):
-            return TremorData.from_csv(self._tremor_data)
-
-        return TremorData(self._tremor_data)
 
     def set_directories(self) -> tuple:
         """Build and return all output directory paths used during training.
@@ -252,39 +241,17 @@ class TrainingModel(BaseModel):
 
         return self
 
-    def _clamp_dates_to_tremor(self) -> None:
-        """Clamp training dates to the actual span of the tremor data.
-
-        Adjusts ``self.start_date`` and ``self.end_date`` when they fall
-        outside the range covered by the loaded tremor CSV. Called lazily
-        from ``build_label()`` so that constructing a ``TrainingModel``
-        instance does not immediately trigger a CSV read.
-        """
-        tremor_data: TremorData = self.tremor_data
-        tremor_start_date = tremor_data.start_date
-        tremor_end_date = tremor_data.end_date
-        if self.start_date < tremor_start_date:
-            self.start_date = tremor_start_date
-            logger.info(
-                f"Training start date adjusted to tremor start date: "
-                f"{tremor_start_date.strftime('%Y-%m-%d')}"
-            )
-        if self.end_date > tremor_end_date:
-            self.end_date = tremor_end_date
-            logger.info(
-                f"Training end date adjusted to tremor end date: "
-                f"{tremor_end_date.strftime('%Y-%m-%d')}"
-            )
-
     def describe(self) -> str:
         """Return a human-readable summary of the training configuration.
 
         Returns:
             str: Descriptive string for this training model instance.
+
+        Example:
+            >>> print(model.describe())
+            TrainingModel(period=2025-01-01 → 2025-12-31, window_size=2d, ...)
         """
-        classifier_names = ", ".join(
-            m.slug_name for m in self.classifier_models
-        )
+        classifier_names = ", ".join(m.slug_name for m in self.classifier_models)
         return (
             f"TrainingModel("
             f"period={self.start_date_str} → {self.end_date_str}, "
@@ -303,6 +270,13 @@ class TrainingModel(BaseModel):
             dict: Mapping of parameter names to their current values, including
                 ``start_date``, ``end_date``, ``window_size``,
                 ``eruption_dates``, and ``n_jobs``.
+
+        Example:
+            >>> d = model.to_dict()
+            >>> d["window_size"]
+            2
+            >>> "eruption_dates" in d
+            True
         """
         result: dict = {
             "start_date": self.start_date_str,
@@ -332,12 +306,21 @@ class TrainingModel(BaseModel):
 
         Returns:
             str: Prompt string for this training model instance.
+
+        Example:
+            >>> prompt = model.to_prompt()
+            >>> "Training period" in prompt
+            True
         """
-        classifier_names = ", ".join(
-            m.slug_name for m in self.classifier_models
+        classifier_names = ", ".join(m.slug_name for m in self.classifier_models)
+        eruption_list = (
+            ", ".join(self.eruption_dates)
+            if self.eruption_dates is not None
+            else "none"
         )
-        eruption_list = ", ".join(self.eruption_dates) if self.eruption_dates is not None else "none"
-        basename_str = f" Basename: {self.basename}." if self.basename is not None else ""
+        basename_str = (
+            f" Basename: {self.basename}." if self.basename is not None else ""
+        )
         return (
             f"Training period: {self.start_date_str} to {self.end_date_str}. "
             f"Window size: {self.window_size} day(s). "
@@ -391,11 +374,20 @@ class TrainingModel(BaseModel):
             ValueError: If ``window_step`` is not greater than zero.
             ValueError: If ``builder="dynamic"`` and ``days_before_eruption``
                 is None.
+
+        Example:
+            >>> model.build_label(window_step=6, window_step_unit="hours")
+            >>> model.build_label(
+            ...     window_step=10,
+            ...     window_step_unit="minutes",
+            ...     builder="dynamic",
+            ...     days_before_eruption=3,
+            ... )
         """
         if window_step <= 0:
             raise ValueError("window_step must be > 0.")
 
-        self._clamp_dates_to_tremor()
+        self._sync_dates_to_tremor()
         verbose = verbose if verbose is not None else self.verbose
 
         if builder == "dynamic":
@@ -477,6 +469,12 @@ class TrainingModel(BaseModel):
 
         Raises:
             ValueError: If ``build_label()`` has not been called first.
+
+        Example:
+            >>> model.build_label(window_step=6, window_step_unit="hours")
+            >>> model.extract_features(select_tremor_columns=["rsam_f2", "entropy"])
+            >>> model.extracted_features_df.shape
+            (n_windows, n_features)
         """
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
@@ -517,11 +515,8 @@ class TrainingModel(BaseModel):
         )
 
         labels = features_builder.label_df.copy()
-        if "id" in labels.columns:
-            labels = labels.set_index("id")
-        if "datetime" in labels.columns:
-            labels = labels.drop("datetime", axis=1)
-
+        labels = labels.set_index("id")
+        labels = labels.drop("datetime", axis=1)
         self.labels = labels["is_erupted"]
 
         return self
@@ -535,6 +530,9 @@ class TrainingModel(BaseModel):
         Args:
             plot_features (bool): Also create the per-seed figures directory
                 when True. Defaults to False.
+
+        Example:
+            >>> model.create_directories(plot_features=True)
         """
         ensure_dir(self.training_dir)
         ensure_dir(self.features_dir)
@@ -585,6 +583,12 @@ class TrainingModel(BaseModel):
             ValueError: If ``build_label()`` has not been called first.
             ValueError: If ``extracted_features_df`` is empty, meaning
                 ``extract_features()`` has not been called.
+
+        Example:
+            >>> model.build_label(window_step=6, window_step_unit="hours")
+            >>> model.extract_features()
+            >>> model.fit(seeds=25, resample_method="auto", plot_features=True)
+            >>> model.csv  # {"random-forest-classifier": "path/to/trained_model_*.csv"}
         """
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
@@ -598,12 +602,14 @@ class TrainingModel(BaseModel):
         self.create_directories(plot_features=plot_features)
 
         if resample_method == "auto":
-            minority_share = self.LabelBuilder.df["is_erupted"].value_counts(normalize=True).min()
+            minority_share = (
+                self.LabelBuilder.df["is_erupted"].value_counts(normalize=True).min()
+            )
             if minority_share <= minority_threshold:
                 resample_method = "under"
                 logger.info(
                     f"resample_method='auto': minority class is {minority_share:.1%} "
-                    "(<10%) — using 'under' (RandomUnderSampler)."
+                    f"(<{minority_threshold * 100}%) — using 'under' (RandomUnderSampler)."
                 )
             else:
                 resample_method = None
@@ -689,7 +695,9 @@ class TrainingModel(BaseModel):
         if plot_features and not self.features_selected_df.empty:
             plot_significant_features(
                 df=self.features_selected_df.reset_index(),
-                filepath=os.path.join(self.features_dir, f"top_{self.number_of_features}_features"),
+                filepath=os.path.join(
+                    self.features_dir, f"top_{self.number_of_features}_features"
+                ),
                 overwrite=True,
                 values_column="score",
             )
@@ -697,7 +705,9 @@ class TrainingModel(BaseModel):
         # Save registry per classifier
         for classifier_model in self.classifier_models:
             if self.verbose:
-                logger.info(f"Prediction: Saving {classifier_model} model registry...")
+                logger.info(
+                    f"Prediction: Saving {classifier_model.name} model registry..."
+                )
 
             classifier_slug = classifier_model.slug_name
             if not records_per_classifier[classifier_slug]:
@@ -969,7 +979,9 @@ class TrainingModel(BaseModel):
                             }
                         )
                     else:
-                        pending_training_model_jobs.append((random_state, classifier_slug))
+                        pending_training_model_jobs.append(
+                            (random_state, classifier_slug)
+                        )
                 continue
 
             pending_feature_selection_jobs.append(

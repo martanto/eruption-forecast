@@ -41,6 +41,14 @@ def remove_anomalies(
         TypeError: If ``df.index`` is not a ``pd.DatetimeIndex``.
         ValueError: If ``threshold`` is not a positive number.
         ValueError: If any column in ``columns`` does not exist in ``df``.
+
+    Examples:
+        >>> import pandas as pd
+        >>> df = pd.DataFrame(
+        ...     {"rsam_f0": [1.0, 1e9, 1.1, 0.9]},
+        ...     index=pd.date_range("2025-01-01", periods=4, freq="10min"),
+        ... )
+        >>> cleaned = remove_anomalies(df, threshold=3.5, interpolate=True)
     """
     if not isinstance(df.index, pd.DatetimeIndex):
         raise TypeError("Dataframe index should be a DatetimeIndex")
@@ -213,6 +221,22 @@ def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: The same DataFrame with the eight envelope columns added.
+
+    Raises:
+        ValueError: If no columns ending with ``_probability`` (excluding
+            ``consensus_*``) are found in ``df``.
+        ValueError: If no columns ending with ``_prediction`` (excluding
+            ``consensus_*``) are found in ``df``.
+
+    Examples:
+        >>> import pandas as pd
+        >>> df = pd.DataFrame({
+        ...     "rf_probability": [0.2, 0.8, 0.5],
+        ...     "rf_prediction": [0, 1, 0],
+        ... })
+        >>> result = get_envelope_values(df)
+        >>> list(result.columns)  # doctest: +ELLIPSIS
+        ['rf_probability', 'rf_prediction', ..., 'consensus_prediction_max_envelope']
     """
     prob_cols = [
         col
@@ -274,7 +298,41 @@ def concat_significant_features(
     number_of_features: int | None = None,
     filename: str = "significant_features",
 ) -> pd.DataFrame:
+    """Concatenate per-seed significant-feature CSVs and save a ranked summary.
 
+    Reads all CSVs in ``features_csvs``, concatenates them row-wise, and
+    writes the combined data to ``{features_dir}/{filename}.csv``. When
+    ``number_of_features`` is provided, also aggregates by feature name,
+    counts occurrences across seeds (``score``), computes mean score
+    (``mean_score``), sorts descending by frequency and ascending by mean
+    p-value, and saves the top-N result as
+    ``{features_dir}/top_{number_of_features}_features.csv``.
+
+    Args:
+        features_csvs (list[str]): Paths to per-seed significant-feature CSV
+            files, each expected to contain a ``features`` column and a
+            ``score`` column.
+        features_dir (str): Directory where output CSVs are written.
+        number_of_features (int | None, optional): If set, produce an
+            additional ranked CSV limited to the top N features by occurrence
+            count. If ``None`` or ``<= 0``, only the combined CSV is written.
+            Defaults to ``None``.
+        filename (str, optional): Base filename (without extension) for the
+            combined CSV. Defaults to ``"significant_features"``.
+
+    Returns:
+        pd.DataFrame: The combined DataFrame (all seeds concatenated), or the
+            ranked top-N DataFrame when ``number_of_features`` is specified.
+
+    Raises:
+        ValueError: If ``combined_features_df`` is empty after concatenation.
+
+    Examples:
+        >>> csvs = ["seed_0_features.csv", "seed_1_features.csv"]
+        >>> df = concat_significant_features(csvs, "output/features", number_of_features=20)
+        >>> df.index.name
+        'features'
+    """
     combined_features_df = pd.concat(
         [pd.read_csv(file) for file in features_csvs],
         ignore_index=True,
