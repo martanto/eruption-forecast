@@ -224,9 +224,7 @@ class TremorMatrixBuilder:
         start_date_str = self.start_date.strftime("%Y-%m-%d")
         end_date_str = self.end_date.strftime("%Y-%m-%d")
         date_str = f"{start_date_str}_{end_date_str}"
-        tremor_matrix_filename = (
-            f"tremor_matrix_unified_{date_str}_ws-{self.window_size}.csv"
-        )
+        tremor_matrix_filename = f"tremor-matrix_{date_str}_ws-{self.window_size}.csv"
         self._date_str = date_str
         self.tremor_matrix_filename = tremor_matrix_filename
 
