@@ -717,6 +717,11 @@ class CalculateTremor:
             >>> print(tremor.df.head())
             >>> print(f"Saved to: {tremor.csv}")
         """
+        if self._source is None:
+            raise ValueError(
+                "No source specified. Please run from_sds() or from_fdsn() first."
+            )
+
         csv = self.csv
 
         if not self.overwrite and os.path.isfile(csv):
