@@ -8,12 +8,7 @@ import joblib
 import pandas as pd
 from joblib import Parallel, delayed
 
-from eruption_forecast import (
-    LabelBuilder,
-    FeaturesBuilder,
-    DynamicLabelBuilder,
-    TremorMatrixBuilder,
-)
+from eruption_forecast import LabelBuilder, DynamicLabelBuilder
 from eruption_forecast.plots import plot_significant_features
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
@@ -153,15 +148,12 @@ class TrainingModel(BaseModel):
         self.features_csvs: list[str] = []
         self.features_selected_df: pd.DataFrame = pd.DataFrame()
 
-        # Will be set after build_Label() called
+        # Will be set after build_label() called
         self.LabelBuilder: LabelBuilder | None = None
         self.labels: pd.Series = pd.Series()
         self.basename: str | None = None
 
-        # WIll be set after extract_features() called
-        self.extracted_features_df: pd.DataFrame = pd.DataFrame()
-
-        # WIll be set after fit() called
+        # Will be set after fit() called
         self.csv: dict[str, str] = {}
         self.model = None
 
@@ -261,7 +253,7 @@ class TrainingModel(BaseModel):
 
         # Optimize n_grids search to utitlize all available CPU
         if self.n_jobs == 1 and self.n_grids == 1:
-            self.n_grids = self.total_cpu - 2
+            self.n_grids = max(1, self.total_cpu - 2)
 
         ensure_dir(self.training_dir)
 
@@ -435,7 +427,7 @@ class TrainingModel(BaseModel):
         else:
             if days_before_eruption:
                 logger.info(
-                    "Using standart label builder, ``days_before_eruption`` will be ignored."
+                    "Using standard label builder, ``days_before_eruption`` will be ignored."
                 )
 
             label_builder = LabelBuilder(
@@ -470,7 +462,7 @@ class TrainingModel(BaseModel):
         Slices tremor data into label-aligned windows via
         ``TremorMatrixBuilder``, then runs ``FeaturesBuilder`` to extract and
         filter relevant tsfresh features. Stores the result in
-        ``self.extracted_features_df`` and the aligned labels in
+        ``self.features_df`` and the aligned labels in
         ``self.labels``. Must be called after ``build_label()``.
 
         Args:
@@ -505,44 +497,32 @@ class TrainingModel(BaseModel):
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
 
-        verbose = verbose if verbose is not None else self.verbose
-
-        tremor_matrix_df = (
-            TremorMatrixBuilder(
-                tremor_df=self.tremor_data.df,
-                label_df=self.LabelBuilder.df,
-                output_dir=os.path.join(self.training_dir, "tremor"),
-                window_size=self.window_size,
-                overwrite=overwrite or self.overwrite,
-                verbose=verbose,
-            )
-            .build(
-                select_tremor_columns=select_tremor_columns,
-                save_tremor_matrix_per_method=save_tremor_matrix_per_method,
-                save_tremor_matrix_per_id=save_tremor_matrix_per_id,
-            )
-            .df
-        )
-
-        features_builder = FeaturesBuilder(
-            tremor_matrix_df=tremor_matrix_df,
+        features_builder = self._build_features(
             label_df=self.LabelBuilder.df,
-            label_features_basename=self.basename,
-            output_dir=self.features_dir,
-            overwrite=overwrite or self.overwrite,
-            n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
+            output_dir=self.training_dir,
+            features_dir=self.features_dir,
+            select_tremor_columns=select_tremor_columns,
+            save_tremor_matrix_per_method=save_tremor_matrix_per_method,
+            save_tremor_matrix_per_id=save_tremor_matrix_per_id,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
             verbose=verbose,
         )
 
-        self.extracted_features_df = features_builder.extract_features(
+        self.features_df = features_builder.extract_features(
             use_relevant_features=True,
             select_tremor_columns=select_tremor_columns,
             exclude_features=exclude_features,
         )
 
+        self.features_csv = features_builder.csv
+
         labels = features_builder.label_df.copy()
-        labels = labels.set_index("id")
-        labels = labels.drop("datetime", axis=1)
+
+        if "id" in labels.columns:
+            labels = labels.set_index("id")
+        if "datetime" in labels.columns:
+            labels = labels.drop("datetime", axis=1)
         self.labels = labels["is_erupted"]
 
         return self
@@ -595,7 +575,7 @@ class TrainingModel(BaseModel):
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
 
-        if self.extracted_features_df.empty:
+        if self.features_df.empty and self.features_csv is None:
             raise ValueError(
                 "Features (matrix) dataframe (features_df) is empty. "
                 "Please run extract_features() first."
@@ -686,7 +666,7 @@ class TrainingModel(BaseModel):
                 self.features_csvs.append(path)
 
         if self.verbose:
-            logger.info("Prediction: Concatenating significant features")
+            logger.info("Training: Concatenating significant features")
 
         self.features_selected_df = concat_significant_features(
             features_csvs=self.features_csvs,
@@ -708,7 +688,7 @@ class TrainingModel(BaseModel):
         for classifier_model in self.classifier_models:
             if self.verbose:
                 logger.info(
-                    f"Prediction: Saving {classifier_model.name} model registry..."
+                    f"Training: Saving {classifier_model.name} model registry..."
                 )
 
             classifier_slug = classifier_model.slug_name
@@ -723,7 +703,7 @@ class TrainingModel(BaseModel):
             )
 
         if self.verbose:
-            logger.info(f"Prediction: Models saved to: {self.csv}")
+            logger.info(f"Training: Models saved to: {self.csv}")
 
         return self
 
@@ -840,7 +820,7 @@ class TrainingModel(BaseModel):
                 feature selection yields zero features.
         """
         features_resampled, labels_resampled = resample(
-            features=self.extracted_features_df,
+            features=self.features_df,
             labels=self.labels,
             method=resample_method,
             sampling_strategy=sampling_strategy,
@@ -996,24 +976,6 @@ class TrainingModel(BaseModel):
                     sampling_strategy,
                 )
             )
-
-            # Training for this seed will be scheduled via new_training_model_jobs
-            # in fit() after feature selection completes, so do not add to
-            # pending_training_model_jobs here — that would create duplicate jobs.
-            filename = f"{random_state:05d}"
-            for classifier_model in self.classifier_models:
-                classifier_slug = classifier_model.slug_name
-                model_seed_path = os.path.join(
-                    self.models_dir[classifier_slug], f"{filename}.pkl"
-                )
-                if not self.overwrite and os.path.isfile(model_seed_path):
-                    records_per_classifier[classifier_slug].append(
-                        {
-                            "random_state": random_state,
-                            "features_csv": features_seed_path,
-                            "model_filepath": model_seed_path,
-                        }
-                    )
 
         return (
             pending_feature_selection_jobs,
