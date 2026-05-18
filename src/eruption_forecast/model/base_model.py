@@ -47,12 +47,13 @@ class BaseModel(ABC):
         end_date: str | datetime,
         window_size: int = 2,
         eruption_dates: list[str] | None = None,
+        overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ):
-        """Initializes the base model.
+        """Initialize the base model.
 
         Args:
             tremor_data (str | DataFrame): Path to a tremor CSV file or a
@@ -64,14 +65,23 @@ class BaseModel(ABC):
                 to 2.
             eruption_dates (list[str] | None, optional): Known eruption dates
                 in ``YYYY-MM-DD`` format. Defaults to ``None``.
+            overwrite (bool, optional): Overwrite existing output files when
+                ``True``. Defaults to ``False``.
             output_dir (str | None, optional): Output directory path. Resolved
                 relative to ``root_dir`` when omitted. Defaults to ``None``.
             root_dir (str | None, optional): Project root directory used to
                 resolve ``output_dir``. Defaults to ``None``.
             n_jobs (int, optional): Number of parallel workers. Capped at
-                ``cpu_count - 2`` when too high. Defaults to 1.
+                ``cpu_count - 2`` when too high. Defaults to ``1``.
             verbose (bool, optional): Emit verbose log messages when ``True``.
                 Defaults to ``False``.
+
+        Example:
+            >>> model = ConcreteModel(
+            ...     tremor_data="tremor.csv",
+            ...     start_date="2025-01-01",
+            ...     end_date="2025-01-31",
+            ... )
         """
 
         # Set properties
@@ -87,6 +97,7 @@ class BaseModel(ABC):
         self.end_date = to_datetime(end_date)
         self.window_size = window_size
         self.eruption_dates = sort_dates(eruption_dates) if eruption_dates else None
+        self.overwrite = overwrite
         self.output_dir = output_dir
         self.root_dir = root_dir
         self.n_jobs = n_jobs
@@ -95,13 +106,18 @@ class BaseModel(ABC):
         # Set additional properties
         self.start_date_str = self.start_date.strftime("%Y-%m-%d")
         self.end_date_str = self.end_date.strftime("%Y-%m-%d")
+        self.use_relevant_features: bool = True
         self.n_days = (self.end_date - self.start_date).days + 1
         self.total_cpu = multiprocessing.cpu_count()
+
+        # WIll be set after extract_features() called
+        self.features_df: pd.DataFrame = pd.DataFrame()
+        self.features_csv: str | None = None
 
         self._validate()
 
     def _validate(self) -> Self:
-        """Validates the base model parameters and clamps ``n_jobs``.
+        """Validate base model parameters and clamp ``n_jobs`` to a safe range.
 
         Returns:
             Self: The current instance, for method chaining.
@@ -120,11 +136,11 @@ class BaseModel(ABC):
         return self
 
     def _sync_dates_to_tremor(self) -> None:
-        """Clamps ``start_date`` and ``end_date`` to the tremor data range.
+        """Clamp ``start_date`` and ``end_date`` to the tremor data range.
 
-        Adjusts ``self.start_date`` and ``self.end_date`` when they fall
-        outside the span of the loaded tremor CSV. Called lazily from
-        ``build_label()`` to avoid triggering a CSV read at construction time.
+        Adjusts ``start_date`` and ``end_date`` when they fall outside the span
+        of the loaded tremor CSV. Called lazily from ``build_label()`` to avoid
+        triggering a CSV read at construction time.
         """
         tremor_data: TremorData = self.tremor_data
         tremor_start_date = tremor_data.start_date
@@ -144,7 +160,7 @@ class BaseModel(ABC):
 
     @cached_property
     def tremor_data(self) -> TremorData:
-        """The validated ``TremorData`` instance loaded from the configured source.
+        """The validated TremorData instance loaded from the configured source.
 
         Accepts a filesystem path or a pre-loaded DataFrame. The result is
         cached after the first access so subsequent reads are free.
@@ -169,27 +185,27 @@ class BaseModel(ABC):
 
     @abstractmethod
     def set_directories(self) -> tuple:
-        """Build and return all directory paths needed for class."""
+        """Build and return all directory paths needed for this model."""
 
     @abstractmethod
     def create_directories(self) -> None:
-        """Creates the output directories required by this model."""
+        """Create the output directories required by this model."""
 
     @abstractmethod
     def validate(self) -> Self:
-        """Validates model-specific parameters."""
+        """Validate model-specific parameters."""
 
     @abstractmethod
     def describe(self) -> str:
-        """Returns a human-readable prose description of this instance."""
+        """Return a human-readable prose description of this instance."""
 
     @abstractmethod
     def to_dict(self) -> dict:
-        """Returns a structured dictionary of all configuration and derived fields."""
+        """Return a structured dictionary of all configuration and derived fields."""
 
     @abstractmethod
     def to_prompt(self) -> str:
-        """Returns a structured text block suitable for LLM and MCP prompt input.
+        """Return a structured text block suitable for LLM and MCP prompt input.
 
         Builds a deterministic, template-driven bullet-list block from
         ``to_dict()`` that is stable across calls. Paths are reduced to
@@ -206,7 +222,7 @@ class BaseModel(ABC):
     def build_label(
         self, window_step: int, window_step_unit: Literal["minutes", "hours"]
     ) -> Self:
-        """Builds the label set for this model.
+        """Build the label set for this model.
 
         Args:
             window_step (int): Step size between consecutive windows.
@@ -217,9 +233,79 @@ class BaseModel(ABC):
             Self: The current instance, for method chaining.
         """
 
+    def _build_features(
+        self,
+        label_df: pd.DataFrame,
+        output_dir: str,
+        features_dir: str,
+        select_tremor_columns: list[str] | None = None,
+        save_tremor_matrix_per_method: bool = False,
+        save_tremor_matrix_per_id: bool = False,
+        overwrite: bool = False,
+        n_jobs: int | None = None,
+        verbose: bool | None = None,
+    ) -> FeaturesBuilder:
+        """Build a tremor matrix and return a configured FeaturesBuilder.
+
+        Constructs the windowed tremor matrix aligned to label_df, then wraps
+        it in a FeaturesBuilder ready for tsfresh extraction.
+
+        Args:
+            label_df (pd.DataFrame): Label DataFrame used to align tremor
+                windows.
+            output_dir (str): Base output directory for tremor matrix files.
+            features_dir (str): Output directory for extracted features.
+            select_tremor_columns (list[str] | None, optional): Tremor column
+                names to include. All columns are used when ``None``. Defaults
+                to ``None``.
+            save_tremor_matrix_per_method (bool, optional): Save per-column
+                tremor matrices under ``output_dir/tremor/per_method/`` when
+                ``True``. Defaults to ``False``.
+            save_tremor_matrix_per_id (bool, optional): Save per-ID tremor
+                matrices when ``True``. Defaults to ``False``.
+            overwrite (bool, optional): Overwrite existing matrix files when
+                ``True``. Defaults to ``False``.
+            n_jobs (int | None, optional): Number of parallel workers for
+                ``FeaturesBuilder``. Falls back to ``self.n_jobs`` when
+                ``None``. Defaults to ``None``.
+            verbose (bool | None, optional): Emit verbose log messages. Falls
+                back to ``self.verbose`` when ``None``. Defaults to ``None``.
+
+        Returns:
+            FeaturesBuilder: Configured builder ready to run feature
+                extraction.
+        """
+        tremor_matrix_df = (
+            TremorMatrixBuilder(
+                tremor_df=self.tremor_data.df,
+                label_df=label_df,
+                output_dir=os.path.join(output_dir, "tremor"),
+                window_size=self.window_size,
+                overwrite=overwrite or self.overwrite,
+                verbose=verbose if verbose else self.verbose,
+            )
+            .build(
+                select_tremor_columns=select_tremor_columns,
+                save_tremor_matrix_per_method=save_tremor_matrix_per_method,
+                save_tremor_matrix_per_id=save_tremor_matrix_per_id,
+            )
+            .df
+        )
+
+        features_builder = FeaturesBuilder(
+            tremor_matrix_df=tremor_matrix_df,
+            label_df=None,
+            output_dir=features_dir,
+            overwrite=overwrite or self.overwrite,
+            n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
+            verbose=self.verbose,
+        )
+
+        return features_builder
+
     @abstractmethod
     def extract_features(self) -> Self:
-        """Extracts features from the tremor data.
+        """Extract features from the tremor data.
 
         Returns:
             Self: The current instance, for method chaining.
