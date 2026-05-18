@@ -167,7 +167,9 @@ class TrainingModel(BaseModel):
 
         self.validate()
 
-    def set_directories(self) -> tuple:
+    def set_directories(
+        self,
+    ) -> tuple[str, str, str, str, str, dict[str, str], dict[str, str]]:
         """Build and return all output directory paths used during training.
 
         Creates classifier-level subdirectories immediately so downstream
@@ -214,6 +216,30 @@ class TrainingModel(BaseModel):
             classifier_dirs,
             models_dir,
         )
+
+    def create_directories(
+        self,
+        plot_features: bool = False,
+    ) -> None:
+        """Create all output directories required before training begins.
+
+        Args:
+            plot_features (bool): Also create the per-seed figures directory
+                when True. Defaults to False.
+
+        Example:
+            >>> model.create_directories(plot_features=True)
+        """
+        ensure_dir(self.training_dir)
+        ensure_dir(self.features_dir)
+        ensure_dir(self.features_seed_dir)
+        ensure_dir(self.features_resampled_dir)
+
+        for model_name in self.models_dir.keys():
+            ensure_dir(self.models_dir[model_name])
+
+        if plot_features:
+            ensure_dir(self.figures_seed_dir)
 
     def validate(self) -> Self:
         """Validate and reconcile model parameters against system and data constraints.
@@ -520,30 +546,6 @@ class TrainingModel(BaseModel):
         self.labels = labels["is_erupted"]
 
         return self
-
-    def create_directories(
-        self,
-        plot_features: bool = False,
-    ) -> None:
-        """Create all output directories required before training begins.
-
-        Args:
-            plot_features (bool): Also create the per-seed figures directory
-                when True. Defaults to False.
-
-        Example:
-            >>> model.create_directories(plot_features=True)
-        """
-        ensure_dir(self.training_dir)
-        ensure_dir(self.features_dir)
-        ensure_dir(self.features_seed_dir)
-        ensure_dir(self.features_resampled_dir)
-
-        for model_name in self.models_dir.keys():
-            ensure_dir(self.models_dir[model_name])
-
-        if plot_features:
-            ensure_dir(self.figures_seed_dir)
 
     def fit(
         self,

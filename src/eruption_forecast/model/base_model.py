@@ -168,32 +168,24 @@ class BaseModel(ABC):
         return TremorData(self._tremor_data)
 
     @abstractmethod
+    def set_directories(self) -> tuple:
+        """Build and return all directory paths needed for class."""
+
+    @abstractmethod
     def create_directories(self) -> None:
         """Creates the output directories required by this model."""
 
     @abstractmethod
     def validate(self) -> Self:
-        """Validates model-specific parameters.
-
-        Returns:
-            Self: The current instance, for method chaining.
-        """
+        """Validates model-specific parameters."""
 
     @abstractmethod
     def describe(self) -> str:
-        """Returns a human-readable prose description of this instance.
-
-        Returns:
-            str: Natural-language summary of the model configuration.
-        """
+        """Returns a human-readable prose description of this instance."""
 
     @abstractmethod
     def to_dict(self) -> dict:
-        """Returns a structured dictionary of all configuration and derived fields.
-
-        Returns:
-            dict: Mapping of field names to their current values.
-        """
+        """Returns a structured dictionary of all configuration and derived fields."""
 
     @abstractmethod
     def to_prompt(self) -> str:
