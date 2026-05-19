@@ -21,6 +21,7 @@ class BaseEnsemble:
     information (e.g. seed count, classifier count) to the load log line.
     """
 
+    @logger.catch
     def save(self, path: str) -> None:
         """Dump the ensemble to a single ``.pkl`` file via joblib.
 
@@ -52,6 +53,7 @@ class BaseEnsemble:
         """
         if not os.path.isfile(path):
             raise FileNotFoundError(f"{cls.__name__} file not found: {path}")
+
         obj = joblib.load(path)
         extra = cls._load_log_msg(obj)
         suffix = f" — {extra}" if extra else ""
