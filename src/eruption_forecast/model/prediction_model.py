@@ -63,15 +63,22 @@ class PredictionModel(BaseModel):
         )
         self.overwrite = overwrite
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
-        self.prediction_dir, self.features_dir = self.set_directories()
+        (
+            self.prediction_dir,
+            self.features_dir,
+            self.result_dir,
+            self.result_seeds_dir,
+        ) = self.set_directories()
 
         self.labels: pd.DataFrame = pd.DataFrame()
 
-    def set_directories(self) -> tuple[str, str]:
+    def set_directories(self) -> tuple[str, str, str, str]:
         prediction_dir = os.path.join(self.output_dir, "prediction")
         features_dir = os.path.join(prediction_dir, "features")
+        result_dir = os.path.join(prediction_dir, "results")
+        result_seeds_dir = os.path.join(result_dir, "seeds")
 
-        return prediction_dir, features_dir
+        return prediction_dir, features_dir, result_dir, result_seeds_dir
 
     def create_directories(self) -> None:
         ensure_dir(self.prediction_dir)
