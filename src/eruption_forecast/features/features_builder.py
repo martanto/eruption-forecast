@@ -503,7 +503,7 @@ class FeaturesBuilder:
         features_csv, features_df = utils_concat_features(list(csv_list), filepath)
 
         if self.verbose:
-            logger.info(f"Features saved to: {filepath}")
+            logger.info(f"Features matrix saved to: {filepath}")
 
         if use_relevant_features:
             self.relevant_features_csv = features_csv
