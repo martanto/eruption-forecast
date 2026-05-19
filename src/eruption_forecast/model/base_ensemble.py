@@ -56,22 +56,5 @@ class BaseEnsemble:
             raise FileNotFoundError(f"{cls.__name__} file not found: {path}")
 
         obj = joblib.load(path)
-        extra = cls._load_log_msg(obj)
-        suffix = f" — {extra}" if extra else ""
-        logger.info(f"[{cls.__name__}] Loaded from: {path}{suffix}")
+        logger.info(f"{cls.__name__}: Loaded from: {path}")
         return obj
-
-    @classmethod
-    def _load_log_msg(cls, obj: "BaseEnsemble") -> str:
-        """Return an optional info string appended to the load log message.
-
-        Subclasses override this to report ensemble-specific counts (e.g.
-        number of seeds or classifiers).  The default returns an empty string.
-
-        Args:
-            obj (BaseEnsemble): The just-loaded ensemble instance.
-
-        Returns:
-            str: Info string to append, or empty string for no suffix.
-        """
-        return ""
