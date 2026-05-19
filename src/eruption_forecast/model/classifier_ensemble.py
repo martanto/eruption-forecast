@@ -125,12 +125,12 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 - ``str`` path ending in ``".json"`` — loaded via
                   :meth:`from_json`.  ``TrainingModel.fit()`` writes this file
                   to ``{training_dir}/ClassifierEnsemble.json``, e.g.
-                  ``output/VG.OJN.00.EHZ/training/ClassifierEnsemble.json``.
+                  ``output/VG.OJN.00.EHZ/training/classifier/ClassifierEnsemble_StratifiedShuffleSplit.json``.
                 - ``str`` path ending in ``".pkl"`` — deserialised via
                   :meth:`~BaseEnsemble.load`; if the result is a
                   ``SeedEnsemble`` it is wrapped automatically.  Examples:
-                  ``{training_dir}/ClassifierEnsemble.pkl`` or
-                  ``{classifier_dir}/SeedEnsemble_RandomForestClassifier.pkl``.
+                  ``{training_dir}/classifiers/ClassifierEnsemble.pkl`` or
+                  ``{classifier_dir}/random-forest-classifier/SeedEnsemble_RandomForestClassifier.pkl``.
                 - ``str`` path ending in ``".csv"`` — registry CSV loaded via
                   :meth:`SeedEnsemble.from_registry` then wrapped.  One value
                   from ``TrainingModel.results``, e.g.
