@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Self, Literal
 from datetime import datetime
 from collections.abc import Callable
@@ -6,10 +7,10 @@ from collections.abc import Callable
 import numpy as np
 import joblib
 import pandas as pd
-from cycler import V
 from joblib import Parallel, delayed
 
 from eruption_forecast import LabelBuilder, DynamicLabelBuilder
+from eruption_forecast.model import SeedEnsemble, ClassifierEnsemble
 from eruption_forecast.plots import plot_significant_features
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
@@ -139,6 +140,7 @@ class TrainingModel(BaseModel):
 
         (
             self.training_dir,
+            self.classifier_dir,
             self.features_dir,
             self.features_seed_dir,
             self.features_resampled_dir,
@@ -155,14 +157,17 @@ class TrainingModel(BaseModel):
         self.basename: str | None = None
 
         # Will be set after fit() called
-        self.csv: dict[str, str] = {}
-        self.model = None
+        # self.results save trained_model
+        self.results: dict[str, str] = {}
+        self.results_json: str | None = None
+        self.seed_ensembles: dict[str, str] = {}
+        self.classifier_ensemble: str | None = None
 
         self.validate()
 
     def set_directories(
         self,
-    ) -> tuple[str, str, str, str, str, dict[str, str], dict[str, str]]:
+    ) -> tuple[str, str, str, str, str, str, dict[str, str], dict[str, str]]:
         """Build and return all output directory paths used during training.
 
         Creates classifier-level subdirectories immediately so downstream
@@ -171,6 +176,7 @@ class TrainingModel(BaseModel):
         Returns:
             tuple: A seven-element tuple containing:
                 - training_dir (str): Root training output path.
+                - classifier_dir (str): Classifier training output path.
                 - features_dir (str): CV-scoped features directory.
                 - features_seed_dir (str): Per-seed selected-feature CSVs.
                 - features_resampled_dir (str): Per-seed resampled-data CSVs.
@@ -179,6 +185,7 @@ class TrainingModel(BaseModel):
                 - models_dir (dict[str, str]): Classifier-slug → model directory.
         """
         training_dir = os.path.join(self.output_dir, "training")
+        classifier_dir = os.path.join(training_dir, "classifiers")
         features_dir = os.path.join(training_dir, "features", self.cv_name)
         features_seed_dir = os.path.join(features_dir, "seed")
         features_resampled_dir = os.path.join(features_dir, "resampled")
@@ -189,19 +196,16 @@ class TrainingModel(BaseModel):
 
         for classifier_model in self.classifier_models:
             classifier_slug_name = classifier_model.slug_name
-            classifier_dir = os.path.join(
-                training_dir,
-                "classifiers",
-                classifier_slug_name,
-                self.cv_name,
+            model_dir = os.path.join(
+                classifier_dir, classifier_slug_name, self.cv_name, "models"
             )
             classifier_dirs[classifier_slug_name] = classifier_dir
-            model_dir = os.path.join(classifier_dir, "models")
             ensure_dir(classifier_dir)
             models_dir[classifier_slug_name] = model_dir
 
         return (
             training_dir,
+            classifier_dir,
             features_dir,
             features_seed_dir,
             features_resampled_dir,
@@ -519,7 +523,7 @@ class TrainingModel(BaseModel):
 
         self.features_csv = features_builder.csv
 
-        labels = features_builder.label_df.copy()
+        labels: pd.DataFrame = features_builder.label_df
 
         if "id" in labels.columns:
             labels = labels.set_index("id")
@@ -542,7 +546,7 @@ class TrainingModel(BaseModel):
         For each seed, resamples the extracted features, selects the top-N
         features, and fits every configured classifier via ``GridSearchCV``.
         Existing feature and model files are reused unless ``overwrite=True``.
-        Populates ``self.csv`` with the registry CSV path for each classifier
+        Populates ``self.results`` with the registry CSV path for each classifier
         and ``self.features_selected_df`` with the aggregated top-N feature
         importance DataFrame.
 
@@ -696,17 +700,19 @@ class TrainingModel(BaseModel):
                 values_column="score",
             )
 
-        # Save registry per classifier
+        # Save SeedEnsemble
+        seed_ensembles: dict[str, SeedEnsemble] = {}
         for classifier_model in self.classifier_models:
             if self.verbose:
                 logger.info(
-                    f"Training: Saving {classifier_model.name} model registry..."
+                    f"Training: Saving SeedEnsemble for {classifier_model.name} model ..."
                 )
 
             classifier_slug = classifier_model.slug_name
             if not records_per_classifier[classifier_slug]:
                 continue
-            self.csv[classifier_slug] = save_model_csv(
+
+            trained_model_csv = save_model_csv(
                 seeds=seeds,
                 records=records_per_classifier[classifier_slug],
                 classifier_dir=self.classifier_dirs[classifier_slug],
@@ -716,10 +722,103 @@ class TrainingModel(BaseModel):
                 verbose=self.verbose,
             )
 
-        if self.verbose:
-            logger.info(f"Training: Models saved to: {self.csv}")
+            seed_ensemble_path, seed_ensemble = self.build_seed_ensemble(
+                output_dir=self.classifier_dir,
+                classifier_name=classifier_model.name,
+                registry_csv=trained_model_csv,
+                verbose=self.verbose,
+            )
+
+            seed_ensembles[classifier_model.name] = seed_ensemble
+            self.seed_ensembles[classifier_model.name] = seed_ensemble_path
+            self.results[classifier_model.name] = trained_model_csv
+
+        if seed_ensembles:
+            self.classifier_ensemble = self.build_classifier_ensemble(
+                output_dir=self.training_dir, seed_ensembles=seed_ensembles
+            )
+
+        if self.results:
+            results_json_path = os.path.join(
+                self.training_dir, "ClassifierEnsemble.json"
+            )
+            with open(results_json_path, "w") as f:
+                json.dump(self.results, f, indent=2)
+            self.results_json = results_json_path
 
         return self
+
+    @staticmethod
+    def build_classifier_ensemble(
+        output_dir: str, seed_ensembles: dict[str, SeedEnsemble], verbose: bool = False
+    ) -> str:
+        """Build and save a ClassifierEnsemble from in-memory SeedEnsemble objects.
+
+        Assembles all per-classifier ``SeedEnsemble`` objects into a single
+        ``ClassifierEnsemble`` via :meth:`ClassifierEnsemble.from_seed_ensembles`
+        and persists it to ``{output_dir}/ClassifierEnsemble.pkl``.
+
+        Args:
+            output_dir (str): Directory where ``ClassifierEnsemble.pkl`` is written.
+            seed_ensembles (dict[str, SeedEnsemble]): Mapping from classifier name
+                to its already-constructed ``SeedEnsemble``. Passed directly to
+                ``from_seed_ensembles`` to avoid reloading models from disk.
+            verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
+
+        Returns:
+            str: Absolute path to the saved ``ClassifierEnsemble.pkl`` file.
+
+        Example:
+            >>> path = TrainingModel.build_classifier_ensemble(
+            ...     output_dir="training/classifiers",
+            ...     seed_ensembles={"RandomForestClassifier": rf_ensemble, "XGBClassifier": xgb_ensemble},
+            ... )
+        """
+        classifier_ensemble_path = os.path.join(output_dir, "ClassifierEnsemble.pkl")
+        ClassifierEnsemble.from_seed_ensembles(seed_ensembles, verbose).save(
+            classifier_ensemble_path
+        )
+        return classifier_ensemble_path
+
+    @staticmethod
+    def build_seed_ensemble(
+        output_dir: str, classifier_name: str, registry_csv: str, verbose: bool = False
+    ) -> tuple[str, SeedEnsemble]:
+        """Build and save a SeedEnsemble from a trained-model registry CSV.
+
+        Loads all per-seed model paths from ``registry_csv`` via
+        :meth:`SeedEnsemble.from_registry`, saves the ensemble to
+        ``{output_dir}/SeedEnsemble_{classifier_name}.pkl``, and returns both
+        the path and the in-memory object so the caller can pass it directly to
+        :meth:`build_classifier_ensemble` without a disk reload.
+
+        Args:
+            output_dir (str): Directory where ``SeedEnsemble_{classifier_name}.pkl``
+                is written.
+            classifier_name (str): Human-readable classifier name used as the
+                filename suffix (e.g. ``"RandomForestClassifier"``).
+            registry_csv (str): Path to the ``trained_model_*.csv`` registry
+                produced by :func:`~eruption_forecast.utils.ml.save_model_csv`.
+            verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
+
+        Returns:
+            tuple[str, SeedEnsemble]: A two-element tuple ``(filepath, seed_ensemble)``
+            where ``filepath`` is the absolute path to the saved ``.pkl`` file and
+            ``seed_ensemble`` is the constructed :class:`SeedEnsemble` instance.
+
+        Example:
+            >>> path, ensemble = TrainingModel.build_seed_ensemble(
+            ...     output_dir="training/classifiers",
+            ...     classifier_name="RandomForestClassifier",
+            ...     registry_csv="training/classifiers/trained_model_rf.csv",
+            ... )
+        """
+        filepath = os.path.join(output_dir, f"SeedEnsemble_{classifier_name}.pkl")
+        seed_ensemble = SeedEnsemble.from_registry(
+            registry_csv, classifier_name=classifier_name, verbose=verbose
+        )
+        seed_ensemble.save(filepath)
+        return filepath, seed_ensemble
 
     def _train(
         self,
