@@ -664,7 +664,7 @@ def save_model_csv(
     """
     classifier_id = f"{classifier_model.name}-{classifier_model.cv_name}"
 
-    suffix = f"{classifier_id}_rs-{seeds}_top-{number_of_features}"
+    suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
     filename = f"{prefix_filename}_{suffix}.csv"
 
     registry_df = pd.DataFrame(records).set_index("random_state")
