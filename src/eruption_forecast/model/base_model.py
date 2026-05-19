@@ -7,13 +7,7 @@ from functools import cached_property
 
 import pandas as pd
 
-from eruption_forecast import (
-    TremorData,
-    LabelBuilder,
-    FeaturesBuilder,
-    DynamicLabelBuilder,
-    TremorMatrixBuilder,
-)
+from eruption_forecast import TremorData, FeaturesBuilder, TremorMatrixBuilder
 from eruption_forecast.utils import validate_date_ranges
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import resolve_output_dir
@@ -238,6 +232,7 @@ class BaseModel(ABC):
         label_df: pd.DataFrame,
         output_dir: str,
         features_dir: str,
+        features_label: pd.DataFrame | None = None,
         select_tremor_columns: list[str] | None = None,
         save_tremor_matrix_per_method: bool = False,
         save_tremor_matrix_per_id: bool = False,
@@ -294,7 +289,7 @@ class BaseModel(ABC):
 
         features_builder = FeaturesBuilder(
             tremor_matrix_df=tremor_matrix_df,
-            label_df=None,
+            label_df=features_label,
             output_dir=features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,

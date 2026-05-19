@@ -6,6 +6,7 @@ from collections.abc import Callable
 import numpy as np
 import joblib
 import pandas as pd
+from cycler import V
 from joblib import Parallel, delayed
 
 from eruption_forecast import LabelBuilder, DynamicLabelBuilder
@@ -501,6 +502,7 @@ class TrainingModel(BaseModel):
             label_df=self.LabelBuilder.df,
             output_dir=self.training_dir,
             features_dir=self.features_dir,
+            features_label=self.LabelBuilder.df,
             select_tremor_columns=select_tremor_columns,
             save_tremor_matrix_per_method=save_tremor_matrix_per_method,
             save_tremor_matrix_per_id=save_tremor_matrix_per_id,
