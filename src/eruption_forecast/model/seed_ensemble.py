@@ -69,12 +69,13 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         self.classifier_name = classifier_name
         self.seeds: list[dict] = []
 
-    # ------------------------------------------------------------------
-    # Construction helpers
-    # ------------------------------------------------------------------
-
     @classmethod
-    def from_registry(cls, registry_csv: str) -> "SeedEnsemble":
+    def from_registry(
+        cls,
+        registry_csv: str,
+        classifier_name: str | None = None,
+        verbose: bool = False,
+    ) -> "SeedEnsemble":
         """Load all seed models from a registry CSV and bundle into a SeedEnsemble.
 
         Reads the registry CSV produced by ``ModelTrainer._save_models_registry``,
@@ -97,22 +98,31 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         if not os.path.isfile(registry_csv):
             raise FileNotFoundError(f"Registry CSV not found: {registry_csv}")
 
+        _classifier_name = "Unknown" if classifier_name is None else classifier_name
+
         df = pd.read_csv(registry_csv, index_col=0)
 
-        classifier_name = "unknown"
+        if df.empty:
+            raise ValueError(f"Trained model CSV is empty: {registry_csv}")
+
+        for column in ("features_csv", "model_filepath"):
+            if column not in df.columns.tolist():
+                raise ValueError(f"Column {column} is not present in {registry_csv}")
+
         seeds: list[dict] = []
-
         for random_state, row in df.iterrows():
-            sig_csv: str = row["significant_features_csv"]
-            model_path: str = row["trained_model_filepath"]
+            features_csv: str = row["features_csv"]
+            model_filepath: str = row["model_filepath"]
 
-            feature_names: list[str] = pd.read_csv(sig_csv, index_col=0).index.tolist()
+            feature_names: list[str] = pd.read_csv(
+                features_csv, index_col=0
+            ).index.tolist()
 
-            model = joblib.load(model_path)
+            model = joblib.load(model_filepath)
 
             # Try to extract metadata from the first seed
-            if classifier_name == "unknown":
-                classifier_name = type(model).__name__
+            if _classifier_name == "Unknown":
+                _classifier_name = type(model).__name__
 
             seeds.append(
                 {
@@ -122,14 +132,12 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 }
             )
 
-            logger.debug(
-                f"[SeedEnsemble] Loaded seed {int(random_state):05d} — "  # ty:ignore[invalid-argument-type]
-                f"{len(feature_names)} features"
-            )
-
-        ensemble = cls(classifier_name=classifier_name)
+        ensemble = cls(classifier_name=_classifier_name)
         ensemble.seeds = seeds
-        logger.info(f"[SeedEnsemble] Loaded {len(seeds)} seeds for {classifier_name}")
+
+        if verbose:
+            logger.info(f"SeedEnsemble: {classifier_name} — Loaded {len(seeds)} seeds.")
+
         return ensemble
 
     # ------------------------------------------------------------------
