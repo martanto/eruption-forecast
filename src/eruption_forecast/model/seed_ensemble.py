@@ -23,6 +23,7 @@ Key capabilities:
 """
 
 import os
+from typing import Self, cast
 
 import numpy as np
 import joblib
@@ -75,7 +76,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         registry_csv: str,
         classifier_name: str | None = None,
         verbose: bool = False,
-    ) -> "SeedEnsemble":
+    ) -> Self:
         """Load all seed models from a registry CSV and bundle into a SeedEnsemble.
 
         Reads the registry CSV produced by ``ModelTrainer._save_models_registry``,
@@ -271,16 +272,16 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return compute_model_probabilities(seed_proba_matrix, seed_predicts_matrix)
 
     @classmethod
-    def _load_log_msg(cls, obj: "SeedEnsemble") -> str:  # ty:ignore[invalid-method-override]
+    def _load_log_msg(cls, obj: BaseEnsemble) -> str:
         """Return a seed-count suffix for the load log message.
 
         Args:
-            obj (SeedEnsemble): The just-loaded SeedEnsemble instance.
+            obj (BaseEnsemble): The just-loaded SeedEnsemble instance.
 
         Returns:
             str: Human-readable seed count string.
         """
-        return f"{len(obj.seeds)} seeds"
+        return f"{len(cast(SeedEnsemble, obj).seeds)} seeds"
 
     def __len__(self) -> int:
         """Return the number of seeds in this ensemble.
