@@ -206,19 +206,21 @@ class TremorMatrixBuilder:
         tremor_end_date = self.tremor_df.index.max()
 
         if self.start_date < tremor_start_date:
-            self.start_date = tremor_start_date
             if self.verbose:
                 logger.info(
                     f"start_date: {self.start_date}. Tremor start date: {tremor_start_date}"
                 )
+            self.start_date = tremor_start_date
+            if self.verbose:
                 logger.info(f"start_date updated to: {self.start_date}")
 
         if self.end_date > tremor_end_date:
-            self.end_date = tremor_end_date
             if self.verbose:
                 logger.info(
                     f"end_date: {self.end_date}. Tremor end date: {tremor_end_date}"
                 )
+            self.end_date = tremor_end_date
+            if self.verbose:
                 logger.info(f"end_date updated to: {self.end_date}")
 
         start_date_str = self.start_date.strftime("%Y-%m-%d")
