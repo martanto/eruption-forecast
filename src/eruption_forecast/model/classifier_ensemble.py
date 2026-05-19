@@ -26,7 +26,7 @@ Key capabilities:
 
 import os
 import json
-from typing import Self, cast
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -59,8 +59,58 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.ensembles: dict[str, SeedEnsemble] = {}
 
+    def __getitem__(self, name: str) -> SeedEnsemble:
+        """Return the SeedEnsemble for the given classifier name.
+
+        Allows dictionary-style access: ``ensemble["rf"]``.
+
+        Args:
+            name (str): Classifier name key.
+
+        Returns:
+            SeedEnsemble: The SeedEnsemble registered under ``name``.
+
+        Raises:
+            KeyError: If ``name`` is not a registered classifier.
+        """
+        return self.ensembles[name]
+
+    def __len__(self) -> int:
+        """Return the number of classifiers in this ensemble.
+
+        Returns:
+            int: Number of registered classifiers.
+        """
+        return len(self.ensembles)
+
+    def __repr__(self, N_CHAR_MAX: int = 700) -> str:
+        """Return a concise string representation of the ensemble.
+
+        The ``N_CHAR_MAX`` parameter matches the ``BaseEstimator.__repr__``
+        signature; it is accepted but not used — the representation is always
+        compact.
+
+        Args:
+            N_CHAR_MAX (int): Maximum character limit inherited from
+                ``BaseEstimator``.  Not applied here.  Defaults to 700.
+
+        Returns:
+            str: Representation including classifier names and counts.
+        """
+        names = list(self.ensembles.keys())
+        return f"ClassifierEnsemble(n_classifiers={len(names)}, classifiers={names!r})"
+
+    @property
+    def classifiers(self) -> list[str]:
+        """Return the list of classifier names registered in this ensemble.
+
+        Returns:
+            list[str]: Names of all classifiers in insertion order.
+        """
+        return list(self.ensembles.keys())
+
     @classmethod
-    def from_any(cls, source: str | SeedEnsemble) -> Self:
+    def from_any(cls, source: str | SeedEnsemble, verbose: bool = False) -> Self:
         """Load a ``ClassifierEnsemble`` from any supported model source.
 
         Normalises a ``SeedEnsemble`` object or a file path (``*.json``,
@@ -85,6 +135,8 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                   :meth:`SeedEnsemble.from_registry` then wrapped.  One value
                   from ``TrainingModel.results``, e.g.
                   ``{classifier_dir}/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-25_top-20.csv``.
+            verbose (bool, optional): Wether to show more informations.
+                Defaults to ``False``.
 
         Returns:
             ClassifierEnsemble: A fully constructed ``ClassifierEnsemble``
@@ -95,7 +147,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 extension.
         """
         if isinstance(source, SeedEnsemble):
-            return cls.from_seed_ensembles({source.classifier_name: source})
+            return cls.from_seed_ensembles({source.classifier_name: source}, verbose)
 
         if source.endswith(".json"):
             return cls.from_json(source)
@@ -103,11 +155,13 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         if source.endswith(".pkl"):
             loaded = cls.load(source)
             if isinstance(loaded, SeedEnsemble):
-                return cls.from_seed_ensembles({loaded.classifier_name: loaded})
+                return cls.from_seed_ensembles(
+                    {loaded.classifier_name: loaded}, verbose
+                )
             return loaded
 
         if source.endswith(".csv"):
-            seed_ensemble = SeedEnsemble.from_registry(source)
+            seed_ensemble = SeedEnsemble.from_registry(source, verbose=verbose)
             return cls.from_seed_ensembles(
                 {seed_ensemble.classifier_name: seed_ensemble}
             )
@@ -150,9 +204,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return obj
 
     @classmethod
-    def from_dict(
-        cls, registry_csvs: dict[str, str], verbose: bool = False
-    ) -> Self:
+    def from_dict(cls, registry_csvs: dict[str, str], verbose: bool = False) -> Self:
         """Build a ClassifierEnsemble directly from registry CSV paths.
 
         Calls :meth:`SeedEnsemble.from_registry` for each entry and assembles
@@ -341,65 +393,3 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             consensus_confidence,
             clf_results,
         )
-
-    @classmethod
-    def _load_log_msg(cls, obj: BaseEnsemble) -> str:
-        """Return a classifier-count suffix for the load log message.
-
-        Args:
-            obj (BaseEnsemble): The just-loaded ClassifierEnsemble instance.
-
-        Returns:
-            str: Human-readable classifier count string.
-        """
-        return f"{len(cast(ClassifierEnsemble, obj))} classifier(s)"
-
-    @property
-    def classifiers(self) -> list[str]:
-        """Return the list of classifier names registered in this ensemble.
-
-        Returns:
-            list[str]: Names of all classifiers in insertion order.
-        """
-        return list(self.ensembles.keys())
-
-    def __getitem__(self, name: str) -> SeedEnsemble:
-        """Return the SeedEnsemble for the given classifier name.
-
-        Allows dictionary-style access: ``ensemble["rf"]``.
-
-        Args:
-            name (str): Classifier name key.
-
-        Returns:
-            SeedEnsemble: The SeedEnsemble registered under ``name``.
-
-        Raises:
-            KeyError: If ``name`` is not a registered classifier.
-        """
-        return self.ensembles[name]
-
-    def __len__(self) -> int:
-        """Return the number of classifiers in this ensemble.
-
-        Returns:
-            int: Number of registered classifiers.
-        """
-        return len(self.ensembles)
-
-    def __repr__(self, N_CHAR_MAX: int = 700) -> str:
-        """Return a concise string representation of the ensemble.
-
-        The ``N_CHAR_MAX`` parameter matches the ``BaseEstimator.__repr__``
-        signature; it is accepted but not used — the representation is always
-        compact.
-
-        Args:
-            N_CHAR_MAX (int): Maximum character limit inherited from
-                ``BaseEstimator``.  Not applied here.  Defaults to 700.
-
-        Returns:
-            str: Representation including classifier names and counts.
-        """
-        names = list(self.ensembles.keys())
-        return f"ClassifierEnsemble(n_classifiers={len(names)}, classifiers={names!r})"
