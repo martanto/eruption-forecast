@@ -26,6 +26,7 @@ Key capabilities:
 
 import os
 import json
+from typing import Self, cast
 
 import numpy as np
 import pandas as pd
@@ -59,9 +60,64 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         self.ensembles: dict[str, SeedEnsemble] = {}
 
     @classmethod
+    def from_any(cls, source: str | SeedEnsemble) -> Self:
+        """Load a ``ClassifierEnsemble`` from any supported model source.
+
+        Normalises a ``SeedEnsemble`` object or a file path (``*.json``,
+        ``*.pkl``, or ``*.csv``) into a ``ClassifierEnsemble``.  A ``*.csv``
+        path is treated as a trained-model registry produced by
+        ``TrainingModel`` and loaded via ``SeedEnsemble.from_registry()``.
+
+        Args:
+            source (str | SeedEnsemble): Source to load from.  Accepted forms:
+
+                - ``SeedEnsemble`` object — wrapped directly.
+                - ``str`` path ending in ``".json"`` — loaded via
+                  :meth:`from_json`.  ``TrainingModel.fit()`` writes this file
+                  to ``{training_dir}/ClassifierEnsemble.json``, e.g.
+                  ``output/VG.OJN.00.EHZ/training/ClassifierEnsemble.json``.
+                - ``str`` path ending in ``".pkl"`` — deserialised via
+                  :meth:`~BaseEnsemble.load`; if the result is a
+                  ``SeedEnsemble`` it is wrapped automatically.  Examples:
+                  ``{training_dir}/ClassifierEnsemble.pkl`` or
+                  ``{classifier_dir}/SeedEnsemble_RandomForestClassifier.pkl``.
+                - ``str`` path ending in ``".csv"`` — registry CSV loaded via
+                  :meth:`SeedEnsemble.from_registry` then wrapped.  One value
+                  from ``TrainingModel.results``, e.g.
+                  ``{classifier_dir}/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-25_top-20.csv``.
+
+        Returns:
+            ClassifierEnsemble: A fully constructed ``ClassifierEnsemble``
+                instance.
+
+        Raises:
+            ValueError: If ``source`` is a string with an unrecognised
+                extension.
+        """
+        if isinstance(source, SeedEnsemble):
+            return cls.from_seed_ensembles({source.classifier_name: source})
+
+        if source.endswith(".json"):
+            return cls.from_json(source)
+
+        if source.endswith(".pkl"):
+            loaded = cls.load(source)
+            if isinstance(loaded, SeedEnsemble):
+                return cls.from_seed_ensembles({loaded.classifier_name: loaded})
+            return loaded
+
+        if source.endswith(".csv"):
+            seed_ensemble = SeedEnsemble.from_registry(source)
+            return cls.from_seed_ensembles(
+                {seed_ensemble.classifier_name: seed_ensemble}
+            )
+
+        raise ValueError(f"Unsupported source type or extension: {source!r}")
+
+    @classmethod
     def from_seed_ensembles(
         cls, ensembles: dict[str, SeedEnsemble], verbose: bool = False
-    ) -> "ClassifierEnsemble":
+    ) -> Self:
         """Build a ClassifierEnsemble from a dict of named SeedEnsemble objects.
 
         Copies the provided mapping into a new ``ClassifierEnsemble`` instance
@@ -94,9 +150,9 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return obj
 
     @classmethod
-    def from_registry_dict(
+    def from_dict(
         cls, registry_csvs: dict[str, str], verbose: bool = False
-    ) -> "ClassifierEnsemble":
+    ) -> Self:
         """Build a ClassifierEnsemble directly from registry CSV paths.
 
         Calls :meth:`SeedEnsemble.from_registry` for each entry and assembles
@@ -126,7 +182,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return cls.from_seed_ensembles(ensembles)
 
     @classmethod
-    def from_json(cls, json_path: str, verbose: bool = False) -> "ClassifierEnsemble":
+    def from_json(cls, json_path: str, verbose: bool = False) -> Self:
         """Build a ClassifierEnsemble from a JSON results file.
 
         Loads the classifier-name-to-registry-CSV mapping produced by
@@ -150,7 +206,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             raise FileNotFoundError(f"JSON file not found: {json_path}")
         with open(json_path) as f:
             registry_csvs: dict[str, str] = json.load(f)
-        return cls.from_registry_dict(registry_csvs, verbose=verbose)
+        return cls.from_dict(registry_csvs, verbose=verbose)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Return consensus class probabilities across all classifiers.
@@ -287,16 +343,16 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         )
 
     @classmethod
-    def _load_log_msg(cls, obj: "ClassifierEnsemble") -> str:  # ty:ignore[invalid-method-override]
+    def _load_log_msg(cls, obj: BaseEnsemble) -> str:
         """Return a classifier-count suffix for the load log message.
 
         Args:
-            obj (ClassifierEnsemble): The just-loaded ClassifierEnsemble instance.
+            obj (BaseEnsemble): The just-loaded ClassifierEnsemble instance.
 
         Returns:
             str: Human-readable classifier count string.
         """
-        return f"{len(obj)} classifier(s)"
+        return f"{len(cast(ClassifierEnsemble, obj))} classifier(s)"
 
     @property
     def classifiers(self) -> list[str]:
