@@ -87,6 +87,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             registry_csv (str): Path to the trained-model registry CSV.  Must
                 have ``random_state`` as index and columns
                 ``significant_features_csv`` and ``trained_model_filepath``.
+            classifier_name (str, optional): Human-readable classifier name.
+                Defaults to None.
+            verbose (bool, optional): If ``True``, log a message for each saved file.
+                Defaults to ``False``.
 
         Returns:
             SeedEnsemble: Populated ensemble with all seeds loaded.
@@ -140,10 +144,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return ensemble
 
-    # ------------------------------------------------------------------
-    # Prediction helpers
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _compute_seed(seed: dict, X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
         """Compute eruption probability for a single seed.
@@ -173,10 +173,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             model, X_seed, identifier=seed["random_state"]
         )
         return eruption_proba, eruption_predict
-
-    # ------------------------------------------------------------------
-    # Public sklearn-compatible interface
-    # ------------------------------------------------------------------
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Return class probabilities averaged across all seeds.
@@ -274,10 +270,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return compute_model_probabilities(seed_proba_matrix, seed_predicts_matrix)
 
-    # ------------------------------------------------------------------
-    # Serialisation
-    # ------------------------------------------------------------------
-
     @classmethod
     def _load_log_msg(cls, obj: "SeedEnsemble") -> str:  # ty:ignore[invalid-method-override]
         """Return a seed-count suffix for the load log message.
@@ -289,10 +281,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             str: Human-readable seed count string.
         """
         return f"{len(obj.seeds)} seeds"
-
-    # ------------------------------------------------------------------
-    # Dunder helpers
-    # ------------------------------------------------------------------
 
     def __len__(self) -> int:
         """Return the number of seeds in this ensemble.
