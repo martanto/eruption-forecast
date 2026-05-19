@@ -25,6 +25,7 @@ Key capabilities:
 """
 
 import os
+import json
 
 import numpy as np
 import pandas as pd
@@ -57,13 +58,9 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.ensembles: dict[str, SeedEnsemble] = {}
 
-    # ------------------------------------------------------------------
-    # Construction helpers
-    # ------------------------------------------------------------------
-
     @classmethod
     def from_seed_ensembles(
-        cls, ensembles: dict[str, SeedEnsemble]
+        cls, ensembles: dict[str, SeedEnsemble], verbose: bool = False
     ) -> "ClassifierEnsemble":
         """Build a ClassifierEnsemble from a dict of named SeedEnsemble objects.
 
@@ -73,6 +70,8 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         Args:
             ensembles (dict[str, SeedEnsemble]): Mapping from classifier name to
                 its already-constructed ``SeedEnsemble``.
+            verbose (bool, optional): Wether to show more informations.
+                Defaults to ``False``.
 
         Returns:
             ClassifierEnsemble: Populated ensemble containing all provided
@@ -85,14 +84,19 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             raise ValueError("ensembles must not be empty.")
         obj = cls()
         obj.ensembles = dict(ensembles)
-        logger.info(
-            f"[ClassifierEnsemble] Built from {len(ensembles)} SeedEnsemble(s): "
-            f"{list(ensembles.keys())}"
-        )
+
+        if verbose:
+            logger.info(
+                f"[ClassifierEnsemble] Built from {len(ensembles)} SeedEnsemble(s): "
+                f"{list(ensembles.keys())}"
+            )
+
         return obj
 
     @classmethod
-    def from_registry_dict(cls, registry_csvs: dict[str, str]) -> "ClassifierEnsemble":
+    def from_registry_dict(
+        cls, registry_csvs: dict[str, str], verbose: bool = False
+    ) -> "ClassifierEnsemble":
         """Build a ClassifierEnsemble directly from registry CSV paths.
 
         Calls :meth:`SeedEnsemble.from_registry` for each entry and assembles
@@ -101,6 +105,8 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         Args:
             registry_csvs (dict[str, str]): Mapping from classifier name to the
                 path of its trained-model registry CSV.
+            verbose (bool, optional): Wether to show more informations.
+                Defaults to ``False``.
 
         Returns:
             ClassifierEnsemble: Populated ensemble with all seed models loaded
@@ -114,13 +120,37 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             raise ValueError("registry_csvs must not be empty.")
         ensembles: dict[str, SeedEnsemble] = {}
         for name, csv_path in registry_csvs.items():
-            logger.info(f"[ClassifierEnsemble] Loading classifier: {name}")
             ensembles[name] = SeedEnsemble.from_registry(csv_path)
+            if verbose:
+                logger.info(f"[ClassifierEnsemble] Loaded from: {registry_csvs}")
         return cls.from_seed_ensembles(ensembles)
 
-    # ------------------------------------------------------------------
-    # Inference
-    # ------------------------------------------------------------------
+    @classmethod
+    def from_json(cls, json_path: str, verbose: bool = False) -> "ClassifierEnsemble":
+        """Build a ClassifierEnsemble from a JSON results file.
+
+        Loads the classifier-name-to-registry-CSV mapping produced by
+        ``TrainingModel.fit()`` and delegates to :meth:`from_registry_dict`.
+
+        Args:
+            json_path (str): Path to the ``results.json`` file written by
+                ``TrainingModel.fit()``.
+            verbose (bool): Whether to emit load progress logs. Defaults to
+                ``False``.
+
+        Returns:
+            ClassifierEnsemble: Populated ensemble with all seed models loaded
+                from disk.
+
+        Raises:
+            FileNotFoundError: If ``json_path`` does not exist.
+            ValueError: If the JSON file contains an empty mapping.
+        """
+        if not os.path.isfile(json_path):
+            raise FileNotFoundError(f"JSON file not found: {json_path}")
+        with open(json_path) as f:
+            registry_csvs: dict[str, str] = json.load(f)
+        return cls.from_registry_dict(registry_csvs, verbose=verbose)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Return consensus class probabilities across all classifiers.
@@ -256,10 +286,6 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             clf_results,
         )
 
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
-
     @classmethod
     def _load_log_msg(cls, obj: "ClassifierEnsemble") -> str:  # ty:ignore[invalid-method-override]
         """Return a classifier-count suffix for the load log message.
@@ -271,10 +297,6 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             str: Human-readable classifier count string.
         """
         return f"{len(obj)} classifier(s)"
-
-    # ------------------------------------------------------------------
-    # Introspection
-    # ------------------------------------------------------------------
 
     @property
     def classifiers(self) -> list[str]:
@@ -309,7 +331,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         return len(self.ensembles)
 
-    def __repr__(self, N_CHAR_MAX: int = 700) -> str:  # noqa: N803
+    def __repr__(self, N_CHAR_MAX: int = 700) -> str:
         """Return a concise string representation of the ensemble.
 
         The ``N_CHAR_MAX`` parameter matches the ``BaseEstimator.__repr__``
