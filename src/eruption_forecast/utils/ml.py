@@ -624,12 +624,14 @@ def grid_search_cv(
     return classifier, grid_search, grid_search.best_estimator_
 
 
-def save_model_registry(
+def save_model_csv(
     seeds: int,
     records: list[dict],
     classifier_dir: str,
     classifier_model: ClassifierModel,
     number_of_features: int,
+    prefix_filename: str = "trained_model",
+    verbose: bool = False,
 ) -> str:
     """Build and save the trained-models registry CSV for one classifier.
 
@@ -649,6 +651,9 @@ def save_model_registry(
             ``name`` and ``cv_name`` attributes form the filename prefix.
         number_of_features (int): Number of top significant features selected;
             written into the filename as ``top-{number_of_features}``.
+        prefix_filename (str, optional): Filename prefix for saved training model CSV.
+            Defaults to ``"trained_model"``.
+        verbose (bool, optional): Show detailed information. Defaults to False.
 
     Returns:
         str: Absolute path to the saved registry CSV file.
@@ -660,7 +665,7 @@ def save_model_registry(
     classifier_id = f"{classifier_model.name}-{classifier_model.cv_name}"
 
     suffix = f"{classifier_id}_rs-{seeds}_top-{number_of_features}"
-    filename = f"trained_model_{suffix}.csv"
+    filename = f"{prefix_filename}_{suffix}.csv"
 
     registry_df = pd.DataFrame(records).set_index("random_state")
     if registry_df.empty:
@@ -668,5 +673,8 @@ def save_model_registry(
 
     csv = os.path.join(classifier_dir, filename)
     registry_df.to_csv(csv, index=True)
+
+    if verbose:
+        logger.info(f"Saved trained model CSV to {csv}")
 
     return csv

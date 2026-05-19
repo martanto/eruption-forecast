@@ -14,7 +14,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
     resample,
     grid_search_cv,
-    save_model_registry,
+    save_model_csv,
     get_classifier_models,
 )
 from eruption_forecast.utils.dataframe import concat_significant_features
@@ -694,12 +694,14 @@ class TrainingModel(BaseModel):
             classifier_slug = classifier_model.slug_name
             if not records_per_classifier[classifier_slug]:
                 continue
-            self.csv[classifier_slug] = save_model_registry(
+            self.csv[classifier_slug] = save_model_csv(
                 seeds=seeds,
                 records=records_per_classifier[classifier_slug],
                 classifier_dir=self.classifier_dirs[classifier_slug],
                 classifier_model=classifier_model,
                 number_of_features=self.number_of_features,
+                prefix_filename="trained_model",
+                verbose=self.verbose,
             )
 
         if self.verbose:
