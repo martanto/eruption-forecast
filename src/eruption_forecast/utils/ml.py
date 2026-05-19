@@ -675,6 +675,6 @@ def save_model_csv(
     registry_df.to_csv(csv, index=True)
 
     if verbose:
-        logger.info(f"Saved trained model CSV to {csv}")
+        logger.info(f"{classifier_model.name}: CSV trained model saved to {csv}")
 
     return csv
