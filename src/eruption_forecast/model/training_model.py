@@ -938,6 +938,7 @@ class TrainingModel(BaseModel):
         pending_training_model_jobs: list[tuple] = []
         existing_feature_paths: list[str] = []
 
+        # Init records per classifier
         records_per_classifier: dict[str, list[dict]] = {
             classifier_model.slug_name: []
             for classifier_model in self.classifier_models
@@ -966,6 +967,10 @@ class TrainingModel(BaseModel):
                     model_seed_path = os.path.join(
                         self.models_dir[classifier_slug], f"{filename}.pkl"
                     )
+
+                    # Check if seed model per classifier exists
+                    # Should be exists in: <self.models_dir[classifier_slug]>/models
+                    # Example: training\classifiers\lite-random-forest-classifier\stratified-shuffle-split\models
                     if os.path.isfile(model_seed_path):
                         records_per_classifier[classifier_slug].append(
                             {
