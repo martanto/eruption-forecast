@@ -623,6 +623,11 @@ class TrainingModel(BaseModel):
             job_name="Pending Feature Selection",
         )
 
+        if self.verbose:
+            logger.info(
+                f"Pending Feature Selection: Found {len(feature_selection_results)} job(s)"
+            )
+
         new_training_model_jobs: list[tuple] = []
 
         for feature_selection_result, pending_feature_selection_job in zip(
@@ -642,6 +647,11 @@ class TrainingModel(BaseModel):
             all_training_model_jobs,
             job_name="Pending Training",
         )
+
+        if self.verbose:
+            logger.info(
+                f"Pending Training: Found {len(feature_selection_results)} job(s)"
+            )
 
         for result in training_model_results:
             if result is None:
@@ -876,7 +886,7 @@ class TrainingModel(BaseModel):
         """
         if self.n_jobs != 1:
             logger.info(
-                f"[{job_name}]: Running on {self.n_jobs} job(s). Grid search jobs {self.n_grids}..."
+                f"[{job_name}]: Running on {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
             )
             return Parallel(n_jobs=self.n_jobs, backend="loky")(
                 delayed(method)(*job) for job in jobs
