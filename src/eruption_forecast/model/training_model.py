@@ -157,7 +157,6 @@ class TrainingModel(BaseModel):
         self.basename: str | None = None
 
         # Will be set after fit() called
-        # self.results save trained_model
         self.results: dict[str, str] = {}
         self.results_json: str | None = None
         self.seed_ensembles: dict[str, str] = {}
@@ -196,10 +195,10 @@ class TrainingModel(BaseModel):
 
         for classifier_model in self.classifier_models:
             classifier_slug_name = classifier_model.slug_name
-            model_dir = os.path.join(
-                classifier_dir, classifier_slug_name, self.cv_name, "models"
+            classifier_dirs[classifier_slug_name] = os.path.join(
+                classifier_dir, classifier_slug_name, self.cv_name
             )
-            classifier_dirs[classifier_slug_name] = classifier_dir
+            model_dir = os.path.join(classifier_dirs[classifier_slug_name], "models")
             ensure_dir(classifier_dir)
             models_dir[classifier_slug_name] = model_dir
 
@@ -702,6 +701,7 @@ class TrainingModel(BaseModel):
 
         # Save SeedEnsemble
         seed_ensembles: dict[str, SeedEnsemble] = {}
+        cv_name = self.classifier_models[0].cv_name
         for classifier_model in self.classifier_models:
             if self.verbose:
                 logger.info(
@@ -723,9 +723,10 @@ class TrainingModel(BaseModel):
             )
 
             seed_ensemble_path, seed_ensemble = self.build_seed_ensemble(
-                output_dir=self.classifier_dir,
+                output_dir=self.classifier_dirs[classifier_slug],
                 classifier_name=classifier_model.name,
                 registry_csv=trained_model_csv,
+                cv_name=cv_name,
                 verbose=self.verbose,
             )
 
@@ -733,24 +734,28 @@ class TrainingModel(BaseModel):
             self.seed_ensembles[classifier_model.name] = seed_ensemble_path
             self.results[classifier_model.name] = trained_model_csv
 
-        if seed_ensembles:
-            self.classifier_ensemble = self.build_classifier_ensemble(
-                output_dir=self.training_dir, seed_ensembles=seed_ensembles
-            )
-
+        filename = f"ClassifierEnsemble_{cv_name}"
         if self.results:
-            results_json_path = os.path.join(
-                self.training_dir, "ClassifierEnsemble.json"
-            )
+            results_json_path = os.path.join(self.classifier_dir, f"{filename}.json")
             with open(results_json_path, "w") as f:
                 json.dump(self.results, f, indent=2)
             self.results_json = results_json_path
+
+        if seed_ensembles:
+            self.classifier_ensemble = self.build_classifier_ensemble(
+                output_dir=self.classifier_dir,
+                seed_ensembles=seed_ensembles,
+                filename=filename,
+            )
 
         return self
 
     @staticmethod
     def build_classifier_ensemble(
-        output_dir: str, seed_ensembles: dict[str, SeedEnsemble], verbose: bool = False
+        output_dir: str,
+        seed_ensembles: dict[str, SeedEnsemble],
+        filename: str = "ClassifierEnsemble",
+        verbose: bool = False,
     ) -> str:
         """Build and save a ClassifierEnsemble from in-memory SeedEnsemble objects.
 
@@ -763,6 +768,8 @@ class TrainingModel(BaseModel):
             seed_ensembles (dict[str, SeedEnsemble]): Mapping from classifier name
                 to its already-constructed ``SeedEnsemble``. Passed directly to
                 ``from_seed_ensembles`` to avoid reloading models from disk.
+            filename (str, optional): Classifier ensemble filename.
+                Defaults to "ClassifierEnsemble".
             verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
 
         Returns:
@@ -774,7 +781,7 @@ class TrainingModel(BaseModel):
             ...     seed_ensembles={"RandomForestClassifier": rf_ensemble, "XGBClassifier": xgb_ensemble},
             ... )
         """
-        classifier_ensemble_path = os.path.join(output_dir, "ClassifierEnsemble.pkl")
+        classifier_ensemble_path = os.path.join(output_dir, f"{filename}.pkl")
         ClassifierEnsemble.from_seed_ensembles(seed_ensembles, verbose).save(
             classifier_ensemble_path
         )
@@ -782,7 +789,11 @@ class TrainingModel(BaseModel):
 
     @staticmethod
     def build_seed_ensemble(
-        output_dir: str, classifier_name: str, registry_csv: str, verbose: bool = False
+        output_dir: str,
+        classifier_name: str,
+        registry_csv: str,
+        cv_name: str | None = None,
+        verbose: bool = False,
     ) -> tuple[str, SeedEnsemble]:
         """Build and save a SeedEnsemble from a trained-model registry CSV.
 
@@ -799,6 +810,8 @@ class TrainingModel(BaseModel):
                 filename suffix (e.g. ``"RandomForestClassifier"``).
             registry_csv (str): Path to the ``trained_model_*.csv`` registry
                 produced by :func:`~eruption_forecast.utils.ml.save_model_csv`.
+            cv_name (str, optional): Name of the cross-validation splitter class.
+                Defaults to None.
             verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
 
         Returns:
@@ -813,7 +826,11 @@ class TrainingModel(BaseModel):
             ...     registry_csv="training/classifiers/trained_model_rf.csv",
             ... )
         """
-        filepath = os.path.join(output_dir, f"SeedEnsemble_{classifier_name}.pkl")
+        suffix = f"_{cv_name}" if cv_name else ""
+
+        filepath = os.path.join(
+            output_dir, f"SeedEnsemble_{classifier_name}{suffix}.pkl"
+        )
         seed_ensemble = SeedEnsemble.from_registry(
             registry_csv, classifier_name=classifier_name, verbose=verbose
         )
