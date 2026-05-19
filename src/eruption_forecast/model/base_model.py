@@ -153,6 +153,11 @@ class BaseModel(ABC):
             )
 
     @cached_property
+    def tremor_df(self) -> pd.DataFrame:
+        """Return tremor DataFrame."""
+        return self.tremor_data.df
+
+    @cached_property
     def tremor_data(self) -> TremorData:
         """The validated TremorData instance loaded from the configured source.
 
@@ -272,7 +277,7 @@ class BaseModel(ABC):
         """
         tremor_matrix_df = (
             TremorMatrixBuilder(
-                tremor_df=self.tremor_data.df,
+                tremor_df=self.tremor_df,
                 label_df=label_df,
                 output_dir=os.path.join(output_dir, "tremor"),
                 window_size=self.window_size,
