@@ -6,6 +6,7 @@ duplicate the persistence boilerplate.
 """
 
 import os
+from typing import Self
 
 import joblib
 
@@ -37,7 +38,7 @@ class BaseEnsemble:
         logger.info(f"[{type(self).__name__}] Saved to: {path}")
 
     @classmethod
-    def load(cls, path: str) -> "BaseEnsemble":
+    def load(cls, path: str) -> Self:
         """Load a previously saved ensemble from a ``.pkl`` file.
 
         Restores the full object from a file written by :meth:`save`.
