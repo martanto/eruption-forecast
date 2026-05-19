@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
+from eruption_forecast.model import SeedEnsemble, ClassifierEnsemble
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir
@@ -11,8 +12,28 @@ from eruption_forecast.model.base_model import BaseModel
 
 
 class PredictionModel(BaseModel):
+    """Forecast eruption using trained model.
+
+    Loads models produced by ``TrainingModel.fit()`` and runs forecast
+    inference. Supports single-model or multi-model consensus predictions by
+    aggregating across classifiers and seeds with uncertainty quantification.
+    Use :meth:`predict_proba` for unlabelled forecast mode.
+
+    Args:
+        model (str | ClassifierEnsemble | SeedEnsemble): Trained model source.
+            Accepted forms:
+
+            - ``ClassifierEnsemble`` object — used directly.
+            - ``SeedEnsemble`` object — wrapped into a ``ClassifierEnsemble``.
+            - Path to ``ClassifierEnsemble.json`` (from ``TrainingModel``).
+            - Path to ``ClassifierEnsemble.pkl`` or ``SeedEnsemble_*.pkl``.
+            - Path to a trained-model registry ``*.csv`` (one value from
+              ``TrainingModel.results``).
+    """
+
     def __init__(
         self,
+        model: str | ClassifierEnsemble | SeedEnsemble,
         tremor_data: str | pd.DataFrame,
         start_date: str | datetime,
         end_date: str | datetime,
@@ -35,8 +56,12 @@ class PredictionModel(BaseModel):
             verbose=verbose,
         )
 
+        self.model: ClassifierEnsemble = (
+            model
+            if isinstance(model, ClassifierEnsemble)
+            else ClassifierEnsemble.from_any(model, verbose)
+        )
         self.overwrite = overwrite
-
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
         self.prediction_dir, self.features_dir = self.set_directories()
 
