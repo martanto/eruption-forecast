@@ -274,7 +274,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             np.ndarray: Array of shape ``(n_samples, 2)`` where column 1 is the
                 consensus mean eruption probability.
         """
-        _, _, _, _, clf_results = self.predict_with_uncertainty(X)
+        clf_results = self.predict_per_classifier(X)
 
         classifier_probability_means = np.stack(
             [v["probability"] for v in clf_results.values()], axis=0
@@ -283,19 +283,59 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         mean_proba = classifier_probability_means.mean(axis=0)
         return np.column_stack([1.0 - mean_proba, mean_proba])
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: pd.DataFrame, threshold: float = 0.5) -> np.ndarray:
         """Return binary predictions using a 0.5 threshold on the consensus probability.
 
         Applies a 0.5 threshold to the consensus mean P(eruption).
-
-        Args:
-            X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
 
         Returns:
             np.ndarray: 1-D integer array of shape ``(n_samples,)`` with values
                 0 (non-eruption) or 1 (eruption).
         """
-        return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
+        return (self.predict_proba(X)[:, 1] >= threshold).astype(int)
+
+    def predict_per_classifier(
+        self,
+        X: pd.DataFrame,
+        save: bool = False,
+        output_dir: str | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ) -> dict[str, dict[str, np.ndarray]]:
+        clf_results: dict[str, dict[str, np.ndarray]] = {}
+        for classifier_name, seed_ensemble in self.ensembles.items():
+            clf_output_dir = (
+                os.path.join(output_dir, classifier_name)
+                if (save and output_dir)
+                else None
+            )
+
+            if verbose:
+                logger.info(
+                    f"Predicting probabiities for {classifier_name} with {len(seed_ensemble)} seed(s) ..."
+                )
+
+            (
+                seed_probability,
+                seed_uncertainty,
+                seed_prediction,
+                seed_confidence,
+            ) = seed_ensemble.predict_with_uncertainty(
+                X,
+                save=save,
+                output_dir=clf_output_dir,
+                overwrite=overwrite,
+                verbose=verbose,
+            )
+
+            clf_results[classifier_name] = {
+                "probability": seed_probability,
+                "uncertainty": seed_uncertainty,
+                "prediction": seed_prediction,
+                "confidence": seed_confidence,
+            }
+
+        return clf_results
 
     def predict_with_uncertainty(
         self,
@@ -304,7 +344,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         output_dir: str | None = None,
         overwrite: bool = False,
         verbose: bool = False,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]:
+    ) -> dict[str, np.ndarray]:
         """Return consensus statistics and per-classifier results.
 
         For each classifier, calls :meth:`SeedEnsemble.predict_with_uncertainty`
@@ -343,37 +383,15 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                   ``"prediction"``, ``"confidence"`` — each a 1-D ``np.ndarray``
                   of shape ``(n_samples,)``.
         """
-        clf_results: dict[str, dict[str, np.ndarray]] = {}
-        for name, seed_ensemble in self.ensembles.items():
-            clf_output_dir = (
-                os.path.join(output_dir, name) if (save and output_dir) else None
-            )
-
-            (
-                seed_probability,
-                seed_uncertainty,
-                seed_prediction,
-                seed_confidence,
-            ) = seed_ensemble.predict_with_uncertainty(
-                X,
-                save=save,
-                output_dir=clf_output_dir,
-                overwrite=overwrite,
-                verbose=verbose,
-            )
-
-            clf_results[name] = {
-                "probability": seed_probability,
-                "uncertainty": seed_uncertainty,
-                "prediction": seed_prediction,
-                "confidence": seed_confidence,
-            }
+        clf_results = self.predict_per_classifier(
+            X, save=save, output_dir=output_dir, overwrite=overwrite, verbose=verbose
+        )
 
         # Cross-classifier consensus
-        classifier_probability_means = np.stack(
+        classifier_probability_matrix = np.stack(
             [v["probability"] for v in clf_results.values()], axis=1
         )  # (n_samples, n_classifiers)
-        classifier_prediction_means = np.stack(
+        classifier_prediction_matrix = np.stack(
             [v["prediction"] for v in clf_results.values()], axis=1
         )  # (n_samples, n_classifiers)
 
@@ -383,13 +401,20 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             consensus_prediction,
             consensus_confidence,
         ) = compute_model_probabilities(
-            classifier_probability_means, classifier_prediction_means
+            classifier_probability_matrix, classifier_prediction_matrix
         )
 
-        return (
-            consensus_probability,
-            consensus_uncertainty,
-            consensus_prediction,
-            consensus_confidence,
-            clf_results,
-        )
+        results: dict[str, np.ndarray] = {
+            "consensus_probability": consensus_probability,
+            "consensus_uncertainty": consensus_uncertainty,
+            "consensus_prediction": consensus_prediction,
+            "consensus_confidence": consensus_confidence,
+        }
+
+        for classifier_name, clf_result in clf_results.items():
+            results[f"{classifier_name}_probability"] = clf_result["probability"]
+            results[f"{classifier_name}_uncertainty"] = clf_result["uncertainty"]
+            results[f"{classifier_name}_prediction"] = clf_result["prediction"]
+            results[f"{classifier_name}_confidence"] = clf_result["confidence"]
+
+        return results
