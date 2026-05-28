@@ -220,16 +220,6 @@ class FeaturesBuilder:
         Returns:
             None
         """
-        if not isinstance(self.tremor_matrix_df, pd.DataFrame):
-            raise ValueError(
-                f"Tremor matrix must be pd.DataFrame. "
-                f"Your tremor matrix type is {type(self.tremor_matrix_df)}"
-            )
-        if not isinstance(self.label_df, pd.DataFrame):
-            raise ValueError(
-                f"Label dataframe must be pd.DataFrame. "
-                f"Your label data type is {type(self.label_df)}"
-            )
         validate_columns(self.tremor_matrix_df, [ID_COLUMN, DATETIME_COLUMN])
 
         # If label df is not empty, it must have "id" and "is_erupted" columns.
@@ -688,9 +678,11 @@ class FeaturesBuilder:
         # Prediction mode forces use_relevant_features=False (requires labels).
         if isinstance(self.label_df, pd.DataFrame) and self.label_df.empty:
             use_relevant_features = False
-            dates_str, label_df = self._prepare_prediction_mode(tremor_matrix_df)
-        else:
+
+        if use_relevant_features:
             dates_str, label_df = self._prepare_training_mode(self.label_df)
+        else:
+            dates_str, label_df = self._prepare_prediction_mode(tremor_matrix_df)
 
         # Get params for features extraction
         extract_params = self._prepare_extraction_parameters(exclude_features)

@@ -1,14 +1,23 @@
 import os
-from typing import Self, Literal
+from typing import Any, Self, Literal
 from datetime import datetime
 
 import pandas as pd
+import matplotlib
 
-from eruption_forecast.model import SeedEnsemble, ClassifierEnsemble
+from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.utils.date_utils import set_datetime_index
+from eruption_forecast.utils.formatting import pdf_metadata
+from eruption_forecast.model.new_seed_ensemble import SeedEnsemble
+from eruption_forecast.model.new_classifier_ensemble import ClassifierEnsemble
+
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 class PredictionModel(BaseModel):
@@ -56,7 +65,7 @@ class PredictionModel(BaseModel):
             verbose=verbose,
         )
 
-        self.model: ClassifierEnsemble = (
+        self.ClassifierEnsemble: ClassifierEnsemble = (
             model
             if isinstance(model, ClassifierEnsemble)
             else ClassifierEnsemble.from_any(model, verbose)
@@ -67,22 +76,22 @@ class PredictionModel(BaseModel):
             self.prediction_dir,
             self.features_dir,
             self.result_dir,
-            self.result_seeds_dir,
         ) = self.set_directories()
 
         self.labels: pd.DataFrame = pd.DataFrame()
+        self.df: pd.DataFrame = pd.DataFrame()
 
-    def set_directories(self) -> tuple[str, str, str, str]:
+    def set_directories(self) -> tuple[str, str, str]:
         prediction_dir = os.path.join(self.output_dir, "prediction")
         features_dir = os.path.join(prediction_dir, "features")
         result_dir = os.path.join(prediction_dir, "results")
-        result_seeds_dir = os.path.join(result_dir, "seeds")
 
-        return prediction_dir, features_dir, result_dir, result_seeds_dir
+        return prediction_dir, features_dir, result_dir
 
     def create_directories(self) -> None:
         ensure_dir(self.prediction_dir)
         ensure_dir(self.features_dir)
+        ensure_dir(self.result_dir)
 
     def validate(self) -> Self:
         return self
@@ -158,7 +167,6 @@ class PredictionModel(BaseModel):
         )
 
         self.features_df = features_builder.extract_features(
-            use_relevant_features=False,
             select_tremor_columns=select_tremor_columns,
             exclude_features=exclude_features,
         )
@@ -167,7 +175,14 @@ class PredictionModel(BaseModel):
 
         return self
 
-    def predict_proba(self) -> pd.DataFrame:
+    def forecast(
+        self,
+        save_seed_result: bool = True,
+        plot_threshold: float = 0.5,
+        plot_title: str | None = None,
+        plot_pdf: bool = True,
+        **plot_kwargs,
+    ) -> pd.DataFrame:
         if self.labels.empty:
             raise ValueError("Please run build_label() first.")
 
@@ -179,4 +194,79 @@ class PredictionModel(BaseModel):
 
         self.create_directories()
 
-        return pd.DataFrame()
+        results = self.ClassifierEnsemble.predict_with_uncertainty(
+            X=self.features_df,
+            save=save_seed_result,
+            output_dir=self.result_dir,
+            overwrite=self.overwrite,
+            verbose=self.verbose,
+        )
+
+        df_forecast = pd.DataFrame(results, index=self.features_df.index)
+        csv_path = os.path.join(
+            self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
+        )
+
+        if not self.labels.empty:
+            df_forecast = set_datetime_index(self.labels, df_forecast)
+
+        df_forecast.to_csv(csv_path)
+        logger.info(f"Predictions saved to: {csv_path}")
+
+        self._plot_forecast(
+            df_forecast,
+            plot_threshold,
+            title=plot_title,
+            plot_pdf=plot_pdf,
+            **plot_kwargs,
+        )
+
+        return df_forecast
+
+    def _plot_forecast(
+        self,
+        df: pd.DataFrame,
+        threshold: float,
+        title: str | None = None,
+        plot_pdf: bool = False,
+        **plot_kwargs: Any,
+    ) -> None:
+        if self.labels.empty:
+            raise ValueError("No labels dataframe provided.")
+
+        fig = plot_forecast(
+            df=df,
+            label_df=self.labels,
+            threshold=threshold,
+            title=title,
+            **plot_kwargs,
+        )
+
+        figure_dir = os.path.join(self.prediction_dir, "figures")
+        os.makedirs(figure_dir, exist_ok=True)
+
+        path = os.path.join(figure_dir, f"forecast_{self.basename}.png")
+        fig.savefig(
+            path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor=None
+        )
+
+        logger.info(f"Forecast plot saved to: {path}")
+
+        if plot_pdf:
+            path = os.path.join(figure_dir, f"forecast_{self.basename}.pdf")
+
+            # Type 42 embeds TrueType fonts — text stays selectable and
+            # renders consistently in all PDF viewers and vector editors.
+            with matplotlib.rc_context({"pdf.fonttype": 42}):
+                fig.savefig(
+                    path,
+                    bbox_inches="tight",
+                    facecolor="white",
+                    edgecolor=None,
+                    metadata=pdf_metadata(
+                        title=f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}"
+                    ),
+                )
+
+        plt.close(fig)
+        self.forecast_plot_path = path

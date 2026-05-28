@@ -2,6 +2,7 @@ import os
 from typing import Self
 from datetime import timedelta
 
+import numpy as np
 import pandas as pd
 
 from eruption_forecast.logger import logger
@@ -35,9 +36,11 @@ class TremorMatrixBuilder:
         window_size (int): Window size in days.
         tremor_matrix_filename (str): Auto-generated filename for unified tremor matrix.
         matrix_tmp_dir (str): Directory for temporary per-window CSV files.
+        minimum_completion (float): Minimum data-completeness ratio (0.0–1.0).
+            Windows whose sample count falls below this fraction of the expected
+            count are skipped during matrix building.
         overwrite (bool): Whether to overwrite existing output files.
         verbose (bool): Enable verbose logging.
-        debug (bool): Enable debug mode.
         start_date (pd.Timestamp): Adjusted start date for matrix building.
         end_date (pd.Timestamp): Adjusted end date for matrix building.
         tremor_start_date_str (str): Tremor data start date in 'YYYY-MM-DD' format.
@@ -61,6 +64,10 @@ class TremorMatrixBuilder:
         window_size (int, optional): Window size in days. Defaults to 1.
         root_dir (str | None, optional): Anchor directory for resolving relative
             ``output_dir`` values. Defaults to None (uses ``os.getcwd()``).
+        minimum_completion (float, optional): Minimum data-completeness ratio
+            in the range 0.0–1.0. A window is skipped when the number of
+            samples it contains is below ``minimum_completion`` × expected
+            sample count. Defaults to 1.0 (no gaps tolerated).
         overwrite (bool, optional): Overwrite existing output files.
             Defaults to False.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
@@ -100,9 +107,9 @@ class TremorMatrixBuilder:
         output_dir: str | None = None,
         window_size: int = 1,
         root_dir: str | None = None,
+        minimum_completion: float = 1.0,
         overwrite: bool = False,
         verbose: bool = False,
-        debug: bool = False,
     ):
         """Initialize the TremorMatrixBuilder with tremor data, labels, and window settings.
 
@@ -120,9 +127,12 @@ class TremorMatrixBuilder:
             window_size (int, optional): Window size in days. Defaults to 1.
             root_dir (str | None, optional): Anchor directory for relative path resolution.
                 Defaults to None (uses os.getcwd()).
+            minimum_completion (float, optional): Minimum data-completeness
+                ratio in the range 0.0–1.0. Windows whose sample count falls
+                below this fraction of the expected count are skipped.
+                Defaults to 1.0 (no gaps tolerated).
             overwrite (bool, optional): Overwrite existing output files. Defaults to False.
             verbose (bool, optional): Enable verbose logging. Defaults to False.
-            debug (bool, optional): Enable debug mode. Defaults to False.
 
         Raises:
             TypeError: If tremor_df or label_df index is not a pd.DatetimeIndex.
@@ -152,9 +162,9 @@ class TremorMatrixBuilder:
         self.output_dir = output_dir
         self.window_size = window_size
         self.matrix_tmp_dir = matrix_tmp_dir
+        self.minimum_completion = np.clip(minimum_completion, 0, 1)
         self.overwrite = overwrite
         self.verbose = verbose
-        self.debug = debug
 
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
@@ -364,21 +374,24 @@ class TremorMatrixBuilder:
             )
 
             tremor_df_sliced = tremor_df.loc[start_datetime:end_datetime]
+            completeness = len(tremor_df_sliced) / total_window
 
-            if len(tremor_df_sliced) == total_window:
-                logger.debug(f"Label id={column_id}: accepted ({total_window} samples)")
+            # if len(tremor_df_sliced) == total_window:
+            #     logger.debug(f"Label id={column_id}: accepted ({total_window} samples)")
 
+            if completeness >= self.minimum_completion:
                 tremor_df_sliced = tremor_df_sliced.sort_index(ascending=True)
                 tremor_df_sliced = tremor_df_sliced.reset_index()
                 tremor_df_sliced[ID_COLUMN] = column_id
 
-                # Rearrange column to: id, datetime, ...columns
+                # Rearrange column to: id, datetime, ...tremor columns
                 tremor_df_sliced = tremor_df_sliced[
                     [ID_COLUMN, DATETIME_COLUMN, *tremor_columns]
                 ]
 
                 tremor_matrices.append(tremor_df_sliced)
 
+                # WARNING!
                 # BE CAREFUL TO USE THIS FEATURE.
                 # THIS WILL GENERATE TREMOR DATA GROUPED BY COLUMN "id" FROM LABEL DATASET
                 # IT WILL GENERATED A LOT OF FILES DEPENDS ON THE WINDOW SIZE.
@@ -397,10 +410,11 @@ class TremorMatrixBuilder:
                         matrix_tmp_filename
                     )
             else:
-                logger.debug(
-                    f"Window id={column_id}: skipped (expected {total_window} "
-                    f"samples, got {len(tremor_df_sliced)})"
+                message = (
+                    f"Label id={column_id}/{start_datetime}: skipped (expected {total_window} "
+                    f"samples, got {len(tremor_df_sliced)}) / completeness={completeness}"
                 )
+                logger.warning(message)
 
         # Unified tremor matrix as one single dataframe
         if len(tremor_matrices) == 0:

@@ -195,7 +195,7 @@ def setup_nslc_directories(
     """
     nslc = f"{network}.{station}.{location}.{channel}"
     output_dir = resolve_output_dir(output_dir, root_dir, "output")
-    station_dir = os.path.join(output_dir, nslc)
+    station_dir = os.path.join(output_dir, nslc.upper())
 
     return nslc, output_dir, station_dir
 

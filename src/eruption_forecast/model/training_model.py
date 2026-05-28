@@ -10,7 +10,6 @@ import pandas as pd
 from joblib import Parallel, delayed
 
 from eruption_forecast import LabelBuilder, DynamicLabelBuilder
-from eruption_forecast.model import SeedEnsemble, ClassifierEnsemble
 from eruption_forecast.plots import plot_significant_features
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
@@ -22,8 +21,11 @@ from eruption_forecast.utils.ml import (
 from eruption_forecast.utils.dataframe import concat_significant_features
 from eruption_forecast.utils.pathutils import ensure_dir, generate_features_filepaths
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.model.new_seed_ensemble import SeedEnsemble
 from eruption_forecast.features.feature_selector import FeatureSelector
+from eruption_forecast.model.new_classifier_ensemble import ClassifierEnsemble
 
 
 class TrainingModel(BaseModel):
@@ -93,9 +95,9 @@ class TrainingModel(BaseModel):
         cv_splits: int = 5,
         number_of_features: int = 20,
         include_eruption_date: bool = False,
-        overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        overwrite: bool = False,
         n_jobs: int = 1,
         n_grids: int = 1,
         verbose: bool = False,
@@ -161,6 +163,7 @@ class TrainingModel(BaseModel):
         self.results_json: str | None = None
         self.seed_ensembles: dict[str, str] = {}
         self.classifier_ensemble: str | None = None
+        self.model: ClassifierEnsemble | None = None
 
         self.validate()
 
@@ -412,6 +415,24 @@ class TrainingModel(BaseModel):
         self._sync_dates_to_tremor()
         verbose = verbose if verbose is not None else self.verbose
 
+        filtered_eruption_dates = (
+            [
+                eruption_date_str
+                for eruption_date_str in self.eruption_dates
+                if self.start_date <= to_datetime(eruption_date_str) <= self.end_date
+            ]
+            if self.eruption_dates is not None
+            else None
+        )
+
+        if (
+            self.verbose
+            and filtered_eruption_dates is not None
+            and self.eruption_dates is not None
+            and len(filtered_eruption_dates) != len(self.eruption_dates)
+        ):
+            logger.info(f"Eruption dates updated to: {filtered_eruption_dates}")
+
         if builder == "dynamic":
             if days_before_eruption is None:
                 raise ValueError(
@@ -423,7 +444,7 @@ class TrainingModel(BaseModel):
                 window_step=window_step,
                 window_step_unit=window_step_unit,
                 day_to_forecast=self.window_size,
-                eruption_dates=self.eruption_dates,  # ty:ignore[invalid-argument-type]
+                eruption_dates=filtered_eruption_dates,  # ty:ignore[invalid-argument-type]
                 output_dir=self.training_dir,
                 root_dir=self.root_dir,
                 verbose=verbose,
@@ -440,7 +461,7 @@ class TrainingModel(BaseModel):
                 window_step=window_step,
                 window_step_unit=window_step_unit,
                 day_to_forecast=self.window_size,
-                eruption_dates=self.eruption_dates,  # ty:ignore[invalid-argument-type]
+                eruption_dates=filtered_eruption_dates,  # ty:ignore[invalid-argument-type]
                 output_dir=self.training_dir,
                 root_dir=self.root_dir,
                 verbose=verbose,
@@ -457,6 +478,7 @@ class TrainingModel(BaseModel):
         save_tremor_matrix_per_method: bool = False,
         exclude_features: list[str] | None = None,
         save_tremor_matrix_per_id: bool = False,
+        minimum_completion: float = 1.0,
         overwrite: bool = False,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -479,6 +501,11 @@ class TrainingModel(BaseModel):
                 drop before saving. Defaults to None.
             save_tremor_matrix_per_id (bool): Write one CSV per window ID.
                 Defaults to False.
+            minimum_completion (float, optional): Minimum data-completeness
+                ratio in the range 0.0–1.0. Tremor windows whose sample count
+                falls below this fraction of the expected count are skipped
+                before feature extraction. Defaults to 1.0 (no gaps
+                tolerated).
             overwrite (bool): Re-extract even when cached files exist.
                 Defaults to False.
             n_jobs (int | None): Worker count for tsfresh extraction. Falls
@@ -509,6 +536,7 @@ class TrainingModel(BaseModel):
             select_tremor_columns=select_tremor_columns,
             save_tremor_matrix_per_method=save_tremor_matrix_per_method,
             save_tremor_matrix_per_id=save_tremor_matrix_per_id,
+            minimum_completion=minimum_completion,
             overwrite=overwrite,
             n_jobs=n_jobs,
             verbose=verbose,
@@ -742,11 +770,13 @@ class TrainingModel(BaseModel):
             self.results_json = results_json_path
 
         if seed_ensembles:
-            self.classifier_ensemble = self.build_classifier_ensemble(
+            self.classifier_ensemble, self.model = self.build_classifier_ensemble(
                 output_dir=self.classifier_dir,
                 seed_ensembles=seed_ensembles,
                 filename=filename,
             )
+        else:
+            raise ValueError("No seed ensembles found")
 
         return self
 
@@ -756,21 +786,12 @@ class TrainingModel(BaseModel):
         seed_ensembles: dict[str, SeedEnsemble],
         filename: str = "ClassifierEnsemble",
         verbose: bool = False,
-    ) -> str:
+    ) -> tuple[str, ClassifierEnsemble]:
         """Build and save a ClassifierEnsemble from in-memory SeedEnsemble objects.
 
         Assembles all per-classifier ``SeedEnsemble`` objects into a single
         ``ClassifierEnsemble`` via :meth:`ClassifierEnsemble.from_seed_ensembles`
-        and persists it to ``{output_dir}/ClassifierEnsemble.pkl``.
-
-        Args:
-            output_dir (str): Directory where ``ClassifierEnsemble.pkl`` is written.
-            seed_ensembles (dict[str, SeedEnsemble]): Mapping from classifier name
-                to its already-constructed ``SeedEnsemble``. Passed directly to
-                ``from_seed_ensembles`` to avoid reloading models from disk.
-            filename (str, optional): Classifier ensemble filename.
-                Defaults to "ClassifierEnsemble".
-            verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
+        and persists it to ``{output_dir}/ClassifierEnsemble.pkl``.`.
 
         Returns:
             str: Absolute path to the saved ``ClassifierEnsemble.pkl`` file.
@@ -782,10 +803,11 @@ class TrainingModel(BaseModel):
             ... )
         """
         classifier_ensemble_path = os.path.join(output_dir, f"{filename}.pkl")
-        ClassifierEnsemble.from_seed_ensembles(seed_ensembles, verbose).save(
-            classifier_ensemble_path
+        classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+            seed_ensembles, verbose
         )
-        return classifier_ensemble_path
+        classifier_ensemble.save(classifier_ensemble_path)
+        return classifier_ensemble_path, classifier_ensemble
 
     @staticmethod
     def build_seed_ensemble(

@@ -241,6 +241,7 @@ class BaseModel(ABC):
         select_tremor_columns: list[str] | None = None,
         save_tremor_matrix_per_method: bool = False,
         save_tremor_matrix_per_id: bool = False,
+        minimum_completion: float = 1.0,
         overwrite: bool = False,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -265,6 +266,10 @@ class BaseModel(ABC):
                 matrices when ``True``. Defaults to ``False``.
             overwrite (bool, optional): Overwrite existing matrix files when
                 ``True``. Defaults to ``False``.
+            minimum_completion (float, optional): Minimum data-completeness
+                ratio in the range 0.0–1.0. Tremor windows whose sample count
+                falls below this fraction of the expected count are skipped.
+                Defaults to 1.0 (no gaps tolerated).
             n_jobs (int | None, optional): Number of parallel workers for
                 ``FeaturesBuilder``. Falls back to ``self.n_jobs`` when
                 ``None``. Defaults to ``None``.
@@ -282,6 +287,7 @@ class BaseModel(ABC):
                 output_dir=os.path.join(output_dir, "tremor"),
                 window_size=self.window_size,
                 overwrite=overwrite or self.overwrite,
+                minimum_completion=minimum_completion,
                 verbose=verbose if verbose else self.verbose,
             )
             .build(

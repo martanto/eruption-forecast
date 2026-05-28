@@ -28,13 +28,14 @@ import pandas as pd
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-from eruption_forecast.utils.formatting import get_classifier_label
 from eruption_forecast.plots.styles import DIVERGING_BREWER
 from eruption_forecast.utils.dataframe import get_envelope_values
 from eruption_forecast.utils.date_utils import (
     sort_dates,
+    to_datetime,
     set_datetime_index,
 )
+from eruption_forecast.utils.formatting import get_classifier_label
 
 
 def plot_forecast(
@@ -233,7 +234,7 @@ def plot_forecast(
             for _index, eruption_date in enumerate(_eruption_dates):
                 label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
                 if df.index[0] <= eruption_date <= df.index[-1]:
-                    ax = _ax_eruption(ax, eruption_date, label=label)
+                    ax = _ax_eruption(ax, to_datetime(eruption_date), label=label)
 
         ax.axhline(
             y=threshold,
