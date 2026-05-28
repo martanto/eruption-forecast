@@ -150,6 +150,10 @@ class TremorMatrixBuilder:
         output_dir = resolve_output_dir(
             output_dir, root_dir, os.path.join("output", "tremor", "matrix")
         )
+
+        if tremor_df.empty:
+            raise ValueError("tremor_df.empty")
+
         matrix_tmp_dir = os.path.join(output_dir, "tmp")
         tremor_start_date_str = tremor_df.index.min().strftime("%Y-%m-%d")
         tremor_end_date_str = tremor_df.index.max().strftime("%Y-%m-%d")

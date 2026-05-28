@@ -13,7 +13,7 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.utils.formatting import pdf_metadata
 from eruption_forecast.model.new_seed_ensemble import SeedEnsemble
-from eruption_forecast.model.new_classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
 
 matplotlib.use("Agg")

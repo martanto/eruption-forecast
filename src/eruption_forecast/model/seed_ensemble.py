@@ -34,7 +34,6 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
     save_forecast_seed,
     compute_model_probabilities,
-    predict_proba_from_estimator,
 )
 from eruption_forecast.model.base_ensemble import BaseEnsemble
 
@@ -69,6 +68,33 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.classifier_name = classifier_name
         self.seeds: list[dict] = []
+
+    def __len__(self) -> int:
+        """Return the number of seeds in this ensemble.
+
+        Returns:
+            int: Number of seed records stored.
+        """
+        return len(self.seeds)
+
+    def __repr__(self, N_CHAR_MAX: int = 700) -> str:
+        """Return a concise string representation of the ensemble.
+
+        The ``N_CHAR_MAX`` parameter matches the ``BaseEstimator.__repr__``
+        signature; it is accepted but not used — the representation is always
+        compact.
+
+        Args:
+            N_CHAR_MAX (int): Maximum character limit inherited from
+                ``BaseEstimator``.  Not applied here.  Defaults to 700.
+
+        Returns:
+            str: Representation including classifier name and seed count.
+        """
+        return (
+            f"SeedEnsemble(classifier_name={self.classifier_name!r}, "
+            f"n_seeds={len(self.seeds)})"
+        )
 
     @classmethod
     def from_registry(
@@ -145,61 +171,67 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return ensemble
 
-    @staticmethod
-    def _compute_seed(seed: dict, X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
-        """Compute eruption probability for a single seed.
+    def _compute_probabilities_and_predictions(
+        self, X: pd.DataFrame
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Compute eruption probabilities and predictions across all seeds.
 
-        Selects the seed-specific features from ``X``, then calls
-        ``predict_proba`` or ``decision_function`` on the stored estimator and
-        returns a 1-D array of P(eruption) values.
+        Selects each seed's feature subset from ``X``, runs ``predict_proba``
+        or ``decision_function``, and returns stacked matrices.
 
         Args:
-            seed (dict): Seed record with keys ``model`` and ``feature_names``.
-            X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
+            X (pd.DataFrame): Extracted features DataFrame with shape
+                (n_samples, n_features).
 
         Returns:
-            tuple[np.ndarray, np.ndarray]: A 2-tuple of:
+            tuple[np.ndarray, np.ndarray]: Two arrays of shape
+                ``(n_samples, n_seeds)``:
 
-                - 1-D array of shape ``(n_samples,)`` with P(eruption).
-                - 1-D array of shape ``(n_samples,)`` with binary prediction (0 or 1).
+                - ``probabilities``: P(eruption) per seed.
+                - ``predictions``: Binary prediction (0 or 1) per seed.
 
         Raises:
-            RuntimeError: If the estimator supports neither ``predict_proba``
+            RuntimeError: If an estimator supports neither ``predict_proba``
                 nor ``decision_function``.
         """
-        model = seed["model"]
-        feature_names: list[str] = seed["feature_names"]
-        X_seed = X[feature_names]
-        eruption_proba, _, eruption_predict = predict_proba_from_estimator(
-            model, X_seed, identifier=seed["random_state"]
-        )
-        return eruption_proba, eruption_predict
+        seed_probabilities: list[np.ndarray] = []
+        seed_predictions: list[np.ndarray] = []
+
+        for seed in self.seeds:
+            seed_model = seed["model"]
+            features_df: pd.DataFrame = X[seed["feature_names"]]
+
+            if hasattr(seed_model, "predict_proba"):
+                scores: np.ndarray = seed_model.predict_proba(features_df)
+                eruption_probabilities = scores[:, 1]
+                eruption_predictions = seed_model.predict(features_df)
+            elif hasattr(seed_model, "decision_function"):
+                scores = seed_model.decision_function(features_df)
+                eruption_probabilities = 1.0 / (1.0 + np.exp(-scores))
+                eruption_predictions = (eruption_probabilities >= 0.5).astype(int)
+            else:
+                raise RuntimeError(
+                    f"{seed_model} supports neither ``predict_proba`` nor ``decision_function``."
+                )
+
+            seed_probabilities.append(eruption_probabilities)
+            seed_predictions.append(eruption_predictions)
+
+        return np.stack(seed_probabilities, axis=1), np.stack(seed_predictions, axis=1)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Return class probabilities averaged across all seeds.
 
-        Conforms to the sklearn ``(n_samples, n_classes)`` convention: column 0
-        is P(non-eruption), column 1 is P(eruption).  The values are the mean
-        across all seed estimators.
-
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
 
         Returns:
-            np.ndarray: Array of shape ``(n_samples, 2)`` where column 1 is the
-                mean eruption probability across seeds.
+            np.ndarray: Array of shape ``(n_samples, 2)`` where column 0 is
+                P(non-eruption) and column 1 is the mean P(eruption) across seeds.
         """
-        seed_probas: list[np.ndarray] = []
-
-        for seed in self.seeds:
-            seed_proba, _ = self._compute_seed(seed, X)
-            seed_probas.append(seed_proba)
-
-        seed_proba_matrix = np.stack(seed_probas, axis=1)  # (n_samples, n_seeds)
-
-        mean_eruption: np.ndarray = seed_proba_matrix.mean(axis=1)
-        result = np.column_stack([1.0 - mean_eruption, mean_eruption])
-        return result
+        probabilities, _ = self._compute_probabilities_and_predictions(X)
+        mean_eruption: np.ndarray = np.mean(probabilities, axis=1)
+        return np.column_stack([1.0 - mean_eruption, mean_eruption])
 
     def predict(self, X: pd.DataFrame, threshold: float = 0.5) -> np.ndarray:
         """Return binary predictions using a threshold on the mean probability.
@@ -247,53 +279,18 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             - ``seed_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
             - ``seed_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
         """
-        seed_probas: list[np.ndarray] = []
-        seed_preds: list[np.ndarray] = []
+        probabilities, predictions = self._compute_probabilities_and_predictions(X)
 
-        for seed in self.seeds:
-            seed_proba, seed_pred = self._compute_seed(seed, X)
-            seed_probas.append(seed_proba)
-            seed_preds.append(seed_pred)
-
-        seed_proba_matrix = np.stack(seed_probas, axis=1)  # (n_samples, n_seeds)
-        seed_predicts_matrix = np.stack(seed_preds, axis=1)  # (n_samples, n_seeds)
-
+        # Save probability and prediction per seed
         if save and output_dir is not None:
             for idx, seed in enumerate(self.seeds):
                 save_forecast_seed(
-                    output_dir,
-                    seed["random_state"],
-                    seed_proba_matrix[:, idx],
-                    seed_predicts_matrix[:, idx],
+                    output_dir=output_dir,
+                    random_state=seed["random_state"],
+                    probabilities=probabilities[:, idx],
+                    predictions=predictions[:, idx],
                     overwrite=overwrite,
                     verbose=verbose,
                 )
 
-        return compute_model_probabilities(seed_proba_matrix, seed_predicts_matrix)
-
-    def __len__(self) -> int:
-        """Return the number of seeds in this ensemble.
-
-        Returns:
-            int: Number of seed records stored.
-        """
-        return len(self.seeds)
-
-    def __repr__(self, N_CHAR_MAX: int = 700) -> str:
-        """Return a concise string representation of the ensemble.
-
-        The ``N_CHAR_MAX`` parameter matches the ``BaseEstimator.__repr__``
-        signature; it is accepted but not used — the representation is always
-        compact.
-
-        Args:
-            N_CHAR_MAX (int): Maximum character limit inherited from
-                ``BaseEstimator``.  Not applied here.  Defaults to 700.
-
-        Returns:
-            str: Representation including classifier name and seed count.
-        """
-        return (
-            f"SeedEnsemble(classifier_name={self.classifier_name!r}, "
-            f"n_seeds={len(self.seeds)})"
-        )
+        return compute_model_probabilities(probabilities, predictions)
