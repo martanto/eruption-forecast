@@ -52,6 +52,8 @@ class TrainingModel(BaseModel):
         cv_splits (int): Number of CV folds. Defaults to 5.
         number_of_features (int): Top-N features retained after feature
             selection. Defaults to 20.
+        include_eruption_date (bool): Whether to include the eruption day
+            itself as a positive label. Defaults to False.
         overwrite (bool): Re-run and overwrite cached feature and model files.
             Defaults to False.
         output_dir (str | None): Root output directory. Resolved automatically
@@ -92,6 +94,7 @@ class TrainingModel(BaseModel):
         ] = "shuffle-stratified",
         cv_splits: int = 5,
         number_of_features: int = 20,
+        include_eruption_date: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
@@ -119,6 +122,7 @@ class TrainingModel(BaseModel):
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
         self.number_of_features = number_of_features
+        self.include_eruption_date: bool = include_eruption_date
         self.overwrite: bool = overwrite
         self.n_grids: int = n_grids
 
@@ -308,6 +312,7 @@ class TrainingModel(BaseModel):
             "cv_strategy": self.cv_strategy,
             "cv_splits": self.cv_splits,
             "number_of_features": self.number_of_features,
+            "include_eruption_date": self.include_eruption_date,
             "overwrite": self.overwrite,
             "output_dir": self.output_dir,
             "root_dir": self.root_dir,
@@ -347,6 +352,7 @@ class TrainingModel(BaseModel):
             f"Classifiers: {classifier_names}. "
             f"CV strategy: {self.cv_strategy} with {self.cv_splits} folds. "
             f"Top features retained: {self.number_of_features}. "
+            f"Include eruption date: {self.include_eruption_date}. "
             f"Overwrite: {self.overwrite}. "
             f"Output dir: {self.output_dir}. "
             f"Root dir: {self.root_dir}. "
@@ -362,7 +368,6 @@ class TrainingModel(BaseModel):
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         builder: Literal["standard", "dynamic"] = "standard",
-        include_eruption_date: bool = False,
         days_before_eruption: int | None = None,
         verbose: bool | None = None,
     ) -> Self:
@@ -457,7 +462,6 @@ class TrainingModel(BaseModel):
                 window_step_unit=window_step_unit,
                 day_to_forecast=self.window_size,
                 eruption_dates=filtered_eruption_dates,  # ty:ignore[invalid-argument-type]
-                include_eruption_date=include_eruption_date,
                 output_dir=self.training_dir,
                 root_dir=self.root_dir,
                 verbose=verbose,
