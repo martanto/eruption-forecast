@@ -22,13 +22,14 @@ from eruption_forecast.utils.dataframe import concat_significant_features
 from eruption_forecast.utils.pathutils import ensure_dir, generate_features_filepaths
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
 
-class TrainingModel(BaseModel):
+class TrainingModel(BaseModel, CacheModel):
     """Train classifier models across multiple random seeds on tremor feature data.
 
     Orchestrates the full training pipeline: label building, tremor matrix
@@ -370,6 +371,85 @@ class TrainingModel(BaseModel):
             f"Eruption dates: {eruption_list}."
             f"{basename_str}"
         )
+
+    @classmethod
+    def build_cache_identity(  # ty:ignore[invalid-method-override]
+        cls,
+        *,
+        nslc: str,
+        tremor_df: pd.DataFrame,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        classifiers: str | list[str],
+        eruption_dates: list[str],
+        window_size: int,
+        cv_strategy: str,
+        cv_splits: int,
+        number_of_features: int,
+        include_eruption_date: bool,
+        build_label_params: dict,
+        extract_features_params: dict,
+        fit_params: dict,
+    ) -> dict:
+        """Return the canonical identity dict that defines this training cache entry.
+
+        Builds the parameter bundle that uniquely identifies a trained
+        ``TrainingModel``: the station-channel id, the tremor data
+        fingerprint, all constructor params that affect the output, plus the
+        params passed to ``build_label()``, ``extract_features()``, and
+        ``fit()``. Runtime knobs (``n_jobs``, ``n_grids``, ``verbose``,
+        ``overwrite``) are excluded because they do not change the produced
+        artefact.
+
+        Args:
+            nslc (str): ``Network.Station.Location.Channel`` identifier.
+            tremor_df (pd.DataFrame): The tremor DataFrame that will be used
+                for training. Reduced to a small fingerprint via
+                :meth:`CacheModel.tremor_fingerprint`.
+            start_date (str | datetime): Training period start.
+            end_date (str | datetime): Training period end.
+            classifiers (str | list[str]): Classifier keys.
+            eruption_dates (list[str]): Eruption dates used for labelling.
+            window_size (int): Sliding window size in days.
+            cv_strategy (str): Cross-validation strategy name.
+            cv_splits (int): Number of CV folds.
+            number_of_features (int): Top-N features retained.
+            include_eruption_date (bool): Whether the eruption day itself is
+                labelled positive.
+            build_label_params (dict): Kwargs passed to ``build_label()``
+                excluding ``verbose``.
+            extract_features_params (dict): Kwargs passed to
+                ``extract_features()`` excluding ``overwrite``, ``n_jobs``,
+                ``verbose``.
+            fit_params (dict): Kwargs passed to ``fit()`` excluding
+                ``plot_features``.
+
+        Returns:
+            dict: Canonical identity dict ready for hashing.
+        """
+        classifiers_list = (
+            [classifiers] if isinstance(classifiers, str) else list(classifiers)
+        )
+
+        return {
+            "class": cls.__name__,
+            "nslc": nslc,
+            "tremor": cls.tremor_fingerprint(tremor_df),
+            "constructor": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "classifiers": sorted(classifiers_list),
+                "eruption_dates": sorted(eruption_dates),
+                "window_size": window_size,
+                "cv_strategy": cv_strategy,
+                "cv_splits": cv_splits,
+                "number_of_features": number_of_features,
+                "include_eruption_date": include_eruption_date,
+            },
+            "build_label": build_label_params,
+            "extract_features": extract_features_params,
+            "fit": fit_params,
+        }
 
     def build_label(
         self,
