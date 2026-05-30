@@ -7,6 +7,7 @@ import pandas as pd
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import setup_nslc_directories
 from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.evaluation_model import EvaluationModel
@@ -72,6 +73,11 @@ class ForecastModel:
         # Eruption dates from train() forwarded to evaluate() as a fallback
         # when the caller does not pass them explicitly.
         self._eruption_dates: list[str] | None = None
+
+        # Hash of the TrainingModel identity produced by the last train() call.
+        # Threaded into PredictionModel.build_cache_identity so the prediction
+        # cache invalidates whenever the upstream training model changes.
+        self._training_cache_hash: str | None = None
 
         # Will be set after predict() run
         self.PredictionModel: PredictionModel | None = None
@@ -177,7 +183,7 @@ class ForecastModel:
         ] = "shuffle-stratified",
         cv_splits: int = 5,
         number_of_features: int = 20,
-        include_eruption_date: bool = False,
+        include_eruption_date: bool = True,
         select_tremor_columns: list[str] | None = None,
         save_tremor_matrix_per_method: bool = True,
         exclude_features: list[str] | None = None,
@@ -200,6 +206,52 @@ class ForecastModel:
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
 
+        resolved_output_dir = output_dir or self.station_dir
+
+        identity = TrainingModel.build_cache_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            start_date=start_date,
+            end_date=end_date,
+            classifiers=classifiers,
+            eruption_dates=eruption_dates,
+            window_size=self.day_to_forecast,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            number_of_features=number_of_features,
+            include_eruption_date=include_eruption_date,
+            build_label_params={
+                "window_step": window_step,
+                "window_step_unit": window_step_unit,
+                "builder": label_builder,
+                "days_before_eruption": days_before_eruption,
+            },
+            extract_features_params={
+                "select_tremor_columns": select_tremor_columns,
+                "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
+                "exclude_features": exclude_features,
+                "minimum_completion": minimum_completion,
+            },
+            fit_params={
+                "seeds": seeds,
+                "resample_method": resample_method,
+                "minority_threshold": minority_threshold,
+                "sampling_strategy": sampling_strategy,
+            },
+        )
+
+        if not overwrite:
+            cached = TrainingModel.load_from_cache(resolved_output_dir, identity)
+            if cached is not None:
+                self.TrainingModel = cached
+                self.ClassifierEnsemble = cached.ClassifierEnsemble
+                self.select_tremor_columns = select_tremor_columns
+                self.save_tremor_matrix_per_method = save_tremor_matrix_per_method
+                self.exclude_features = exclude_features
+                self._eruption_dates = eruption_dates
+                self._training_cache_hash = CacheModel.compute_hash(identity)
+                return self
+
         training_model = (
             TrainingModel(
                 tremor_data=self.tremor_df,
@@ -212,7 +264,7 @@ class ForecastModel:
                 cv_splits=cv_splits,
                 number_of_features=number_of_features,
                 include_eruption_date=include_eruption_date,
-                output_dir=output_dir or self.station_dir,
+                output_dir=resolved_output_dir,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
                 n_grids=n_grids,
@@ -251,7 +303,8 @@ class ForecastModel:
 
         self._eruption_dates = eruption_dates
 
-        training_model.save()
+        training_model.save_to_cache(identity)
+        self._training_cache_hash = CacheModel.compute_hash(identity)
 
         return self
 
@@ -278,6 +331,33 @@ class ForecastModel:
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
 
+        resolved_output_dir = output_dir or self.station_dir
+
+        identity = PredictionModel.build_cache_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            training_hash=self._training_cache_hash,
+            start_date=start_date,
+            end_date=end_date,
+            window_size=self.day_to_forecast,
+            build_label_params={
+                "window_step": window_step,
+                "window_step_unit": window_step_unit,
+            },
+            extract_features_params={
+                "select_tremor_columns": self.select_tremor_columns,
+                "save_tremor_matrix_per_method": self.save_tremor_matrix_per_method,
+                "exclude_features": self.exclude_features,
+            },
+        )
+
+        if not overwrite:
+            cached = PredictionModel.load_from_cache(resolved_output_dir, identity)
+            if cached is not None:
+                self.PredictionModel = cached
+                self.results = cached.results
+                return self
+
         prediction_model = (
             PredictionModel(
                 model=self.ClassifierEnsemble,
@@ -285,7 +365,7 @@ class ForecastModel:
                 start_date=start_date,
                 end_date=end_date,
                 window_size=self.day_to_forecast,
-                output_dir=output_dir or self.station_dir,
+                output_dir=resolved_output_dir,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
                 verbose=verbose,
@@ -313,7 +393,7 @@ class ForecastModel:
             **plot_kwargs,
         )
 
-        prediction_model.save()
+        prediction_model.save_to_cache(identity)
 
         return self
 
