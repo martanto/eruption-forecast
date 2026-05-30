@@ -54,12 +54,12 @@ class TrainingModel(BaseModel):
             selection. Defaults to 20.
         include_eruption_date (bool): Whether to include the eruption day
             itself as a positive label. Defaults to False.
-        overwrite (bool): Re-run and overwrite cached feature and model files.
-            Defaults to False.
         output_dir (str | None): Root output directory. Resolved automatically
             when None. Defaults to None.
         root_dir (str | None): Project root used for path resolution. Defaults
             to None.
+        overwrite (bool): Re-run and overwrite cached feature and model files.
+            Defaults to False.
         n_jobs (int): Number of parallel outer workers for seed-level
             parallelism. Defaults to 1.
         n_grids (int): Parallel workers used inside ``GridSearchCV`` and
@@ -118,6 +118,7 @@ class TrainingModel(BaseModel):
         classifiers = [classifiers] if isinstance(classifiers, str) else classifiers
 
         # Set default properties
+        self.kind: Literal["training", "prediction"] = "training"
         self.classifiers = classifiers
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
@@ -157,13 +158,14 @@ class TrainingModel(BaseModel):
         self.LabelBuilder: LabelBuilder | None = None
         self.labels: pd.Series = pd.Series()
         self.basename: str | None = None
+        self.builder: Literal["standard", "dynamic"] = "standard"
+        self.days_before_eruption: int | None = None
 
         # Will be set after fit() called
         self.results: dict[str, str] = {}
         self.results_json: str | None = None
         self.seed_ensembles: dict[str, str] = {}
-        self.classifier_ensemble: str | None = None
-        self.model: ClassifierEnsemble | None = None
+        self.classifier_ensemble_path: str | None = None
 
         self.validate()
 
@@ -176,7 +178,7 @@ class TrainingModel(BaseModel):
         steps can write files without additional setup calls.
 
         Returns:
-            tuple: A seven-element tuple containing:
+            tuple: An eight-element tuple containing:
                 - training_dir (str): Root training output path.
                 - classifier_dir (str): Classifier training output path.
                 - features_dir (str): CV-scoped features directory.
@@ -244,11 +246,13 @@ class TrainingModel(BaseModel):
         """Validate and reconcile model parameters against system and data constraints.
 
         Clamps ``n_grids`` so that the product ``n_jobs × n_grids`` never
-        exceeds the available CPU count. Creates the root training directory
-        as a side effect. Date range clamping against the tremor data bounds
-        is deferred to ``_clamp_dates_to_tremor()``, which is called lazily
-        from ``build_label()`` to avoid loading the tremor CSV during
-        construction.
+        exceeds the available CPU count. When the caller leaves both
+        ``n_jobs`` and ``n_grids`` at their default of ``1``, ``n_grids`` is
+        boosted to ``total_cpu - 2`` so the grid search can use the available
+        cores. Creates the root training directory as a side effect. Date
+        range clamping against the tremor data bounds is deferred to
+        ``_sync_dates_to_tremor()``, which is called lazily from
+        ``build_label()`` to avoid loading the tremor CSV during construction.
 
         Returns:
             Self: The current instance, enabling method chaining.
@@ -292,9 +296,13 @@ class TrainingModel(BaseModel):
         """Serialise core training parameters to a plain dictionary.
 
         Returns:
-            dict: Mapping of parameter names to their current values, including
-                ``start_date``, ``end_date``, ``window_size``,
-                ``eruption_dates``, and ``n_jobs``.
+            dict: Mapping of parameter names to their current values. Always
+                includes ``start_date``, ``end_date``, ``classifiers``,
+                ``eruption_dates``, ``window_size``, ``cv_strategy``,
+                ``cv_splits``, ``number_of_features``,
+                ``include_eruption_date``, ``overwrite``, ``output_dir``,
+                ``root_dir``, ``n_jobs``, ``n_grids``, and ``verbose``. Also
+                includes ``basename`` once ``build_label()`` has been called.
 
         Example:
             >>> d = model.to_dict()
@@ -412,6 +420,11 @@ class TrainingModel(BaseModel):
         if window_step <= 0:
             raise ValueError("window_step must be > 0.")
 
+        self.window_step = window_step
+        self.window_step_unit = window_step_unit
+        self.builder = builder
+        self.days_before_eruption = days_before_eruption
+
         self._sync_dates_to_tremor()
         verbose = verbose if verbose is not None else self.verbose
 
@@ -522,7 +535,7 @@ class TrainingModel(BaseModel):
         Example:
             >>> model.build_label(window_step=6, window_step_unit="hours")
             >>> model.extract_features(select_tremor_columns=["rsam_f2", "entropy"])
-            >>> model.extracted_features_df.shape
+            >>> model.features_df.shape
             (n_windows, n_features)
         """
         if self.LabelBuilder is None:
@@ -556,6 +569,8 @@ class TrainingModel(BaseModel):
             labels = labels.set_index("id")
         if "datetime" in labels.columns:
             labels = labels.drop("datetime", axis=1)
+
+        # Label with ``pd.RangeIndex`` and column ``is_erupted`` only
         self.labels = labels["is_erupted"]
 
         return self
@@ -596,14 +611,16 @@ class TrainingModel(BaseModel):
 
         Raises:
             ValueError: If ``build_label()`` has not been called first.
-            ValueError: If ``extracted_features_df`` is empty, meaning
+            ValueError: If ``features_df`` is empty, meaning
                 ``extract_features()`` has not been called.
+            ValueError: If no seed ensembles are produced (every classifier
+                yielded zero successful seeds).
 
         Example:
             >>> model.build_label(window_step=6, window_step_unit="hours")
             >>> model.extract_features()
             >>> model.fit(seeds=25, resample_method="auto", plot_features=True)
-            >>> model.csv  # {"random-forest-classifier": "path/to/trained_model_*.csv"}
+            >>> model.results  # {"RandomForestClassifier": "path/to/trained_model_*.csv"}
         """
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
@@ -681,7 +698,7 @@ class TrainingModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"Pending Training: Found {len(feature_selection_results)} job(s)"
+                f"Pending Training: Found {len(training_model_results)} job(s)"
             )
 
         for result in training_model_results:
@@ -770,10 +787,12 @@ class TrainingModel(BaseModel):
             self.results_json = results_json_path
 
         if seed_ensembles:
-            self.classifier_ensemble, self.model = self.build_classifier_ensemble(
-                output_dir=self.classifier_dir,
-                seed_ensembles=seed_ensembles,
-                filename=filename,
+            self.classifier_ensemble_path, self.ClassifierEnsemble = (
+                self.build_classifier_ensemble(
+                    output_dir=self.classifier_dir,
+                    seed_ensembles=seed_ensembles,
+                    filename=filename,
+                )
             )
         else:
             raise ValueError("No seed ensembles found")
