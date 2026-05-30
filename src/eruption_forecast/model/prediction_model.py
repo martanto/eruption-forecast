@@ -166,6 +166,7 @@ class PredictionModel(BaseModel):
 
         # Label with ``pd.DatetimeIndex`` and column ``id`` only
         self.labels: pd.Series = pd.Series()
+        self._labels: pd.DataFrame = pd.DataFrame()
 
         # Will be set after forecast() called
         self.forecast_plot_path: str | None = None
@@ -395,6 +396,7 @@ class PredictionModel(BaseModel):
                     f"{labels_df.columns.tolist()}"
                 )
 
+            self._labels = labels_df
             self.labels = labels_df["id"]
 
             return self
@@ -406,17 +408,19 @@ class PredictionModel(BaseModel):
             window_step_unit=window_step_unit,
         )
 
+        label_df["id"] = range(label_df.shape[0])
+
         if label_df.empty:
             raise ValueError(
                 f"Labels is empty. Check your start date {self.start_date} "
                 f"and end date {self.end_date}, window step {window_step} and "
-                f"window step unit {window_step_unit}"
+                f"window step unit {window_step_unit}. {label_df}"
             )
 
-        label_df["id"] = range(label_df.shape[0])
         label_df.to_csv(label_csv, index=True)
 
         # Label with ``pd.DatetimeIndex`` and column ``id``. No ``is_erupted``.
+        self._labels = label_df
         self.labels = label_df["id"]
 
         if self.verbose:
@@ -464,7 +468,7 @@ class PredictionModel(BaseModel):
         Raises:
             ValueError: If ``build_label()`` has not been called first.
         """
-        if self.labels.empty:
+        if self._labels.empty:
             raise ValueError("Please run build_label() first.")
 
         if not self.features_df.empty and self.features_csv is not None:
@@ -473,7 +477,7 @@ class PredictionModel(BaseModel):
             return self
 
         features_builder = self._build_features(
-            label_df=self.labels.to_frame(),
+            label_df=self._labels,
             output_dir=self.prediction_dir,
             features_dir=self.features_dir,
             select_tremor_columns=select_tremor_columns,
@@ -533,7 +537,7 @@ class PredictionModel(BaseModel):
             ValueError: If ``build_label()`` has not been called first.
             ValueError: If ``extract_features()`` has not been called first.
         """
-        if self.labels.empty:
+        if self.labels.empty or self._labels.empty:
             raise ValueError("Please run build_label() first.")
 
         if self.features_df.empty and self.features_csv is None:
@@ -557,7 +561,7 @@ class PredictionModel(BaseModel):
             self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
         )
 
-        df_forecast = set_datetime_index(self.labels, df_forecast)
+        df_forecast = set_datetime_index(self._labels, df_forecast)
 
         df_forecast.to_csv(csv_path)
         logger.info(f"Predictions saved to: {csv_path}")
@@ -603,7 +607,7 @@ class PredictionModel(BaseModel):
         """
         fig = plot_forecast(
             df=df,
-            label_df=self.labels,
+            label_df=self._labels,
             threshold=threshold,
             title=title,
             **plot_kwargs,
