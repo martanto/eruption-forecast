@@ -964,7 +964,7 @@ class LabelBuilder:
 
         return label_data.df
 
-    def build(self, overwrite: bool = True) -> Self:
+    def build(self, overwrite: bool = True, plot_distribution: bool = True) -> Self:
         """Build labels based on eruption dates and window configuration.
 
         Main orchestration method that performs the complete label building workflow:
@@ -979,7 +979,10 @@ class LabelBuilder:
         falls within [eruption_date - day_to_forecast, eruption_date].
 
         Args:
-            overwrite (bool): Whether to overwrite existing label file
+            overwrite (bool): Whether to overwrite existing label file.
+                Defaults to ``True``.
+            plot_distribution (bool, optional): Wether to plot label distribution.
+                Defaults to ``True``.
 
         Returns:
             Self: Instance with populated df, df_eruption, and df_eruptions properties.
@@ -1054,11 +1057,13 @@ class LabelBuilder:
         self.df_eruption = df_eruption
 
         if not file_exists or overwrite:
-            self.save()
+            self.save(plot_distribution=plot_distribution)
 
         return self
 
-    def save(self, file_type: Literal["csv", "xlsx"] = "csv") -> Self:
+    def save(
+        self, file_type: Literal["csv", "xlsx"] = "csv", plot_distribution: bool = True
+    ) -> Self:
         """Save labels DataFrame to disk in CSV or Excel format.
 
         Writes the built labels DataFrame to a file with the standardized filename
@@ -1075,6 +1080,8 @@ class LabelBuilder:
 
                 - ``"csv"``: Comma-separated values (lightweight, fast).
                 - ``"xlsx"``: Excel workbook (for manual inspection).
+            plot_distribution (bool, optional): Wether to plot label distribution.
+                Defaults to ``True``.
 
         Returns:
             Self: Instance for method chaining.
@@ -1105,10 +1112,11 @@ class LabelBuilder:
 
         self.save_eruption_dates()
 
-        try:
-            self.plot_distribution()
-        except Exception as exc:
-            logger.warning(f"Label distribution plot could not be saved: {exc}")
+        if plot_distribution:
+            try:
+                self.plot_distribution()
+            except Exception as exc:
+                logger.warning(f"Label distribution plot could not be saved: {exc}")
 
         return self
 
@@ -1141,9 +1149,6 @@ class LabelBuilder:
             >>> builder.build().plot_distribution()
             >>> builder.build().plot_distribution(filetype="pdf")
         """
-        if self.df is None:
-            raise RuntimeError("Call build() before plot_distribution().")
-
         base = os.path.splitext(self.csv)[0]
         filepath = f"{base}_distribution"
 
