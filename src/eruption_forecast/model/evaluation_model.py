@@ -179,7 +179,6 @@ class EvaluationModel(BaseModel):
 
         (
             self.evaluation_dir,
-            self.features_dir,
             self.classifiers_dir,
         ) = self.set_directories()
 
@@ -261,7 +260,7 @@ class EvaluationModel(BaseModel):
             verbose=verbose,
         )
 
-    def set_directories(self) -> tuple[str, str, str]:
+    def set_directories(self) -> tuple[str, str]:
         """Build the output directory paths for evaluation artefacts.
 
         Output paths are namespaced by mode — ``evaluation/training/`` or
@@ -273,14 +272,12 @@ class EvaluationModel(BaseModel):
             tuple: A three-element tuple containing:
 
                 - evaluation_dir (str): Root evaluation output path.
-                - features_dir (str): Features subdirectory.
                 - classifiers_dir (str): Classifier-level results subdirectory.
         """
         evaluation_dir = os.path.join(self.output_dir, "evaluation", self.model_kind)
-        features_dir = os.path.join(evaluation_dir, "features")
         classifiers_dir = os.path.join(evaluation_dir, "classifiers")
 
-        return evaluation_dir, features_dir, classifiers_dir
+        return evaluation_dir, classifiers_dir
 
     def create_directories(self) -> None:
         """Create the evaluation output directories on disk.
@@ -291,7 +288,6 @@ class EvaluationModel(BaseModel):
         missing parent directory.
         """
         ensure_dir(self.evaluation_dir)
-        ensure_dir(self.features_dir)
         ensure_dir(self.classifiers_dir)
 
     def validate(self) -> Self:
@@ -397,7 +393,10 @@ class EvaluationModel(BaseModel):
             eruption_dates=self.eruption_dates,
             day_to_forecast=self.window_size,
             verbose=self.verbose,
-        ).build(plot_distribution=False)
+        ).build(
+            save_label=False,
+            plot_distribution=False,
+        )
 
         true_label_df = label_builder.df
         merged = labels.to_frame().join(true_label_df["is_erupted"], how="left")
@@ -505,8 +504,11 @@ class EvaluationModel(BaseModel):
                     continue
 
                 available_features = [
-                    f for f in feature_names if f in self.features_df.columns
+                    feature_name
+                    for feature_name in feature_names
+                    if f in self.features_df.columns
                 ]
+
                 if not available_features:
                     logger.warning(
                         f"{classifier_name}/{random_state:05d}: none of the "
@@ -574,8 +576,7 @@ class EvaluationModel(BaseModel):
         self.metrics = metrics_per_classifier
         return metrics_per_classifier
 
-    @staticmethod
-    def _plot_aggregate(metrics_dir: str, classifier_name: str) -> None:
+    def _plot_aggregate(self, metrics_dir: str, classifier_name: str) -> None:
         """Render aggregate plots for one classifier from per-seed metrics JSON.
 
         Delegates to :class:`MultiModelEvaluator`, which reads ``*.json`` files
@@ -589,7 +590,9 @@ class EvaluationModel(BaseModel):
                 message when plotting fails.
         """
         try:
-            MultiModelEvaluator(metrics_dir=metrics_dir).plot_all()
+            MultiModelEvaluator(
+                output_dir=self.output_dir, metrics_dir=metrics_dir
+            ).plot_all()
         except Exception as exc:
             logger.warning(f"{classifier_name}: aggregate plots skipped. Reason: {exc}")
 
