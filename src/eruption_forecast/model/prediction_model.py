@@ -22,6 +22,7 @@ from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.utils.formatting import pdf_metadata
+from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.model.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
@@ -30,7 +31,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-class PredictionModel(BaseModel):
+class PredictionModel(BaseModel, CacheModel):
     """Forecast volcanic eruption probabilities from a trained ensemble.
 
     Loads a trained ensemble produced by ``TrainingModel.fit()`` and runs
@@ -170,6 +171,7 @@ class PredictionModel(BaseModel):
 
         # Will be set after forecast() called
         self.forecast_plot_path: str | None = None
+        self.results: pd.DataFrame = pd.DataFrame()
 
     def set_directories(self) -> tuple[str, str, str]:
         """Build and return the prediction output directory paths.
@@ -346,6 +348,62 @@ class PredictionModel(BaseModel):
             f"Verbose: {self.verbose}. "
             f"Basename: {self.basename}."
         )
+
+    @classmethod
+    def build_cache_identity(  # ty:ignore[invalid-method-override]
+        cls,
+        *,
+        nslc: str,
+        tremor_df: pd.DataFrame,
+        training_hash: str | None,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        window_size: int,
+        build_label_params: dict,
+        extract_features_params: dict,
+    ) -> dict:
+        """Return the canonical identity dict that defines this prediction cache entry.
+
+        Bundles the station-channel id, the tremor data fingerprint, the
+        upstream training-model hash, and all prediction-specific params into
+        a canonical dict. Including ``training_hash`` ensures the prediction
+        cache invalidates automatically whenever the trained ensemble it
+        depends on changes — even when the prediction inputs themselves are
+        unchanged.
+
+        Args:
+            nslc (str): ``Network.Station.Location.Channel`` identifier.
+            tremor_df (pd.DataFrame): The tremor DataFrame used for the
+                forecast. Reduced to a fingerprint via
+                :meth:`CacheModel.tremor_fingerprint`.
+            training_hash (str | None): Hash of the upstream
+                :class:`TrainingModel` identity that produced the loaded
+                ensemble. ``None`` only when the ensemble was loaded from a
+                source outside the current pipeline run.
+            start_date (str | datetime): Forecast period start.
+            end_date (str | datetime): Forecast period end.
+            window_size (int): Sliding window size in days.
+            build_label_params (dict): Kwargs passed to ``build_label()``.
+            extract_features_params (dict): Kwargs passed to
+                ``extract_features()`` excluding ``overwrite``, ``n_jobs``,
+                ``verbose``.
+
+        Returns:
+            dict: Canonical identity dict ready for hashing.
+        """
+        return {
+            "class": cls.__name__,
+            "nslc": nslc,
+            "training_hash": training_hash,
+            "tremor": cls.tremor_fingerprint(tremor_df),
+            "constructor": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "window_size": window_size,
+            },
+            "build_label": build_label_params,
+            "extract_features": extract_features_params,
+        }
 
     def build_label(
         self, window_step: int, window_step_unit: Literal["minutes", "hours"]
@@ -574,6 +632,7 @@ class PredictionModel(BaseModel):
             **plot_kwargs,
         )
 
+        self.results = df_forecast
         return df_forecast
 
     def _plot_forecast(
