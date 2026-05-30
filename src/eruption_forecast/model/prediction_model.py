@@ -212,37 +212,139 @@ class PredictionModel(BaseModel):
         return self
 
     def describe(self) -> str:
-        """Return a human-readable description of this prediction model.
+        """Return a one-line prose summary of the prediction configuration.
 
-        Placeholder hook required by :class:`BaseModel`. Concrete prose
-        description is not yet implemented for this stage.
+        Builds a compact human-readable string covering the forecast period,
+        sliding window size, and registered classifiers. Suitable for CLI
+        output and human-facing reports. For raw data use ``to_dict()``; for
+        an MCP/LLM-friendly block use ``to_prompt()``.
 
         Returns:
-            str: Empty string.
+            str: One-line description such as
+                ``"PredictionModel(period=2025-03-16 → 2025-03-22,
+                window_size=2d, classifiers=[rf, xgb])"``.
+
+        Example:
+            >>> print(prediction.describe())
+            PredictionModel(period=2025-03-16 → 2025-03-22, window_size=2d, classifiers=[rf, xgb])
         """
-        return ""
+        classifier_names = ", ".join(self.ClassifierEnsemble.classifiers)
+        return (
+            f"PredictionModel("
+            f"period={self.start_date_str} → {self.end_date_str}, "
+            f"window_size={self.window_size}d, "
+            f"classifiers=[{classifier_names}]"
+            f")"
+        )
 
     def to_dict(self) -> dict:
-        """Return a structured dictionary of this prediction model's configuration.
+        """Serialise core prediction parameters to a JSON-friendly dictionary.
 
-        Placeholder hook required by :class:`BaseModel`. Concrete
-        serialisation is not yet implemented for this stage.
+        Produces a stable schema for MCP tool responses and downstream LLM
+        consumption. Always includes the construction-time configuration
+        (``start_date``, ``end_date``, ``window_size``, ``classifiers``,
+        ``overwrite``, ``output_dir``, ``root_dir``, ``n_jobs``, ``verbose``,
+        and ``basename``). Stage-specific keys (``window_step``,
+        ``window_step_unit``, ``features_csv``, ``forecast_plot_path``) are
+        added once the corresponding method has been called.
 
         Returns:
-            dict: Empty mapping.
+            dict: Mapping of parameter name to its serialised value.
+
+        Example:
+            >>> d = prediction.to_dict()
+            >>> d["window_size"]
+            2
+            >>> "classifiers" in d
+            True
         """
-        return {}
+        result: dict = {
+            "start_date": self.start_date_str,
+            "end_date": self.end_date_str,
+            "window_size": self.window_size,
+            "classifiers": self.ClassifierEnsemble.classifiers,
+            "overwrite": self.overwrite,
+            "output_dir": self.output_dir,
+            "root_dir": self.root_dir,
+            "n_jobs": self.n_jobs,
+            "verbose": self.verbose,
+            "basename": self.basename,
+        }
+
+        if self.window_step is not None:
+            result["window_step"] = self.window_step
+
+        if self.window_step_unit is not None:
+            result["window_step_unit"] = self.window_step_unit
+
+        if self.features_csv is not None:
+            result["features_csv"] = self.features_csv
+
+        if self.forecast_plot_path is not None:
+            result["forecast_plot_path"] = self.forecast_plot_path
+
+        return result
 
     def to_prompt(self) -> str:
-        """Return a prompt-ready text block for this prediction model.
+        """Return a structured bullet-list block suitable for LLM and MCP prompts.
 
-        Placeholder hook required by :class:`BaseModel`. Concrete prompt
-        formatting is not yet implemented for this stage.
+        Builds a deterministic, template-driven prose block from
+        :meth:`to_dict`. Paths are reduced to filenames only to avoid leaking
+        absolute system paths into prompts. For human-readable prose use
+        :meth:`describe`. For raw data use :meth:`to_dict`.
 
         Returns:
-            str: Empty string.
+            str: Prompt-ready block ending with the build state (window grid,
+                feature extraction, and forecast plot).
+
+        Example:
+            >>> for part in prediction.to_prompt().split(". "):
+            ...     print(part)
+            Forecast period: 2025-03-16 to 2025-03-22
+            Window size: 2 day(s)
+            Classifiers: RandomForestClassifier, XGBClassifier
+            Window step: 10 minutes
+            Features CSV: features-label_2025-03-16_2025-03-22_step-10-minutes.csv
+            Forecast plot: forecast_2025-03-16_2025-03-22.pdf
+            Overwrite: False
+            Output dir: output/VG.OJN.00.EHZ
+            Root dir: None
+            n_jobs: 4
+            Verbose: False
+            Basename: 2025-03-16_2025-03-22.
         """
-        return ""
+        classifier_names = ", ".join(self.ClassifierEnsemble.classifiers)
+
+        window_step_str = (
+            f"{self.window_step} {self.window_step_unit}"
+            if self.window_step is not None and self.window_step_unit is not None
+            else "not built"
+        )
+        features_csv_str = (
+            os.path.basename(self.features_csv)
+            if self.features_csv is not None
+            else "not extracted"
+        )
+        forecast_plot_str = (
+            os.path.basename(self.forecast_plot_path)
+            if self.forecast_plot_path is not None
+            else "not rendered"
+        )
+
+        return (
+            f"Forecast period: {self.start_date_str} to {self.end_date_str}. "
+            f"Window size: {self.window_size} day(s). "
+            f"Classifiers: {classifier_names}. "
+            f"Window step: {window_step_str}. "
+            f"Features CSV: {features_csv_str}. "
+            f"Forecast plot: {forecast_plot_str}. "
+            f"Overwrite: {self.overwrite}. "
+            f"Output dir: {self.output_dir}. "
+            f"Root dir: {self.root_dir}. "
+            f"n_jobs: {self.n_jobs}. "
+            f"Verbose: {self.verbose}. "
+            f"Basename: {self.basename}."
+        )
 
     def build_label(
         self, window_step: int, window_step_unit: Literal["minutes", "hours"]
