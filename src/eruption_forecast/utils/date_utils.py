@@ -358,7 +358,8 @@ def set_datetime_index(
     if isinstance(datetime_map, pd.Series):
         if datetime_map.name != "datetime":
             raise ValueError(
-                f"Series passed as datetime_map must be named 'datetime'. Got: {datetime_map.name!r}"
+                f"Series passed as datetime_map must be named 'datetime'. Got: {datetime_map.name!r}. "
+                f"{datetime_map}"
             )
         datetime_map = datetime_map.to_frame()
 
