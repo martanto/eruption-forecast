@@ -397,7 +397,7 @@ class EvaluationModel(BaseModel):
             eruption_dates=self.eruption_dates,
             day_to_forecast=self.window_size,
             verbose=self.verbose,
-        ).build()
+        ).build(plot_distribution=False)
 
         true_label_df = label_builder.df
         merged = labels.to_frame().join(true_label_df["is_erupted"], how="left")
