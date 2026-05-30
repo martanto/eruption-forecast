@@ -88,7 +88,7 @@ class DynamicLabelBuilder(LabelBuilder):
             ValueError: If any LabelBuilder validation fails (date range too short,
                 invalid window_step_unit, etc.).
         """
-        eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
+        eruption_dates: list[str] = sort_dates(eruption_dates)
         prefix_filename = prefix_filename or "label"
 
         # Compute overall data range from eruption dates + look-back window.
