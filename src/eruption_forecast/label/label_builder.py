@@ -105,7 +105,7 @@ class LabelBuilder:
         day_to_forecast: int,
         eruption_dates: list[str] | list[datetime],
         volcano_id: str | None = None,
-        include_eruption_date: bool = False,
+        include_eruption_date: bool = True,
         output_dir: str | None = None,
         root_dir: str | None = None,
         verbose: bool = False,
@@ -137,7 +137,7 @@ class LabelBuilder:
                 When ``False`` (default), the ``day_to_forecast`` days are strictly
                 before the eruption date; the eruption day is additionally marked
                 positive, giving ``day_to_forecast + 1`` positive days in total.
-                Defaults to False.
+                Defaults to True.
             output_dir (str | None, optional): Output directory path. If None, defaults
                 to "output" subdirectory. Relative paths are resolved against root_dir.
                 Absolute paths are used as-is. Defaults to None.
@@ -964,7 +964,12 @@ class LabelBuilder:
 
         return label_data.df
 
-    def build(self, overwrite: bool = True, plot_distribution: bool = True) -> Self:
+    def build(
+        self,
+        overwrite: bool = True,
+        save_label: bool = True,
+        plot_distribution: bool = True,
+    ) -> Self:
         """Build labels based on eruption dates and window configuration.
 
         Main orchestration method that performs the complete label building workflow:
@@ -980,6 +985,8 @@ class LabelBuilder:
 
         Args:
             overwrite (bool): Whether to overwrite existing label file.
+                Defaults to ``True``.
+            save_label (bool, optional): Wether to save label to CSV.
                 Defaults to ``True``.
             plot_distribution (bool, optional): Wether to plot label distribution.
                 Defaults to ``True``.
@@ -1056,7 +1063,7 @@ class LabelBuilder:
 
         self.df_eruption = df_eruption
 
-        if not file_exists or overwrite:
+        if save_label and (not file_exists or overwrite):
             self.save(plot_distribution=plot_distribution)
 
         return self
