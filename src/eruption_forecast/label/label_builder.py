@@ -103,7 +103,7 @@ class LabelBuilder:
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
-        eruption_dates: list[str],
+        eruption_dates: list[str] | list[datetime],
         volcano_id: str | None = None,
         include_eruption_date: bool = False,
         output_dir: str | None = None,
@@ -195,7 +195,7 @@ class LabelBuilder:
         self.window_step = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
-        self.eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
+        self.eruption_dates: list[str] = sort_dates(eruption_dates)
         self.volcano_id: str = str(volcano_id)
         self.include_eruption_date = include_eruption_date
         self.verbose: bool = bool(verbose)
@@ -219,9 +219,6 @@ class LabelBuilder:
             f"_ie-{int(include_eruption_date)}.csv"
         )
         self.csv = os.path.join(label_dir, self.filename)
-        self.n_positive: int | None = None
-        self.n_negative: int | None = None
-        self.ratio: float | None = None
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -597,11 +594,6 @@ class LabelBuilder:
 
         # Validate keys are strings and valid dates
         for key in df_dict.keys():
-            if not isinstance(key, str):
-                raise TypeError(
-                    f"All keys must be strings. Got key with type: {type(key)}"
-                )
-
             try:
                 parsed_date = pd.to_datetime(key).strftime("%Y-%m-%d")
                 if parsed_date != key:
@@ -615,16 +607,10 @@ class LabelBuilder:
 
         # Validate values are DataFrames with required structure
         for key, value in df_dict.items():
-            if not isinstance(value, pd.DataFrame):
-                raise TypeError(
-                    f"All values must be pandas DataFrames. "
-                    f"Got value for key '{key}' with type: {type(value)}"
-                )
-
             if not isinstance(value.index, pd.DatetimeIndex):
                 raise ValueError(
                     f"DataFrame for key '{key}' must have a DatetimeIndex. "
-                    f"Got index type: {type(value.index)}"
+                    f"Got index type: {type(value.index).__name__}"
                 )
 
             if "id" not in value.columns:
@@ -781,11 +767,10 @@ class LabelBuilder:
                 ...
             ValueError: df must have an 'is_erupted' column...
         """
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError(f"df must be a pandas DataFrame, got {type(df)}")
-
         if not isinstance(df.index, pd.DatetimeIndex):
-            raise TypeError(f"df index must be a DatetimeIndex, got {type(df.index)}")
+            raise TypeError(
+                f"df index must be a DatetimeIndex, got {type(df.index).__name__}"
+            )
 
         if "id" not in df.columns:
             raise ValueError(
@@ -883,39 +868,6 @@ class LabelBuilder:
         """
         ensure_dir(self.output_dir)
         ensure_dir(self.label_dir)
-
-    def validate_eruption_dates(self) -> None:
-        """Ensure at least one eruption exists between start and end dates.
-
-        Checks that df_eruption is not empty, meaning at least one eruption
-        date falls within the configured date range.
-
-        Raises:
-            ValueError: If no eruptions are recorded between start_date and end_date.
-                The error message includes the provided eruption_dates list for debugging.
-
-        Examples:
-            >>> builder.build()
-            >>> builder.validate_eruption_dates()  # Passes if eruptions exist
-
-            >>> # No eruptions in range
-            >>> builder = LabelBuilder(
-            ...     start_date="2020-01-01",
-            ...     end_date="2020-01-15",
-            ...     eruption_dates=["2020-12-25"],  # Outside range
-            ...     ...
-            ... )
-            >>> builder.build()  # doctest: +SKIP
-            Traceback (most recent call last):
-                ...
-            ValueError: No eruption between start date (2020-01-01) and end date (2020-01-15)...
-        """
-        if len(self.df_eruption) == 0:
-            raise ValueError(
-                f"No eruption recorded between date "
-                f"{self.start_date_str} and {self.end_date_str}. "
-                f"Your eruption_dates: {self.eruption_dates}"
-            )
 
     def initiate_label(
         self, start_date: datetime | None = None, end_date: datetime | None = None
@@ -1080,8 +1032,6 @@ class LabelBuilder:
 
         self.update_df_eruptions(df)
         self.df = df
-        self.n_positive = int(self._df["is_erupted"].sum())
-        self.n_negative = int((self._df["is_erupted"] == 0).sum())
 
         df_eruption = df[df["is_erupted"] > 0]
         if df_eruption.empty:
@@ -1093,18 +1043,17 @@ class LabelBuilder:
 
         erupted_count = len(df_eruption)
         total_count = len(df)
-        self.ratio = erupted_count / total_count * 100
+        ratio = erupted_count / total_count * 100
 
         if self.verbose:
             logger.info(
                 f"Label building complete: {erupted_count} erupted windows out of {total_count} total "
-                f"({self.ratio:.2f}%)"
+                f"({ratio:.2f}%)"
             )
 
         self.df_eruption = df_eruption
 
         if not file_exists or overwrite:
-            self.validate_eruption_dates()
             self.save()
 
         return self
@@ -1112,16 +1061,20 @@ class LabelBuilder:
     def save(self, file_type: Literal["csv", "xlsx"] = "csv") -> Self:
         """Save labels DataFrame to disk in CSV or Excel format.
 
-        Saves the built labels DataFrame to a file with standardized filename:
-        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.{ext}
-
-        Also saves a separate 'eruption_dates.csv' reference file.
+        Writes the built labels DataFrame to a file with the standardized filename
+        ``label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.{ext}``.
+        The canonical ``self.csv`` path is never mutated by this method, even when
+        ``file_type="xlsx"`` — the Excel output path is derived from ``self.csv``
+        by swapping the extension. Both formats also save a separate
+        ``eruption_dates_{volcano_id}.csv`` reference file and a label distribution
+        plot alongside the output.
 
         Args:
             file_type (Literal["csv", "xlsx"], optional): Output file format.
-                Defaults to "csv".
-                - "csv": Comma-separated values (lightweight, fast)
-                - "xlsx": Excel workbook (for manual inspection)
+                Defaults to ``"csv"``.
+
+                - ``"csv"``: Comma-separated values (lightweight, fast).
+                - ``"xlsx"``: Excel workbook (for manual inspection).
 
         Returns:
             Self: Instance for method chaining.
@@ -1131,31 +1084,25 @@ class LabelBuilder:
             >>> builder.build().save()
             >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv
 
-            >>> # Save as Excel
+            >>> # Save as Excel — does not change builder.csv
             >>> builder.build().save(file_type="xlsx")
             >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.xlsx
 
-            >>> # Method chaining
+            >>> # Method chaining — both CSV and Excel files are produced
             >>> builder.build().save().save(file_type="xlsx")
-            >>> # Creates both CSV and Excel files
         """
         df = self.df
-        filepath = self.csv
 
         if file_type == "xlsx":
             filepath = self.csv.replace(".csv", ".xlsx")
             df.to_excel(filepath, index=True)
-
-            # Update filepath as an excel file
-            self.csv = filepath
-            return self
-
-        df.to_csv(filepath, index=True)
+        else:
+            filepath = self.csv
+            df.to_csv(filepath, index=True)
 
         if self.verbose:
             logger.info(f"Label saved to {filepath}")
 
-        # Save eruption dates
         self.save_eruption_dates()
 
         try:
