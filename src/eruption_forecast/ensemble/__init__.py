@@ -12,13 +12,11 @@ Public API:
       cross-classifier consensus probabilities and uncertainty estimates.
 """
 
-from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 __all__ = [
-    "BaseEnsemble",
     "ClassifierEnsemble",
     "SeedEnsemble",
 ]
