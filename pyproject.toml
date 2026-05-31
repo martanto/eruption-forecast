@@ -46,7 +46,7 @@ dev = [
     "notebook",
     "pytest",
     "ipywidgets",
-    "pandas-stubs>=3.0.0.260204",
+    "pandas-stubs~=3.0.3",
 ]
 
 [tool.pytest.ini_options]
