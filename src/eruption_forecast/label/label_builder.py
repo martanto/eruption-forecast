@@ -867,7 +867,6 @@ class LabelBuilder:
             >>> # Directories created: output_dir/ and output_dir/labels/
         """
         ensure_dir(self.output_dir)
-        ensure_dir(self.label_dir)
 
     def initiate_label(
         self, start_date: datetime | None = None, end_date: datetime | None = None
@@ -929,6 +928,8 @@ class LabelBuilder:
         df.index.name = "id"
         df["volcano_id"] = self.volcano_id
         df = df[["volcano_id", "eruption_date"]]
+
+        ensure_dir(self.label_dir)
         df.to_csv(filename, index=True)
 
         if self.verbose:
@@ -1106,6 +1107,7 @@ class LabelBuilder:
             >>> builder.build().save().save(file_type="xlsx")
         """
         df = self.df
+        ensure_dir(self.label_dir)
 
         if file_type == "xlsx":
             filepath = self.csv.replace(".csv", ".xlsx")
