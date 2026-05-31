@@ -836,7 +836,6 @@ class ForecastModel:
         features_builder = FeaturesBuilder(
             tremor_matrix_df=tremor_matrix_df,
             label_df=self.label_data,
-            label_features_basename=self.basename,
             output_dir=output_dir if output_dir else self.features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
@@ -1052,7 +1051,7 @@ class ForecastModel:
 
         # Filter labels from start_date onwards
         if builder == "standard" and train_start_date is not None:
-            df_label = df_label.loc[to_datetime(train_start_date):]
+            df_label = df_label.loc[to_datetime(train_start_date) :]
 
         if df_label.empty:
             raise ValueError(f"Label from start date {self.start_date} is empty.")

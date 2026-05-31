@@ -7,11 +7,13 @@ import pandas as pd
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import setup_nslc_directories
 from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.training_model import TrainingModel
+from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.model.new_classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 
 
 class ForecastModel:
@@ -63,14 +65,27 @@ class ForecastModel:
 
         # Will be set after train() run
         self.TrainingModel: TrainingModel | None = None
-        self.classifier_ensemble: ClassifierEnsemble | None = None
+        self.ClassifierEnsemble: ClassifierEnsemble | None = None
         self.select_tremor_columns: list[str] | None = None
         self.save_tremor_matrix_per_method: bool = False
         self.exclude_features: list[str] | None = None
 
+        # Eruption dates from train() forwarded to evaluate() as a fallback
+        # when the caller does not pass them explicitly.
+        self._eruption_dates: list[str] | None = None
+
+        # Hash of the TrainingModel identity produced by the last train() call.
+        # Threaded into PredictionModel.build_cache_identity so the prediction
+        # cache invalidates whenever the upstream training model changes.
+        self._training_cache_hash: str | None = None
+
         # Will be set after predict() run
         self.PredictionModel: PredictionModel | None = None
         self.results: pd.DataFrame = pd.DataFrame()
+
+        # Will be set after evaluate() run
+        self.EvaluationModel: EvaluationModel | None = None
+        self.evaluation_results: dict[str, pd.DataFrame] = {}
 
     def calculate(
         self,
@@ -122,7 +137,7 @@ class ForecastModel:
             plot_daily=plot_daily,
             save_plot=save_plot,
             overwrite_plot=overwrite_plot,
-            overwrite=overwrite or self.overwrite,
+            overwrite=overwrite,
             minimum_completion_ratio=minimum_completion_ratio,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             verbose=verbose,
@@ -135,8 +150,10 @@ class ForecastModel:
                     "Example: calculate(source='sds', sds_dir='converted')"
                 )
             calculate = calculate.from_sds(sds_dir=sds_dir).run()
-        if source.upper() == "FDSN":
+        elif source.upper() == "FDSN":
             calculate = calculate.from_fdsn(client_url=client_url).run()
+        else:
+            raise ValueError(f"Unknown source {source!r}. Expected 'sds' or 'fdsn'.")
 
         self.CalculateTremor = calculate
 
@@ -166,7 +183,7 @@ class ForecastModel:
         ] = "shuffle-stratified",
         cv_splits: int = 5,
         number_of_features: int = 20,
-        include_eruption_date: bool = False,
+        include_eruption_date: bool = True,
         select_tremor_columns: list[str] | None = None,
         save_tremor_matrix_per_method: bool = True,
         exclude_features: list[str] | None = None,
@@ -189,6 +206,52 @@ class ForecastModel:
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
 
+        resolved_output_dir = output_dir or self.station_dir
+
+        identity = TrainingModel.build_cache_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            start_date=start_date,
+            end_date=end_date,
+            classifiers=classifiers,
+            eruption_dates=eruption_dates,
+            window_size=self.day_to_forecast,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            number_of_features=number_of_features,
+            include_eruption_date=include_eruption_date,
+            build_label_params={
+                "window_step": window_step,
+                "window_step_unit": window_step_unit,
+                "builder": label_builder,
+                "days_before_eruption": days_before_eruption,
+            },
+            extract_features_params={
+                "select_tremor_columns": select_tremor_columns,
+                "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
+                "exclude_features": exclude_features,
+                "minimum_completion": minimum_completion,
+            },
+            fit_params={
+                "seeds": seeds,
+                "resample_method": resample_method,
+                "minority_threshold": minority_threshold,
+                "sampling_strategy": sampling_strategy,
+            },
+        )
+
+        if not overwrite:
+            cached = TrainingModel.load_from_cache(resolved_output_dir, identity)
+            if cached is not None:
+                self.TrainingModel = cached
+                self.ClassifierEnsemble = cached.ClassifierEnsemble
+                self.select_tremor_columns = select_tremor_columns
+                self.save_tremor_matrix_per_method = save_tremor_matrix_per_method
+                self.exclude_features = exclude_features
+                self._eruption_dates = eruption_dates
+                self._training_cache_hash = CacheModel.compute_hash(identity)
+                return self
+
         training_model = (
             TrainingModel(
                 tremor_data=self.tremor_df,
@@ -201,7 +264,7 @@ class ForecastModel:
                 cv_splits=cv_splits,
                 number_of_features=number_of_features,
                 include_eruption_date=include_eruption_date,
-                output_dir=output_dir or self.station_dir,
+                output_dir=resolved_output_dir,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
                 n_grids=n_grids,
@@ -233,10 +296,15 @@ class ForecastModel:
         )
 
         self.TrainingModel = training_model
-        self.classifier_ensemble = training_model.model
+        self.ClassifierEnsemble = training_model.ClassifierEnsemble
         self.select_tremor_columns = select_tremor_columns
         self.save_tremor_matrix_per_method = save_tremor_matrix_per_method
         self.exclude_features = exclude_features
+
+        self._eruption_dates = eruption_dates
+
+        training_model.save_to_cache(identity)
+        self._training_cache_hash = CacheModel.compute_hash(identity)
 
         return self
 
@@ -256,21 +324,48 @@ class ForecastModel:
         verbose: bool | None = None,
         **plot_kwargs,
     ) -> Self:
-        if self.TrainingModel is None or self.classifier_ensemble is None:
+        if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
 
         n_jobs = n_jobs if n_jobs is not None else self.n_jobs
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
 
+        resolved_output_dir = output_dir or self.station_dir
+
+        identity = PredictionModel.build_cache_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            training_hash=self._training_cache_hash,
+            start_date=start_date,
+            end_date=end_date,
+            window_size=self.day_to_forecast,
+            build_label_params={
+                "window_step": window_step,
+                "window_step_unit": window_step_unit,
+            },
+            extract_features_params={
+                "select_tremor_columns": self.select_tremor_columns,
+                "save_tremor_matrix_per_method": self.save_tremor_matrix_per_method,
+                "exclude_features": self.exclude_features,
+            },
+        )
+
+        if not overwrite:
+            cached = PredictionModel.load_from_cache(resolved_output_dir, identity)
+            if cached is not None:
+                self.PredictionModel = cached
+                self.results = cached.results
+                return self
+
         prediction_model = (
             PredictionModel(
-                model=self.classifier_ensemble,
+                model=self.ClassifierEnsemble,
                 tremor_data=self.tremor_df,
                 start_date=start_date,
                 end_date=end_date,
                 window_size=self.day_to_forecast,
-                output_dir=output_dir or self.station_dir,
+                output_dir=resolved_output_dir,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
                 verbose=verbose,
@@ -296,6 +391,106 @@ class ForecastModel:
             plot_title=plot_title,
             plot_pdf=plot_pdf,
             **plot_kwargs,
+        )
+
+        prediction_model.save_to_cache(identity)
+
+        return self
+
+    def evaluate(
+        self,
+        model: Literal["training", "prediction"] = "prediction",
+        eruption_dates: list[str] | None = None,
+        plot_per_seed: bool = False,
+        plot_aggregate: bool = True,
+        output_dir: str | None = None,
+        overwrite: bool | None = None,
+        n_jobs: int | None = None,
+        verbose: bool | None = None,
+    ) -> Self:
+        """Evaluate a previously trained ensemble against ground-truth labels.
+
+        Reuses the ``TrainingModel`` or ``PredictionModel`` already produced
+        in the current session.  No tsfresh re-run or model re-fit is
+        performed — the window grid and extracted features are taken
+        directly from the chosen reuse source.
+
+        Args:
+            model (Literal["training", "prediction"]): Which model in the
+                current pipeline to evaluate.  ``"training"`` performs an
+                in-sample / training-window evaluation against the
+                ``TrainingModel`` from the last ``train()`` call.
+                ``"prediction"`` performs a forecast-window evaluation
+                against the ``PredictionModel`` from the last ``predict()``
+                call. Defaults to ``"prediction"``.
+            eruption_dates (list[str] | None): Ground-truth eruption dates in
+                ``YYYY-MM-DD`` format.  Falls back to the dates captured
+                during ``train()`` when ``None``. Defaults to ``None``.
+            plot_per_seed (bool): Render per-seed evaluation plots. Expensive
+                across many seeds. Defaults to ``False``.
+            plot_aggregate (bool): Render aggregate plots per classifier via
+                ``MultiModelEvaluator``. Defaults to ``True``.
+            output_dir (str | None): Root output directory for evaluation
+                artefacts. Defaults to the station directory.
+            overwrite (bool | None): Overwrite cached results. Falls back to
+                ``self.overwrite`` when ``None``. Defaults to ``None``.
+            n_jobs (int | None): Parallel workers. Falls back to
+                ``self.n_jobs`` when ``None``. Defaults to ``None``.
+            verbose (bool | None): Verbose logging. Falls back to
+                ``self.verbose`` when ``None``. Defaults to ``None``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If the required model for the selected ``model``
+                mode has not been produced yet.
+        """
+        if model == "training" and self.TrainingModel is None:
+            raise ValueError(
+                "TrainingModel is required for model='training'. "
+                "Please run train() first."
+            )
+        if model == "prediction" and self.PredictionModel is None:
+            raise ValueError(
+                "PredictionModel is required for model='prediction'. "
+                "Please run train() then predict()."
+            )
+
+        n_jobs = n_jobs if n_jobs is not None else self.n_jobs
+        verbose = verbose if verbose is not None else self.verbose
+        overwrite = overwrite if overwrite is not None else self.overwrite
+
+        # Caller-supplied eruption_dates win over the values captured from
+        # train(); without either, EvaluationModel runs label-free.
+        eruption_dates = (
+            eruption_dates if eruption_dates is not None else self._eruption_dates
+        )
+
+        model_object: TrainingModel | PredictionModel
+        if model == "prediction" and self.PredictionModel is not None:
+            model_object = self.PredictionModel
+        elif self.TrainingModel is not None:
+            model_object = self.TrainingModel
+        else:
+            raise ValueError(
+                f"Model {model} is not supported. Choose between "
+                f"'prediction' and 'training'"
+            )
+
+        evaluation_model = EvaluationModel(
+            model=model_object,
+            eruption_dates=eruption_dates,
+            output_dir=output_dir or self.station_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
+        self.EvaluationModel = evaluation_model
+        self.evaluation_results = evaluation_model.evaluate(
+            plot_per_seed=plot_per_seed,
+            plot_aggregate=plot_aggregate,
         )
 
         return self
