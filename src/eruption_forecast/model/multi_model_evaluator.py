@@ -600,7 +600,8 @@ class MultiModelEvaluator:
         """
         models, x_tests, y_trues, _ = self._predictions
         y_preds: list[np.ndarray] = [
-            model.predict(X_test) for model, X_test in zip(models, x_tests, strict=True)
+            model.predict(X_test)  # ty:ignore[unresolved-attribute]
+            for model, X_test in zip(models, x_tests, strict=True)
         ]
 
         fig, data = _plot_cm_styled(
