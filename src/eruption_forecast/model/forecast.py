@@ -13,7 +13,7 @@ from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class ForecastModel:

@@ -37,8 +37,8 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.prediction_model import PredictionModel
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class EvaluationModel(BaseModel):

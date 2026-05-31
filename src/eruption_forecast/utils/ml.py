@@ -26,9 +26,9 @@ from eruption_forecast.utils.array import (
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 def compute_threshold_metrics(
@@ -420,7 +420,7 @@ def merge_seed_models(
 
     Reads the trained-model registry CSV produced by ``ModelTrainer``, loads
     every seed estimator and its significant-feature list into memory, and
-    serialises the resulting :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`
+    serialises the resulting :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble`
     to a single ``.pkl`` file.  This eliminates the per-seed I/O overhead at
     prediction time.
 
@@ -463,7 +463,7 @@ def merge_all_classifiers(
     """Merge multiple classifier registry CSVs into a single multi-classifier pkl.
 
     Calls :func:`merge_seed_models` for each classifier, bundles the resulting
-    :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble` objects into a
+    :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble` objects into a
     plain ``dict[str, SeedEnsemble]``, and serialises the dict to one ``.pkl``
     file.  ``ModelPredictor`` detects this dict type automatically when the path
     is passed as the ``trained_models`` parameter.

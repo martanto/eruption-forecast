@@ -23,10 +23,10 @@ from eruption_forecast.utils.pathutils import ensure_dir, generate_features_file
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.model.cache_model import CacheModel
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class TrainingModel(BaseModel, CacheModel):

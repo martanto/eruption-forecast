@@ -20,9 +20,9 @@ All classifiers use the standard scikit-learn implementations.
 GridSearchCV is always run under the ``loky`` parallel backend for nested-parallelism safety.
 """
 
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.model_evaluator import ModelEvaluator
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 

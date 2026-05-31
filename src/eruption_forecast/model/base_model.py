@@ -24,7 +24,7 @@ from eruption_forecast.utils import validate_date_ranges
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import sort_dates, to_datetime
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class BaseModel(ABC):

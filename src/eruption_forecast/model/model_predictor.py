@@ -2,8 +2,8 @@
 
 Provides :class:`ModelPredictor`, the production inference component of the
 eruption forecasting pipeline.  It accepts a trained
-:class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`,
-:class:`~eruption_forecast.model.classifier_ensemble.ClassifierEnsemble`, or a
+:class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble`,
+:class:`~eruption_forecast.ensemble.classifier_ensemble.ClassifierEnsemble`, or a
 mapping of classifier names to registry CSV paths, and produces eruption
 probability forecasts over a specified date range.
 
@@ -51,10 +51,10 @@ from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import normalize_dates
 from eruption_forecast.tremor.tremor_data import TremorData
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.plots.forecast_plots import plot_forecast
 from eruption_forecast.features.features_builder import FeaturesBuilder
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
