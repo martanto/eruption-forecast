@@ -604,7 +604,7 @@ results = comparator.plot_all()
 After training, collapse all seed models into a single `.pkl` to remove per-seed I/O overhead:
 
 ```python
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
 
 # Single classifier

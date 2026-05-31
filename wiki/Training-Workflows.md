@@ -199,7 +199,7 @@ bundle_path = trainer.merge_classifier_models(
 # → .../trainings/merged_classifiers_{suffix}.pkl
 
 # Load and use directly (no ModelPredictor needed):
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 
 ensemble = SeedEnsemble.load(merged_path)
 mean_p, std, conf, pred = ensemble.predict_with_uncertainty(features_df)
