@@ -1,5 +1,6 @@
 import os
 from typing import Any, Literal
+from datetime import datetime
 
 import numpy as np
 import joblib
@@ -26,9 +27,36 @@ from eruption_forecast.utils.array import (
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
+from eruption_forecast.utils.date_utils import sort_dates
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+
+
+def split_eruption_dates(
+    eruption_dates: list[str] | list[datetime], test_size: float = 0.2
+):
+    """Split eruption dates into training and testing sets.
+
+    Args:
+        eruption_dates (list[str] | list[datetime]): Eruption dates.
+        test_size (float, optional): Fraction of test data.
+    """
+    if test_size < 0 or test_size > 1:
+        raise ValueError(f"test_size must be between 0 and 1. You provided {test_size}")
+
+    eruption_dates = sort_dates(eruption_dates, as_datetime=False)
+
+    # Clip to ensure not used all data as test
+    split_idx = np.clip(
+        np.ceil(len(eruption_dates) * test_size),
+        a_min=1,
+        a_max=len(eruption_dates) - 1,
+    ).astype(int)
+
+    X_train = eruption_dates[:-split_idx]
+    X_test = eruption_dates[-split_idx:]
+    return X_train, X_test
 
 
 def compute_threshold_metrics(
