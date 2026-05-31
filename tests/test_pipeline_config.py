@@ -510,7 +510,7 @@ class TestForecastModelConfigInit:
         """_config.model mirrors every __init__ parameter."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
-            m = fm._config.model
+            m = fm._config.ClassifierEnsemble
             assert m.station == "OJN"
             assert m.channel == "EHZ"
             assert m.window_size == 1
@@ -703,7 +703,7 @@ class TestForecastModelSaveLoadModel:
             pkl_path = fm.save_model()
 
             fm2 = ForecastModel.load_model(pkl_path)
-            assert fm2._config.model.station == "OJN"
+            assert fm2._config.ClassifierEnsemble.station == "OJN"
 
     def test_load_model_missing_file_raises(self) -> None:
         """load_model() raises FileNotFoundError for a non-existent path."""
