@@ -14,8 +14,8 @@ import pytest
 from sklearn.linear_model import LogisticRegression
 
 from eruption_forecast.utils.ml import merge_all_classifiers
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 # ---------------------------------------------------------------------------
