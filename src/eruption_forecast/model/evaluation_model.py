@@ -173,9 +173,11 @@ class EvaluationModel(BaseModel):
         self.window_step_unit: Literal["minutes", "hours"] = model.window_step_unit
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
 
-        # Prediction labels will have ``pd.DatetimeIndex``
-        # Training labels will have ``pd.RangeIndex``
-        self.labels: pd.Series = model.labels
+        # In training reuse mode, ``model.labels`` already holds 0/1 ground
+        # truth indexed by ``pd.RangeIndex``. In prediction reuse mode,
+        # ``model.labels`` is a window-id mapping indexed by
+        # ``pd.DatetimeIndex``; ``build_label()`` rewrites it into 0/1 truth.
+        self.y_true: pd.Series = model.labels
 
         (
             self.evaluation_dir,
@@ -357,12 +359,13 @@ class EvaluationModel(BaseModel):
     ) -> Self:
         """Build ground-truth labels for the evaluation window grid.
 
-        In **training reuse** mode this is a no-op: the id-aligned truth labels
-        are taken directly from the training stage and returned untouched.  In
-        **prediction reuse** mode a fresh :class:`LabelBuilder` is run over the
-        evaluation period and its ``is_erupted`` flags are joined onto the
-        prediction window grid by datetime, so the labels are keyed by the same
-        window ids as the reused features.
+        In **training reuse** mode this is a no-op: the id-aligned truth on
+        ``self.y_true`` is taken directly from the training stage and returned
+        untouched.  In **prediction reuse** mode a fresh :class:`LabelBuilder`
+        is run over the evaluation period and its ``is_erupted`` flags are
+        joined onto the prediction window grid by datetime, then assigned back
+        to ``self.y_true`` so the ground truth is keyed by the same window ids
+        as the reused features.
 
         Args:
             window_step (int): Step size between consecutive windows.
@@ -376,8 +379,8 @@ class EvaluationModel(BaseModel):
             ValueError: If ``self.eruption_dates`` is ``None`` while prediction
                 reuse requires rebuilding labels.
         """
-        labels = self.labels
-        if isinstance(labels.index, pd.RangeIndex) and not labels.empty:
+        y_true = self.y_true
+        if isinstance(y_true.index, pd.RangeIndex) and not y_true.empty:
             return self
 
         if self.eruption_dates is None:
@@ -399,11 +402,11 @@ class EvaluationModel(BaseModel):
         )
 
         true_label_df = label_builder.df
-        merged = labels.to_frame().join(true_label_df["is_erupted"], how="left")
-        labels = merged.set_index("id")["is_erupted"].fillna(0).astype(int)
-        labels.name = "is_erupted"
+        merged = y_true.to_frame().join(true_label_df["is_erupted"], how="left")
+        y_true = merged.set_index("id")["is_erupted"].fillna(0).astype(int)
+        y_true.name = "is_erupted"
 
-        self.labels = labels
+        self.y_true = y_true
 
         return self
 
@@ -460,13 +463,15 @@ class EvaluationModel(BaseModel):
                 of per-seed metrics (one row per seed).
 
         Raises:
-            ValueError: If ``self.labels`` is empty (``build_label`` has not
+            ValueError: If ``self.y_true`` is empty (``build_label`` has not
                 run).
             ValueError: If ``self.features_df`` is empty (the upstream model
                 was passed in without running ``extract_features``).
         """
-        if self.labels.empty:
-            raise ValueError("Labels are empty. Run build_label() first.")
+        if self.y_true.empty:
+            raise ValueError(
+                "Ground-truth labels (self.y_true) are empty. Run build_label() first."
+            )
         if self.features_df.empty:
             raise ValueError(
                 "Features are empty. Ensure the source model ran extract_features() "
@@ -506,7 +511,7 @@ class EvaluationModel(BaseModel):
                 available_features = [
                     feature_name
                     for feature_name in feature_names
-                    if f in self.features_df.columns
+                    if feature_name in self.features_df.columns
                 ]
 
                 if not available_features:
@@ -516,14 +521,15 @@ class EvaluationModel(BaseModel):
                     )
                     continue
 
-                X_seed = self.features_df[available_features]
-                common_index = X_seed.index.intersection(self.labels.index)
-                X_seed = X_seed.loc[common_index]
-                y_true = self.labels.loc[common_index]
+                X_test = self.features_df[available_features]
+                common_index = X_test.index.intersection(self.y_true.index)
+                X_test = X_test.loc[common_index]
+                y_true = self.y_true.loc[common_index]
+                y_pred = seed_model.predict(X_test)
 
                 evaluator = ModelEvaluator(
                     model=seed_model,
-                    X_test=X_seed,
+                    X_test=X_test,
                     y_test=y_true,
                     model_name=classifier_name,
                     output_dir=figures_dir,
@@ -552,7 +558,9 @@ class EvaluationModel(BaseModel):
                     logger.info(
                         f"{classifier_name}/{random_state:05d}: "
                         f"balanced_accuracy="
-                        f"{metrics.get('balanced_accuracy', float('nan')):.4f}"
+                        f"{metrics.get('balanced_accuracy', float('nan')):.4f} "
+                        f"(y_pred positives={int(y_pred.sum())}, "
+                        f"y_true positives={int(y_true.sum())})"
                     )
 
                 all_metrics.append(metrics)
@@ -569,14 +577,16 @@ class EvaluationModel(BaseModel):
             )
 
             if plot_aggregate:
-                self._plot_aggregate(metrics_dir, classifier_name)
+                self._plot_aggregate(metrics_dir, classifier_name, clf_dir)
 
             metrics_per_classifier[classifier_name] = pd.DataFrame(all_metrics)
 
         self.metrics = metrics_per_classifier
         return metrics_per_classifier
 
-    def _plot_aggregate(self, metrics_dir: str, classifier_name: str) -> None:
+    def _plot_aggregate(
+        self, metrics_dir: str, classifier_name: str, output_dir: str | None = None
+    ) -> None:
         """Render aggregate plots for one classifier from per-seed metrics JSON.
 
         Delegates to :class:`MultiModelEvaluator`, which reads ``*.json`` files
@@ -589,9 +599,13 @@ class EvaluationModel(BaseModel):
             classifier_name (str): Classifier name used in the warning log
                 message when plotting fails.
         """
+        output_dir = output_dir or self.output_dir
+
         try:
             MultiModelEvaluator(
-                output_dir=self.output_dir, metrics_dir=metrics_dir
+                output_dir=output_dir,
+                metrics_dir=metrics_dir,
+                classifier_name=classifier_name,
             ).plot_all()
         except Exception as exc:
             logger.warning(f"{classifier_name}: aggregate plots skipped. Reason: {exc}")
