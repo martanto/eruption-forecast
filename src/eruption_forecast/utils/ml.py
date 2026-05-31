@@ -658,7 +658,7 @@ def save_model_csv(
     classifier_dir: str,
     classifier_model: ClassifierModel,
     number_of_features: int,
-    prefix_filename: str = "trained_model",
+    prefix_filename: str = "trained-model",
     verbose: bool = False,
 ) -> str:
     """Build and save the trained-models registry CSV for one classifier.
@@ -690,10 +690,10 @@ def save_model_csv(
         ValueError: If ``records`` is empty (no models were successfully
             trained), which would produce an empty registry.
     """
-    classifier_id = f"{classifier_model.name}-{classifier_model.cv_name}"
+    classifier_id = f"{classifier_model.name}_{classifier_model.cv_name}"
 
     suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
-    filename = f"{prefix_filename}_{suffix}.csv"
+    filename = f"{prefix_filename}__{suffix}.csv"
 
     registry_df = pd.DataFrame(records).set_index("random_state")
     if registry_df.empty:

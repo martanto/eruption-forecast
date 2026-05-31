@@ -777,9 +777,7 @@ class TrainingModel(BaseModel, CacheModel):
         )
 
         if self.verbose:
-            logger.info(
-                f"Pending Training: Found {len(training_model_results)} job(s)"
-            )
+            logger.info(f"Pending Training: Found {len(training_model_results)} job(s)")
 
         for result in training_model_results:
             if result is None:
@@ -843,7 +841,7 @@ class TrainingModel(BaseModel, CacheModel):
                 classifier_dir=self.classifier_dirs[classifier_slug],
                 classifier_model=classifier_model,
                 number_of_features=self.number_of_features,
-                prefix_filename="trained_model",
+                prefix_filename="trained-model",
                 verbose=self.verbose,
             )
 
@@ -851,7 +849,6 @@ class TrainingModel(BaseModel, CacheModel):
                 output_dir=self.classifier_dirs[classifier_slug],
                 classifier_name=classifier_model.name,
                 registry_csv=trained_model_csv,
-                cv_name=cv_name,
                 verbose=self.verbose,
             )
 
@@ -913,7 +910,6 @@ class TrainingModel(BaseModel, CacheModel):
         output_dir: str,
         classifier_name: str,
         registry_csv: str,
-        cv_name: str | None = None,
         verbose: bool = False,
     ) -> tuple[str, SeedEnsemble]:
         """Build and save a SeedEnsemble from a trained-model registry CSV.
@@ -931,8 +927,6 @@ class TrainingModel(BaseModel, CacheModel):
                 filename suffix (e.g. ``"RandomForestClassifier"``).
             registry_csv (str): Path to the ``trained_model_*.csv`` registry
                 produced by :func:`~eruption_forecast.utils.ml.save_model_csv`.
-            cv_name (str, optional): Name of the cross-validation splitter class.
-                Defaults to None.
             verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
 
         Returns:
@@ -947,11 +941,11 @@ class TrainingModel(BaseModel, CacheModel):
             ...     registry_csv="training/classifiers/trained_model_rf.csv",
             ... )
         """
-        suffix = f"_{cv_name}" if cv_name else ""
+        # Example registry_csv filename:
+        # trained-model__XGBClassifier_StratifiedShuffleSplit_seeds-25_features-20.csv
+        suffix = os.path.basename(registry_csv).split(".csv")[0].split("__")[-1]
 
-        filepath = os.path.join(
-            output_dir, f"SeedEnsemble_{classifier_name}{suffix}.pkl"
-        )
+        filepath = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
         seed_ensemble = SeedEnsemble.from_registry(
             registry_csv, classifier_name=classifier_name, verbose=verbose
         )
