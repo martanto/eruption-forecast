@@ -586,7 +586,7 @@ After training 500 seeds, each estimator and its feature list live in separate f
 ```
 
 ```python
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 
 # Merge right after training
 merged_path = trainer.merge_models()

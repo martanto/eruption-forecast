@@ -163,7 +163,12 @@ class DynamicLabelBuilder(LabelBuilder):
         return label_dates
 
     @logger.catch
-    def build(self, overwrite: bool = True) -> Self:
+    def build(
+        self,
+        overwrite: bool = True,
+        save_label: bool = True,
+        plot_distribution: bool = True,
+    ) -> Self:
         """Build per-eruption label windows and concatenate into one DataFrame.
 
         For each eruption, creates a windowed DataFrame spanning
@@ -176,6 +181,10 @@ class DynamicLabelBuilder(LabelBuilder):
 
         Args:
             overwrite (bool): Whether to overwrite existing label file
+            save_label (bool, optional): Wether to save label to CSV.
+                Defaults to ``True``.
+            plot_distribution (bool, optional): Wether to plot label distribution.
+                Defaults to ``True``.
 
         Returns:
             Self: Instance with populated ``df``, ``df_eruption``, and
@@ -257,6 +266,7 @@ class DynamicLabelBuilder(LabelBuilder):
                 f"{total_count} total ({erupted_count / total_count * 100:.2f}%)"
             )
 
-        self.save()
+        if save_label and (not file_exists or overwrite):
+            self.save(plot_distribution=plot_distribution)
 
         return self

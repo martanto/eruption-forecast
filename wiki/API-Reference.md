@@ -113,7 +113,7 @@ from eruption_forecast.model.model_trainer import ModelTrainer
 Bundles all seed models for a single classifier into one serialisable object. Subclasses `sklearn.base.BaseEstimator` and `ClassifierMixin`.
 
 ```python
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 # or
 from eruption_forecast.model import SeedEnsemble
 ```

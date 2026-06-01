@@ -1,7 +1,7 @@
 """Wrap multiple SeedEnsemble objects for cross-classifier consensus inference.
 
 Provides :class:`ClassifierEnsemble`, a serialisable sklearn-compatible
-estimator that bundles one :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`
+estimator that bundles one :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble`
 per classifier type.
 
 Each :class:`SeedEnsemble` already averages predictions across random seeds for
@@ -21,7 +21,7 @@ Key capabilities:
       deviation, mean binary vote, confidence, and a per-classifier breakdown
       dict.
     - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
-      from :class:`~eruption_forecast.model.base_ensemble.BaseEnsemble`).
+      from :class:`~eruption_forecast.ensemble.base_ensemble.BaseEnsemble`).
 """
 
 import os
@@ -34,8 +34,8 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import compute_model_probabilities
-from eruption_forecast.model.base_ensemble import BaseEnsemble
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 
 
 class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):

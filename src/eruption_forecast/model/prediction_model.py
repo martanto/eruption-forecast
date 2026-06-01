@@ -23,8 +23,8 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.utils.formatting import pdf_metadata
 from eruption_forecast.model.cache_model import CacheModel
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 matplotlib.use("Agg")
@@ -165,7 +165,10 @@ class PredictionModel(BaseModel, CacheModel):
             self.result_dir,
         ) = self.set_directories()
 
-        # Label with ``pd.DatetimeIndex`` and column ``id`` only
+        # ``self.labels`` exposes the ``id`` Series for downstream callers;
+        # ``self._labels`` keeps the full forecast grid (``id`` + ``is_erupted``
+        # all-zero) so prediction labels match the training schema produced by
+        # ``construct_windows``.
         self.labels: pd.Series = pd.Series()
         self._labels: pd.DataFrame = pd.DataFrame()
 
@@ -448,11 +451,9 @@ class PredictionModel(BaseModel, CacheModel):
         if os.path.exists(label_csv) and not self.overwrite:
             labels_df = pd.read_csv(label_csv, index_col=0, parse_dates=True)
 
-            if "id" not in labels_df.columns.tolist():
-                raise ValueError(
-                    f"Column `id` not found in CSV. Available columns: "
-                    f"{labels_df.columns.tolist()}"
-                )
+            # Backward compat
+            if "is_erupted" not in labels_df.columns:
+                labels_df["is_eruped"] = 0
 
             self._labels = labels_df
             self.labels = labels_df["id"]
@@ -466,18 +467,16 @@ class PredictionModel(BaseModel, CacheModel):
             window_step_unit=window_step_unit,
         )
 
-        label_df["id"] = range(label_df.shape[0])
-
         if label_df.empty:
             raise ValueError(
                 f"Labels is empty. Check your start date {self.start_date} "
                 f"and end date {self.end_date}, window step {window_step} and "
-                f"window step unit {window_step_unit}. {label_df}"
+                f"window step unit {window_step_unit}."
             )
 
         label_df.to_csv(label_csv, index=True)
 
-        # Label with ``pd.DatetimeIndex`` and column ``id``. No ``is_erupted``.
+        # Label with ``is_erupted`` values are 0.
         self._labels = label_df
         self.labels = label_df["id"]
 

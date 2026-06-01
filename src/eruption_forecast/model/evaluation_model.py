@@ -30,15 +30,16 @@ from typing import Self, Literal
 import joblib
 import pandas as pd
 
-from eruption_forecast import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.prediction_model import PredictionModel
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class EvaluationModel(BaseModel):
@@ -173,11 +174,17 @@ class EvaluationModel(BaseModel):
         self.window_step_unit: Literal["minutes", "hours"] = model.window_step_unit
         self.basename = f"{self.start_date_str}_{self.end_date_str}"
 
-        # In training reuse mode, ``model.labels`` already holds 0/1 ground
-        # truth indexed by ``pd.RangeIndex``. In prediction reuse mode,
-        # ``model.labels`` is a window-id mapping indexed by
-        # ``pd.DatetimeIndex``; ``build_label()`` rewrites it into 0/1 truth.
-        self.y_true: pd.Series = model.labels
+        # ``self.y_true`` always holds ground-truth labels (0/1) when populated.
+        # Training reuse: ``TrainingModel.labels`` is already truth on
+        # ``pd.RangeIndex``, so assign directly. Prediction reuse: no truth
+        # exists upstream, so start empty; ``evaluate()`` calls
+        # ``build_label()`` which constructs truth from a fresh
+        # ``LabelBuilder`` joined against ``self.model.labels`` (the window-id
+        # mapping).
+        if self.model_kind == "training":
+            self.y_true: pd.Series = model.labels
+        else:
+            self.y_true: pd.Series = pd.Series(dtype=int, name="is_erupted")
 
         (
             self.evaluation_dir,
@@ -186,11 +193,6 @@ class EvaluationModel(BaseModel):
 
         # Will be set after evaluate() called
         self.metrics: dict[str, pd.DataFrame] = {}
-
-        self.build_label(
-            window_step=self.window_step,
-            window_step_unit=self.window_step_unit,
-        )
 
         self.validate()
 
@@ -359,13 +361,12 @@ class EvaluationModel(BaseModel):
     ) -> Self:
         """Build ground-truth labels for the evaluation window grid.
 
-        In **training reuse** mode this is a no-op: the id-aligned truth on
-        ``self.y_true`` is taken directly from the training stage and returned
-        untouched.  In **prediction reuse** mode a fresh :class:`LabelBuilder`
-        is run over the evaluation period and its ``is_erupted`` flags are
-        joined onto the prediction window grid by datetime, then assigned back
-        to ``self.y_true`` so the ground truth is keyed by the same window ids
-        as the reused features.
+        In **training reuse** mode this is a no-op: ``self.y_true`` was
+        populated directly from ``TrainingModel.labels`` at construction.  In
+        **prediction reuse** mode a fresh :class:`LabelBuilder` is run over
+        the evaluation period and its ``is_erupted`` flags are joined onto
+        the prediction window-id mapping (``self.model.labels``) by datetime,
+        then re-indexed by window id and assigned to ``self.y_true``.
 
         Args:
             window_step (int): Step size between consecutive windows.
@@ -379,14 +380,11 @@ class EvaluationModel(BaseModel):
             ValueError: If ``self.eruption_dates`` is ``None`` while prediction
                 reuse requires rebuilding labels.
         """
-        y_true = self.y_true
-        if isinstance(y_true.index, pd.RangeIndex) and not y_true.empty:
+        if self.model_kind == "training":
             return self
 
         if self.eruption_dates is None:
             raise ValueError("No eruption dates provided.")
-
-        ensure_dir(self.evaluation_dir)
 
         label_builder = LabelBuilder(
             start_date=self.start_date,
@@ -401,8 +399,9 @@ class EvaluationModel(BaseModel):
             plot_distribution=False,
         )
 
+        id_series = self.model.labels
         true_label_df = label_builder.df
-        merged = y_true.to_frame().join(true_label_df["is_erupted"], how="left")
+        merged = id_series.to_frame().join(true_label_df["is_erupted"], how="left")
         y_true = merged.set_index("id")["is_erupted"].fillna(0).astype(int)
         y_true.name = "is_erupted"
 
@@ -463,22 +462,33 @@ class EvaluationModel(BaseModel):
                 of per-seed metrics (one row per seed).
 
         Raises:
-            ValueError: If ``self.y_true`` is empty (``build_label`` has not
-                run).
+            ValueError: If ``self.eruption_dates`` is ``None`` in prediction
+                reuse mode (raised by ``build_label()``).
+            ValueError: If ``self.y_true`` is still empty after
+                ``build_label()`` — usually means the upstream
+                ``TrainingModel`` was constructed without running
+                ``extract_features``.
             ValueError: If ``self.features_df`` is empty (the upstream model
                 was passed in without running ``extract_features``).
         """
+        self.create_directories()
+
+        self.build_label(
+            window_step=self.window_step,
+            window_step_unit=self.window_step_unit,
+        )
+
         if self.y_true.empty:
             raise ValueError(
-                "Ground-truth labels (self.y_true) are empty. Run build_label() first."
+                "Ground-truth labels (self.y_true) are empty after build_label(). "
+                "This usually means the upstream TrainingModel was constructed "
+                "without running extract_features()."
             )
         if self.features_df.empty:
             raise ValueError(
                 "Features are empty. Ensure the source model ran extract_features() "
                 "before being passed to EvaluationModel."
             )
-
-        self.create_directories()
 
         metrics_per_classifier: dict[str, pd.DataFrame] = {}
 
@@ -492,6 +502,17 @@ class EvaluationModel(BaseModel):
             all_metrics: list[dict] = []
 
             for seed_record in seed_ensemble.seeds:
+                missing_keys: list[str] = []
+                for key in ("random_state", "model", "feature_names"):
+                    if key not in seed_record.keys():
+                        missing_keys.append(key)
+
+                if len(missing_keys) > 0:
+                    raise ValueError(
+                        f"SeedEnsemble.seeds missing keys: {missing_keys}. "
+                        f"Available keys: {', '.join(seed_record.keys())}"
+                    )
+
                 random_state: int = seed_record["random_state"]
                 seed_model = seed_record["model"]
                 feature_names: list[str] = seed_record["feature_names"]
@@ -583,6 +604,59 @@ class EvaluationModel(BaseModel):
 
         self.metrics = metrics_per_classifier
         return metrics_per_classifier
+
+    def compare(
+        self,
+        metrics: str | list[str] | None = None,
+        output_dir: str | None = None,
+    ) -> ClassifierComparator:
+        """Build a :class:`ClassifierComparator` from the per-classifier results.
+
+        Constructs one ``MultiModelEvaluator`` per classifier from the metrics
+        JSON directory written by :meth:`evaluate` and returns a
+        ``ClassifierComparator`` that can produce cross-classifier rankings and
+        comparison plots.  The live ``ClassifierEnsemble`` plus
+        ``self.features_df`` and ``self.y_true`` are forwarded as
+        ``ensemble_source`` so ROC plotting uses in-memory models and never
+        requires a trained-model registry CSV on disk.
+
+        Output of the returned comparator is written under
+        ``{evaluation_dir}/comparison/`` (i.e. peer to ``classifiers/``).
+
+        Args:
+            metrics (str | list[str] | None, optional): Metric or ordered list
+                of metrics used for ranking and plots.  When None, the
+                comparator falls back to its own default metrics list.
+                Defaults to None.
+
+        Returns:
+            ClassifierComparator: Comparator wired to the per-classifier metrics
+                directories and the in-memory ensemble.
+
+        Examples:
+            >>> em = EvaluationModel(model=training_model)
+            >>> em.evaluate()
+            >>> comparator = em.compare()
+            >>> ranking = comparator.get_ranking()
+            >>> figures = comparator.plot_all()
+        """
+        evaluators: dict[str, MultiModelEvaluator] = {
+            name: MultiModelEvaluator(
+                metrics_dir=os.path.join(self.classifiers_dir, name, "metrics"),
+                classifier_name=name,
+                output_dir=output_dir,
+            )
+            for name in self.ClassifierEnsemble.ensembles
+        }
+
+        ensemble_source = (self.ClassifierEnsemble, self.features_df, self.y_true)
+
+        return ClassifierComparator.from_evaluators(
+            evaluators=evaluators,
+            output_dir=self.evaluation_dir,
+            metrics=metrics,
+            ensemble_source=ensemble_source,
+        )
 
     def _plot_aggregate(
         self, metrics_dir: str, classifier_name: str, output_dir: str | None = None

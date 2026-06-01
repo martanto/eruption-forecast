@@ -19,7 +19,7 @@ Key capabilities:
     - ``predict_with_uncertainty(X)``: Return mean probability, standard
       deviation across seeds, confidence score, and binary prediction array.
     - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
-      from :class:`~eruption_forecast.model.base_ensemble.BaseEnsemble`).
+      from :class:`~eruption_forecast.ensemble.base_ensemble.BaseEnsemble`).
 """
 
 import os
@@ -35,7 +35,7 @@ from eruption_forecast.utils.array import (
     save_forecast_seed,
     compute_model_probabilities,
 )
-from eruption_forecast.model.base_ensemble import BaseEnsemble
+from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 
 
 class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):

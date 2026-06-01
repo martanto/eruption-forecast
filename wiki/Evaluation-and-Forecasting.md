@@ -465,7 +465,7 @@ df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_s
 You can also use `SeedEnsemble` directly without going through `ModelPredictor`:
 
 ```python
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 
 ensemble = SeedEnsemble.load("SeedEnsemble_*.pkl")
 mean_p, std, conf, pred = ensemble.predict_with_uncertainty(features_df)

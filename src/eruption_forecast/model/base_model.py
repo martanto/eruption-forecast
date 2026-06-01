@@ -19,12 +19,14 @@ from functools import cached_property
 import joblib
 import pandas as pd
 
-from eruption_forecast import TremorData, FeaturesBuilder, TremorMatrixBuilder
 from eruption_forecast.utils import validate_date_ranges
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.date_utils import sort_dates, to_datetime
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.tremor.tremor_data import TremorData
+from eruption_forecast.features.features_builder import FeaturesBuilder
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.features.tremor_matrix_builder import TremorMatrixBuilder
 
 
 class BaseModel(ABC):

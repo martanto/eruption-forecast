@@ -1,5 +1,6 @@
 import os
 from typing import Any, Literal
+from datetime import datetime
 
 import numpy as np
 import joblib
@@ -19,16 +20,39 @@ from sklearn.model_selection import GridSearchCV
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.array import (
-    save_forecast_seed,
-    predict_proba_from_estimator,
-)
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.utils.date_utils import sort_dates
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+
+
+def split_eruption_dates(
+    eruption_dates: list[str] | list[datetime], test_size: float = 0.2
+):
+    """Split eruption dates into training and testing sets.
+
+    Args:
+        eruption_dates (list[str] | list[datetime]): Eruption dates.
+        test_size (float, optional): Fraction of test data.
+    """
+    if test_size < 0 or test_size > 1:
+        raise ValueError(f"test_size must be between 0 and 1. You provided {test_size}")
+
+    eruption_dates = sort_dates(eruption_dates, as_datetime=False)
+
+    # Clip to ensure not used all data as test
+    split_idx = np.clip(
+        np.ceil(len(eruption_dates) * test_size),
+        a_min=1,
+        a_max=len(eruption_dates) - 1,
+    ).astype(int)
+
+    X_train = eruption_dates[:-split_idx]
+    X_test = eruption_dates[-split_idx:]
+    return X_train, X_test
 
 
 def compute_threshold_metrics(
@@ -291,106 +315,6 @@ def get_significant_features(
     return features_filtered, _significant_features
 
 
-def compute_seed_eruption_probability(
-    random_state: int,
-    features_df: pd.DataFrame,
-    significant_features_csv: str,
-    model_filepath: str,
-    output_dir: str | None = None,
-    save: bool = False,
-    overwrite: bool = False,
-    verbose: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Compute eruption probability for a single random seed model.
-
-    Loads a trained model and computes eruption probabilities for the given features.
-    Supports both predict_proba (probabilistic) and decision_function (SVM) methods.
-    Can cache results to disk for faster repeated predictions.
-
-    Args:
-        random_state (int): Random seed identifying the model.
-        features_df (pd.DataFrame): Extracted features DataFrame for prediction.
-        significant_features_csv (str): Path to CSV containing significant feature names.
-        model_filepath (str): Path to the saved model (.pkl file).
-        output_dir (str | None, optional): Directory to save predictions. If None,
-            uses "output/predictions/seeds". Defaults to None.
-        save (bool, optional): If True, save probabilities to CSV. Defaults to False.
-        overwrite (bool, optional): If True, overwrite existing cached predictions.
-            Defaults to False.
-        verbose (bool, optional): If True, log save operations. Defaults to False.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing:
-            - probabilities_eruption (np.ndarray): 1D array of eruption probabilities (P(class=1)).
-            - probabilities_scores (np.ndarray): 2D array of shape (n_windows, 2) with
-              columns [P(non-eruption), P(eruption)].
-            - predictions_eruption (np.ndarray): 1D array of binary predictions (0 or 1).
-
-    Raises:
-        ValueError: If model output is 1-dimensional.
-        RuntimeError: If model supports neither predict_proba nor decision_function.
-
-    Examples:
-        >>> proba_1d, proba_2d, pred_1d = compute_seed_eruption_probability(
-        ...     random_state=42,
-        ...     features_df=features,
-        ...     significant_features_csv="sig_features.csv",
-        ...     model_filepath="model_00042.pkl",
-        ...     save=True
-        ... )
-        >>> print(proba_1d.mean())
-        0.35
-    """
-    output_dir = output_dir or os.path.join(os.getcwd(), "output", "predictions")
-    output_dir = os.path.join(output_dir, "seeds")
-
-    filename = f"p_{random_state:05d}.csv"
-    filepath = os.path.join(output_dir, f"{filename}")
-
-    # Return cached result regardless of the `save` flag — if the file exists
-    # and overwrite is False, we skip inference entirely and serve the cache.
-    # `save=True` here means "persist if not already cached", not "always write".
-    if os.path.exists(filepath) and not overwrite:
-        seed_df: pd.DataFrame = pd.read_csv(filepath, index_col=0)
-        eruption_probabilities = seed_df["p_eruption"]
-        eruption_predictions = seed_df["prediction"]
-        return (
-            eruption_probabilities.to_numpy(),
-            seed_df[
-                [
-                    "p_non_eruption",
-                    "p_eruption",
-                ]
-            ].to_numpy(),
-            eruption_predictions.to_numpy(),
-        )
-
-    df_sig = pd.read_csv(significant_features_csv, index_col=0)
-    feature_names: list[str] = df_sig.index.tolist()
-
-    # Load trained model
-    model = joblib.load(model_filepath)
-
-    # Select features dataframe with top-n significant features
-    X: pd.DataFrame = features_df[feature_names]
-
-    probabilities_eruption, probabilities_scores, predictions_eruption = (
-        predict_proba_from_estimator(model, X, identifier=random_state)
-    )
-
-    if save:
-        save_forecast_seed(
-            output_dir,
-            random_state,
-            probabilities_eruption,
-            predictions_eruption,
-            overwrite=overwrite,
-            verbose=verbose,
-        )
-
-    return probabilities_eruption, probabilities_scores, predictions_eruption
-
-
 def _extract_trained_model_suffix(csv_path: str) -> str:
     """Extract the suffix portion from a trained-model registry CSV filename.
 
@@ -420,7 +344,7 @@ def merge_seed_models(
 
     Reads the trained-model registry CSV produced by ``ModelTrainer``, loads
     every seed estimator and its significant-feature list into memory, and
-    serialises the resulting :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble`
+    serialises the resulting :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble`
     to a single ``.pkl`` file.  This eliminates the per-seed I/O overhead at
     prediction time.
 
@@ -463,7 +387,7 @@ def merge_all_classifiers(
     """Merge multiple classifier registry CSVs into a single multi-classifier pkl.
 
     Calls :func:`merge_seed_models` for each classifier, bundles the resulting
-    :class:`~eruption_forecast.model.seed_ensemble.SeedEnsemble` objects into a
+    :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble` objects into a
     plain ``dict[str, SeedEnsemble]``, and serialises the dict to one ``.pkl``
     file.  ``ModelPredictor`` detects this dict type automatically when the path
     is passed as the ``trained_models`` parameter.
@@ -578,6 +502,7 @@ def grid_search_cv(
     top_n_features: list[str],
     classifier_model: ClassifierModel,
     n_grids: int = 1,
+    scoring: str = "balanced_accuracy",
 ) -> tuple[ClassifierModel, GridSearchCV, Any]:
     """Run GridSearchCV for a single seed and return the fitted results.
 
@@ -597,6 +522,8 @@ def grid_search_cv(
             exposes the estimator, parameter grid, and CV splitter.
         n_grids (int, optional): Number of parallel jobs for ``GridSearchCV``.
             Defaults to 1.
+        scoring (str, optional): Scoring GridSearchCV. Defaults to "balanced_accuracy".
+            See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
 
     Returns:
         tuple[ClassifierModel, GridSearchCV, Any]: A 3-tuple of:
@@ -613,7 +540,7 @@ def grid_search_cv(
         estimator=classifier.model,
         param_grid=classifier.grid,
         cv=classifier.get_cv_splitter(),
-        scoring="balanced_accuracy",
+        scoring=scoring,
         n_jobs=n_grids,
         verbose=0,
     )
@@ -630,7 +557,7 @@ def save_model_csv(
     classifier_dir: str,
     classifier_model: ClassifierModel,
     number_of_features: int,
-    prefix_filename: str = "trained_model",
+    prefix_filename: str = "trained-model",
     verbose: bool = False,
 ) -> str:
     """Build and save the trained-models registry CSV for one classifier.
@@ -662,10 +589,10 @@ def save_model_csv(
         ValueError: If ``records`` is empty (no models were successfully
             trained), which would produce an empty registry.
     """
-    classifier_id = f"{classifier_model.name}-{classifier_model.cv_name}"
+    classifier_id = f"{classifier_model.name}_{classifier_model.cv_name}"
 
     suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
-    filename = f"{prefix_filename}_{suffix}.csv"
+    filename = f"{prefix_filename}__{suffix}.csv"
 
     registry_df = pd.DataFrame(records).set_index("random_state")
     if registry_df.empty:

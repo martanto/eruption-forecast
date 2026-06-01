@@ -8,7 +8,7 @@ per classifier, and produces side-by-side comparison plots and a ranking table.
 import os
 import json
 import math
-from typing import Any, Self, cast
+from typing import Any, Self
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ from eruption_forecast.plots.styles import (
 )
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 #: Metrics shown by default when ``metrics=None`` is passed to the constructor
@@ -48,6 +49,18 @@ class ClassifierComparator:
     (produced by ``ModelTrainer.evaluate()``), constructs one
     ``MultiModelEvaluator`` per classifier, and exposes methods for generating
     comparison tables and plots.
+
+    Two construction paths are supported:
+
+    - **CSV-based** — :meth:`__init__` and :meth:`from_json` build evaluators
+      from trained-model registry CSVs.  ROC plotting reads per-seed models
+      and test sets from disk via ``MultiModelEvaluator._load_seed_data``.
+    - **In-memory** — :meth:`from_evaluators` skips the registry entirely.
+      Pre-built ``MultiModelEvaluator`` instances supply aggregate metrics
+      from JSON, and an optional ``ensemble_source`` triple
+      (``ClassifierEnsemble``, ``features_df``, ``y_true``) lets ROC use the
+      live ensemble without any registry CSV on disk.  This is the path used
+      by ``EvaluationModel.compare()``.
 
     Attributes:
         output_dir (str): Root directory for saved outputs.
@@ -135,6 +148,9 @@ class ClassifierComparator:
         self.figures_dir = os.path.join(self.output_dir, "figures")
         self.metrics_dir = os.path.join(self.output_dir, "metrics")
         self._metrics_table_cache: pd.DataFrame | None = None
+        self._ensemble_source: (
+            tuple[ClassifierEnsemble, pd.DataFrame, pd.Series] | None
+        ) = None
 
         self._evaluators: dict[str, MultiModelEvaluator] = {}
         for name, csv_path in classifiers.items():
@@ -202,9 +218,88 @@ class ClassifierComparator:
 
         return cls(classifiers=classifiers, output_dir=output_dir, metrics=metrics)
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    @classmethod
+    def from_evaluators(
+        cls,
+        evaluators: dict[str, MultiModelEvaluator],
+        output_dir: str | None = None,
+        metrics: str | list[str] | None = None,
+        ensemble_source: (
+            tuple[ClassifierEnsemble, pd.DataFrame, pd.Series] | None
+        ) = None,
+    ) -> Self:
+        """Create a ClassifierComparator from pre-built ``MultiModelEvaluator`` instances.
+
+        Bypasses the registry-CSV validation in :meth:`__init__` so the
+        comparator can be constructed directly from metrics directories already
+        on disk (e.g. those written by ``EvaluationModel.evaluate()``).  When
+        ``ensemble_source`` is supplied, ROC plotting uses the live
+        ``ClassifierEnsemble`` in memory rather than reloading per-seed models
+        from a registry CSV.
+
+        Args:
+            evaluators (dict[str, MultiModelEvaluator]): Mapping of classifier
+                name to a pre-built ``MultiModelEvaluator``.
+            output_dir (str | None, optional): Root output directory. When
+                None, defaults to ``{cwd}/output/comparison/``. An explicit
+                path is used as-is. Defaults to None.
+            metrics (str | list[str] | None, optional): Metric or ordered list
+                of metrics used for ranking and plots. Single strings are
+                wrapped in a list. The first entry is used as the default
+                ranking metric. When None, uses ``DEFAULT_METRICS``. Defaults
+                to None.
+            ensemble_source (tuple[ClassifierEnsemble, pd.DataFrame, pd.Series] | None, optional):
+                Triple of ``(ensemble, features_df, y_true)`` used to compute
+                ROC curves from in-memory seeds instead of a registry CSV. When
+                None, ROC plotting falls back to the registry pathway and will
+                fail if no registry is available. Defaults to None.
+
+        Returns:
+            ClassifierComparator: Initialised comparator backed by the supplied
+                evaluators.
+
+        Raises:
+            ValueError: If ``evaluators`` is empty.
+
+        Examples:
+            >>> evaluators = {
+            ...     "rf": MultiModelEvaluator(metrics_dir="output/.../rf/metrics"),
+            ...     "xgb": MultiModelEvaluator(metrics_dir="output/.../xgb/metrics"),
+            ... }
+            >>> comparator = ClassifierComparator.from_evaluators(
+            ...     evaluators=evaluators,
+            ...     output_dir="output/.../evaluation/training",
+            ...     ensemble_source=(ensemble, features_df, y_true),
+            ... )
+        """
+        if not evaluators:
+            raise ValueError("evaluators dict must not be empty.")
+
+        if len(evaluators) == 1:
+            logger.info(
+                f"ClassifierComparator: only one classifier "
+                f"('{next(iter(evaluators))}') — comparator will produce "
+                "single-bar plots."
+            )
+
+        self = cls.__new__(cls)
+
+        if metrics is None:
+            self.metrics = list(DEFAULT_METRICS)
+        elif isinstance(metrics, str):
+            self.metrics = [metrics]
+        else:
+            self.metrics = list(metrics)
+
+        output_dir = output_dir or os.path.join(os.getcwd(), "output")
+        self.output_dir = os.path.join(output_dir, "comparison")
+        self.figures_dir = os.path.join(self.output_dir, "figures")
+        self.metrics_dir = os.path.join(self.output_dir, "metrics")
+        self._metrics_table_cache = None
+        self._evaluators = dict(evaluators)
+        self._ensemble_source = ensemble_source
+
+        return self
 
     def _save_figure(self, fig: plt.Figure, filename: str, dpi: int) -> None:
         """Save a figure to the figures subdirectory.
@@ -233,7 +328,8 @@ class ClassifierComparator:
         colors = list(OKABE_ITO)
         return [colors[i % len(colors)] for i in range(n)]
 
-    def _validate_metrics(self, metrics_list: list[str], table: pd.DataFrame) -> None:
+    @staticmethod
+    def _validate_metrics(metrics_list: list[str], table: pd.DataFrame) -> None:
         """Raise ValueError for any metric not present in the metrics table.
 
         Checks that ``{metric}_mean`` exists as a column in ``table`` for
@@ -275,8 +371,8 @@ class ClassifierComparator:
             return [metrics]
         return list(metrics)
 
+    @staticmethod
     def _build_legend_patches(
-        self,
         clf_names: list[str],
         clf_colors: list[str],
     ) -> list[mpatches.Patch]:
@@ -300,8 +396,8 @@ class ClassifierComparator:
             for i, name in enumerate(clf_names)
         ]
 
+    @staticmethod
     def _attach_legend(
-        self,
         fig: plt.Figure,
         handles: list[mpatches.Patch],
         ncol: int,
@@ -460,6 +556,71 @@ class ClassifierComparator:
         plt.close(fig_all)
         return fig_all
 
+    def _iter_seed_roc_data(
+        self,
+        evaluator: MultiModelEvaluator,
+        name: str,
+    ):
+        """Yield ``(y_true, y_proba)`` pairs for every seed of one classifier.
+
+        Dispatches between two data sources:
+
+        - **In-memory** — when ``self._ensemble_source`` is set and contains an
+          entry for ``name``, iterates the seeds of
+          ``ensemble.ensembles[name]`` and computes positive-class
+          probabilities by slicing ``features_df`` to the seed's
+          ``feature_names``, intersecting the index with ``y_true``, and
+          calling ``seed["model"].predict_proba(X)[:, 1]``.
+        - **Registry** — otherwise, calls ``evaluator._require_registry()``
+          and ``evaluator._load_seed_data(row)`` for each row, exactly as the
+          CSV-based pathway did before.
+
+        Yields:
+            tuple[np.ndarray, np.ndarray]: ``(y_true_array, y_proba_array)``
+                for each seed.  Seeds with no usable data are skipped (with a
+                warning logged).
+        """
+        if self._ensemble_source is not None:
+            ensemble, features_df, y_true_series = self._ensemble_source
+            if name in ensemble.ensembles:
+                for seed_record in ensemble.ensembles[name].seeds:
+                    feature_names: list[str] = seed_record.get("feature_names", [])
+                    available_features = [
+                        feature_name
+                        for feature_name in feature_names
+                        if feature_name in features_df.columns
+                    ]
+                    if not available_features:
+                        logger.warning(
+                            f"Skipped a seed for '{name}' in plot_roc: "
+                            "no overlapping features."
+                        )
+                        continue
+                    try:
+                        X_seed = features_df[available_features]
+                        common_index = X_seed.index.intersection(y_true_series.index)
+                        if common_index.empty:
+                            logger.warning(
+                                f"Skipped a seed for '{name}' in plot_roc: "
+                                "no overlapping index."
+                            )
+                            continue
+                        X_seed = X_seed.loc[common_index]
+                        y_true_arr = y_true_series.loc[common_index].to_numpy()
+                        y_proba_arr = seed_record["model"].predict_proba(X_seed)[:, 1]
+                        yield y_true_arr, y_proba_arr
+                    except (ValueError, KeyError, AttributeError):
+                        logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+                return
+
+        registry = evaluator._require_registry()
+        for _, row in registry.iterrows():
+            try:
+                _, _X_test, y_true, y_proba = evaluator._load_seed_data(row)
+                yield np.asarray(y_true), np.asarray(y_proba)
+            except (OSError, ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+
     def _compute_classifier_roc(
         self,
         evaluator: MultiModelEvaluator,
@@ -471,10 +632,10 @@ class ClassifierComparator:
     ) -> tuple[np.ndarray, np.ndarray, float] | None:
         """Compute and draw the mean ROC curve for one classifier.
 
-        Iterates over every seed in the classifier's registry, computes per-seed
-        ROC data, optionally draws individual seed curves as thin dashed lines,
-        then plots the interpolated mean curve with a shaded std-deviation band.
-        Returns None if no valid seed data was found.
+        Iterates over per-seed ``(y_true, y_proba)`` pairs supplied by
+        :meth:`_iter_seed_roc_data`, optionally draws individual seed curves as
+        thin dashed lines, then plots the interpolated mean curve with a shaded
+        std-deviation band.  Returns ``None`` if no valid seed data was found.
 
         Args:
             evaluator (MultiModelEvaluator): Evaluator for the classifier.
@@ -489,32 +650,26 @@ class ClassifierComparator:
         Returns:
             tuple[np.ndarray, np.ndarray, float] | None: A
                 ``(mean_tpr, std_tpr, mean_auc)`` triple if at least one seed
-                was successfully processed, or ``None`` if the registry had no
-                usable data.
+                was successfully processed, or ``None`` if no usable seed data
+                was found.
         """
-        registry = evaluator._require_registry()
         tprs: list[np.ndarray] = []
         aucs: list[float] = []
 
-        for _, row in registry.iterrows():
-            try:
-                _, _X_test, y_true, y_proba = evaluator._load_seed_data(row)
-                fpr, tpr, _ = roc_curve(y_true, y_proba)
-                auc_val = roc_auc_score(y_true, y_proba)
-                aucs.append(auc_val)
-                tprs.append(np.interp(mean_fpr, fpr, tpr))
+        for y_true, y_proba in self._iter_seed_roc_data(evaluator, name):
+            fpr, tpr, _ = roc_curve(y_true, y_proba)
+            aucs.append(roc_auc_score(y_true, y_proba))
+            tprs.append(np.interp(mean_fpr, fpr, tpr))
 
-                if show_individual:
-                    ax.plot(
-                        fpr,
-                        tpr,
-                        color=color,
-                        alpha=0.15,
-                        linewidth=0.6,
-                        linestyle="--",
-                    )
-            except (OSError, ValueError, KeyError):
-                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+            if show_individual:
+                ax.plot(
+                    fpr,
+                    tpr,
+                    color=color,
+                    alpha=0.15,
+                    linewidth=0.6,
+                    linestyle="--",
+                )
 
         if not tprs:
             return None
@@ -571,16 +726,14 @@ class ClassifierComparator:
         clf_name = list(self._evaluators.keys())[row]
 
         if vals:
-            parts = cast(
-                dict[str, Any],
-                ax.violinplot(
-                    [vals],
-                    positions=[1],
-                    showmeans=False,
-                    showmedians=True,
-                    showextrema=True,
-                ),
+            parts: dict[str, Any] = ax.violinplot(
+                [vals],
+                positions=[1],
+                showmeans=False,
+                showmedians=True,
+                showextrema=True,
             )
+
             parts["bodies"][0].set_facecolor(color)
             parts["bodies"][0].set_alpha(0.55)
 
@@ -609,10 +762,6 @@ class ClassifierComparator:
         ax.tick_params(axis="y", labelsize=7)
 
         configure_spine(ax)
-
-    # ------------------------------------------------------------------
-    # Metrics table and ranking
-    # ------------------------------------------------------------------
 
     def get_metrics_table(self) -> pd.DataFrame:
         """Return a DataFrame of aggregate metrics for every classifier.
@@ -695,10 +844,6 @@ class ClassifierComparator:
 
         return ranked
 
-    # ------------------------------------------------------------------
-    # Comparison plots
-    # ------------------------------------------------------------------
-
     def plot_metric_bar(
         self,
         metrics: str | list[str] | None = None,
@@ -780,8 +925,8 @@ class ClassifierComparator:
 
         return figures
 
+    @staticmethod
     def _draw_metric_bars(
-        self,
         ax: plt.Axes,
         clf_names: list[str],
         clf_colors: list[str],
@@ -917,8 +1062,8 @@ class ClassifierComparator:
 
         return figures
 
+    @staticmethod
     def _draw_stability_violin(
-        self,
         ax: plt.Axes,
         clf_names: list[str],
         clf_colors: list[str],
@@ -959,7 +1104,7 @@ class ClassifierComparator:
         data_list = list(data_list)
         positions = np.array(positions)
 
-        parts = ax.violinplot(
+        parts: dict[str, Any] = ax.violinplot(
             data_list,
             positions=positions,
             showmeans=False,
@@ -967,7 +1112,7 @@ class ClassifierComparator:
             showextrema=True,
         )
 
-        for i, pc in enumerate(parts["bodies"]):  # ty:ignore[invalid-argument-type]
+        for i, pc in enumerate(parts["bodies"]):
             pc.set_facecolor(clf_colors[i])
             pc.set_alpha(0.6)
 

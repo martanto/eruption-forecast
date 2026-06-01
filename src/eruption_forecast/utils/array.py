@@ -60,10 +60,12 @@ def save_forecast_seed(
     filepath = os.path.join(output_dir, f"p_{random_state:05d}.csv")
     if os.path.exists(filepath) and not overwrite:
         return
+
     df = pd.DataFrame(
         np.column_stack((1 - probabilities, probabilities, predictions)),
         columns=["p_no_eruption", "p_eruption", "prediction"],
-    )
+    ).astype({"prediction": int})
+
     df.index.name = "label_id"
     df.to_csv(filepath, index=True)
     if verbose:

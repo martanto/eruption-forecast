@@ -9,7 +9,6 @@ import joblib
 import pandas as pd
 from joblib import Parallel, delayed
 
-from eruption_forecast import LabelBuilder, DynamicLabelBuilder
 from eruption_forecast.plots import plot_significant_features
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
@@ -23,10 +22,12 @@ from eruption_forecast.utils.pathutils import ensure_dir, generate_features_file
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.model.cache_model import CacheModel
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
-from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
+from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class TrainingModel(BaseModel, CacheModel):
@@ -167,6 +168,10 @@ class TrainingModel(BaseModel, CacheModel):
         self.results_json: str | None = None
         self.seed_ensembles: dict[str, str] = {}
         self.classifier_ensemble_path: str | None = None
+        self._scoring: str = "balanced_accuracy"
+
+        if verbose:
+            logger.info("[Training Model]: Starting Prediction...")
 
         self.validate()
 
@@ -385,6 +390,7 @@ class TrainingModel(BaseModel, CacheModel):
         window_size: int,
         cv_strategy: str,
         cv_splits: int,
+        scoring: str,
         number_of_features: int,
         include_eruption_date: bool,
         build_label_params: dict,
@@ -413,6 +419,7 @@ class TrainingModel(BaseModel, CacheModel):
             window_size (int): Sliding window size in days.
             cv_strategy (str): Cross-validation strategy name.
             cv_splits (int): Number of CV folds.
+            scoring (str): GridSearchCV scoring name.
             number_of_features (int): Top-N features retained.
             include_eruption_date (bool): Whether the eruption day itself is
                 labelled positive.
@@ -443,6 +450,7 @@ class TrainingModel(BaseModel, CacheModel):
                 "window_size": window_size,
                 "cv_strategy": cv_strategy,
                 "cv_splits": cv_splits,
+                "scoring": scoring,
                 "number_of_features": number_of_features,
                 "include_eruption_date": include_eruption_date,
             },
@@ -662,6 +670,7 @@ class TrainingModel(BaseModel, CacheModel):
         minority_threshold: float = 0.15,
         sampling_strategy: str | float = 0.75,
         plot_features: bool = False,
+        scoring: str = "balanced_accuracy",
     ) -> Self:
         """Train classifier models on the full dataset across multiple random seeds.
 
@@ -685,6 +694,8 @@ class TrainingModel(BaseModel, CacheModel):
                 resampler. Defaults to 0.75.
             plot_features (bool): Save per-seed feature importance figures.
                 Defaults to False.
+            scoring (str, optional): Scoring GridSearchCV. Defaults to ``"balanced_accuracy"``.
+                See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
 
         Returns:
             Self: The current instance, enabling method chaining.
@@ -712,6 +723,7 @@ class TrainingModel(BaseModel, CacheModel):
             )
 
         self.create_directories(plot_features=plot_features)
+        self._scoring = scoring
 
         if resample_method == "auto":
             minority_share = (
@@ -777,9 +789,7 @@ class TrainingModel(BaseModel, CacheModel):
         )
 
         if self.verbose:
-            logger.info(
-                f"Pending Training: Found {len(training_model_results)} job(s)"
-            )
+            logger.info(f"Pending Training: Found {len(training_model_results)} job(s)")
 
         for result in training_model_results:
             if result is None:
@@ -843,7 +853,7 @@ class TrainingModel(BaseModel, CacheModel):
                 classifier_dir=self.classifier_dirs[classifier_slug],
                 classifier_model=classifier_model,
                 number_of_features=self.number_of_features,
-                prefix_filename="trained_model",
+                prefix_filename="trained-model",
                 verbose=self.verbose,
             )
 
@@ -851,7 +861,6 @@ class TrainingModel(BaseModel, CacheModel):
                 output_dir=self.classifier_dirs[classifier_slug],
                 classifier_name=classifier_model.name,
                 registry_csv=trained_model_csv,
-                cv_name=cv_name,
                 verbose=self.verbose,
             )
 
@@ -913,7 +922,6 @@ class TrainingModel(BaseModel, CacheModel):
         output_dir: str,
         classifier_name: str,
         registry_csv: str,
-        cv_name: str | None = None,
         verbose: bool = False,
     ) -> tuple[str, SeedEnsemble]:
         """Build and save a SeedEnsemble from a trained-model registry CSV.
@@ -931,8 +939,6 @@ class TrainingModel(BaseModel, CacheModel):
                 filename suffix (e.g. ``"RandomForestClassifier"``).
             registry_csv (str): Path to the ``trained_model_*.csv`` registry
                 produced by :func:`~eruption_forecast.utils.ml.save_model_csv`.
-            cv_name (str, optional): Name of the cross-validation splitter class.
-                Defaults to None.
             verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
 
         Returns:
@@ -947,11 +953,11 @@ class TrainingModel(BaseModel, CacheModel):
             ...     registry_csv="training/classifiers/trained_model_rf.csv",
             ... )
         """
-        suffix = f"_{cv_name}" if cv_name else ""
+        # Example registry_csv filename:
+        # trained-model__XGBClassifier_StratifiedShuffleSplit_seeds-25_features-20.csv
+        suffix = os.path.basename(registry_csv).split(".csv")[0].split("__")[-1]
 
-        filepath = os.path.join(
-            output_dir, f"SeedEnsemble_{classifier_name}{suffix}.pkl"
-        )
+        filepath = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
         seed_ensemble = SeedEnsemble.from_registry(
             registry_csv, classifier_name=classifier_name, verbose=verbose
         )
@@ -1026,6 +1032,7 @@ class TrainingModel(BaseModel, CacheModel):
             labels_resampled,
             top_n_features,
             classifier_model=classifier_model,
+            scoring=self._scoring,
         )
 
         joblib.dump(best_model, model_seed_path)

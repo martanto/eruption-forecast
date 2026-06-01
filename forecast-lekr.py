@@ -2,11 +2,13 @@
 from eruption_forecast.model.forecast import ForecastModel
 
 
-def main(sds_dir: str, n_jobs: int = 2):
+def main():
+    # %%
+    n_jobs = 8
     # %%
     fm = ForecastModel(
         network="VG",
-        station="OJN",
+        station="LEKR",
         location="00",
         channel="EHZ",
         day_to_forecast=2,
@@ -15,10 +17,10 @@ def main(sds_dir: str, n_jobs: int = 2):
     )
     # %%
     fm.calculate(
-        start_date="2025-01-01",
-        end_date="2025-12-31",
+        start_date="2020-08-01",
+        end_date="2022-12-31",
         source="sds",
-        sds_dir=sds_dir,
+        sds_dir=r"D:\Data\LEKR",
         methods=["rsam", "dsar", "entropy"],
         remove_tremor_anomalies=False,
         interpolate=True,
@@ -27,28 +29,32 @@ def main(sds_dir: str, n_jobs: int = 2):
         overwrite_plot=True,
         overwrite=False,
         n_jobs=n_jobs,
-        verbose=False,
+        verbose=True,
     )
     # %%
     fm.train(
-        start_date="2025-01-01",
-        end_date="2025-07-26",
+        start_date="2020-08-01",
+        end_date="2021-12-06",
         classifiers=["lite-rf", "rf", "gb", "xgb"],
         eruption_dates=[
-            "2025-03-20",
-            "2025-04-10",
-            "2025-04-22",
-            "2025-05-18",
-            "2025-06-17",
-            "2025-07-07",
-            "2025-08-02",
-            "2025-08-18",
+            "2020-11-29",
+            "2020-11-30",
+            "2020-12-01",
+            "2020-12-02",
+            "2020-12-23",
+            "2020-12-30",
+            "2021-12-01",
+            "2021-12-04",
+            "2021-12-05",
+            "2021-12-06",
+            "2022-12-04",
+            "2022-12-05",
         ],
         window_step=6,
         window_step_unit="hours",
-        label_builder="standard",
+        label_builder="dynamic",
+        days_before_eruption=60,
         cv_strategy="shuffle-stratified",
-        scoring="recall",
         select_tremor_columns=[
             "rsam_f2",
             "rsam_f3",
@@ -69,17 +75,17 @@ def main(sds_dir: str, n_jobs: int = 2):
         plot_features=True,
         n_jobs=4,
         n_grids=4,
-        verbose=False,
+        verbose=True,
     )
     # %%
     fm.predict(
-        start_date="2025-07-27",
-        end_date="2025-08-22",
+        start_date="2022-11-29",
+        end_date="2022-12-07",
         window_step=10,
         window_step_unit="minutes",
         save_seed_result=True,
         plot_threshold=0.7,
-        use_cache=False,
+        use_cache=True,
         verbose=True,
     )
 
@@ -94,4 +100,4 @@ def main(sds_dir: str, n_jobs: int = 2):
 
 # %%
 if __name__ == "__main__":
-    main(sds_dir=r"D:\Data\OJN", n_jobs=8)
+    main()
