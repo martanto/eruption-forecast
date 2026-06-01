@@ -1,13 +1,10 @@
-"""Pipeline configuration dataclasses for the new ``ForecastModel`` API.
+"""Pipeline configuration dataclasses for the ``ForecastModel`` API.
 
 Each pipeline stage (``calculate``, ``train``, ``predict``, ``evaluate``) has
 a dedicated config section. The top-level ``ForecastConfig`` holds all
 sections and knows how to save/load itself as YAML or JSON.
 
-This module targets ``eruption_forecast.model.forecast.ForecastModel`` and is
-intentionally independent of ``pipeline_config.py`` (which serves the legacy
-``forecast_model.py``).  The two modules will coexist until the legacy stack
-is removed.
+This module targets ``eruption_forecast.model.forecast.ForecastModel``.
 """
 
 import os
@@ -165,10 +162,8 @@ class CalculateConfig(_ConfigBase):
 class TrainConfig(_ConfigBase):
     """Configuration for ``ForecastModel.train()`` parameters.
 
-    The new ``train()`` fuses label building, feature extraction, and
-    multi-seed fitting into a single stage, so this section replaces the
-    legacy ``BuildLabelConfig`` + ``ExtractFeaturesConfig`` + ``TrainConfig``
-    triple.
+    ``train()`` fuses label building, feature extraction, and multi-seed
+    fitting into a single stage.
 
     Attributes:
         start_date (str): Training period start date. Defaults to ``""``.

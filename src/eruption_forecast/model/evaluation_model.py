@@ -30,10 +30,10 @@ from typing import Self, Literal
 import joblib
 import pandas as pd
 
-from eruption_forecast import LabelBuilder
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.prediction_model import PredictionModel

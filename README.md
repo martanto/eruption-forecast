@@ -74,7 +74,6 @@ This project is forked from [Eruption forecast model for Whakaari](https://githu
 - [Installation](#installation)
 - [Data Sources](#data-sources)
 - [Quick Start: Complete Pipeline](#quick-start-complete-pipeline)
-- [Reports](#reports)
 - [Advanced Usage](#advanced-usage)
 - [Supported Classifiers](#supported-classifiers)
 - [Cross-Validation Strategies](#cross-validation-strategies)
@@ -103,10 +102,9 @@ This project is forked from [Eruption forecast model for Whakaari](https://githu
 - **Enhanced Feature Selection**: Three-method feature selection; tsfresh statistical, RandomForest permutation importance, or combined two-stage
 - **Model Training**: Train 10 classifier types (Random Forest, Gradient Boosting, XGBoost, SVM, Logistic Regression, Neural Networks, Ensembles) across multiple random seeds
 - **Model Evaluation**: Comprehensive evaluation with ROC curves, precision-recall curves, confusion matrices, threshold analysis, calibration curves, feature importance, SHAP explainability, seed stability violin plots, frequency band contribution charts, and **learning curve plots** (`plot_learning_curve_grid`) via `ModelEvaluator` and `MultiModelEvaluator`; cross-classifier comparison plots and ranking tables via `ClassifierComparator`
-- **Two Training Workflows**: `evaluate()` for in-sample evaluation (80/20 split), `train()` for full-dataset training with future-data evaluation via `ModelPredictor`; `fit()` as a unified entry point that dispatches between the two
+- **Unified Pipeline**: `ForecastModel` orchestrates the full flow via `calculate() → train() → predict() → evaluate()`, with `train()` supporting both full-dataset fits and 80/20 evaluation runs
 - **Seed Ensemble Merging**: Combine all 500 seed models + their feature lists into a single `.pkl` file via `BaseEnsemble.save()` / `SeedEnsemble` / `ClassifierEnsemble` / `merge_seed_models()` / `merge_all_classifiers()`; eliminates per-seed I/O at prediction time and enables `predict_proba()` directly on the ensemble
 - **Multi-processing**: Parallel processing for faster tremor calculations and model training
-- **Interactive HTML Reports**: (beta, not fully functional yet) Generate self-contained Plotly-powered reports for every pipeline stage via `ForecastModel.generate_report()` or the standalone `generate_report()` function; no external dependencies except an optional `weasyprint` for PDF export
 - **Telegram Notifications**: `notify` decorator and `send_telegram_notification` direct function send structured Telegram messages (success/error, elapsed time, file attachments)
 - **Modular Architecture**: Clean separation of concerns with focused utility modules
 
@@ -122,7 +120,6 @@ eruption-forecast/
 │   ├── model/               # ML model training & prediction
 │   ├── sources/             # SDS and FDSN data source adapters
 │   ├── plots/               # Visualization utilities
-│   ├── report/              # (beta) Interactive HTML report generation
 │   ├── utils/               # Focused utility modules
 │   └── decorators/          # Function decorators
 └── tests/                   # Unit tests
@@ -157,36 +154,31 @@ Raw Seismic Data (SDS / FDSN)
            │
            ▼
 ┌─────────────────────────────────────────────┐
-│                 ModelTrainer                │
+│                TrainingModel                │
 │  ┌─────────────┐   ┌─────────────────────┐  │
 │  │FeatureSelect│   │   ClassifierModel   │  │
 │  │   or        │   │ (10 classifiers,    │  │
 │  │  combined   │   │  3 CV strategies)   │  │
 │  └─────────────┘   └─────────────────────┘  │
-│         ↓  evaluate()  ↓ train()            │
-│    80/20 split + metrics   Full dataset     │
+│         ↓  with_evaluation=True  ↓ False    │
+│    80/20 split + metrics    Full dataset    │
 └─────────┬───────────────────────────────────┘
           │  trained_model_*.csv  +  *.pkl
-          │
-          │  (optional) trainer.merge_models()
-          │  → merged_model_*.pkl  (SeedEnsemble)
+          │  → ClassifierEnsemble.pkl (auto)
           ▼
 ┌─────────────────────────────────────────────┐
-│               ModelPredictor                │
+│               PredictionModel               │
 │  ┌──────────────────────────────────────┐   │
-│  │ predict_proba()                      │   │
-│  │ (forecast mode; no labels needed)    │   │
+│  │ predict() / forecast unlabelled grid │   │
 │  └──────────────────────────────────────┘   │
-│  Single model or multi-model consensus      │
+│  Single model or multi-classifier consensus │
 └──────────────────────┬──────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────┐
-│           Report (beta, optional)           │
-│   generate_report() / fm.generate_report()  │
-│   → self-contained HTML (Plotly, CDN JS)    │
-│   Tremor · Labels · Features · Training     │
-│   Comparator · Prediction · Pipeline        │
+│              EvaluationModel                │
+│  Training-reuse · Prediction-reuse ·        │
+│  Standalone — metrics, ROC, SHAP, etc.      │
 └─────────────────────────────────────────────┘
 ```
 
@@ -357,103 +349,6 @@ See `main.py` in the repository for the complete working example.
 
 ---
 
-## Reports (beta)
-
-The `report/` package generates self-contained, interactive HTML reports (powered by Plotly, loaded from CDN) for every pipeline stage. No image files are produced; each report is a single `.html` file you can open in any browser or share by email.
-
-### Integrated; chain after any pipeline stage
-
-```python
-fm.calculate(...).build_label(...).train(...).generate_report()
-# → output/VG.OJN.00.EHZ/reports/pipeline_report.html
-
-# Select specific sections only
-fm.generate_report(sections=["tremor", "label"])
-
-# Export to PDF (requires: uv add weasyprint)
-fm.generate_report(fmt="pdf")
-```
-
-### Standalone; from an existing output directory
-
-```python
-from eruption_forecast.report import generate_report
-
-path = generate_report("output/VG.OJN.00.EHZ")
-print(f"Report saved to {path}")
-
-# Specific sections
-path = generate_report("output/VG.OJN.00.EHZ", sections=["tremor", "training"])
-```
-
-### Individual section reports
-
-Each report class can be used directly for a focused view:
-
-```python
-from eruption_forecast.report import (
-    TremorReport,
-    LabelReport,
-    FeaturesReport,
-    TrainingReport,
-    ComparatorReport,
-    PredictionReport,
-    PipelineReport,
-)
-
-# Tremor: data completeness, band stats, full-range + daily detail chart
-path = TremorReport("output/.../tremor.csv", station="OJN").save()
-
-# Labels: window config, class distribution, eruption timeline
-path = LabelReport(
-    "output/.../label_2025-01-01_....csv",
-    eruption_dates=["2025-03-20", "2025-04-22"],
-).save()
-
-# Features: feature counts, top-N bar, band contribution
-path = FeaturesReport(
-    features_csv="output/.../all_extracted_features.csv",
-    significant_features_dir="output/.../significant_features/",
-    selection_method="combined",
-).save()
-
-# Training: per-seed <details>, aggregate mean±std, stability, threshold analysis
-path = TrainingReport(
-    metrics_dir="output/.../metrics/",
-    classifier_name="RandomForestClassifier",
-).save()
-
-# Classifier comparison: grouped bar + aggregate table
-from eruption_forecast.report import ComparatorReport
-path = ComparatorReport(
-    classifier_registry={
-        "rf":  "output/.../trainings/evaluations/rf/.../trained_model_rf.csv",
-        "xgb": "output/.../trainings/evaluations/xgb/.../trained_model_xgb.csv",
-    }
-).save()
-
-# Forecast probabilities: consensus line, uncertainty band, eruption markers
-path = PredictionReport(
-    prediction_df=fm.prediction_df,
-    eruption_dates=["2025-03-20"],
-    threshold=0.7,
-).save()
-```
-
-**What each report contains:**
-
-| Report | Charts | Tables |
-|--------|--------|--------|
-| `TremorReport` | Full-range overview, daily detail with date dropdown | Completeness, band stats |
-| `LabelReport` | Class distribution bar, eruption timeline | Window config, class counts |
-| `FeaturesReport` | Top-N features (horizontal bar), band contribution | Feature counts summary |
-| `TrainingReport` | Seed stability, threshold analysis | Per-seed rows + aggregate mean±std |
-| `ComparatorReport` | Grouped bar per metric × classifier | Aggregate metrics table |
-| `PredictionReport` | Probability lines + uncertainty band + eruption markers | Forecast config |
-| `PipelineReport` | All of the above + executive summary | Pipeline stage availability |
-
----
-
 ## Advanced Usage
 
 ### Use FDSN instead of a local SDS archive
@@ -519,7 +414,7 @@ fm.train(
 **Parallelism architecture:**
 
 ```
-ModelTrainer.fit()
+TrainingModel.fit()
 │
 ├── [outer] n_jobs  → Parallel(loky backend)
 │   Each worker runs one full seed independently:
@@ -621,8 +516,8 @@ proba = ensemble.predict_proba(features_df)   # shape (n_samples, 2)
 # Multi-classifier bundle
 bundle_path = trainer.merge_classifier_models({"rf": rf_csv, "xgb": xgb_csv})
 
-# Pass merged pkl directly to ModelPredictor
-predictor = ModelPredictor(
+# Pass merged pkl directly to a PredictionModel
+predictor = PredictionModel(
     start_date="2025-07-28", end_date="2025-08-04",
     trained_models=merged_path,    # single merged pkl
     # or: trained_models=bundle_path  (multi-classifier bundle)

@@ -17,14 +17,13 @@ from eruption_forecast.config.constants import (
     DEFAULT_WINDOW_DURATION_MINUTES,
     DEFAULT_MINIMUM_COMPLETION_RATIO,
 )
-from eruption_forecast.config.pipeline_config import (
+from eruption_forecast.config.forecast_config import (
     ModelConfig,
     TrainConfig,
+    PredictConfig,
+    EvaluateConfig,
     ForecastConfig,
-    PipelineConfig,
     CalculateConfig,
-    BuildLabelConfig,
-    ExtractFeaturesConfig,
 )
 
 
@@ -46,9 +45,8 @@ __all__ = [
     "CLASS_LABELS",
     "ModelConfig",
     "CalculateConfig",
-    "BuildLabelConfig",
-    "ExtractFeaturesConfig",
     "TrainConfig",
+    "PredictConfig",
+    "EvaluateConfig",
     "ForecastConfig",
-    "PipelineConfig",
 ]

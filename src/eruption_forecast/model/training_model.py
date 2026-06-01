@@ -9,7 +9,6 @@ import joblib
 import pandas as pd
 from joblib import Parallel, delayed
 
-from eruption_forecast import LabelBuilder, DynamicLabelBuilder
 from eruption_forecast.plots import plot_significant_features
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
@@ -23,9 +22,11 @@ from eruption_forecast.utils.pathutils import ensure_dir, generate_features_file
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.model.cache_model import CacheModel
+from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
+from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 

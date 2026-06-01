@@ -34,25 +34,16 @@ if os.getenv("ERUPTION_FORECAST_DISABLE_NUMBA_CUDA", "1") == "1":
     os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
 
 from eruption_forecast.logger import enable_logging, disable_logging
-from eruption_forecast.report import (
-    LabelReport,
-    TremorReport,
-    FeaturesReport,
-    PipelineReport,
-    TrainingReport,
-    ComparatorReport,
-    PredictionReport,
-    generate_report,
-)
 from eruption_forecast.decorators import notify, send_telegram_notification
 from eruption_forecast.data_container import BaseDataContainer
+from eruption_forecast.model.forecast import ForecastModel
 from eruption_forecast.label.label_data import LabelData
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_builder import LabelBuilder
-from eruption_forecast.model.model_trainer import ModelTrainer
-from eruption_forecast.model.forecast_model import ForecastModel
+from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.model_evaluator import ModelEvaluator
-from eruption_forecast.config.pipeline_config import PipelineConfig
+from eruption_forecast.model.evaluation_model import EvaluationModel
+from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
@@ -79,23 +70,16 @@ __all__ = [
     "FeaturesBuilder",
     "TremorMatrixBuilder",
     "ForecastModel",
-    "ModelTrainer",
+    "TrainingModel",
+    "PredictionModel",
+    "EvaluationModel",
     "ModelEvaluator",
     "MultiModelEvaluator",
     "LabelData",
     "TremorData",
-    "PipelineConfig",
     "BaseDataContainer",
     "disable_logging",
     "enable_logging",
     "notify",
     "send_telegram_notification",
-    "generate_report",
-    "TremorReport",
-    "LabelReport",
-    "FeaturesReport",
-    "TrainingReport",
-    "ComparatorReport",
-    "PredictionReport",
-    "PipelineReport",
 ]
