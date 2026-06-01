@@ -2,6 +2,8 @@
 import os
 from typing import Any
 
+from dotenv import load_dotenv
+
 from eruption_forecast import send_telegram_notification
 from eruption_forecast.logger import logger
 from eruption_forecast.model.forecast import ForecastModel
@@ -9,6 +11,8 @@ from eruption_forecast.utils.formatting import slugify
 
 
 # %%
+load_dotenv(override=True)
+
 root_dir = r"D:\Projects\eruption-forecast"
 eruption_dates = [
     "2025-03-20",
@@ -29,62 +33,62 @@ scenarios = [
         "prediction_start_date": "2025-04-01",
         "prediction_end_date": "2025-04-30",
     },
-    # {
-    #     "name": "Scenario 2",
-    #     "description": "Training using 1 eruption to forecast eruption 3",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-03-31",
-    #     "prediction_start_date": "2025-05-01",
-    #     "prediction_end_date": "2025-05-31",
-    # },
-    # {
-    #     "name": "Scenario 3",
-    #     "description": "Training using 1 eruption to forecast eruption 4",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-03-31",
-    #     "prediction_start_date": "2025-06-01",
-    #     "prediction_end_date": "2025-06-30",
-    # },
-    # {
-    #     "name": "Scenario 5",
-    #     "description": "Training using 1 and 2 eruptions to forecast eruption 3",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-04-30",
-    #     "prediction_start_date": "2025-05-01",
-    #     "prediction_end_date": "2025-05-31",
-    # },
-    # {
-    #     "name": "Scenario 6",
-    #     "description": "Training using 1, 2 and 3 eruptions to forecast eruption 4",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-05-31",
-    #     "prediction_start_date": "2025-06-01",
-    #     "prediction_end_date": "2025-06-30",
-    # },
-    # {
-    #     "name": "Scenario 7",
-    #     "description": "Training using 1, 2, 3 and 4 eruption to forecast 5",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-06-30",
-    #     "prediction_start_date": "2025-07-01",
-    #     "prediction_end_date": "2025-07-13",
-    # },
-    # {
-    #     "name": "Scenario 8",
-    #     "description": "Training using 1, 2, 3, 4 and 5 eruption to forecast 6, 7",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-07-26",
-    #     "prediction_start_date": "2025-07-27",
-    #     "prediction_end_date": "2025-08-22",
-    # },
-    # {
-    #     "name": "Scenario 9",
-    #     "description": "Training using ALL",
-    #     "train_start_date": "2025-01-01",
-    #     "train_end_date": "2025-08-22",
-    #     "prediction_start_date": "2025-01-01",
-    #     "prediction_end_date": "2025-08-22",
-    # },
+    {
+        "name": "Scenario 2",
+        "description": "Training using 1 eruption to forecast eruption 3",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-03-31",
+        "prediction_start_date": "2025-05-01",
+        "prediction_end_date": "2025-05-31",
+    },
+    {
+        "name": "Scenario 3",
+        "description": "Training using 1 eruption to forecast eruption 4",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-03-31",
+        "prediction_start_date": "2025-06-01",
+        "prediction_end_date": "2025-06-30",
+    },
+    {
+        "name": "Scenario 5",
+        "description": "Training using 1 and 2 eruptions to forecast eruption 3",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-04-30",
+        "prediction_start_date": "2025-05-01",
+        "prediction_end_date": "2025-05-31",
+    },
+    {
+        "name": "Scenario 6",
+        "description": "Training using 1, 2 and 3 eruptions to forecast eruption 4",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-05-31",
+        "prediction_start_date": "2025-06-01",
+        "prediction_end_date": "2025-06-30",
+    },
+    {
+        "name": "Scenario 7",
+        "description": "Training using 1, 2, 3 and 4 eruption to forecast 5",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-06-30",
+        "prediction_start_date": "2025-07-01",
+        "prediction_end_date": "2025-07-13",
+    },
+    {
+        "name": "Scenario 8",
+        "description": "Training using 1, 2, 3, 4 and 5 eruption to forecast 6, 7",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-07-26",
+        "prediction_start_date": "2025-07-27",
+        "prediction_end_date": "2025-08-22",
+    },
+    {
+        "name": "Scenario 9",
+        "description": "Training using ALL",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-08-22",
+        "prediction_start_date": "2025-01-01",
+        "prediction_end_date": "2025-08-22",
+    },
 ]
 
 
