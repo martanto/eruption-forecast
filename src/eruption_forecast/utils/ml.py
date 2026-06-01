@@ -502,6 +502,7 @@ def grid_search_cv(
     top_n_features: list[str],
     classifier_model: ClassifierModel,
     n_grids: int = 1,
+    scoring: str = "balanced_accuracy",
 ) -> tuple[ClassifierModel, GridSearchCV, Any]:
     """Run GridSearchCV for a single seed and return the fitted results.
 
@@ -521,6 +522,8 @@ def grid_search_cv(
             exposes the estimator, parameter grid, and CV splitter.
         n_grids (int, optional): Number of parallel jobs for ``GridSearchCV``.
             Defaults to 1.
+        scoring (str, optional): Scoring GridSearchCV. Defaults to "balanced_accuracy".
+            See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
 
     Returns:
         tuple[ClassifierModel, GridSearchCV, Any]: A 3-tuple of:
@@ -537,7 +540,7 @@ def grid_search_cv(
         estimator=classifier.model,
         param_grid=classifier.grid,
         cv=classifier.get_cv_splitter(),
-        scoring="balanced_accuracy",
+        scoring=scoring,
         n_jobs=n_grids,
         verbose=0,
     )
