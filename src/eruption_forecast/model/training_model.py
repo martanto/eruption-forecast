@@ -167,6 +167,10 @@ class TrainingModel(BaseModel, CacheModel):
         self.results_json: str | None = None
         self.seed_ensembles: dict[str, str] = {}
         self.classifier_ensemble_path: str | None = None
+        self._scoring: str = "balanced_accuracy"
+
+        if verbose:
+            logger.info("[Training Model]: Starting Prediction...")
 
         self.validate()
 
@@ -385,6 +389,7 @@ class TrainingModel(BaseModel, CacheModel):
         window_size: int,
         cv_strategy: str,
         cv_splits: int,
+        scoring: str,
         number_of_features: int,
         include_eruption_date: bool,
         build_label_params: dict,
@@ -413,6 +418,7 @@ class TrainingModel(BaseModel, CacheModel):
             window_size (int): Sliding window size in days.
             cv_strategy (str): Cross-validation strategy name.
             cv_splits (int): Number of CV folds.
+            scoring (str): GridSearchCV scoring name.
             number_of_features (int): Top-N features retained.
             include_eruption_date (bool): Whether the eruption day itself is
                 labelled positive.
@@ -443,6 +449,7 @@ class TrainingModel(BaseModel, CacheModel):
                 "window_size": window_size,
                 "cv_strategy": cv_strategy,
                 "cv_splits": cv_splits,
+                "scoring": scoring,
                 "number_of_features": number_of_features,
                 "include_eruption_date": include_eruption_date,
             },
@@ -662,6 +669,7 @@ class TrainingModel(BaseModel, CacheModel):
         minority_threshold: float = 0.15,
         sampling_strategy: str | float = 0.75,
         plot_features: bool = False,
+        scoring: str = "balanced_accuracy",
     ) -> Self:
         """Train classifier models on the full dataset across multiple random seeds.
 
@@ -685,6 +693,8 @@ class TrainingModel(BaseModel, CacheModel):
                 resampler. Defaults to 0.75.
             plot_features (bool): Save per-seed feature importance figures.
                 Defaults to False.
+            scoring (str, optional): Scoring GridSearchCV. Defaults to ``"balanced_accuracy"``.
+                See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
 
         Returns:
             Self: The current instance, enabling method chaining.
@@ -712,6 +722,7 @@ class TrainingModel(BaseModel, CacheModel):
             )
 
         self.create_directories(plot_features=plot_features)
+        self._scoring = scoring
 
         if resample_method == "auto":
             minority_share = (
@@ -1020,6 +1031,7 @@ class TrainingModel(BaseModel, CacheModel):
             labels_resampled,
             top_n_features,
             classifier_model=classifier_model,
+            scoring=self._scoring,
         )
 
         joblib.dump(best_model, model_seed_path)
