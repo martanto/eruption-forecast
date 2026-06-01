@@ -868,39 +868,34 @@ class LabelBuilder:
         """
         ensure_dir(self.output_dir)
 
-    def initiate_label(
-        self, start_date: datetime | None = None, end_date: datetime | None = None
-    ) -> pd.DataFrame:
+    def initiate_label(self, start_date: datetime, end_date: datetime) -> pd.DataFrame:
         """Initialize label DataFrame with all labels set to 0 (not erupted).
 
         Creates sliding time windows using construct_windows() based on the
-        configured window_step and window_step_unit, then initializes all
-        'is_erupted' values to 0. Eruption labels will be updated later by
+        configured window_step and window_step_unit. The returned frame already
+        carries the sequential ``id`` column and an ``is_erupted`` column
+        initialised to 0; eruption labels are updated later by
         update_df_eruptions().
 
         Returns:
-            pd.DataFrame: DataFrame with DatetimeIndex and 'is_erupted' column
-                containing all zeros.
+            pd.DataFrame: DataFrame with DatetimeIndex and integer columns
+                ``id`` (sequential) and ``is_erupted`` (all zeros).
 
         Examples:
             >>> df = builder.initiate_label()
             >>> print(df.columns.tolist())
-            ['is_erupted']
+            ['id', 'is_erupted']
             >>> print(df['is_erupted'].unique())
             [0]
             >>> print(isinstance(df.index, pd.DatetimeIndex))
             True
         """
-        start_date = start_date or self.start_date
-        end_date = end_date or self.end_date
-
         df = construct_windows(
             start_date=start_date,
             end_date=end_date,
             window_step=self.window_step,
             window_step_unit=self.window_step_unit,
         )
-        df["is_erupted"] = 0
 
         return df
 
@@ -1035,11 +1030,7 @@ class LabelBuilder:
             if self.verbose:
                 logger.info("Creating new label DataFrame...")
 
-            # Create id column to use as data ID reference with tremor data
-            # such as RSAM, DSAR or MSNoise
-            df = self.initiate_label()
-            df["id"] = range(len(df))
-            df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
+            df = self.initiate_label(start_date=self.start_date, end_date=self.end_date)
 
         self.update_df_eruptions(df)
         self.df = df

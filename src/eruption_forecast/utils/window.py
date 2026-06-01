@@ -398,4 +398,8 @@ def construct_windows(
     df = pd.DataFrame(index=dates)
     df.index.name = "datetime"
 
+    df["id"] = range(len(df))
+    df["is_erupted"] = 0
+    df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
+
     return df
