@@ -20,10 +20,6 @@ from sklearn.model_selection import GridSearchCV
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.array import (
-    save_forecast_seed,
-    predict_proba_from_estimator,
-)
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
@@ -317,106 +313,6 @@ def get_significant_features(
         features_filtered = features[selected_features]
 
     return features_filtered, _significant_features
-
-
-def compute_seed_eruption_probability(
-    random_state: int,
-    features_df: pd.DataFrame,
-    significant_features_csv: str,
-    model_filepath: str,
-    output_dir: str | None = None,
-    save: bool = False,
-    overwrite: bool = False,
-    verbose: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Compute eruption probability for a single random seed model.
-
-    Loads a trained model and computes eruption probabilities for the given features.
-    Supports both predict_proba (probabilistic) and decision_function (SVM) methods.
-    Can cache results to disk for faster repeated predictions.
-
-    Args:
-        random_state (int): Random seed identifying the model.
-        features_df (pd.DataFrame): Extracted features DataFrame for prediction.
-        significant_features_csv (str): Path to CSV containing significant feature names.
-        model_filepath (str): Path to the saved model (.pkl file).
-        output_dir (str | None, optional): Directory to save predictions. If None,
-            uses "output/predictions/seeds". Defaults to None.
-        save (bool, optional): If True, save probabilities to CSV. Defaults to False.
-        overwrite (bool, optional): If True, overwrite existing cached predictions.
-            Defaults to False.
-        verbose (bool, optional): If True, log save operations. Defaults to False.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing:
-            - probabilities_eruption (np.ndarray): 1D array of eruption probabilities (P(class=1)).
-            - probabilities_scores (np.ndarray): 2D array of shape (n_windows, 2) with
-              columns [P(non-eruption), P(eruption)].
-            - predictions_eruption (np.ndarray): 1D array of binary predictions (0 or 1).
-
-    Raises:
-        ValueError: If model output is 1-dimensional.
-        RuntimeError: If model supports neither predict_proba nor decision_function.
-
-    Examples:
-        >>> proba_1d, proba_2d, pred_1d = compute_seed_eruption_probability(
-        ...     random_state=42,
-        ...     features_df=features,
-        ...     significant_features_csv="sig_features.csv",
-        ...     model_filepath="model_00042.pkl",
-        ...     save=True
-        ... )
-        >>> print(proba_1d.mean())
-        0.35
-    """
-    output_dir = output_dir or os.path.join(os.getcwd(), "output", "predictions")
-    output_dir = os.path.join(output_dir, "seeds")
-
-    filename = f"p_{random_state:05d}.csv"
-    filepath = os.path.join(output_dir, f"{filename}")
-
-    # Return cached result regardless of the `save` flag — if the file exists
-    # and overwrite is False, we skip inference entirely and serve the cache.
-    # `save=True` here means "persist if not already cached", not "always write".
-    if os.path.exists(filepath) and not overwrite:
-        seed_df: pd.DataFrame = pd.read_csv(filepath, index_col=0)
-        eruption_probabilities = seed_df["p_eruption"]
-        eruption_predictions = seed_df["prediction"]
-        return (
-            eruption_probabilities.to_numpy(),
-            seed_df[
-                [
-                    "p_non_eruption",
-                    "p_eruption",
-                ]
-            ].to_numpy(),
-            eruption_predictions.to_numpy(),
-        )
-
-    df_sig = pd.read_csv(significant_features_csv, index_col=0)
-    feature_names: list[str] = df_sig.index.tolist()
-
-    # Load trained model
-    model = joblib.load(model_filepath)
-
-    # Select features dataframe with top-n significant features
-    X: pd.DataFrame = features_df[feature_names]
-
-    probabilities_eruption, probabilities_scores, predictions_eruption = (
-        predict_proba_from_estimator(model, X, identifier=random_state)
-    )
-
-    if save:
-        save_forecast_seed(
-            output_dir,
-            random_state,
-            probabilities_eruption,
-            predictions_eruption,
-            overwrite=overwrite,
-            verbose=verbose,
-        )
-
-    return probabilities_eruption, probabilities_scores, predictions_eruption
 
 
 def _extract_trained_model_suffix(csv_path: str) -> str:
