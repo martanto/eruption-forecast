@@ -1,5 +1,5 @@
 import os
-from typing import Self, Literal
+from typing import Any, Self, Literal
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -329,7 +329,7 @@ class ForecastModel:
         n_jobs: int | None = None,
         use_cache: bool = True,
         verbose: bool | None = None,
-        **plot_kwargs,
+        **plot_kwargs: Any,
     ) -> Self:
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
