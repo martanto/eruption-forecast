@@ -10,6 +10,14 @@ from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.training_model import TrainingModel
+from eruption_forecast.config.forecast_config import (
+    ModelConfig,
+    TrainConfig,
+    PredictConfig,
+    EvaluateConfig,
+    ForecastConfig,
+    CalculateConfig,
+)
 from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
@@ -38,6 +46,13 @@ class ForecastModel:
         verbose: bool = False,
     ):
         """Initialize the ForecastModel pipeline orchestrator."""
+        # Capture the user-supplied output_dir / root_dir before
+        # setup_nslc_directories() and os.path.abspath() rewrite them — the
+        # saved config should round-trip to the user's original intent
+        # (often a relative path or ``None``).
+        _config_output_dir = output_dir
+        _config_root_dir = root_dir
+
         root_dir = os.path.abspath(root_dir) if root_dir is not None else None
         nslc, output_dir, station_dir = setup_nslc_directories(
             network, station, location, channel, output_dir, root_dir
@@ -87,6 +102,23 @@ class ForecastModel:
         self.EvaluationModel: EvaluationModel | None = None
         self.evaluation_results: dict[str, pd.DataFrame] = {}
 
+        # Pipeline configuration — populated incrementally as each stage runs.
+        # ``save_config()`` serialises whatever stages have executed so far.
+        self._config: ForecastConfig = ForecastConfig(
+            model=ModelConfig(
+                station=station,
+                channel=channel,
+                network=network,
+                location=location,
+                day_to_forecast=day_to_forecast,
+                output_dir=_config_output_dir,
+                root_dir=_config_root_dir,
+                overwrite=overwrite,
+                n_jobs=n_jobs,
+                verbose=verbose,
+            )
+        )
+
     def calculate(
         self,
         start_date: str | datetime,
@@ -108,6 +140,16 @@ class ForecastModel:
         n_jobs: int | None = None,
         verbose: bool | None = None,
     ) -> Self:
+        # Snapshot the user's original kwargs before any normalization so the
+        # captured config round-trips cleanly through YAML.
+        _cfg_start_date = (
+            start_date if isinstance(start_date, str) else start_date.isoformat()
+        )
+        _cfg_end_date = end_date if isinstance(end_date, str) else end_date.isoformat()
+        _cfg_methods = methods
+        _cfg_overwrite = overwrite
+        _cfg_n_jobs = n_jobs
+        _cfg_verbose = verbose
 
         start_date = to_datetime(start_date) - timedelta(days=self.day_to_forecast)
         methods = [methods] if isinstance(methods, str) else methods
@@ -166,6 +208,27 @@ class ForecastModel:
         self.tremor_start_date = tremor_data.start_date
         self.tremor_end_date = tremor_data.end_date
 
+        self._config.calculate = CalculateConfig(
+            start_date=_cfg_start_date,
+            end_date=_cfg_end_date,
+            source=source,
+            methods=_cfg_methods,
+            remove_outlier_method=remove_outlier_method,
+            remove_tremor_anomalies=remove_tremor_anomalies,
+            interpolate=interpolate,
+            value_multiplier=value_multiplier,
+            cleanup_daily_dir=cleanup_daily_dir,
+            plot_daily=plot_daily,
+            save_plot=save_plot,
+            overwrite_plot=overwrite_plot,
+            sds_dir=sds_dir,
+            client_url=client_url,
+            minimum_completion_ratio=minimum_completion_ratio,
+            overwrite=_cfg_overwrite,
+            n_jobs=_cfg_n_jobs,
+            verbose=_cfg_verbose,
+        )
+
         return self
 
     def train(
@@ -203,6 +266,42 @@ class ForecastModel:
     ) -> Self:
         if self.CalculateTremor is None:
             raise ValueError("Tremor data not found. Please run calculate() first.")
+
+        # Snapshot originals for the captured config — must happen before the
+        # n_jobs/verbose/overwrite fallback so ``None`` keeps the "inherit at
+        # replay" semantics.
+        self._config.train = TrainConfig(
+            start_date=(
+                start_date if isinstance(start_date, str) else start_date.isoformat()
+            ),
+            end_date=(end_date if isinstance(end_date, str) else end_date.isoformat()),
+            eruption_dates=list(eruption_dates),
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            label_builder=label_builder,
+            days_before_eruption=days_before_eruption,
+            classifiers=classifiers,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            scoring=scoring,
+            number_of_features=number_of_features,
+            include_eruption_date=include_eruption_date,
+            select_tremor_columns=select_tremor_columns,
+            save_tremor_matrix_per_method=save_tremor_matrix_per_method,
+            exclude_features=exclude_features,
+            minimum_completion=minimum_completion,
+            seeds=seeds,
+            resample_method=resample_method,
+            minority_threshold=minority_threshold,
+            sampling_strategy=sampling_strategy,
+            plot_features=plot_features,
+            output_dir=output_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            n_grids=n_grids,
+            use_cache=use_cache,
+            verbose=verbose,
+        )
 
         n_jobs = n_jobs if n_jobs is not None else self.n_jobs
         verbose = verbose if verbose is not None else self.verbose
@@ -333,6 +432,26 @@ class ForecastModel:
     ) -> Self:
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
+
+        # ``plot_kwargs`` are intentionally excluded from the captured config
+        # because they may carry non-serialisable matplotlib objects.
+        self._config.predict = PredictConfig(
+            start_date=(
+                start_date if isinstance(start_date, str) else start_date.isoformat()
+            ),
+            end_date=(end_date if isinstance(end_date, str) else end_date.isoformat()),
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            save_seed_result=save_seed_result,
+            plot_threshold=plot_threshold,
+            plot_title=plot_title,
+            plot_pdf=plot_pdf,
+            output_dir=output_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            use_cache=use_cache,
+            verbose=verbose,
+        )
 
         n_jobs = n_jobs if n_jobs is not None else self.n_jobs
         verbose = verbose if verbose is not None else self.verbose
@@ -467,6 +586,17 @@ class ForecastModel:
                 "Please run train() then predict()."
             )
 
+        self._config.evaluate = EvaluateConfig(
+            model=model,
+            eruption_dates=list(eruption_dates) if eruption_dates is not None else None,
+            plot_per_seed=plot_per_seed,
+            plot_aggregate=plot_aggregate,
+            output_dir=output_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
         n_jobs = n_jobs if n_jobs is not None else self.n_jobs
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
@@ -503,4 +633,79 @@ class ForecastModel:
             plot_aggregate=plot_aggregate,
         )
 
+        self.save_config()
+
+        return self
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured pipeline configuration to disk.
+
+        Each stage method (``calculate``, ``train``, ``predict``,
+        ``evaluate``) auto-captures its kwargs into ``self._config`` as it
+        runs, so calling ``save_config()`` at any point writes whatever has
+        run so far.  A partial pipeline produces a partial config that
+        ``run()`` can resume.
+
+        Args:
+            path (str | None): Destination file path.  ``None`` resolves to
+                ``{station_dir}/config/forecast_config.{fmt}`` — a sibling of
+                the per-stage ``cache/`` directories written by
+                :class:`~eruption_forecast.model.cache_model.CacheModel`.
+                Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format.  Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+        """
+        if path is None:
+            path = os.path.join(self.station_dir, "config", f"forecast_config.{fmt}")
+        return self._config.save(path, fmt)
+
+    @classmethod
+    def from_config(cls, path: str) -> Self:
+        """Reconstruct a :class:`ForecastModel` from a saved configuration.
+
+        Loads the YAML/JSON file at ``path``, instantiates a fresh
+        ``ForecastModel`` from the ``model`` section, and attaches the loaded
+        stage sections so :meth:`run` can replay them.
+
+        Args:
+            path (str): Path to a configuration file previously written by
+                :meth:`save_config`.
+
+        Returns:
+            ForecastModel: A new instance ready for :meth:`run`.
+
+        Raises:
+            FileNotFoundError: If ``path`` does not exist.
+        """
+        config = ForecastConfig.load(path)
+        instance = cls(**config.model.to_dict())
+        instance._config = config
+        return instance
+
+    def run(self) -> Self:
+        """Replay every captured stage in pipeline order.
+
+        Iterates over ``calculate``, ``train``, ``predict``, ``evaluate`` and
+        calls the corresponding method for each non-``None`` section.  Each
+        stage's auto-capture overwrites its own slot, so the operation is
+        idempotent.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+        """
+        if self._config.calculate is not None:
+            self.calculate(**self._config.calculate.to_dict())
+        if self._config.train is not None:
+            self.train(**self._config.train.to_dict())
+        if self._config.predict is not None:
+            self.predict(**self._config.predict.to_dict())
+        if self._config.evaluate is not None:
+            self.evaluate(**self._config.evaluate.to_dict())
         return self

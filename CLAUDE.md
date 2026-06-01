@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-_Last updated: 2026-05-31_
+_Last updated: 2026-06-01_
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -27,6 +27,7 @@ This package is using UV (https://docs.astral.sh/uv/) as package manager.
 12. **Documentation updates are comprehensive.** When asked to add/update docs, update ALL of: `wiki/*.md`, `README.md`. Also update `CLAUDE.md` for architecture/design changes. The `docs/` directory has been removed — `wiki/` is the single source of truth.
 13. **Always `git checkout <branch>` before creating or working on a branch.** Never create a branch from the wrong base — verify current branch first with `git status` or `git branch`.
 14. **Ask when unsure.** If the intent, scope, or correct approach is unclear, ask before proceeding.
+15. **Keep `forecast_config.py` in sync with the new `ForecastModel`.** Whenever `src/eruption_forecast/model/forecast.py` or `src/eruption_forecast/config/forecast_config.py` is modified — new parameter added, removed, renamed, default changed — run `uvx ty check tests/test_forecast_config.py` to confirm the test file (which asserts every dataclass field and default) still type-checks against the current API. If `ty` flags drift, update both `tests/test_forecast_config.py` and `config.example.yaml` so the example YAML, the dataclass, and the constructor surface all match.
 
 ## Testing
 
