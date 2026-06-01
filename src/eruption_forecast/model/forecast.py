@@ -197,6 +197,7 @@ class ForecastModel:
         overwrite: bool | None = None,
         n_jobs: int | None = None,
         n_grids: int = 1,
+        use_cache: bool = True,
         verbose: bool | None = None,
     ) -> Self:
         if self.CalculateTremor is None:
@@ -240,9 +241,12 @@ class ForecastModel:
             },
         )
 
-        if not overwrite:
+        if use_cache:
             cached = TrainingModel.load_from_cache(resolved_output_dir, identity)
             if cached is not None:
+                if self.verbose:
+                    logger.warning("Loading cached training data...")
+
                 self.TrainingModel = cached
                 self.ClassifierEnsemble = cached.ClassifierEnsemble
                 self.select_tremor_columns = select_tremor_columns
@@ -321,6 +325,7 @@ class ForecastModel:
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
+        use_cache: bool = True,
         verbose: bool | None = None,
         **plot_kwargs,
     ) -> Self:
@@ -351,9 +356,12 @@ class ForecastModel:
             },
         )
 
-        if not overwrite:
+        if use_cache:
             cached = PredictionModel.load_from_cache(resolved_output_dir, identity)
             if cached is not None:
+                if self.verbose:
+                    logger.warning("Loading cached prediction data...")
+
                 self.PredictionModel = cached
                 self.results = cached.results
                 return self
