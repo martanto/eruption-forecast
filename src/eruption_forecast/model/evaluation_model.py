@@ -37,6 +37,7 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
@@ -603,6 +604,59 @@ class EvaluationModel(BaseModel):
 
         self.metrics = metrics_per_classifier
         return metrics_per_classifier
+
+    def compare(
+        self,
+        metrics: str | list[str] | None = None,
+        output_dir: str | None = None,
+    ) -> ClassifierComparator:
+        """Build a :class:`ClassifierComparator` from the per-classifier results.
+
+        Constructs one ``MultiModelEvaluator`` per classifier from the metrics
+        JSON directory written by :meth:`evaluate` and returns a
+        ``ClassifierComparator`` that can produce cross-classifier rankings and
+        comparison plots.  The live ``ClassifierEnsemble`` plus
+        ``self.features_df`` and ``self.y_true`` are forwarded as
+        ``ensemble_source`` so ROC plotting uses in-memory models and never
+        requires a trained-model registry CSV on disk.
+
+        Output of the returned comparator is written under
+        ``{evaluation_dir}/comparison/`` (i.e. peer to ``classifiers/``).
+
+        Args:
+            metrics (str | list[str] | None, optional): Metric or ordered list
+                of metrics used for ranking and plots.  When None, the
+                comparator falls back to its own default metrics list.
+                Defaults to None.
+
+        Returns:
+            ClassifierComparator: Comparator wired to the per-classifier metrics
+                directories and the in-memory ensemble.
+
+        Examples:
+            >>> em = EvaluationModel(model=training_model)
+            >>> em.evaluate()
+            >>> comparator = em.compare()
+            >>> ranking = comparator.get_ranking()
+            >>> figures = comparator.plot_all()
+        """
+        evaluators: dict[str, MultiModelEvaluator] = {
+            name: MultiModelEvaluator(
+                metrics_dir=os.path.join(self.classifiers_dir, name, "metrics"),
+                classifier_name=name,
+                output_dir=output_dir,
+            )
+            for name in self.ClassifierEnsemble.ensembles
+        }
+
+        ensemble_source = (self.ClassifierEnsemble, self.features_df, self.y_true)
+
+        return ClassifierComparator.from_evaluators(
+            evaluators=evaluators,
+            output_dir=self.evaluation_dir,
+            metrics=metrics,
+            ensemble_source=ensemble_source,
+        )
 
     def _plot_aggregate(
         self, metrics_dir: str, classifier_name: str, output_dir: str | None = None
