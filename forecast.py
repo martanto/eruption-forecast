@@ -2,9 +2,7 @@
 from eruption_forecast.model.forecast import ForecastModel
 
 
-def main():
-    # %%
-    n_jobs = 8
+def main(sds_dir: str, n_jobs: int = 2):
     # %%
     fm = ForecastModel(
         network="VG",
@@ -20,22 +18,22 @@ def main():
         start_date="2025-01-01",
         end_date="2025-12-31",
         source="sds",
-        sds_dir=r"D:\Data\OJN",
+        sds_dir=sds_dir,
         methods=["rsam", "dsar", "entropy"],
         remove_tremor_anomalies=False,
         interpolate=True,
-        plot_daily=False,
-        save_plot=False,
-        overwrite_plot=False,
+        plot_daily=True,
+        save_plot=True,
+        overwrite_plot=True,
         overwrite=False,
         n_jobs=n_jobs,
-        verbose=True,
+        verbose=False,
     )
     # %%
     fm.train(
         start_date="2025-01-01",
         end_date="2025-07-26",
-        classifiers=["rf", "lite-rf"],
+        classifiers=["lite-rf", "rf", "gb", "xgb"],
         eruption_dates=[
             "2025-03-20",
             "2025-04-10",
@@ -50,6 +48,7 @@ def main():
         window_step_unit="hours",
         label_builder="standard",
         cv_strategy="shuffle-stratified",
+        scoring="recall",
         select_tremor_columns=[
             "rsam_f2",
             "rsam_f3",
@@ -65,12 +64,12 @@ def main():
             "has_duplicate_min",
             "has_duplicate",
         ],
-        seeds=10,
+        seeds=25,
         resample_method="under",
         plot_features=True,
         n_jobs=4,
         n_grids=4,
-        verbose=True,
+        verbose=False,
     )
     # %%
     fm.predict(
@@ -80,9 +79,19 @@ def main():
         window_step_unit="minutes",
         save_seed_result=True,
         plot_threshold=0.7,
+        use_cache=False,
+        verbose=True,
     )
+
+    fm.evaluate(model="prediction", plot_per_seed=True)
+
+    # %%
+    if fm.EvaluationModel:
+        comparator = fm.EvaluationModel.compare()
+        comparator.get_ranking()
+        comparator.plot_all()
 
 
 # %%
 if __name__ == "__main__":
-    main()
+    main(sds_dir=r"D:\Data\OJN", n_jobs=8)
