@@ -182,6 +182,7 @@ class ForecastModel:
             "shuffle", "stratified", "shuffle-stratified"
         ] = "shuffle-stratified",
         cv_splits: int = 5,
+        scoring: str = "balanced_accuracy",
         number_of_features: int = 20,
         include_eruption_date: bool = True,
         select_tremor_columns: list[str] | None = None,
@@ -219,6 +220,7 @@ class ForecastModel:
             window_size=self.day_to_forecast,
             cv_strategy=cv_strategy,
             cv_splits=cv_splits,
+            scoring=scoring,
             number_of_features=number_of_features,
             include_eruption_date=include_eruption_date,
             build_label_params={
