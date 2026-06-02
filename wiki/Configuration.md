@@ -214,16 +214,16 @@ Useful for preparing a run before executing it:
 ```python
 from eruption_forecast import PipelineConfig
 from eruption_forecast.config import (
-    ModelConfig, CalculateConfig, BuildLabelConfig,
-    ExtractFeaturesConfig, TrainConfig, ForecastConfig,
+    BaseForecastConfig, ForecastCalculateConfig, BuildLabelConfig,
+    ExtractFeaturesConfig, ForecastTrainConfig, ForecastConfig,
 )
 
 config = PipelineConfig(
-    model=ModelConfig(
+    model=BaseForecastConfig(
         station="OJN", channel="EHZ", network="VG", location="00",
         window_size=1, volcano_id="MERAPI", n_jobs=4,
     ),
-    calculate=CalculateConfig(source="sds", sds_dir="D:/Data/OJN"),
+    calculate=ForecastCalculateConfig(source="sds", sds_dir="D:/Data/OJN"),
     build_label=BuildLabelConfig(
         window_step=12, window_step_unit="hours",
         day_to_forecast=2, eruption_dates=["2025-03-20"],
@@ -231,7 +231,7 @@ config = PipelineConfig(
     extract_features=ExtractFeaturesConfig(
         select_tremor_columns=["rsam_f2", "rsam_f3"],
     ),
-    train=TrainConfig(classifiers=["xgb"], cv_strategy="stratified", total_seed=500),
+    train=ForecastTrainConfig(classifiers=["xgb"], cv_strategy="stratified", total_seed=500),
     forecast=ForecastConfig(
         start_date="2025-03-23", end_date="2025-03-30",
         window_step=12, window_step_unit="hours",

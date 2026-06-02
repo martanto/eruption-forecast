@@ -501,11 +501,11 @@ These classes are exported from the package root (`from eruption_forecast import
 
 | Dataclass | Stage it covers |
 |-----------|----------------|
-| `ModelConfig` | `ForecastModel` constructor parameters |
-| `CalculateConfig` | `calculate()` parameters |
+| `BaseForecastConfig` | `ForecastModel` constructor parameters |
+| `ForecastCalculateConfig` | `calculate()` parameters |
 | `BuildLabelConfig` | `build_label()` parameters |
 | `ExtractFeaturesConfig` | `extract_features()` parameters |
-| `TrainConfig` | `train()` parameters |
+| `ForecastTrainConfig` | `train()` parameters |
 | `ForecastConfig` | `forecast()` parameters |
 
 Configs are serialised to YAML or JSON via `PipelineConfig.save()` and loaded via `ForecastModel.from_config()`. See the [Configuration](Configuration) wiki page.
