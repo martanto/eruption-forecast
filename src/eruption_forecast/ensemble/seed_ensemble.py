@@ -18,6 +18,13 @@ Key capabilities:
       each seed uses only its own significant feature subset.
     - ``predict_with_uncertainty(X)``: Return mean probability, standard
       deviation across seeds, confidence score, and binary prediction array.
+    - ``compute_metrics(X, y_true)``: Per-seed classification metrics
+      against ``y_true``, returned as a ``DataFrame`` indexed by
+      ``random_state``.
+    - ``save_seed_matrices(output_dir, probabilities, predictions)``: Persist
+      the full ``(n_samples, n_seeds)`` probability and prediction matrices
+      as two Parquet files (``seed_probabilities.parquet`` /
+      ``seed_predictions.parquet``).
     - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
       from :class:`~eruption_forecast.ensemble.base_ensemble.BaseEnsemble`).
 """
@@ -29,12 +36,22 @@ import numpy as np
 import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.metrics import (
+    f1_score,
+    recall_score,
+    roc_auc_score,
+    accuracy_score,
+    precision_score,
+    matthews_corrcoef,
+    balanced_accuracy_score,
+)
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
     save_forecast_seed,
     compute_model_probabilities,
 )
+from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 
 
@@ -177,7 +194,8 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """Compute eruption probabilities and predictions across all seeds.
 
         Selects each seed's feature subset from ``X``, runs ``predict_proba``
-        or ``decision_function``, and returns stacked matrices.
+        or ``decision_function``, and returns stacked matrices. Pure with
+        respect to ``self`` — no caching is performed.
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape
@@ -249,6 +267,69 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         return (self.predict_proba(X)[:, 1] >= threshold).astype(int)
 
+    def compute_metrics(
+        self,
+        X: pd.DataFrame,
+        y_true: np.ndarray | pd.Series,
+    ) -> pd.DataFrame:
+        """Compute per-seed classification metrics against ``y_true``.
+
+        Runs :meth:`_compute_probabilities_and_predictions` once on ``X`` to
+        obtain the ``(n_samples, n_seeds)`` probability and prediction
+        matrices, then evaluates each seed independently against ``y_true``.
+
+        The metric set is the sklearn-only subset of
+        :meth:`MetricsComputer.compute_all_metrics` — threshold-optimised
+        variants and G-mean are omitted to keep this method free of any
+        ``utils.ml`` dependency (which would close the import cycle
+        ``SeedEnsemble → MetricsComputer → utils.ml → SeedEnsemble``). When
+        the full metric suite is needed, route through
+        :class:`~eruption_forecast.ensemble.metrics_ensemble.MetricsEnsemble`
+        instead.
+
+        Args:
+            X (pd.DataFrame): Extracted features DataFrame of shape
+                ``(n_samples, n_features)``.
+            y_true (np.ndarray | pd.Series): Ground-truth binary labels
+                aligned positionally with ``X``. Length must equal
+                ``n_samples``.
+
+        Returns:
+            pd.DataFrame: One row per seed, indexed by ``random_state``.
+                Columns: ``accuracy``, ``balanced_accuracy``, ``precision``,
+                ``recall``, ``f1_score``, ``roc_auc``, ``mcc``.
+
+        Raises:
+            ValueError: If ``len(y_true) != len(X)``.
+        """
+        y_true_array = np.asarray(y_true)
+        if y_true_array.shape[0] != X.shape[0]:
+            raise ValueError(
+                f"y_true length ({y_true_array.shape[0]}) does not match "
+                f"X length ({X.shape[0]})."
+            )
+
+        probabilities, predictions = self._compute_probabilities_and_predictions(X)
+
+        rows: list[dict[str, float | int]] = []
+        for idx, seed in enumerate(self.seeds):
+            y_proba = probabilities[:, idx]
+            y_pred = predictions[:, idx]
+            rows.append(
+                {
+                    "random_state": int(seed["random_state"]),
+                    "accuracy": accuracy_score(y_true_array, y_pred),
+                    "balanced_accuracy": balanced_accuracy_score(y_true_array, y_pred),
+                    "precision": precision_score(y_true_array, y_pred, zero_division=0),
+                    "recall": recall_score(y_true_array, y_pred, zero_division=0),
+                    "f1_score": f1_score(y_true_array, y_pred, zero_division=0),
+                    "roc_auc": roc_auc_score(y_true_array, y_proba),
+                    "mcc": matthews_corrcoef(y_true_array, y_pred),
+                }
+            )
+
+        return pd.DataFrame(rows).set_index("random_state")
+
     def predict_with_uncertainty(
         self,
         X: pd.DataFrame,
@@ -278,19 +359,112 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             - ``seed_uncertainty``: Standard deviation of P(eruption) across seeds.
             - ``seed_prediction``: Mean of per-seed binary votes (continuous, [0, 1]).
             - ``seed_confidence``: CI-like metric ``1.96 * sqrt(p * (1-p) / n_seeds)``.
+
+        Side effects:
+            When ``save`` is ``True`` and ``output_dir`` is set, writes per-seed
+            CSV files under ``{output_dir}/seeds/`` and additionally persists
+            the full ``(n_samples, n_seeds)`` matrices as
+            ``{output_dir}/seed_probabilities.parquet`` and
+            ``{output_dir}/seed_predictions.parquet`` via
+            :meth:`save_seed_matrices`.
         """
         probabilities, predictions = self._compute_probabilities_and_predictions(X)
 
+        output_dir = (
+            output_dir
+            if output_dir is not None
+            else os.path.join(
+                os.getcwd(), "output", "prediction", "results", self.classifier_name
+            )
+        )
+
         # Save probability and prediction per seed
-        if save and output_dir is not None:
+        if save:
+            seed_output_dir = os.path.join(output_dir, "seeds")
+            ensure_dir(seed_output_dir)
+
             for idx, seed in enumerate(self.seeds):
                 save_forecast_seed(
-                    output_dir=output_dir,
+                    output_dir=seed_output_dir,
                     random_state=seed["random_state"],
                     probabilities=probabilities[:, idx],
                     predictions=predictions[:, idx],
                     overwrite=overwrite,
-                    verbose=verbose,
+                    verbose=False,
                 )
 
+        self.save_matrices(
+            output_dir=output_dir,
+            probabilities=probabilities,
+            predictions=predictions,
+            index=X.index,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
+
         return compute_model_probabilities(probabilities, predictions)
+
+    def save_matrices(
+        self,
+        output_dir: str,
+        probabilities: np.ndarray,
+        predictions: np.ndarray,
+        index: pd.Index | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ) -> tuple[str, str]:
+        """Persist the per-seed probability and prediction matrices as Parquet.
+
+        Writes the two ``(n_samples, n_seeds)`` matrices produced by
+        :meth:`_compute_probabilities_and_predictions` as separate Parquet
+        files under ``output_dir``:
+
+            - ``seed_probabilities.parquet`` — per-seed P(eruption).
+            - ``seed_predictions.parquet``  — per-seed binary predictions (0/1).
+
+        Columns are named ``seed_{random_state:05d}`` in the order of
+        ``self.seeds``. The prediction matrix is cast to ``int8`` to keep the
+        file compact. Existing files are skipped unless ``overwrite`` is
+        ``True``.
+
+        Args:
+            output_dir (str): Directory where the Parquet files are written.
+                Created if it does not exist.
+            probabilities (np.ndarray): Array of shape ``(n_samples, n_seeds)``
+                with per-seed P(eruption) values.
+            predictions (np.ndarray): Array of shape ``(n_samples, n_seeds)``
+                with per-seed binary predictions (0 or 1).
+            index (pd.Index | None, optional): Row index for the resulting
+                DataFrames (typically the feature-matrix index used to compute
+                the matrices). When ``None``, a default ``RangeIndex`` is used.
+                Defaults to ``None``.
+            overwrite (bool, optional): If ``True``, overwrite existing files.
+                Defaults to ``False``.
+            verbose (bool, optional): If ``True``, log the written paths.
+                Defaults to ``False``.
+
+        Returns:
+            tuple[str, str]: ``(probabilities_path, predictions_path)``.
+        """
+        ensure_dir(output_dir)
+
+        seed_columns = [f"seed_{seed['random_state']:05d}" for seed in self.seeds]
+
+        probabilities_path = os.path.join(output_dir, "seed_probabilities.parquet")
+        predictions_path = os.path.join(output_dir, "seed_predictions.parquet")
+
+        if overwrite or not os.path.exists(probabilities_path):
+            pd.DataFrame(probabilities, index=index, columns=seed_columns).to_parquet(
+                probabilities_path
+            )
+            if verbose:
+                logger.info(f"Saved seed probabilities matrix: {probabilities_path}")
+
+        if overwrite or not os.path.exists(predictions_path):
+            pd.DataFrame(
+                predictions.astype(np.int8), index=index, columns=seed_columns
+            ).to_parquet(predictions_path)
+            if verbose:
+                logger.info(f"Saved seed predictions matrix: {predictions_path}")
+
+        return probabilities_path, predictions_path
