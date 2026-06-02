@@ -23,6 +23,7 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.config.training_config import TrainingConfig
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.features.feature_selector import FeatureSelector
@@ -104,6 +105,18 @@ class TrainingModel(BaseModel, CacheModel):
         n_grids: int = 1,
         verbose: bool = False,
     ) -> None:
+        # Snapshot user-supplied kwargs before ``super().__init__`` coerces
+        # dates to ``datetime`` and stores the tremor source on ``_tremor_data``
+        # — the saved config should round-trip the user's original intent
+        # (CSV path or ``None`` when a pre-loaded DataFrame is passed).
+        _config_tremor_data = tremor_data if isinstance(tremor_data, str) else None
+        _config_start_date = (
+            start_date if isinstance(start_date, str) else start_date.isoformat()
+        )
+        _config_end_date = (
+            end_date if isinstance(end_date, str) else end_date.isoformat()
+        )
+
         # Set properties
         super().__init__(
             tremor_data=tremor_data,
@@ -159,7 +172,6 @@ class TrainingModel(BaseModel, CacheModel):
         # Will be set after build_label() called
         self.LabelBuilder: LabelBuilder | None = None
         self.labels: pd.Series = pd.Series()
-        self.basename: str | None = None
         self.builder: Literal["standard", "dynamic"] = "standard"
         self.days_before_eruption: int | None = None
 
@@ -174,6 +186,27 @@ class TrainingModel(BaseModel, CacheModel):
             logger.info("[Training Model]: Starting Prediction...")
 
         self.validate()
+
+        # Capture the constructor surface so ``save_config()`` can persist a
+        # standalone training run independently of ``ForecastModel``.
+        self._config: TrainingConfig = TrainingConfig(
+            tremor_data=_config_tremor_data,
+            start_date=_config_start_date,
+            end_date=_config_end_date,
+            classifiers=classifiers,
+            eruption_dates=list(eruption_dates),
+            window_size=window_size,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            number_of_features=number_of_features,
+            include_eruption_date=include_eruption_date,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            n_grids=n_grids,
+            verbose=verbose,
+        )
 
     def set_directories(
         self,
@@ -376,6 +409,39 @@ class TrainingModel(BaseModel, CacheModel):
             f"Eruption dates: {eruption_list}."
             f"{basename_str}"
         )
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured ``TrainingModel`` init configuration to disk.
+
+        Writes the parameter snapshot captured during ``__init__`` so a
+        standalone training run can save its constructor surface without
+        going through :class:`~eruption_forecast.model.forecast.ForecastModel`.
+
+        Args:
+            path (str | None): Destination file path. ``None`` resolves to
+                ``{output_dir}/config/training.config.{fmt}`` — one level
+                above the ``training/`` directory, alongside the per-stage
+                ``cache/`` directories written by
+                :class:`~eruption_forecast.model.cache_model.CacheModel`.
+                Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+
+        Example:
+            >>> path = model.save_config()
+            >>> path  # doctest: +SKIP
+            'output/VG.OJN.00.EHZ/config/training.config.yaml'
+        """
+        if path is None:
+            path = os.path.join(self.output_dir, f"training.config.{fmt}")
+        return self._config.save(path, fmt)
 
     @classmethod
     def build_cache_identity(  # ty:ignore[invalid-method-override]
