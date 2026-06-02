@@ -11,12 +11,12 @@ from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.config.forecast_config import (
-    ModelConfig,
-    TrainConfig,
-    PredictConfig,
-    EvaluateConfig,
     ForecastConfig,
-    CalculateConfig,
+    BaseForecastConfig,
+    ForecastTrainConfig,
+    ForecastPredictConfig,
+    ForecastEvaluateConfig,
+    ForecastCalculateConfig,
 )
 from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
@@ -105,7 +105,7 @@ class ForecastModel:
         # Pipeline configuration — populated incrementally as each stage runs.
         # ``save_config()`` serialises whatever stages have executed so far.
         self._config: ForecastConfig = ForecastConfig(
-            model=ModelConfig(
+            model=BaseForecastConfig(
                 station=station,
                 channel=channel,
                 network=network,
@@ -208,7 +208,7 @@ class ForecastModel:
         self.tremor_start_date = tremor_data.start_date
         self.tremor_end_date = tremor_data.end_date
 
-        self._config.calculate = CalculateConfig(
+        self._config.calculate = ForecastCalculateConfig(
             start_date=_cfg_start_date,
             end_date=_cfg_end_date,
             source=source,
@@ -270,7 +270,7 @@ class ForecastModel:
         # Snapshot originals for the captured config — must happen before the
         # n_jobs/verbose/overwrite fallback so ``None`` keeps the "inherit at
         # replay" semantics.
-        self._config.train = TrainConfig(
+        self._config.train = ForecastTrainConfig(
             start_date=(
                 start_date if isinstance(start_date, str) else start_date.isoformat()
             ),
@@ -435,7 +435,7 @@ class ForecastModel:
 
         # ``plot_kwargs`` are intentionally excluded from the captured config
         # because they may carry non-serialisable matplotlib objects.
-        self._config.predict = PredictConfig(
+        self._config.predict = ForecastPredictConfig(
             start_date=(
                 start_date if isinstance(start_date, str) else start_date.isoformat()
             ),
@@ -586,7 +586,7 @@ class ForecastModel:
                 "Please run train() then predict()."
             )
 
-        self._config.evaluate = EvaluateConfig(
+        self._config.evaluate = ForecastEvaluateConfig(
             model=model,
             eruption_dates=list(eruption_dates) if eruption_dates is not None else None,
             plot_per_seed=plot_per_seed,
@@ -652,7 +652,7 @@ class ForecastModel:
 
         Args:
             path (str | None): Destination file path.  ``None`` resolves to
-                ``{station_dir}/config/forecast_config.{fmt}`` — a sibling of
+                ``{station_dir}/forecast.config.{fmt}`` — a sibling of
                 the per-stage ``cache/`` directories written by
                 :class:`~eruption_forecast.model.cache_model.CacheModel`.
                 Defaults to ``None``.
@@ -663,7 +663,7 @@ class ForecastModel:
             str: The absolute path the configuration was written to.
         """
         if path is None:
-            path = os.path.join(self.station_dir, "config", f"forecast_config.{fmt}")
+            path = os.path.join(self.station_dir, f"forecast.config.{fmt}")
         return self._config.save(path, fmt)
 
     @classmethod
