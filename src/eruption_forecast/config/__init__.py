@@ -17,14 +17,16 @@ from eruption_forecast.config.constants import (
     DEFAULT_WINDOW_DURATION_MINUTES,
     DEFAULT_MINIMUM_COMPLETION_RATIO,
 )
+from eruption_forecast.config.base_config import BaseConfig
 from eruption_forecast.config.forecast_config import (
-    ModelConfig,
-    TrainConfig,
-    PredictConfig,
-    EvaluateConfig,
     ForecastConfig,
-    CalculateConfig,
+    BaseForecastConfig,
+    ForecastTrainConfig,
+    ForecastPredictConfig,
+    ForecastEvaluateConfig,
+    ForecastCalculateConfig,
 )
+from eruption_forecast.config.training_config import TrainingConfig
 
 
 __all__ = [
@@ -43,10 +45,12 @@ __all__ = [
     "DEFAULT_FREQUENCY_BANDS",
     "MATPLOTLIB_BACKEND",
     "CLASS_LABELS",
-    "ModelConfig",
-    "CalculateConfig",
-    "TrainConfig",
-    "PredictConfig",
-    "EvaluateConfig",
+    "BaseConfig",
+    "BaseForecastConfig",
+    "ForecastCalculateConfig",
+    "ForecastTrainConfig",
+    "ForecastPredictConfig",
+    "ForecastEvaluateConfig",
     "ForecastConfig",
+    "TrainingConfig",
 ]

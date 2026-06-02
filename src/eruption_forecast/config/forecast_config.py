@@ -11,50 +11,16 @@ import os
 import json
 from typing import Any, Self, Literal
 from datetime import datetime
-from dataclasses import field, asdict, fields, dataclass
+from dataclasses import field, dataclass
 
 import yaml
 
 from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.config.base_config import BaseConfig
 
 
 @dataclass
-class _ConfigBase:
-    """Base serialization mixin for forecast config dataclasses.
-
-    Provides ``to_dict`` and ``from_dict`` so each config section avoids
-    repeating the same boilerplate serialization logic.
-    """
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert this config section to a plain dictionary.
-
-        Uses ``dataclasses.asdict`` to recursively serialize all fields.
-
-        Returns:
-            dict[str, Any]: A flat dictionary of all field values.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create an instance from a plain dictionary.
-
-        Unknown keys are silently ignored so that older config files remain
-        forward-compatible.
-
-        Args:
-            data (dict[str, Any]): Dictionary of field names to values.
-
-        Returns:
-            Self: A new instance populated from *data*.
-        """
-        valid = {k: v for k, v in data.items() if k in {f.name for f in fields(cls)}}
-        return cls(**valid)
-
-
-@dataclass
-class ModelConfig(_ConfigBase):
+class BaseForecastConfig(BaseConfig):
     """Configuration for ``ForecastModel.__init__`` parameters.
 
     Mirrors the constructor surface of
@@ -93,7 +59,7 @@ class ModelConfig(_ConfigBase):
 
 
 @dataclass
-class CalculateConfig(_ConfigBase):
+class ForecastCalculateConfig(BaseConfig):
     """Configuration for ``ForecastModel.calculate()`` parameters.
 
     Captures every argument accepted by ``calculate()`` so the tremor
@@ -159,7 +125,7 @@ class CalculateConfig(_ConfigBase):
 
 
 @dataclass
-class TrainConfig(_ConfigBase):
+class ForecastTrainConfig(BaseConfig):
     """Configuration for ``ForecastModel.train()`` parameters.
 
     ``train()`` fuses label building, feature extraction, and multi-seed
@@ -259,7 +225,7 @@ class TrainConfig(_ConfigBase):
 
 
 @dataclass
-class PredictConfig(_ConfigBase):
+class ForecastPredictConfig(BaseConfig):
     """Configuration for ``ForecastModel.predict()`` parameters.
 
     Captures the forecasting window and output settings. Variadic
@@ -312,7 +278,7 @@ class PredictConfig(_ConfigBase):
 
 
 @dataclass
-class EvaluateConfig(_ConfigBase):
+class ForecastEvaluateConfig(BaseConfig):
     """Configuration for ``ForecastModel.evaluate()`` parameters.
 
     Attributes:
@@ -347,7 +313,7 @@ class EvaluateConfig(_ConfigBase):
 
 
 @dataclass
-class ForecastConfig(_ConfigBase):
+class ForecastConfig(BaseConfig):
     """Full ``ForecastModel`` configuration container.
 
     Holds one optional section per pipeline stage plus metadata. Only
@@ -358,22 +324,22 @@ class ForecastConfig(_ConfigBase):
     Attributes:
         version (str): Schema version string.
         saved_at (str): ISO-8601 timestamp set at save time.
-        model (ModelConfig): Core model initialization parameters.
-        calculate (CalculateConfig | None): Tremor calculation parameters.
-        train (TrainConfig | None): Training parameters.
-        predict (PredictConfig | None): Prediction parameters.
-        evaluate (EvaluateConfig | None): Evaluation parameters.
+        model (BaseForecastConfig): Core model initialization parameters.
+        calculate (ForecastCalculateConfig | None): Tremor calculation parameters.
+        train (ForecastTrainConfig | None): Training parameters.
+        predict (ForecastPredictConfig | None): Prediction parameters.
+        evaluate (ForecastEvaluateConfig | None): Evaluation parameters.
     """
 
     version: str = "1.0"
     saved_at: str = field(
         default_factory=lambda: datetime.now().isoformat(timespec="seconds")
     )
-    model: ModelConfig = field(default_factory=ModelConfig)
-    calculate: CalculateConfig | None = None
-    train: TrainConfig | None = None
-    predict: PredictConfig | None = None
-    evaluate: EvaluateConfig | None = None
+    model: BaseForecastConfig = field(default_factory=BaseForecastConfig)
+    calculate: ForecastCalculateConfig | None = None
+    train: ForecastTrainConfig | None = None
+    predict: ForecastPredictConfig | None = None
+    evaluate: ForecastEvaluateConfig | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the full config to a nested plain dictionary.
@@ -458,14 +424,14 @@ class ForecastConfig(_ConfigBase):
         config = cls(
             version=data.get("version", "1.0"),
             saved_at=data.get("saved_at", ""),
-            model=ModelConfig.from_dict(data.get("model", {})),
+            model=BaseForecastConfig.from_dict(data.get("model", {})),
         )
 
         section_map: dict[str, Any] = {
-            "calculate": CalculateConfig,
-            "train": TrainConfig,
-            "predict": PredictConfig,
-            "evaluate": EvaluateConfig,
+            "calculate": ForecastCalculateConfig,
+            "train": ForecastTrainConfig,
+            "predict": ForecastPredictConfig,
+            "evaluate": ForecastEvaluateConfig,
         }
         for section_name, section_cls in section_map.items():
             if section_name in data:

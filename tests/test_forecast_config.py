@@ -12,7 +12,7 @@ Covers the new-API counterpart of ``test_pipeline_config.py``:
   written by :class:`~eruption_forecast.model.cache_model.CacheModel`)
 - ``ForecastModel.from_config()`` round-trip
 - ``ForecastModel.run()`` is a no-op when no stage sections are populated
-- ``PredictConfig`` does not capture the variadic ``**plot_kwargs``
+- ``ForecastPredictConfig`` does not capture the variadic ``**plot_kwargs``
 - ``ForecastConfig.load()`` raises ``FileNotFoundError`` for missing paths
 
 All tests use temporary directories and in-memory data — no seismic files
@@ -30,12 +30,12 @@ import pytest
 
 from eruption_forecast.model.forecast import ForecastModel
 from eruption_forecast.config.forecast_config import (
-    ModelConfig,
-    TrainConfig,
-    PredictConfig,
-    EvaluateConfig,
     ForecastConfig,
-    CalculateConfig,
+    BaseForecastConfig,
+    ForecastTrainConfig,
+    ForecastPredictConfig,
+    ForecastEvaluateConfig,
+    ForecastCalculateConfig,
 )
 
 
@@ -60,7 +60,7 @@ def _model_kwargs(output_dir: str) -> dict:
 def _full_forecast_config() -> ForecastConfig:
     """Return a fully populated ForecastConfig for serialisation tests."""
     return ForecastConfig(
-        model=ModelConfig(
+        model=BaseForecastConfig(
             station="OJN",
             channel="EHZ",
             network="VG",
@@ -68,14 +68,14 @@ def _full_forecast_config() -> ForecastConfig:
             day_to_forecast=2,
             n_jobs=4,
         ),
-        calculate=CalculateConfig(
+        calculate=ForecastCalculateConfig(
             start_date="2025-03-16",
             end_date="2025-03-22",
             source="sds",
             sds_dir="D:/Data/OJN",
             remove_outlier_method="maximum",
         ),
-        train=TrainConfig(
+        train=ForecastTrainConfig(
             start_date="2025-03-16",
             end_date="2025-03-22",
             eruption_dates=["2025-03-20"],
@@ -85,13 +85,13 @@ def _full_forecast_config() -> ForecastConfig:
             cv_strategy="stratified",
             seeds=10,
         ),
-        predict=PredictConfig(
+        predict=ForecastPredictConfig(
             start_date="2025-03-23",
             end_date="2025-03-30",
             window_step=12,
             window_step_unit="hours",
         ),
-        evaluate=EvaluateConfig(
+        evaluate=ForecastEvaluateConfig(
             model="prediction",
             eruption_dates=["2025-03-20"],
         ),
@@ -99,16 +99,16 @@ def _full_forecast_config() -> ForecastConfig:
 
 
 # ---------------------------------------------------------------------------
-# ModelConfig
+# BaseForecastConfig
 # ---------------------------------------------------------------------------
 
 
-class TestModelConfig:
-    """Tests for ``ModelConfig`` dataclass."""
+class TestBaseForecastConfig:
+    """Tests for ``BaseForecastConfig`` dataclass."""
 
     def test_defaults(self) -> None:
-        """``ModelConfig`` has expected default values."""
-        cfg = ModelConfig()
+        """``BaseForecastConfig`` has expected default values."""
+        cfg = BaseForecastConfig()
         assert cfg.station == ""
         assert cfg.channel == ""
         assert cfg.network == ""
@@ -121,15 +121,15 @@ class TestModelConfig:
         assert cfg.verbose is False
 
     def test_no_legacy_fields(self) -> None:
-        """The new ``ModelConfig`` drops legacy ``window_size`` / ``volcano_id``."""
-        names = {f.name for f in fields(ModelConfig)}
+        """The new ``BaseForecastConfig`` drops legacy ``window_size`` / ``volcano_id``."""
+        names = {f.name for f in fields(BaseForecastConfig)}
         assert "window_size" not in names
         assert "volcano_id" not in names
         assert "day_to_forecast" in names
 
     def test_to_dict_contains_all_fields(self) -> None:
         """``to_dict()`` includes every field."""
-        cfg = ModelConfig(station="OJN", channel="EHZ", day_to_forecast=3)
+        cfg = BaseForecastConfig(station="OJN", channel="EHZ", day_to_forecast=3)
         d = cfg.to_dict()
         assert d["station"] == "OJN"
         assert d["channel"] == "EHZ"
@@ -138,35 +138,35 @@ class TestModelConfig:
 
     def test_from_dict_round_trip(self) -> None:
         """``from_dict(to_dict())`` produces an equal object."""
-        cfg = ModelConfig(station="OJN", n_jobs=8, day_to_forecast=5)
-        restored = ModelConfig.from_dict(cfg.to_dict())
+        cfg = BaseForecastConfig(station="OJN", n_jobs=8, day_to_forecast=5)
+        restored = BaseForecastConfig.from_dict(cfg.to_dict())
         assert restored.station == "OJN"
         assert restored.n_jobs == 8
         assert restored.day_to_forecast == 5
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys in the source dict do not raise."""
-        cfg = ModelConfig.from_dict({"station": "OJN", "unknown_key": 99})
+        cfg = BaseForecastConfig.from_dict({"station": "OJN", "unknown_key": 99})
         assert cfg.station == "OJN"
 
     def test_from_dict_partial(self) -> None:
         """``from_dict()`` fills unspecified fields with defaults."""
-        cfg = ModelConfig.from_dict({"station": "ABC"})
+        cfg = BaseForecastConfig.from_dict({"station": "ABC"})
         assert cfg.station == "ABC"
         assert cfg.channel == ""
 
 
 # ---------------------------------------------------------------------------
-# CalculateConfig
+# ForecastCalculateConfig
 # ---------------------------------------------------------------------------
 
 
-class TestCalculateConfig:
-    """Tests for ``CalculateConfig`` dataclass."""
+class TestForecastCalculateConfig:
+    """Tests for ``ForecastCalculateConfig`` dataclass."""
 
     def test_defaults(self) -> None:
-        """``CalculateConfig`` has expected default values."""
-        cfg = CalculateConfig()
+        """``ForecastCalculateConfig`` has expected default values."""
+        cfg = ForecastCalculateConfig()
         assert cfg.start_date == ""
         assert cfg.end_date == ""
         assert cfg.source == "sds"
@@ -188,7 +188,7 @@ class TestCalculateConfig:
 
     def test_to_dict_from_dict_round_trip(self) -> None:
         """``to_dict`` / ``from_dict`` round-trip preserves all values."""
-        cfg = CalculateConfig(
+        cfg = ForecastCalculateConfig(
             start_date="2025-03-16",
             end_date="2025-03-22",
             source="sds",
@@ -196,7 +196,7 @@ class TestCalculateConfig:
             methods=["rsam", "dsar"],
             n_jobs=8,
         )
-        restored = CalculateConfig.from_dict(cfg.to_dict())
+        restored = ForecastCalculateConfig.from_dict(cfg.to_dict())
         assert restored.start_date == "2025-03-16"
         assert restored.sds_dir == "/data/sds"
         assert restored.methods == ["rsam", "dsar"]
@@ -204,21 +204,21 @@ class TestCalculateConfig:
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
-        cfg = CalculateConfig.from_dict({"source": "sds", "not_a_field": True})
+        cfg = ForecastCalculateConfig.from_dict({"source": "sds", "not_a_field": True})
         assert cfg.source == "sds"
 
 
 # ---------------------------------------------------------------------------
-# TrainConfig
+# ForecastTrainConfig
 # ---------------------------------------------------------------------------
 
 
-class TestTrainConfig:
-    """Tests for ``TrainConfig`` dataclass."""
+class TestForecastTrainConfig:
+    """Tests for ``ForecastTrainConfig`` dataclass."""
 
     def test_defaults(self) -> None:
-        """``TrainConfig`` has expected default values."""
-        cfg = TrainConfig()
+        """``ForecastTrainConfig`` has expected default values."""
+        cfg = ForecastTrainConfig()
         assert cfg.start_date == ""
         assert cfg.end_date == ""
         assert cfg.eruption_dates == []
@@ -244,24 +244,24 @@ class TestTrainConfig:
 
     def test_eruption_dates_is_independent(self) -> None:
         """Each instance gets its own ``eruption_dates`` list (no shared mutable default)."""
-        a = TrainConfig()
-        b = TrainConfig()
+        a = ForecastTrainConfig()
+        b = ForecastTrainConfig()
         a.eruption_dates.append("2025-01-01")
         assert b.eruption_dates == []
 
     def test_fuses_legacy_stage_params(self) -> None:
-        """``TrainConfig`` carries fields from the legacy build_label/extract_features/train trio."""
-        names = {f.name for f in fields(TrainConfig)}
+        """``ForecastTrainConfig`` carries fields from the legacy build_label/extract_features/train trio."""
+        names = {f.name for f in fields(ForecastTrainConfig)}
         # From legacy BuildLabelConfig
         assert {"window_step", "window_step_unit", "eruption_dates"} <= names
         # From legacy ExtractFeaturesConfig
         assert {"select_tremor_columns", "exclude_features"} <= names
-        # From legacy TrainConfig
+        # From legacy ForecastTrainConfig
         assert {"classifiers", "cv_strategy", "seeds"} <= names
 
     def test_to_dict_from_dict_round_trip(self) -> None:
         """All fields survive a round-trip."""
-        cfg = TrainConfig(
+        cfg = ForecastTrainConfig(
             eruption_dates=["2025-03-20", "2025-04-22"],
             classifiers=["xgb"],
             cv_strategy="stratified",
@@ -269,7 +269,7 @@ class TestTrainConfig:
             n_jobs=4,
             select_tremor_columns=["rsam_f2", "rsam_f3"],
         )
-        restored = TrainConfig.from_dict(cfg.to_dict())
+        restored = ForecastTrainConfig.from_dict(cfg.to_dict())
         assert restored.eruption_dates == ["2025-03-20", "2025-04-22"]
         assert restored.classifiers == ["xgb"]
         assert restored.cv_strategy == "stratified"
@@ -279,22 +279,22 @@ class TestTrainConfig:
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
-        cfg = TrainConfig.from_dict({"seeds": 99, "grid_params": {"a": 1}})
+        cfg = ForecastTrainConfig.from_dict({"seeds": 99, "grid_params": {"a": 1}})
         assert cfg.classifiers == "rf"
         assert cfg.seeds == 99
 
 
 # ---------------------------------------------------------------------------
-# PredictConfig
+# ForecastPredictConfig
 # ---------------------------------------------------------------------------
 
 
-class TestPredictConfig:
-    """Tests for ``PredictConfig`` dataclass."""
+class TestForecastPredictConfig:
+    """Tests for ``ForecastPredictConfig`` dataclass."""
 
     def test_defaults(self) -> None:
-        """``PredictConfig`` has expected default values."""
-        cfg = PredictConfig()
+        """``ForecastPredictConfig`` has expected default values."""
+        cfg = ForecastPredictConfig()
         assert cfg.start_date == ""
         assert cfg.end_date == ""
         assert cfg.window_step == 12
@@ -307,19 +307,19 @@ class TestPredictConfig:
 
     def test_does_not_capture_plot_kwargs(self) -> None:
         """Variadic ``**plot_kwargs`` is deliberately excluded from the config."""
-        names = {f.name for f in fields(PredictConfig)}
+        names = {f.name for f in fields(ForecastPredictConfig)}
         assert "plot_kwargs" not in names
 
     def test_to_dict_from_dict_round_trip(self) -> None:
         """All fields survive a round-trip."""
-        cfg = PredictConfig(
+        cfg = ForecastPredictConfig(
             start_date="2025-04-01",
             end_date="2025-04-07",
             window_step=6,
             plot_threshold=0.7,
             plot_pdf=False,
         )
-        restored = PredictConfig.from_dict(cfg.to_dict())
+        restored = ForecastPredictConfig.from_dict(cfg.to_dict())
         assert restored.start_date == "2025-04-01"
         assert restored.end_date == "2025-04-07"
         assert restored.window_step == 6
@@ -328,21 +328,21 @@ class TestPredictConfig:
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
-        cfg = PredictConfig.from_dict({"window_step": 30, "extra": True})
+        cfg = ForecastPredictConfig.from_dict({"window_step": 30, "extra": True})
         assert cfg.window_step == 30
 
 
 # ---------------------------------------------------------------------------
-# EvaluateConfig
+# ForecastEvaluateConfig
 # ---------------------------------------------------------------------------
 
 
-class TestEvaluateConfig:
-    """Tests for ``EvaluateConfig`` dataclass."""
+class TestForecastEvaluateConfig:
+    """Tests for ``ForecastEvaluateConfig`` dataclass."""
 
     def test_defaults(self) -> None:
-        """``EvaluateConfig`` has expected default values."""
-        cfg = EvaluateConfig()
+        """``ForecastEvaluateConfig`` has expected default values."""
+        cfg = ForecastEvaluateConfig()
         assert cfg.model == "prediction"
         assert cfg.eruption_dates is None
         assert cfg.plot_per_seed is False
@@ -350,13 +350,13 @@ class TestEvaluateConfig:
 
     def test_to_dict_from_dict_round_trip(self) -> None:
         """All fields survive a round-trip."""
-        cfg = EvaluateConfig(
+        cfg = ForecastEvaluateConfig(
             model="training",
             eruption_dates=["2025-03-20"],
             plot_per_seed=True,
             plot_aggregate=False,
         )
-        restored = EvaluateConfig.from_dict(cfg.to_dict())
+        restored = ForecastEvaluateConfig.from_dict(cfg.to_dict())
         assert restored.model == "training"
         assert restored.eruption_dates == ["2025-03-20"]
         assert restored.plot_per_seed is True
@@ -364,7 +364,7 @@ class TestEvaluateConfig:
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
-        cfg = EvaluateConfig.from_dict({"model": "prediction", "extra": True})
+        cfg = ForecastEvaluateConfig.from_dict({"model": "prediction", "extra": True})
         assert cfg.model == "prediction"
 
 
@@ -378,7 +378,7 @@ class TestForecastConfigToDict:
 
     def test_only_model_when_no_stages_called(self) -> None:
         """``to_dict()`` omits sections that are ``None``."""
-        config = ForecastConfig(model=ModelConfig(station="OJN"))
+        config = ForecastConfig(model=BaseForecastConfig(station="OJN"))
         d = config.to_dict()
         assert "model" in d
         assert "version" in d
@@ -463,8 +463,8 @@ class TestForecastConfigYaml:
     def test_load_partial_config(self) -> None:
         """Loading a config with only model + train sections works."""
         config = ForecastConfig(
-            model=ModelConfig(station="OJN"),
-            train=TrainConfig(classifiers="rf", eruption_dates=["2025-03-20"]),
+            model=BaseForecastConfig(station="OJN"),
+            train=ForecastTrainConfig(classifiers="rf", eruption_dates=["2025-03-20"]),
         )
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "partial.yaml")
@@ -536,7 +536,7 @@ class TestForecastConfigJson:
 
     def test_json_load_auto_detected_by_extension(self) -> None:
         """``load()`` auto-detects JSON format from the ``.json`` extension."""
-        config = ForecastConfig(model=ModelConfig(station="OJN"))
+        config = ForecastConfig(model=BaseForecastConfig(station="OJN"))
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "config.json")
             config.save(path, fmt="json")
@@ -549,7 +549,7 @@ class TestForecastConfigJson:
 # ---------------------------------------------------------------------------
 
 
-class TestForecastModelConfigInit:
+class TestForecastBaseForecastConfigInit:
     """``ForecastModel`` sets ``_config.model`` at construction."""
 
     def test_config_model_section_matches_init_params(self) -> None:
@@ -588,23 +588,22 @@ class TestForecastModelConfigInit:
 class TestForecastModelSaveConfig:
     """Tests for ``ForecastModel.save_config()``."""
 
-    def test_save_config_default_path_under_station_config_dir(self) -> None:
-        """``save_config()`` without a path writes to ``{station_dir}/config/forecast_config.yaml``."""
+    def test_save_config_default_path_under_station_dir(self) -> None:
+        """``save_config()`` without a path writes to ``{station_dir}/forecast.config.yaml``."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
             path = fm.save_config()
-            expected = os.path.join(fm.station_dir, "config", "forecast_config.yaml")
+            expected = os.path.join(fm.station_dir, "forecast.config.yaml")
             assert path == expected
             assert os.path.isfile(path)
 
     def test_save_config_default_path_sibling_of_cache(self) -> None:
-        """Default config dir sits next to the per-stage ``cache/`` directories."""
+        """Default config file sits directly under ``station_dir``, next to the per-stage ``cache/`` directories."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
             path = fm.save_config()
-            config_dir = os.path.dirname(path)
-            assert os.path.basename(config_dir) == "config"
-            assert os.path.dirname(config_dir) == fm.station_dir
+            assert os.path.basename(path) == "forecast.config.yaml"
+            assert os.path.dirname(path) == fm.station_dir
 
     def test_save_config_custom_path(self) -> None:
         """``save_config(path)`` writes to the given path."""
@@ -626,11 +625,11 @@ class TestForecastModelSaveConfig:
             assert data["model"]["station"] == "OJN"
 
     def test_save_config_default_json_path(self) -> None:
-        """``save_config(fmt='json')`` without ``path`` produces ``forecast_config.json``."""
+        """``save_config(fmt='json')`` without ``path`` produces ``forecast.config.json``."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
             path = fm.save_config(fmt="json")
-            assert path.endswith("forecast_config.json")
+            assert path.endswith("forecast.config.json")
             assert os.path.isfile(path)
 
     def test_save_config_returns_path(self) -> None:
@@ -677,7 +676,7 @@ class TestForecastModelFromConfig:
         """Stage sections present in the YAML are attached to ``_config``."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
-            fm._config.calculate = CalculateConfig(
+            fm._config.calculate = ForecastCalculateConfig(
                 start_date="2025-03-16",
                 end_date="2025-03-22",
                 source="sds",
