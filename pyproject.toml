@@ -28,6 +28,7 @@ dependencies = [
     "shap>=0.51.0",
     "python-dotenv>=1.2.2",
     "pip-system-certs>=5.3",
+    "pyarrow>=18.0.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
