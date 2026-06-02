@@ -249,7 +249,7 @@ class EvaluationModel(BaseModel):
         model = joblib.load(filepath)
 
         if not isinstance(model, (TrainingModel, PredictionModel)):
-            raise ValueError(
+            raise TypeError(
                 f"Loaded .pkl is not a TrainingModel or PredictionModel "
                 f"(got {type(model).__name__})."
             )
@@ -386,26 +386,35 @@ class EvaluationModel(BaseModel):
         if self.eruption_dates is None:
             raise ValueError("No eruption dates provided.")
 
-        label_builder = LabelBuilder(
-            start_date=self.start_date,
-            end_date=self.end_date,
-            window_step=window_step,
-            window_step_unit=window_step_unit,
-            eruption_dates=self.eruption_dates,
-            day_to_forecast=self.window_size,
-            verbose=self.verbose,
-        ).build(
-            save_label=False,
-            plot_distribution=False,
+        y_true_df = (
+            LabelBuilder(
+                start_date=self.start_date,
+                end_date=self.end_date,
+                window_step=window_step,
+                window_step_unit=window_step_unit,
+                eruption_dates=self.eruption_dates,
+                day_to_forecast=self.window_size,
+                verbose=self.verbose,
+            )
+            .build(
+                save_label=False,
+                plot_distribution=False,
+            )
+            .df
         )
 
         id_series = self.model.labels
-        true_label_df = label_builder.df
-        merged = id_series.to_frame().join(true_label_df["is_erupted"], how="left")
+        merged = id_series.to_frame().join(y_true_df["is_erupted"], how="left")
         y_true = merged.set_index("id")["is_erupted"].fillna(0).astype(int)
         y_true.name = "is_erupted"
 
+        y_true_filepath = os.path.join(self.evaluation_dir, "labels", "y_true.csv")
+        y_true.to_csv(y_true_filepath, index=True)
+
         self.y_true = y_true
+
+        if self.verbose:
+            logger.info(f"Label y_true saved to {y_true_filepath}")
 
         return self
 
@@ -496,7 +505,6 @@ class EvaluationModel(BaseModel):
             clf_dir = os.path.join(self.classifiers_dir, classifier_name)
             metrics_dir = os.path.join(clf_dir, "metrics")
             json_dir = os.path.join(metrics_dir, "json")
-            figures_dir = os.path.join(clf_dir, "figures")
             ensure_dir(json_dir)
 
             all_metrics: list[dict] = []
@@ -553,7 +561,7 @@ class EvaluationModel(BaseModel):
                     X_test=X_test,
                     y_test=y_true,
                     model_name=classifier_name,
-                    output_dir=figures_dir,
+                    output_dir=clf_dir,
                     selected_features=available_features,
                     random_state=random_state,
                     plot_shap=plot_shap,
@@ -627,6 +635,8 @@ class EvaluationModel(BaseModel):
             metrics (str | list[str] | None, optional): Metric or ordered list
                 of metrics used for ranking and plots.  When None, the
                 comparator falls back to its own default metrics list.
+                Defaults to None.
+            output_dir (str, optional): MultiModelEvaluator output directory.
                 Defaults to None.
 
         Returns:
