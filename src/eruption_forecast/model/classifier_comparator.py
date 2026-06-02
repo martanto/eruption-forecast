@@ -1186,7 +1186,6 @@ class ClassifierComparator:
                     color="gray",
                     linestyle="--",
                     linewidth=0.8,
-                    label="Chance",
                 )
 
                 self._compute_classifier_roc(
