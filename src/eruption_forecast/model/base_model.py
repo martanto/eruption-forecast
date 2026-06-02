@@ -165,6 +165,7 @@ class BaseModel(ABC):
         # Will be set after build_label() called
         self.window_step: int | None = None
         self.window_step_unit: Literal["minutes", "hours"] | None = None
+        self.basename: str | None = None
 
         # Use for evaluation model
         self.ClassifierEnsemble: ClassifierEnsemble | None = None
