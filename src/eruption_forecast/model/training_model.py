@@ -635,7 +635,9 @@ class TrainingModel(BaseModel, CacheModel):
             ).build()
 
         self.LabelBuilder = label_builder
-        self.basename = os.path.basename(label_builder.csv).split(".csv")[0]
+        self.basename = (
+            os.path.basename(label_builder.csv).split("label_")[1].split(".csv")[0]
+        )
 
         return self
 
@@ -951,6 +953,8 @@ class TrainingModel(BaseModel, CacheModel):
             )
         else:
             raise ValueError("No seed ensembles found")
+
+        self.save()
 
         return self
 
