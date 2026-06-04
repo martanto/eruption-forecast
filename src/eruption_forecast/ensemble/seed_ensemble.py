@@ -36,15 +36,6 @@ import numpy as np
 import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.metrics import (
-    f1_score,
-    recall_score,
-    roc_auc_score,
-    accuracy_score,
-    precision_score,
-    matthews_corrcoef,
-    balanced_accuracy_score,
-)
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
@@ -188,7 +179,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return ensemble
 
-    def _compute_probabilities_and_predictions(
+    def compute_probabilities_and_predictions(
         self, X: pd.DataFrame
     ) -> tuple[np.ndarray, np.ndarray]:
         """Compute eruption probabilities and predictions across all seeds.
@@ -226,7 +217,9 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             elif hasattr(seed_model, "decision_function"):
                 scores = seed_model.decision_function(features_df)
                 eruption_probabilities = 1.0 / (1.0 + np.exp(-scores))
-                eruption_predictions = (eruption_probabilities >= 0.5).astype(int)
+                eruption_predictions = np.asarray(eruption_probabilities >= 0.5).astype(
+                    int
+                )
             else:
                 raise RuntimeError(
                     f"{seed_model} supports neither ``predict_proba`` nor ``decision_function``."
@@ -247,7 +240,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             np.ndarray: Array of shape ``(n_samples, 2)`` where column 0 is
                 P(non-eruption) and column 1 is the mean P(eruption) across seeds.
         """
-        probabilities, _ = self._compute_probabilities_and_predictions(X)
+        probabilities, _ = self.compute_probabilities_and_predictions(X)
         mean_eruption: np.ndarray = np.mean(probabilities, axis=1)
         return np.column_stack([1.0 - mean_eruption, mean_eruption])
 
@@ -266,69 +259,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 0 (non-eruption) or 1 (eruption).
         """
         return (self.predict_proba(X)[:, 1] >= threshold).astype(int)
-
-    def compute_metrics(
-        self,
-        X: pd.DataFrame,
-        y_true: np.ndarray | pd.Series,
-    ) -> pd.DataFrame:
-        """Compute per-seed classification metrics against ``y_true``.
-
-        Runs :meth:`_compute_probabilities_and_predictions` once on ``X`` to
-        obtain the ``(n_samples, n_seeds)`` probability and prediction
-        matrices, then evaluates each seed independently against ``y_true``.
-
-        The metric set is the sklearn-only subset of
-        :meth:`MetricsComputer.compute_all_metrics` — threshold-optimised
-        variants and G-mean are omitted to keep this method free of any
-        ``utils.ml`` dependency (which would close the import cycle
-        ``SeedEnsemble → MetricsComputer → utils.ml → SeedEnsemble``). When
-        the full metric suite is needed, route through
-        :class:`~eruption_forecast.ensemble.metrics_ensemble.MetricsEnsemble`
-        instead.
-
-        Args:
-            X (pd.DataFrame): Extracted features DataFrame of shape
-                ``(n_samples, n_features)``.
-            y_true (np.ndarray | pd.Series): Ground-truth binary labels
-                aligned positionally with ``X``. Length must equal
-                ``n_samples``.
-
-        Returns:
-            pd.DataFrame: One row per seed, indexed by ``random_state``.
-                Columns: ``accuracy``, ``balanced_accuracy``, ``precision``,
-                ``recall``, ``f1_score``, ``roc_auc``, ``mcc``.
-
-        Raises:
-            ValueError: If ``len(y_true) != len(X)``.
-        """
-        y_true_array = np.asarray(y_true)
-        if y_true_array.shape[0] != X.shape[0]:
-            raise ValueError(
-                f"y_true length ({y_true_array.shape[0]}) does not match "
-                f"X length ({X.shape[0]})."
-            )
-
-        probabilities, predictions = self._compute_probabilities_and_predictions(X)
-
-        rows: list[dict[str, float | int]] = []
-        for idx, seed in enumerate(self.seeds):
-            y_proba = probabilities[:, idx]
-            y_pred = predictions[:, idx]
-            rows.append(
-                {
-                    "random_state": int(seed["random_state"]),
-                    "accuracy": accuracy_score(y_true_array, y_pred),
-                    "balanced_accuracy": balanced_accuracy_score(y_true_array, y_pred),
-                    "precision": precision_score(y_true_array, y_pred, zero_division=0),
-                    "recall": recall_score(y_true_array, y_pred, zero_division=0),
-                    "f1_score": f1_score(y_true_array, y_pred, zero_division=0),
-                    "roc_auc": roc_auc_score(y_true_array, y_proba),
-                    "mcc": matthews_corrcoef(y_true_array, y_pred),
-                }
-            )
-
-        return pd.DataFrame(rows).set_index("random_state")
 
     def predict_with_uncertainty(
         self,
@@ -368,7 +298,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             ``{output_dir}/seed_predictions.parquet`` via
             :meth:`save_seed_matrices`.
         """
-        probabilities, predictions = self._compute_probabilities_and_predictions(X)
+        probabilities, predictions = self.compute_probabilities_and_predictions(X)
 
         output_dir = (
             output_dir
@@ -416,7 +346,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """Persist the per-seed probability and prediction matrices as Parquet.
 
         Writes the two ``(n_samples, n_seeds)`` matrices produced by
-        :meth:`_compute_probabilities_and_predictions` as separate Parquet
+        :meth:`compute_probabilities_and_predictions` as separate Parquet
         files under ``output_dir``:
 
             - ``seed_probabilities.parquet`` — per-seed P(eruption).
@@ -450,8 +380,12 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         seed_columns = [f"seed_{seed['random_state']:05d}" for seed in self.seeds]
 
-        probabilities_path = os.path.join(output_dir, "seed_probabilities.parquet")
-        predictions_path = os.path.join(output_dir, "seed_predictions.parquet")
+        probabilities_path = os.path.join(
+            output_dir, f"{self.classifier_name}_seed_probabilities.parquet"
+        )
+        predictions_path = os.path.join(
+            output_dir, f"{self.classifier_name}_seed_predictions.parquet"
+        )
 
         if overwrite or not os.path.exists(probabilities_path):
             pd.DataFrame(probabilities, index=index, columns=seed_columns).to_parquet(

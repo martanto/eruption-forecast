@@ -8,9 +8,12 @@ import pandas as pd
 from sklearn.metrics import (
     f1_score,
     recall_score,
+    roc_auc_score,
+    accuracy_score,
     precision_score,
     confusion_matrix,
     matthews_corrcoef,
+    average_precision_score,
     balanced_accuracy_score,
 )
 from tsfresh.transformers import FeatureSelector
@@ -22,6 +25,7 @@ from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 from eruption_forecast.logger import logger
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
+from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
 from eruption_forecast.utils.date_utils import sort_dates
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
@@ -677,3 +681,103 @@ def save_model_csv(
         logger.info(f"{classifier_model.name}: CSV trained model saved to {csv}")
 
     return csv
+
+
+def compute_seed(
+    seed_ensemble: SeedEnsemble,
+    X: pd.DataFrame,
+    y_true: np.ndarray | pd.Series,
+    output_dir: str,
+    overwrite: bool = False,
+    verbose: bool = False,
+):
+    """Compute per-seed classification metrics against ``y_true``.
+
+    Args:
+        seed_ensemble (SeedEnsemble): SeedEnsemble object.
+        X (pd.DataFrame): Extracted features DataFrame of shape
+            ``(n_samples, n_features)``.
+        y_true (np.ndarray | pd.Series): Ground-truth binary labels
+            aligned positionally with ``X``. Length must equal
+            ``n_samples``.
+        output_dir (str): Directory in which to write the results.
+        overwrite (bool, optional): If ``True``, overwrite result file.
+        verbose (bool, optional): Show detailed information. Defaults to ``False``.
+
+    Returns:
+        pd.DataFrame: One row per seed, indexed by ``random_state``.
+            Columns: ``accuracy``, ``balanced_accuracy``, ``precision``,
+            ``recall``, ``specificity``, ``f1_score``, ``roc_auc``,
+            ``mcc``, ``true_positives``, ``false_positives``,
+            ``true_negatives``, ``false_negatives``.
+
+    Raises:
+        ValueError: If ``len(y_true) != len(X)``.
+    """
+    classifier_name = seed_ensemble.classifier_name
+    seeds = seed_ensemble.seeds
+
+    metrics_dir = os.path.join(
+        output_dir,
+        classifier_name,
+        "metrics",
+    )
+
+    save_filepath = os.path.join(
+        metrics_dir,
+        f"{classifier_name}_metrics_seeds-{len(seed_ensemble)}.csv",
+    )
+
+    if os.path.exists(save_filepath) and not overwrite:
+        return pd.read_csv(save_filepath, index_col=0)
+
+    y_true = np.asarray(y_true)
+    if y_true.shape[0] != X.shape[0]:
+        raise ValueError(
+            f"y_true length ({y_true.shape[0]}) does not match X length ({X.shape[0]})."
+        )
+
+    probabilities, predictions = seed_ensemble.compute_probabilities_and_predictions(X)
+
+    rows: list[dict[str, float | int]] = []
+    for idx, seed in enumerate(seeds):
+        y_proba = probabilities[:, idx]
+        y_pred = predictions[:, idx]
+
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+
+        # Fall back to 0.0 to match sklearn's ``zero_division=0`` convention
+        # used for precision/recall above.
+        specificity = float(tn) / (tn + fp) if (tn + fp) > 0 else 0.0
+
+        results: dict[str, float | int] = {
+            "random_state": int(seed["random_state"]),
+            "accuracy": round(accuracy_score(y_true, y_pred), 2),
+            "balanced_accuracy": round(balanced_accuracy_score(y_true, y_pred), 2),
+            "precision": round(precision_score(y_true, y_pred, zero_division=0), 2),
+            "average_precision": round(average_precision_score(y_true, y_proba), 2),
+            "recall": round(recall_score(y_true, y_pred, zero_division=0), 2),
+            "specificity": round(specificity, 2),
+            "f1_score": round(f1_score(y_true, y_pred, zero_division=0), 2),
+            "roc_auc": round(roc_auc_score(y_true, y_proba), 2),
+            "mcc": round(matthews_corrcoef(y_true, y_pred), 2),
+            "true_positives": int(tp),
+            "false_positives": int(fp),
+            "true_negatives": int(tn),
+            "false_negatives": int(fn),
+        }
+
+        rows.append(results)
+
+    df = pd.DataFrame(rows).set_index("random_state")
+
+    ensure_dir(metrics_dir)
+    df.to_csv(save_filepath, index=True)
+    if verbose:
+        logger.info(f"Saved {classifier_name} metrics: {save_filepath}")
+
+    return df
+
+
+def plot_seed(y_true: np.ndarray, y_proba: np.ndarray, dpi: int = 150) -> None:
+    return
