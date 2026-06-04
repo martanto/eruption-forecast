@@ -29,6 +29,78 @@ from eruption_forecast.model.classifier_model import ClassifierModel
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
+def build_y_true(
+    features_label_csv: str,
+    eruption_dates: list[str] | list[datetime],
+    datetime_column: str = "datetime",
+) -> pd.Series:
+    """Build a pandas Series containing ground truth binary labels (y_true).
+
+    Reads a features-label CSV indexed by datetime, marks every row falling on
+    one of ``eruption_dates`` as ``1`` in the ``is_erupted`` column, and returns
+    the column re-indexed by the window ``id``. Rows outside eruption days are
+    coerced to ``0`` so the returned series never contains ``NaN``.
+
+    Args:
+        features_label_csv (str): Path to the features-label CSV. Usually saved
+            under ``output_dir/{prediction,training}/features/features-label*.csv``.
+            The CSV must contain ``id`` and ``is_erupted`` columns plus the
+            datetime column named by ``datetime``.
+        eruption_dates (list[str] | list[datetime]): Eruption dates. Strings are
+            parsed via :func:`sort_dates`.
+        datetime_column (str, optional): Name of the column to use as the
+            datetime index. Forwarded to ``pd.read_csv(index_col=...)``.
+            Defaults to ``"datetime"``.
+
+    Returns:
+        pd.Series: Ground truth binary labels indexed by window ``id``, with
+            name ``"is_erupted"``.
+
+    Raises:
+        FileNotFoundError: If ``features_label_csv`` does not exist.
+        KeyError: If the CSV is missing the ``id`` or ``is_erupted`` column,
+            or if ``datetime_column`` is not present in the CSV.
+        TypeError: If the resolved index cannot be parsed as a
+            ``pd.DatetimeIndex``.
+
+    Examples:
+        >>> y_true = build_y_true(
+        ...     "output/VG.OJN.00.EHZ/prediction/features/features-label.csv",
+        ...     eruption_dates=["2025-03-20"],
+        ... )
+        >>> y_true.value_counts()
+    """
+    df = pd.read_csv(features_label_csv, index_col=datetime_column, parse_dates=True)
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError(
+            f"features_label_csv index must be a pd.DatetimeIndex, "
+            f"got '{type(df.index).__name__}'. "
+            f"Check that column '{datetime_column}' in '{features_label_csv}' "
+            f"contains parseable datetimes."
+        )
+
+    missing = {"id", "is_erupted"} - set(df.columns)
+    if missing:
+        raise KeyError(
+            f"features_label_csv is missing required column(s): {sorted(missing)}. "
+            f"Found columns: {list(df.columns)}."
+        )
+
+    df["is_erupted"] = df["is_erupted"].fillna(0).astype(int)
+
+    sorted_eruption_dates = sort_dates(eruption_dates, as_datetime=True)
+    for eruption_date in sorted_eruption_dates:
+        start_date = eruption_date.replace(hour=0, minute=0, second=0)
+        end_date = eruption_date.replace(hour=23, minute=59, second=59)
+        df.loc[start_date:end_date, "is_erupted"] = 1
+
+    y_true = df.set_index("id")["is_erupted"]
+    y_true.name = "is_erupted"
+
+    return y_true
+
+
 def split_eruption_dates(
     eruption_dates: list[str] | list[datetime], test_size: float = 0.2
 ):
