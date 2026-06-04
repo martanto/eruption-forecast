@@ -134,9 +134,9 @@ class BaseModel(ABC):
 
         # Set properties
         output_dir = resolve_output_dir(
-            output_dir,
-            root_dir,
-            os.path.join("output"),
+            output_dir=output_dir,
+            root_dir=root_dir,
+            default_subpath="output",
         )
 
         # Set default properties
