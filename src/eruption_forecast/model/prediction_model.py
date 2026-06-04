@@ -158,7 +158,10 @@ class PredictionModel(BaseModel, CacheModel):
 
         self.kind: Literal["training", "prediction"] = "prediction"
         self.overwrite = overwrite
-        self.basename = f"{self.start_date_str}_{self.end_date_str}"
+        self.basename = (
+            f"{self.start_date_str}_{self.end_date_str}_ws-{self.window_size}"
+        )
+
         (
             self.prediction_dir,
             self.features_dir,
@@ -632,6 +635,9 @@ class PredictionModel(BaseModel, CacheModel):
         )
 
         self.results = df_forecast
+
+        self.save()
+
         return df_forecast
 
     def _plot_forecast(
