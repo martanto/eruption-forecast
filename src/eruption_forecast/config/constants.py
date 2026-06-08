@@ -13,7 +13,7 @@ Contents:
       ``DEFAULT_N_SIGNIFICANT_FEATURES``, ``DEFAULT_SAMPLING_STRATEGY``,
       ``LEARNING_CURVE_SCORINGS``.
     - **Inference / evaluation**: ``ERUPTION_PROBABILITY_THRESHOLD``,
-      ``THRESHOLD_RESOLUTION``, ``CLASS_LABELS``.
+      ``CLASS_LABELS``.
     - **Plotting / output**: ``PLOT_DPI``, ``PLOT_SEPARATOR_LENGTH``,
       ``MATPLOTLIB_BACKEND``.
 
@@ -38,10 +38,6 @@ DEFAULT_SAMPLING_STRATEGY: float = 0.75
 
 ERUPTION_PROBABILITY_THRESHOLD: float = 0.5
 """Threshold for classifying eruption probability as positive."""
-
-# TODO: Consider to reduce the value. Affecting in smoothing PR curves
-THRESHOLD_RESOLUTION: int = 101
-"""Number of threshold points to evaluate (for ROC/PR curves)."""
 
 LEARNING_CURVE_SCORINGS: list[str] = ["balanced_accuracy", "f1_weighted"]
 """Scoring metrics computed for every learning curve during training."""
