@@ -19,7 +19,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 
-from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
+from eruption_forecast.utils.ml import compute_threshold_metrics
 
 
 class MetricsComputer:
@@ -96,12 +96,7 @@ class MetricsComputer:
 
         # G-mean at default (0.5) threshold
         metrics["g_mean"] = float(
-            compute_g_mean(
-                {
-                    "recall": [metrics["sensitivity"]],
-                    "specificity": [metrics["specificity"]],
-                }
-            )[0]
+            np.sqrt(np.array(metrics["recall"]) * np.array(metrics["specificity"]))
         )
 
         # AUC metrics
@@ -144,8 +139,7 @@ class MetricsComputer:
         """
         thresholds, metrics = compute_threshold_metrics(self.y_true, self.y_proba)
 
-        g_mean = compute_g_mean(metrics)
-        optimal_idx = np.argmax(g_mean)
+        optimal_idx = np.argmax(metrics["g_mean"])
         g_mean_optimal_threshold = float(thresholds[optimal_idx])
 
         f1_optimal_idx = np.argmax(metrics["f1"])
@@ -155,7 +149,7 @@ class MetricsComputer:
 
         return {
             "optimal_threshold": g_mean_optimal_threshold,
-            "g_mean_at_optimal": float(g_mean[optimal_idx]),
+            "g_mean_at_optimal": float(metrics["g_mean"][optimal_idx]),
             "f1_at_optimal": float(metrics["f1"][optimal_idx]),
             "recall_at_optimal": float(metrics["recall"][optimal_idx]),
             "precision_at_optimal": float(metrics["precision"][optimal_idx]),
