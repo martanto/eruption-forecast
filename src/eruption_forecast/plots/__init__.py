@@ -71,7 +71,6 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_feature_importance,
     plot_threshold_analysis,
     plot_precision_recall_curve,
-    plot_prediction_distribution,
     plot_aggregate_learning_curve,
 )
 
@@ -98,7 +97,6 @@ __all__ = [
     "plot_threshold_analysis",
     "plot_feature_importance",
     "plot_calibration",
-    "plot_prediction_distribution",
     "plot_seed_stability",
     "plot_learning_curve",
     "plot_aggregate_learning_curve",

@@ -18,7 +18,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.ml import compute_g_mean
 from eruption_forecast.utils.pathutils import (
     ensure_dir,
     save_figure,
@@ -44,7 +43,6 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_threshold_analysis as _plot_threshold_styled,
     plot_learning_curve_grid as _plot_lc_grid,
     plot_precision_recall_curve as _plot_pr_styled,
-    plot_prediction_distribution as _plot_pred_dist_styled,
 )
 
 
@@ -392,12 +390,7 @@ class ModelEvaluator:
                         "sensitivity": sensitivity,
                         "specificity": specificity,
                         "g_mean": float(
-                            compute_g_mean(
-                                {
-                                    "recall": [sensitivity],
-                                    "specificity": [specificity],
-                                }
-                            )[0]
+                            np.sqrt(np.array(sensitivity) * np.array(specificity))
                         ),
                     }
                 )
@@ -815,50 +808,6 @@ class ModelEvaluator:
 
         return fig
 
-    def plot_prediction_distribution(
-        self,
-        filename: str | None = None,
-        dpi: int = 150,
-    ) -> plt.Figure | None:
-        """Plot histograms of predicted probabilities split by true class.
-
-        Class 0 (not erupted) is shown in blue and class 1 (erupted) in
-        orange. A dashed line marks the default 0.5 decision threshold.
-
-        Args:
-            filename (str | None, optional): Output filename. If None,
-                defaults to ``"<model_name>_prediction_distribution.png"``.
-                Defaults to None.
-            dpi (int, optional): Figure resolution. Defaults to 150.
-
-        Returns:
-            plt.Figure | None: Matplotlib figure, or None if probability
-            predictions are unavailable.
-        """
-        if self._y_proba is None:
-            logger.warning(
-                "plot_prediction_distribution requires probability predictions"
-            )
-            return None
-
-        # Delegate to styled plotting function
-        fig = _plot_pred_dist_styled(
-            y_true=np.asarray(self.y_test),  # Convert Series to ndarray
-            y_proba=self._y_proba,
-            title=f"Prediction Distribution — {self.model_name}",
-            figsize=(8, 5),
-            dpi=dpi,
-        )
-
-        save_figure(
-            fig,
-            self._get_plot_filepath("prediction_distribution", filename=filename),
-            dpi,
-            verbose=self.verbose,
-        )
-
-        return fig
-
     def save_metrics(self, path: str | None = None) -> str:
         """Serialize evaluation metrics to a JSON file.
 
@@ -1058,9 +1007,9 @@ class ModelEvaluator:
             object. Keys: ``"confusion_matrix"``, ``"roc_curve"``,
             ``"pr_curve"``, ``"threshold_analysis"``, ``"g_mean_curve"``,
             ``"mcc_curve"``, ``"feature_importance"``, ``"calibration"``,
-            ``"prediction_distribution"``, ``"shap_summary"``,
-            ``"shap_waterfall"``, ``"learning_curve"``. Values are None when a
-            plot could not be generated (e.g. probabilities unavailable or no
+            ``"shap_summary"``, ``"shap_waterfall"``, ``"learning_curve"``.
+            Values are None when a  plot could not be generated
+            (e.g. probabilities unavailable or no
             learning-curve JSON supplied).
 
         Examples:
@@ -1076,7 +1025,6 @@ class ModelEvaluator:
             "mcc_curve": self.plot_mcc_curve(dpi=dpi),
             "feature_importance": self.plot_feature_importance(dpi=dpi),
             "calibration": self.plot_calibration(dpi=dpi),
-            "prediction_distribution": self.plot_prediction_distribution(dpi=dpi),
             "learning_curve": self.plot_learning_curve(dpi=dpi),
             "shap_summary": self.plot_shap_summary(dpi=dpi) if self.plot_shap else None,
             "shap_waterfall": (
