@@ -40,11 +40,9 @@ from eruption_forecast.plots.evaluation_plots import (
     plot_aggregate_calibration as _plot_cal_styled,
     plot_aggregate_g_mean_curve as _plot_gmean_styled,
     plot_aggregate_learning_curve as _plot_agg_lc_styled,
-    plot_aggregate_confusion_matrix as _plot_cm_styled,
     plot_aggregate_feature_importance as _plot_fi_styled,
     plot_aggregate_threshold_analysis as _plot_threshold_styled,
     plot_aggregate_precision_recall_curve as _plot_pr_styled,
-    plot_aggregate_prediction_distribution as _plot_pred_dist_styled,
 )
 
 
@@ -532,96 +530,6 @@ class MultiModelEvaluator:
         )
         return fig
 
-    def plot_prediction_distribution(
-        self,
-        save: bool = True,
-        filename: str | None = None,
-        dpi: int = 150,
-        title: str | None = None,
-    ) -> plt.Figure:
-        """Generate an aggregate prediction distribution plot across all seeds.
-
-        Pools predicted probabilities from all seeds by true class and plots
-        KDE distributions, giving an ensemble-level view of model
-        discrimination.
-
-        Args:
-            save (bool, optional): Whether to save the figure. Defaults to True.
-            filename (str | None, optional): Override figure filename. Defaults to
-                ``"aggregate_prediction_distribution.png"``.
-            dpi (int, optional): Figure resolution. Defaults to 150.
-            title (str | None, optional): Plot title. Defaults to None.
-
-        Returns:
-            plt.Figure: Matplotlib figure with aggregate KDE distributions.
-        """
-        _, _, y_trues, y_probas = self._predictions
-
-        fig, data = _plot_pred_dist_styled(
-            y_trues=y_trues,
-            y_probas=y_probas,
-            title=title,
-            dpi=dpi,
-        )
-        self._save_outputs(
-            fig,
-            data,
-            filename or f"{self.classifier_name}_aggregate_prediction_distribution",
-            f"{self.classifier_name}_aggregate_prediction_distribution",
-            dpi,
-            save,
-        )
-        return fig
-
-    def plot_confusion_matrix(
-        self,
-        save: bool = True,
-        filename: str | None = None,
-        dpi: int = 150,
-        title: str | None = None,
-        normalize: str | None = None,
-    ) -> plt.Figure:
-        """Generate an aggregate confusion matrix summed across all seeds.
-
-        Accumulates raw confusion matrices from every seed and optionally
-        normalises the result before displaying as a heatmap.
-
-        Args:
-            save (bool, optional): Whether to save the figure. Defaults to True.
-            filename (str | None, optional): Override figure filename. Defaults to
-                ``"aggregate_confusion_matrix.png"``.
-            dpi (int, optional): Figure resolution. Defaults to 150.
-            title (str | None, optional): Plot title. Defaults to None.
-            normalize (str | None, optional): Normalisation mode: ``"true"``,
-                ``"pred"``, ``"all"``, or None. Defaults to None.
-
-        Returns:
-            plt.Figure: Matplotlib figure with the aggregate confusion matrix.
-        """
-        models, x_tests, y_trues, _ = self._predictions
-        y_preds: list[np.ndarray] = [
-            model.predict(X_test)  # ty:ignore[unresolved-attribute]
-            for model, X_test in zip(models, x_tests, strict=True)
-        ]
-
-        fig, data = _plot_cm_styled(
-            y_trues=y_trues,
-            y_preds=y_preds,
-            normalize=normalize,
-            title=title,
-            dpi=dpi,
-        )
-
-        self._save_outputs(
-            fig,
-            data,
-            filename or f"{self.classifier_name}_aggregate_confusion_matrix",
-            f"{self.classifier_name}_aggregate_confusion_matrix",
-            dpi,
-            save,
-        )
-        return fig
-
     def plot_threshold_analysis(
         self,
         save: bool = True,
@@ -927,10 +835,6 @@ class MultiModelEvaluator:
                 dpi=dpi, show_individual=show_individual
             ),
             "calibration": lambda: self.plot_calibration(dpi=dpi),
-            "prediction_distribution": lambda: self.plot_prediction_distribution(
-                dpi=dpi
-            ),
-            "confusion_matrix": lambda: self.plot_confusion_matrix(dpi=dpi),
             "threshold_analysis": lambda: self.plot_threshold_analysis(
                 dpi=dpi, show_individual=show_individual
             ),
@@ -1038,13 +942,13 @@ class MultiModelEvaluator:
             registry.iterrows(), models, x_tests, strict=False
         ):
             filepath = row.get("shap_explanation_filepath") if col_exists else None
-            if filepath and os.path.isfile(str(filepath)):
+            if filepath and os.path.isfile(filepath):
                 try:
                     explanations.append(joblib.load(filepath))
                     continue
                 except Exception as e:
                     logger.warning(
-                        f"Failed to load SHAP explanation from {filepath}: {e}"
+                        f"Failed to load SHAP explanation from {str(filepath)}: {e}"
                     )
             try:
                 explanations.append(compute_shap_explanation(model, X))
@@ -1204,7 +1108,6 @@ class MultiModelEvaluator:
             "precision",
             "recall",
             "specificity",
-            "sensitivity",
         ]
 
         for metric in metrics:

@@ -24,7 +24,6 @@ prediction-window results never share the same directory.
 """
 
 import os
-import json
 from typing import Self, Literal
 
 import joblib
@@ -35,8 +34,8 @@ from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
-from eruption_forecast.model.model_evaluator import ModelEvaluator
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
@@ -172,7 +171,7 @@ class EvaluationModel(BaseModel):
         self.features_df = model.features_df
         self.window_step: int = model.window_step
         self.window_step_unit: Literal["minutes", "hours"] = model.window_step_unit
-        self.basename = f"{self.start_date_str}_{self.end_date_str}"
+        self.basename: str = f"{self.start_date_str}_{self.end_date_str}"
 
         # ``self.y_true`` always holds ground-truth labels (0/1) when populated.
         # Training reuse: ``TrainingModel.labels`` is already truth on
@@ -408,7 +407,9 @@ class EvaluationModel(BaseModel):
         y_true = merged.set_index("id")["is_erupted"].fillna(0).astype(int)
         y_true.name = "is_erupted"
 
-        y_true_filepath = os.path.join(self.evaluation_dir, "labels", "y_true.csv")
+        y_true_dir = os.path.join(self.evaluation_dir, "labels")
+        ensure_dir(y_true_dir)
+        y_true_filepath = os.path.join(y_true_dir, "y_true.csv")
         y_true.to_csv(y_true_filepath, index=True)
 
         self.y_true = y_true
@@ -446,25 +447,27 @@ class EvaluationModel(BaseModel):
     ) -> dict[str, pd.DataFrame]:
         """Evaluate every seed model against the true labels and aggregate.
 
-        For each classifier and seed in the loaded ``ClassifierEnsemble``,
-        slices the reused feature matrix to the seed's selected features and
-        runs :class:`ModelEvaluator` to compute per-seed metrics.
-        ``ModelEvaluator`` calls ``model.predict`` only — models are **never
-        re-fit**.  Per-seed metrics are cached as JSON under
-        ``{classifiers_dir}/{classifier}/metrics/json/`` and reused on
-        subsequent runs unless ``self.overwrite`` is ``True``.  Per-seed
-        metrics are aggregated to mean ± std per classifier and the resulting
-        ``DataFrame`` is also assigned to ``self.metrics``.
+        Delegates the per-seed metric loop to
+        :class:`~eruption_forecast.ensemble.metrics_ensemble.MetricsEnsemble`,
+        which computes ``(n_samples, n_seeds)`` ``y_proba`` / ``y_pred``
+        matrices once per classifier, persists them to
+        ``{classifiers_dir}/{classifier}/predictions/``, runs
+        :class:`MetricsComputer` per seed, and writes per-seed JSONs under
+        ``{classifiers_dir}/{classifier}/metrics/json/{seed:05d}.json``.
+        Cached JSONs are reused unless ``self.overwrite`` is ``True``.
+        Per-classifier ``mean ± std`` aggregate CSVs and the assignment to
+        ``self.metrics`` follow the same naming as before the refactor.
 
         Args:
-            plot_per_seed (bool): Render per-seed evaluation plots via
-                ``ModelEvaluator.plot_all``.  Expensive across many seeds.
+            plot_per_seed (bool): Reserved for a follow-up that will rebuild
+                per-seed plots from the persisted prediction matrices. Setting
+                ``True`` currently emits a warning and has no effect.
                 Defaults to ``False``.
             plot_aggregate (bool): Render aggregate plots per classifier via
                 :class:`MultiModelEvaluator`. Defaults to ``True``.
-            plot_shap (bool): Enable SHAP plots within per-seed
-                ``ModelEvaluator`` (only relevant when ``plot_per_seed=True``).
-                Defaults to ``False``.
+            plot_shap (bool): Reserved for a follow-up. Setting ``True``
+                currently emits a warning and has no effect. Defaults to
+                ``False``.
 
         Returns:
             dict[str, pd.DataFrame]: Mapping of classifier name to a DataFrame
@@ -499,119 +502,34 @@ class EvaluationModel(BaseModel):
                 "before being passed to EvaluationModel."
             )
 
-        metrics_per_classifier: dict[str, pd.DataFrame] = {}
-
-        for classifier_name, seed_ensemble in self.ClassifierEnsemble.ensembles.items():
-            clf_dir = os.path.join(self.classifiers_dir, classifier_name)
-            metrics_dir = os.path.join(clf_dir, "metrics")
-            json_dir = os.path.join(metrics_dir, "json")
-            ensure_dir(json_dir)
-
-            all_metrics: list[dict] = []
-
-            for seed_record in seed_ensemble.seeds:
-                missing_keys: list[str] = []
-                for key in ("random_state", "model", "feature_names"):
-                    if key not in seed_record.keys():
-                        missing_keys.append(key)
-
-                if len(missing_keys) > 0:
-                    raise ValueError(
-                        f"SeedEnsemble.seeds missing keys: {missing_keys}. "
-                        f"Available keys: {', '.join(seed_record.keys())}"
-                    )
-
-                random_state: int = seed_record["random_state"]
-                seed_model = seed_record["model"]
-                feature_names: list[str] = seed_record["feature_names"]
-
-                metrics_filepath = os.path.join(json_dir, f"{random_state:05d}.json")
-
-                if not self.overwrite and os.path.isfile(metrics_filepath):
-                    with open(metrics_filepath) as f:
-                        metrics: dict = json.load(f)
-                    all_metrics.append(metrics)
-                    if self.verbose:
-                        logger.info(
-                            f"{classifier_name}/{random_state:05d}: cached metrics loaded, skipping."
-                        )
-                    continue
-
-                available_features = [
-                    feature_name
-                    for feature_name in feature_names
-                    if feature_name in self.features_df.columns
-                ]
-
-                if not available_features:
-                    logger.warning(
-                        f"{classifier_name}/{random_state:05d}: none of the "
-                        "seed features are present in the data — skipping."
-                    )
-                    continue
-
-                X_test = self.features_df[available_features]
-                common_index = X_test.index.intersection(self.y_true.index)
-                X_test = X_test.loc[common_index]
-                y_true = self.y_true.loc[common_index]
-                y_pred = seed_model.predict(X_test)
-
-                evaluator = ModelEvaluator(
-                    model=seed_model,
-                    X_test=X_test,
-                    y_test=y_true,
-                    model_name=classifier_name,
-                    output_dir=clf_dir,
-                    selected_features=available_features,
-                    random_state=random_state,
-                    plot_shap=plot_shap,
-                    verbose=self.verbose,
-                )
-
-                metrics = evaluator.get_metrics()
-                metrics["random_state"] = random_state
-
-                with open(metrics_filepath, "w") as f:
-                    json.dump(metrics, f, indent=4)
-
-                if plot_per_seed:
-                    try:
-                        evaluator.plot_all(dpi=150)
-                    except Exception as e:
-                        logger.warning(
-                            f"{classifier_name}/{random_state:05d}: "
-                            f"plot_all() skipped. Reason: {e}"
-                        )
-
-                if self.verbose:
-                    logger.info(
-                        f"{classifier_name}/{random_state:05d}: "
-                        f"balanced_accuracy="
-                        f"{metrics.get('balanced_accuracy', float('nan')):.4f} "
-                        f"(y_pred positives={int(y_pred.sum())}, "
-                        f"y_true positives={int(y_true.sum())})"
-                    )
-
-                all_metrics.append(metrics)
-
-            if not all_metrics:
-                logger.warning(f"{classifier_name}: no seed results — skipping.")
-                continue
-
-            self._aggregate_metrics(
-                all_metrics=all_metrics,
-                suffix_filename=self.basename,
-                classifier_name=classifier_name,
-                classifier_dir=clf_dir,
+        if plot_per_seed or plot_shap:
+            logger.warning(
+                "plot_per_seed/plot_shap are not yet supported by the "
+                "MetricsEnsemble-backed evaluate(). The per-seed prediction "
+                "matrices are now persisted under "
+                "{classifiers_dir}/{classifier}/predictions/ — a follow-up "
+                "change will rebuild per-seed plots from those files."
             )
 
-            if plot_aggregate:
+        me = MetricsEnsemble(
+            classifier_ensemble=self.ClassifierEnsemble,
+            features_df=self.features_df,
+            y_true=self.y_true,
+            n_jobs=self.n_jobs,
+            output_dir=self.evaluation_dir,
+            basename=self.basename,
+            overwrite=self.overwrite,
+            verbose=self.verbose,
+        ).compute()
+
+        if plot_aggregate:
+            for classifier_name in me.metrics:
+                clf_dir = os.path.join(self.classifiers_dir, classifier_name)
+                metrics_dir = os.path.join(clf_dir, "metrics")
                 self._plot_aggregate(metrics_dir, classifier_name, clf_dir)
 
-            metrics_per_classifier[classifier_name] = pd.DataFrame(all_metrics)
-
-        self.metrics = metrics_per_classifier
-        return metrics_per_classifier
+        self.metrics = me.metrics
+        return me.metrics
 
     def compare(
         self,
@@ -693,63 +611,3 @@ class EvaluationModel(BaseModel):
             ).plot_all()
         except Exception as exc:
             logger.warning(f"{classifier_name}: aggregate plots skipped. Reason: {exc}")
-
-    def _aggregate_metrics(
-        self,
-        all_metrics: list[dict],
-        suffix_filename: str,
-        classifier_name: str,
-        classifier_dir: str,
-    ) -> None:
-        """Aggregate per-seed metrics into summary statistics for one classifier.
-
-        Computes ``DataFrame.describe()`` statistics across all seed rows and
-        writes both the per-seed table and the summary to CSV under
-        ``classifier_dir``.  A condensed mean ± std line is logged for the
-        common metrics (``accuracy``, ``balanced_accuracy``, ``f1_score``,
-        ``precision``, ``recall``) when they are present in the records.
-
-        Args:
-            all_metrics (list[dict]): One metrics dictionary per seed.
-            suffix_filename (str): Suffix appended to the output filenames
-                (typically ``self.basename``).
-            classifier_name (str): Classifier name used in the log header.
-            classifier_dir (str): Directory where ``metrics_summary_*.csv`` and
-                ``all_metrics_*.csv`` are written.
-        """
-        ensure_dir(classifier_dir)
-
-        df_metrics = pd.DataFrame(all_metrics)
-
-        summary = df_metrics.describe().T
-        summary_filepath = os.path.join(
-            classifier_dir, f"metrics_summary_{suffix_filename}.csv"
-        )
-        summary.to_csv(summary_filepath)
-
-        all_metrics_filepath = os.path.join(
-            classifier_dir, f"all_metrics_{suffix_filename}.csv"
-        )
-        df_metrics = df_metrics.set_index("random_state")
-        df_metrics.to_csv(all_metrics_filepath, index=True)
-
-        logger.info("=" * 60)
-        logger.info(f"Metrics Summary — {classifier_name} (mean ± std across seeds)")
-        logger.info("=" * 60)
-        for metric in (
-            "accuracy",
-            "balanced_accuracy",
-            "f1_score",
-            "precision",
-            "recall",
-        ):
-            if metric not in df_metrics.columns:
-                continue
-            mean = df_metrics[metric].mean()
-            std = df_metrics[metric].std()
-            logger.info(f"{metric:20s}: {mean:.4f} ± {std:.4f}")
-        logger.info("=" * 60)
-
-        if self.verbose:
-            logger.info(f"Summary metrics saved to: {summary_filepath}")
-            logger.info(f"All metrics saved to: {all_metrics_filepath}")

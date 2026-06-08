@@ -2,12 +2,14 @@ import os
 import json
 from typing import Self, Literal
 from datetime import datetime
+from functools import partial
 from collections.abc import Callable
 
 import numpy as np
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
+from sklearn.model_selection import learning_curve
 
 from eruption_forecast.plots import plot_significant_features
 from eruption_forecast.logger import logger
@@ -165,6 +167,7 @@ class TrainingModel(BaseModel, CacheModel):
             self.figures_seed_dir,
             self.classifier_dirs,
             self.models_dir,
+            self.learning_curve_dirs,
         ) = self.set_directories()
         self.features_csvs: list[str] = []
         self.features_selected_df: pd.DataFrame = pd.DataFrame()
@@ -210,14 +213,16 @@ class TrainingModel(BaseModel, CacheModel):
 
     def set_directories(
         self,
-    ) -> tuple[str, str, str, str, str, str, dict[str, str], dict[str, str]]:
+    ) -> tuple[
+        str, str, str, str, str, str, dict[str, str], dict[str, str], dict[str, str]
+    ]:
         """Build and return all output directory paths used during training.
 
         Creates classifier-level subdirectories immediately so downstream
         steps can write files without additional setup calls.
 
         Returns:
-            tuple: An eight-element tuple containing:
+            tuple: A nine-element tuple containing:
                 - training_dir (str): Root training output path.
                 - classifier_dir (str): Classifier training output path.
                 - features_dir (str): CV-scoped features directory.
@@ -226,6 +231,8 @@ class TrainingModel(BaseModel, CacheModel):
                 - figures_seed_dir (str): Per-seed feature importance figures.
                 - classifier_dirs (dict[str, str]): Classifier-slug → directory.
                 - models_dir (dict[str, str]): Classifier-slug → model directory.
+                - learning_curve_dirs (dict[str, str]): Classifier-slug →
+                  per-seed learning-curve JSON directory.
         """
         training_dir = os.path.join(self.output_dir, "training")
         classifier_dir = os.path.join(training_dir, "classifiers")
@@ -236,6 +243,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         classifier_dirs: dict[str, str] = {}
         models_dir: dict[str, str] = {}
+        learning_curve_dirs: dict[str, str] = {}
 
         for classifier_model in self.classifier_models:
             classifier_slug_name = classifier_model.slug_name
@@ -245,6 +253,9 @@ class TrainingModel(BaseModel, CacheModel):
             model_dir = os.path.join(classifier_dirs[classifier_slug_name], "models")
             ensure_dir(classifier_dir)
             models_dir[classifier_slug_name] = model_dir
+            learning_curve_dirs[classifier_slug_name] = os.path.join(
+                classifier_dirs[classifier_slug_name], "learning_curves"
+            )
 
         return (
             training_dir,
@@ -255,6 +266,7 @@ class TrainingModel(BaseModel, CacheModel):
             figures_seed_dir,
             classifier_dirs,
             models_dir,
+            learning_curve_dirs,
         )
 
     def create_directories(
@@ -739,6 +751,7 @@ class TrainingModel(BaseModel, CacheModel):
         sampling_strategy: str | float = 0.75,
         plot_features: bool = False,
         scoring: str = "balanced_accuracy",
+        compute_learning_curve: bool = False,
     ) -> Self:
         """Train classifier models on the full dataset across multiple random seeds.
 
@@ -764,6 +777,11 @@ class TrainingModel(BaseModel, CacheModel):
                 Defaults to False.
             scoring (str, optional): Scoring GridSearchCV. Defaults to ``"balanced_accuracy"``.
                 See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
+            compute_learning_curve (bool): If ``True``, run
+                :meth:`compute_learning_curve` after the ensemble is built and
+                saved, generating per-seed sklearn learning-curve JSON files
+                under ``training/classifiers/{slug}/{cv}/learning_curves/``.
+                Defaults to ``False``.
 
         Returns:
             Self: The current instance, enabling method chaining.
@@ -956,6 +974,9 @@ class TrainingModel(BaseModel, CacheModel):
 
         self.save()
 
+        if compute_learning_curve:
+            self.compute_learning_curve(overwrite=self.overwrite)
+
         return self
 
     @staticmethod
@@ -1033,6 +1054,108 @@ class TrainingModel(BaseModel, CacheModel):
         )
         seed_ensemble.save(filepath)
         return filepath, seed_ensemble
+
+    def compute_learning_curve(
+        self,
+        scoring: list[str] | None = None,
+        train_sizes: list[float] | np.ndarray | None = None,
+        overwrite: bool = False,
+    ) -> Self:
+        """Compute sklearn learning curves for every (classifier, seed) pair.
+
+        For each previously trained ``(classifier, seed)``, loads the tuned
+        estimator pickle and the per-seed resampled training data, then calls
+        :func:`sklearn.model_selection.learning_curve` once per scoring metric.
+        Hyperparameters are reused from the existing ``best_estimator_`` — no
+        ``GridSearchCV`` re-tuning happens. Outputs JSON files matching the
+        schema consumed by
+        :func:`eruption_forecast.plots.evaluation_plots.plot_learning_curve`.
+
+        Must be called after :meth:`fit`. Existing JSON files are kept unless
+        ``overwrite=True``.
+
+        Args:
+            scoring (list[str] | None): sklearn scoring keys to evaluate. Each
+                triggers an independent ``learning_curve`` call sharing the
+                same CV splits. Defaults to
+                ``["balanced_accuracy", "roc_auc"]``.
+            train_sizes (list[float] | np.ndarray | None): Fractions of the
+                training set used to seed the curve. Defaults to
+                ``np.linspace(0.1, 1.0, 5)``.
+            overwrite (bool): Re-compute and overwrite existing per-seed JSON.
+                Defaults to False.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If :meth:`fit` has not been called first.
+
+        Example:
+            >>> model.fit(seeds=25)
+            >>> model.compute_learning_curve()
+            >>> # → training/classifiers/{slug}/{cv}/learning_curves/{seed:05d}.json
+        """
+        ensemble = self.ClassifierEnsemble
+        if ensemble is None:
+            raise ValueError("Please run fit() first.")
+
+        scoring = (
+            list(scoring) if scoring is not None else ["balanced_accuracy", "roc_auc"]
+        )
+        train_sizes = (
+            np.asarray(train_sizes)
+            if train_sizes is not None
+            else np.linspace(0.1, 1.0, 5)
+        )
+
+        # Lazy directory creation — only when this opt-in step actually runs.
+        for lc_dir in self.learning_curve_dirs.values():
+            ensure_dir(lc_dir)
+
+        jobs: list[tuple] = []
+        for classifier_model in self.classifier_models:
+            classifier_slug = classifier_model.slug_name
+            seed_ensemble = ensemble.ensembles.get(classifier_model.name)
+            if seed_ensemble is None:
+                continue
+            lc_dir = self.learning_curve_dirs[classifier_slug]
+            for seed_record in seed_ensemble.seeds:
+                random_state = seed_record["random_state"]
+                lc_path = os.path.join(lc_dir, f"{random_state:05d}.json")
+                if not overwrite and os.path.isfile(lc_path):
+                    if self.verbose:
+                        logger.info(
+                            f"Learning curve {random_state:05d} / {classifier_slug}: "
+                            f"exists, skipping."
+                        )
+                    continue
+                jobs.append((random_state, classifier_slug))
+
+        if not jobs:
+            logger.info("Learning Curve: nothing to compute (all JSONs present).")
+            return self
+
+        logger.info(f"Running learning-curve computation across {len(jobs)} job(s)..")
+
+        worker = partial(
+            self._run_compute_learning_curve,
+            classifier_ensemble=ensemble,
+            scoring=scoring,
+            train_sizes=train_sizes,
+        )
+
+        results: list[str | None] = self._run_jobs(
+            worker,
+            jobs,
+            job_name="Learning Curve",
+        )
+
+        if self.verbose:
+            written = sum(1 for result in results if result is not None)
+            logger.info(f"Learning Curve: wrote {written}/{len(results)} JSON(s)")
+
+        return self
 
     def _train(
         self,
@@ -1401,3 +1524,127 @@ class TrainingModel(BaseModel, CacheModel):
             selected_features,
             number_of_features,
         )
+
+    def _run_compute_learning_curve(
+        self,
+        classifier_ensemble: ClassifierEnsemble,
+        random_state: int,
+        classifier_slug: str,
+        scoring: list[str],
+        train_sizes: np.ndarray,
+    ) -> str | None:
+        """Compute and persist the learning-curve JSON for one (seed, classifier).
+
+        Reads the per-seed resampled CSV for the training data, then runs
+        :func:`learning_curve` once per scoring metric. The tuned estimator
+        and its feature list are pulled from ``classifier_ensemble`` (passed
+        in by :meth:`compute_learning_curve` after it has validated the
+        in-memory ensemble is populated) — no pickle or feature-list CSV is
+        read from disk. The CV splitter is rebuilt reproducibly via
+        :meth:`ClassifierModel.set_random_state` ``+`` :meth:`get_cv_splitter`,
+        so train/validation splits are identical across the metric loop.
+
+        Args:
+            classifier_ensemble (ClassifierEnsemble): The in-memory
+                ``ClassifierEnsemble`` produced by :meth:`fit`. Caller
+                guarantees this is non-None.
+            random_state (int): Seed identifying the resampled CSV and
+                in-memory seed record.
+            classifier_slug (str): Slug name of the classifier to evaluate.
+            scoring (list[str]): sklearn scoring keys to evaluate.
+            train_sizes (np.ndarray): Fractions of the training set to evaluate.
+
+        Returns:
+            str | None: Absolute path of the written JSON, or ``None`` when
+                the resampled CSV is missing or the seed was skipped during
+                ``fit()``.
+        """
+        filename = f"{random_state:05d}"
+        features_resampled_path = os.path.join(
+            self.features_resampled_dir, f"{filename}.csv"
+        )
+
+        if not os.path.isfile(features_resampled_path):
+            logger.warning(
+                f"Learning curve {filename} / {classifier_slug}: "
+                f"missing {features_resampled_path}, skipping."
+            )
+            return None
+
+        classifier_model = next(
+            m for m in self.classifier_models if m.slug_name == classifier_slug
+        )
+        seed_ensemble = classifier_ensemble.ensembles.get(classifier_model.name)
+        if seed_ensemble is None:
+            logger.warning(
+                f"Learning curve {filename} / {classifier_slug}: "
+                f"{classifier_model.name} missing from ClassifierEnsemble, skipping."
+            )
+            return None
+
+        seed_record = next(
+            (s for s in seed_ensemble.seeds if s["random_state"] == random_state),
+            None,
+        )
+        if seed_record is None:
+            logger.warning(
+                f"Learning curve {filename} / {classifier_slug}: "
+                f"seed not found in SeedEnsemble (likely skipped during fit), skipping."
+            )
+            return None
+
+        estimator = seed_record["model"]
+        top_n_features = list(seed_record["feature_names"])
+        if not top_n_features:
+            return None
+
+        resampled_df = pd.read_csv(features_resampled_path, index_col=0)
+        y = resampled_df["is_erupted"]
+        X = resampled_df[top_n_features]
+
+        cv_splitter = classifier_model.set_random_state(random_state).get_cv_splitter()
+
+        metrics_payload: dict[str, dict[str, list[float]]] = {}
+        train_sizes_abs: np.ndarray | None = None
+
+        for metric in scoring:
+            sizes_abs, train_scores, test_scores = learning_curve(
+                estimator=estimator,
+                X=X,
+                y=y,
+                cv=cv_splitter,
+                scoring=metric,
+                train_sizes=train_sizes,
+                n_jobs=1,
+                shuffle=False,
+                random_state=random_state,
+            )
+            train_sizes_abs = sizes_abs
+            metrics_payload[metric] = {
+                "train_scores_mean": train_scores.mean(axis=1).tolist(),
+                "train_scores_std": train_scores.std(axis=1).tolist(),
+                "test_scores_mean": test_scores.mean(axis=1).tolist(),
+                "test_scores_std": test_scores.std(axis=1).tolist(),
+            }
+
+        payload = {
+            "random_state": random_state,
+            "classifier_slug": classifier_slug,
+            "train_sizes": train_sizes_abs.tolist()
+            if train_sizes_abs is not None
+            else [],
+            "metrics": metrics_payload,
+        }
+
+        lc_path = os.path.join(
+            self.learning_curve_dirs[classifier_slug], f"{filename}.json"
+        )
+        with open(lc_path, "w") as f:
+            json.dump(payload, f, indent=2)
+
+        if self.verbose:
+            logger.info(
+                f"Learning curve {filename} / {classifier_slug}: wrote {lc_path}"
+            )
+
+        return lc_path

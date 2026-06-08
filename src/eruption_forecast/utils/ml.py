@@ -26,7 +26,6 @@ from eruption_forecast.logger import logger
 from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.utils.pathutils import ensure_dir
-from eruption_forecast.config.constants import THRESHOLD_RESOLUTION
 from eruption_forecast.utils.date_utils import sort_dates
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
@@ -134,7 +133,7 @@ def split_eruption_dates(
 def compute_threshold_metrics(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    resolution: int = THRESHOLD_RESOLUTION,
+    resolution: int = 101,
 ) -> tuple[np.ndarray, dict[str, list[float]]]:
     """Sweep decision thresholds and compute classification metrics at each step.
 
@@ -146,8 +145,7 @@ def compute_threshold_metrics(
     Args:
         y_true (np.ndarray): Ground-truth binary labels (0 or 1).
         y_proba (np.ndarray): Predicted probabilities for the positive class.
-        resolution (int, optional): Number of threshold steps. Defaults to
-            ``THRESHOLD_RESOLUTION``.
+        resolution (int, optional): Number of threshold steps. Defaults to ``101``.
 
     Returns:
         tuple[np.ndarray, dict[str, list[float]]]: A 2-tuple of:
@@ -161,42 +159,119 @@ def compute_threshold_metrics(
         "precision": [],
         "recall": [],
         "f1": [],
+        "roc_auc": [],
         "balanced_accuracy": [],
         "specificity": [],
         "mcc": [],
+        "g_mean": [],
     }
+
     for threshold in thresholds:
         y_pred_thresh = (y_proba >= threshold).astype(int)
+        recall = recall_score(y_true, y_pred_thresh, zero_division=0)
+        tn, fp, _, _ = confusion_matrix(y_true, y_pred_thresh, labels=[0, 1]).ravel()
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+
         metrics["f1"].append(f1_score(y_true, y_pred_thresh, zero_division=0))
-        metrics["recall"].append(recall_score(y_true, y_pred_thresh, zero_division=0))
+        metrics["recall"].append(recall)
         metrics["precision"].append(
             precision_score(y_true, y_pred_thresh, zero_division=0)
         )
         metrics["balanced_accuracy"].append(
             balanced_accuracy_score(y_true, y_pred_thresh)
         )
-        tn, fp, _, _ = confusion_matrix(y_true, y_pred_thresh, labels=[0, 1]).ravel()
-        metrics["specificity"].append(tn / (tn + fp) if (tn + fp) > 0 else 0.0)
+        metrics["specificity"].append(specificity)
         metrics["mcc"].append(matthews_corrcoef(y_true, y_pred_thresh))
+        metrics["g_mean"].append(float(np.sqrt(recall * specificity)))
+
     return thresholds, metrics
 
 
-def compute_g_mean(metrics: dict[str, list[float]]) -> np.ndarray:
-    """Compute G-mean from threshold metrics.
+def compute_aggregate_threshold_metrics(
+    y_trues: np.ndarray | list[np.ndarray],
+    y_probas: list[np.ndarray],
+    resolution: int = 101,
+) -> tuple[
+    np.ndarray,
+    dict[str, np.ndarray],
+    dict[str, np.ndarray],
+    dict[str, np.ndarray],
+]:
+    """Aggregate per-seed threshold metrics into mean ± std curves.
 
-    G-mean is the geometric mean of sensitivity (recall) and specificity.
-    It is preferred over F1 for rare-event forecasting because it equally
-    penalizes missing eruptions and false alarms without class-imbalance inflation.
+    For every ``(y_true, y_proba)`` pair, calls
+    :func:`compute_threshold_metrics`, stacks the resulting per-seed curves
+    along a new seed axis, and returns the mean and standard deviation at each
+    threshold step plus the raw per-seed stack for callers that need to plot
+    individual curves.
 
     Args:
-        metrics (dict[str, list[float]]): Metrics dict returned by
-            ``compute_threshold_metrics``, must contain ``"recall"`` and
-            ``"specificity"`` keys.
+        y_trues (np.ndarray | list[np.ndarray]): Ground-truth binary labels.
+            A single ``np.ndarray`` is broadcast to every seed; a list must
+            have the same length as ``y_probas``.
+        y_probas (list[np.ndarray]): Per-seed predicted probabilities for the
+            positive class. Must contain at least one seed.
+        resolution (int, optional): Number of threshold steps forwarded to
+            :func:`compute_threshold_metrics`. Defaults to ``101``.
 
     Returns:
-        np.ndarray: G-mean values, one per threshold step.
+        tuple[np.ndarray, dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
+            A 4-tuple of:
+
+            - ``thresholds``: 1-D array of shape ``(resolution,)``.
+            - ``mean_curves``: dict keyed by metric name; each value has
+              shape ``(resolution,)``.
+            - ``std_curves``: dict keyed by metric name; each value has
+              shape ``(resolution,)``.
+            - ``per_seed_curves``: dict keyed by metric name; each value has
+              shape ``(n_seeds, resolution)``.
+
+            Metric keys come from :func:`compute_threshold_metrics`; keys
+            whose lists were never populated (e.g. ``"roc_auc"``) are skipped.
+
+    Raises:
+        ValueError: If ``y_probas`` is empty, or if ``y_trues`` is a list whose
+            length does not match ``y_probas``.
     """
-    return np.sqrt(np.array(metrics["recall"]) * np.array(metrics["specificity"]))
+    if len(y_probas) == 0:
+        raise ValueError("y_probas must contain at least one seed.")
+
+    if isinstance(y_trues, np.ndarray):
+        y_trues_list: list[np.ndarray] = [y_trues] * len(y_probas)
+    else:
+        y_trues_list = list(y_trues)
+
+    if len(y_trues_list) != len(y_probas):
+        raise ValueError(
+            f"y_trues length ({len(y_trues_list)}) does not match "
+            f"y_probas length ({len(y_probas)})."
+        )
+
+    all_curves: dict[str, list[np.ndarray]] = {}
+    thresholds: np.ndarray | None = None
+
+    for y_true, y_proba in zip(y_trues_list, y_probas, strict=True):
+        thresholds, metrics = compute_threshold_metrics(
+            y_true, y_proba, resolution=resolution
+        )
+        for key, values in metrics.items():
+            if not values:
+                continue
+            all_curves.setdefault(key, []).append(np.array(values))
+
+    assert thresholds is not None  # guaranteed by the non-empty y_probas check
+
+    per_seed_curves: dict[str, np.ndarray] = {
+        key: np.stack(curves, axis=0) for key, curves in all_curves.items()
+    }
+    mean_curves: dict[str, np.ndarray] = {
+        key: matrix.mean(axis=0) for key, matrix in per_seed_curves.items()
+    }
+    std_curves: dict[str, np.ndarray] = {
+        key: matrix.std(axis=0) for key, matrix in per_seed_curves.items()
+    }
+
+    return thresholds, mean_curves, std_curves, per_seed_curves
 
 
 def random_under_sampler(
@@ -407,8 +482,8 @@ def _extract_trained_model_suffix(csv_path: str) -> str:
             (without extension) if the prefix is absent.
     """
     basename = os.path.splitext(os.path.basename(csv_path))[0]
-    if basename.startswith("trained_model_"):
-        return basename[len("trained_model_") :]
+    if basename.startswith("trained-model_"):
+        return basename[len("trained-model_") :]
     return basename
 
 
@@ -688,28 +763,35 @@ def compute_seed(
     X: pd.DataFrame,
     y_true: np.ndarray | pd.Series,
     output_dir: str,
-    overwrite: bool = False,
     verbose: bool = False,
-):
+) -> tuple[pd.DataFrame, np.ndarray]:
     """Compute per-seed classification metrics against ``y_true``.
 
+    Runs :meth:`SeedEnsemble.compute_probabilities_and_predictions` once on
+    ``X``, then iterates over each seed to build a per-seed metrics row and
+    writes the aggregated table to
+    ``{output_dir}/{classifier_name}/metrics/{classifier_name}_metrics_seeds-{n_seeds}.csv``.
+
     Args:
-        seed_ensemble (SeedEnsemble): SeedEnsemble object.
+        seed_ensemble (SeedEnsemble): Fitted ensemble whose seeds are evaluated.
         X (pd.DataFrame): Extracted features DataFrame of shape
             ``(n_samples, n_features)``.
-        y_true (np.ndarray | pd.Series): Ground-truth binary labels
-            aligned positionally with ``X``. Length must equal
-            ``n_samples``.
-        output_dir (str): Directory in which to write the results.
-        overwrite (bool, optional): If ``True``, overwrite result file.
-        verbose (bool, optional): Show detailed information. Defaults to ``False``.
+        y_true (np.ndarray | pd.Series): Ground-truth binary labels aligned
+            positionally with ``X``. Length must equal ``n_samples``.
+        output_dir (str): Root directory under which the per-classifier
+            ``metrics/`` sub-directory and CSV are written. Created if missing.
+        verbose (bool, optional): Log the saved CSV path when ``True``.
+            Defaults to ``False``.
 
     Returns:
-        pd.DataFrame: One row per seed, indexed by ``random_state``.
-            Columns: ``accuracy``, ``balanced_accuracy``, ``precision``,
-            ``recall``, ``specificity``, ``f1_score``, ``roc_auc``,
-            ``mcc``, ``true_positives``, ``false_positives``,
-            ``true_negatives``, ``false_negatives``.
+        tuple[pd.DataFrame, np.ndarray, np.ndarray]: A 3-tuple of:
+            - metrics_df: One row per seed, indexed by ``random_state``, with
+              columns ``accuracy``, ``balanced_accuracy``, ``precision``,
+              ``average_precision``, ``recall``, ``specificity``, ``f1_score``,
+              ``roc_auc``, ``mcc``, ``true_positives``, ``false_positives``,
+              ``true_negatives``, ``false_negatives``.
+            - y_probas: Probability matrix of shape ``(n_samples, n_seeds)``
+              produced by the ensemble.
 
     Raises:
         ValueError: If ``len(y_true) != len(X)``.
@@ -728,46 +810,42 @@ def compute_seed(
         f"{classifier_name}_metrics_seeds-{len(seed_ensemble)}.csv",
     )
 
-    if os.path.exists(save_filepath) and not overwrite:
-        return pd.read_csv(save_filepath, index_col=0)
-
     y_true = np.asarray(y_true)
     if y_true.shape[0] != X.shape[0]:
         raise ValueError(
             f"y_true length ({y_true.shape[0]}) does not match X length ({X.shape[0]})."
         )
 
-    probabilities, predictions = seed_ensemble.compute_probabilities_and_predictions(X)
+    y_probas, y_preds = seed_ensemble.compute_probabilities_and_predictions(X)
 
     rows: list[dict[str, float | int]] = []
     for idx, seed in enumerate(seeds):
-        y_proba = probabilities[:, idx]
-        y_pred = predictions[:, idx]
+        y_proba = y_probas[:, idx]
+        y_pred = y_preds[:, idx]
 
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
-
-        # Fall back to 0.0 to match sklearn's ``zero_division=0`` convention
-        # used for precision/recall above.
         specificity = float(tn) / (tn + fp) if (tn + fp) > 0 else 0.0
+        recall = round(recall_score(y_true, y_pred, zero_division=0), 2)
 
-        results: dict[str, float | int] = {
+        metrics: dict[str, float | int] = {
             "random_state": int(seed["random_state"]),
             "accuracy": round(accuracy_score(y_true, y_pred), 2),
             "balanced_accuracy": round(balanced_accuracy_score(y_true, y_pred), 2),
             "precision": round(precision_score(y_true, y_pred, zero_division=0), 2),
             "average_precision": round(average_precision_score(y_true, y_proba), 2),
-            "recall": round(recall_score(y_true, y_pred, zero_division=0), 2),
+            "recall": recall,
             "specificity": round(specificity, 2),
             "f1_score": round(f1_score(y_true, y_pred, zero_division=0), 2),
             "roc_auc": round(roc_auc_score(y_true, y_proba), 2),
             "mcc": round(matthews_corrcoef(y_true, y_pred), 2),
+            "g_mean": round(float(np.sqrt(recall * specificity)), 2),
             "true_positives": int(tp),
             "false_positives": int(fp),
             "true_negatives": int(tn),
             "false_negatives": int(fn),
         }
 
-        rows.append(results)
+        rows.append(metrics)
 
     df = pd.DataFrame(rows).set_index("random_state")
 
@@ -776,8 +854,4 @@ def compute_seed(
     if verbose:
         logger.info(f"Saved {classifier_name} metrics: {save_filepath}")
 
-    return df
-
-
-def plot_seed(y_true: np.ndarray, y_proba: np.ndarray, dpi: int = 150) -> None:
-    return
+    return df, y_probas

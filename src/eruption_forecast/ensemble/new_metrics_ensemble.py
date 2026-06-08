@@ -8,6 +8,10 @@ import pandas as pd
 
 from eruption_forecast.utils.ml import build_y_true, compute_seed
 from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.plots.evaluation_plots import (
+    PER_SEED_PLOT_DISPATCHER,
+    render_one_plot,
+)
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
@@ -18,8 +22,6 @@ class MetricsEnsemble:
         features_df: pd.DataFrame,
         y_true: pd.Series | np.ndarray,
         kind: Literal["prediction", "training"] = "prediction",
-        basename: str | None = None,
-        overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         n_jobs: int = 1,
@@ -42,11 +44,10 @@ class MetricsEnsemble:
         self.n_jobs = n_jobs
         self.output_dir = output_dir
         self.classifiers_dir = os.path.join(output_dir, "classifiers")
-        self.basename = basename
-        self.overwrite = overwrite
         self.verbose = verbose
 
         self.metrics: dict[str, pd.DataFrame] = {}
+        self.y_probas: dict[str, np.ndarray] = {}
 
     @classmethod
     def from_file(
@@ -56,8 +57,6 @@ class MetricsEnsemble:
         features_label_csv: str,
         eruption_dates: list[str] | list[datetime],
         kind: Literal["prediction", "training"] = "prediction",
-        basename: str | None = None,
-        overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         n_jobs: int = 1,
@@ -82,8 +81,6 @@ class MetricsEnsemble:
             features_df=features_df,
             y_true=y_true,
             kind=kind,
-            basename=basename,
-            overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
             n_jobs=n_jobs,
@@ -91,11 +88,7 @@ class MetricsEnsemble:
         )
 
     def compute(self) -> Self:
-        y_true = self.y_true
-        if isinstance(y_true, np.ndarray):
-            y_true = pd.Series(
-                np.asarray(y_true), index=self.features_df.index, name="is_erupted"
-            )
+        y_true = pd.Series(self.y_true, index=self.features_df.index, name="is_erupted")
 
         common_index = self.features_df.index.intersection(y_true.index)
         if len(common_index) == 0:
@@ -105,18 +98,79 @@ class MetricsEnsemble:
             )
 
         features_df = self.features_df.loc[common_index]
+        self.y_true = y_true.loc[common_index].astype(int).to_numpy()
 
-        y_true = y_true.loc[common_index].astype(int).to_numpy()
-
-        self.metrics = self._compute(X=features_df, y_true=y_true)
+        (
+            self.metrics,
+            self.y_probas,
+        ) = self._compute_job(X=features_df, y_true=self.y_true)
 
         return self
 
-    def _compute(
+    def plot(
+        self,
+        exclude_plots: list[str] | None = None,
+    ):
+        """Render every per-seed plot registered in the dispatcher.
+
+        Auto-runs :meth:`compute` first if probabilities have not been
+        materialised yet. Plot names in ``exclude_plots`` are skipped.
+
+        Args:
+            exclude_plots (list[str] | None): Plot names to omit. Defaults to
+                ``None`` (render all).
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
+        """
+        if len(self.y_probas) == 0:
+            self.compute()
+
+        plots = list(PER_SEED_PLOT_DISPATCHER.keys())
+        if exclude_plots:
+            plots = [name for name in plots if name not in exclude_plots]
+
+        return self._plot_jobs(plots)
+
+    def _plot_jobs(self, plots: list[str]) -> list[str]:
+        """Render the requested per-seed plots in parallel.
+
+        Builds a flat list of ``(classifier_name, seed_idx, plot_name)`` jobs
+        and dispatches them to ``joblib.Parallel`` with the ``loky`` backend.
+        Caller is responsible for restricting ``plots`` to names registered
+        in ``PER_SEED_PLOT_DISPATCHER``.
+
+        Args:
+            plots (list[str]): Per-seed plot names to render.
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
+        """
+        jobs: list[tuple[str, int, str]] = []
+        for classifier_name, y_probas in self.y_probas.items():
+            n_seeds = y_probas.shape[1]
+            for seed_idx in range(n_seeds):
+                for plot_name in plots:
+                    jobs.append((classifier_name, seed_idx, plot_name))
+
+        return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
+            joblib.delayed(render_one_plot)(
+                classifier_name=cls,
+                random_state=int(self.metrics[cls].index[idx]),
+                plot_name=name,
+                y_true=self.y_true,
+                y_proba=self.y_probas[cls][:, idx],
+                output_dir=self.classifiers_dir,
+                verbose=self.verbose,
+            )
+            for cls, idx, name in jobs
+        )
+
+    def _compute_job(
         self,
         X: pd.DataFrame,
         y_true: np.ndarray,
-    ) -> dict[str, pd.DataFrame]:
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, np.ndarray]]:
         """Handling parallel job to calculate metrics.
 
         Args:
@@ -135,12 +189,14 @@ class MetricsEnsemble:
                 X=X,
                 y_true=y_true,
                 output_dir=self.classifiers_dir,
-                overwrite=self.overwrite,
+                verbose=self.verbose,
             )
             for seed_ensemble in seed_ensembles
         )
 
-        if len(results) == 0:
-            raise ValueError(f"No metrics were calculated. For {classifier_names}")
+        metrics_dfs, y_probas = zip(*results, strict=True)
 
-        return dict(zip(classifier_names, results, strict=True))
+        metrics = dict(zip(classifier_names, metrics_dfs, strict=True))
+        y_probas = dict(zip(classifier_names, y_probas, strict=True))
+
+        return metrics, y_probas
