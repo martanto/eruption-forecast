@@ -766,7 +766,7 @@ def compute_seed(
     y_true: np.ndarray | pd.Series,
     output_dir: str,
     verbose: bool = False,
-) -> tuple[pd.DataFrame, np.ndarray]:
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """Compute per-seed classification metrics against ``y_true``.
 
     Runs :meth:`SeedEnsemble.compute_probabilities_and_predictions` once on
@@ -799,6 +799,9 @@ def compute_seed(
               :func:`sklearn.metrics.average_precision_score`.
             - y_probas: Probability matrix of shape ``(n_samples, n_seeds)``
               produced by the ensemble.
+            - y_preds: Hard-label matrix of shape ``(n_samples, n_seeds)``
+              produced by the ensemble (probas thresholded at 0.5 or per-seed
+              calibrated threshold).
 
     Raises:
         ValueError: If ``len(y_true) != len(X)``.
@@ -866,4 +869,4 @@ def compute_seed(
     if verbose:
         logger.info(f"Saved {classifier_name} metrics: {save_filepath}")
 
-    return df, y_probas
+    return df, y_probas, y_preds
