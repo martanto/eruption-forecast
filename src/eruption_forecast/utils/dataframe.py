@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -512,6 +513,104 @@ def plot_common_features_heatmap(
     Returns:
         plt.Axes: The heatmap axes, so the caller can further annotate it.
     """
+    _CALC_ABBREV: dict[str, str] = {
+        "fft_coefficient": "fft_coef",
+        "fft_aggregated": "fft_agg",
+        "change_quantiles": "chg_q",
+        "agg_autocorrelation": "agg_autocorr",
+        "partial_autocorrelation": "partial_autocorr",
+        "autocorrelation": "autocorr",
+        "agg_linear_trend": "agg_lin_trend",
+        "linear_trend": "lin_trend",
+        "linear_trend_timewise": "lin_trend_tw",
+        "index_mass_quantile": "idx_mass_q",
+        "time_reversal_asymmetry_statistic": "time_rev_asym",
+        "friedrich_coefficients": "friedrich_coef",
+        "ar_coefficient": "ar_coef",
+        "cwt_coefficients": "cwt_coef",
+        "binned_entropy": "bin_ent",
+        "permutation_entropy": "perm_ent",
+        "sample_entropy": "samp_ent",
+        "approximate_entropy": "approx_ent",
+        "absolute_sum_of_changes": "abs_sum_chg",
+        "large_standard_deviation": "large_std",
+        "longest_strike_above_mean": "lng_strike_above_mean",
+        "longest_strike_below_mean": "lng_strike_below_mean",
+        "mean_abs_change": "mean_abs_chg",
+        "mean_change": "mean_chg",
+        "mean_second_derivative_central": "mean_2nd_deriv",
+        "number_crossing_m": "n_crossings",
+        "number_peaks": "n_peaks",
+        "number_cwt_peaks": "n_cwt_peaks",
+        "percentage_of_reoccurring_datapoints_to_all_datapoints": "pct_reoccur_dp",
+        "percentage_of_reoccurring_values_to_all_values": "pct_reoccur_vals",
+        "ratio_beyond_r_sigma": "ratio_beyond",
+        "ratio_value_number_to_time_series_length": "ratio_n_vals_to_len",
+        "sum_of_reoccurring_data_points": "sum_reoccur_dp",
+        "sum_of_reoccurring_values": "sum_reoccur_vals",
+        "symmetry_looking": "sym_looking",
+        "variance_larger_than_standard_deviation": "var_gt_std",
+        "variation_coefficient": "var_coef",
+        "augmented_dickey_fuller": "adf",
+        "spkt_welch_density": "spkt_welch",
+        "standard_deviation": "std",
+        "root_mean_square": "rms",
+        "quantile": "q",
+        "skewness": "skew",
+        "kurtosis": "kurt",
+        "maximum": "max",
+        "minimum": "min",
+        "median": "med",
+        "length": "len",
+        "sum_values": "sum",
+        "value_count": "val_cnt",
+        "range_count": "range_cnt",
+        "count_above": "cnt_above",
+        "count_above_mean": "cnt_above_mean",
+        "count_below": "cnt_below",
+        "count_below_mean": "cnt_below_mean",
+        "first_location_of_maximum": "first_loc_max",
+        "first_location_of_minimum": "first_loc_min",
+        "last_location_of_maximum": "last_loc_max",
+        "last_location_of_minimum": "last_loc_min",
+    }
+
+    #  Trailing-value token inside a tsfresh param segment (``attr_"abs"`` /
+    #  ``coeff_91`` / ``isabs_True``). Anchored at end-of-string so multi-
+    #  underscore keys like ``f_agg_"var"`` resolve to ``"var"`` rather than
+    #  ``agg_"var"``.
+    _PARAM_VALUE_RE = re.compile(r'_(("[^"]*"|-?\d+(?:\.\d+)?|True|False))$')
+
+    def _shorten_feature_name(name: str) -> str:
+        """Render a tsfresh feature name in a compact form for plot labels.
+
+        Splits the canonical ``column__calculator[__key_value]*`` form, swaps
+        the calculator for a short alias when one is known, drops the param
+        keys (the calculator implies them), and joins the remaining values in
+        parentheses. Names that do not match the tsfresh shape are returned
+        unchanged.
+
+        Examples:
+            >>> _shorten_feature_name('dsar_f3-f4__fft_coefficient__attr_"abs"__coeff_91')
+            'dsar_f3-f4 · fft_coef(abs, 91)'
+            >>> _shorten_feature_name("entropy__variance")
+            'entropy · variance'
+        """
+        parts = name.split("__")
+        if len(parts) < 2:
+            return name
+        column, calculator, *params = parts
+        short_calc = _CALC_ABBREV.get(calculator, calculator)
+
+        values: list[str] = []
+        for param in params:
+            match = _PARAM_VALUE_RE.search(param)
+            values.append(match.group(1).strip('"') if match else param)
+
+        if values:
+            return f"{column} · {short_calc}({', '.join(values)})"
+        return f"{column} · {short_calc}"
+
     common_df = find_common_features(list(top_features_csv.values()))
     common_features = list(common_df.index)
     labels = list(top_features_csv.keys())
@@ -520,6 +619,8 @@ def plot_common_features_heatmap(
     for label, path in top_features_csv.items():
         per_scenario = pd.read_csv(path, index_col=0)
         matrix[label] = per_scenario["score"].reindex(common_features)
+
+    matrix.index = [_shorten_feature_name(name) for name in matrix.index]
 
     fig, ax = plt.subplots(
         figsize=(
