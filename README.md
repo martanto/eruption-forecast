@@ -379,6 +379,47 @@ fm.set_feature_selection_method("combined").train(
 )
 ```
 
+### Reuse curated features (skip full tsfresh re-extraction)
+
+Once a `TrainingModel` run has persisted its `features-matrix_*.csv` / `features-label_*.csv` and a `top_{N}_features.csv`, two shortcuts let subsequent runs reuse that work. Pick the one that matches what changed since the original extraction.
+
+**Skip tsfresh entirely with `load_features()`** — reads the persisted feature matrix and projects it to the curated column subset. Fastest path; ideal for hyperparameter iteration when the windowing and tremor data have not changed. `build_label()` is not required; `self.LabelBuilder` stays `None` and `fit()` falls back to `self.labels` for the auto-resample minority check.
+
+```python
+from eruption_forecast import TrainingModel
+
+(
+    TrainingModel(
+        tremor_data="output/VG.OJN.00.EHZ/tremor/tremor_2025-01-01_2025-07-24.csv",
+        start_date="2025-01-01",
+        end_date="2025-07-24",
+        classifiers="rf",
+        eruption_dates=["2025-03-20"],
+        window_size=2,
+        number_of_features=20,
+    )
+    .load_features(
+        select_features="output/.../training/features/.../top_20_features.csv",
+    )
+    .fit(seeds=25)
+)
+```
+
+**Run tsfresh on a curated set only with `extract_features(select_features=...)`** — instructs tsfresh to compute only the curated feature names per tremor column instead of the full `ComprehensiveFCParameters` set. Slower than `load_features()` but needed when the tremor data or windowing has changed. Still requires `build_label()` first.
+
+```python
+(
+    TrainingModel(...)
+    .build_label(window_step=6, window_step_unit="hours")
+    .extract_features(
+        select_features="output/.../training/features/.../top_20_features.csv",
+    )
+    .fit(seeds=25)
+)
+```
+
+`select_features` accepts either the path to a `top_{N}_features.csv` / `significant_features.csv` written by a prior run, or an explicit `list[str]` of fully-qualified tsfresh feature names. Per-seed feature selection inside `fit()` still runs — if the curated list is already ≤ `number_of_features`, selection is effectively a no-op.
+
 ### Train with evaluation (80/20 split) for in-sample testing
 
 ```python

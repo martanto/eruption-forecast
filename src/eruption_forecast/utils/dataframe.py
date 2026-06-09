@@ -162,6 +162,59 @@ def load_label_csv(label_features_csv: str) -> pd.Series:
     return df["is_erupted"]
 
 
+def load_select_features(
+    value: str | list[str], number_of_features: int = 20
+) -> list[str]:
+    """Resolve a ``select_features`` value into a list of tsfresh feature names.
+
+    Accepts either a CSV path written by :func:`concat_significant_features`
+    (``top_{N}_features.csv`` or ``significant_features.csv``), in which case
+    the ``features`` index column is read, or an explicit list of tsfresh
+    feature names. Empty lists and blank entries raise.
+
+    Args:
+        value (str | list[str]): A CSV path or a list of fully-qualified
+            tsfresh feature names (e.g. ``"rsam_f2__mean"``,
+            ``"rsam_f1__autocorrelation__lag_1"``).
+        number_of_features (int, optional): Cap the returned list to the top
+            ``number_of_features`` entries. The CSV produced by
+            :func:`concat_significant_features` is already sorted descending
+            by frequency, so truncation preserves the highest-ranked names;
+            an in-memory list is assumed to be in priority order. Pass ``0``
+            or a negative value to disable truncation. Defaults to ``20``.
+
+    Returns:
+        list[str]: Cleaned list of feature names, capped to the top
+            ``number_of_features`` entries.
+
+    Raises:
+        FileNotFoundError: If ``value`` is a path that does not exist.
+        ValueError: If ``value`` resolves to an empty list, contains blank
+            entries, or is of an unsupported type.
+
+    Examples:
+        >>> load_select_features("output/.../top_20_features.csv")
+        ['rsam_f2__mean', 'rsam_f1__autocorrelation__lag_1', ...]
+        >>> load_select_features(["rsam_f2__mean", "entropy__variance"])
+        ['rsam_f2__mean', 'entropy__variance']
+        >>> load_select_features("output/.../top_50_features.csv", number_of_features=10)
+        # returns at most 10 names from the top of the ranked CSV
+    """
+    if isinstance(value, str):
+        if not os.path.isfile(value):
+            raise FileNotFoundError(f"select_features CSV not found: {value}")
+        names = pd.read_csv(value, index_col=0).index.astype(str).tolist()
+    else:
+        names = [str(name) for name in value]
+
+    cleaned = [name.strip() for name in names if name and name.strip()]
+    if not cleaned:
+        raise ValueError("select_features resolved to an empty list.")
+    if number_of_features > 0:
+        cleaned = cleaned[:number_of_features]
+    return cleaned
+
+
 def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFrame]:
     """Concatenate feature CSVs into one DataFrame and save.
 
@@ -363,3 +416,68 @@ def concat_significant_features(
         )
 
     return combined_features_df
+
+
+def find_common_features(
+    top_features_csv: list[str], output_dir: str | None = None
+) -> pd.DataFrame:
+    """Return features that appear in every ``top_N_features.csv``.
+
+    Loads each CSV produced by the scenario training stage and intersects
+    their feature indices, so the result contains only features that every
+    scenario agreed on. The ``score`` and ``mean_score`` columns are summed
+    across the input CSVs so the output keeps the same shape as a source
+    ``top_N_features.csv`` and can be sorted the same way (descending by
+    ``score``, ascending by ``mean_score``).
+
+    Args:
+        top_features_csv (list[str]): Paths to ``top_{N}_features.csv`` files
+            (one per scenario). Each file must have a ``features`` index
+            column and ``score`` / ``mean_score`` columns.
+        output_dir (str | None, optional): Directory where the resulting
+            ``common_top_features.csv`` is written. When ``None``, falls back
+            to the current working directory (``os.getcwd()``). Defaults to
+            ``None``.
+
+    Returns:
+        pd.DataFrame: DataFrame indexed by the common feature names with
+        ``score`` and ``mean_score`` columns summed across the input CSVs.
+        Also written to ``{output_dir}/common_top_features.csv``.
+
+    Raises:
+        ValueError: If ``top_features_csv`` is empty or the intersection is
+            empty.
+        FileNotFoundError: If any of the paths does not exist (raised by
+            :func:`load_select_features`).
+
+    Examples:
+        >>> csvs = [
+        ...     "output/.../scenarios/scenario-1/training/features/stratified-shuffle-split/top_20_features.csv",
+        ...     "output/.../scenarios/scenario-2/training/features/stratified-shuffle-split/top_20_features.csv",
+        ... ]
+        >>> df = find_common_features(csvs)
+        >>> df.index.tolist()[:3]
+        ['rsam_f2__mean', 'entropy__variance', 'dsar_f3-f4__median']
+        >>> df = find_common_features(csvs, output_dir="output/.../scenarios")
+    """
+    if not top_features_csv:
+        raise ValueError("top_features_csv is empty.")
+
+    frames: list[pd.DataFrame] = []
+    for path in top_features_csv:
+        load_select_features(path, number_of_features=0)
+        frames.append(pd.read_csv(path, index_col=0))
+
+    common = sorted(set.intersection(*(set(df.index) for df in frames)))
+    if not common:
+        raise ValueError("No features are common to all CSVs.")
+
+    aligned = [
+        df.loc[df.index.intersection(common), ["score", "mean_score"]] for df in frames
+    ]
+    combined = pd.concat(aligned).groupby(level=0).sum()
+    combined = combined.sort_values(by=["score", "mean_score"], ascending=[False, True])
+
+    out_path = os.path.join(output_dir or os.getcwd(), "common_top_features.csv")
+    combined.to_csv(out_path, index=True)
+    return combined

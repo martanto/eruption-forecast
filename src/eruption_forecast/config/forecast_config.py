@@ -164,6 +164,12 @@ class ForecastTrainConfig(BaseConfig):
         exclude_features (list[str] | None): tsfresh feature calculator names
             to skip during extraction. ``None`` excludes nothing. Defaults to
             ``None``.
+        select_features (str | list[str] | None): Pre-filter tsfresh to a
+            curated feature set — either the path to a prior run's
+            ``top_{N}_features.csv`` / ``significant_features.csv`` or an
+            explicit ``list[str]`` of fully-qualified feature names. ``None``
+            keeps the default ``ComprehensiveFCParameters`` behaviour. Defaults
+            to ``None``.
         minimum_completion (float): Minimum fraction of valid samples per
             window required to keep the window. Defaults to ``1.0``.
         seeds (int): Number of independent training seeds. Defaults to ``10``.
@@ -210,6 +216,7 @@ class ForecastTrainConfig(BaseConfig):
     select_tremor_columns: list[str] | None = None
     save_tremor_matrix_per_method: bool = True
     exclude_features: list[str] | None = None
+    select_features: str | list[str] | None = None
     minimum_completion: float = 1.0
     seeds: int = 10
     resample_method: Literal["under", "over", "auto"] | None = "auto"
