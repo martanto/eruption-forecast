@@ -332,19 +332,20 @@ class TestPlotAll:
 
     def test_returns_dict_with_expected_keys(self, tmp_path):
         comparator = _make_comparator(tmp_path)
-        results = comparator.plot_all()
+        results = comparator.plot_all(parallel=False)
         assert set(results.keys()) == {
             "metric_bar",
             "seed_stability",
             "comparison_grid",
             "roc",
+            "pr",
             "ranking",
         }
         plt.close("all")
 
     def test_ranking_value_is_dataframe(self, tmp_path):
         comparator = _make_comparator(tmp_path)
-        results = comparator.plot_all()
+        results = comparator.plot_all(parallel=False)
         assert isinstance(results["ranking"], pd.DataFrame)
         assert "rank" in results["ranking"].columns
         plt.close("all")
