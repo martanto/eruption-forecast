@@ -6,6 +6,7 @@ import numpy as np
 import joblib
 import pandas as pd
 from sklearn.metrics import (
+    auc,
     f1_score,
     recall_score,
     roc_auc_score,
@@ -13,6 +14,7 @@ from sklearn.metrics import (
     precision_score,
     confusion_matrix,
     matthews_corrcoef,
+    precision_recall_curve,
     average_precision_score,
     balanced_accuracy_score,
 )
@@ -787,9 +789,14 @@ def compute_seed(
         tuple[pd.DataFrame, np.ndarray, np.ndarray]: A 3-tuple of:
             - metrics_df: One row per seed, indexed by ``random_state``, with
               columns ``accuracy``, ``balanced_accuracy``, ``precision``,
-              ``average_precision``, ``recall``, ``specificity``, ``f1_score``,
-              ``roc_auc``, ``mcc``, ``true_positives``, ``false_positives``,
-              ``true_negatives``, ``false_negatives``.
+              ``average_precision``, ``pr_auc``, ``recall``, ``specificity``,
+              ``f1_score``, ``roc_auc``, ``mcc``, ``g_mean``,
+              ``true_positives``, ``false_positives``, ``true_negatives``,
+              ``false_negatives``. ``pr_auc`` is the trapezoidal area under the
+              precision-recall curve computed via
+              :func:`sklearn.metrics.precision_recall_curve` + :func:`auc`;
+              ``average_precision`` is the weighted-mean variant from
+              :func:`sklearn.metrics.average_precision_score`.
             - y_probas: Probability matrix of shape ``(n_samples, n_seeds)``
               produced by the ensemble.
 
@@ -826,13 +833,18 @@ def compute_seed(
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
         specificity = float(tn) / (tn + fp) if (tn + fp) > 0 else 0.0
         recall = round(recall_score(y_true, y_pred, zero_division=0), 2)
+        precision = round(precision_score(y_true, y_pred, zero_division=0), 2)
+
+        precisions_curve, recalls_curve, _ = precision_recall_curve(y_true, y_proba)
+        pr_auc = float(auc(recalls_curve, precisions_curve))
 
         metrics: dict[str, float | int] = {
             "random_state": int(seed["random_state"]),
             "accuracy": round(accuracy_score(y_true, y_pred), 2),
             "balanced_accuracy": round(balanced_accuracy_score(y_true, y_pred), 2),
-            "precision": round(precision_score(y_true, y_pred, zero_division=0), 2),
+            "precision": precision,
             "average_precision": round(average_precision_score(y_true, y_proba), 2),
+            "pr_auc": round(pr_auc, 2),
             "recall": recall,
             "specificity": round(specificity, 2),
             "f1_score": round(f1_score(y_true, y_pred, zero_division=0), 2),

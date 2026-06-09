@@ -538,13 +538,10 @@ class EvaluationModel(BaseModel):
     ) -> ClassifierComparator:
         """Build a :class:`ClassifierComparator` from the per-classifier results.
 
-        Constructs one ``MultiModelEvaluator`` per classifier from the metrics
-        JSON directory written by :meth:`evaluate` and returns a
-        ``ClassifierComparator`` that can produce cross-classifier rankings and
-        comparison plots.  The live ``ClassifierEnsemble`` plus
-        ``self.features_df`` and ``self.y_true`` are forwarded as
-        ``ensemble_source`` so ROC plotting uses in-memory models and never
-        requires a trained-model registry CSV on disk.
+        Delegates to :meth:`ClassifierComparator.from_classifier_ensemble`,
+        which builds a fresh :class:`MetricsEnsemble` from
+        ``self.ClassifierEnsemble`` / ``self.features_df`` / ``self.y_true`` and
+        wires the comparator to its in-memory metrics and probability matrices.
 
         Output of the returned comparator is written under
         ``{evaluation_dir}/comparison/`` (i.e. peer to ``classifiers/``).
@@ -554,12 +551,12 @@ class EvaluationModel(BaseModel):
                 of metrics used for ranking and plots.  When None, the
                 comparator falls back to its own default metrics list.
                 Defaults to None.
-            output_dir (str, optional): MultiModelEvaluator output directory.
-                Defaults to None.
+            output_dir (str, optional): Override comparator output root.
+                Defaults to ``self.evaluation_dir``.
 
         Returns:
-            ClassifierComparator: Comparator wired to the per-classifier metrics
-                directories and the in-memory ensemble.
+            ClassifierComparator: Comparator backed by a freshly computed
+                ``MetricsEnsemble``.
 
         Examples:
             >>> em = EvaluationModel(model=training_model)
@@ -568,22 +565,15 @@ class EvaluationModel(BaseModel):
             >>> ranking = comparator.get_ranking()
             >>> figures = comparator.plot_all()
         """
-        evaluators: dict[str, MultiModelEvaluator] = {
-            name: MultiModelEvaluator(
-                metrics_dir=os.path.join(self.classifiers_dir, name, "metrics"),
-                classifier_name=name,
-                output_dir=output_dir,
-            )
-            for name in self.ClassifierEnsemble.ensembles
-        }
-
-        ensemble_source = (self.ClassifierEnsemble, self.features_df, self.y_true)
-
-        return ClassifierComparator.from_evaluators(
-            evaluators=evaluators,
-            output_dir=self.evaluation_dir,
+        return ClassifierComparator.from_classifier_ensemble(
+            classifier_ensemble=self.ClassifierEnsemble,
+            features_df=self.features_df,
+            y_true=self.y_true,
+            kind=self.model_kind,
+            output_dir=output_dir or self.evaluation_dir,
             metrics=metrics,
-            ensemble_source=ensemble_source,
+            n_jobs=self.n_jobs,
+            verbose=self.verbose,
         )
 
     def _plot_aggregate(
