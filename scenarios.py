@@ -27,7 +27,7 @@ eruption_dates = [
 scenarios = [
     {
         "name": "Scenario 1",
-        "description": "Training using 1 eruption to forecast eruption 1",
+        "description": "Training using 1 eruption to forecast eruption 2",
         "train_start_date": "2025-01-01",
         "train_end_date": "2025-03-31",
         "prediction_start_date": "2025-04-01",
@@ -191,11 +191,6 @@ def main(sds_dir: str, n_jobs: int = 2):
             )
 
         fm.evaluate(model="prediction", plot_per_seed=True, output_dir=output_dir)
-
-        if fm.EvaluationModel:
-            comparator = fm.EvaluationModel.compare(output_dir=output_dir)
-            comparator.get_ranking()
-            comparator.plot_all()
 
 
 # %%
