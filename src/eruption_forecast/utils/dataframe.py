@@ -2,6 +2,8 @@ import os
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import detect_anomalies_zscore
@@ -481,3 +483,66 @@ def find_common_features(
     out_path = os.path.join(output_dir or os.getcwd(), "common_top_features.csv")
     combined.to_csv(out_path, index=True)
     return combined
+
+
+def plot_common_features_heatmap(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "viridis",
+) -> plt.Axes:
+    """Heatmap of per-scenario ``score`` for the common-feature subset.
+
+    Computes the cross-scenario intersection via :func:`find_common_features`,
+    re-reads each input CSV to recover its per-scenario ``score`` column, and
+    renders a heatmap with common features on the rows and scenarios on the
+    columns. Rows are ordered by the ranking produced by
+    :func:`find_common_features` (most universally strong on top).
+
+    Args:
+        top_features_csv (dict[str, str]): Mapping of column label → path to
+            a ``top_{N}_features.csv`` file (one entry per scenario). The
+            dict keys are used directly as the heatmap's x-axis labels, so
+            insertion order controls left-to-right column order.
+        output_path (str | None, optional): Where to save the PNG. When
+            ``None``, writes to ``{cwd}/common_top_features_heatmap.png``.
+            Defaults to ``None``.
+        cmap (str, optional): Matplotlib/seaborn colormap name. Defaults to
+            ``"viridis"``.
+
+    Returns:
+        plt.Axes: The heatmap axes, so the caller can further annotate it.
+    """
+    common_df = find_common_features(list(top_features_csv.values()))
+    common_features = list(common_df.index)
+    labels = list(top_features_csv.keys())
+
+    matrix = pd.DataFrame(index=common_features, columns=labels, dtype=float)
+    for label, path in top_features_csv.items():
+        per_scenario = pd.read_csv(path, index_col=0)
+        matrix[label] = per_scenario["score"].reindex(common_features)
+
+    fig, ax = plt.subplots(
+        figsize=(
+            max(6.0, 1.6 * len(labels) + 3),
+            max(4.0, 0.6 * len(common_features) + 2),
+        )
+    )
+
+    sns.heatmap(
+        matrix,
+        annot=True,
+        fmt=".0f",
+        cmap=cmap,
+        cbar_kws={"label": "frequency", "shrink": 0.8, "pad": 0.02},
+        linewidths=0.5,
+        square=True,
+        ax=ax,
+    )
+
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_title(f"{len(common_features)} features × {len(labels)} scenarios")
+    fig.tight_layout()
+
+    out = output_path or os.path.join(os.getcwd(), "common_top_features_heatmap.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    return ax
