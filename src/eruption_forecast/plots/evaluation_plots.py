@@ -2084,3 +2084,65 @@ def render_one_plot(
 
     save_figure(fig, filepath, dpi, verbose=verbose)
     return filepath
+
+
+AGGREGATE_PLOT_DISPATCHER: dict[
+    str, Callable[..., tuple[plt.Figure, pd.DataFrame]]
+] = {
+    "roc_curve": plot_aggregate_roc_curve,
+    "precision_recall": plot_aggregate_precision_recall_curve,
+    "threshold_analysis": plot_aggregate_threshold_analysis,
+    "g_mean_curve": plot_aggregate_g_mean_curve,
+    "mcc_curve": plot_aggregate_mcc_curve,
+}
+
+
+def render_one_aggregate_plot(
+    classifier_name: str,
+    plot_name: str,
+    y_true: np.ndarray,
+    y_probas: np.ndarray,
+    output_dir: str,
+    dpi: int = 150,
+    verbose: bool = False,
+) -> str:
+    """Render and persist one aggregate plot for one classifier.
+
+    Module-level so ``joblib`` workers under the ``loky`` backend can pickle
+    it. Slices the ``(n_samples, n_seeds)`` probability matrix into per-seed
+    columns, delegates to the function registered in
+    :data:`AGGREGATE_PLOT_DISPATCHER`, and saves the figure plus the returned
+    mean/std DataFrame to disk.
+
+    Args:
+        classifier_name (str): Classifier identifier used as the first path
+            segment under ``output_dir``.
+        plot_name (str): Key into ``AGGREGATE_PLOT_DISPATCHER``.
+        y_true (np.ndarray): Ground-truth binary labels of shape
+            ``(n_samples,)``.
+        y_probas (np.ndarray): Probability matrix of shape
+            ``(n_samples, n_seeds)``.
+        output_dir (str): Root directory for figure output.
+        dpi (int): Figure resolution. Defaults to ``150``.
+        verbose (bool): Forwarded to ``save_figure``. Defaults to ``False``.
+
+    Returns:
+        str: Filepath stem (without extension). The PNG figure and the CSV
+            data table share this stem.
+    """
+    plot_function = AGGREGATE_PLOT_DISPATCHER[plot_name]
+    per_seed_list = [y_probas[:, idx] for idx in range(y_probas.shape[1])]
+
+    fig, data = plot_function(y_trues=y_true, y_probas=per_seed_list, dpi=dpi)
+
+    filepath = os.path.join(
+        output_dir,
+        classifier_name,
+        "figures",
+        "aggregate",
+        plot_name,
+    )
+
+    save_figure(fig, filepath, dpi, verbose=verbose)
+    data.to_csv(f"{filepath}.csv", index=False)
+    return filepath

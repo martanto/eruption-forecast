@@ -38,7 +38,8 @@ DEFAULT_METRICS: list[str] = [
     "precision",
     "recall",
     "specificity",
-    "sensitivity",
+    "g_mean",
+    "mcc",
 ]
 
 
@@ -969,9 +970,10 @@ class ClassifierComparator:
                 f"{means[ci]:.3f}",
                 ha="center",
                 va="bottom",
-                fontsize=7,
+                fontsize=6,
             )
 
+        ax.set_ylim(0.0, 1.0)
         ax.set_xticks([])
         ax.set_ylabel("Score")
         ax.set_title(metric.replace("_", " ").title(), fontsize=9)
@@ -1121,13 +1123,14 @@ class ClassifierComparator:
             ax.scatter(
                 positions[i] + jitter,
                 vals,
-                color=clf_colors[i],
+                color="grey",
                 s=12,
                 alpha=0.7,
                 zorder=3,
                 linewidths=0,
             )
 
+        ax.set_ylim(0.0, 1.0)
         ax.set_xticks([])
         ax.set_ylabel("Score")
         ax.set_title(metric.replace("_", " ").title(), fontsize=9)
