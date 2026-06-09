@@ -631,6 +631,7 @@ class ForecastModel:
         self.evaluation_results = evaluation_model.evaluate(
             plot_per_seed=plot_per_seed,
             plot_aggregate=plot_aggregate,
+            compare_classifiers=True,
         )
 
         self.save_config()

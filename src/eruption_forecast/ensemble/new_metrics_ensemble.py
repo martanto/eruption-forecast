@@ -1,13 +1,15 @@
 import os
 from typing import Self, Literal
+from os.path import dirname
 from datetime import datetime
 
 import numpy as np
 import joblib
 import pandas as pd
 
+from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import build_y_true, compute_seed
-from eruption_forecast.utils.pathutils import resolve_output_dir
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.plots.evaluation_plots import (
     PER_SEED_PLOT_DISPATCHER,
     AGGREGATE_PLOT_DISPATCHER,
@@ -32,10 +34,8 @@ class MetricsEnsemble:
         output_dir = resolve_output_dir(
             output_dir=output_dir,
             root_dir=root_dir,
-            default_subpath=os.path.join("output", "evaluation"),
+            default_subpath=os.path.join("output", "evaluation", kind),
         )
-
-        output_dir = os.path.join(output_dir, kind)
 
         if isinstance(y_true, pd.Series):
             y_true = y_true.to_numpy()
@@ -43,6 +43,7 @@ class MetricsEnsemble:
         self.ClassifierEnsemble = classifier_ensemble
         self.features_df = features_df
         self.y_true: np.ndarray = y_true
+        self.kind: Literal["prediction", "training"] = kind
         self.n_jobs = n_jobs
         self.output_dir = output_dir
         self.classifiers_dir = os.path.join(output_dir, "classifiers")
@@ -50,6 +51,7 @@ class MetricsEnsemble:
 
         self.metrics: dict[str, pd.DataFrame] = {}
         self.y_probas: dict[str, np.ndarray] = {}
+        self.y_preds: dict[str, np.ndarray] = {}
 
     @classmethod
     def from_file(
@@ -89,7 +91,69 @@ class MetricsEnsemble:
             verbose=verbose,
         )
 
+    def save(self, path: str | None = None) -> str:
+        """Persist the computed MetricsEnsemble to disk via joblib.
+
+        Writes a single ``.pkl`` containing the full instance — including the
+        embedded ``ClassifierEnsemble``, ``features_df``, ``y_true``, and the
+        populated ``metrics`` / ``y_probas`` / ``y_preds`` dicts — so
+        :meth:`load` can reconstitute everything without recomputation.
+
+        Args:
+            path (str | None, optional): Destination ``.pkl`` path. ``None``
+                resolves to ``{self.output_dir}/MetricsEnsemble.pkl``.
+                Defaults to ``None``.
+
+        Returns:
+            str: The absolute path the instance was written to.
+        """
+        if path is None:
+            os.makedirs(self.output_dir, exist_ok=True)
+            path = os.path.join(self.output_dir, "MetricsEnsemble.pkl")
+        else:
+            parent = dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+
+        joblib.dump(self, path)
+        if self.verbose:
+            logger.info(f"Saved MetricsEnsemble to {path}")
+        return path
+
+    @classmethod
+    def load(cls, path: str) -> "MetricsEnsemble":
+        """Reconstitute a saved MetricsEnsemble from a joblib ``.pkl``.
+
+        Args:
+            path (str): Path to a ``.pkl`` previously written by :meth:`save`.
+
+        Returns:
+            MetricsEnsemble: The deserialised instance, with ``metrics`` /
+                ``y_probas`` / ``y_preds`` populated as of the save.
+
+        Raises:
+            FileNotFoundError: If ``path`` does not exist.
+            TypeError: If the loaded object is not a ``MetricsEnsemble``.
+        """
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"MetricsEnsemble file not found: {path}")
+
+        obj = joblib.load(path)
+        if not isinstance(obj, cls):
+            raise TypeError(
+                f"Loaded object is not a MetricsEnsemble (got {type(obj).__name__})."
+            )
+        return obj
+
     def compute(self) -> Self:
+        if self.y_probas:
+            if self.verbose:
+                logger.info(
+                    "MetricsEnsemble.compute(): y_probas already populated; "
+                    "skipping recomputation."
+                )
+            return self
+
         y_true = pd.Series(self.y_true, index=self.features_df.index, name="is_erupted")
 
         common_index = self.features_df.index.intersection(y_true.index)
@@ -100,27 +164,36 @@ class MetricsEnsemble:
             )
 
         features_df = self.features_df.loc[common_index]
-        self.y_true = y_true.loc[common_index].astype(int).to_numpy()
+        y_true_series = y_true.loc[common_index].astype(int)
+        self.y_true = y_true_series.to_numpy()
 
         (
             self.metrics,
             self.y_probas,
+            self.y_preds,
         ) = self._compute_job(X=features_df, y_true=self.y_true)
+
+        self._persist_predictions(features_df=features_df)
 
         return self
 
     def plot(
         self,
+        include_plots: list[str] | None = None,
         exclude_plots: list[str] | None = None,
     ):
-        """Render every per-seed plot registered in the dispatcher.
+        """Render per-seed plots registered in the dispatcher.
 
         Auto-runs :meth:`compute` first if probabilities have not been
-        materialised yet. Plot names in ``exclude_plots`` are skipped.
+        materialised yet. ``include_plots`` narrows to a positive subset (when
+        provided); ``exclude_plots`` then drops names from whatever remains.
 
         Args:
-            exclude_plots (list[str] | None): Plot names to omit. Defaults to
-                ``None`` (render all).
+            include_plots (list[str] | None): Positive opt-in list of plot
+                names. When ``None``, starts from the full dispatcher
+                registry. Defaults to ``None``.
+            exclude_plots (list[str] | None): Plot names to omit. Applied
+                after ``include_plots``. Defaults to ``None``.
 
         Returns:
             list[str]: Saved figure filepath stems, one per executed job.
@@ -129,6 +202,8 @@ class MetricsEnsemble:
             self.compute()
 
         plots = list(PER_SEED_PLOT_DISPATCHER.keys())
+        if include_plots:
+            plots = [name for name in plots if name in include_plots]
         if exclude_plots:
             plots = [name for name in plots if name not in exclude_plots]
 
@@ -157,33 +232,39 @@ class MetricsEnsemble:
 
         return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
             joblib.delayed(render_one_plot)(
-                classifier_name=cls,
-                random_state=int(self.metrics[cls].index[idx]),
-                plot_name=name,
+                classifier_name=classifier_name,
+                random_state=int(self.metrics[classifier_name].index[seed_idx]),
+                plot_name=plot_name,
                 y_true=self.y_true,
-                y_proba=self.y_probas[cls][:, idx],
+                y_proba=self.y_probas[classifier_name][:, seed_idx],
                 output_dir=self.classifiers_dir,
                 verbose=self.verbose,
             )
-            for cls, idx, name in jobs
+            for classifier_name, seed_idx, plot_name in jobs
         )
 
     def plot_aggregate(
         self,
+        include_plots: list[str] | None = None,
         exclude_plots: list[str] | None = None,
     ) -> list[str]:
-        """Render every aggregate plot registered in the dispatcher.
+        """Render aggregate plots registered in the dispatcher.
 
         For each ``(classifier_name, plot_name)`` pair, hands the full
         ``(n_samples, n_seeds)`` probability matrix to
         :func:`render_one_aggregate_plot`, which slices it into per-seed
         columns and writes both the figure and the returned mean/std
         DataFrame to disk. Auto-runs :meth:`compute` first if probabilities
-        have not been materialised yet.
+        have not been materialised yet. ``include_plots`` narrows to a
+        positive subset (when provided); ``exclude_plots`` then drops names
+        from whatever remains.
 
         Args:
-            exclude_plots (list[str] | None): Plot names to omit. Defaults to
-                ``None`` (render all).
+            include_plots (list[str] | None): Positive opt-in list of plot
+                names. When ``None``, starts from the full dispatcher
+                registry. Defaults to ``None``.
+            exclude_plots (list[str] | None): Plot names to omit. Applied
+                after ``include_plots``. Defaults to ``None``.
 
         Returns:
             list[str]: Saved figure filepath stems, one per executed job.
@@ -194,6 +275,8 @@ class MetricsEnsemble:
             self.compute()
 
         plots = list(AGGREGATE_PLOT_DISPATCHER.keys())
+        if include_plots:
+            plots = [name for name in plots if name in include_plots]
         if exclude_plots:
             plots = [name for name in plots if name not in exclude_plots]
 
@@ -233,7 +316,11 @@ class MetricsEnsemble:
         self,
         X: pd.DataFrame,
         y_true: np.ndarray,
-    ) -> tuple[dict[str, pd.DataFrame], dict[str, np.ndarray]]:
+    ) -> tuple[
+        dict[str, pd.DataFrame],
+        dict[str, np.ndarray],
+        dict[str, np.ndarray],
+    ]:
         """Handling parallel job to calculate metrics.
 
         Args:
@@ -242,6 +329,10 @@ class MetricsEnsemble:
             y_true (np.ndarray | pd.Series): Ground-truth binary labels
                 aligned positionally with ``X``. Length must equal
                 ``n_samples``.
+
+        Returns:
+            tuple: A 3-tuple of per-classifier dicts —
+                ``(metrics, y_probas, y_preds)`` — keyed by classifier name.
         """
         classifier_names = list(self.ClassifierEnsemble.ensembles.keys())
         seed_ensembles = list(self.ClassifierEnsemble.ensembles.values())
@@ -257,9 +348,55 @@ class MetricsEnsemble:
             for seed_ensemble in seed_ensembles
         )
 
-        metrics_dfs, y_probas = zip(*results, strict=True)
+        metrics_dfs, y_probas_arrs, y_preds_arrs = zip(*results, strict=True)
 
         metrics = dict(zip(classifier_names, metrics_dfs, strict=True))
-        y_probas = dict(zip(classifier_names, y_probas, strict=True))
+        y_probas = dict(zip(classifier_names, y_probas_arrs, strict=True))
+        y_preds = dict(zip(classifier_names, y_preds_arrs, strict=True))
 
-        return metrics, y_probas
+        return metrics, y_probas, y_preds
+
+    def _persist_predictions(
+        self,
+        features_df: pd.DataFrame,
+    ) -> None:
+        """Write per-classifier ``y_proba`` / ``y_pred`` / ``y_true`` CSVs.
+
+        For every classifier in :attr:`y_probas`, materialises the
+        ``(n_samples, n_seeds)`` probability and prediction matrices as
+        DataFrames indexed by ``features_df.index`` with one column per seed
+        (``seed_{random_state:05d}``), and writes them alongside the aligned
+        ground-truth Series under
+        ``{classifiers_dir}/{classifier_name}/predictions/``.
+
+        Args:
+            features_df (pd.DataFrame): Index-aligned feature matrix; supplies
+                the row index for the saved matrices.
+        """
+        for classifier_name, y_proba_matrix in self.y_probas.items():
+            predictions_dir = os.path.join(
+                self.classifiers_dir, classifier_name, "predictions"
+            )
+            ensure_dir(predictions_dir)
+
+            seed_columns = [
+                f"seed_{int(rs):05d}" for rs in self.metrics[classifier_name].index
+            ]
+            y_proba_df = pd.DataFrame(
+                y_proba_matrix,
+                index=features_df.index,
+                columns=seed_columns,
+            )
+            y_pred_df = pd.DataFrame(
+                self.y_preds[classifier_name].astype(int),
+                index=features_df.index,
+                columns=seed_columns,
+            )
+
+            y_proba_df.to_csv(os.path.join(predictions_dir, "y_proba.csv"))
+            y_pred_df.to_csv(os.path.join(predictions_dir, "y_pred.csv"))
+
+            if self.verbose:
+                logger.info(
+                    f"{classifier_name}: y_proba and y_pred saved to {predictions_dir}"
+                )

@@ -941,7 +941,9 @@ class MultiModelEvaluator:
         for (_, row), model, X in zip(
             registry.iterrows(), models, x_tests, strict=False
         ):
-            filepath = row.get("shap_explanation_filepath") if col_exists else None
+            filepath: str | None = (
+                row.get("shap_explanation_filepath") if col_exists else None
+            )
             if filepath and os.path.isfile(filepath):
                 try:
                     explanations.append(joblib.load(filepath))

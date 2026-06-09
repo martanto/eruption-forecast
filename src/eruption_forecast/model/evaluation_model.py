@@ -35,10 +35,9 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
-from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
-from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.new_metrics_ensemble import MetricsEnsemble
 
 
 class EvaluationModel(BaseModel):
@@ -185,13 +184,21 @@ class EvaluationModel(BaseModel):
         else:
             self.y_true: pd.Series = pd.Series(dtype=int, name="is_erupted")
 
-        (
-            self.evaluation_dir,
-            self.classifiers_dir,
-        ) = self.set_directories()
+        self.evaluation_dir, self.classifiers_dir = self.set_directories()
 
         # Will be set after evaluate() called
         self.metrics: dict[str, pd.DataFrame] = {}
+
+        # Lazy-built and cached by :meth:`_metrics_ensemble`, which is invoked
+        # by both :meth:`evaluate` and :meth:`compare`.  Survives across
+        # repeated calls so the per-classifier ``predict_proba`` pass is only
+        # paid once.
+        self.MetricsEnsemble: MetricsEnsemble | None = None
+
+        # Populated by :meth:`evaluate` when ``compare_classifiers=True`` so
+        # callers can re-use the ranking / plot outputs without paying for a
+        # fresh ``ClassifierComparator`` construction.
+        self.comparator: ClassifierComparator | None = None
 
         self.validate()
 
@@ -232,7 +239,7 @@ class EvaluationModel(BaseModel):
 
         Raises:
             FileNotFoundError: If ``filepath`` does not exist on disk.
-            ValueError: If the loaded object is not a ``TrainingModel`` or
+            TypeError: If the loaded object is not a ``TrainingModel`` or
                 ``PredictionModel``.
 
         Example:
@@ -272,7 +279,7 @@ class EvaluationModel(BaseModel):
         directories are created here; call :meth:`create_directories` for that.
 
         Returns:
-            tuple: A three-element tuple containing:
+            tuple: A two-element tuple containing:
 
                 - evaluation_dir (str): Root evaluation output path.
                 - classifiers_dir (str): Classifier-level results subdirectory.
@@ -323,12 +330,17 @@ class EvaluationModel(BaseModel):
 
         ``eruption_dates`` are emitted as a plain list of ``YYYY-MM-DD``
         strings (the format returned by :func:`sort_dates`).  An empty list is
-        used when no eruption dates were provided.
+        used when no eruption dates were provided.  When :meth:`evaluate` has
+        already populated ``self.metrics``, each per-classifier ``DataFrame``
+        is summarised via ``DataFrame.describe()`` (``count``, ``mean``,
+        ``std``, ``min``, quartiles, ``max``) so the dump stays bounded
+        regardless of seed count; the key is omitted entirely when
+        ``self.metrics`` is empty.
 
         Returns:
             dict: Mapping of field names to their current values.
         """
-        return {
+        data: dict = {
             "mode": self.model_kind,
             "start_date": self.start_date_str,
             "end_date": self.end_date_str,
@@ -339,6 +351,12 @@ class EvaluationModel(BaseModel):
             "classifiers": self.ClassifierEnsemble.classifiers,
             "output_dir": self.output_dir,
         }
+        if self.metrics:
+            data["metrics"] = {
+                classifier_name: df.describe().to_dict()
+                for classifier_name, df in self.metrics.items()
+            }
+        return data
 
     def to_prompt(self) -> str:
         """Return a structured text block suitable for LLM prompt input.
@@ -444,19 +462,20 @@ class EvaluationModel(BaseModel):
         plot_per_seed: bool = False,
         plot_aggregate: bool = True,
         plot_shap: bool = False,
+        compare_classifiers: bool = True,
     ) -> dict[str, pd.DataFrame]:
         """Evaluate every seed model against the true labels and aggregate.
 
         Delegates the per-seed metric loop to
-        :class:`~eruption_forecast.ensemble.metrics_ensemble.MetricsEnsemble`,
+        :class:`~eruption_forecast.ensemble.new_metrics_ensemble.MetricsEnsemble`,
         which computes ``(n_samples, n_seeds)`` ``y_proba`` / ``y_pred``
-        matrices once per classifier, persists them to
-        ``{classifiers_dir}/{classifier}/predictions/``, runs
-        :class:`MetricsComputer` per seed, and writes per-seed JSONs under
-        ``{classifiers_dir}/{classifier}/metrics/json/{seed:05d}.json``.
-        Cached JSONs are reused unless ``self.overwrite`` is ``True``.
-        Per-classifier ``mean ± std`` aggregate CSVs and the assignment to
-        ``self.metrics`` follow the same naming as before the refactor.
+        matrices once per classifier, persists them as
+        ``{classifiers_dir}/{classifier}/predictions/{y_proba,y_pred,y_true}.csv``,
+        and runs :class:`MetricsComputer` per seed to produce a per-classifier
+        ``DataFrame`` of seed-level metrics that is assigned to
+        ``self.metrics``.  Re-calling :meth:`evaluate` on the same instance
+        reuses the cached in-memory :class:`MetricsEnsemble` and skips the
+        per-classifier ``predict_proba`` pass entirely.
 
         Args:
             plot_per_seed (bool): Reserved for a follow-up that will rebuild
@@ -464,10 +483,11 @@ class EvaluationModel(BaseModel):
                 ``True`` currently emits a warning and has no effect.
                 Defaults to ``False``.
             plot_aggregate (bool): Render aggregate plots per classifier via
-                :class:`MultiModelEvaluator`. Defaults to ``True``.
+                :meth:`MetricsEnsemble.plot_aggregate`. Defaults to ``True``.
             plot_shap (bool): Reserved for a follow-up. Setting ``True``
                 currently emits a warning and has no effect. Defaults to
                 ``False``.
+            compare_classifiers (bool): Compare classifiers. Defaults to ``True``.
 
         Returns:
             dict[str, pd.DataFrame]: Mapping of classifier name to a DataFrame
@@ -477,9 +497,11 @@ class EvaluationModel(BaseModel):
             ValueError: If ``self.eruption_dates`` is ``None`` in prediction
                 reuse mode (raised by ``build_label()``).
             ValueError: If ``self.y_true`` is still empty after
-                ``build_label()`` — usually means the upstream
+                ``build_label()``.  For training reuse this means the upstream
                 ``TrainingModel`` was constructed without running
-                ``extract_features``.
+                ``build_label`` / ``extract_features``; for prediction reuse it
+                means :class:`LabelBuilder` produced no overlapping windows
+                over the evaluation period.
             ValueError: If ``self.features_df`` is empty (the upstream model
                 was passed in without running ``extract_features``).
         """
@@ -493,8 +515,11 @@ class EvaluationModel(BaseModel):
         if self.y_true.empty:
             raise ValueError(
                 "Ground-truth labels (self.y_true) are empty after build_label(). "
-                "This usually means the upstream TrainingModel was constructed "
-                "without running extract_features()."
+                "For training reuse, the upstream TrainingModel did not run "
+                "build_label/extract_features before being passed in. For "
+                "prediction reuse, LabelBuilder produced no overlapping windows "
+                "over the evaluation period — check eruption_dates and the "
+                "prediction window grid."
             )
         if self.features_df.empty:
             raise ValueError(
@@ -502,6 +527,7 @@ class EvaluationModel(BaseModel):
                 "before being passed to EvaluationModel."
             )
 
+        # TODO: Per seed plot and plot SHAP
         if plot_per_seed or plot_shap:
             logger.warning(
                 "plot_per_seed/plot_shap are not yet supported by the "
@@ -511,22 +537,17 @@ class EvaluationModel(BaseModel):
                 "change will rebuild per-seed plots from those files."
             )
 
-        me = MetricsEnsemble(
-            classifier_ensemble=self.ClassifierEnsemble,
-            features_df=self.features_df,
-            y_true=self.y_true,
-            n_jobs=self.n_jobs,
-            output_dir=self.evaluation_dir,
-            basename=self.basename,
-            overwrite=self.overwrite,
-            verbose=self.verbose,
-        ).compute()
+        me: MetricsEnsemble = self._metrics_ensemble()
 
         if plot_aggregate:
-            for classifier_name in me.metrics:
-                clf_dir = os.path.join(self.classifiers_dir, classifier_name)
-                metrics_dir = os.path.join(clf_dir, "metrics")
-                self._plot_aggregate(metrics_dir, classifier_name, clf_dir)
+            me.plot_aggregate()
+
+        if compare_classifiers:
+            if self.verbose:
+                logger.info("Comparing classifier ...")
+            self.comparator = self.compare()
+            self.comparator.get_ranking()
+            self.comparator.plot_all()
 
         self.metrics = me.metrics
         return me.metrics
@@ -534,32 +555,24 @@ class EvaluationModel(BaseModel):
     def compare(
         self,
         metrics: str | list[str] | None = None,
-        output_dir: str | None = None,
     ) -> ClassifierComparator:
         """Build a :class:`ClassifierComparator` from the per-classifier results.
 
-        Constructs one ``MultiModelEvaluator`` per classifier from the metrics
-        JSON directory written by :meth:`evaluate` and returns a
-        ``ClassifierComparator`` that can produce cross-classifier rankings and
-        comparison plots.  The live ``ClassifierEnsemble`` plus
-        ``self.features_df`` and ``self.y_true`` are forwarded as
-        ``ensemble_source`` so ROC plotting uses in-memory models and never
-        requires a trained-model registry CSV on disk.
-
-        Output of the returned comparator is written under
-        ``{evaluation_dir}/comparison/`` (i.e. peer to ``classifiers/``).
+        Lazily computes a :class:`MetricsEnsemble` on first call and caches it
+        on ``self.MetricsEnsemble``; subsequent ``compare()`` calls reuse
+        the cached instance and skip the per-classifier ``predict_proba``
+        pass entirely. Output of the returned comparator is written under
+        ``{evaluation_dir}/comparison/``.
 
         Args:
             metrics (str | list[str] | None, optional): Metric or ordered list
                 of metrics used for ranking and plots.  When None, the
                 comparator falls back to its own default metrics list.
                 Defaults to None.
-            output_dir (str, optional): MultiModelEvaluator output directory.
-                Defaults to None.
 
         Returns:
-            ClassifierComparator: Comparator wired to the per-classifier metrics
-                directories and the in-memory ensemble.
+            ClassifierComparator: Comparator backed by the cached
+                ``MetricsEnsemble``.
 
         Examples:
             >>> em = EvaluationModel(model=training_model)
@@ -568,46 +581,35 @@ class EvaluationModel(BaseModel):
             >>> ranking = comparator.get_ranking()
             >>> figures = comparator.plot_all()
         """
-        evaluators: dict[str, MultiModelEvaluator] = {
-            name: MultiModelEvaluator(
-                metrics_dir=os.path.join(self.classifiers_dir, name, "metrics"),
-                classifier_name=name,
-                output_dir=output_dir,
-            )
-            for name in self.ClassifierEnsemble.ensembles
-        }
-
-        ensemble_source = (self.ClassifierEnsemble, self.features_df, self.y_true)
-
-        return ClassifierComparator.from_evaluators(
-            evaluators=evaluators,
+        return ClassifierComparator(
+            metrics_ensemble=self._metrics_ensemble(),
             output_dir=self.evaluation_dir,
             metrics=metrics,
-            ensemble_source=ensemble_source,
         )
 
-    def _plot_aggregate(
-        self, metrics_dir: str, classifier_name: str, output_dir: str | None = None
-    ) -> None:
-        """Render aggregate plots for one classifier from per-seed metrics JSON.
+    def _metrics_ensemble(self) -> MetricsEnsemble:
+        """Return the cached :class:`MetricsEnsemble`, building it on first call.
 
-        Delegates to :class:`MultiModelEvaluator`, which reads ``*.json`` files
-        from ``{metrics_dir}/json/``.  Failures are logged and swallowed so a
-        plotting error never aborts the evaluation run.
+        Constructs a :class:`MetricsEnsemble` over
+        ``(ClassifierEnsemble, features_df, y_true)`` and runs
+        :meth:`MetricsEnsemble.compute` exactly once.  The instance is stored
+        on ``self.MetricsEnsemble`` and returned directly on subsequent calls,
+        so the per-classifier ``predict_proba`` pass is amortised across
+        :meth:`evaluate` and any number of :meth:`compare` calls.
 
-        Args:
-            metrics_dir (str): Per-classifier metrics directory whose ``json/``
-                subfolder holds the per-seed metric files.
-            classifier_name (str): Classifier name used in the warning log
-                message when plotting fails.
+        Returns:
+            MetricsEnsemble: The cached metrics-ensemble for this evaluation.
         """
-        output_dir = output_dir or self.output_dir
+        if self.MetricsEnsemble is None:
+            me = MetricsEnsemble(
+                classifier_ensemble=self.ClassifierEnsemble,
+                features_df=self.features_df,
+                y_true=self.y_true,
+                kind=self.model_kind,
+                output_dir=self.evaluation_dir,
+                n_jobs=self.n_jobs,
+                verbose=self.verbose,
+            ).compute()
+            self.MetricsEnsemble = me
 
-        try:
-            MultiModelEvaluator(
-                output_dir=output_dir,
-                metrics_dir=metrics_dir,
-                classifier_name=classifier_name,
-            ).plot_all()
-        except Exception as exc:
-            logger.warning(f"{classifier_name}: aggregate plots skipped. Reason: {exc}")
+        return self.MetricsEnsemble

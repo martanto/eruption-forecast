@@ -1,20 +1,25 @@
 """Cross-classifier comparison for volcanic eruption forecasting models.
 
-This module provides ``ClassifierComparator``, which accepts a mapping of
-classifier names to trained-model CSV paths, builds a ``MultiModelEvaluator``
-per classifier, and produces side-by-side comparison plots and a ranking table.
+This module provides ``ClassifierComparator``, which consumes a fitted
+:class:`MetricsEnsemble` and produces side-by-side comparison plots and a
+ranking table across the classifiers it covers.
 """
 
 import os
-import json
 import math
-from typing import Any, Self
+from typing import Self, Literal
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.metrics import (
+    roc_curve,
+    roc_auc_score,
+    precision_recall_curve,
+    average_precision_score,
+)
 
 from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import (
@@ -23,8 +28,8 @@ from eruption_forecast.plots.styles import (
     apply_nature_style,
 )
 from eruption_forecast.utils.pathutils import ensure_dir
-from eruption_forecast.model.multi_model_evaluator import MultiModelEvaluator
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.new_metrics_ensemble import MetricsEnsemble
 
 
 #: Metrics shown by default when ``metrics=None`` is passed to the constructor
@@ -44,24 +49,11 @@ DEFAULT_METRICS: list[str] = [
 
 
 class ClassifierComparator:
-    """Compare multiple classifiers side-by-side using aggregate seed metrics.
+    """Compare multiple classifiers side-by-side using a fitted ``MetricsEnsemble``.
 
-    Accepts a mapping of classifier names to trained-model registry CSV paths
-    (produced by ``ModelTrainer.evaluate()``), constructs one
-    ``MultiModelEvaluator`` per classifier, and exposes methods for generating
-    comparison tables and plots.
-
-    Two construction paths are supported:
-
-    - **CSV-based** — :meth:`__init__` and :meth:`from_json` build evaluators
-      from trained-model registry CSVs.  ROC plotting reads per-seed models
-      and test sets from disk via ``MultiModelEvaluator._load_seed_data``.
-    - **In-memory** — :meth:`from_evaluators` skips the registry entirely.
-      Pre-built ``MultiModelEvaluator`` instances supply aggregate metrics
-      from JSON, and an optional ``ensemble_source`` triple
-      (``ClassifierEnsemble``, ``features_df``, ``y_true``) lets ROC use the
-      live ensemble without any registry CSV on disk.  This is the path used
-      by ``EvaluationModel.compare()``.
+    Consumes a computed :class:`MetricsEnsemble` (per-classifier per-seed
+    metric DataFrames plus the ``(n_samples, n_seeds)`` ``y_probas`` matrices)
+    and exposes methods for ranking, aggregate tables, and comparison plots.
 
     Attributes:
         output_dir (str): Root directory for saved outputs.
@@ -70,71 +62,41 @@ class ClassifierComparator:
         metrics (list[str]): Ordered list of metrics to compare.
 
     Args:
-        classifiers (dict[str, str]): Mapping of classifier name to the path
-            of its trained-model registry CSV. Example:
-            ``{"rf": "output/.../trained_model_rf.csv"}``.
-        output_dir (str | None, optional): Root output directory. When None,
-            defaults to ``{cwd}/output/comparison/``. An explicit path is used
-            as-is without appending a subdirectory. Defaults to None.
+        metrics_ensemble (MetricsEnsemble): A ``MetricsEnsemble`` whose
+            ``compute()`` has already populated ``metrics`` and ``y_probas``.
         metrics (str | list[str] | None, optional): Metric or ordered list of
             metrics used for ranking and plots. The first entry is the default
-            ranking metric. When None, uses ``DEFAULT_METRICS`` (f1_score,
-            roc_auc, pr_auc, balanced_accuracy, precision, recall,
-            specificity, sensitivity). Defaults to None.
+            ranking metric. When None, uses ``DEFAULT_METRICS``. Defaults to
+            None.
+        output_dir (str | None, optional): Root output directory. When None,
+            falls back to ``metrics_ensemble.output_dir``; the comparator
+            always appends ``comparison/`` to whichever root is resolved.
+            Defaults to None.
 
     Raises:
-        ValueError: If ``classifiers`` is empty.
-        ValueError: If any metric name in ``metrics`` is not present in the
-            aggregate metrics table.
-        FileNotFoundError: If any CSV path in ``classifiers`` does not exist.
+        ValueError: If ``metrics_ensemble.metrics`` is empty (``compute()``
+            was not called).
 
     Examples:
-        >>> comparator = ClassifierComparator(
-        ...     classifiers={"rf": "output/.../trained_model_rf.csv",
-        ...                  "xgb": "output/.../trained_model_xgb.csv"},
-        ...     metrics=["f1_score", "roc_auc"],
-        ... )
-        >>> df = comparator.get_ranking()
-        >>> figs = comparator.plot_all()
+        >>> me = MetricsEnsemble(
+        ...     classifier_ensemble=ce, features_df=X, y_true=y
+        ... ).compute()
+        >>> comparator = ClassifierComparator(me, metrics=["f1_score", "roc_auc"])
+        >>> ranking = comparator.get_ranking()
+        >>> figures = comparator.plot_all()
     """
 
     def __init__(
         self,
-        classifiers: dict[str, str],
-        output_dir: str | None = None,
+        metrics_ensemble: MetricsEnsemble,
         metrics: str | list[str] | None = None,
+        output_dir: str | None = None,
     ) -> None:
-        """Initialize the ClassifierComparator.
-
-        Validates that the classifiers dict is non-empty and that every CSV
-        path exists, then builds a MultiModelEvaluator for each classifier.
-        When metrics is None, the full DEFAULT_METRICS list is used. Any metric
-        name not present in the aggregate metrics table raises a ValueError.
-
-        Args:
-            classifiers (dict[str, str]): Mapping of classifier name to its
-                trained-model registry CSV path.
-            output_dir (str | None, optional): Root directory for outputs.
-                When None, defaults to ``{cwd}/output/comparison/``. An
-                explicit path is used as-is. Defaults to None.
-            metrics (str | list[str] | None, optional): Metric or list of
-                metrics for comparison. Single strings are wrapped in a list.
-                The first entry is used as the default ranking metric. When
-                None, defaults to ``DEFAULT_METRICS``. Defaults to None.
-
-        Raises:
-            ValueError: If ``classifiers`` is empty.
-            ValueError: If a requested metric does not exist in the data.
-            FileNotFoundError: If any CSV path does not exist on disk.
-        """
-        if not classifiers:
-            raise ValueError("classifiers dict must not be empty.")
-
-        for name, csv_path in classifiers.items():
-            if not os.path.isfile(csv_path):
-                raise FileNotFoundError(
-                    f"Trained model CSV for '{name}' not found: {csv_path}"
-                )
+        if not metrics_ensemble.metrics:
+            raise ValueError(
+                "metrics_ensemble.metrics is empty. "
+                "Call metrics_ensemble.compute() before constructing ClassifierComparator."
+            )
 
         if metrics is None:
             self.metrics: list[str] = list(DEFAULT_METRICS)
@@ -143,170 +105,88 @@ class ClassifierComparator:
         else:
             self.metrics = list(metrics)
 
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
-        self.output_dir = os.path.join(output_dir, "comparison")
+        self._metrics_ensemble: MetricsEnsemble = metrics_ensemble
+        self._classifier_names: list[str] = list(metrics_ensemble.metrics.keys())
 
+        output_dir = output_dir or metrics_ensemble.output_dir
+        self.output_dir = os.path.join(output_dir, "comparison")
         self.figures_dir = os.path.join(self.output_dir, "figures")
         self.metrics_dir = os.path.join(self.output_dir, "metrics")
         self._metrics_table_cache: pd.DataFrame | None = None
-        self._ensemble_source: (
-            tuple[ClassifierEnsemble, pd.DataFrame, pd.Series] | None
-        ) = None
-
-        self._evaluators: dict[str, MultiModelEvaluator] = {}
-        for name, csv_path in classifiers.items():
-            # Metrics JSON files live in a ``metrics/`` sibling to the registry CSV.
-            csv_dir = os.path.dirname(os.path.abspath(csv_path))
-            clf_metrics_dir = os.path.join(csv_dir, "metrics")
-            self._evaluators[name] = MultiModelEvaluator(
-                metrics_dir=clf_metrics_dir if os.path.isdir(clf_metrics_dir) else None,
-                trained_model_csv=csv_path,
-            )
 
     @classmethod
-    def from_json(
+    def from_classifier_ensemble(
         cls,
-        json_path: str,
+        classifier_ensemble: ClassifierEnsemble,
+        features_df: pd.DataFrame,
+        y_true: pd.Series | np.ndarray,
+        kind: Literal["training", "prediction"] = "training",
         output_dir: str | None = None,
+        root_dir: str | None = None,
         metrics: str | list[str] | None = None,
+        n_jobs: int = 1,
+        verbose: bool = False,
     ) -> Self:
-        """Create a ClassifierComparator from a JSON file of classifier paths.
+        """Build a comparator directly from a fitted ``ClassifierEnsemble``.
 
-        Loads a JSON file whose keys are classifier names and whose values are
-        absolute paths to their trained-model registry CSVs, then constructs
-        and returns a ``ClassifierComparator`` with those classifiers.
-
-        The expected JSON format is:
-
-        .. code-block:: json
-
-            {
-                "RandomForestClassifier": "/path/to/trained_model_rf.csv",
-                "XGBClassifier":          "/path/to/trained_model_xgb.csv"
-            }
+        Constructs a fresh :class:`MetricsEnsemble`, runs its ``compute()``,
+        and returns a ``ClassifierComparator`` wired to its in-memory results.
 
         Args:
-            json_path (str): Path to the JSON file.
+            classifier_ensemble (ClassifierEnsemble): Fitted ensemble whose
+                seeds are evaluated.
+            features_df (pd.DataFrame): Feature matrix aligned to ``y_true``.
+            y_true (pd.Series | np.ndarray): Ground-truth binary labels.
+            kind (Literal["training", "prediction"]): Evaluation context;
+                stored on the constructed ``MetricsEnsemble`` and, when
+                ``output_dir`` is provided, appended to it so artefacts land
+                under ``{output_dir}/{kind}/``. Defaults to ``"training"``.
             output_dir (str | None, optional): Root output directory passed to
-                the constructor. Defaults to None.
-            metrics (str | list[str] | None, optional): Metrics passed to the
-                constructor. Defaults to None.
+                ``MetricsEnsemble``. ``kind`` is appended automatically when
+                this is set. Defaults to None.
+            root_dir (str | None, optional): Project root passed to
+                ``MetricsEnsemble`` for path resolution. Defaults to None.
+            metrics (str | list[str] | None, optional): Metric or list of
+                metrics for ranking and plots. Defaults to None.
+            n_jobs (int, optional): Parallel workers passed to
+                ``MetricsEnsemble``. Defaults to 1.
+            verbose (bool, optional): Emit progress logs. Defaults to False.
 
         Returns:
-            ClassifierComparator: Initialised comparator loaded from the JSON.
-
-        Raises:
-            FileNotFoundError: If ``json_path`` does not exist.
-            ValueError: If the JSON does not contain a non-empty object.
+            ClassifierComparator: Initialised comparator backed by a freshly
+                computed ``MetricsEnsemble``.
 
         Examples:
-            >>> comparator = ClassifierComparator.from_json(
-            ...     "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
-            ...     metrics=["f1_score", "roc_auc"],
+            >>> comparator = ClassifierComparator.from_classifier_ensemble(
+            ...     classifier_ensemble=training_model.ClassifierEnsemble,
+            ...     features_df=training_model.features_df,
+            ...     y_true=training_model.labels,
+            ...     output_dir=training_model.output_dir,
             ... )
         """
-        if not os.path.isfile(json_path):
-            raise FileNotFoundError(f"JSON file not found: {json_path}")
+        resolved_output_dir = (
+            os.path.join(output_dir, kind) if output_dir is not None else None
+        )
 
-        with open(json_path) as f:
-            classifiers = json.load(f)
+        metrics_ensemble = MetricsEnsemble(
+            classifier_ensemble=classifier_ensemble,
+            features_df=features_df,
+            y_true=y_true,
+            kind=kind,
+            output_dir=resolved_output_dir,
+            root_dir=root_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        ).compute()
 
-        if not isinstance(classifiers, dict) or not classifiers:
-            raise ValueError(
-                f"JSON file must contain a non-empty object mapping classifier "
-                f"names to CSV paths. Got: {type(classifiers).__name__}"
-            )
-
-        return cls(classifiers=classifiers, output_dir=output_dir, metrics=metrics)
-
-    @classmethod
-    def from_evaluators(
-        cls,
-        evaluators: dict[str, MultiModelEvaluator],
-        output_dir: str | None = None,
-        metrics: str | list[str] | None = None,
-        ensemble_source: (
-            tuple[ClassifierEnsemble, pd.DataFrame, pd.Series] | None
-        ) = None,
-    ) -> Self:
-        """Create a ClassifierComparator from pre-built ``MultiModelEvaluator`` instances.
-
-        Bypasses the registry-CSV validation in :meth:`__init__` so the
-        comparator can be constructed directly from metrics directories already
-        on disk (e.g. those written by ``EvaluationModel.evaluate()``).  When
-        ``ensemble_source`` is supplied, ROC plotting uses the live
-        ``ClassifierEnsemble`` in memory rather than reloading per-seed models
-        from a registry CSV.
-
-        Args:
-            evaluators (dict[str, MultiModelEvaluator]): Mapping of classifier
-                name to a pre-built ``MultiModelEvaluator``.
-            output_dir (str | None, optional): Root output directory. When
-                None, defaults to ``{cwd}/output/comparison/``. An explicit
-                path is used as-is. Defaults to None.
-            metrics (str | list[str] | None, optional): Metric or ordered list
-                of metrics used for ranking and plots. Single strings are
-                wrapped in a list. The first entry is used as the default
-                ranking metric. When None, uses ``DEFAULT_METRICS``. Defaults
-                to None.
-            ensemble_source (tuple[ClassifierEnsemble, pd.DataFrame, pd.Series] | None, optional):
-                Triple of ``(ensemble, features_df, y_true)`` used to compute
-                ROC curves from in-memory seeds instead of a registry CSV. When
-                None, ROC plotting falls back to the registry pathway and will
-                fail if no registry is available. Defaults to None.
-
-        Returns:
-            ClassifierComparator: Initialised comparator backed by the supplied
-                evaluators.
-
-        Raises:
-            ValueError: If ``evaluators`` is empty.
-
-        Examples:
-            >>> evaluators = {
-            ...     "rf": MultiModelEvaluator(metrics_dir="output/.../rf/metrics"),
-            ...     "xgb": MultiModelEvaluator(metrics_dir="output/.../xgb/metrics"),
-            ... }
-            >>> comparator = ClassifierComparator.from_evaluators(
-            ...     evaluators=evaluators,
-            ...     output_dir="output/.../evaluation/training",
-            ...     ensemble_source=(ensemble, features_df, y_true),
-            ... )
-        """
-        if not evaluators:
-            raise ValueError("evaluators dict must not be empty.")
-
-        if len(evaluators) == 1:
-            logger.info(
-                f"ClassifierComparator: only one classifier "
-                f"('{next(iter(evaluators))}') — comparator will produce "
-                "single-bar plots."
-            )
-
-        self = cls.__new__(cls)
-
-        if metrics is None:
-            self.metrics = list(DEFAULT_METRICS)
-        elif isinstance(metrics, str):
-            self.metrics = [metrics]
-        else:
-            self.metrics = list(metrics)
-
-        output_dir = output_dir or os.path.join(os.getcwd(), "output")
-        self.output_dir = os.path.join(output_dir, "comparison")
-        self.figures_dir = os.path.join(self.output_dir, "figures")
-        self.metrics_dir = os.path.join(self.output_dir, "metrics")
-        self._metrics_table_cache = None
-        self._evaluators = dict(evaluators)
-        self._ensemble_source = ensemble_source
-
-        return self
+        return cls(
+            metrics_ensemble=metrics_ensemble,
+            output_dir=resolved_output_dir,
+            metrics=metrics,
+        )
 
     def _save_figure(self, fig: plt.Figure, filename: str, dpi: int) -> None:
         """Save a figure to the figures subdirectory.
-
-        Creates the figures directory if it does not already exist and writes
-        the figure as a PNG at the requested resolution.
 
         Args:
             fig (plt.Figure): Figure to save.
@@ -319,28 +199,19 @@ class ClassifierComparator:
         logger.info(f"Saved comparison figure: {path}")
 
     def _color_cycle(self) -> list[str]:
-        """Return a list of OKABE_ITO colors, cycling if needed.
-
-        Returns:
-            list[str]: List of hex color strings with length equal to the
-                number of classifiers.
-        """
-        n = len(self._evaluators)
+        """Return one ``OKABE_ITO`` colour per classifier, cycling if needed."""
+        n = len(self._classifier_names)
         colors = list(OKABE_ITO)
         return [colors[i % len(colors)] for i in range(n)]
 
     @staticmethod
     def _validate_metrics(metrics_list: list[str], table: pd.DataFrame) -> None:
-        """Raise ValueError for any metric not present in the metrics table.
-
-        Checks that ``{metric}_mean`` exists as a column in ``table`` for
-        every entry in ``metrics_list``.  This catches typos or unsupported
-        metric names early, before any plotting begins.
+        """Raise ``ValueError`` for any metric not present in ``table``.
 
         Args:
             metrics_list (list[str]): Metric names to validate.
             table (pd.DataFrame): Aggregate metrics table produced by
-                ``get_metrics_table()``.
+                :meth:`get_metrics_table`.
 
         Raises:
             ValueError: If any metric name is absent from ``table``.
@@ -355,17 +226,7 @@ class ClassifierComparator:
             )
 
     def _resolve_metrics(self, metrics: str | list[str] | None) -> list[str]:
-        """Normalise a metrics argument to a list.
-
-        Converts ``None`` to ``self.metrics``, a bare string to a one-element
-        list, and passes any existing list through unchanged.
-
-        Args:
-            metrics (str | list[str] | None): Raw metrics argument.
-
-        Returns:
-            list[str]: Resolved list of metric names.
-        """
+        """Normalise a metrics argument to a list."""
         if metrics is None:
             return list(self.metrics)
         if isinstance(metrics, str):
@@ -377,21 +238,7 @@ class ClassifierComparator:
         clf_names: list[str],
         clf_colors: list[str],
     ) -> list[mpatches.Patch]:
-        """Build a list of legend patch handles for the classifier colour palette.
-
-        Produces one ``mpatches.Patch`` per classifier, used as handles in
-        ``fig.legend()`` calls so that classifier identity can be read from
-        the legend rather than x-axis tick labels.
-
-        Args:
-            clf_names (list[str]): Ordered classifier names.
-            clf_colors (list[str]): Ordered hex colour strings aligned with
-                ``clf_names``.
-
-        Returns:
-            list[mpatches.Patch]: One patch per classifier in the same order
-                as ``clf_names``.
-        """
+        """Build one legend patch per classifier."""
         return [
             mpatches.Patch(facecolor=clf_colors[i], label=name)
             for i, name in enumerate(clf_names)
@@ -404,18 +251,7 @@ class ClassifierComparator:
         ncol: int,
         bbox_to_anchor: tuple[float, float],
     ) -> None:
-        """Attach a classifier legend to the bottom of a figure.
-
-        Places ``fig.legend()`` at the lower centre of the figure using a
-        consistent style: no frame, 7 pt font, horizontally laid out patches.
-
-        Args:
-            fig (plt.Figure): Figure to attach the legend to.
-            handles (list[mpatches.Patch]): Legend patch handles.
-            ncol (int): Number of columns in the legend layout.
-            bbox_to_anchor (tuple[float, float]): ``(x, y)`` anchor for the
-                legend in figure coordinates.
-        """
+        """Attach a classifier legend to the bottom of a figure."""
         fig.legend(
             handles=handles,
             loc="lower center",
@@ -425,206 +261,114 @@ class ClassifierComparator:
             bbox_to_anchor=bbox_to_anchor,
         )
 
-    def _build_combined_bar_figure(
-        self,
-        metrics_list: list[str],
-        table: pd.DataFrame,
-        clf_names: list[str],
-        clf_colors: list[str],
-        legend_handles: list[mpatches.Patch],
-        save: bool,
-        dpi: int,
-    ) -> plt.Figure:
-        """Build the combined overview bar figure for all metrics.
+    def _per_seed_records(self) -> dict[str, list[dict]]:
+        """Return per-seed metric records keyed by classifier name.
 
-        Lays out all metrics in a grid of subplots (max 4 columns), calls
-        ``_draw_metric_bars`` for each cell, hides any unused axes in the
-        last row, attaches the classifier legend at the bottom, and optionally
-        saves the figure as ``metric_bar_all.png``.
+        Converts each ``metrics_ensemble.metrics[clf]`` DataFrame into a list
+        of row-dicts. The ``random_state`` index is surfaced as a column so it
+        appears in each record alongside the metric values.
+        """
+        return {
+            name: df.reset_index().to_dict(orient="records")
+            for name, df in self._metrics_ensemble.metrics.items()
+        }
 
-        Args:
-            metrics_list (list[str]): Ordered list of metric names to include.
-            table (pd.DataFrame): Aggregate metrics table from
-                ``get_metrics_table()``.
-            clf_names (list[str]): Ordered classifier names.
-            clf_colors (list[str]): Ordered hex colour strings aligned with
-                ``clf_names``.
-            legend_handles (list[mpatches.Patch]): Pre-built legend patches.
-            save (bool): Whether to save the figure to disk.
-            dpi (int): Resolution in dots per inch.
+    def get_metrics_table(self) -> pd.DataFrame:
+        """Return a DataFrame of aggregate metrics for every classifier.
+
+        Aggregates ``mean``, ``std``, ``min``, and ``max`` across seeds from
+        each numeric column of ``metrics_ensemble.metrics[clf]`` and flattens
+        them into ``{metric}_{stat}`` columns.
 
         Returns:
-            plt.Figure: The combined overview figure.
+            pd.DataFrame: DataFrame indexed by classifier name with one
+                ``{metric}_{stat}`` column per (metric, statistic) pair.
+
+        Examples:
+            >>> df = comparator.get_metrics_table()
+            >>> print(df[["f1_score_mean", "f1_score_std"]])
         """
-        n_clf = len(clf_names)
-        n_cols = min(4, len(metrics_list))
-        n_rows = int(np.ceil(len(metrics_list) / n_cols))
+        if self._metrics_table_cache is not None:
+            return self._metrics_table_cache
 
-        with apply_nature_style():
-            fig_all, axes_all = plt.subplots(
-                n_rows,
-                n_cols,
-                figsize=(n_cols * max(2.5, n_clf * 0.65), n_rows * 3.2),
-                squeeze=False,
-            )
+        rows: dict[str, dict[str, float]] = {}
+        for name, df in self._metrics_ensemble.metrics.items():
+            numeric = df.select_dtypes(include="number")
+            flat: dict[str, float] = {}
+            for metric_name in numeric.columns:
+                col = numeric[metric_name]
+                flat[f"{metric_name}_mean"] = float(col.mean())
+                # ``ddof=0`` so a single-seed run yields 0.0 rather than NaN.
+                flat[f"{metric_name}_std"] = float(col.std(ddof=0))
+                flat[f"{metric_name}_min"] = float(col.min())
+                flat[f"{metric_name}_max"] = float(col.max())
+            rows[name] = flat
 
-            for i, m in enumerate(metrics_list):
-                row, col = divmod(i, n_cols)
-                ax = axes_all[row][col]
-                mean_col = f"{m}_mean"
-                std_col = f"{m}_std"
-                means = table[mean_col].to_numpy()
-                stds = (
-                    table[std_col].to_numpy()
-                    if std_col in table.columns
-                    else np.zeros(len(means))
-                )
-                self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
+        self._metrics_table_cache = pd.DataFrame.from_dict(rows, orient="index")
+        return self._metrics_table_cache
 
-            # Hide any unused axes in the last row.
-            for j in range(len(metrics_list), n_rows * n_cols):
-                row, col = divmod(j, n_cols)
-                axes_all[row][col].set_visible(False)
-
-        self._attach_legend(fig_all, legend_handles, len(clf_names), (0.5, -0.02))
-        fig_all.set_layout_engine("tight")
-
-        if save:
-            self._save_figure(fig_all, "metric_bar_all.png", dpi)
-
-        plt.close(fig_all)
-        return fig_all
-
-    def _build_combined_stability_figure(
+    def get_ranking(
         self,
-        metrics_list: list[str],
-        clf_names: list[str],
-        clf_colors: list[str],
-        all_records: dict[str, list[dict]],
-        legend_patches: list[mpatches.Patch],
-        save: bool,
-        dpi: int,
-    ) -> plt.Figure:
-        """Build the combined overview stability figure for all metrics.
-
-        Lays out all metrics in a grid of subplots (max 4 columns), calls
-        ``_draw_stability_violin`` for each cell, hides any unused axes, attaches
-        the classifier legend at the bottom, and optionally saves the figure as
-        ``seed_stability_all.png``.
+        metric: str = "recall",
+        by: str = "mean",
+    ) -> pd.DataFrame:
+        """Return classifiers ranked by a chosen metric, descending.
 
         Args:
-            metrics_list (list[str]): Ordered list of metric names to include.
-            clf_names (list[str]): Ordered classifier names.
-            clf_colors (list[str]): Ordered hex colour strings aligned with
-                ``clf_names``.
-            all_records (dict[str, list[dict]]): Per-seed metric dicts keyed by
-                classifier name.
-            legend_patches (list[mpatches.Patch]): Pre-built legend patches.
-            save (bool): Whether to save the figure to disk.
-            dpi (int): Resolution in dots per inch.
+            metric (str, optional): Metric to rank by. Defaults to ``"recall"``.
+            by (str, optional): Aggregation statistic to sort on — one of
+                ``"mean"``, ``"std"``, ``"min"``, or ``"max"``. Defaults to
+                ``"mean"``.
 
         Returns:
-            plt.Figure: The combined overview figure.
-        """
-        n_cols = min(4, len(metrics_list))
-        n_rows = int(np.ceil(len(metrics_list) / n_cols))
-        rng_all = np.random.default_rng(42)
+            pd.DataFrame: Ranked DataFrame with a ``rank`` column prepended.
 
-        with apply_nature_style():
-            fig_all, axes_all = plt.subplots(
-                n_rows,
-                n_cols,
-                figsize=(n_cols * max(2.5, len(clf_names) * 0.85), n_rows * 3.2),
-                squeeze=False,
+        Raises:
+            KeyError: If the requested ``{metric}_{by}`` column does not exist
+                in the metrics table.
+        """
+        col = f"{metric}_{by}"
+        table = self.get_metrics_table()
+
+        if col not in table.columns:
+            raise KeyError(
+                f"Column '{col}' not found in metrics table. "
+                f"Available columns: {list(table.columns)}"
             )
 
-            for i, m in enumerate(metrics_list):
-                row, col = divmod(i, n_cols)
-                self._draw_stability_violin(
-                    axes_all[row][col], clf_names, clf_colors, all_records, m, rng_all
-                )
+        ranked = table.sort_values(col, ascending=False).copy()
+        ranked.insert(0, "rank", range(1, len(ranked) + 1))
 
-            for j in range(len(metrics_list), n_rows * n_cols):
-                row, col = divmod(j, n_cols)
-                axes_all[row][col].set_visible(False)
+        ensure_dir(self.metrics_dir)
+        csv_path = os.path.join(self.metrics_dir, f"ranking_{metric}.csv")
+        ranked.to_csv(csv_path)
+        logger.info(f"Saved ranking table: {csv_path}")
 
-        self._attach_legend(fig_all, legend_patches, len(clf_names), (0.5, -0.02))
-        fig_all.set_layout_engine("tight")
+        return ranked
 
-        if save:
-            self._save_figure(fig_all, "seed_stability_all.png", dpi)
-
-        plt.close(fig_all)
-        return fig_all
-
-    def _iter_seed_roc_data(
-        self,
-        evaluator: MultiModelEvaluator,
-        name: str,
-    ):
+    def _iter_seed_roc_data(self, name: str):
         """Yield ``(y_true, y_proba)`` pairs for every seed of one classifier.
 
-        Dispatches between two data sources:
+        Reads directly from ``metrics_ensemble.y_probas[name]`` columns and
+        ``metrics_ensemble.y_true`` — no per-seed model reload. The
+        ``y_true`` conversion to ``np.ndarray`` happens once outside the
+        loop and the same array is yielded each iteration.
 
-        - **In-memory** — when ``self._ensemble_source`` is set and contains an
-          entry for ``name``, iterates the seeds of
-          ``ensemble.ensembles[name]`` and computes positive-class
-          probabilities by slicing ``features_df`` to the seed's
-          ``feature_names``, intersecting the index with ``y_true``, and
-          calling ``seed["model"].predict_proba(X)[:, 1]``.
-        - **Registry** — otherwise, calls ``evaluator._require_registry()``
-          and ``evaluator._load_seed_data(row)`` for each row, exactly as the
-          CSV-based pathway did before.
+        Args:
+            name (str): Classifier name; must be a key of
+                ``metrics_ensemble.y_probas``.
 
         Yields:
             tuple[np.ndarray, np.ndarray]: ``(y_true_array, y_proba_array)``
-                for each seed.  Seeds with no usable data are skipped (with a
-                warning logged).
+                for each seed column.
         """
-        if self._ensemble_source is not None:
-            ensemble, features_df, y_true_series = self._ensemble_source
-            if name in ensemble.ensembles:
-                for seed_record in ensemble.ensembles[name].seeds:
-                    feature_names: list[str] = seed_record.get("feature_names", [])
-                    available_features = [
-                        feature_name
-                        for feature_name in feature_names
-                        if feature_name in features_df.columns
-                    ]
-                    if not available_features:
-                        logger.warning(
-                            f"Skipped a seed for '{name}' in plot_roc: "
-                            "no overlapping features."
-                        )
-                        continue
-                    try:
-                        X_seed = features_df[available_features]
-                        common_index = X_seed.index.intersection(y_true_series.index)
-                        if common_index.empty:
-                            logger.warning(
-                                f"Skipped a seed for '{name}' in plot_roc: "
-                                "no overlapping index."
-                            )
-                            continue
-                        X_seed = X_seed.loc[common_index]
-                        y_true_arr = y_true_series.loc[common_index].to_numpy()
-                        y_proba_arr = seed_record["model"].predict_proba(X_seed)[:, 1]
-                        yield y_true_arr, y_proba_arr
-                    except (ValueError, KeyError, AttributeError):
-                        logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
-                return
-
-        registry = evaluator._require_registry()
-        for _, row in registry.iterrows():
-            try:
-                _, _X_test, y_true, y_proba = evaluator._load_seed_data(row)
-                yield np.asarray(y_true), np.asarray(y_proba)
-            except (OSError, ValueError, KeyError):
-                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+        y_probas = self._metrics_ensemble.y_probas[name]
+        y_true = np.asarray(self._metrics_ensemble.y_true)
+        for seed_idx in range(y_probas.shape[1]):
+            yield y_true, y_probas[:, seed_idx]
 
     def _compute_classifier_roc(
         self,
-        evaluator: MultiModelEvaluator,
         name: str,
         mean_fpr: np.ndarray,
         color: str,
@@ -633,13 +377,7 @@ class ClassifierComparator:
     ) -> tuple[np.ndarray, np.ndarray, float] | None:
         """Compute and draw the mean ROC curve for one classifier.
 
-        Iterates over per-seed ``(y_true, y_proba)`` pairs supplied by
-        :meth:`_iter_seed_roc_data`, optionally draws individual seed curves as
-        thin dashed lines, then plots the interpolated mean curve with a shaded
-        std-deviation band.  Returns ``None`` if no valid seed data was found.
-
         Args:
-            evaluator (MultiModelEvaluator): Evaluator for the classifier.
             name (str): Classifier name used for the legend label and warnings.
             mean_fpr (np.ndarray): Common FPR grid onto which TPR values are
                 interpolated before averaging.
@@ -649,18 +387,21 @@ class ClassifierComparator:
                 dashed lines.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, float] | None: A
-                ``(mean_tpr, std_tpr, mean_auc)`` triple if at least one seed
-                was successfully processed, or ``None`` if no usable seed data
-                was found.
+            tuple[np.ndarray, np.ndarray, float] | None:
+                ``(mean_tpr, std_tpr, mean_auc)`` if at least one seed was
+                processed, else ``None``.
         """
         tprs: list[np.ndarray] = []
         aucs: list[float] = []
 
-        for y_true, y_proba in self._iter_seed_roc_data(evaluator, name):
-            fpr, tpr, _ = roc_curve(y_true, y_proba)
-            aucs.append(roc_auc_score(y_true, y_proba))
-            tprs.append(np.interp(mean_fpr, fpr, tpr))
+        for y_true, y_proba in self._iter_seed_roc_data(name):
+            try:
+                fpr, tpr, _ = roc_curve(y_true, y_proba)
+                aucs.append(roc_auc_score(y_true, y_proba))
+                tprs.append(np.interp(mean_fpr, fpr, tpr))
+            except (ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+                continue
 
             if show_individual:
                 ax.plot(
@@ -696,154 +437,258 @@ class ClassifierComparator:
 
         return mean_tpr, std_tpr, mean_auc
 
-    def _draw_grid_cell(
+    def _compute_classifier_pr(
         self,
-        ax: plt.Axes,
-        vals: list[float],
+        name: str,
+        mean_recall: np.ndarray,
         color: str,
-        row: int,
-        col: int,
-        metric: str,
-        rng: np.random.Generator,
-    ) -> None:
-        """Draw a violin + strip plot for one (classifier, metric) grid cell.
+        ax: plt.Axes,
+        show_individual: bool,
+    ) -> tuple[np.ndarray, np.ndarray, float] | None:
+        """Compute and draw the mean PR curve for one classifier.
 
-        Renders a violin body with a jittered scatter overlay when ``vals`` is
-        non-empty.  Sets the column header title on the first row and the
-        classifier name as y-axis label on the first column.  Hides x-axis ticks
-        and configures spines via ``configure_spine``.
+        Iterates over per-seed ``(y_true, y_proba)`` pairs from
+        :meth:`_iter_seed_roc_data`, calls
+        :func:`sklearn.metrics.precision_recall_curve`, reverses the
+        descending-recall arrays so they are monotonically increasing for
+        ``np.interp``, and aggregates precision onto the common ``mean_recall``
+        grid. Per-seed AP is computed via
+        :func:`sklearn.metrics.average_precision_score`.
 
         Args:
-            ax (plt.Axes): Axes for this grid cell.
-            vals (list[float]): Per-seed metric values for the cell.
-            color (str): Hex colour string for violin and scatter points.
-            row (int): Zero-based row index in the grid (used for title
-                placement on the first row).
-            col (int): Zero-based column index in the grid (used for y-label
-                placement on the first column).
-            metric (str): Metric name; used as column header on row 0.
-            rng (np.random.Generator): Random number generator for jitter.
+            name (str): Classifier name used for the legend label.
+            mean_recall (np.ndarray): Common recall grid onto which precision
+                values are interpolated before averaging.
+            color (str): Hex colour string for this classifier's curves.
+            ax (plt.Axes): Axes to draw on.
+            show_individual (bool): Whether to draw per-seed PR curves as
+                thin dashed lines.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, float] | None:
+                ``(mean_precision, std_precision, mean_ap)`` if at least one
+                seed was processed, else ``None``.
         """
-        clf_name = list(self._evaluators.keys())[row]
+        precisions_interp: list[np.ndarray] = []
+        aps: list[float] = []
 
-        if vals:
-            parts: dict[str, Any] = ax.violinplot(
-                [vals],
-                positions=[1],
-                showmeans=False,
-                showmedians=True,
-                showextrema=True,
+        for y_true, y_proba in self._iter_seed_roc_data(name):
+            try:
+                precisions, recalls, _ = precision_recall_curve(y_true, y_proba)
+                aps.append(average_precision_score(y_true, y_proba))
+            except (ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_pr.")
+                continue
+
+            # precision_recall_curve returns recalls in decreasing order;
+            # reverse both arrays so np.interp sees a monotonically
+            # increasing x-grid.
+            recalls_asc = recalls[::-1]
+            precisions_paired = precisions[::-1]
+            precisions_interp.append(
+                np.interp(mean_recall, recalls_asc, precisions_paired)
             )
 
-            parts["bodies"][0].set_facecolor(color)
-            parts["bodies"][0].set_alpha(0.55)
+            if show_individual:
+                ax.plot(
+                    recalls,
+                    precisions,
+                    color=color,
+                    alpha=0.15,
+                    linewidth=0.6,
+                    linestyle="--",
+                )
 
-            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
-            ax.scatter(
-                np.ones(len(vals)) + jitter,
-                vals,
-                color=color,
-                s=6,
-                alpha=0.6,
-                zorder=3,
-                linewidths=0,
+        if not precisions_interp:
+            return None
+
+        mean_precision = np.mean(precisions_interp, axis=0)
+        std_precision = np.std(precisions_interp, axis=0)
+        mean_ap = float(np.mean(aps))
+
+        ax.plot(
+            mean_recall,
+            mean_precision,
+            color=color,
+            linewidth=1.5,
+            label=f"{name} (AP={mean_ap:.3f})",
+        )
+        ax.fill_between(
+            mean_recall,
+            np.clip(mean_precision - std_precision, 0, 1),
+            np.clip(mean_precision + std_precision, 0, 1),
+            alpha=0.12,
+            color=color,
+        )
+
+        return mean_precision, std_precision, mean_ap
+
+    def plot_pr(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+        show_individual: bool = False,
+    ) -> plt.Figure:
+        """Plot one PR subplot per classifier in a grid (≤4 columns).
+
+        Mirrors :meth:`plot_roc` but uses
+        :func:`sklearn.metrics.precision_recall_curve` and
+        :func:`sklearn.metrics.average_precision_score`. The horizontal
+        baseline is the positive-class prevalence (``y_true.mean()``).
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override output filename. Defaults
+                to ``"comparison_pr.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+            show_individual (bool, optional): Draw per-seed curves as thin
+                dashed lines. Defaults to False.
+
+        Returns:
+            plt.Figure: The matplotlib figure.
+        """
+        colors = self._color_cycle()
+        mean_recall = np.linspace(0, 1, 200)
+
+        y_true = np.asarray(self._metrics_ensemble.y_true)
+        baseline = float(y_true.mean()) if len(y_true) else 0.0
+
+        n = len(self._classifier_names)
+        ncols = min(4, n)
+        nrows = math.ceil(n / ncols)
+
+        with apply_nature_style():
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(ncols * 3.2, nrows * 3.2),
+                squeeze=False,
             )
 
-        # Column header: metric name on first row only.
-        if row == 0:
-            ax.set_title(metric.replace("_", " ").title(), fontsize=8, pad=4)
+            for i, name in enumerate(self._classifier_names):
+                ax = axes.flat[i]
 
-        # Row header: classifier name as y-label on first column only.
-        if col == 0:
-            ax.set_ylabel(clf_name, fontsize=8)
-        else:
-            ax.set_ylabel("")
+                ax.hlines(
+                    baseline,
+                    0,
+                    1,
+                    color="gray",
+                    linestyle="--",
+                    linewidth=0.8,
+                )
 
+                self._compute_classifier_pr(
+                    name, mean_recall, colors[i], ax, show_individual
+                )
+
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1.02)
+                ax.set_xlabel("Recall")
+                ax.set_ylabel("Precision")
+                ax.set_title(name)
+                ax.legend(fontsize=6, loc="lower left")
+                configure_spine(ax)
+
+            for ax in axes.flat[n:]:
+                ax.set_visible(False)
+
+            fig.set_layout_engine("tight")
+
+        if save:
+            fname = filename or "comparison_pr.png"
+            self._save_figure(fig, fname, dpi)
+
+        plt.close(fig)
+        return fig
+
+    @staticmethod
+    def _draw_metric_bars(
+        ax: plt.Axes,
+        clf_names: list[str],
+        clf_colors: list[str],
+        means: np.ndarray,
+        stds: np.ndarray,
+        metric: str,
+    ) -> None:
+        """Draw a bar chart of mean ± std onto an existing Axes."""
+        bar_width = 0.6
+
+        for ci, (_clf, clr) in enumerate(zip(clf_names, clf_colors, strict=True)):
+            ax.bar(
+                ci,
+                means[ci],
+                width=bar_width,
+                yerr=stds[ci],
+                capsize=3,
+                color=clr,
+                edgecolor="black",
+                linewidth=0.5,
+                error_kw={"elinewidth": 0.8, "ecolor": "black"},
+            )
+            ax.text(
+                ci,
+                means[ci] + stds[ci] * 0.05 + 0.005,
+                f"{means[ci]:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=6,
+            )
+
+        ax.set_ylim(0.0, 1.0)
         ax.set_xticks([])
-        ax.tick_params(axis="y", labelsize=7)
-
+        ax.set_ylabel("Score")
+        ax.set_title(metric.replace("_", " ").title(), fontsize=9)
         configure_spine(ax)
 
-    def get_metrics_table(self) -> pd.DataFrame:
-        """Return a DataFrame of aggregate metrics for every classifier.
-
-        Calls ``MultiModelEvaluator.get_aggregate_metrics()`` for each
-        classifier and stacks the results into a single wide DataFrame where
-        each row represents one classifier and columns are flattened
-        ``{metric}_{stat}`` pairs (e.g. ``f1_score_mean``, ``f1_score_std``).
-
-        Returns:
-            pd.DataFrame: DataFrame indexed by classifier name with columns
-                for each ``{metric}_{stat}`` combination.
-
-        Raises:
-            ValueError: If any evaluator cannot load its metrics files.
-
-        Examples:
-            >>> df = comparator.get_metrics_table()
-            >>> print(df[["f1_score_mean", "f1_score_std"]])
-        """
-        if self._metrics_table_cache is not None:
-            return self._metrics_table_cache
-        rows: dict[str, dict[str, float]] = {}
-        for name, evaluator in self._evaluators.items():
-            agg = evaluator.get_aggregate_metrics()
-            flat: dict[str, float] = {}
-            for metric_name in agg.index:
-                for stat in agg.columns:
-                    flat[f"{metric_name}_{stat}"] = agg.loc[metric_name, stat]
-            rows[name] = flat
-
-        self._metrics_table_cache = pd.DataFrame.from_dict(rows, orient="index")
-        return self._metrics_table_cache
-
-    def get_ranking(
+    def _build_combined_bar_figure(
         self,
-        metric: str = "recall",
-        by: str = "mean",
-    ) -> pd.DataFrame:
-        """Return classifiers ranked by a chosen metric, descending.
+        metrics_list: list[str],
+        table: pd.DataFrame,
+        clf_names: list[str],
+        clf_colors: list[str],
+        legend_handles: list[mpatches.Patch],
+        save: bool,
+        dpi: int,
+    ) -> plt.Figure:
+        """Build the combined overview bar figure for all metrics."""
+        n_clf = len(clf_names)
+        n_cols = min(4, len(metrics_list))
+        n_rows = int(np.ceil(len(metrics_list) / n_cols))
 
-        Builds the full metrics table, sorts by ``{metric}_{by}`` descending,
-        inserts a ``rank`` column, and saves the result to
-        ``{metrics_dir}/ranking_{metric}.csv``.
-
-        Args:
-            metric (str, optional): Metric to rank by. Defaults to
-                ``"recall"``.
-            by (str, optional): Aggregation statistic to sort on — one of
-                ``"mean"``, ``"std"``, ``"min"``, or ``"max"``. Defaults to
-                ``"mean"``.
-
-        Returns:
-            pd.DataFrame: Ranked DataFrame with a ``rank`` column prepended.
-
-        Raises:
-            KeyError: If the requested ``{metric}_{by}`` column does not exist
-                in the metrics table.
-
-        Examples:
-            >>> df = comparator.get_ranking()
-            >>> df = comparator.get_ranking(metric="roc_auc", by="mean")
-        """
-        col = f"{metric}_{by}"
-        table = self.get_metrics_table()
-
-        if col not in table.columns:
-            raise KeyError(
-                f"Column '{col}' not found in metrics table. "
-                f"Available columns: {list(table.columns)}"
+        with apply_nature_style():
+            fig_all, axes_all = plt.subplots(
+                n_rows,
+                n_cols,
+                figsize=(n_cols * max(2.5, n_clf * 0.65), n_rows * 3.2),
+                squeeze=False,
             )
 
-        ranked = table.sort_values(col, ascending=False).copy()
-        ranked.insert(0, "rank", range(1, len(ranked) + 1))
+            for i, m in enumerate(metrics_list):
+                row, col = divmod(i, n_cols)
+                ax = axes_all[row][col]
+                mean_col = f"{m}_mean"
+                std_col = f"{m}_std"
+                means = table[mean_col].to_numpy()
+                stds = (
+                    table[std_col].to_numpy()
+                    if std_col in table.columns
+                    else np.zeros(len(means))
+                )
+                self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
 
-        ensure_dir(self.metrics_dir)
-        csv_path = os.path.join(self.metrics_dir, f"ranking_{metric}.csv")
-        ranked.to_csv(csv_path)
-        logger.info(f"Saved ranking table: {csv_path}")
+            for j in range(len(metrics_list), n_rows * n_cols):
+                row, col = divmod(j, n_cols)
+                axes_all[row][col].set_visible(False)
 
-        return ranked
+        self._attach_legend(fig_all, legend_handles, len(clf_names), (0.5, -0.02))
+        fig_all.set_layout_engine("tight")
+
+        if save:
+            self._save_figure(fig_all, "metric_bar_all.png", dpi)
+
+        plt.close(fig_all)
+        return fig_all
 
     def plot_metric_bar(
         self,
@@ -853,14 +698,6 @@ class ClassifierComparator:
         dpi: int = 150,
     ) -> dict[str, plt.Figure]:
         """Plot one bar chart per metric, each showing mean ± std per classifier.
-
-        Produces a separate figure for every metric in ``metrics``.  Within
-        each figure, one bar per classifier is drawn, coloured by classifier
-        using the OKABE_ITO palette.  The classifier legend is placed outside
-        the figure at the bottom.  Each figure is saved as
-        ``metric_bar_{metric}.png``.  When more than one metric is requested, an
-        additional combined overview figure (max 4 columns) is produced and
-        stored under the key ``"all"``; saved as ``metric_bar_all.png``.
 
         Args:
             metrics (str | list[str] | None, optional): Metric or list of
@@ -875,10 +712,8 @@ class ClassifierComparator:
 
         Returns:
             dict[str, plt.Figure]: Mapping of metric name to its figure.
-
-        Examples:
-            >>> figs = comparator.plot_metric_bar(metrics="f1_score")
-            >>> figs = comparator.plot_metric_bar(metrics=["f1_score", "roc_auc"])
+                When more than one metric is requested, an additional combined
+                overview figure is stored under the key ``"all"``.
         """
         metrics_list = self._resolve_metrics(metrics)
 
@@ -918,7 +753,6 @@ class ClassifierComparator:
             plt.close(fig)
             figures[m] = fig
 
-        # Combined overview figure — all metrics in a single subplot grid.
         if len(metrics_list) > 1:
             figures["all"] = self._build_combined_bar_figure(
                 metrics_list, table, clf_names, clf_colors, legend_handles, save, dpi
@@ -927,50 +761,54 @@ class ClassifierComparator:
         return figures
 
     @staticmethod
-    def _draw_metric_bars(
+    def _draw_stability_violin(
         ax: plt.Axes,
         clf_names: list[str],
         clf_colors: list[str],
-        means: np.ndarray,
-        stds: np.ndarray,
+        all_records: dict[str, list[dict]],
         metric: str,
+        rng: np.random.Generator,
     ) -> None:
-        """Draw a bar chart of mean ± std values onto an existing Axes.
+        """Draw a violin + strip plot for one metric onto an existing Axes."""
+        data_list = [
+            [r[metric] for r in all_records[name] if metric in r] for name in clf_names
+        ]
+        positions = np.arange(1, len(clf_names) + 1)
 
-        Places one bar per classifier with error bars and a value annotation
-        above each bar. x-axis ticks are hidden; classifier identity is
-        conveyed via the caller's legend.
+        non_empty = [(d, p) for d, p in zip(data_list, positions, strict=True) if d]
+        if not non_empty:
+            ax.set_xticks([])
+            ax.set_ylabel("Score")
+            ax.set_title(metric.replace("_", " ").title(), fontsize=9)
+            configure_spine(ax)
+            return
 
-        Args:
-            ax (plt.Axes): Axes to draw on.
-            clf_names (list[str]): Ordered classifier names.
-            clf_colors (list[str]): Ordered hex colour strings aligned with
-                ``clf_names``.
-            means (np.ndarray): Mean metric value per classifier.
-            stds (np.ndarray): Standard deviation per classifier.
-            metric (str): Metric name used as the subplot title.
-        """
-        bar_width = 0.6
+        data_list_filt, positions_filt = zip(*non_empty, strict=True)
+        data_list_filt = list(data_list_filt)
+        positions_filt = np.array(positions_filt)
 
-        for ci, (_clf, clr) in enumerate(zip(clf_names, clf_colors, strict=True)):
-            ax.bar(
-                ci,
-                means[ci],
-                width=bar_width,
-                yerr=stds[ci],
-                capsize=3,
-                color=clr,
-                edgecolor="black",
-                linewidth=0.5,
-                error_kw={"elinewidth": 0.8, "ecolor": "black"},
-            )
-            ax.text(
-                ci,
-                means[ci] + stds[ci] * 0.05 + 0.005,
-                f"{means[ci]:.3f}",
-                ha="center",
-                va="bottom",
-                fontsize=6,
+        parts: dict = ax.violinplot(
+            data_list_filt,
+            positions=positions_filt,
+            showmeans=False,
+            showmedians=True,
+            showextrema=True,
+        )
+
+        for i, pc in enumerate(parts["bodies"]):
+            pc.set_facecolor(clf_colors[i])
+            pc.set_alpha(0.6)
+
+        for i, vals in enumerate(data_list_filt):
+            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+            ax.scatter(
+                positions_filt[i] + jitter,
+                vals,
+                color="grey",
+                s=12,
+                alpha=0.7,
+                zorder=3,
+                linewidths=0,
             )
 
         ax.set_ylim(0.0, 1.0)
@@ -978,6 +816,48 @@ class ClassifierComparator:
         ax.set_ylabel("Score")
         ax.set_title(metric.replace("_", " ").title(), fontsize=9)
         configure_spine(ax)
+
+    def _build_combined_stability_figure(
+        self,
+        metrics_list: list[str],
+        clf_names: list[str],
+        clf_colors: list[str],
+        all_records: dict[str, list[dict]],
+        legend_patches: list[mpatches.Patch],
+        save: bool,
+        dpi: int,
+    ) -> plt.Figure:
+        """Build the combined overview stability figure for all metrics."""
+        n_cols = min(4, len(metrics_list))
+        n_rows = int(np.ceil(len(metrics_list) / n_cols))
+        rng_all = np.random.default_rng(42)
+
+        with apply_nature_style():
+            fig_all, axes_all = plt.subplots(
+                n_rows,
+                n_cols,
+                figsize=(n_cols * max(2.5, len(clf_names) * 0.85), n_rows * 3.2),
+                squeeze=False,
+            )
+
+            for i, m in enumerate(metrics_list):
+                row, col = divmod(i, n_cols)
+                self._draw_stability_violin(
+                    axes_all[row][col], clf_names, clf_colors, all_records, m, rng_all
+                )
+
+            for j in range(len(metrics_list), n_rows * n_cols):
+                row, col = divmod(j, n_cols)
+                axes_all[row][col].set_visible(False)
+
+        self._attach_legend(fig_all, legend_patches, len(clf_names), (0.5, -0.02))
+        fig_all.set_layout_engine("tight")
+
+        if save:
+            self._save_figure(fig_all, "seed_stability_all.png", dpi)
+
+        plt.close(fig_all)
+        return fig_all
 
     def plot_seed_stability(
         self,
@@ -988,45 +868,29 @@ class ClassifierComparator:
     ) -> dict[str, plt.Figure]:
         """Plot per-seed metric distributions as violin + strip plots.
 
-        Collects raw per-seed metric values from each classifier's
-        ``MultiModelEvaluator.get_metrics_list()`` and produces one figure per
-        metric, each showing a violin + strip plot per classifier.  Classifier
-        identity is shown via a legend of coloured patches rather than x-axis
-        tick labels.  When more than one metric is requested, an additional
-        combined overview figure (max 4 columns) is produced and stored under
-        the key ``"all"``; saved as ``seed_stability_all.png``.
-
         Args:
             metrics (str | list[str] | None, optional): Metric or list of
                 metrics to visualise. Defaults to ``self.metrics``.
             save (bool, optional): Whether to save the figures. Defaults to
                 True.
             filename (str | None, optional): Override output filename applied
-                to the first metric only. Subsequent metrics always use the
-                default ``"seed_stability_{metric}.png"`` pattern. Defaults to
-                None.
+                to the first metric only. Defaults to None.
             dpi (int, optional): Figure resolution. Defaults to 150.
 
         Returns:
             dict[str, plt.Figure]: Mapping of metric name to its figure.
-
-        Examples:
-            >>> figs = comparator.plot_seed_stability(metrics="roc_auc")
-            >>> figs = comparator.plot_seed_stability(metrics=["f1_score", "roc_auc"])
+                When more than one metric is requested, an additional combined
+                overview figure is stored under the key ``"all"``.
         """
         metrics_list = self._resolve_metrics(metrics)
 
         table = self.get_metrics_table()
         self._validate_metrics(metrics_list, table)
 
-        clf_names = list(self._evaluators.keys())
+        clf_names = list(self._classifier_names)
         clf_colors = self._color_cycle()
 
-        # Pre-load per-seed records once for all classifiers.
-        all_records: dict[str, list[dict]] = {
-            name: evaluator.get_metrics_list()
-            for name, evaluator in self._evaluators.items()
-        }
+        all_records = self._per_seed_records()
 
         legend_patches = self._build_legend_patches(clf_names, clf_colors)
 
@@ -1050,7 +914,6 @@ class ClassifierComparator:
             plt.close(fig)
             figures[m] = fig
 
-        # Combined overview figure — all metrics in a single subplot grid.
         if len(metrics_list) > 1:
             figures["all"] = self._build_combined_stability_figure(
                 metrics_list,
@@ -1064,154 +927,54 @@ class ClassifierComparator:
 
         return figures
 
-    @staticmethod
-    def _draw_stability_violin(
+    def _draw_grid_cell(
+        self,
         ax: plt.Axes,
-        clf_names: list[str],
-        clf_colors: list[str],
-        all_records: dict[str, list[dict]],
+        vals: list[float],
+        color: str,
+        row: int,
+        col: int,
         metric: str,
         rng: np.random.Generator,
     ) -> None:
-        """Draw a violin + strip plot for one metric onto an existing Axes.
+        """Draw a violin + strip plot for one (classifier, metric) grid cell."""
+        clf_name = self._classifier_names[row]
 
-        Renders one violin per classifier with a jittered strip overlay.
-        x-axis ticks are hidden; classifier identity is conveyed via the
-        caller's legend.
+        if vals:
+            parts: dict = ax.violinplot(
+                [vals],
+                positions=[1],
+                showmeans=False,
+                showmedians=True,
+                showextrema=True,
+            )
 
-        Args:
-            ax (plt.Axes): Axes to draw on.
-            clf_names (list[str]): Ordered classifier names.
-            clf_colors (list[str]): Ordered hex colour strings aligned with
-                ``clf_names``.
-            all_records (dict[str, list[dict]]): Per-seed metric dicts keyed
-                by classifier name.
-            metric (str): Metric key to extract from each record dict.
-            rng (np.random.Generator): Random number generator for jitter.
-        """
-        data_list = [
-            [r[metric] for r in all_records[name] if metric in r] for name in clf_names
-        ]
-        positions = np.arange(1, len(clf_names) + 1)
+            parts["bodies"][0].set_facecolor(color)
+            parts["bodies"][0].set_alpha(0.55)
 
-        # Filter out classifiers with no seed data for this metric.
-        non_empty = [(d, p) for d, p in zip(data_list, positions, strict=True) if d]
-        if not non_empty:
-            ax.set_xticks([])
-            ax.set_ylabel("Score")
-            ax.set_title(metric.replace("_", " ").title(), fontsize=9)
-            configure_spine(ax)
-            return
-        data_list, positions = zip(*non_empty, strict=True)
-        data_list = list(data_list)
-        positions = np.array(positions)
-
-        parts: dict[str, Any] = ax.violinplot(
-            data_list,
-            positions=positions,
-            showmeans=False,
-            showmedians=True,
-            showextrema=True,
-        )
-
-        for i, pc in enumerate(parts["bodies"]):
-            pc.set_facecolor(clf_colors[i])
-            pc.set_alpha(0.6)
-
-        for i, vals in enumerate(data_list):
             jitter = rng.uniform(-0.08, 0.08, size=len(vals))
             ax.scatter(
-                positions[i] + jitter,
+                np.ones(len(vals)) + jitter,
                 vals,
-                color="grey",
-                s=12,
-                alpha=0.7,
+                color=color,
+                s=6,
+                alpha=0.6,
                 zorder=3,
                 linewidths=0,
             )
 
-        ax.set_ylim(0.0, 1.0)
+        if row == 0:
+            ax.set_title(metric.replace("_", " ").title(), fontsize=8, pad=4)
+
+        if col == 0:
+            ax.set_ylabel(clf_name, fontsize=8)
+        else:
+            ax.set_ylabel("")
+
         ax.set_xticks([])
-        ax.set_ylabel("Score")
-        ax.set_title(metric.replace("_", " ").title(), fontsize=9)
+        ax.tick_params(axis="y", labelsize=7)
+
         configure_spine(ax)
-
-    def plot_roc(
-        self,
-        save: bool = True,
-        filename: str | None = None,
-        dpi: int = 150,
-        show_individual: bool = False,
-    ) -> plt.Figure:
-        """Plot one ROC subplot per classifier in a grid (≤4 columns).
-
-        Loads per-seed ROC data via each ``MultiModelEvaluator._load_seed_data()``,
-        interpolates to a common FPR grid, and plots mean AUC curves. A gray
-        diagonal chance line is drawn on every subplot. The grid has at most
-        four columns; unused cells are hidden.
-
-        Args:
-            save (bool, optional): Whether to save the figure. Defaults to True.
-            filename (str | None, optional): Override output filename. Defaults
-                to ``"comparison_roc.png"``.
-            dpi (int, optional): Figure resolution. Defaults to 150.
-            show_individual (bool, optional): Draw per-seed curves as thin
-                dashed lines. Defaults to False.
-
-        Returns:
-            plt.Figure: The matplotlib figure.
-
-        Examples:
-            >>> fig = comparator.plot_roc(show_individual=True)
-        """
-        colors = self._color_cycle()
-        mean_fpr = np.linspace(0, 1, 200)
-
-        n = len(self._evaluators)
-        ncols = min(4, n)
-        nrows = math.ceil(n / ncols)
-
-        with apply_nature_style():
-            fig, axes = plt.subplots(
-                nrows,
-                ncols,
-                figsize=(ncols * 3.2, nrows * 3.2),
-                squeeze=False,
-            )
-
-            for i, (name, evaluator) in enumerate(self._evaluators.items()):
-                ax = axes.flat[i]
-
-                # Diagonal chance line
-                ax.plot(
-                    [0, 1],
-                    [0, 1],
-                    color="gray",
-                    linestyle="--",
-                    linewidth=0.8,
-                )
-
-                self._compute_classifier_roc(
-                    evaluator, name, mean_fpr, colors[i], ax, show_individual
-                )
-
-                ax.set_xlabel("False Positive Rate")
-                ax.set_ylabel("True Positive Rate")
-                ax.set_title(name)
-                ax.legend(fontsize=6, loc="lower right")
-                configure_spine(ax)
-
-            for ax in axes.flat[n:]:
-                ax.set_visible(False)
-
-            fig.set_layout_engine("tight")
-
-        if save:
-            fname = filename or "comparison_roc.png"
-            self._save_figure(fig, fname, dpi)
-
-        plt.close(fig)
-        return fig
 
     def plot_comparison_grid(
         self,
@@ -1221,17 +984,6 @@ class ClassifierComparator:
         dpi: int = 150,
     ) -> plt.Figure:
         """Plot a classifier × metric grid of per-seed distributions.
-
-        Creates a figure where each row corresponds to one classifier and each
-        column corresponds to one metric.  Every cell shows the per-seed
-        distribution for that (classifier, metric) combination as a violin plot
-        overlaid with jittered strip points, so both the shape and individual
-        seed values are visible.
-
-        Column headers (metric names) are shown as titles on the top row only.
-        Row headers (classifier names) are shown as y-axis labels on the
-        leftmost column only.  All other axes labels are hidden to reduce
-        clutter.
 
         Args:
             metrics (str | list[str] | None, optional): Metric or list of
@@ -1244,25 +996,17 @@ class ClassifierComparator:
 
         Returns:
             plt.Figure: The matplotlib figure.
-
-        Examples:
-            >>> fig = comparator.plot_comparison_grid()
-            >>> fig = comparator.plot_comparison_grid(metrics=["f1_score", "roc_auc"])
         """
         metrics_list = self._resolve_metrics(metrics)
 
         self._validate_metrics(metrics_list, self.get_metrics_table())
 
-        clf_names = list(self._evaluators.keys())
+        clf_names = list(self._classifier_names)
         clf_colors = self._color_cycle()
         n_clf = len(clf_names)
         n_met = len(metrics_list)
 
-        # Pre-load all per-seed records once.
-        all_records: dict[str, list[dict]] = {
-            name: evaluator.get_metrics_list()
-            for name, evaluator in self._evaluators.items()
-        }
+        all_records = self._per_seed_records()
 
         rng = np.random.default_rng(42)
 
@@ -1294,33 +1038,127 @@ class ClassifierComparator:
         plt.close(fig)
         return fig
 
-    def plot_all(self, dpi: int = 150) -> dict[str, Any]:
-        """Run all plot methods and return the resulting figures.
+    def plot_roc(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+        show_individual: bool = False,
+    ) -> plt.Figure:
+        """Plot one ROC subplot per classifier in a grid (≤4 columns).
 
-        Calls ``plot_metric_bar()``, ``plot_seed_stability()``,
-        ``plot_comparison_grid()``, ``plot_roc()``, and ``get_ranking()`` in
-        sequence and bundles their outputs into a dict.  All configured metrics
-        are passed to the bar, stability, and grid plots.
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override output filename. Defaults
+                to ``"comparison_roc.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+            show_individual (bool, optional): Draw per-seed curves as thin
+                dashed lines. Defaults to False.
+
+        Returns:
+            plt.Figure: The matplotlib figure.
+        """
+        colors = self._color_cycle()
+        mean_fpr = np.linspace(0, 1, 200)
+
+        n = len(self._classifier_names)
+        ncols = min(4, n)
+        nrows = math.ceil(n / ncols)
+
+        with apply_nature_style():
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(ncols * 3.2, nrows * 3.2),
+                squeeze=False,
+            )
+
+            for i, name in enumerate(self._classifier_names):
+                ax = axes.flat[i]
+
+                ax.plot(
+                    [0, 1],
+                    [0, 1],
+                    color="gray",
+                    linestyle="--",
+                    linewidth=0.8,
+                )
+
+                self._compute_classifier_roc(
+                    name, mean_fpr, colors[i], ax, show_individual
+                )
+
+                ax.set_xlabel("False Positive Rate")
+                ax.set_ylabel("True Positive Rate")
+                ax.set_title(name)
+                ax.legend(fontsize=6, loc="lower right")
+                configure_spine(ax)
+
+            for ax in axes.flat[n:]:
+                ax.set_visible(False)
+
+            fig.set_layout_engine("tight")
+
+        if save:
+            fname = filename or "comparison_roc.png"
+            self._save_figure(fig, fname, dpi)
+
+        plt.close(fig)
+        return fig
+
+    def plot_all(
+        self,
+        dpi: int = 150,
+        save: bool = True,
+        parallel: bool = True,
+    ) -> dict:
+        """Run all plot methods and return the resulting figures.
 
         Args:
             dpi (int, optional): Figure resolution passed to each plot method.
                 Defaults to 150.
+            save (bool, optional): Whether sub-plot calls write their figures
+                and CSVs to disk. Piped through to each plot method.
+                Defaults to ``True``.
+            parallel (bool, optional): Run the plot tasks concurrently via a
+                :class:`ThreadPoolExecutor`. Set to ``False`` if matplotlib
+                rcParams contention causes visual artefacts. Defaults to
+                ``True``.
 
         Returns:
-            dict[str, Any]: Dictionary with keys ``"metric_bar"``
-                (dict[str, plt.Figure] — one figure per metric),
-                ``"comparison_grid"``, ``"roc"`` (plt.Figure),
-                ``"seed_stability"`` (dict[str, plt.Figure] — one figure per
-                metric), and ``"ranking"`` (pd.DataFrame ranked by recall).
-
-        Examples:
-            >>> results = comparator.plot_all()
-            >>> results["ranking"].head()
+            dict: Dictionary with keys ``"metric_bar"``, ``"seed_stability"``
+                (each a ``dict[str, plt.Figure]``), ``"comparison_grid"``,
+                ``"roc"``, ``"pr"`` (each a ``plt.Figure``), and
+                ``"ranking"`` (``pd.DataFrame``). Failed tasks store
+                ``None`` for the corresponding key.
         """
-        return {
-            "metric_bar": self.plot_metric_bar(dpi=dpi),
-            "seed_stability": self.plot_seed_stability(dpi=dpi),
-            "comparison_grid": self.plot_comparison_grid(dpi=dpi),
-            "roc": self.plot_roc(dpi=dpi),
-            "ranking": self.get_ranking(),
+        tasks = {
+            "metric_bar": lambda: self.plot_metric_bar(dpi=dpi, save=save),
+            "seed_stability": lambda: self.plot_seed_stability(dpi=dpi, save=save),
+            "comparison_grid": lambda: self.plot_comparison_grid(dpi=dpi, save=save),
+            "roc": lambda: self.plot_roc(dpi=dpi, save=save),
+            "pr": lambda: self.plot_pr(dpi=dpi, save=save),
+            "ranking": self.get_ranking,
         }
+
+        if not parallel:
+            results: dict = {}
+            for name, fn in tasks.items():
+                try:
+                    results[name] = fn()
+                except Exception as exc:
+                    logger.warning(f"Plot {name!r} failed: {exc}")
+                    results[name] = None
+            return results
+
+        results = {}
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(fn): name for name, fn in tasks.items()}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    results[name] = future.result()
+                except Exception as exc:
+                    logger.warning(f"Plot {name!r} failed: {exc}")
+                    results[name] = None
+        return results
