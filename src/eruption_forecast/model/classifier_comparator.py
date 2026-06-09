@@ -8,12 +8,18 @@ ranking table across the classifiers it covers.
 import os
 import math
 from typing import Self, Literal
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.metrics import (
+    roc_curve,
+    roc_auc_score,
+    precision_recall_curve,
+    average_precision_score,
+)
 
 from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import (
@@ -58,14 +64,14 @@ class ClassifierComparator:
     Args:
         metrics_ensemble (MetricsEnsemble): A ``MetricsEnsemble`` whose
             ``compute()`` has already populated ``metrics`` and ``y_probas``.
-        output_dir (str | None, optional): Root output directory. When None,
-            falls back to ``metrics_ensemble.output_dir``; the comparator
-            always appends ``comparison/`` to whichever root is resolved.
-            Defaults to None.
         metrics (str | list[str] | None, optional): Metric or ordered list of
             metrics used for ranking and plots. The first entry is the default
             ranking metric. When None, uses ``DEFAULT_METRICS``. Defaults to
             None.
+        output_dir (str | None, optional): Root output directory. When None,
+            falls back to ``metrics_ensemble.output_dir``; the comparator
+            always appends ``comparison/`` to whichever root is resolved.
+            Defaults to None.
 
     Raises:
         ValueError: If ``metrics_ensemble.metrics`` is empty (``compute()``
@@ -83,8 +89,8 @@ class ClassifierComparator:
     def __init__(
         self,
         metrics_ensemble: MetricsEnsemble,
-        output_dir: str | None = None,
         metrics: str | list[str] | None = None,
+        output_dir: str | None = None,
     ) -> None:
         if not metrics_ensemble.metrics:
             raise ValueError(
@@ -132,10 +138,12 @@ class ClassifierComparator:
             features_df (pd.DataFrame): Feature matrix aligned to ``y_true``.
             y_true (pd.Series | np.ndarray): Ground-truth binary labels.
             kind (Literal["training", "prediction"]): Evaluation context;
-                threaded to ``MetricsEnsemble`` so its output dir is
-                ``{output_dir}/{kind}/``. Defaults to ``"training"``.
+                stored on the constructed ``MetricsEnsemble`` and, when
+                ``output_dir`` is provided, appended to it so artefacts land
+                under ``{output_dir}/{kind}/``. Defaults to ``"training"``.
             output_dir (str | None, optional): Root output directory passed to
-                ``MetricsEnsemble``. Defaults to None.
+                ``MetricsEnsemble``. ``kind`` is appended automatically when
+                this is set. Defaults to None.
             root_dir (str | None, optional): Project root passed to
                 ``MetricsEnsemble`` for path resolution. Defaults to None.
             metrics (str | list[str] | None, optional): Metric or list of
@@ -156,12 +164,16 @@ class ClassifierComparator:
             ...     output_dir=training_model.output_dir,
             ... )
         """
+        resolved_output_dir = (
+            os.path.join(output_dir, kind) if output_dir is not None else None
+        )
+
         metrics_ensemble = MetricsEnsemble(
             classifier_ensemble=classifier_ensemble,
             features_df=features_df,
             y_true=y_true,
             kind=kind,
-            output_dir=output_dir,
+            output_dir=resolved_output_dir,
             root_dir=root_dir,
             n_jobs=n_jobs,
             verbose=verbose,
@@ -169,13 +181,9 @@ class ClassifierComparator:
 
         return cls(
             metrics_ensemble=metrics_ensemble,
-            output_dir=output_dir,
+            output_dir=resolved_output_dir,
             metrics=metrics,
         )
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _save_figure(self, fig: plt.Figure, filename: str, dpi: int) -> None:
         """Save a figure to the figures subdirectory.
@@ -265,10 +273,6 @@ class ClassifierComparator:
             for name, df in self._metrics_ensemble.metrics.items()
         }
 
-    # ------------------------------------------------------------------
-    # Aggregate metrics / ranking
-    # ------------------------------------------------------------------
-
     def get_metrics_table(self) -> pd.DataFrame:
         """Return a DataFrame of aggregate metrics for every classifier.
 
@@ -294,7 +298,8 @@ class ClassifierComparator:
             for metric_name in numeric.columns:
                 col = numeric[metric_name]
                 flat[f"{metric_name}_mean"] = float(col.mean())
-                flat[f"{metric_name}_std"] = float(col.std())
+                # ``ddof=0`` so a single-seed run yields 0.0 rather than NaN.
+                flat[f"{metric_name}_std"] = float(col.std(ddof=0))
                 flat[f"{metric_name}_min"] = float(col.min())
                 flat[f"{metric_name}_max"] = float(col.max())
             rows[name] = flat
@@ -341,15 +346,13 @@ class ClassifierComparator:
 
         return ranked
 
-    # ------------------------------------------------------------------
-    # ROC iteration
-    # ------------------------------------------------------------------
-
     def _iter_seed_roc_data(self, name: str):
         """Yield ``(y_true, y_proba)`` pairs for every seed of one classifier.
 
         Reads directly from ``metrics_ensemble.y_probas[name]`` columns and
-        ``metrics_ensemble.y_true`` — no per-seed model reload.
+        ``metrics_ensemble.y_true`` — no per-seed model reload. The
+        ``y_true`` conversion to ``np.ndarray`` happens once outside the
+        loop and the same array is yielded each iteration.
 
         Args:
             name (str): Classifier name; must be a key of
@@ -360,9 +363,9 @@ class ClassifierComparator:
                 for each seed column.
         """
         y_probas = self._metrics_ensemble.y_probas[name]
-        y_true = self._metrics_ensemble.y_true
+        y_true = np.asarray(self._metrics_ensemble.y_true)
         for seed_idx in range(y_probas.shape[1]):
-            yield np.asarray(y_true), y_probas[:, seed_idx]
+            yield y_true, y_probas[:, seed_idx]
 
     def _compute_classifier_roc(
         self,
@@ -434,9 +437,170 @@ class ClassifierComparator:
 
         return mean_tpr, std_tpr, mean_auc
 
-    # ------------------------------------------------------------------
-    # Bar charts
-    # ------------------------------------------------------------------
+    def _compute_classifier_pr(
+        self,
+        name: str,
+        mean_recall: np.ndarray,
+        color: str,
+        ax: plt.Axes,
+        show_individual: bool,
+    ) -> tuple[np.ndarray, np.ndarray, float] | None:
+        """Compute and draw the mean PR curve for one classifier.
+
+        Iterates over per-seed ``(y_true, y_proba)`` pairs from
+        :meth:`_iter_seed_roc_data`, calls
+        :func:`sklearn.metrics.precision_recall_curve`, reverses the
+        descending-recall arrays so they are monotonically increasing for
+        ``np.interp``, and aggregates precision onto the common ``mean_recall``
+        grid. Per-seed AP is computed via
+        :func:`sklearn.metrics.average_precision_score`.
+
+        Args:
+            name (str): Classifier name used for the legend label.
+            mean_recall (np.ndarray): Common recall grid onto which precision
+                values are interpolated before averaging.
+            color (str): Hex colour string for this classifier's curves.
+            ax (plt.Axes): Axes to draw on.
+            show_individual (bool): Whether to draw per-seed PR curves as
+                thin dashed lines.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, float] | None:
+                ``(mean_precision, std_precision, mean_ap)`` if at least one
+                seed was processed, else ``None``.
+        """
+        precisions_interp: list[np.ndarray] = []
+        aps: list[float] = []
+
+        for y_true, y_proba in self._iter_seed_roc_data(name):
+            try:
+                precisions, recalls, _ = precision_recall_curve(y_true, y_proba)
+                aps.append(average_precision_score(y_true, y_proba))
+            except (ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_pr.")
+                continue
+
+            # precision_recall_curve returns recalls in decreasing order;
+            # reverse both arrays so np.interp sees a monotonically
+            # increasing x-grid.
+            recalls_asc = recalls[::-1]
+            precisions_paired = precisions[::-1]
+            precisions_interp.append(
+                np.interp(mean_recall, recalls_asc, precisions_paired)
+            )
+
+            if show_individual:
+                ax.plot(
+                    recalls,
+                    precisions,
+                    color=color,
+                    alpha=0.15,
+                    linewidth=0.6,
+                    linestyle="--",
+                )
+
+        if not precisions_interp:
+            return None
+
+        mean_precision = np.mean(precisions_interp, axis=0)
+        std_precision = np.std(precisions_interp, axis=0)
+        mean_ap = float(np.mean(aps))
+
+        ax.plot(
+            mean_recall,
+            mean_precision,
+            color=color,
+            linewidth=1.5,
+            label=f"{name} (AP={mean_ap:.3f})",
+        )
+        ax.fill_between(
+            mean_recall,
+            np.clip(mean_precision - std_precision, 0, 1),
+            np.clip(mean_precision + std_precision, 0, 1),
+            alpha=0.12,
+            color=color,
+        )
+
+        return mean_precision, std_precision, mean_ap
+
+    def plot_pr(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+        show_individual: bool = False,
+    ) -> plt.Figure:
+        """Plot one PR subplot per classifier in a grid (≤4 columns).
+
+        Mirrors :meth:`plot_roc` but uses
+        :func:`sklearn.metrics.precision_recall_curve` and
+        :func:`sklearn.metrics.average_precision_score`. The horizontal
+        baseline is the positive-class prevalence (``y_true.mean()``).
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override output filename. Defaults
+                to ``"comparison_pr.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+            show_individual (bool, optional): Draw per-seed curves as thin
+                dashed lines. Defaults to False.
+
+        Returns:
+            plt.Figure: The matplotlib figure.
+        """
+        colors = self._color_cycle()
+        mean_recall = np.linspace(0, 1, 200)
+
+        y_true = np.asarray(self._metrics_ensemble.y_true)
+        baseline = float(y_true.mean()) if len(y_true) else 0.0
+
+        n = len(self._classifier_names)
+        ncols = min(4, n)
+        nrows = math.ceil(n / ncols)
+
+        with apply_nature_style():
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(ncols * 3.2, nrows * 3.2),
+                squeeze=False,
+            )
+
+            for i, name in enumerate(self._classifier_names):
+                ax = axes.flat[i]
+
+                ax.hlines(
+                    baseline,
+                    0,
+                    1,
+                    color="gray",
+                    linestyle="--",
+                    linewidth=0.8,
+                )
+
+                self._compute_classifier_pr(
+                    name, mean_recall, colors[i], ax, show_individual
+                )
+
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1.02)
+                ax.set_xlabel("Recall")
+                ax.set_ylabel("Precision")
+                ax.set_title(name)
+                ax.legend(fontsize=6, loc="lower left")
+                configure_spine(ax)
+
+            for ax in axes.flat[n:]:
+                ax.set_visible(False)
+
+            fig.set_layout_engine("tight")
+
+        if save:
+            fname = filename or "comparison_pr.png"
+            self._save_figure(fig, fname, dpi)
+
+        plt.close(fig)
+        return fig
 
     @staticmethod
     def _draw_metric_bars(
@@ -595,10 +759,6 @@ class ClassifierComparator:
             )
 
         return figures
-
-    # ------------------------------------------------------------------
-    # Seed stability
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _draw_stability_violin(
@@ -767,10 +927,6 @@ class ClassifierComparator:
 
         return figures
 
-    # ------------------------------------------------------------------
-    # Classifier × metric grid
-    # ------------------------------------------------------------------
-
     def _draw_grid_cell(
         self,
         ax: plt.Axes,
@@ -882,10 +1038,6 @@ class ClassifierComparator:
         plt.close(fig)
         return fig
 
-    # ------------------------------------------------------------------
-    # ROC
-    # ------------------------------------------------------------------
-
     def plot_roc(
         self,
         save: bool = True,
@@ -954,27 +1106,59 @@ class ClassifierComparator:
         plt.close(fig)
         return fig
 
-    # ------------------------------------------------------------------
-    # All-in-one
-    # ------------------------------------------------------------------
-
-    def plot_all(self, dpi: int = 150) -> dict:
+    def plot_all(
+        self,
+        dpi: int = 150,
+        save: bool = True,
+        parallel: bool = True,
+    ) -> dict:
         """Run all plot methods and return the resulting figures.
 
         Args:
             dpi (int, optional): Figure resolution passed to each plot method.
                 Defaults to 150.
+            save (bool, optional): Whether sub-plot calls write their figures
+                and CSVs to disk. Piped through to each plot method.
+                Defaults to ``True``.
+            parallel (bool, optional): Run the plot tasks concurrently via a
+                :class:`ThreadPoolExecutor`. Set to ``False`` if matplotlib
+                rcParams contention causes visual artefacts. Defaults to
+                ``True``.
 
         Returns:
             dict: Dictionary with keys ``"metric_bar"``, ``"seed_stability"``
                 (each a ``dict[str, plt.Figure]``), ``"comparison_grid"``,
-                ``"roc"`` (each a ``plt.Figure``), and ``"ranking"``
-                (``pd.DataFrame``).
+                ``"roc"``, ``"pr"`` (each a ``plt.Figure``), and
+                ``"ranking"`` (``pd.DataFrame``). Failed tasks store
+                ``None`` for the corresponding key.
         """
-        return {
-            "metric_bar": self.plot_metric_bar(dpi=dpi),
-            "seed_stability": self.plot_seed_stability(dpi=dpi),
-            "comparison_grid": self.plot_comparison_grid(dpi=dpi),
-            "roc": self.plot_roc(dpi=dpi),
-            "ranking": self.get_ranking(),
+        tasks = {
+            "metric_bar": lambda: self.plot_metric_bar(dpi=dpi, save=save),
+            "seed_stability": lambda: self.plot_seed_stability(dpi=dpi, save=save),
+            "comparison_grid": lambda: self.plot_comparison_grid(dpi=dpi, save=save),
+            "roc": lambda: self.plot_roc(dpi=dpi, save=save),
+            "pr": lambda: self.plot_pr(dpi=dpi, save=save),
+            "ranking": self.get_ranking,
         }
+
+        if not parallel:
+            results: dict = {}
+            for name, fn in tasks.items():
+                try:
+                    results[name] = fn()
+                except Exception as exc:
+                    logger.warning(f"Plot {name!r} failed: {exc}")
+                    results[name] = None
+            return results
+
+        results = {}
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(fn): name for name, fn in tasks.items()}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    results[name] = future.result()
+                except Exception as exc:
+                    logger.warning(f"Plot {name!r} failed: {exc}")
+                    results[name] = None
+        return results
