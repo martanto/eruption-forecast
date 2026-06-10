@@ -396,6 +396,74 @@ class ClassifierComparator:
 
         return ranked
 
+    def plot_roc(
+        self,
+        save: bool = True,
+        filename: str | None = None,
+        dpi: int = 150,
+        show_individual: bool = False,
+    ) -> plt.Figure:
+        """Plot one ROC subplot per classifier in a grid (≤4 columns).
+
+        Args:
+            save (bool, optional): Whether to save the figure. Defaults to True.
+            filename (str | None, optional): Override output filename. Defaults
+                to ``"comparison_roc.png"``.
+            dpi (int, optional): Figure resolution. Defaults to 150.
+            show_individual (bool, optional): Draw per-seed curves as thin
+                dashed lines. Defaults to False.
+
+        Returns:
+            plt.Figure: The matplotlib figure.
+        """
+        colors = self._color_cycle()
+        mean_fpr = np.linspace(0, 1, 200)
+
+        n = len(self._classifier_names)
+        ncols = min(4, n)
+        nrows = math.ceil(n / ncols)
+
+        with apply_nature_style():
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(ncols * 3.2, nrows * 3.2),
+                squeeze=False,
+            )
+
+            for i, name in enumerate(self._classifier_names):
+                ax = axes.flat[i]
+
+                ax.plot(
+                    [0, 1],
+                    [0, 1],
+                    color="gray",
+                    linestyle="--",
+                    linewidth=0.8,
+                )
+
+                self._compute_classifier_roc(
+                    name, mean_fpr, colors[i], ax, show_individual
+                )
+
+                ax.set_xlabel("False Positive Rate")
+                ax.set_ylabel("True Positive Rate")
+                ax.set_title(name)
+                ax.legend(fontsize=6, loc="lower right")
+                configure_spine(ax)
+
+            for ax in axes.flat[n:]:
+                ax.set_visible(False)
+
+            fig.set_layout_engine("tight")
+
+        if save:
+            fname = filename or "comparison_roc.png"
+            self._save_figure(fig, fname, dpi)
+
+        plt.close(fig)
+        return fig
+
     def plot_pr(
         self,
         save: bool = True,
@@ -670,74 +738,6 @@ class ClassifierComparator:
 
         if save:
             fname = filename or "comparison_grid.png"
-            self._save_figure(fig, fname, dpi)
-
-        plt.close(fig)
-        return fig
-
-    def plot_roc(
-        self,
-        save: bool = True,
-        filename: str | None = None,
-        dpi: int = 150,
-        show_individual: bool = False,
-    ) -> plt.Figure:
-        """Plot one ROC subplot per classifier in a grid (≤4 columns).
-
-        Args:
-            save (bool, optional): Whether to save the figure. Defaults to True.
-            filename (str | None, optional): Override output filename. Defaults
-                to ``"comparison_roc.png"``.
-            dpi (int, optional): Figure resolution. Defaults to 150.
-            show_individual (bool, optional): Draw per-seed curves as thin
-                dashed lines. Defaults to False.
-
-        Returns:
-            plt.Figure: The matplotlib figure.
-        """
-        colors = self._color_cycle()
-        mean_fpr = np.linspace(0, 1, 200)
-
-        n = len(self._classifier_names)
-        ncols = min(4, n)
-        nrows = math.ceil(n / ncols)
-
-        with apply_nature_style():
-            fig, axes = plt.subplots(
-                nrows,
-                ncols,
-                figsize=(ncols * 3.2, nrows * 3.2),
-                squeeze=False,
-            )
-
-            for i, name in enumerate(self._classifier_names):
-                ax = axes.flat[i]
-
-                ax.plot(
-                    [0, 1],
-                    [0, 1],
-                    color="gray",
-                    linestyle="--",
-                    linewidth=0.8,
-                )
-
-                self._compute_classifier_roc(
-                    name, mean_fpr, colors[i], ax, show_individual
-                )
-
-                ax.set_xlabel("False Positive Rate")
-                ax.set_ylabel("True Positive Rate")
-                ax.set_title(name)
-                ax.legend(fontsize=6, loc="lower right")
-                configure_spine(ax)
-
-            for ax in axes.flat[n:]:
-                ax.set_visible(False)
-
-            fig.set_layout_engine("tight")
-
-        if save:
-            fname = filename or "comparison_roc.png"
             self._save_figure(fig, fname, dpi)
 
         plt.close(fig)
