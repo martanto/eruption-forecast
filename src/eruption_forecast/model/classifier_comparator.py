@@ -178,25 +178,6 @@ class ClassifierComparator:
             metrics=metrics,
         )
 
-    def _save_figure(self, fig: plt.Figure, filename: str, dpi: int) -> None:
-        """Save a figure to the figures subdirectory.
-
-        Args:
-            fig (plt.Figure): Figure to save.
-            filename (str): PNG filename (without path).
-            dpi (int): Resolution in dots per inch.
-        """
-        ensure_dir(self.figures_dir)
-        path = os.path.join(self.figures_dir, filename)
-        fig.savefig(path, dpi=dpi, bbox_inches="tight")
-        logger.info(f"Saved comparison figure: {path}")
-
-    def _color_cycle(self) -> list[str]:
-        """Return one ``OKABE_ITO`` colour per classifier, cycling if needed."""
-        n = len(self._classifier_names)
-        colors = list(OKABE_ITO)
-        return [colors[i % len(colors)] for i in range(n)]
-
     @staticmethod
     def _validate_metrics(metrics_list: list[str], table: pd.DataFrame) -> None:
         """Raise ``ValueError`` for any metric not present in ``table``.
@@ -218,14 +199,6 @@ class ClassifierComparator:
                 f"Unknown metric(s): {invalid}. Available metrics: {sorted(available)}"
             )
 
-    def _resolve_metrics(self, metrics: str | list[str] | None) -> list[str]:
-        """Normalise a metrics argument to a list."""
-        if metrics is None:
-            return list(self.metrics)
-        if isinstance(metrics, str):
-            return [metrics]
-        return list(metrics)
-
     @staticmethod
     def _build_legend_patches(
         clf_names: list[str],
@@ -236,6 +209,63 @@ class ClassifierComparator:
             mpatches.Patch(facecolor=clf_colors[i], label=name)
             for i, name in enumerate(clf_names)
         ]
+
+    @staticmethod
+    def _draw_stability_violin(
+        ax: plt.Axes,
+        clf_names: list[str],
+        clf_colors: list[str],
+        all_records: dict[str, list[dict]],
+        metric: str,
+        rng: np.random.Generator,
+    ) -> None:
+        """Draw a violin + strip plot for one metric onto an existing Axes."""
+        data_list = [
+            [r[metric] for r in all_records[name] if metric in r] for name in clf_names
+        ]
+        positions = np.arange(1, len(clf_names) + 1)
+
+        non_empty = [(d, p) for d, p in zip(data_list, positions, strict=True) if d]
+        if not non_empty:
+            ax.set_xticks([])
+            ax.set_ylabel("Score")
+            ax.set_title(metric.replace("_", " ").title(), fontsize=9)
+            configure_spine(ax)
+            return
+
+        data_list_filt, positions_filt = zip(*non_empty, strict=True)
+        data_list_filt = list(data_list_filt)
+        positions_filt = np.array(positions_filt)
+
+        parts: dict = ax.violinplot(
+            data_list_filt,
+            positions=positions_filt,
+            showmeans=False,
+            showmedians=True,
+            showextrema=True,
+        )
+
+        for i, pc in enumerate(parts["bodies"]):
+            pc.set_facecolor(clf_colors[i])
+            pc.set_alpha(0.6)
+
+        for i, vals in enumerate(data_list_filt):
+            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+            ax.scatter(
+                positions_filt[i] + jitter,
+                vals,
+                color="grey",
+                s=12,
+                alpha=0.7,
+                zorder=3,
+                linewidths=0,
+            )
+
+        ax.set_ylim(0.0, 1.0)
+        ax.set_xticks([])
+        ax.set_ylabel("Score")
+        ax.set_title(metric.replace("_", " ").title(), fontsize=9)
+        configure_spine(ax)
 
     @staticmethod
     def _attach_legend(
@@ -254,17 +284,44 @@ class ClassifierComparator:
             bbox_to_anchor=bbox_to_anchor,
         )
 
-    def _per_seed_records(self) -> dict[str, list[dict]]:
-        """Return per-seed metric records keyed by classifier name.
+    @staticmethod
+    def _draw_metric_bars(
+        ax: plt.Axes,
+        clf_names: list[str],
+        clf_colors: list[str],
+        means: np.ndarray,
+        stds: np.ndarray,
+        metric: str,
+    ) -> None:
+        """Draw a bar chart of mean ± std onto an existing Axes."""
+        bar_width = 0.6
 
-        Converts each ``metrics_ensemble.metrics[clf]`` DataFrame into a list
-        of row-dicts. The ``random_state`` index is surfaced as a column so it
-        appears in each record alongside the metric values.
-        """
-        return {
-            name: df.reset_index().to_dict(orient="records")
-            for name, df in self._metrics_ensemble.metrics.items()
-        }
+        for ci, (_clf, clr) in enumerate(zip(clf_names, clf_colors, strict=True)):
+            ax.bar(
+                ci,
+                means[ci],
+                width=bar_width,
+                yerr=stds[ci],
+                capsize=3,
+                color=clr,
+                edgecolor="black",
+                linewidth=0.5,
+                error_kw={"elinewidth": 0.8, "ecolor": "black"},
+            )
+            ax.text(
+                ci,
+                means[ci] + stds[ci] * 0.05 + 0.005,
+                f"{means[ci]:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=6,
+            )
+
+        ax.set_ylim(0.0, 1.0)
+        ax.set_xticks([])
+        ax.set_ylabel("Score")
+        ax.set_title(metric.replace("_", " ").title(), fontsize=9)
+        configure_spine(ax)
 
     def get_metrics_table(self) -> pd.DataFrame:
         """Return a DataFrame of aggregate metrics for every classifier.
@@ -338,183 +395,6 @@ class ClassifierComparator:
         logger.info(f"Saved ranking table: {csv_path}")
 
         return ranked
-
-    def _iter_seed_roc_data(self, name: str):
-        """Yield ``(y_true, y_proba)`` pairs for every seed of one classifier.
-
-        Reads directly from ``metrics_ensemble.y_probas[name]`` columns and
-        ``metrics_ensemble.y_true`` — no per-seed model reload. The
-        ``y_true`` conversion to ``np.ndarray`` happens once outside the
-        loop and the same array is yielded each iteration.
-
-        Args:
-            name (str): Classifier name; must be a key of
-                ``metrics_ensemble.y_probas``.
-
-        Yields:
-            tuple[np.ndarray, np.ndarray]: ``(y_true_array, y_proba_array)``
-                for each seed column.
-        """
-        y_probas = self._metrics_ensemble.y_probas[name]
-        y_true = np.asarray(self._metrics_ensemble.y_true)
-        for seed_idx in range(y_probas.shape[1]):
-            yield y_true, y_probas[:, seed_idx]
-
-    def _compute_classifier_roc(
-        self,
-        name: str,
-        mean_fpr: np.ndarray,
-        color: str,
-        ax: plt.Axes,
-        show_individual: bool,
-    ) -> tuple[np.ndarray, np.ndarray, float] | None:
-        """Compute and draw the mean ROC curve for one classifier.
-
-        Args:
-            name (str): Classifier name used for the legend label and warnings.
-            mean_fpr (np.ndarray): Common FPR grid onto which TPR values are
-                interpolated before averaging.
-            color (str): Hex colour string for this classifier's curves.
-            ax (plt.Axes): Axes to draw on.
-            show_individual (bool): Whether to draw per-seed curves as thin
-                dashed lines.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray, float] | None:
-                ``(mean_tpr, std_tpr, mean_auc)`` if at least one seed was
-                processed, else ``None``.
-        """
-        tprs: list[np.ndarray] = []
-        aucs: list[float] = []
-
-        for y_true, y_proba in self._iter_seed_roc_data(name):
-            try:
-                fpr, tpr, _ = roc_curve(y_true, y_proba)
-                aucs.append(roc_auc_score(y_true, y_proba))
-                tprs.append(np.interp(mean_fpr, fpr, tpr))
-            except (ValueError, KeyError):
-                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
-                continue
-
-            if show_individual:
-                ax.plot(
-                    fpr,
-                    tpr,
-                    color=color,
-                    alpha=0.15,
-                    linewidth=0.6,
-                    linestyle="--",
-                )
-
-        if not tprs:
-            return None
-
-        mean_tpr = np.mean(tprs, axis=0)
-        std_tpr = np.std(tprs, axis=0)
-        mean_auc = float(np.mean(aucs))
-
-        ax.plot(
-            mean_fpr,
-            mean_tpr,
-            color=color,
-            linewidth=1.5,
-            label=f"{name} (AUC={mean_auc:.3f})",
-        )
-        ax.fill_between(
-            mean_fpr,
-            np.clip(mean_tpr - std_tpr, 0, 1),
-            np.clip(mean_tpr + std_tpr, 0, 1),
-            alpha=0.12,
-            color=color,
-        )
-
-        return mean_tpr, std_tpr, mean_auc
-
-    def _compute_classifier_pr(
-        self,
-        name: str,
-        mean_recall: np.ndarray,
-        color: str,
-        ax: plt.Axes,
-        show_individual: bool,
-    ) -> tuple[np.ndarray, np.ndarray, float] | None:
-        """Compute and draw the mean PR curve for one classifier.
-
-        Iterates over per-seed ``(y_true, y_proba)`` pairs from
-        :meth:`_iter_seed_roc_data`, calls
-        :func:`sklearn.metrics.precision_recall_curve`, reverses the
-        descending-recall arrays so they are monotonically increasing for
-        ``np.interp``, and aggregates precision onto the common ``mean_recall``
-        grid. Per-seed AP is computed via
-        :func:`sklearn.metrics.average_precision_score`.
-
-        Args:
-            name (str): Classifier name used for the legend label.
-            mean_recall (np.ndarray): Common recall grid onto which precision
-                values are interpolated before averaging.
-            color (str): Hex colour string for this classifier's curves.
-            ax (plt.Axes): Axes to draw on.
-            show_individual (bool): Whether to draw per-seed PR curves as
-                thin dashed lines.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray, float] | None:
-                ``(mean_precision, std_precision, mean_ap)`` if at least one
-                seed was processed, else ``None``.
-        """
-        precisions_interp: list[np.ndarray] = []
-        aps: list[float] = []
-
-        for y_true, y_proba in self._iter_seed_roc_data(name):
-            try:
-                precisions, recalls, _ = precision_recall_curve(y_true, y_proba)
-                aps.append(average_precision_score(y_true, y_proba))
-            except (ValueError, KeyError):
-                logger.warning(f"Skipped a seed for '{name}' in plot_pr.")
-                continue
-
-            # precision_recall_curve returns recalls in decreasing order;
-            # reverse both arrays so np.interp sees a monotonically
-            # increasing x-grid.
-            recalls_asc = recalls[::-1]
-            precisions_paired = precisions[::-1]
-            precisions_interp.append(
-                np.interp(mean_recall, recalls_asc, precisions_paired)
-            )
-
-            if show_individual:
-                ax.plot(
-                    recalls,
-                    precisions,
-                    color=color,
-                    alpha=0.15,
-                    linewidth=0.6,
-                    linestyle="--",
-                )
-
-        if not precisions_interp:
-            return None
-
-        mean_precision = np.mean(precisions_interp, axis=0)
-        std_precision = np.std(precisions_interp, axis=0)
-        mean_ap = float(np.mean(aps))
-
-        ax.plot(
-            mean_recall,
-            mean_precision,
-            color=color,
-            linewidth=1.5,
-            label=f"{name} (AP={mean_ap:.3f})",
-        )
-        ax.fill_between(
-            mean_recall,
-            np.clip(mean_precision - std_precision, 0, 1),
-            np.clip(mean_precision + std_precision, 0, 1),
-            alpha=0.12,
-            color=color,
-        )
-
-        return mean_precision, std_precision, mean_ap
 
     def plot_pr(
         self,
@@ -595,94 +475,6 @@ class ClassifierComparator:
         plt.close(fig)
         return fig
 
-    @staticmethod
-    def _draw_metric_bars(
-        ax: plt.Axes,
-        clf_names: list[str],
-        clf_colors: list[str],
-        means: np.ndarray,
-        stds: np.ndarray,
-        metric: str,
-    ) -> None:
-        """Draw a bar chart of mean ± std onto an existing Axes."""
-        bar_width = 0.6
-
-        for ci, (_clf, clr) in enumerate(zip(clf_names, clf_colors, strict=True)):
-            ax.bar(
-                ci,
-                means[ci],
-                width=bar_width,
-                yerr=stds[ci],
-                capsize=3,
-                color=clr,
-                edgecolor="black",
-                linewidth=0.5,
-                error_kw={"elinewidth": 0.8, "ecolor": "black"},
-            )
-            ax.text(
-                ci,
-                means[ci] + stds[ci] * 0.05 + 0.005,
-                f"{means[ci]:.3f}",
-                ha="center",
-                va="bottom",
-                fontsize=6,
-            )
-
-        ax.set_ylim(0.0, 1.0)
-        ax.set_xticks([])
-        ax.set_ylabel("Score")
-        ax.set_title(metric.replace("_", " ").title(), fontsize=9)
-        configure_spine(ax)
-
-    def _build_combined_bar_figure(
-        self,
-        metrics_list: list[str],
-        table: pd.DataFrame,
-        clf_names: list[str],
-        clf_colors: list[str],
-        legend_handles: list[mpatches.Patch],
-        save: bool,
-        dpi: int,
-    ) -> plt.Figure:
-        """Build the combined overview bar figure for all metrics."""
-        n_clf = len(clf_names)
-        n_cols = min(4, len(metrics_list))
-        n_rows = int(np.ceil(len(metrics_list) / n_cols))
-
-        with apply_nature_style():
-            fig_all, axes_all = plt.subplots(
-                n_rows,
-                n_cols,
-                figsize=(n_cols * max(2.5, n_clf * 0.65), n_rows * 3.2),
-                squeeze=False,
-            )
-
-            for i, m in enumerate(metrics_list):
-                row, col = divmod(i, n_cols)
-                ax = axes_all[row][col]
-                mean_col = f"{m}_mean"
-                std_col = f"{m}_std"
-                means = table[mean_col].to_numpy()
-                stds = (
-                    table[std_col].to_numpy()
-                    if std_col in table.columns
-                    else np.zeros(len(means))
-                )
-                self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
-
-            for j in range(len(metrics_list), n_rows * n_cols):
-                row, col = divmod(j, n_cols)
-                axes_all[row][col].set_visible(False)
-
-        self._attach_legend(fig_all, legend_handles, len(clf_names), (0.5, -0.02))
-        fig_all.set_layout_engine("tight")
-
-        if save:
-            self._save_figure(fig_all, "metric_bar_all.png", dpi)
-
-        plt.close(fig_all)
-        return fig_all
-
     def plot_metric_bar(
         self,
         metrics: str | list[str] | None = None,
@@ -753,105 +545,6 @@ class ClassifierComparator:
 
         return figures
 
-    @staticmethod
-    def _draw_stability_violin(
-        ax: plt.Axes,
-        clf_names: list[str],
-        clf_colors: list[str],
-        all_records: dict[str, list[dict]],
-        metric: str,
-        rng: np.random.Generator,
-    ) -> None:
-        """Draw a violin + strip plot for one metric onto an existing Axes."""
-        data_list = [
-            [r[metric] for r in all_records[name] if metric in r] for name in clf_names
-        ]
-        positions = np.arange(1, len(clf_names) + 1)
-
-        non_empty = [(d, p) for d, p in zip(data_list, positions, strict=True) if d]
-        if not non_empty:
-            ax.set_xticks([])
-            ax.set_ylabel("Score")
-            ax.set_title(metric.replace("_", " ").title(), fontsize=9)
-            configure_spine(ax)
-            return
-
-        data_list_filt, positions_filt = zip(*non_empty, strict=True)
-        data_list_filt = list(data_list_filt)
-        positions_filt = np.array(positions_filt)
-
-        parts: dict = ax.violinplot(
-            data_list_filt,
-            positions=positions_filt,
-            showmeans=False,
-            showmedians=True,
-            showextrema=True,
-        )
-
-        for i, pc in enumerate(parts["bodies"]):
-            pc.set_facecolor(clf_colors[i])
-            pc.set_alpha(0.6)
-
-        for i, vals in enumerate(data_list_filt):
-            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
-            ax.scatter(
-                positions_filt[i] + jitter,
-                vals,
-                color="grey",
-                s=12,
-                alpha=0.7,
-                zorder=3,
-                linewidths=0,
-            )
-
-        ax.set_ylim(0.0, 1.0)
-        ax.set_xticks([])
-        ax.set_ylabel("Score")
-        ax.set_title(metric.replace("_", " ").title(), fontsize=9)
-        configure_spine(ax)
-
-    def _build_combined_stability_figure(
-        self,
-        metrics_list: list[str],
-        clf_names: list[str],
-        clf_colors: list[str],
-        all_records: dict[str, list[dict]],
-        legend_patches: list[mpatches.Patch],
-        save: bool,
-        dpi: int,
-    ) -> plt.Figure:
-        """Build the combined overview stability figure for all metrics."""
-        n_cols = min(4, len(metrics_list))
-        n_rows = int(np.ceil(len(metrics_list) / n_cols))
-        rng_all = np.random.default_rng(42)
-
-        with apply_nature_style():
-            fig_all, axes_all = plt.subplots(
-                n_rows,
-                n_cols,
-                figsize=(n_cols * max(2.5, len(clf_names) * 0.85), n_rows * 3.2),
-                squeeze=False,
-            )
-
-            for i, m in enumerate(metrics_list):
-                row, col = divmod(i, n_cols)
-                self._draw_stability_violin(
-                    axes_all[row][col], clf_names, clf_colors, all_records, m, rng_all
-                )
-
-            for j in range(len(metrics_list), n_rows * n_cols):
-                row, col = divmod(j, n_cols)
-                axes_all[row][col].set_visible(False)
-
-        self._attach_legend(fig_all, legend_patches, len(clf_names), (0.5, -0.02))
-        fig_all.set_layout_engine("tight")
-
-        if save:
-            self._save_figure(fig_all, "seed_stability_all.png", dpi)
-
-        plt.close(fig_all)
-        return fig_all
-
     def plot_seed_stability(
         self,
         metrics: str | list[str] | None = None,
@@ -919,55 +612,6 @@ class ClassifierComparator:
             )
 
         return figures
-
-    def _draw_grid_cell(
-        self,
-        ax: plt.Axes,
-        vals: list[float],
-        color: str,
-        row: int,
-        col: int,
-        metric: str,
-        rng: np.random.Generator,
-    ) -> None:
-        """Draw a violin + strip plot for one (classifier, metric) grid cell."""
-        clf_name = self._classifier_names[row]
-
-        if vals:
-            parts: dict = ax.violinplot(
-                [vals],
-                positions=[1],
-                showmeans=False,
-                showmedians=True,
-                showextrema=True,
-            )
-
-            parts["bodies"][0].set_facecolor(color)
-            parts["bodies"][0].set_alpha(0.55)
-
-            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
-            ax.scatter(
-                np.ones(len(vals)) + jitter,
-                vals,
-                color=color,
-                s=6,
-                alpha=0.6,
-                zorder=3,
-                linewidths=0,
-            )
-
-        if row == 0:
-            ax.set_title(metric.replace("_", " ").title(), fontsize=8, pad=4)
-
-        if col == 0:
-            ax.set_ylabel(clf_name, fontsize=8)
-        else:
-            ax.set_ylabel("")
-
-        ax.set_xticks([])
-        ax.tick_params(axis="y", labelsize=7)
-
-        configure_spine(ax)
 
     def plot_comparison_grid(
         self,
@@ -1155,3 +799,359 @@ class ClassifierComparator:
                     logger.warning(f"Plot {name!r} failed: {exc}")
                     results[name] = None
         return results
+
+    def _save_figure(self, fig: plt.Figure, filename: str, dpi: int) -> None:
+        """Save a figure to the figures subdirectory.
+
+        Args:
+            fig (plt.Figure): Figure to save.
+            filename (str): PNG filename (without path).
+            dpi (int): Resolution in dots per inch.
+        """
+        ensure_dir(self.figures_dir)
+        path = os.path.join(self.figures_dir, filename)
+        fig.savefig(path, dpi=dpi, bbox_inches="tight")
+        logger.info(f"Saved comparison figure: {path}")
+
+    def _color_cycle(self) -> list[str]:
+        """Return one ``OKABE_ITO`` colour per classifier, cycling if needed."""
+        n = len(self._classifier_names)
+        colors = list(OKABE_ITO)
+        return [colors[i % len(colors)] for i in range(n)]
+
+    def _resolve_metrics(self, metrics: str | list[str] | None) -> list[str]:
+        """Normalise a metrics argument to a list."""
+        if metrics is None:
+            return list(self.metrics)
+        if isinstance(metrics, str):
+            return [metrics]
+        return list(metrics)
+
+    def _per_seed_records(self) -> dict[str, list[dict]]:
+        """Return per-seed metric records keyed by classifier name.
+
+        Converts each ``metrics_ensemble.metrics[clf]`` DataFrame into a list
+        of row-dicts. The ``random_state`` index is surfaced as a column so it
+        appears in each record alongside the metric values.
+        """
+        return {
+            name: df.reset_index().to_dict(orient="records")
+            for name, df in self._metrics_ensemble.metrics.items()
+        }
+
+    def _iter_seed_roc_data(self, name: str):
+        """Yield ``(y_true, y_proba)`` pairs for every seed of one classifier.
+
+        Reads directly from ``metrics_ensemble.y_probas[name]`` columns and
+        ``metrics_ensemble.y_true`` — no per-seed model reload. The
+        ``y_true`` conversion to ``np.ndarray`` happens once outside the
+        loop and the same array is yielded each iteration.
+
+        Args:
+            name (str): Classifier name; must be a key of
+                ``metrics_ensemble.y_probas``.
+
+        Yields:
+            tuple[np.ndarray, np.ndarray]: ``(y_true_array, y_proba_array)``
+                for each seed column.
+        """
+        y_probas = self._metrics_ensemble.y_probas[name]
+        y_true = np.asarray(self._metrics_ensemble.y_true)
+        for seed_idx in range(y_probas.shape[1]):
+            yield y_true, y_probas[:, seed_idx]
+
+    def _compute_classifier_roc(
+        self,
+        name: str,
+        mean_fpr: np.ndarray,
+        color: str,
+        ax: plt.Axes,
+        show_individual: bool,
+    ) -> tuple[np.ndarray, np.ndarray, float] | None:
+        """Compute and draw the mean ROC curve for one classifier.
+
+        Args:
+            name (str): Classifier name used for the legend label and warnings.
+            mean_fpr (np.ndarray): Common FPR grid onto which TPR values are
+                interpolated before averaging.
+            color (str): Hex colour string for this classifier's curves.
+            ax (plt.Axes): Axes to draw on.
+            show_individual (bool): Whether to draw per-seed curves as thin
+                dashed lines.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, float] | None:
+                ``(mean_tpr, std_tpr, mean_auc)`` if at least one seed was
+                processed, else ``None``.
+        """
+        tprs: list[np.ndarray] = []
+        aucs: list[float] = []
+
+        for y_true, y_proba in self._iter_seed_roc_data(name):
+            try:
+                fpr, tpr, _ = roc_curve(y_true, y_proba)
+                aucs.append(roc_auc_score(y_true, y_proba))
+                tprs.append(np.interp(mean_fpr, fpr, tpr))
+            except (ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_roc.")
+                continue
+
+            if show_individual:
+                ax.plot(
+                    fpr,
+                    tpr,
+                    color=color,
+                    alpha=0.15,
+                    linewidth=0.6,
+                    linestyle="--",
+                )
+
+        if not tprs:
+            return None
+
+        mean_tpr = np.mean(tprs, axis=0)
+        std_tpr = np.std(tprs, axis=0)
+        mean_auc = float(np.mean(aucs))
+
+        ax.plot(
+            mean_fpr,
+            mean_tpr,
+            color=color,
+            linewidth=1.5,
+            label=f"{name} (AUC={mean_auc:.3f})",
+        )
+        ax.fill_between(
+            mean_fpr,
+            np.clip(mean_tpr - std_tpr, 0, 1),
+            np.clip(mean_tpr + std_tpr, 0, 1),
+            alpha=0.12,
+            color=color,
+        )
+
+        return mean_tpr, std_tpr, mean_auc
+
+    def _compute_classifier_pr(
+        self,
+        name: str,
+        mean_recall: np.ndarray,
+        color: str,
+        ax: plt.Axes,
+        show_individual: bool,
+    ) -> tuple[np.ndarray, np.ndarray, float] | None:
+        """Compute and draw the mean PR curve for one classifier.
+
+        Iterates over per-seed ``(y_true, y_proba)`` pairs from
+        :meth:`_iter_seed_roc_data`, calls
+        :func:`sklearn.metrics.precision_recall_curve`, reverses the
+        descending-recall arrays so they are monotonically increasing for
+        ``np.interp``, and aggregates precision onto the common ``mean_recall``
+        grid. Per-seed AP is computed via
+        :func:`sklearn.metrics.average_precision_score`.
+
+        Args:
+            name (str): Classifier name used for the legend label.
+            mean_recall (np.ndarray): Common recall grid onto which precision
+                values are interpolated before averaging.
+            color (str): Hex colour string for this classifier's curves.
+            ax (plt.Axes): Axes to draw on.
+            show_individual (bool): Whether to draw per-seed PR curves as
+                thin dashed lines.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, float] | None:
+                ``(mean_precision, std_precision, mean_ap)`` if at least one
+                seed was processed, else ``None``.
+        """
+        precisions_interp: list[np.ndarray] = []
+        aps: list[float] = []
+
+        for y_true, y_proba in self._iter_seed_roc_data(name):
+            try:
+                precisions, recalls, _ = precision_recall_curve(y_true, y_proba)
+                aps.append(average_precision_score(y_true, y_proba))
+            except (ValueError, KeyError):
+                logger.warning(f"Skipped a seed for '{name}' in plot_pr.")
+                continue
+
+            # precision_recall_curve returns recalls in decreasing order;
+            # reverse both arrays so np.interp sees a monotonically
+            # increasing x-grid.
+            recalls_asc = recalls[::-1]
+            precisions_paired = precisions[::-1]
+            precisions_interp.append(
+                np.interp(mean_recall, recalls_asc, precisions_paired)
+            )
+
+            if show_individual:
+                ax.plot(
+                    recalls,
+                    precisions,
+                    color=color,
+                    alpha=0.15,
+                    linewidth=0.6,
+                    linestyle="--",
+                )
+
+        if not precisions_interp:
+            return None
+
+        mean_precision = np.mean(precisions_interp, axis=0)
+        std_precision = np.std(precisions_interp, axis=0)
+        mean_ap = float(np.mean(aps))
+
+        ax.plot(
+            mean_recall,
+            mean_precision,
+            color=color,
+            linewidth=1.5,
+            label=f"{name} (AP={mean_ap:.3f})",
+        )
+        ax.fill_between(
+            mean_recall,
+            np.clip(mean_precision - std_precision, 0, 1),
+            np.clip(mean_precision + std_precision, 0, 1),
+            alpha=0.12,
+            color=color,
+        )
+
+        return mean_precision, std_precision, mean_ap
+
+    def _build_combined_bar_figure(
+        self,
+        metrics_list: list[str],
+        table: pd.DataFrame,
+        clf_names: list[str],
+        clf_colors: list[str],
+        legend_handles: list[mpatches.Patch],
+        save: bool,
+        dpi: int,
+    ) -> plt.Figure:
+        """Build the combined overview bar figure for all metrics."""
+        n_clf = len(clf_names)
+        n_cols = min(4, len(metrics_list))
+        n_rows = int(np.ceil(len(metrics_list) / n_cols))
+
+        with apply_nature_style():
+            fig_all, axes_all = plt.subplots(
+                n_rows,
+                n_cols,
+                figsize=(n_cols * max(2.5, n_clf * 0.65), n_rows * 3.2),
+                squeeze=False,
+            )
+
+            for i, m in enumerate(metrics_list):
+                row, col = divmod(i, n_cols)
+                ax = axes_all[row][col]
+                mean_col = f"{m}_mean"
+                std_col = f"{m}_std"
+                means = table[mean_col].to_numpy()
+                stds = (
+                    table[std_col].to_numpy()
+                    if std_col in table.columns
+                    else np.zeros(len(means))
+                )
+                self._draw_metric_bars(ax, clf_names, clf_colors, means, stds, m)
+
+            for j in range(len(metrics_list), n_rows * n_cols):
+                row, col = divmod(j, n_cols)
+                axes_all[row][col].set_visible(False)
+
+        self._attach_legend(fig_all, legend_handles, len(clf_names), (0.5, -0.02))
+        fig_all.set_layout_engine("tight")
+
+        if save:
+            self._save_figure(fig_all, "metric_bar_all.png", dpi)
+
+        plt.close(fig_all)
+        return fig_all
+
+    def _build_combined_stability_figure(
+        self,
+        metrics_list: list[str],
+        clf_names: list[str],
+        clf_colors: list[str],
+        all_records: dict[str, list[dict]],
+        legend_patches: list[mpatches.Patch],
+        save: bool,
+        dpi: int,
+    ) -> plt.Figure:
+        """Build the combined overview stability figure for all metrics."""
+        n_cols = min(4, len(metrics_list))
+        n_rows = int(np.ceil(len(metrics_list) / n_cols))
+        rng_all = np.random.default_rng(42)
+
+        with apply_nature_style():
+            fig_all, axes_all = plt.subplots(
+                n_rows,
+                n_cols,
+                figsize=(n_cols * max(2.5, len(clf_names) * 0.85), n_rows * 3.2),
+                squeeze=False,
+            )
+
+            for i, m in enumerate(metrics_list):
+                row, col = divmod(i, n_cols)
+                self._draw_stability_violin(
+                    axes_all[row][col], clf_names, clf_colors, all_records, m, rng_all
+                )
+
+            for j in range(len(metrics_list), n_rows * n_cols):
+                row, col = divmod(j, n_cols)
+                axes_all[row][col].set_visible(False)
+
+        self._attach_legend(fig_all, legend_patches, len(clf_names), (0.5, -0.02))
+        fig_all.set_layout_engine("tight")
+
+        if save:
+            self._save_figure(fig_all, "seed_stability_all.png", dpi)
+
+        plt.close(fig_all)
+        return fig_all
+
+    def _draw_grid_cell(
+        self,
+        ax: plt.Axes,
+        vals: list[float],
+        color: str,
+        row: int,
+        col: int,
+        metric: str,
+        rng: np.random.Generator,
+    ) -> None:
+        """Draw a violin + strip plot for one (classifier, metric) grid cell."""
+        clf_name = self._classifier_names[row]
+
+        if vals:
+            parts: dict = ax.violinplot(
+                [vals],
+                positions=[1],
+                showmeans=False,
+                showmedians=True,
+                showextrema=True,
+            )
+
+            parts["bodies"][0].set_facecolor(color)
+            parts["bodies"][0].set_alpha(0.55)
+
+            jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+            ax.scatter(
+                np.ones(len(vals)) + jitter,
+                vals,
+                color=color,
+                s=6,
+                alpha=0.6,
+                zorder=3,
+                linewidths=0,
+            )
+
+        if row == 0:
+            ax.set_title(metric.replace("_", " ").title(), fontsize=8, pad=4)
+
+        if col == 0:
+            ax.set_ylabel(clf_name, fontsize=8)
+        else:
+            ax.set_ylabel("")
+
+        ax.set_xticks([])
+        ax.tick_params(axis="y", labelsize=7)
+
+        configure_spine(ax)
