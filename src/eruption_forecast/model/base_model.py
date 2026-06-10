@@ -494,11 +494,11 @@ class BaseModel(ABC):
         features_builder = FeaturesBuilder(
             tremor_matrix_df=tremor_matrix_df,
             label_df=features_label,
+            select_features=select_features,
             output_dir=features_dir,
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             verbose=self.verbose,
-            select_features=select_features,
         )
 
         return features_builder
