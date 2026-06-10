@@ -1,6 +1,6 @@
 # %%
 import os
-from typing import Any
+from typing import Any, TypedDict, NotRequired
 
 from dotenv import load_dotenv
 
@@ -8,6 +8,16 @@ from eruption_forecast import send_telegram_notification
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.model.forecast_model import ForecastModel
+
+
+class Scenario(TypedDict):
+    name: str
+    description: str
+    train_start_date: str
+    train_end_date: str
+    prediction_start_date: str
+    prediction_end_date: str
+    plot_kwargs: NotRequired[dict[str, Any]]
 
 
 # %%
@@ -24,7 +34,9 @@ eruption_dates = [
     "2025-08-02",
     "2025-08-18",
 ]
-scenarios = [
+
+
+scenarios: list[Scenario] = [
     {
         "name": "Scenario 1",
         "description": "Training using 1 eruption to forecast eruption 2",
@@ -80,6 +92,9 @@ scenarios = [
         "train_end_date": "2025-07-26",
         "prediction_start_date": "2025-07-27",
         "prediction_end_date": "2025-08-22",
+        "plot_kwargs": {
+            "legend_n_cols": 4,
+        },
     },
     {
         "name": "Scenario 9",
@@ -88,8 +103,19 @@ scenarios = [
         "train_end_date": "2025-08-22",
         "prediction_start_date": "2025-01-01",
         "prediction_end_date": "2025-08-22",
+        "plot_kwargs": {
+            "rolling_window": "6h",
+            "x_days_interval": 14,
+            "legend_n_cols": 4,
+        },
     },
 ]
+
+
+def build_plot_kwargs(scenario: Scenario, eruption_dates: list[str]) -> dict[str, Any]:
+    plot_kwargs = dict(scenario.get("plot_kwargs", {}))
+    plot_kwargs["eruption_dates"] = eruption_dates
+    return plot_kwargs
 
 
 def main(sds_dir: str, n_jobs: int = 2):
@@ -119,13 +145,12 @@ def main(sds_dir: str, n_jobs: int = 2):
         n_jobs=n_jobs,
         verbose=False,
     )
+
     # %%
     for scenario in scenarios:
         name = scenario["name"]
         description = scenario["description"]
-        plot_kwargs: Any = {
-            "eruption_dates": eruption_dates,
-        }
+        plot_kwargs = build_plot_kwargs(scenario, eruption_dates)
 
         logger.info("=================================")
         logger.info(f"Running {name}: {description}")
