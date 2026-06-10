@@ -61,6 +61,7 @@ __all__ = [
     "__author_email__",
     "__license__",
     "__copyright__",
+    "__url__",
     "LabelData",
     "TremorData",
     "LabelBuilder",
