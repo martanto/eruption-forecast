@@ -160,7 +160,7 @@ def main(sds_dir: str, n_jobs: int = 2):
                 "has_duplicate_min",
                 "has_duplicate",
             ],
-            seeds=25,
+            seeds=10,
             resample_method="under",
             plot_features=True,
             output_dir=output_dir,
