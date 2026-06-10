@@ -1,511 +1,441 @@
 # Architecture
 
-## Package Layout
+This page is the structural reference for `eruption_forecast`: every module under `src/`, the top-level pipeline, how the model and ensemble classes relate, what flows between stages on disk, and the utility surface that holds the rest together.
+
+---
+
+## 1. Package Layout
 
 ```
 src/eruption_forecast/
-├── data_container.py      # BaseDataContainer — shared ABC for TremorData & LabelData
-├── tremor/              # Seismic tremor processing
-│   ├── calculate_tremor.py    # CalculateTremor — main orchestrator
-│   ├── rsam.py                # Real Seismic Amplitude Measurement
-│   ├── dsar.py                # Displacement Seismic Amplitude Ratio
-│   ├── shannon_entropy.py     # Shannon Entropy metric
-│   └── tremor_data.py         # TremorData — wraps tremor CSV
-├── label/               # Training label generation
-│   ├── label_builder.py           # LabelBuilder — global sliding window labelling
-│   ├── dynamic_label_builder.py   # DynamicLabelBuilder — per-eruption windows
-│   └── label_data.py              # LabelData — wraps label CSV
-├── features/            # Feature extraction & selection
-│   ├── features_builder.py    # FeaturesBuilder — tsfresh extraction
-│   ├── feature_selector.py    # FeatureSelector — 3-method selection
-│   └── tremor_matrix_builder.py  # TremorMatrixBuilder — windowed alignment
-├── model/               # ML model training & prediction
-│   ├── forecast_model.py      # ForecastModel — full pipeline orchestrator
-│   ├── model_trainer.py       # ModelTrainer — multi-seed training
-│   ├── model_predictor.py     # ModelPredictor — inference & forecasting
-│   ├── model_evaluator.py     # ModelEvaluator — single-seed evaluation
-│   ├── multi_model_evaluator.py  # MultiModelEvaluator — aggregate evaluation
-│   ├── base_ensemble.py       # BaseEnsemble — shared save/load mixin
-│   ├── seed_ensemble.py       # SeedEnsemble — all seeds, 1 classifier
-│   ├── classifier_ensemble.py # ClassifierEnsemble — N SeedEnsembles
-│   └── classifier_model.py    # ClassifierModel — classifier + grid management
-├── sources/             # Seismic data source adapters
-│   ├── base.py                # SeismicDataSource — abstract base class
-│   ├── sds.py                 # SDS reader (SeisComP Data Structure)
-│   └── fdsn.py                # FDSN web service client with local caching
-├── config/              # Pipeline configuration
-│   └── pipeline_config.py     # PipelineConfig + sub-config dataclasses
-├── plots/               # Visualization utilities
-│   ├── tremor_plots.py
-│   ├── feature_plots.py
-│   ├── evaluation_plots.py
-│   └── shap_plots.py
-├── utils/               # Focused utility modules
-│   ├── array.py               # Z-score outlier detection
-│   ├── window.py              # Sliding window construction
-│   ├── date_utils.py          # Date conversion and filename parsing
-│   ├── dataframe.py           # DataFrame helpers
-│   ├── ml.py                  # Resampling and feature utilities
-│   ├── validation.py          # Centralised validation (dates, random state, columns, sampling)
-│   ├── pathutils.py           # Path resolution relative to root_dir
-│   └── formatting.py          # Text formatting
-└── decorators/          # Function decorators and Telegram notify helper
-    └── notify.py              # Telegram notification decorator + direct send function
+├── __init__.py            — public exports
+├── logger.py              — loguru wrapper (enable/disable/set_level/set_directory)
+├── data_container.py      — BaseDataContainer ABC for TremorData / LabelData
+│
+├── config/
+│   ├── base_config.py         — shared config primitives
+│   ├── constants.py           — ERUPTION_PROBABILITY_THRESHOLD, defaults
+│   ├── forecast_config.py     — ForecastConfig + per-stage sub-configs
+│   └── training_config.py     — TrainingConfig (standalone TrainingModel)
+│
+├── dataclass/
+│   └── station_data.py        — StationData (immutable nslc identity)
+│
+├── decorators/
+│   ├── decorator_class.py     — base decorator scaffolding
+│   └── notify.py              — Telegram notify + send_telegram_notification
+│
+├── ensemble/
+│   ├── base_ensemble.py       — BaseEnsemble (joblib save/load mixin)
+│   ├── seed_ensemble.py       — SeedEnsemble (one classifier × N seeds)
+│   ├── classifier_ensemble.py — ClassifierEnsemble (N classifiers)
+│   └── metrics_ensemble.py    — MetricsEnsemble (metrics engine)
+│
+├── features/
+│   ├── constants.py
+│   ├── tremor_matrix_builder.py — TremorMatrixBuilder (windowed alignment)
+│   ├── features_builder.py      — FeaturesBuilder (tsfresh extraction)
+│   └── feature_selector.py      — FeatureSelector (tsfresh FDR + RF importance)
+│
+├── label/
+│   ├── constants.py
+│   ├── label_builder.py         — LabelBuilder (sliding window)
+│   ├── dynamic_label_builder.py — DynamicLabelBuilder (per-eruption build)
+│   ├── label_data.py            — LabelData (CSV wrapper)
+│   └── label_plots.py           — plot_label_distribution
+│
+├── model/
+│   ├── constants.py
+│   ├── base_model.py            — BaseModel ABC (dates, I/O, save/load)
+│   ├── cache_model.py           — CacheModel mixin (content-addressed cache)
+│   ├── forecast_model.py        — ForecastModel orchestrator
+│   ├── training_model.py        — TrainingModel(BaseModel, CacheModel)
+│   ├── prediction_model.py      — PredictionModel(BaseModel, CacheModel)
+│   ├── evaluation_model.py      — EvaluationModel(BaseModel)
+│   ├── classifier_model.py      — ClassifierModel (estimator + grid)
+│   └── classifier_comparator.py — ClassifierComparator (cross-classifier rank)
+│
+├── plots/
+│   ├── styles.py
+│   ├── tremor_plots.py          — plot_tremor
+│   ├── feature_plots.py         — feature-importance plots
+│   ├── forecast_plots.py        — plot_forecast, plot_forecast_from_file
+│   └── evaluation_plots.py      — ROC, PR, confusion, threshold, importance
+│
+├── sources/
+│   ├── base.py                  — SeismicDataSource ABC
+│   ├── sds.py                   — Local SeisComP archive reader
+│   └── fdsn.py                  — FDSN client with local SDS caching
+│
+├── tremor/
+│   ├── calculate_tremor.py      — CalculateTremor (orchestrator)
+│   ├── rsam.py, dsar.py, shannon_entropy.py — per-metric kernels
+│   └── tremor_data.py           — TremorData (CSV wrapper)
+│
+└── utils/
+    ├── array.py, dataframe.py, date_utils.py
+    ├── formatting.py, ml.py, pathutils.py
+    ├── validation.py, window.py
 ```
+
+64 `.py` files in total.
 
 ---
 
-## Design Principles
+## 2. Pipeline Overview
 
-| Principle | What it means in practice |
-|-----------|-----------------------------|
-| **Single Responsibility** | Each module has one purpose — `rsam.py` only computes RSAM, `date_utils.py` only handles dates |
-| **DRY (Don't Repeat Yourself)** | Shared behaviour extracted into base classes (`BaseDataContainer`, `SeismicDataSource`) and utilities (`validate_random_state`, `load_labels_from_csv`) |
-| **Explicit Imports** | No hidden re-exports; import exactly what you need: `from eruption_forecast.utils.date_utils import to_datetime` |
-| **Minimal Dependencies** | Each utility module imports only its own direct dependencies |
-| **Fluent API** | All pipeline classes support method chaining via `return self` |
-| **Data Leakage Prevention** | Train/test split always happens before resampling and feature selection |
-| **Cached Properties** | `TremorData` and `LabelData` use `@cached_property` so attributes are computed once |
+```
+       ┌──────────────┐     ┌────────────────────┐    ┌─────────────────┐
+       │  Seismic     │     │  CalculateTremor   │    │   TremorData    │
+       │  archive     │ ──► │  (rsam/dsar/       │ ─► │   (CSV wrapper) │
+       │  (SDS|FDSN)  │     │   entropy/bands)   │    │                 │
+       └──────────────┘     └────────────────────┘    └────────┬────────┘
+                                                               │
+       ┌─────────────────────────── feature pipeline ──────────┴─────┐
+       │   LabelBuilder            TremorMatrixBuilder               │
+       │   DynamicLabelBuilder ──► FeaturesBuilder (tsfresh)         │
+       │                           FeatureSelector (FDR+RF)          │
+       └────────────────────────────┬────────────────────────────────┘
+                                    ▼
+                       ┌────────────────────────┐
+                       │     TrainingModel      │
+                       │   build_label →        │
+                       │   extract_features →   │
+                       │   fit (N seeds × M cv) │
+                       └──┬───────────────────┬─┘
+                          │ writes            │ assembles
+                          ▼                   ▼
+                ┌────────────────┐    ┌────────────────────────┐
+                │ SeedEnsemble × │    │   ClassifierEnsemble   │
+                │ N classifiers  │ ─► │ (all SeedEnsembles)    │
+                └────────────────┘    └──────────┬─────────────┘
+                                                 │
+                                                 ▼
+                                  ┌──────────────────────────────┐
+                                  │      PredictionModel         │
+                                  │   build_label →              │
+                                  │   extract_features →         │
+                                  │   forecast (per-seed proba)  │
+                                  └──────────┬───────────────────┘
+                                             │
+            ┌────────────────────────────────┴──────────────────────┐
+            ▼                                                       ▼
+   ┌──────────────────────┐                          ┌────────────────────────┐
+   │   EvaluationModel    │                          │  result_all_model_     │
+   │  dispatch on .kind:  │                          │  predictions_*.csv +   │
+   │  training | predict  │  ── MetricsEnsemble ──►  │  forecast PNG/PDF      │
+   └──────────┬───────────┘                          └────────────────────────┘
+              │ writes per-seed JSON + aggregate CSVs
+              ▼
+   ┌──────────────────────┐
+   │ ClassifierComparator │   ranking_*.csv + comparison figures
+   └──────────────────────┘
+```
+
+`ForecastModel` is the orchestrator that calls every box in sequence. The dashed arrows are also the **method-chain order**: `fm.calculate(...).train(...).predict(...).evaluate(...)`.
 
 ---
 
-## Pipeline Overview
+## 3. Component Details
 
-```
-Raw Seismic Data (SDS / FDSN)
-         │
-         ▼
-┌─────────────────────┐
-│   CalculateTremor   │  RSAM + DSAR + Entropy → tremor.csv
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│    LabelBuilder     │  Binary labels → label_*.csv
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ TremorMatrixBuilder │  Windowed matrix → tremor_matrix_*.csv
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│   FeaturesBuilder   │  700+ features → all_extracted_features_*.csv
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────────────────────────────┐
-│                 ModelTrainer                │
-│  ┌─────────────┐   ┌──────────────────────┐ │
-│  │FeatureSelect│   │   ClassifierModel    │ │
-│  │   or        │   │ (10 classifiers,     │ │
-│  │  combined   │   │  3 CV strategies)    │ │
-│  └─────────────┘   └──────────────────────┘ │
-│         ↓  evaluate()  ↓ train()            │
-│    80/20 split + metrics   Full dataset     │
-└─────────┬───────────────────────────────────┘
-          │  trained_model_*.csv  +  *.pkl
-          │
-          │  (optional) trainer.merge_models()
-          │  → SeedEnsemble_*.pkl  (SeedEnsemble)
-          │  → ClassifierEnsemble.pkl  (ClassifierEnsemble, auto-saved by ForecastModel)
-          ▼
-┌─────────────────────────────────────────────┐
-│               ModelPredictor                │
-│  ┌──────────────────────────────────────┐   │
-│  │ predict_proba()                      │   │
-│  │ (forecast mode — no labels needed)   │   │
-│  └──────────────────────────────────────┘   │
-│  Single model or multi-model consensus      │
-└─────────────────────────────────────────────┘
-```
+### 3.1 Tremor (`tremor/`)
 
----
+`CalculateTremor` reads seismic traces day-by-day from a `SeismicDataSource` and dispatches each day to the configured tremor kernels (`rsam.py`, `dsar.py`, `shannon_entropy.py`). Per-day CSVs are written to `tremor/daily/`, then concatenated into the merged tremor CSV at the station root. `TremorData` is a thin wrapper that exposes `df`, `start_date`, `end_date`, sampling-rate validation, and the CSV `filename` / `basename` / `filetype` triple.
 
-## Research Workflow (`main.py`)
+### 3.2 Labels (`label/`)
 
-`main.py` is the top-level research script. It runs the full pipeline in two
-sequential branches — train-with-evaluation and train-for-prediction — both
-operating on the same `ForecastModel` instance.
+Two builders share the same output shape (`id`, `is_erupted`) but differ in how positives are placed:
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        main.py  —  Stage Flow                        │
-└──────────────────────────────────────────────────────────────────────┘
-
-  fm = ForecastModel(root_dir, station, channel, …, n_jobs=6)
-       │
-       ▼
-┌─────────────────┐
-│  fm.calculate() │  CalculateTremor
-│                 │  SDS → RSAM / DSAR / Entropy → tremor_*.csv
-│                 │  dates: 2025-01-01 → 2025-12-31
-└────────┬────────┘
-         │
-         ├──────────────────────────────────────────────────────────────┐
-         │                                                              │
-         │  evaluate(fm)                              predict(fm)       │
-         │                                                              │
-         ▼                                                              ▼
-┌─────────────────┐                                            ┌─────────────────┐
-│  build_label()  │  2025-01-01 → 2025-08-24                   │  build_label()  │  2025-07-28 → 2025-08-20
-│                 │  window_step=6h, dtf=2                     │                 │  window_step=6h, dtf=2
-└────────┬────────┘                                            └────────┬────────┘
-         │                                                              │
-         ▼                                                              ▼
-┌─────────────────┐                                            ┌─────────────────┐
-│ extract_        │  FeaturesBuilder                           │ extract_        │  FeaturesBuilder
-│ features()      │  rsam_f2/f3/f4, dsar_f3-f4                 │ features()      │  (same kwargs)
-│                 │  700+ tsfresh features → CSV               │                 │
-└────────┬────────┘                                            └────────┬────────┘
-         │                                                              │
-         ▼                                                              ▼
-┌─────────────────┐                                            ┌─────────────────┐
-│  train()        │  ModelTrainer                              │  train()        │  ModelTrainer
-│  with_eval=True │  classifiers: lite-rf, rf, gb, xgb         │  with_eval=False│  (same classifiers)
-│                 │  cv: stratified, seeds: 500                │                 │  cv: stratified, seeds: 500
-│                 │  80/20 split → metrics JSON per seed       │                 │  full dataset → no metrics
-└────────┬────────┘                                            └────────┬────────┘
-         │                                                              │
-         ▼                                                              ▼
-┌─────────────────┐                                            ┌─────────────────┐
-│ MultiModel      │  per-classifier aggregate plots            │  forecast()     │  ModelPredictor
-│ Evaluator       │  ROC, PR, calibration, confusion,          │                 │  predict_proba
-│ (loop per clf)  │  SHAP, seed stability, …                   │                 │  2025-07-28 → 2025-08-20
-└────────┬────────┘                                            └─────────────────┘
-         │
-         ▼  (when ≥ 2 classifiers)
-┌─────────────────┐
-│ Classifier      │  cross-classifier comparison
-│ Comparator      │  metric bar, ROC overlay,
-│                 │  ranking CSV
-└─────────────────┘
-
-
-  Runtime flags (top-level constants in main.py):
-  ┌──────────────────────────┬─────────────────────────────────────────────┐
-  │ DEBUG                    │ Read from .env; reduces seeds to 10,        │
-  │                          │ classifiers to [lite-rf, rf]                │
-  │ N_JOBS                   │ 6 (outer parallelism)                       │
-  │ TRAINING_SEEDS           │ 500 (or 10 in DEBUG mode)                   │
-  │ CLASSIFIER               │ ["lite-rf", "rf", "gb", "xgb"]              │
-  └──────────────────────────┴─────────────────────────────────────────────┘
-```
-
----
-
-## Component Details
-
-### 1. Tremor Calculation (`src/eruption_forecast/tremor/`)
-
-**`CalculateTremor`** processes raw seismic data into tremor metrics:
-- Reads seismic data from SDS (SeisComP Data Structure) format or FDSN web services
-- Calculates three metrics across multiple frequency bands in parallel:
-  - **RSAM** (Real Seismic Amplitude Measurement): Mean amplitude per band
-  - **DSAR** (Displacement Seismic Amplitude Ratio): Ratio between consecutive bands
-  - **Shannon Entropy**: Signal complexity, single broadband column
-- Default frequency bands: `(0.01-0.1), (0.1-2), (2-5), (4.5-8), (8-16) Hz`
-- Supports multiprocessing via `n_jobs`; outputs 10-minute interval CSVs
-
-**Key classes:**
-- `CalculateTremor`: Main orchestrator (`calculate_tremor.py`)
-- `RSAM`: Mean amplitude metrics (`rsam.py`)
-- `DSAR`: Amplitude ratios between bands (`dsar.py`)
-- `ShannonEntropy`: Signal complexity metric (`shannon_entropy.py`)
-- `TremorData`: Loads and validates tremor CSV files (`tremor_data.py`)
-- `SDS`: Reads SeisComP Data Structure files (`sources/sds.py`)
-- `FDSN`: Downloads seismic data from FDSN web services with local SDS caching (`sources/fdsn.py`)
-
-**Workflow:**
-```python
-from eruption_forecast.tremor.calculate_tremor import CalculateTremor
-
-# From SDS archive
-calculate = CalculateTremor(
-    station="OJN",
-    channel="EHZ",
-    start_date="2025-01-01",
-    end_date="2025-01-03",
-    n_jobs=4
-).from_sds(sds_dir="/path/to/sds").run()
-# Output CSV columns: rsam_f0, rsam_f1, dsar_f0-f1, entropy, etc.
-
-# From FDSN web service
-calculate = CalculateTremor(
-    station="OJN",
-    channel="EHZ",
-    start_date="2025-01-01",
-    end_date="2025-01-03",
-).from_fdsn(client_url="https://service.iris.edu").run()
-```
-
-### 2. Label Building (`src/eruption_forecast/label/`)
-
-**`LabelBuilder`** generates binary labels for supervised learning:
-- Creates sliding time windows and labels them erupted (1) or not (0)
-- Uses `day_to_forecast` to look ahead N days before eruptions
-- `include_eruption_date` (default `False`): controls whether the eruption date counts toward the `day_to_forecast` window. When `True`, the window spans exactly `day_to_forecast` days ending on the eruption date. When `False`, the window covers `day_to_forecast` days strictly before the eruption date and the eruption day itself is additionally marked positive (`day_to_forecast + 1` positive days total)
-- Label filenames follow: `label_YYYY-MM-DD_YYYY-MM-DD_ws-X_step-X-unit_dtf-X.csv`
-
-**`DynamicLabelBuilder`** (extends `LabelBuilder`) generates one window per eruption:
-- Each window spans `days_before_eruption` days ending on the eruption date
-- Build proceeds in three phases:
-  1. **Initiate** — create one all-zero label DataFrame per eruption window
-  2. **Deduplicate** — concat all windows, drop duplicate datetimes from overlapping windows, sort by datetime
-  3. **Label** — iterate eruption dates and mark the `day_to_forecast` positive region on the unified frame
-- Overlapping windows are handled cleanly: duplicate datetimes are removed before labeling, so positive labels from multiple eruptions accumulate correctly in the shared frame
-- All per-eruption windows are concatenated into one DataFrame with globally unique IDs
+- **`LabelBuilder`** — sliding window over the full date range; `day_to_forecast` controls the look-ahead window. `include_eruption_date=False` (default) still marks the eruption day as positive, giving `day_to_forecast + 1` positive days per eruption.
+- **`DynamicLabelBuilder`** — extends `LabelBuilder` with a per-eruption three-phase build: (1) zero frames per eruption, (2) concat + deduplicate datetimes, (3) mark positives per eruption. Solves the issue where overlapping look-ahead windows collide in `LabelBuilder`.
 
 ```
 LabelBuilder — one global window over the full date range
-─────────────────────────────────────────────────────────────────
- start_date                                              end_date
- │                                                          │
- ├──────────────────────── window ──────────────────────────┤
- │           0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 E              │
- │                               ↑           ↑              │
- │                           dtf start   eruption           │
- └──────────────────────────────────────────────────────────┘
-
- include_eruption_date=False (default)
- │  0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  1                │
- │                       ↑              ↑  ↑                │
- │                   dtf start    day before  eruption      │
- │                                eruption    (also = 1)    │
- │  → day_to_forecast days strictly before eruption         │
- │    + eruption day = day_to_forecast + 1 positive days    │
+─────────────────────────────────────────────────────────
+ include_eruption_date=False  (default)
+   0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  1
+                        ↑              ↑  ↑
+                    dtf start       day-before eruption
+                                       eruption (also 1)
+   → dtf days strictly before eruption + eruption day = dtf+1 positives
 
  include_eruption_date=True
- │  0 0 0 0 0 0 0 0 0 0  0  1  1  1  1  1  1                │
- │                          ↑              ↑                │
- │                      dtf start      eruption             │
- │                                    (counted in dtf)      │
- │  → exactly day_to_forecast days ending on eruption day   │
+   0 0 0 0 0 0 0 0 0 0  0  1  1  1  1  1  1
+                           ↑              ↑
+                       dtf start      eruption (counted in dtf)
+   → exactly dtf days ending on the eruption day
 
-DynamicLabelBuilder — three-phase build, overlapping windows deduped
+
+DynamicLabelBuilder — per-eruption build, overlapping windows deduped
 ─────────────────────────────────────────────────────────────────────
  Phase 1: initiate (all zeros)
    Eruption A window           Eruption B window
    [0 0 0 0 0 0 0 0 0 0]      [0 0 0 0 0 0 0 0 0 0]
 
  Phase 2: concat + deduplicate datetimes
-   [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  ← unified, sorted, no duplicates
+   [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]   ← unified, sorted, unique
 
- Phase 3: mark positive labels per eruption
-   Eruption A (2025-03-20, dtf=2):  mark Mar 18–20 → 1
-   Eruption B (2025-03-23, dtf=2):  mark Mar 21–23 → 1
+ Phase 3: mark positives per eruption
+   Erup A (2025-03-20, dtf=2):  Mar 18–20 → 1
+   Erup B (2025-03-23, dtf=2):  Mar 21–23 → 1
    [0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1]
                             ↑       ↑
-                         Erup A   Erup B
-
-   dtf = days_to_forecast
-   E   = eruption date (is_erupted = 1)
-   1   = positive label within day_to_forecast window
-   0   = negative label
+                          Erup A  Erup B
 ```
 
-**Key classes:**
-- `LabelBuilder`: Creates labeled windows over a global date range (`label_builder.py`)
-- `DynamicLabelBuilder`: Per-eruption windows with three-phase build and overlap deduplication (`dynamic_label_builder.py`)
-- `LabelData`: Loads label CSV and parses parameters from filename (`label_data.py`)
+`LabelData` parses parameters (`window_size`, `window_step`, `window_step_unit`, `day_to_forecast`) directly out of the label filename so a CSV alone is enough to rehydrate the build context.
 
-### 3. Tremor Matrix Building (`src/eruption_forecast/features/`)
-
-**`TremorMatrixBuilder`** slices tremor time-series into windows aligned with labels:
-- Takes tremor DataFrame and label DataFrame as input
-- Validates sample counts per window; start/end dates are derived from the label date range (clamped to available tremor data) inside `validate()`
-- Concatenates all windows into a unified matrix with `id`, `datetime`, and tremor columns
-- Default output directory: `output/tremor/matrix`
-- Per-method matrices saved to `per_method/` subdirectory with date-stamped filenames when `save_tremor_matrix_per_method=True`
-
-### 4. Feature Extraction (`src/eruption_forecast/features/`)
-
-**`FeaturesBuilder`** extracts tsfresh features from the tremor matrix:
-- Operates in two modes:
-  - **Training mode** (labels provided): Filters windows to match labels, saves aligned label CSV
-  - **Prediction mode** (no labels): Extracts all features, disables relevance filtering
-- Runs tsfresh extraction per tremor column independently
-
-**Key classes:**
-- `FeaturesBuilder`: Orchestrates tsfresh feature extraction (`features_builder.py`)
-- `FeatureSelector`: Two-stage selection — tsfresh (statistical FDR) → RandomForest (importance) (`feature_selector.py`)
-  - Methods: `"tsfresh"`, `"random_forest"`, `"combined"`
-
-### 5. Model Training (`src/eruption_forecast/model/`)
-
-**`ModelTrainer`** trains classifiers across multiple random seeds:
-- Supports 10 classifiers: `rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`
-- CV strategies: `shuffle`, `stratified`, `shuffle-stratified`, `timeseries`
-- Uses `RandomUnderSampler` to handle class imbalance
-- Feature selection and resampled training data are cached per seed to `features/{cv-slug}/` (resampled data in `features/{cv-slug}/resampled/`) for deterministic two-phase parallel dispatch
-- Two training modes:
-  - `evaluate()`: 80/20 split → resample train → feature selection → CV → evaluate on test set → save
-  - `train()`: Resample full dataset → feature selection → CV → save (no metrics)
-
-**Key classes:**
-- `ModelTrainer`: Multi-seed training and evaluation (`model_trainer.py`)
-  - `fit(with_evaluation=True)`: Dispatches to `evaluate()` or `train()` based on flag
-  - `n_jobs`: outer seed workers; `grid_search_n_jobs`: inner `GridSearchCV`/`FeatureSelector` workers
-- `ClassifierModel`: Manages classifier instances and hyperparameter grids (`classifier_model.py`)
-- `ModelEvaluator`: Computes metrics and plots for a fitted model (`model_evaluator.py`)
-  - Methods: `get_metrics()`, `summary()`, `plot_all()`, `from_files()`, `plot_shap_summary()`, `plot_shap_waterfall()`
-  - `cv_name` parameter (default `"cv"`): slugified into the default output path `output/trainings/evaluations/classifiers/{clf-slug}/{cv-slug}/` when `output_dir` is `None`
-  - `plot_shap=True` required to enable SHAP plots in `plot_all()`
-- `MultiModelEvaluator`: Aggregate evaluation across all seeds (`multi_model_evaluator.py`)
-  - Methods: `plot_all()`, `plot_roc()`, `plot_shap_summary()`, `plot_shap_waterfall()`, `get_aggregate_metrics()`, `save_aggregate_metrics()`
-- `ModelPredictor`: Runs forecast inference (`model_predictor.py`)
-  - `predict_proba()`: Unlabelled forecasting with per-classifier + consensus output
-- `PipelineConfig`: Serialisable pipeline configuration (`src/eruption_forecast/config/pipeline_config.py`)
-
-### 5.1 Model Class Relationships
+### 3.3 Features (`features/`)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                         TRAINING PHASE                                              │
-│                                                                                                     │
-│   ┌──────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│   │                              ModelTrainer  (one classifier)                                  │  │
-│   │                                                                                              │  │
-│   │   .fit(with_evaluation=True)                     .fit(with_evaluation=False)                 │  │
-│   │           │                                                   │                              │  │
-│   │       evaluate()                                            train()                          │  │
-│   │   80/20 split → resample                            full dataset → resample                  │  │
-│   │   → feature select → CV                              → feature select → CV                   │  │
-│   │   → eval on test set                                    (no evaluation)                      │  │
-│   └───────────────────┬──────────────────────────────────────────────────────────────────────────┘  │
-│                       │ produces (per seed)                                                         │
-│                       ▼                                                                             │
-│          ┌────────────────────────┐                                                                 │
-│          │  trained_model_*.pkl   │   metrics/*.json   features/*.csv   registry.csv                │
-│          └────────────┬───────────┘                                                                 │
-│                       │                                                                             │
-│          ┌────────────┴─────────────────────────────────────────────┐                               │
-│          │ .merge_models()                                          │ .merge_classifier_models()    │
-│          ▼                                                          ▼                               │
-└──────────┼──────────────────────────────────────────────────────────────────────────────────────────┘
-           │                                                          │
-           ▼                                                          ▼
-┌─────────────────────────────┐                       ┌───────────────────────────────────────────────┐
-│        SeedEnsemble         │                       │              ClassifierEnsemble               │
-│  (all seeds, 1 classifier)  │◄───────────────────── │  (multiple SeedEnsembles, N classifiers)      │
-│                             │  contains 1..N seeds  │                                               │
-│  .predict_proba(X)          │                       │  .from_seed_ensembles(dict)                   │
-│    → (n_samples, 2)         │                       │  .from_registry_dict(dict)                    │
-│                             │                       │                                               │
-│  .predict_with_uncertainty  │                       │  .predict_proba(X) → consensus (n_samples, 2) │
-│    → (mean, std, conf, pred)│                       │                                               │
-│                             │                       │  .predict_with_uncertainty(X)                 │
-│  .save() / .load()          │                       │    → (mean, std, conf, pred, per_clf_dict)    │
-└─────────────────────────────┘                       │                                               │
-                                                      │  .classifiers  .__getitem__  .__len__         │
-                                                      │  .save() / .load()                            │
-                                                      └───────────────────────────────────────────────┘
-
-
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                        EVALUATION PHASE                                             │
-│                                                                                                     │
-│  ┌──────────────────────────┐    ┌────────────────────────────────┐    ┌────────────────────────┐   │
-│  │      ModelEvaluator      │    │      MultiModelEvaluator       │    │  ClassifierComparator  │   │
-│  │  (1 fitted model/seed)   │    │  (all seeds, 1 classifier)     │    │  (N classifiers)       │   │
-│  │                          │    │                                │    │                        │   │
-│  │  .get_metrics()          │    │  .get_aggregate_metrics()      │    │  .get_ranking_table()  │   │
-│  │  .summary()              │    │  .save_aggregate_metrics()     │    │  .save_ranking_table() │   │
-│  │  .plot_all()   (9 plots) │    │  .plot_all()    (11 plots)     │    │  .plot_all()           │   │
-│  │  .from_files()           │    │  ───────────────────────────   │    │  ────────────────────  │   │
-│  │  ─────────────────────── │    │  reads: metrics/*.json         │    │  wraps N instances of  │   │
-│  │  inputs:                 │    │         registry.csv           │    │  MultiModelEvaluator   │   │
-│  │    fitted model          │    │                                │    │  (one per classifier)  │   │
-│  │    X_test, y_test        │    │  outputs:                      │    │                        │   │
-│  │    selected_features     │    │    aggregate_metrics.csv       │    │  outputs:              │   │
-│  │                          │    │    aggregate_*.png/.csv        │    │    ranking_table.csv   │   │
-│  │  called internally by    │    │    seed_stability_*.png        │    │    comparison plots    │   │
-│  │  ModelTrainer per seed   │    │    freq_band_contribution.png  │    │                        │   │
-│  └──────────────────────────┘    └────────────────────────────────┘    └────────────────────────┘   │
-│               ▲                                  ▲                                  ▲               │
-│               │                                  │                                  │               │
-│         called per seed                 reads per-seed metrics                reads per-clf         │
-│         during training                     & registry CSV                  metrics/registries      │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  SCOPE SUMMARY
-  ─────────────────────────────────────────────────────────────────────────────
-  ModelEvaluator        → 1 model,  1 seed,   1 classifier    (micro)
-  MultiModelEvaluator   → N models, N seeds,  1 classifier    (per-classifier)
-  ClassifierComparator  → N models, N seeds,  N classifiers   (cross-classifier)
-  SeedEnsemble          → N seeds,  1 classifier              (inference)
-  ClassifierEnsemble    → N seeds,  N classifiers             (inference, consensus)
-  BaseEnsemble          → mixin providing save() / load()     (inherited by both)
-  ─────────────────────────────────────────────────────────────────────────────
+        labels (id, is_erupted)         tremor_df
+                │                            │
+                ▼                            ▼
+        ┌────────────────────────────────────────┐
+        │         TremorMatrixBuilder            │
+        │  windowed slices aligned to labels     │
+        └────────────────────┬───────────────────┘
+                             ▼
+        ┌────────────────────────────────────────┐
+        │           FeaturesBuilder              │
+        │  tsfresh extraction (per-column)       │
+        │  training: relevance-filter on labels  │
+        │  prediction: no filtering              │
+        └────────────────────┬───────────────────┘
+                             ▼
+        ┌────────────────────────────────────────┐
+        │           FeatureSelector              │
+        │  1. tsfresh FDR filter                 │
+        │  2. RandomForest importance            │
+        │  → top-N feature names per seed        │
+        └────────────────────────────────────────┘
 ```
 
+`TremorMatrixBuilder.build()` validates sample counts per window against `minimum_completion` and skips short windows so tsfresh never sees ragged input. `FeaturesBuilder` runs per-column independent extractions so adding a new tremor band does not invalidate the cached results for the others.
+
+### 3.4 Model (`model/`)
+
+The model layer follows a **mixin** pattern:
+
+- **`BaseModel`** — abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, and joblib `save()` / `load()`. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`.
+- **`CacheModel`** — abstract mixin that adds a content-addressable cache layer. Implementers declare `build_cache_identity(**kwargs) -> dict`; the mixin canonicalises the dict, SHA-256-hashes it, and reads/writes `{output_dir}/cache/{ClassName}/{hash}.pkl` (with a `.params.json` sidecar for debugging).
+- **`TrainingModel(BaseModel, CacheModel)`** — `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, then auto-merges every seed via `merge_seed_models` and every classifier via `merge_all_classifiers`.
+- **`PredictionModel(BaseModel, CacheModel)`** — `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash`, so re-training automatically invalidates downstream forecasts.
+- **`EvaluationModel(BaseModel)`** — no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
+- **`ForecastModel`** — the orchestrator. Not a `BaseModel` subclass — it owns `CalculateTremor`, builds the three stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
+
+`ClassifierModel` is the per-classifier descriptor (sklearn estimator + hyperparameter grid + slug). `ClassifierComparator` consumes the metric JSON tree written by `EvaluationModel` to rank classifiers head-to-head.
+
+### 3.5 Ensemble (`ensemble/`)
+
+```
+            BaseEnsemble (joblib save/load mixin)
+                │
+       ┌────────┴────────┐
+       ▼                 ▼
+SeedEnsemble       ClassifierEnsemble
+1 classifier ×     N classifiers ×
+N fitted seeds     1 SeedEnsemble each
++ feature lists    + factories (from_any, from_json,
+                     from_dict, from_seed_ensembles,
+                     from_registry_dict)
+
+           MetricsEnsemble  (standalone — not a BaseEnsemble subclass)
+           wraps ClassifierEnsemble + features + y_true
+           writes per-seed metrics JSON and y_proba / y_pred matrices
+```
+
+`MetricsEnsemble` is deliberately not exported from `ensemble/__init__.py` and is imported via `eruption_forecast.ensemble.metrics_ensemble` to break a `MetricsEnsemble → MetricsComputer → utils.ml → SeedEnsemble` cycle.
+
+### 3.6 Sources (`sources/`)
+
+`SeismicDataSource` is the read interface: `get(date) -> obspy.Stream`. Two concrete implementations:
+
+- **`SDS`** — pure local read from `{root}/{year}/{network}/{station}/{channel}.D/{file}`.
+- **`FDSN`** — pulls from a remote FDSN service, then caches the downloaded MSEED into a local SDS layout (`download_dir`). Repeat calls with the same date hit the local cache.
+
+### 3.7 Plots (`plots/`)
+
+`apply_nature_style()` normalises every figure to a Nature/Science-friendly palette and font stack. Each plot module is a thin functional wrapper around `matplotlib` (and `seaborn` where appropriate) — see [Visualization](Visualization) for the catalog and output paths.
+
+### 3.8 Config (`config/`)
+
+`ForecastConfig` is the round-trip record for `ForecastModel`. Its five sub-configs match the stage method signatures one-for-one:
+
+```
+ForecastConfig
+├── model:     BaseForecastConfig
+├── calculate: ForecastCalculateConfig | None
+├── train:     ForecastTrainConfig     | None
+├── predict:   ForecastPredictConfig   | None
+└── evaluate:  ForecastEvaluateConfig  | None
+```
+
+`TrainingConfig` mirrors `TrainingModel.__init__` directly and is the standalone equivalent used when `TrainingModel` runs outside `ForecastModel`.
+
+### 3.9 Decorators (`decorators/`)
+
+`notify(label)` wraps a function with start/finish/error Telegram messages. `send_telegram_notification(message, files, file_caption)` is the one-off helper used inside `scenarios.py` to ship each per-scenario plot.
+
+### 3.10 Utils (`utils/`)
+
+Eight focused modules that the rest of the codebase pulls from — see the table in [§6](#6-utility-modules).
+
 ---
 
-## Base Classes
+## 4. Model Class Relationships
 
-Two abstract base classes establish shared contracts:
+```
+                            ┌─────────────────────────┐
+                            │       BaseModel         │
+                            │   (ABC)                 │
+                            │ • dates, output_dir     │
+                            │ • tremor_data (lazy)    │
+                            │ • n_jobs clamp          │
+                            │ • save() / load()       │
+                            └────────────┬────────────┘
+                                         │ inherits
+            ┌────────────────────────────┼────────────────────────────┐
+            ▼                            ▼                            ▼
+  ┌───────────────────┐       ┌────────────────────┐      ┌────────────────────┐
+  │  TrainingModel    │       │  PredictionModel   │      │  EvaluationModel   │
+  │ + CacheModel mix  │       │ + CacheModel mix   │      │ (BaseModel only)   │
+  │                   │       │                    │      │                    │
+  │ build_label →     │       │ build_label →      │      │ dispatch on        │
+  │ extract_features →│       │ extract_features → │      │ model.kind:        │
+  │ fit (N seeds)     │       │ forecast           │      │   training |       │
+  └────────┬──────────┘       └─────────┬──────────┘      │   prediction       │
+           │                            │                 │ evaluate / compare │
+           │ produces                   │ consumes        └──────────┬─────────┘
+           ▼                            │                            │ uses
+  ┌────────────────────────┐            │                            ▼
+  │  ClassifierEnsemble    │ ◄──────────┘             ┌────────────────────────┐
+  │ ───────────────────    │                          │   MetricsEnsemble      │
+  │  • from_any            │                          │ • per-seed metrics     │
+  │  • from_json           │                          │ • y_proba / y_pred CSV │
+  │  • from_seed_ensembles │                          └───────────┬────────────┘
+  └────────┬───────────────┘                                      │ aggregates
+           │ bundles                                              ▼
+           ▼                                          ┌───────────────────────┐
+  ┌────────────────────────┐                          │ ClassifierComparator  │
+  │   SeedEnsemble × M     │                          │ • get_ranking()       │
+  │ ───────────────────    │                          │ • plot_all()          │
+  │ • predict_proba        │                          └───────────────────────┘
+  │ • predict_with_        │
+  │   uncertainty          │
+  └──────────┬─────────────┘
+             │ inherits
+             ▼
+       ┌──────────────────────┐
+       │    BaseEnsemble      │
+       │  (joblib save/load)  │
+       └──────────────────────┘
+```
 
-| Class | Module | Purpose |
-|-------|--------|---------|
-| `BaseDataContainer` | `data_container.py` | Abstract interface (`start_date_str`, `end_date_str`, `data`) shared by `TremorData` and `LabelData` |
-| `SeismicDataSource` | `sources/base.py` | Abstract interface (`get(date)`) and shared `_make_log_prefix(date)` helper for `SDS` and `FDSN` |
-| `BaseEnsemble` | `model/base_ensemble.py` | Mixin providing `save(path)` / `load(path)` via joblib; inherited by `SeedEnsemble` and `ClassifierEnsemble` |
+**Scope cheat-sheet**:
 
-These classes are exported from the package root (`from eruption_forecast import BaseDataContainer`) and from `eruption_forecast.sources` respectively.
+| Class                  | Scope (per …)              | Mixin / Inheritance          | Cache |
+|------------------------|----------------------------|------------------------------|-------|
+| `BaseModel`            | —                          | ABC                          | ✗ |
+| `CacheModel`           | —                          | ABC mixin                    | self |
+| `BaseEnsemble`         | —                          | mixin                        | ✗ |
+| `TrainingModel`        | One date span              | `BaseModel + CacheModel`     | ✓ |
+| `PredictionModel`      | One forecast window grid   | `BaseModel + CacheModel`     | ✓ |
+| `EvaluationModel`      | One trained model          | `BaseModel`                  | ✗ |
+| `SeedEnsemble`         | 1 classifier × N seeds     | `BaseEnsemble`               | ✗ |
+| `ClassifierEnsemble`   | M classifiers × N seeds    | `BaseEnsemble`               | ✗ |
+| `MetricsEnsemble`      | 1 ensemble × 1 dataset     | standalone                   | ✗ |
+| `ClassifierComparator` | M classifiers, post-eval   | standalone                   | ✗ |
+| `ForecastModel`        | Full pipeline              | standalone orchestrator      | via stages |
 
 ---
 
-## Pipeline Data Flow
+## 5. Pipeline Data Flow
 
-| Stage | Input | Output |
-|-------|-------|--------|
-| `CalculateTremor` | Raw SDS/FDSN waveforms | `tremor_*.csv` — DateTime index, RSAM/DSAR/entropy columns |
-| `LabelBuilder` | Date range + eruption dates | `label_*.csv` — DateTime index, `id`, `is_erupted` columns |
-| `TremorMatrixBuilder` | tremor DataFrame + label DataFrame | `tremor_matrix_*.csv` — long-format with `id`, `datetime`, tremor columns |
-| `FeaturesBuilder` | tremor matrix + labels | `all_extracted_features_*.csv`, `label_features_*.csv` |
-| `ModelTrainer` | features CSV + labels CSV | `models/*.pkl`, `trained_model_*.csv`, metrics files |
-| `ModelPredictor` | `*.pkl` (SeedEnsemble / ClassifierEnsemble) + new tremor | `predictions.csv`, `eruption_forecast.png` |
+### 5.1 Per-stage I/O
+
+| Stage              | Driver class               | Reads                          | Writes                                                                                       |
+|--------------------|----------------------------|--------------------------------|----------------------------------------------------------------------------------------------|
+| Tremor             | `CalculateTremor`          | `SeismicDataSource.get(date)`  | `tremor/daily/*.csv`, merged `{nslc}_{start}_{end}.csv`                                      |
+| Label              | `LabelBuilder`             | Tremor index, eruption dates   | `training/features/{cv}/features-label_*.csv`                                                |
+| Tremor matrix      | `TremorMatrixBuilder`      | Tremor CSV + labels            | `training/tremor/tremor_matrix_*.csv` (+ `per_method/`)                                      |
+| Features           | `FeaturesBuilder`          | Tremor matrix                  | `training/features/{cv}/features-matrix_*.csv`                                               |
+| Feature selection  | `FeatureSelector`          | Features + labels              | `training/features/{cv}/seed/{seed:05d}.csv` + `top_N_features.csv`                          |
+| Training fit       | `TrainingModel`            | Selected features + labels     | `training/classifiers/{clf}/{cv}/models/*.pkl` + `SeedEnsemble_*.pkl` + `ClassifierEnsemble_*.{pkl,json}` |
+| Prediction grid    | `PredictionModel`          | Tremor CSV + window grid       | `prediction/features/features-{matrix,label}_*.csv`                                          |
+| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{clf}/{seed:05d}.csv` + `result_all_model_predictions_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
+| Evaluation         | `EvaluationModel.evaluate` | y_proba + y_true               | `evaluation/{kind}/classifiers/{Clf}/metrics/json/{seed:05d}.json` + `predictions/{y_proba,y_pred,y_true}.csv` + `metrics_summary_*.csv` + `figures/*.png` |
+| Compare            | `ClassifierComparator`     | Metrics JSON tree              | `evaluation/{kind}/comparison/metrics/ranking_*.csv` + `comparison/figures/*.png`            |
+
+### 5.2 On-disk artefact graph
+
+```
+            ┌────────────────────────────────────────┐
+            │   tremor/{nslc}_{start}_{end}.csv      │  ← CalculateTremor
+            └─────────┬──────────────────────────────┘
+                      │ used by Training / Prediction / Evaluation
+                      ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │ training/                                                     │
+    │  features/{cv}/                                               │
+    │    features-matrix_*.csv ──► features-label_*.csv             │
+    │       │                                                       │
+    │       ▼                                                       │
+    │    seed/{seed:05d}.csv  ──► resampled/{seed:05d}.csv          │
+    │    top_{N}_features.csv  + .png                               │
+    │                                                               │
+    │  classifiers/                                                 │
+    │    {clf}/{cv}/models/{seed:05d}.pkl                           │
+    │    {clf}/{cv}/SeedEnsemble_*.pkl                              │
+    │    ClassifierEnsemble_{cv}.{pkl,json}                         │
+    └─────────┬─────────────────────────────────────────────────────┘
+              │ ClassifierEnsemble bundle
+              ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │ prediction/                                                   │
+    │   features/{features-matrix,features-label}_*.csv             │
+    │   results/{clf}/{seed:05d}.csv                                │
+    │   figures/forecast_*.{png,pdf}                                │
+    │ result_all_model_predictions_*.csv  (top-level dump)          │
+    └─────────┬─────────────────────────────────────────────────────┘
+              │ ClassifierEnsemble + features + y_true (rebuilt or training-derived)
+              ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │ evaluation/{training|prediction}/                             │
+    │   classifiers/{Clf}/                                          │
+    │     predictions/{y_proba,y_pred,y_true}.csv                   │
+    │     metrics/json/{seed:05d}.json                              │
+    │     metrics_summary_*.csv  + all_metrics_*.csv                │
+    │     figures/*.png                                             │
+    │   comparison/                                                 │
+    │     metrics/ranking_*.csv                                     │
+    │     figures/*.png                                             │
+    └──────────────────────────────────────────────────────────────┘
+
+           ┌──────────────────────────────────────────────────┐
+           │  cache/                                           │
+           │    TrainingModel/{hash}.pkl + {hash}.params.json  │  ← CacheModel
+           │    PredictionModel/{hash}.pkl + {hash}.params.json│
+           └──────────────────────────────────────────────────┘
+```
+
+A cache hit on `TrainingModel` short-circuits everything in the `training/` box; a cache hit on `PredictionModel` short-circuits the `prediction/` box. Evaluation is **never cached** — the metric JSONs themselves act as the cache via the `overwrite` flag.
 
 ---
 
-## Utility Modules
+## 6. Utility Modules
 
-| Module | Key Functions |
-|--------|---------------|
-| `utils/array.py` | `detect_maximum_outlier()`, `remove_outliers()`, `detect_anomalies_zscore()`, `predict_proba_from_estimator()`, `aggregate_seed_probabilities()` |
-| `utils/window.py` | `construct_windows()`, `calculate_window_metrics()` |
-| `utils/date_utils.py` | `to_datetime()`, `normalize_dates()`, `sort_dates()`, `parse_label_filename()`, `set_datetime_index()` |
-| `utils/ml.py` | `random_under_sampler()`, `get_significant_features()`, `load_labels_from_csv()`, `merge_seed_models()`, `merge_all_classifiers()` |
-| `utils/validation.py` | `validate_random_state()`, `validate_date_ranges()`, `validate_window_step()`, `validate_columns()`, `check_sampling_consistency()` |
-| `utils/pathutils.py` | `resolve_output_dir()` — resolves relative paths against `root_dir`; `ensure_dir()` — canonical directory-creation helper |
-| `utils/dataframe.py` | `load_label_csv()` — loads label CSV with datetime index; DataFrame shape/column validation helpers |
-| `utils/formatting.py` | Human-readable text formatting (elapsed time, file sizes, etc.) |
+| Module               | Key functions                                                                                                  |
+|----------------------|----------------------------------------------------------------------------------------------------------------|
+| `utils/array.py`     | `detect_maximum_outlier`, `remove_outliers`, `detect_anomalies_zscore`, `aggregate_seed_probabilities`, `predict_proba_from_estimator` |
+| `utils/window.py`    | `construct_windows`, `calculate_window_metrics`                                                                |
+| `utils/date_utils.py`| `to_datetime`, `normalize_dates`, `sort_dates`, `parse_label_filename`, `set_datetime_index`, `label_id_to_datetime` |
+| `utils/ml.py`        | `random_under_sampler`, `get_significant_features`, `load_labels_from_csv`, `merge_seed_models`, `merge_all_classifiers`, `compute_seed_eruption_probability`, `compute_model_probabilities`, `get_classifier_models`, `compute_g_mean`, `compute_seed`, `build_y_true` |
+| `utils/validation.py`| `validate_random_state`, `validate_date_ranges`, `validate_window_step`, `validate_columns`, `check_sampling_consistency` |
+| `utils/pathutils.py` | `resolve_output_dir`, `ensure_dir`, `save_figure`, `save_data`, `load_json`                                    |
+| `utils/dataframe.py` | `load_label_csv`, DataFrame shape and column helpers                                                           |
+| `utils/formatting.py`| `slugify`, human-readable elapsed time and file sizes                                                          |
 
----
+`utils/ml.merge_seed_models` and `utils/ml.merge_all_classifiers` are the bridge between the per-seed `.pkl` outputs and the `SeedEnsemble` / `ClassifierEnsemble` packaging — both are invoked at the end of `TrainingModel.fit()`.
 
-## Data Source Adapters (`src/eruption_forecast/sources/`)
-
-- **`SeismicDataSource`** (`sources/base.py`): Abstract base class declaring the `get(date)` interface and `_make_log_prefix(date)` helper shared by all adapters.
-- **`SDS`** (`sds.py`): Reads SeisComP Data Structure files directly from a local archive. Inherits from `SeismicDataSource`.
-- **`FDSN`** (`fdsn.py`): Downloads from any FDSN web service with transparent local SDS caching. Inherits from `SeismicDataSource`.
-  - `download_dir` is created automatically if absent
-  - Downloaded files are cached as SDS miniSEED so subsequent runs skip the network
-
----
-
-## Configuration Dataclasses
-
-`PipelineConfig` holds sub-configs for each pipeline stage:
-
-| Dataclass | Stage it covers |
-|-----------|----------------|
-| `BaseForecastConfig` | `ForecastModel` constructor parameters |
-| `ForecastCalculateConfig` | `calculate()` parameters |
-| `BuildLabelConfig` | `build_label()` parameters |
-| `ExtractFeaturesConfig` | `extract_features()` parameters |
-| `ForecastTrainConfig` | `train()` parameters |
-| `ForecastConfig` | `forecast()` parameters |
-
-Configs are serialised to YAML or JSON via `PipelineConfig.save()` and loaded via `ForecastModel.from_config()`. See the [Configuration](Configuration) wiki page.
+`utils/formatting.slugify` is what turns `"Scenario 1"` into `scenario-1` for the per-scenario `output_dir` used in `scenarios.py`.
