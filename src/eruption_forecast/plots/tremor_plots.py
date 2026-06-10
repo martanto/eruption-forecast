@@ -1,5 +1,3 @@
-"""Tremor time-series visualization with Nature/Science journal styling."""
-
 import os
 from typing import Literal
 from pathlib import Path
@@ -121,7 +119,7 @@ def plot_tremor(
         fig, axs = plt.subplots(
             nrows=n_rows,
             ncols=1,
-            figsize=(10, 1.5 * n_rows),
+            figsize=(10, 1.2 * n_rows),
             sharex=True,
         )
 

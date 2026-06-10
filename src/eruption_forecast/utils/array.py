@@ -35,7 +35,7 @@ from eruption_forecast.utils.pathutils import ensure_dir
 def save_forecast_seed(
     output_dir: str,
     random_state: int,
-    p_eruption: np.ndarray,
+    probabilities: np.ndarray,
     predictions: np.ndarray,
     overwrite: bool = False,
     verbose: bool = False,
@@ -49,7 +49,7 @@ def save_forecast_seed(
     Args:
         output_dir (str): Directory where the CSV will be written.
         random_state (int): Seed identifier used to build the filename.
-        p_eruption (np.ndarray): 1-D array of P(eruption) values.
+        probabilities (np.ndarray): 1-D array of P(eruption) values.
         predictions (np.ndarray): 1-D array of binary predictions (0 or 1).
         overwrite (bool, optional): If ``True``, overwrite an existing file.
             Defaults to ``False``.
@@ -60,10 +60,12 @@ def save_forecast_seed(
     filepath = os.path.join(output_dir, f"p_{random_state:05d}.csv")
     if os.path.exists(filepath) and not overwrite:
         return
+
     df = pd.DataFrame(
-        np.column_stack((1 - p_eruption, p_eruption, predictions)),
-        columns=["p_non_eruption", "p_eruption", "prediction"],
-    )
+        np.column_stack((1 - probabilities, probabilities, predictions)),
+        columns=["p_no_eruption", "p_eruption", "prediction"],
+    ).astype({"prediction": int})
+
     df.index.name = "label_id"
     df.to_csv(filepath, index=True)
     if verbose:

@@ -20,6 +20,7 @@ Key functions
   an ``id → datetime`` mapping; used for features and forecast outputs
 """
 
+from typing import Literal, overload
 from datetime import datetime
 
 import pandas as pd
@@ -61,36 +62,52 @@ def to_datetime(date: str | datetime, variable_name: str | None = None) -> datet
         )
 
 
+@overload
 def sort_dates(
-    dates: list[str], as_datetime: bool = False
-) -> list[str] | list[datetime]:
-    """Sort a list of date strings chronologically.
+    dates: list[str] | list[datetime],
+    as_datetime: Literal[False] = False,
+) -> list[str]: ...
 
-    Converts date strings to datetime objects, sorts them chronologically,
-    and returns them either as formatted strings or as datetime objects.
+
+@overload
+def sort_dates(
+    dates: list[str] | list[datetime],
+    as_datetime: Literal[True],
+) -> list[datetime]: ...
+
+
+def sort_dates(
+    dates: list[str] | list[datetime], as_datetime: bool = False
+) -> list[str] | list[datetime]:
+    """Sort a list of dates chronologically.
+
+    Accepts either ``YYYY-MM-DD`` strings or ``datetime`` objects, converts them
+    to ``datetime`` for sorting, and returns the sorted list in the requested
+    format. The return type narrows based on ``as_datetime``: ``list[str]`` when
+    ``False`` (default), ``list[datetime]`` when ``True``.
 
     Args:
-        dates (list[str]): List of date strings in YYYY-MM-DD format.
-        as_datetime (bool, optional): If True, returns a list of datetime objects
-            instead of formatted strings. Defaults to False.
+        dates (list[str] | list[datetime]): Dates as ``YYYY-MM-DD`` strings or
+            ``datetime`` objects. Mixed lists are not supported.
+        as_datetime (bool, optional): If ``True``, returns ``datetime`` objects;
+            if ``False``, returns ``YYYY-MM-DD`` strings. Defaults to ``False``.
 
     Returns:
-        list[str] | list[datetime]: Sorted dates as YYYY-MM-DD strings when
-        ``as_datetime`` is False, or as datetime objects when True.
+        list[str] | list[datetime]: Sorted dates as ``YYYY-MM-DD`` strings when
+        ``as_datetime`` is ``False``, or as ``datetime`` objects when ``True``.
 
     Examples:
         >>> sort_dates(["2025-03-20", "2025-01-15", "2025-02-10"])
         ['2025-01-15', '2025-02-10', '2025-03-20']
+        >>> sort_dates([datetime(2025, 3, 20), datetime(2025, 1, 15)], as_datetime=True)
+        [datetime.datetime(2025, 1, 15, 0, 0), datetime.datetime(2025, 3, 20, 0, 0)]
     """
-    date_series = pd.Series(dates)
-    date_series = date_series.apply(pd.to_datetime, format="%Y-%m-%d").sort_values()
+    sorted_datetimes: list[datetime] = sorted(to_datetime(_date) for _date in dates)
 
     if as_datetime:
-        return date_series.tolist()
+        return sorted_datetimes
 
-    date_list: list[str] = list(date_series.dt.strftime("%Y-%m-%d"))
-
-    return date_list
+    return [_date.strftime("%Y-%m-%d") for _date in sorted_datetimes]
 
 
 def normalize_dates(
@@ -341,7 +358,8 @@ def set_datetime_index(
     if isinstance(datetime_map, pd.Series):
         if datetime_map.name != "datetime":
             raise ValueError(
-                f"Series passed as datetime_map must be named 'datetime'. Got: '{datetime_map.name}'"
+                f"Series passed as datetime_map must be named 'datetime'. Got: {datetime_map.name!r}. "
+                f"{datetime_map}"
             )
         datetime_map = datetime_map.to_frame()
 

@@ -284,12 +284,8 @@ class ClassifierModel:
                 random_state=self.random_state,
             )
 
-        if strategy == "timeseries":
-            return TimeSeriesSplit(n_splits=self.n_splits)
-
-        raise ValueError(
-            "Unknown CV strategy {strategy}. Choose between: shuffle, stratified, shuffle-stratified, timeseries"
-        )
+        # Return TimeSeriesSplit
+        return TimeSeriesSplit(n_splits=self.n_splits)
 
     @property
     def slug_name(self) -> str:

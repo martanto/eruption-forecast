@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
-from eruption_forecast.model.seed_ensemble import SeedEnsemble
+from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
 
 # ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ class TestMergeAllClassifiers:
         xgb_csv = os.path.join(str(tmp_path), "trained_model_xgb2.csv")
         _build_registry(records_xgb, xgb_csv)
 
-        from eruption_forecast.model.classifier_ensemble import ClassifierEnsemble
+        from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
         bundle_path = merge_all_classifiers({"rf": rf_csv, "xgb": xgb_csv})
         loaded = joblib.load(bundle_path)

@@ -1,271 +1,248 @@
 # Configuration
 
-## notify — Telegram Notifications
+Every `ForecastModel` stage auto-captures its kwargs into a `ForecastConfig` object, which can be saved to YAML/JSON and replayed via `from_config() → run()`. This page covers config persistence, the dataclass layout, Telegram notifications, and runtime logging.
 
-The package provides two Telegram notification APIs:
+---
 
-- `notify`: decorator for function success/error notifications.
-- `send_telegram_notification`: direct function call for one-off messages (with optional file attachments).
-
-Both are useful for long-running steps like multi-seed training.
-
-### Setup
-
-1. Create a bot via [@BotFather](https://t.me/BotFather) and get your chat ID from [@userinfobot](https://t.me/userinfobot).
-2. Copy `.env.example` to `.env` and fill in your credentials:
+## ForecastConfig Lifecycle
 
 ```
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
+                   ┌────────────────────────────────────────┐
+                   │            ForecastModel               │
+                   │   _config: ForecastConfig              │
+                   └────────────┬───────────────────────────┘
+                                │ stage methods auto-capture kwargs
+                                ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │  ForecastConfig                                              │
+   │   ├── version, saved_at                                      │
+   │   ├── model:      BaseForecastConfig                         │
+   │   ├── calculate:  ForecastCalculateConfig | None             │
+   │   ├── train:      ForecastTrainConfig     | None             │
+   │   ├── predict:    ForecastPredictConfig   | None             │
+   │   └── evaluate:   ForecastEvaluateConfig  | None             │
+   └────────────────────────┬─────────────────────────────────────┘
+                            │
+                ┌───────────┴───────────┐
+                ▼                       ▼
+         fm.save_config()         ForecastModel.from_config(path)
+         → forecast.config.yaml   → new ForecastModel
+                                  → fm.run() replays each non-None section
 ```
 
-Credentials are loaded automatically from `.env` via `python-dotenv`.
+- A stage that hasn't run yet is `None` in the YAML — the produced config is "partial" and can be loaded + continued.
+- `fm.evaluate(...)` calls `save_config()` automatically before returning. Call it manually at earlier points to checkpoint a partial pipeline.
 
-### Basic Usage
+### Default path
+
+```
+{station_dir}/forecast.config.yaml      # fm.save_config()
+{station_dir}/forecast.config.json      # fm.save_config(fmt="json")
+```
+
+`{station_dir} = {output_dir}/{network}.{station}.{location}.{channel}` — sibling of the per-stage `cache/` directories.
+
+### Round-trip
 
 ```python
-from eruption_forecast.decorators import notify, send_telegram_notification
-
-# Credentials read from .env automatically
-@notify(name="Training Run")
-def train_model():
-    ...
-
-# Or pass credentials explicitly
-@notify(bot_token="TOKEN", chat_id="CHAT_ID", name="Training Run")
-def train_model():
-    ...
-
-# Direct function-style call (no decorator)
-send_telegram_notification(
-    message="Training run finished successfully.",
-    files=["output/forecast.png", "output/metrics.csv"],
-    file_caption="Training artifacts",
-)
-```
-
-### Message Format
-
-**Success:**
-```
-🖥 Host:       DESKTOP-ABC
-📋 Task:       train_model
-🕐 Time:       2026-02-23 14:05:00
-✅ Status:     finished successfully.
-💬 Message:    Function completed without errors.
-⏱ Elapsed:    00h 02m 35s
-```
-
-**Error:**
-```
-🖥 Host:       DESKTOP-ABC
-📋 Task:       train_model
-🕐 Time:       2026-02-23 14:05:12
-❌ Status:     raised ValueError
-💬 Message:    Something went wrong
-⏱ Elapsed:    00h 00m 12s
-```
-
-> Exceptions are always re-raised after the error notification — `notify` never swallows errors. Network errors during notification are logged and never propagate.
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `bot_token` | `str \| None` | `None` | Telegram bot token. Falls back to `TELEGRAM_BOT_TOKEN` env var |
-| `chat_id` | `str \| int \| None` | `None` | Chat ID. Falls back to `TELEGRAM_CHAT_ID` env var |
-| `name` | `str \| None` | `None` | Display name in messages. Defaults to `func.__name__` |
-| `on_success` | `bool` | `True` | Send notification on success |
-| `on_error` | `bool` | `True` | Send notification on error |
-| `include_elapsed` | `bool` | `True` | Include elapsed time in the message |
-| `files` | `list \| Callable \| None` | `None` | Files to attach on success (static list or callable receiving return value) |
-
-### File Attachments
-
-```python
-# Static list of files
-@notify(files=["output/plot.png", "output/metrics.csv"])
-def generate_report():
-    ...
-
-# Dynamic — callable receives the function's return value
-@notify(files=lambda result: [result["plot_path"]])
-def run_pipeline():
-    return {"plot_path": "output/forecast.png"}
-```
-
-PNG/JPG files are sent via `sendPhoto`; all others via `sendDocument`.
-
-### Suppressing Notifications
-
-```python
-@notify(on_success=False)   # Only notify on error
-def long_running_job(): ...
-
-@notify(on_error=False)     # Only notify on success
-def experimental_step(): ...
+fm.save_config("output/config.yaml")
+fm2 = ForecastModel.from_config("output/config.yaml")
+fm2.run()    # idempotent — replays every captured stage
 ```
 
 ---
 
-## Pipeline Configuration — Save & Replay
-
-`ForecastModel` accumulates all pipeline parameters into a `PipelineConfig` object as each stage completes. You can save it to YAML/JSON, then reload it later to replay the run or resume from a saved model.
-
-> **Important:** The config stores *parameters*, not data. All output files from each stage must still exist on disk when you replay. If files have been moved or deleted, re-run the corresponding stage with `overwrite=True`.
-
-### Saving Configuration
-
-`ForecastModel` saves automatically after `train()` and `forecast()`. You can also save manually at any point:
-
-```python
-fm.save_config()                           # YAML → {station_dir}/config.yaml
-fm.save_config("my_run.yaml")              # Custom path
-fm.save_config("my_run.json", fmt="json")  # JSON format
-fm.save_model()                            # Serialise full instance → forecast_model.pkl
-fm.save_model("my_model.pkl")             # Custom path
-```
-
-### YAML Config Format
-
-A fully annotated template is at [`config.example.yaml`](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml).
+## ForecastConfig Schema (YAML)
 
 ```yaml
-version: '1.0'
-saved_at: '2026-02-23T12:00:00'
+# eruption-forecast ForecastModel configuration
+version: "1.0"
+saved_at: "2026-06-10T11:23:45"
 
 model:
   station: OJN
   channel: EHZ
-  start_date: '2025-03-16'
-  end_date: '2025-03-22'
-  window_size: 1
-  volcano_id: MERAPI
   network: VG
-  location: '00'
-  n_jobs: 4
+  location: "00"
+  day_to_forecast: 2
+  output_dir: null
+  root_dir: null
+  overwrite: false
+  n_jobs: 8
+  verbose: true
 
 calculate:
+  start_date: "2025-01-01"
+  end_date: "2025-12-31"
   source: sds
-  sds_dir: D:/Data/OJN
+  methods: [rsam, dsar, entropy]
   remove_outlier_method: maximum
-
-build_label:
-  window_step: 12
-  window_step_unit: hours
-  day_to_forecast: 2
-  eruption_dates: ['2025-03-20']
-
-extract_features:
-  select_tremor_columns: [rsam_f2, rsam_f3]
-  use_relevant_features: false
+  remove_tremor_anomalies: false
+  interpolate: true
+  plot_daily: true
+  save_plot: true
+  overwrite_plot: true
+  sds_dir: "D:/Data/OJN"
+  client_url: "https://service.iris.edu"
+  minimum_completion_ratio: 0.3
+  overwrite: false
+  n_jobs: null               # null → inherit from model.n_jobs at replay
+  verbose: null
 
 train:
-  classifiers: [xgb]
-  cv_strategy: stratified
-  total_seed: 500
-  with_evaluation: false
-  number_of_significant_features: 20
-
-forecast:
-  start_date: '2025-03-23'
-  end_date: '2025-03-30'
-  window_step: 12
+  start_date: "2025-01-01"
+  end_date: "2025-07-26"
+  eruption_dates:
+    - "2025-03-20"
+    - "2025-04-22"
+  window_step: 6
   window_step_unit: hours
+  label_builder: standard
+  classifiers: [lite-rf, rf, gb, xgb]
+  cv_strategy: shuffle-stratified
+  cv_splits: 5
+  scoring: recall
+  top_n_features: 20
+  include_eruption_date: true
+  select_tremor_columns: [rsam_f2, rsam_f3, rsam_f4, dsar_f3-f4, entropy]
+  save_tremor_matrix_per_method: true
+  exclude_features: [agg_linear_trend, linear_trend_timewise, length]
+  seeds: 25
+  resample_method: under
+  sampling_strategy: 0.75
+  plot_features: true
+  n_jobs: 4
+  n_grids: 4
+  use_cache: true
+
+predict:
+  start_date: "2025-07-27"
+  end_date: "2025-08-22"
+  window_step: 10
+  window_step_unit: minutes
+  save_seed_result: true
+  plot_threshold: 0.7
+  plot_pdf: true
+  use_cache: false
+
+evaluate:
+  model: prediction
+  plot_per_seed: true
+  plot_aggregate: true
 ```
 
-Sections for stages that were not called are omitted.
+The keys mirror the kwargs accepted by each method 1:1 — see [API Reference](API-Reference) for the per-stage signatures.
 
-### Replay the Full Pipeline
+### `None`-as-inherit
+
+For `overwrite`, `n_jobs`, and `verbose`, a YAML value of `null` means "inherit the value `ForecastModel.__init__` was constructed with". This is the same semantics applied at runtime when the kwarg is omitted, so a replay behaves identically.
+
+---
+
+## TrainingConfig (Standalone)
+
+`TrainingModel.__init__` captures its own kwargs into a `TrainingConfig` dataclass (`config/training_config.py`), independent of `ForecastConfig`. Use this when you run `TrainingModel` outside of `ForecastModel`:
 
 ```python
-from eruption_forecast import ForecastModel
-
-fm = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
-fm.run()   # calculate() → build_label() → extract_features() → train() → forecast()
+tm.save_config()      # → {output_dir}/training.config.yaml
 ```
 
-Stages that already have output files are skipped automatically (`overwrite` defaults to `False`). To force a specific stage to re-run:
+The shape mirrors the `TrainingModel.__init__` signature — see [Training Workflow](Training-Workflow#standalone-use).
+
+---
+
+## `config.example.yaml`
+
+A fully annotated example config ships at the repo root: [`config.example.yaml`](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml). Project Rule 11 keeps it in sync with `forecast_config.py` — when any `ForecastConfig` field is added, renamed, or has its default changed, the example YAML is updated in the same commit.
+
+---
+
+## Telegram Notifications
+
+`eruption_forecast.decorators` exposes two complementary primitives.
+
+### `notify` decorator
+
+Wraps a function to send a Telegram message on success or failure:
 
 ```python
-fm = ForecastModel.from_config("output/VG.OJN.00.EHZ/config.yaml")
-fm._loaded_config.train.overwrite = True  # Force re-train only
-fm.run()
+from eruption_forecast import notify
+import dotenv; dotenv.load_dotenv()
+
+@notify("Run Forecasting")
+def main():
+    fm = ForecastModel(...)
+    fm.calculate(...).train(...).predict(...).evaluate(...)
+
+main()    # Telegram chat receives start, finish, and error messages
 ```
 
-### Resume from a Saved Model
+### `send_telegram_notification(...)` helper
 
-The pickle file embeds all in-memory state (tremor DataFrame, labels, feature DataFrame, trained model paths). The trained `.pkl` model files must still be accessible on disk.
+Used by `scenarios.py` to ship the per-scenario forecast plot:
 
 ```python
-fm = ForecastModel.load_model("output/VG.OJN.00.EHZ/forecast_model.pkl")
-fm.forecast(
-    start_date="2025-04-01",
-    end_date="2025-04-07",
-    window_step=12,
-    window_step_unit="hours",
+from eruption_forecast import send_telegram_notification
+
+send_telegram_notification(
+    message=f"{name}: {description}",
+    files=[fm.PredictionModel.forecast_plot_path],
+    file_caption=f"{name}: {description}",
+    send_as_document=True,        # preserves DPI — Telegram does not re-encode
 )
 ```
 
-### Build a Config Manually
+### Credentials (`.env`)
 
-Useful for preparing a run before executing it:
-
-```python
-from eruption_forecast import PipelineConfig
-from eruption_forecast.config import (
-    ModelConfig, CalculateConfig, BuildLabelConfig,
-    ExtractFeaturesConfig, TrainConfig, ForecastConfig,
-)
-
-config = PipelineConfig(
-    model=ModelConfig(
-        station="OJN", channel="EHZ", network="VG", location="00",
-        window_size=1, volcano_id="MERAPI", n_jobs=4,
-    ),
-    calculate=CalculateConfig(source="sds", sds_dir="D:/Data/OJN"),
-    build_label=BuildLabelConfig(
-        window_step=12, window_step_unit="hours",
-        day_to_forecast=2, eruption_dates=["2025-03-20"],
-    ),
-    extract_features=ExtractFeaturesConfig(
-        select_tremor_columns=["rsam_f2", "rsam_f3"],
-    ),
-    train=TrainConfig(classifiers=["xgb"], cv_strategy="stratified", total_seed=500),
-    forecast=ForecastConfig(
-        start_date="2025-03-23", end_date="2025-03-30",
-        window_step=12, window_step_unit="hours",
-    ),
-)
-
-config.save("my_run.yaml")
-fm = ForecastModel.from_config("my_run.yaml")
-fm.run()
+```dotenv
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_CHAT_ID=your_chat_id_here
 ```
 
-### API Summary
+- Bot token from [@BotFather](https://t.me/BotFather)
+- Chat ID from [@userinfobot](https://t.me/userinfobot)
 
-| Method | Description |
-|--------|-------------|
-| `fm.save_config(path=None, fmt="yaml")` | Save to YAML (default) or JSON |
-| `fm.save_model(path=None)` | joblib-serialise the full instance |
-| `ForecastModel.from_config(path)` | Load config, construct instance |
-| `ForecastModel.load_model(path)` | Restore serialised instance |
-| `fm.run()` | Replay all stages (only after `from_config()`) |
-| `PipelineConfig.save(path, fmt)` | Save standalone config |
-| `PipelineConfig.load(path)` | Load YAML or JSON (format from extension) |
+Both primitives degrade gracefully when the env vars are absent — they emit a warning and skip the network call instead of raising.
 
 ---
 
 ## Logging
 
-The package uses [loguru](https://loguru.readthedocs.io/) for structured logging.
+The package wraps [`loguru`](https://github.com/Delgan/loguru) behind `eruption_forecast.logger`.
+
+| Function | Purpose |
+|----------|---------|
+| `enable_logging()` | Restore console + file handlers using the current log directory |
+| `disable_logging()` | Remove every active loguru handler — no console, no file |
+| `set_log_level(level)` | Change the console handler level (`"DEBUG"` / `"INFO"` / `"WARNING"` / `"ERROR"` / `"CRITICAL"`) |
+| `set_log_directory(dir)` | Move the log file to a new directory — created if missing |
 
 ```python
+from eruption_forecast import enable_logging, disable_logging
 from eruption_forecast.logger import set_log_level, set_log_directory
 
-set_log_level("DEBUG")            # DEBUG, INFO, WARNING, ERROR
-set_log_directory("/custom/logs") # Write logs to a custom directory
+set_log_directory("logs/2026-06-10")
+set_log_level("DEBUG")        # console only — file handlers keep their level
+
+disable_logging()
+fm.calculate(...)             # silent — useful during tests
+enable_logging()              # restore handlers
 ```
 
-Most pipeline classes accept `verbose=True` for progress messages and `debug=True` for debug-level logging without changing the global log level.
+`enable_logging`, `disable_logging`, `notify`, and `send_telegram_notification` are exported from the package root.
+
+---
+
+## Where Configuration Lives in the Filesystem
+
+```
+{station_dir}/
+├── forecast.config.yaml                 # fm.save_config()  — full pipeline
+├── training.config.yaml                 # tm.save_config()  — standalone TrainingModel
+├── cache/
+│   ├── TrainingModel/{hash}.params.json # CacheModel identity dumps (diff-able)
+│   └── PredictionModel/{hash}.params.json
+└── ...
+```
+
+The `*.params.json` files inside `cache/` capture **exactly** what went into the cache hash. They are handy when debugging a cache miss — `diff` two of them to see which kwarg differed.

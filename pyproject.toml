@@ -21,18 +21,18 @@ dependencies = [
     "pandas>=3.0.2",
     "pip>=26.1.1",
     "imbalanced-learn>=0.14.1",
-    "scikit-learn>=1.4",
+    "scikit-learn>=1.8",
     "seaborn>=0.13.2",
     "xgboost>=3.2.0",
     "lightgbm>=4.6.0",
     "shap>=0.51.0",
     "python-dotenv>=1.2.2",
     "pip-system-certs>=5.3",
+    "pyarrow>=18.0.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -47,7 +47,7 @@ dev = [
     "notebook",
     "pytest",
     "ipywidgets",
-    "pandas-stubs>=3.0.0.260204",
+    "pandas-stubs~=3.0.3",
 ]
 
 [tool.pytest.ini_options]

@@ -1,22 +1,3 @@
-"""Feature importance and selection visualisation.
-
-Provides plotting functions for inspecting the tsfresh features selected during
-training, including bar charts of top features ranked by importance score and
-frequency-band contribution summaries. Supports both single-seed and batch
-(multi-seed) workflows.
-
-Key functions:
-
-- ``plot_significant_features(features_df, ...)`` — horizontal bar chart of the
-  top-N significant features for a single seed, coloured by tremor column origin
-  (RSAM, DSAR, entropy).
-- ``replot_significant_features(features_dir, ...)`` — batch replot all feature
-  importance CSVs in a directory, with optional parallel processing via ``n_jobs``.
-- ``plot_frequency_band_contribution(features_df, ...)`` — stacked bar chart showing
-  what proportion of selected features comes from each frequency band, broken down
-  by metric type (RSAM vs. DSAR vs. entropy).
-"""
-
 import os
 import re
 from typing import Any, Literal, cast
@@ -39,13 +20,14 @@ from eruption_forecast.plots.styles import (
 def plot_significant_features(
     df: pd.DataFrame,
     filepath: str,
-    number_of_features: int = 30,
     top_features: int = 20,
     title: str | None = None,
     figsize: tuple[float, float] = (4, 12),
     features_column: str = "features",
     values_column: str = "score",
+    number_of_features: int = 30,
     dpi: int = 150,
+    legend_loc="upper right",
     overwrite: bool = True,
 ) -> None:
     """Plot a horizontal bar chart of significant features with publication-quality styling.
@@ -82,6 +64,7 @@ def plot_significant_features(
             numeric. Defaults to "score".
         dpi (int, optional): Figure resolution in dots per inch for saved PNG.
             Defaults to 150.
+        legend_loc (str, optional): Change legend location. Defaults to "upper right".
         overwrite (bool, optional): If True, overwrite an existing file at
             filepath. If False, skip plotting if file exists. Defaults to True.
 
@@ -169,13 +152,12 @@ def plot_significant_features(
                 label=f"Top {top_features} features",
                 alpha=0.7,
             )
-            ax.legend(frameon=False, loc="upper right")
+            ax.legend(frameon=False, loc=legend_loc)
 
         # Configure axes
         configure_spine(ax)
         ax.set_xlabel("Score")
-        ax.set_ylabel("Feature")
-        ax.set_title(title or f"{number_of_features} Significant Features")
+        ax.set_title(title or f"{number_of_features} Features", fontsize=10)
 
         # Set y-axis limits
         ax.set_ylim(-0.5, number_of_features - 0.5)
@@ -230,7 +212,8 @@ def _process_single_file(
         - Errors are logged but don't raise exceptions for robustness
     """
     # Generate output filename
-    output_filename = csv_path.stem + ".png"
+    seed = csv_path.stem
+    output_filename = seed + ".png"
     output_path = output_dir / output_filename
 
     # Check if should skip
@@ -272,12 +255,12 @@ def _process_single_file(
 
             kwargs["values_column"] = values_column
 
-        # Plot
         plot_significant_features(
             df=df,
             filepath=str(output_path),
-            number_of_features=number_of_features,
             top_features=top_features,
+            title=f"{seed} - {number_of_features} Feature",
+            number_of_features=number_of_features,
             dpi=dpi,
             overwrite=overwrite,
             **kwargs,

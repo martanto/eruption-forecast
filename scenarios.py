@@ -1,0 +1,198 @@
+# %%
+import os
+from typing import Any
+
+from dotenv import load_dotenv
+
+from eruption_forecast import send_telegram_notification
+from eruption_forecast.logger import logger
+from eruption_forecast.utils.formatting import slugify
+from eruption_forecast.model.forecast_model import ForecastModel
+
+
+# %%
+load_dotenv(override=True)
+
+root_dir = r"D:\Projects\eruption-forecast"
+eruption_dates = [
+    "2025-03-20",
+    "2025-04-10",
+    "2025-04-22",
+    "2025-05-18",
+    "2025-06-17",
+    "2025-07-07",
+    "2025-08-02",
+    "2025-08-18",
+]
+scenarios = [
+    {
+        "name": "Scenario 1",
+        "description": "Training using 1 eruption to forecast eruption 2",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-03-31",
+        "prediction_start_date": "2025-04-01",
+        "prediction_end_date": "2025-04-30",
+    },
+    {
+        "name": "Scenario 2",
+        "description": "Training using 1 eruption to forecast eruption 3",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-03-31",
+        "prediction_start_date": "2025-05-01",
+        "prediction_end_date": "2025-05-31",
+    },
+    {
+        "name": "Scenario 3",
+        "description": "Training using 1 eruption to forecast eruption 4",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-03-31",
+        "prediction_start_date": "2025-06-01",
+        "prediction_end_date": "2025-06-30",
+    },
+    {
+        "name": "Scenario 5",
+        "description": "Training using 1 and 2 eruptions to forecast eruption 3",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-04-30",
+        "prediction_start_date": "2025-05-01",
+        "prediction_end_date": "2025-05-31",
+    },
+    {
+        "name": "Scenario 6",
+        "description": "Training using 1, 2 and 3 eruptions to forecast eruption 4",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-05-31",
+        "prediction_start_date": "2025-06-01",
+        "prediction_end_date": "2025-06-30",
+    },
+    {
+        "name": "Scenario 7",
+        "description": "Training using 1, 2, 3 and 4 eruption to forecast 5",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-06-30",
+        "prediction_start_date": "2025-07-01",
+        "prediction_end_date": "2025-07-13",
+    },
+    {
+        "name": "Scenario 8",
+        "description": "Training using 1, 2, 3, 4 and 5 eruption to forecast 6, 7",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-07-26",
+        "prediction_start_date": "2025-07-27",
+        "prediction_end_date": "2025-08-22",
+    },
+    {
+        "name": "Scenario 9",
+        "description": "Training using ALL",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-08-22",
+        "prediction_start_date": "2025-01-01",
+        "prediction_end_date": "2025-08-22",
+    },
+]
+
+
+def main(sds_dir: str, n_jobs: int = 2):
+    # %%
+    fm = ForecastModel(
+        network="VG",
+        station="OJN",
+        location="00",
+        channel="EHZ",
+        day_to_forecast=2,
+        n_jobs=n_jobs,
+        verbose=True,
+    )
+    # %%
+    fm.calculate(
+        start_date="2025-01-01",
+        end_date="2025-12-31",
+        source="sds",
+        sds_dir=sds_dir,
+        methods=["rsam", "dsar", "entropy"],
+        remove_tremor_anomalies=False,
+        interpolate=True,
+        plot_daily=True,
+        save_plot=True,
+        overwrite_plot=True,
+        overwrite=False,
+        n_jobs=n_jobs,
+        verbose=False,
+    )
+    # %%
+    for scenario in scenarios:
+        name = scenario["name"]
+        description = scenario["description"]
+        plot_kwargs: Any = {
+            "eruption_dates": eruption_dates,
+        }
+
+        logger.info("=================================")
+        logger.info(f"Running {name}: {description}")
+        logger.info("=================================")
+
+        output_dir = os.path.join(
+            root_dir, "output", fm.nslc, "scenarios", slugify(name)
+        )
+
+        fm.train(
+            start_date=scenario["train_start_date"],
+            end_date=scenario["train_end_date"],
+            classifiers=["lite-rf", "rf", "gb", "xgb"],
+            eruption_dates=eruption_dates,
+            window_step=6,
+            window_step_unit="hours",
+            label_builder="standard",
+            cv_strategy="shuffle-stratified",
+            scoring="recall",
+            select_tremor_columns=[
+                "rsam_f2",
+                "rsam_f3",
+                "rsam_f4",
+                "dsar_f3-f4",
+                "entropy",
+            ],
+            exclude_features=[
+                "agg_linear_trend",
+                "linear_trend_timewise",
+                "length",
+                "has_duplicate_max",
+                "has_duplicate_min",
+                "has_duplicate",
+            ],
+            seeds=10,
+            resample_method="under",
+            plot_features=True,
+            output_dir=output_dir,
+            n_jobs=4,
+            n_grids=4,
+            verbose=True,
+        )
+
+        fm.predict(
+            start_date=scenario["prediction_start_date"],
+            end_date=scenario["prediction_end_date"],
+            window_step=10,
+            window_step_unit="minutes",
+            save_seed_result=True,
+            plot_threshold=0.7,
+            output_dir=output_dir,
+            use_cache=False,
+            verbose=True,
+            **plot_kwargs,
+        )
+
+        if fm.PredictionModel and fm.PredictionModel.forecast_plot_path:
+            send_telegram_notification(
+                message=f"{name}: {description}",
+                files=[fm.PredictionModel.forecast_plot_path],
+                file_caption=f"{name}: {description}",
+                send_as_document=True,
+            )
+
+        fm.evaluate(model="prediction", plot_per_seed=True, output_dir=output_dir)
+
+
+# %%
+if __name__ == "__main__":
+    main(sds_dir=r"D:\Data\OJN", n_jobs=8)

@@ -1,28 +1,3 @@
-"""Nature/Science journal publication-quality styling for matplotlib plots.
-
-Centralises all visual design decisions used across the plots package: color palettes,
-typography, figure dimensions, DPI settings, grid and spine configuration, and rcParams
-helpers. Every other plotting module in this package imports from here rather than
-defining its own style constants.
-
-Key contents:
-
-- **Color palettes**: ``NATURE_COLORS`` (named hex dict), ``OKABE_ITO`` (8-color
-  colorblind-safe list), ``VIBRANT_TONES``, ``SUNRISE_GLOW``, ``DIVERGING_BREWER``,
-  ``SEQUENTIAL``, ``DIVERGING``.
-- **Typography**: ``FONT_FAMILY``, ``FONT_SANS_SERIF``, ``FONT_SIZES`` — sizes for
-  title, label, tick, legend, and annotation elements.
-- **Figure dimensions**: ``FIGURE_SIZES`` — predefined (width, height) tuples matching
-  Nature single-column (3.5"), double-column (7"), and other standard formats.
-- **DPI constants**: ``DPI_SCREEN``, ``DPI_PRINT``, ``DPI_PUBLICATION``.
-- **Style helpers**: ``setup_nature_style()`` returns an rcParams dict;
-  ``apply_nature_style()`` is a context manager that applies and restores settings;
-  ``nature_figure()`` combines both and yields a ``(fig, ax)`` pair.
-- **Utilities**: ``get_color(name, palette)`` retrieves hex codes by name or index;
-  ``configure_spine(ax, which)`` removes publication-standard spines;
-  ``get_figure_size(key)`` returns a predefined ``(width, height)`` tuple.
-"""
-
 from typing import Any, Literal
 from contextlib import contextmanager
 

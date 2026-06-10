@@ -19,8 +19,8 @@ from functools import cached_property
 
 import pandas as pd
 
+from eruption_forecast.config import DEFAULT_SAMPLING_FREQUENCY
 from eruption_forecast.data_container import BaseDataContainer
-from eruption_forecast.config.constants import DEFAULT_SAMPLING_FREQUENCY
 from eruption_forecast.utils.validation import check_sampling_consistency
 
 
@@ -80,12 +80,45 @@ class TremorData(BaseDataContainer):
             debug (bool, optional): Emit debug log messages. Defaults to False.
         """
         super().__init__()
-        self.df: pd.DataFrame = df
+        self._df: pd.DataFrame = df
         self.verbose = verbose
         self.debug = debug
 
+    @cached_property
+    def df(self) -> pd.DataFrame:
+        """Return the validated tremor DataFrame with a guaranteed DatetimeIndex.
+
+        Checks whether the stored DataFrame already has a DatetimeIndex. If not,
+        promotes a ``datetime`` column to the index and drops the original column.
+        Raises ``ValueError`` if neither condition is satisfied. The result is
+        cached so validation runs only once per instance.
+
+        Returns:
+            pd.DataFrame: Tremor DataFrame with a DatetimeIndex.
+
+        Raises:
+            ValueError: If the DataFrame has no DatetimeIndex and no ``datetime`` column.
+        """
+        if not isinstance(self._df.index, pd.DatetimeIndex):
+            df = self._df.copy()
+            if "datetime" in df.columns.tolist():
+                df.index = pd.to_datetime(df["datetime"])
+                df = df.drop(columns=["datetime"])
+                return df
+            else:
+                raise ValueError(
+                    "Tremor dataframe index is not pd.DatetimeIndex or "
+                    "doesn't have `datetime` column."
+                )
+
+        return self._df
+
     def __repr__(self) -> str:
         """Return a detailed string representation of this TremorData instance.
+
+        Includes the source CSV path, the shape of the underlying DataFrame, and
+        the current verbosity flags so the instance can be identified at a glance
+        in interactive sessions and log output.
 
         Returns:
             str: A string showing the CSV path, DataFrame shape, and logging flags.
@@ -96,7 +129,7 @@ class TremorData(BaseDataContainer):
         )
 
     @classmethod
-    def from_csv(cls, tremor_csv: str) -> Self:
+    def from_csv(cls, tremor_csv: str, datetime_column: str = "datetime") -> Self:
         """Load tremor data from a CSV file and return a new TremorData instance.
 
         Reads the CSV, parses the ``datetime`` column as the DatetimeIndex, and
@@ -104,7 +137,8 @@ class TremorData(BaseDataContainer):
 
         Args:
             tremor_csv (str): Absolute or relative path to the tremor CSV file.
-                Must contain a ``datetime`` column used as the DatetimeIndex.
+            datetime_column (str, optional): Use to assign DatetimeIndex.
+                Defaults to ``"datetime"``.
 
         Returns:
             Self: A new :class:`TremorData` instance wrapping the loaded
@@ -119,16 +153,20 @@ class TremorData(BaseDataContainer):
         if not os.path.exists(tremor_csv):
             raise FileNotFoundError(f"Tremor CSV file does not exist: {tremor_csv}")
 
-        df = pd.read_csv(tremor_csv, index_col="datetime", parse_dates=True)
-        df = df.sort_index()
-
-        tremor_data = cls(df=df)
-
-        return tremor_data
+        try:
+            df = pd.read_csv(tremor_csv, index_col=datetime_column, parse_dates=True)
+            df = df.sort_index()
+            tremor_data = cls(df=df)
+            return tremor_data
+        except KeyError:
+            raise KeyError("`datetime` column not exists in tremor CSV.")
 
     @cached_property
     def columns(self) -> list[str]:
         """Return the list of DataFrame column names.
+
+        Delegates to the underlying DataFrame and caches the result so repeated
+        access does not recompute the column list.
 
         Returns:
             list[str]: Column names, e.g. ``["rsam_f0", "rsam_f1", "dsar_f0-f1", "entropy"]``.
@@ -139,25 +177,36 @@ class TremorData(BaseDataContainer):
     def start_date(self) -> datetime:
         """Return the first timestamp in the tremor data.
 
+        Resolves the minimum value of the DatetimeIndex and converts it to a
+        plain Python ``datetime`` object. The result is cached after the first
+        access.
+
         Returns:
             datetime: Start datetime derived from the first index entry.
         """
-        start_date: datetime = self.df.index[0].to_pydatetime()
+        start_date: datetime = self.df.index.min().to_pydatetime()
         return start_date
 
     @cached_property
     def end_date(self) -> datetime:
         """Return the last timestamp in the tremor data.
 
+        Resolves the maximum value of the DatetimeIndex and converts it to a
+        plain Python ``datetime`` object. The result is cached after the first
+        access.
+
         Returns:
             datetime: End datetime derived from the last index entry.
         """
-        end_date: datetime = self.df.index[-1].to_pydatetime()
+        end_date: datetime = self.df.index.max().to_pydatetime()
         return end_date
 
     @cached_property
     def start_date_str(self) -> str:
         """Return the start date as an ISO-format string.
+
+        Formats :attr:`start_date` as ``"YYYY-MM-DD"`` for use in filenames,
+        log messages, and downstream pipeline stages that accept date strings.
 
         Returns:
             str: Start date in ``"YYYY-MM-DD"`` format.
@@ -168,6 +217,9 @@ class TremorData(BaseDataContainer):
     def end_date_str(self) -> str:
         """Return the end date as an ISO-format string.
 
+        Formats :attr:`end_date` as ``"YYYY-MM-DD"`` for use in filenames,
+        log messages, and downstream pipeline stages that accept date strings.
+
         Returns:
             str: End date in ``"YYYY-MM-DD"`` format.
         """
@@ -176,6 +228,10 @@ class TremorData(BaseDataContainer):
     @property
     def n_days(self) -> int:
         """Return the number of days spanned by the tremor data.
+
+        Computes the difference between :attr:`end_date` and :attr:`start_date`
+        and truncates to whole days. Useful for quick sanity checks on data
+        coverage before further processing.
 
         Returns:
             int: Integer number of days between start and end date.
@@ -186,18 +242,26 @@ class TremorData(BaseDataContainer):
     def data(self) -> pd.DataFrame:
         """Return the tremor DataFrame, satisfying the :class:`BaseDataContainer` interface.
 
-        Delegates to :attr:`df`.
+        Acts as a thin alias for :attr:`df` so that code written against the
+        shared ``BaseDataContainer`` interface can access the underlying data
+        without knowing the concrete attribute name.
 
         Returns:
             pd.DataFrame: The tremor DataFrame.
         """
         return self.df
 
-    def check_consistency(self) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
+    def check_consistency(
+        self, expected_freq: str | None = None
+    ) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
         """Check temporal sampling consistency of the tremor data.
 
         Validates that the DataFrame has a uniform 10-minute sampling
         interval throughout its DatetimeIndex.
+
+        Args:
+            expected_freq (str, optional): Expected frequency (Ex: ``"10min"``).
+                Defaults to ``DEFAULT_SAMPLING_FREQUENCY`` (10min).
 
         Returns:
             tuple: A 4-element tuple ``(is_consistent, consistent_df,
@@ -217,8 +281,10 @@ class TremorData(BaseDataContainer):
             >>> if not ok:
             ...     print(f"Found {len(df_bad)} inconsistent rows")
         """
+        expected_freq = expected_freq or DEFAULT_SAMPLING_FREQUENCY
+
         return check_sampling_consistency(
             df=self.df,
-            expected_freq=DEFAULT_SAMPLING_FREQUENCY,
+            expected_freq=expected_freq,
             verbose=self.verbose,
         )

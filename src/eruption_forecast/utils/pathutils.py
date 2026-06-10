@@ -146,7 +146,7 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     Args:
         data (Any): Object to persist. Pass a ``pd.DataFrame`` with
             ``filetype="csv"``; pass any joblib-serialisable object
-            (e.g. ``shap.Explanation``) with ``filetype="pkl"``.
+            with ``filetype="pkl"``.
         path (str): Destination path WITHOUT a file extension.
         filetype (str): File extension without a leading dot, also
             determines the serialisation method. Defaults to ``"csv"``.
@@ -161,3 +161,73 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     else:
         joblib.dump(data, full_path)
     logger.info(f"Saved: {full_path}")
+
+
+def setup_nslc_directories(
+    network: str,
+    station: str,
+    location: str,
+    channel: str,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+) -> tuple[str, str, str]:
+    """Set up directory structure for forecast model outputs.
+
+    Creates the NSLC (Network.Station.Location.Channel) identifier and
+    builds the directory structure for storing model outputs.
+
+    Args:
+        network (str): Network code (e.g., "VG").
+        station (str): Station code (e.g., "OJN").
+        location (str): Location code (e.g., "00").
+        channel (str): Channel code (e.g., "EHZ").
+        output_dir (str | None): Base output directory. If None, defaults to
+            "output" relative to root_dir.
+        root_dir (str | None, optional): Anchor directory for resolving relative
+            paths. If None, falls back to ``os.getcwd()``. Defaults to None.
+
+    Returns:
+        tuple[str, str, str]: A 3-tuple containing:
+
+            - **nslc** (str): Combined identifier (e.g., "VG.OJN.00.EHZ")
+            - **output_dir** (str): Resolved output directory path
+            - **station_dir** (str): Station-specific directory path
+    """
+    nslc = f"{network}.{station}.{location}.{channel}"
+    output_dir = resolve_output_dir(output_dir, root_dir, "output")
+    station_dir = os.path.join(output_dir, nslc.upper())
+
+    return nslc, output_dir, station_dir
+
+
+def generate_features_filepaths(
+    random_state: int,
+    features_seed_dir: str,
+    features_resampled_dir: str,
+    figures_seed_dir: str,
+    plot_features: bool = False,
+    overwrite: bool = False,
+) -> tuple[bool, str, str, str | None]:
+    filename = f"{random_state:05d}"
+
+    # Required
+    features_seed_path = os.path.join(features_seed_dir, f"{filename}.csv")
+    features_resampled_path = os.path.join(features_resampled_dir, f"{filename}.csv")
+
+    filepath_required = [features_seed_path, features_resampled_path]
+
+    can_skip = not overwrite and all(os.path.isfile(p) for p in filepath_required)
+
+    # Optional
+    figures_seed_path = (
+        os.path.join(figures_seed_dir, f"{filename}.png") if plot_features else None
+    )
+    if can_skip and plot_features:
+        can_skip = figures_seed_path is not None and os.path.isfile(figures_seed_path)
+
+    return (
+        can_skip,
+        features_seed_path,
+        features_resampled_path,
+        figures_seed_path,
+    )

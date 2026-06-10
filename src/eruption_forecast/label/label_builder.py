@@ -1,20 +1,3 @@
-"""Label builder for generating binary eruption classification labels.
-
-This module provides the ``LabelBuilder`` class, which creates sliding time windows
-across a global date range and assigns binary eruption labels based on known eruption
-dates and a configurable lead-time (``day_to_forecast``). Windows whose end time
-falls within ``[eruption_date - day_to_forecast, eruption_date]`` are labeled as
-positive (erupted = 1); all other windows are labeled as negative (erupted = 0).
-
-Key class:
-    - ``LabelBuilder``: Requires ``start_date``, ``end_date``, ``window_size``,
-      ``window_step``, ``window_step_unit``, ``day_to_forecast``, ``eruption_dates``,
-      and ``volcano_id``. Call ``build()`` to generate and save the label CSV.
-    - Supports ``include_eruption_date`` flag to control whether the eruption date
-      itself counts as one of the positive ``day_to_forecast`` days.
-    - Output filenames encode all parameters for reproducibility.
-"""
-
 import os
 from typing import Self, Literal
 from datetime import datetime, timedelta
@@ -103,9 +86,9 @@ class LabelBuilder:
         window_step: int,
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
-        eruption_dates: list[str],
-        volcano_id: str,
-        include_eruption_date: bool = False,
+        eruption_dates: list[str] | list[datetime],
+        volcano_id: str | None = None,
+        include_eruption_date: bool = True,
         output_dir: str | None = None,
         root_dir: str | None = None,
         verbose: bool = False,
@@ -128,7 +111,8 @@ class LabelBuilder:
                 windows as positive. Must be positive and less than total date range.
             eruption_dates (list[str]): List of eruption dates in YYYY-MM-DD format.
                 Dates are automatically sorted.
-            volcano_id (str): Unique identifier for the volcano, used in output filenames.
+            volcano_id (str, optional): Unique identifier for the volcano, used in output filenames.
+                Defaults to None.
             include_eruption_date (bool, optional): Controls whether the eruption
                 date counts as one of the ``day_to_forecast`` positive days.
                 When ``True``, the positive window spans exactly ``day_to_forecast``
@@ -136,7 +120,7 @@ class LabelBuilder:
                 When ``False`` (default), the ``day_to_forecast`` days are strictly
                 before the eruption date; the eruption day is additionally marked
                 positive, giving ``day_to_forecast + 1`` positive days in total.
-                Defaults to False.
+                Defaults to True.
             output_dir (str | None, optional): Output directory path. If None, defaults
                 to "output" subdirectory. Relative paths are resolved against root_dir.
                 Absolute paths are used as-is. Defaults to None.
@@ -184,6 +168,8 @@ class LabelBuilder:
         output_dir = resolve_output_dir(output_dir, root_dir, "output")
         label_dir = os.path.join(output_dir, "labels")
 
+        volcano_id = volcano_id or f"volcano_{start_date_str}_{end_date_str}"
+
         # ------------------------------------------------------------------
         # Set DEFAULT properties
         # ------------------------------------------------------------------
@@ -192,7 +178,7 @@ class LabelBuilder:
         self.window_step = int(window_step)
         self.window_step_unit: Literal["minutes", "hours"] = window_step_unit
         self.day_to_forecast: int = int(day_to_forecast)
-        self.eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
+        self.eruption_dates: list[str] = sort_dates(eruption_dates)
         self.volcano_id: str = str(volcano_id)
         self.include_eruption_date = include_eruption_date
         self.verbose: bool = bool(verbose)
@@ -326,9 +312,9 @@ class LabelBuilder:
             "is_built": is_built,
             "n_windows": len(self._df) if is_built else None,
             "n_positive": int(self._df["is_erupted"].sum()) if is_built else None,
-            "n_negative": int((self._df["is_erupted"] == 0).sum())
-            if is_built
-            else None,
+            "n_negative": (
+                int((self._df["is_erupted"] == 0).sum()) if is_built else None
+            ),
         }
         return result
 
@@ -591,11 +577,6 @@ class LabelBuilder:
 
         # Validate keys are strings and valid dates
         for key in df_dict.keys():
-            if not isinstance(key, str):
-                raise TypeError(
-                    f"All keys must be strings. Got key with type: {type(key)}"
-                )
-
             try:
                 parsed_date = pd.to_datetime(key).strftime("%Y-%m-%d")
                 if parsed_date != key:
@@ -609,16 +590,10 @@ class LabelBuilder:
 
         # Validate values are DataFrames with required structure
         for key, value in df_dict.items():
-            if not isinstance(value, pd.DataFrame):
-                raise TypeError(
-                    f"All values must be pandas DataFrames. "
-                    f"Got value for key '{key}' with type: {type(value)}"
-                )
-
             if not isinstance(value.index, pd.DatetimeIndex):
                 raise ValueError(
                     f"DataFrame for key '{key}' must have a DatetimeIndex. "
-                    f"Got index type: {type(value.index)}"
+                    f"Got index type: {type(value.index).__name__}"
                 )
 
             if "id" not in value.columns:
@@ -775,11 +750,10 @@ class LabelBuilder:
                 ...
             ValueError: df must have an 'is_erupted' column...
         """
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError(f"df must be a pandas DataFrame, got {type(df)}")
-
         if not isinstance(df.index, pd.DatetimeIndex):
-            raise TypeError(f"df index must be a DatetimeIndex, got {type(df.index)}")
+            raise TypeError(
+                f"df index must be a DatetimeIndex, got {type(df.index).__name__}"
+            )
 
         if "id" not in df.columns:
             raise ValueError(
@@ -876,74 +850,35 @@ class LabelBuilder:
             >>> # Directories created: output_dir/ and output_dir/labels/
         """
         ensure_dir(self.output_dir)
-        ensure_dir(self.label_dir)
 
-    def validate_eruption_dates(self) -> None:
-        """Ensure at least one eruption exists between start and end dates.
-
-        Checks that df_eruption is not empty, meaning at least one eruption
-        date falls within the configured date range.
-
-        Raises:
-            ValueError: If no eruptions are recorded between start_date and end_date.
-                The error message includes the provided eruption_dates list for debugging.
-
-        Examples:
-            >>> builder.build()
-            >>> builder.validate_eruption_dates()  # Passes if eruptions exist
-
-            >>> # No eruptions in range
-            >>> builder = LabelBuilder(
-            ...     start_date="2020-01-01",
-            ...     end_date="2020-01-15",
-            ...     eruption_dates=["2020-12-25"],  # Outside range
-            ...     ...
-            ... )
-            >>> builder.build()  # doctest: +SKIP
-            Traceback (most recent call last):
-                ...
-            ValueError: No eruption between start date (2020-01-01) and end date (2020-01-15)...
-        """
-        if len(self.df_eruption) == 0:
-            raise ValueError(
-                f"No eruption recorded between date "
-                f"{self.start_date_str} and {self.end_date_str}. "
-                f"Your eruption_dates: {self.eruption_dates}"
-            )
-
-    def initiate_label(
-        self, start_date: datetime | None = None, end_date: datetime | None = None
-    ) -> pd.DataFrame:
+    def initiate_label(self, start_date: datetime, end_date: datetime) -> pd.DataFrame:
         """Initialize label DataFrame with all labels set to 0 (not erupted).
 
         Creates sliding time windows using construct_windows() based on the
-        configured window_step and window_step_unit, then initializes all
-        'is_erupted' values to 0. Eruption labels will be updated later by
+        configured window_step and window_step_unit. The returned frame already
+        carries the sequential ``id`` column and an ``is_erupted`` column
+        initialised to 0; eruption labels are updated later by
         update_df_eruptions().
 
         Returns:
-            pd.DataFrame: DataFrame with DatetimeIndex and 'is_erupted' column
-                containing all zeros.
+            pd.DataFrame: DataFrame with DatetimeIndex and integer columns
+                ``id`` (sequential) and ``is_erupted`` (all zeros).
 
         Examples:
             >>> df = builder.initiate_label()
             >>> print(df.columns.tolist())
-            ['is_erupted']
+            ['id', 'is_erupted']
             >>> print(df['is_erupted'].unique())
             [0]
             >>> print(isinstance(df.index, pd.DatetimeIndex))
             True
         """
-        start_date = start_date or self.start_date
-        end_date = end_date or self.end_date
-
         df = construct_windows(
             start_date=start_date,
             end_date=end_date,
             window_step=self.window_step,
             window_step_unit=self.window_step_unit,
         )
-        df["is_erupted"] = 0
 
         return df
 
@@ -971,6 +906,8 @@ class LabelBuilder:
         df.index.name = "id"
         df["volcano_id"] = self.volcano_id
         df = df[["volcano_id", "eruption_date"]]
+
+        ensure_dir(self.label_dir)
         df.to_csv(filename, index=True)
 
         if self.verbose:
@@ -1006,7 +943,12 @@ class LabelBuilder:
 
         return label_data.df
 
-    def build(self, overwrite: bool = True) -> Self:
+    def build(
+        self,
+        overwrite: bool = True,
+        save_label: bool = True,
+        plot_distribution: bool = True,
+    ) -> Self:
         """Build labels based on eruption dates and window configuration.
 
         Main orchestration method that performs the complete label building workflow:
@@ -1021,7 +963,12 @@ class LabelBuilder:
         falls within [eruption_date - day_to_forecast, eruption_date].
 
         Args:
-            overwrite (bool): Whether to overwrite existing label file
+            overwrite (bool): Whether to overwrite existing label file.
+                Defaults to ``True``.
+            save_label (bool, optional): Wether to save label to CSV.
+                Defaults to ``True``.
+            plot_distribution (bool, optional): Wether to plot label distribution.
+                Defaults to ``True``.
 
         Returns:
             Self: Instance with populated df, df_eruption, and df_eruptions properties.
@@ -1066,11 +1013,7 @@ class LabelBuilder:
             if self.verbose:
                 logger.info("Creating new label DataFrame...")
 
-            # Create id column to use as data ID reference with tremor data
-            # such as RSAM, DSAR or MSNoise
-            df = self.initiate_label()
-            df["id"] = range(len(df))
-            df = df[["id", "is_erupted"]].astype({"id": int, "is_erupted": int})
+            df = self.initiate_label(start_date=self.start_date, end_date=self.end_date)
 
         self.update_df_eruptions(df)
         self.df = df
@@ -1083,35 +1026,44 @@ class LabelBuilder:
                 f"Please change your start_date and end_date parameters."
             )
 
+        erupted_count = len(df_eruption)
+        total_count = len(df)
+        ratio = erupted_count / total_count * 100
+
         if self.verbose:
-            erupted_count = len(df_eruption)
-            total_count = len(df)
             logger.info(
                 f"Label building complete: {erupted_count} erupted windows out of {total_count} total "
-                f"({erupted_count / total_count * 100:.2f}%)"
+                f"({ratio:.2f}%)"
             )
 
         self.df_eruption = df_eruption
 
-        if not file_exists or overwrite:
-            self.validate_eruption_dates()
-            self.save()
+        if save_label and (not file_exists or overwrite):
+            self.save(plot_distribution=plot_distribution)
 
         return self
 
-    def save(self, file_type: Literal["csv", "xlsx"] = "csv") -> Self:
+    def save(
+        self, file_type: Literal["csv", "xlsx"] = "csv", plot_distribution: bool = True
+    ) -> Self:
         """Save labels DataFrame to disk in CSV or Excel format.
 
-        Saves the built labels DataFrame to a file with standardized filename:
-        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.{ext}
-
-        Also saves a separate 'eruption_dates.csv' reference file.
+        Writes the built labels DataFrame to a file with the standardized filename
+        ``label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.{ext}``.
+        The canonical ``self.csv`` path is never mutated by this method, even when
+        ``file_type="xlsx"`` — the Excel output path is derived from ``self.csv``
+        by swapping the extension. Both formats also save a separate
+        ``eruption_dates_{volcano_id}.csv`` reference file and a label distribution
+        plot alongside the output.
 
         Args:
             file_type (Literal["csv", "xlsx"], optional): Output file format.
-                Defaults to "csv".
-                - "csv": Comma-separated values (lightweight, fast)
-                - "xlsx": Excel workbook (for manual inspection)
+                Defaults to ``"csv"``.
+
+                - ``"csv"``: Comma-separated values (lightweight, fast).
+                - ``"xlsx"``: Excel workbook (for manual inspection).
+            plot_distribution (bool, optional): Wether to plot label distribution.
+                Defaults to ``True``.
 
         Returns:
             Self: Instance for method chaining.
@@ -1121,37 +1073,33 @@ class LabelBuilder:
             >>> builder.build().save()
             >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv
 
-            >>> # Save as Excel
+            >>> # Save as Excel — does not change builder.csv
             >>> builder.build().save(file_type="xlsx")
             >>> # File created: label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.xlsx
 
-            >>> # Method chaining
+            >>> # Method chaining — both CSV and Excel files are produced
             >>> builder.build().save().save(file_type="xlsx")
-            >>> # Creates both CSV and Excel files
         """
         df = self.df
-        filepath = self.csv
+        ensure_dir(self.label_dir)
 
         if file_type == "xlsx":
             filepath = self.csv.replace(".csv", ".xlsx")
             df.to_excel(filepath, index=True)
-
-            # Update filepath as an excel file
-            self.csv = filepath
-            return self
-
-        df.to_csv(filepath, index=True)
+        else:
+            filepath = self.csv
+            df.to_csv(filepath, index=True)
 
         if self.verbose:
             logger.info(f"Label saved to {filepath}")
 
-        # Save eruption dates
         self.save_eruption_dates()
 
-        try:
-            self.plot_distribution()
-        except Exception as exc:
-            logger.warning(f"Label distribution plot could not be saved: {exc}")
+        if plot_distribution:
+            try:
+                self.plot_distribution()
+            except Exception as exc:
+                logger.warning(f"Label distribution plot could not be saved: {exc}")
 
         return self
 
@@ -1184,9 +1132,6 @@ class LabelBuilder:
             >>> builder.build().plot_distribution()
             >>> builder.build().plot_distribution(filetype="pdf")
         """
-        if self.df is None:
-            raise RuntimeError("Call build() before plot_distribution().")
-
         base = os.path.splitext(self.csv)[0]
         filepath = f"{base}_distribution"
 

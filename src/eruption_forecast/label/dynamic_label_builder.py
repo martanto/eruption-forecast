@@ -1,18 +1,3 @@
-"""Per-eruption dynamic label builder for volcanic eruption forecasting.
-
-This module provides the ``DynamicLabelBuilder`` class, a subclass of ``LabelBuilder``
-that generates one label window per eruption event rather than a single global window.
-Each per-eruption window spans ``days_before_eruption`` days ending on the eruption
-date, giving denser positive-class coverage and making it suitable for datasets where
-eruptions are sparse across a long date range.
-
-Key class:
-    - ``DynamicLabelBuilder``: Extends ``LabelBuilder`` with a ``days_before_eruption``
-      parameter. For each eruption date, a separate window is constructed, labeled,
-      and concatenated into a single DataFrame with unique sequential IDs. Call
-      ``build()`` to generate and save the combined label CSV.
-"""
-
 import os
 from typing import Self, Literal
 from datetime import datetime, timedelta
@@ -56,7 +41,7 @@ class DynamicLabelBuilder(LabelBuilder):
         window_step_unit: Literal["minutes", "hours"],
         day_to_forecast: int,
         eruption_dates: list[str],
-        volcano_id: str,
+        volcano_id: str | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         prefix_filename: str | None = None,
@@ -74,7 +59,8 @@ class DynamicLabelBuilder(LabelBuilder):
             window_step_unit (Literal["minutes", "hours"]): Unit for window_step.
             day_to_forecast (int): Days before eruption to start positive labeling.
             eruption_dates (list[str]): Eruption dates in YYYY-MM-DD format.
-            volcano_id (str): Volcano identifier used in filenames.
+            volcano_id (str, optional): Volcano identifier used in filenames.
+                Defaults to None.
             output_dir (str | None, optional): Output directory path. Defaults to None.
             root_dir (str | None, optional): Anchor directory for resolving
                 relative output_dir paths. Defaults to None.
@@ -87,7 +73,7 @@ class DynamicLabelBuilder(LabelBuilder):
             ValueError: If any LabelBuilder validation fails (date range too short,
                 invalid window_step_unit, etc.).
         """
-        eruption_dates: list[str] = sort_dates(eruption_dates)  # ty:ignore[invalid-assignment]
+        eruption_dates: list[str] = sort_dates(eruption_dates)
         prefix_filename = prefix_filename or "label"
 
         # Compute overall data range from eruption dates + look-back window.
@@ -162,7 +148,12 @@ class DynamicLabelBuilder(LabelBuilder):
         return label_dates
 
     @logger.catch
-    def build(self, overwrite: bool = True) -> Self:
+    def build(
+        self,
+        overwrite: bool = True,
+        save_label: bool = True,
+        plot_distribution: bool = True,
+    ) -> Self:
         """Build per-eruption label windows and concatenate into one DataFrame.
 
         For each eruption, creates a windowed DataFrame spanning
@@ -175,6 +166,10 @@ class DynamicLabelBuilder(LabelBuilder):
 
         Args:
             overwrite (bool): Whether to overwrite existing label file
+            save_label (bool, optional): Wether to save label to CSV.
+                Defaults to ``True``.
+            plot_distribution (bool, optional): Wether to plot label distribution.
+                Defaults to ``True``.
 
         Returns:
             Self: Instance with populated ``df``, ``df_eruption``, and
@@ -256,6 +251,7 @@ class DynamicLabelBuilder(LabelBuilder):
                 f"{total_count} total ({erupted_count / total_count * 100:.2f}%)"
             )
 
-        self.save()
+        if save_label and (not file_exists or overwrite):
+            self.save(plot_distribution=plot_distribution)
 
         return self

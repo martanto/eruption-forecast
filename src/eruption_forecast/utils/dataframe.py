@@ -1,29 +1,14 @@
-"""DataFrame manipulation utilities for tremor, label, and feature data.
-
-This module provides DataFrame helpers used at multiple stages of the pipeline:
-cleaning raw tremor data, preparing labels for tsfresh, merging extracted
-feature sets, and computing forecast envelope statistics.
-
-Key functions
--------------
-- ``remove_anomalies`` — apply modified z-score detection column-wise and replace
-  flagged values with NaN; optionally interpolate the result
-- ``to_series`` — extract a value column from a DataFrame and reindex by another
-  column (e.g. convert a label DataFrame to a tsfresh-compatible ``id``-indexed
-  ``Series``)
-- ``load_label_csv`` — read an aligned label CSV produced by ``FeaturesBuilder``
-  and return an ``id``-indexed binary eruption ``Series``
-- ``concat_features`` — horizontally concatenate per-column tsfresh feature CSVs
-  into a single combined feature matrix and persist it to disk
-- ``get_envelope_values`` — compute rolling min/max envelopes for per-classifier
-  probability and prediction columns in a forecast output DataFrame
-"""
+import os
+import glob
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import detect_anomalies_zscore
+from eruption_forecast.utils.formatting import shorten_feature_name
 
 
 def remove_anomalies(
@@ -60,6 +45,14 @@ def remove_anomalies(
         TypeError: If ``df.index`` is not a ``pd.DatetimeIndex``.
         ValueError: If ``threshold`` is not a positive number.
         ValueError: If any column in ``columns`` does not exist in ``df``.
+
+    Examples:
+        >>> import pandas as pd
+        >>> df = pd.DataFrame(
+        ...     {"rsam_f0": [1.0, 1e9, 1.1, 0.9]},
+        ...     index=pd.date_range("2025-01-01", periods=4, freq="10min"),
+        ... )
+        >>> cleaned = remove_anomalies(df, threshold=3.5, interpolate=True)
     """
     if not isinstance(df.index, pd.DatetimeIndex):
         raise TypeError("Dataframe index should be a DatetimeIndex")
@@ -173,36 +166,112 @@ def load_label_csv(label_features_csv: str) -> pd.Series:
     return df["is_erupted"]
 
 
-def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFrame]:
-    """Concatenate feature CSVs into one DataFrame and save.
+def load_select_features(
+    value: str | list[str], number_of_features: int = 20
+) -> list[str]:
+    """Resolve a ``select_features`` value into a list of tsfresh feature names.
 
-    Reads multiple feature CSV files, concatenates them column-wise (axis=1),
-    and saves the combined DataFrame to the specified filepath. This is used
-    to merge per-column tsfresh feature extractions.
+    Accepts either a CSV path written by :func:`concat_significant_features`
+    (``top_{N}_features.csv`` or ``significant_features.csv``), in which case
+    the ``features`` index column is read, or an explicit list of tsfresh
+    feature names. Empty lists and blank entries raise.
 
     Args:
-        csv_list (list[str]): List of CSV file paths to concatenate.
-        filepath (str): Output filepath to save the concatenated CSV.
+        value (str | list[str]): A CSV path or a list of fully-qualified
+            tsfresh feature names (e.g. ``"rsam_f2__mean"``,
+            ``"rsam_f1__autocorrelation__lag_1"``).
+        number_of_features (int, optional): Cap the returned list to the top
+            ``number_of_features`` entries. The CSV produced by
+            :func:`concat_significant_features` is already sorted descending
+            by frequency, so truncation preserves the highest-ranked names;
+            an in-memory list is assumed to be in priority order. Pass ``0``
+            or a negative value to disable truncation. Defaults to ``20``.
+
+    Returns:
+        list[str]: Cleaned list of feature names, capped to the top
+            ``number_of_features`` entries.
+
+    Raises:
+        FileNotFoundError: If ``value`` is a path that does not exist.
+        ValueError: If ``value`` resolves to an empty list, contains blank
+            entries, or is of an unsupported type.
+
+    Examples:
+        >>> load_select_features("output/.../top_20_features.csv")
+        ['rsam_f2__mean', 'rsam_f1__autocorrelation__lag_1', ...]
+        >>> load_select_features(["rsam_f2__mean", "entropy__variance"])
+        ['rsam_f2__mean', 'entropy__variance']
+        >>> load_select_features("output/.../top_50_features.csv", number_of_features=10)
+        # returns at most 10 names from the top of the ranked CSV
+    """
+    if isinstance(value, str):
+        if not os.path.isfile(value):
+            raise FileNotFoundError(f"select_features CSV not found: {value}")
+        names = pd.read_csv(value, index_col=0).index.astype(str).tolist()
+    else:
+        names = [str(name) for name in value]
+
+    cleaned = [name.strip() for name in names if name and name.strip()]
+    if not cleaned:
+        raise ValueError("select_features resolved to an empty list.")
+    if number_of_features > 0:
+        cleaned = cleaned[:number_of_features]
+    return cleaned
+
+
+def concat_features(
+    csv_list: list[str],
+    filepath: str,
+    frames: list[pd.DataFrame] | None = None,
+) -> tuple[str, pd.DataFrame]:
+    """Concatenate feature CSVs (and optional in-memory frames) into one DataFrame and save.
+
+    Reads each path in ``csv_list``, optionally combines them with already-loaded
+    DataFrames in ``frames``, concatenates everything column-wise (``axis=1``),
+    and saves the merged DataFrame to ``filepath``. Used to merge per-column
+    tsfresh feature extractions; ``frames`` lets callers skip a disk round-trip
+    for columns whose DataFrames are already in memory.
+
+    Args:
+        csv_list (list[str]): Paths to feature CSV files to read and concatenate.
+        filepath (str): Output filepath for the merged CSV.
+        frames (list[pd.DataFrame] | None, optional): Pre-loaded feature
+            DataFrames to include in the concatenation alongside the CSVs.
+            Defaults to ``None`` (CSV-only behaviour).
 
     Returns:
         tuple[str, pd.DataFrame]: Tuple containing:
-            - filepath (str): Path where the CSV was saved.
+            - filepath (str): Path where the merged CSV was saved.
             - df (pd.DataFrame): Concatenated DataFrame.
 
     Raises:
-        ValueError: If csv_list has fewer than 2 files or if all CSVs are empty.
+        ValueError: If the combined input count (``len(csv_list) + len(frames)``)
+            is fewer than 2, or if all inputs concatenate to an empty frame.
 
     Examples:
         >>> csv_files = ["features_f0.csv", "features_f1.csv"]
         >>> path, df = concat_features(csv_files, "all_features.csv")
         >>> print(df.shape)
+        >>> # mix in already-loaded frames
+        >>> path, df = concat_features(
+        ...     ["features_f0.csv"],
+        ...     "all_features.csv",
+        ...     frames=[fresh_df_f1, fresh_df_f2],
+        ... )
     """
-    if len(csv_list) <= 1:
+    frames = frames or []
+    total_inputs = len(csv_list) + len(frames)
+    if total_inputs <= 1:
         raise ValueError(
-            f"Requires at least 2 CSV files. Total your CSV file is {len(csv_list)}"
+            f"Requires at least 2 inputs (csv_list + frames). Got {total_inputs}."
         )
 
-    df = pd.concat([pd.read_csv(file, index_col=0) for file in csv_list], axis=1)
+    pieces: list[pd.DataFrame] = [
+        pd.read_csv(file, index_col=0) for file in csv_list
+    ]
+    pieces.extend(frames)
+
+    df = pd.concat(pieces, axis=1)
 
     if df.empty:
         raise ValueError("There is no data in the csv files.")
@@ -232,6 +301,22 @@ def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: The same DataFrame with the eight envelope columns added.
+
+    Raises:
+        ValueError: If no columns ending with ``_probability`` (excluding
+            ``consensus_*``) are found in ``df``.
+        ValueError: If no columns ending with ``_prediction`` (excluding
+            ``consensus_*``) are found in ``df``.
+
+    Examples:
+        >>> import pandas as pd
+        >>> df = pd.DataFrame({
+        ...     "rf_probability": [0.2, 0.8, 0.5],
+        ...     "rf_prediction": [0, 1, 0],
+        ... })
+        >>> result = get_envelope_values(df)
+        >>> list(result.columns)  # doctest: +ELLIPSIS
+        ['rf_probability', 'rf_prediction', ..., 'consensus_prediction_max_envelope']
     """
     prob_cols = [
         col
@@ -285,3 +370,292 @@ def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return df
+
+
+def concat_significant_features(
+    features_csvs: list[str],
+    features_dir: str,
+    number_of_features: int | None = None,
+) -> pd.DataFrame:
+    """Concatenate per-seed significant-feature CSVs and save a ranked summary.
+
+    Reads all CSVs in ``features_csvs``, concatenates them row-wise, and
+    writes the combined data to ``{features_dir}/{filename}.csv``. When
+    ``number_of_features`` is provided, also aggregates by feature name,
+    counts occurrences across seeds (``score``), computes mean score
+    (``mean_score``), sorts descending by frequency and ascending by mean
+    p-value, and saves the top-N result as
+    ``{features_dir}/top_{number_of_features}_features.csv``.
+
+    Args:
+        features_csvs (list[str]): Paths to per-seed significant-feature CSV
+            files, each expected to contain a ``features`` column and a
+            ``score`` column.
+        features_dir (str): Directory where output CSVs are written.
+        number_of_features (int | None, optional): If set, produce an
+            additional ranked CSV limited to the top N features by occurrence
+            count. If ``None`` or ``<= 0``, only the combined CSV is written.
+            Defaults to ``None``.
+
+    Returns:
+        pd.DataFrame: The combined DataFrame (all seeds concatenated), or the
+            ranked top-N DataFrame when ``number_of_features`` is specified.
+
+    Raises:
+        ValueError: If ``combined_features_df`` is empty after concatenation.
+
+    Examples:
+        >>> csvs = ["seed_0_features.csv", "seed_1_features.csv"]
+        >>> df = concat_significant_features(csvs, "output/features", number_of_features=20)
+        >>> df.index.name
+        'features'
+    """
+    combined_features_df = pd.concat(
+        [pd.read_csv(file) for file in features_csvs],
+        ignore_index=True,
+    )
+
+    if combined_features_df.empty:
+        raise ValueError("No data found inside csv files.")
+
+    combined_features_df.to_csv(
+        os.path.join(features_dir, "significant_features.csv"), index=False
+    )
+
+    if number_of_features is not None and number_of_features > 0:
+        filename = f"top_{number_of_features}_features"
+
+        combined_features_df = (
+            combined_features_df.groupby(by="features")
+            .agg(score=("score", "count"), mean_score=("score", "mean"))
+            .sort_values(
+                by=["score", "mean_score"],
+                ascending=[False, True],
+            )
+        )
+        combined_features_df.index.name = "features"
+        combined_features_df.to_csv(
+            os.path.join(features_dir, f"{filename}.csv"),
+            index=True,
+        )
+
+    return combined_features_df
+
+
+def find_common_features(
+    top_features_csv: list[str], output_dir: str | None = None
+) -> pd.DataFrame:
+    """Return features that appear in every ``top_N_features.csv``.
+
+    Loads each CSV produced by the scenario training stage and intersects
+    their feature indices, so the result contains only features that every
+    scenario agreed on. The ``score`` and ``mean_score`` columns are summed
+    across the input CSVs so the output keeps the same shape as a source
+    ``top_N_features.csv`` and can be sorted the same way (descending by
+    ``score``, ascending by ``mean_score``).
+
+    Args:
+        top_features_csv (list[str]): Paths to ``top_{N}_features.csv`` files
+            (one per scenario). Each file must have a ``features`` index
+            column and ``score`` / ``mean_score`` columns.
+        output_dir (str | None, optional): Directory where the resulting
+            ``common_top_features.csv`` is written. When ``None``, falls back
+            to the current working directory (``os.getcwd()``). Defaults to
+            ``None``.
+
+    Returns:
+        pd.DataFrame: DataFrame indexed by the common feature names with
+        ``score`` and ``mean_score`` columns summed across the input CSVs.
+        Also written to ``{output_dir}/common_top_features.csv``.
+
+    Raises:
+        ValueError: If ``top_features_csv`` is empty or the intersection is
+            empty.
+        FileNotFoundError: If any of the paths does not exist (raised by
+            :func:`load_select_features`).
+
+    Examples:
+        >>> csvs = [
+        ...     "output/.../scenarios/scenario-1/training/features/stratified-shuffle-split/top_20_features.csv",
+        ...     "output/.../scenarios/scenario-2/training/features/stratified-shuffle-split/top_20_features.csv",
+        ... ]
+        >>> df = find_common_features(csvs)
+        >>> df.index.tolist()[:3]
+        ['rsam_f2__mean', 'entropy__variance', 'dsar_f3-f4__median']
+        >>> df = find_common_features(csvs, output_dir="output/.../scenarios")
+    """
+    if not top_features_csv:
+        raise ValueError("top_features_csv is empty.")
+
+    frames: list[pd.DataFrame] = []
+    for path in top_features_csv:
+        load_select_features(path, number_of_features=0)
+        frames.append(pd.read_csv(path, index_col=0))
+
+    common = sorted(set.intersection(*(set(df.index) for df in frames)))
+    if not common:
+        raise ValueError("No features are common to all CSVs.")
+
+    aligned = [
+        df.loc[df.index.intersection(common), ["score", "mean_score"]] for df in frames
+    ]
+    combined = pd.concat(aligned).groupby(level=0).sum()
+    combined = combined.sort_values(by=["score", "mean_score"], ascending=[False, True])
+
+    out_path = os.path.join(output_dir or os.getcwd(), "common_top_features.csv")
+    combined.to_csv(out_path, index=True)
+    return combined
+
+
+def plot_common_features_heatmap(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "viridis",
+) -> plt.Axes:
+    """Heatmap of per-scenario ``score`` for the common-feature subset.
+
+    Computes the cross-scenario intersection via :func:`find_common_features`,
+    re-reads each input CSV to recover its per-scenario ``score`` column, and
+    renders a heatmap with common features on the rows and scenarios on the
+    columns. Rows are ordered by the ranking produced by
+    :func:`find_common_features` (most universally strong on top).
+
+    Args:
+        top_features_csv (dict[str, str]): Mapping of column label → path to
+            a ``top_{N}_features.csv`` file (one entry per scenario). The
+            dict keys are used directly as the heatmap's x-axis labels, so
+            insertion order controls left-to-right column order.
+        output_path (str | None, optional): Where to save the PNG. When
+            ``None``, writes to ``{cwd}/common_top_features_heatmap.png``.
+            Defaults to ``None``.
+        cmap (str, optional): Matplotlib/seaborn colormap name. Defaults to
+            ``"viridis"``.
+
+    Returns:
+        plt.Axes: The heatmap axes, so the caller can further annotate it.
+    """
+    common_df = find_common_features(list(top_features_csv.values()))
+    common_features = list(common_df.index)
+    labels = list(top_features_csv.keys())
+
+    matrix = pd.DataFrame(index=common_features, columns=labels, dtype=float)
+    for label, path in top_features_csv.items():
+        per_scenario = pd.read_csv(path, index_col=0)
+        matrix[label] = per_scenario["score"].reindex(common_features)
+
+    matrix.index = [shorten_feature_name(name) for name in matrix.index]
+
+    fig, ax = plt.subplots(
+        figsize=(
+            max(6.0, 1.6 * len(labels) + 3),
+            max(4.0, 0.6 * len(common_features) + 2),
+        )
+    )
+
+    sns.heatmap(
+        matrix,
+        annot=True,
+        fmt=".0f",
+        cmap=cmap,
+        cbar_kws={"label": "frequency", "shrink": 0.8, "pad": 0.02},
+        linewidths=0.5,
+        square=True,
+        ax=ax,
+    )
+
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_title(f"{len(common_features)} features × {len(labels)} scenarios")
+    fig.tight_layout()
+
+    out = output_path or os.path.join(os.getcwd(), "common_top_features_heatmap.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    return ax
+
+
+def plot_common_features_correlation(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "RdBu_r",
+) -> plt.Axes:
+    """Pearson correlation heatmap across scenarios for the common-feature subset.
+
+    For each entry in ``top_features_csv``, globs the sibling
+    ``features-matrix_*.csv`` (written by ``TrainingModel.extract_features``)
+    next to the top-N CSV, slices it to the cross-scenario common-feature
+    subset returned by :func:`find_common_features`, and stacks the rows
+    across all scenarios into a single feature matrix. Pairwise Pearson
+    correlations are then rendered as a square heatmap with a diverging
+    colormap centred on 0.
+
+    Args:
+        top_features_csv (dict[str, str]): Mapping of column label → path to
+            a ``top_{N}_features.csv`` file (one entry per scenario). The
+            label is informational; correlations are computed on the stacked
+            features matrices found next to each path.
+        output_path (str | None, optional): Where to save the PNG. When
+            ``None``, writes to ``{cwd}/common_features_correlation.png``.
+            Defaults to ``None``.
+        cmap (str, optional): Diverging colormap name. Defaults to
+            ``"RdBu_r"``.
+
+    Returns:
+        plt.Axes: The heatmap axes.
+
+    Raises:
+        ValueError: If the sibling ``features-matrix_*.csv`` next to any
+            input path is missing or ambiguous (0 or >1 matches).
+        KeyError: If any common feature is absent from a scenario's matrix.
+    """
+    common_df = find_common_features(list(top_features_csv.values()))
+    common_features = list(common_df.index)
+
+    blocks: list[pd.DataFrame] = []
+    for path in top_features_csv.values():
+        parent = os.path.dirname(path)
+        matches = glob.glob(os.path.join(parent, "features-matrix_*.csv"))
+        if len(matches) != 1:
+            raise ValueError(
+                f"Expected exactly 1 features-matrix_*.csv next to {path}, "
+                f"found {len(matches)}."
+            )
+        matrix = pd.read_csv(matches[0], index_col=0)
+        missing = [f for f in common_features if f not in matrix.columns]
+        if missing:
+            shown = ", ".join(missing[:3]) + ("..." if len(missing) > 3 else "")
+            raise KeyError(
+                f"{len(missing)} common feature(s) missing from {matches[0]}: {shown}"
+            )
+        blocks.append(matrix[common_features])
+
+    stacked = pd.concat(blocks, axis=0, ignore_index=True)
+    corr = stacked.corr()
+    short_labels = [shorten_feature_name(n) for n in corr.index]
+    corr.index = short_labels
+    corr.columns = short_labels
+
+    n_features = len(common_features)
+    side = max(6.0, 0.6 * n_features + 3)
+    fig, ax = plt.subplots(figsize=(side, side))
+    sns.heatmap(
+        corr,
+        annot=True,
+        fmt=".2f",
+        cmap=cmap,
+        vmin=-1,
+        vmax=1,
+        center=0,
+        cbar_kws={"shrink": 0.8, "pad": 0.02},
+        linewidths=0.5,
+        square=True,
+        ax=ax,
+    )
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_title(
+        f"Correlation across {len(top_features_csv)} scenarios "
+        f"({n_features} common features)"
+    )
+    fig.tight_layout()
+
+    out = output_path or os.path.join(os.getcwd(), "common_features_correlation.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    return ax

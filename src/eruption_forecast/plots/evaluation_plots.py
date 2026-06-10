@@ -1,38 +1,5 @@
-"""Model evaluation plots with Nature/Science journal styling.
-
-Provides a comprehensive suite of per-seed and aggregate classifier evaluation
-charts. Single-seed functions accept pre-computed arrays or dicts; aggregate
-functions accept lists of per-seed results and plot mean ± std envelopes.
-
-Key functions (single-seed):
-
-- ``plot_confusion_matrix`` — annotated normalised confusion matrix heatmap.
-- ``plot_roc_curve`` — ROC curve with AUC annotation.
-- ``plot_precision_recall_curve`` — precision-recall curve with average precision.
-- ``plot_calibration`` — calibration (reliability) diagram.
-- ``plot_threshold_analysis`` — precision/recall/F1 vs. decision threshold.
-- ``plot_g_mean_curve`` — G-mean with sensitivity/specificity vs. threshold.
-- ``plot_mcc_curve`` — MCC with sensitivity/specificity vs. threshold.
-- ``plot_feature_importance`` — horizontal bar chart of top-N features.
-- ``plot_prediction_distribution`` — histogram of predicted probabilities by class.
-- ``plot_learning_curve`` — training vs. validation score against training set size.
-- ``plot_seed_stability`` — scatter/box plot of metric values across seeds.
-- ``plot_classifier_comparison`` — side-by-side metric bars across classifiers.
-
-Key functions (aggregate / multi-seed):
-
-- ``plot_aggregate_roc_curve``, ``plot_aggregate_precision_recall_curve``,
-  ``plot_aggregate_calibration``, ``plot_aggregate_confusion_matrix``,
-  ``plot_aggregate_threshold_analysis``, ``plot_aggregate_g_mean_curve``,
-  ``plot_aggregate_mcc_curve``,
-  ``plot_aggregate_feature_importance``,
-  ``plot_aggregate_prediction_distribution``, ``plot_aggregate_learning_curve``,
-  ``plot_learning_curve_grid`` — ensemble-level variants with mean ± std shading.
-"""
-
 import os
-import json
-from typing import Any
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -47,10 +14,13 @@ from sklearn.metrics import (
     average_precision_score,
 )
 from sklearn.ensemble import VotingClassifier
-from sklearn.calibration import calibration_curve
 
 from eruption_forecast.config import CLASS_LABELS, ERUPTION_PROBABILITY_THRESHOLD
-from eruption_forecast.utils.ml import compute_g_mean, compute_threshold_metrics
+from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import (
+    compute_threshold_metrics,
+    compute_aggregate_threshold_metrics,
+)
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -58,7 +28,146 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import save_figure
+
+
+def plot_threshold_analysis(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    title: str | None = None,
+    figsize: tuple[float, float] = (6, 6),
+    dpi: int = 150,
+) -> plt.Figure:
+    """Plot precision, recall, F1, balanced accuracy, and G-mean vs. decision threshold.
+
+    Creates a multi-metric threshold analysis plot showing how classification metrics
+    vary across decision thresholds from 0 to 1. Marks default threshold
+    ``ERUPTION_PROBABILITY_THRESHOLD`` and the optimal G-mean threshold with vertical
+    lines. G-mean (geometric mean of sensitivity and specificity) is used as the
+    optimization criterion because it is better suited to rare-event forecasting than F1.
+
+    Args:
+        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
+        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
+            Values should be in [0, 1]. Shape: (n_samples,).
+        title (str | None, optional): Plot title. If None, uses
+            "Threshold Analysis". Defaults to None.
+        figsize (tuple[float, float], optional): Figure size as (width, height)
+            in inches. Defaults to (10, 6).
+        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+
+    Returns:
+        plt.Figure: Matplotlib figure object with threshold analysis plot showing
+            precision (blue), recall (orange), F1 score (green), balanced accuracy
+            (pink), and G-mean (purple) curves.
+
+    Examples:
+        >>> import numpy as np
+        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1])
+        >>> y_proba = np.array([0.1, 0.8, 0.3, 0.9, 0.6, 0.2, 0.7])
+        >>> fig = plot_threshold_analysis(y_true, y_proba)
+        >>> fig.savefig("threshold_analysis.png")
+    """
+    thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
+
+    f1_optimal_threshold = thresholds[np.argmax(metrics["f1"])]
+    g_mean_optimal_threshold = thresholds[np.argmax(metrics["g_mean"])]
+    mcc_optimal_threshold = thresholds[np.argmax(metrics["mcc"])]
+
+    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
+        # Plot metrics with distinct colors from Okabe-Ito palette
+        ax.plot(
+            thresholds,
+            metrics["precision"],
+            label="Precision",
+            color=OKABE_ITO[4],  # Blue
+            linewidth=1.5,
+        )
+        ax.plot(
+            thresholds,
+            metrics["recall"],
+            label="Recall",
+            color=OKABE_ITO[0],  # Orange
+            linewidth=1.5,
+        )
+        ax.plot(
+            thresholds,
+            metrics["f1"],
+            label="F1 Score",
+            color=OKABE_ITO[2],  # Bluish green
+            linewidth=1.5,
+        )
+        ax.plot(
+            thresholds,
+            metrics["balanced_accuracy"],
+            label="Balanced Accuracy",
+            color=OKABE_ITO[6],  # Reddish purple
+            linewidth=1.5,
+        )
+        ax.plot(
+            thresholds,
+            metrics["g_mean"],
+            label="G-mean",
+            color=OKABE_ITO[3],  # Yellow
+            linewidth=1.5,
+        )
+        ax.plot(
+            thresholds,
+            metrics["mcc"],
+            label="MCC",
+            color=NATURE_COLORS["purple"],
+            linewidth=1.5,
+        )
+
+        # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.5)
+        ax.axvline(
+            ERUPTION_PROBABILITY_THRESHOLD,
+            color=NATURE_COLORS["gray"],
+            linestyle=":",
+            linewidth=1.5,
+            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
+            alpha=0.7,
+        )
+
+        # Mark optimal threshold by f1
+        ax.axvline(
+            f1_optimal_threshold,
+            color=OKABE_ITO[2],  # Bluish green
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal f1 ({f1_optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        # Mark optimal threshold by G-mean
+        ax.axvline(
+            g_mean_optimal_threshold,
+            color=OKABE_ITO[3],  # Yellow
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal G-mean ({g_mean_optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        # Mark optimal threshold by MCC
+        ax.axvline(
+            mcc_optimal_threshold,
+            color=NATURE_COLORS["purple"],
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Optimal MCC ({mcc_optimal_threshold:.2f})",
+            alpha=0.8,
+        )
+
+        configure_spine(ax)
+        ax.set_xlabel("Threshold", fontsize=8)
+        ax.set_ylabel("Score", fontsize=8)
+        ax.set_title(title or "Threshold Analysis", fontsize=10)
+        ax.legend(loc="best", frameon=False, ncol=3, fontsize=6)
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
+
+    return fig
 
 
 def plot_confusion_matrix(
@@ -66,7 +175,7 @@ def plot_confusion_matrix(
     y_pred: np.ndarray,
     normalize: str | None = None,
     title: str | None = None,
-    figsize: tuple[float, float] = (6, 5),
+    figsize: tuple[float, float] = (6, 6),
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot a confusion matrix heatmap.
@@ -112,10 +221,10 @@ def plot_confusion_matrix(
             annot=True,
             fmt=fmt,
             cmap="Blues",
+            cbar=False,
             xticklabels=labels,
             yticklabels=labels,
             ax=ax,
-            cbar_kws={"label": "Normalized" if normalize else "Count"},
         )
         ax.set_xlabel("Predicted Label")
         ax.set_ylabel("True Label")
@@ -128,7 +237,7 @@ def plot_roc_curve(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     title: str | None = None,
-    figsize: tuple[float, float] = (6, 5),
+    figsize: tuple[float, float] = (6, 6),
     label_classifier: str | None = None,
     dpi: int = 150,
 ) -> plt.Figure:
@@ -168,7 +277,7 @@ def plot_roc_curve(
             fpr,
             tpr,
             color=OKABE_ITO[4],  # Blue
-            linewidth=2.0,
+            linewidth=1.5,
             label=f"ROC (AUC = {auc:.3f})",
         )
 
@@ -188,8 +297,8 @@ def plot_roc_curve(
         ax.set_ylabel("True Positive Rate")
         ax.set_title(title or "ROC Curve")
         ax.legend(loc="lower right", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     return fig
 
@@ -198,7 +307,7 @@ def plot_precision_recall_curve(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     title: str | None = None,
-    figsize: tuple[float, float] = (6, 5),
+    figsize: tuple[float, float] = (6, 6),
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot Precision-Recall curve with AP annotation and Nature/Science styling.
@@ -236,7 +345,7 @@ def plot_precision_recall_curve(
             recall,
             precision,
             color=OKABE_ITO[0],  # Orange
-            linewidth=2.0,
+            linewidth=1.5,
             label=f"PR (AP = {ap:.3f})",
         )
 
@@ -256,132 +365,8 @@ def plot_precision_recall_curve(
         ax.set_ylabel("Precision")
         ax.set_title(title or "Precision-Recall Curve")
         ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
-
-    return fig
-
-
-def plot_threshold_analysis(
-    y_true: np.ndarray,
-    y_proba: np.ndarray,
-    title: str | None = None,
-    figsize: tuple[float, float] = (10, 6),
-    dpi: int = 150,
-) -> plt.Figure:
-    """Plot precision, recall, F1, balanced accuracy, and G-mean vs. decision threshold.
-
-    Creates a multi-metric threshold analysis plot showing how classification metrics
-    vary across decision thresholds from 0 to 1. Marks default threshold
-    ``ERUPTION_PROBABILITY_THRESHOLD`` and the optimal G-mean threshold with vertical
-    lines. G-mean (geometric mean of sensitivity and specificity) is used as the
-    optimization criterion because it is better suited to rare-event forecasting than F1.
-
-    Args:
-        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
-        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
-            Values should be in [0, 1]. Shape: (n_samples,).
-        title (str | None, optional): Plot title. If None, uses
-            "Threshold Analysis". Defaults to None.
-        figsize (tuple[float, float], optional): Figure size as (width, height)
-            in inches. Defaults to (10, 6).
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
-
-    Returns:
-        plt.Figure: Matplotlib figure object with threshold analysis plot showing
-            precision (blue), recall (orange), F1 score (green), balanced accuracy
-            (pink), and G-mean (purple) curves.
-
-    Examples:
-        >>> import numpy as np
-        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1])
-        >>> y_proba = np.array([0.1, 0.8, 0.3, 0.9, 0.6, 0.2, 0.7])
-        >>> fig = plot_threshold_analysis(y_true, y_proba)
-        >>> fig.savefig("threshold_analysis.png")
-    """
-    thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
-
-    g_mean = compute_g_mean(metrics)
-    optimal_idx = np.argmax(g_mean)
-    optimal_threshold = thresholds[optimal_idx]
-    f1_optimal_idx = np.argmax(metrics["f1"])
-    f1_optimal_threshold = thresholds[f1_optimal_idx]
-
-    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-        # Plot metrics with distinct colors from Okabe-Ito palette
-        ax.plot(
-            thresholds,
-            metrics["precision"],
-            label="Precision",
-            color=OKABE_ITO[4],  # Blue
-            linewidth=2.0,
-        )
-        ax.plot(
-            thresholds,
-            metrics["recall"],
-            label="Recall",
-            color=OKABE_ITO[0],  # Orange
-            linewidth=2.0,
-        )
-        ax.plot(
-            thresholds,
-            metrics["f1"],
-            label="F1 Score",
-            color=OKABE_ITO[2],  # Green
-            linewidth=2.0,
-        )
-        ax.plot(
-            thresholds,
-            metrics["balanced_accuracy"],
-            label="Balanced Accuracy",
-            color=OKABE_ITO[6],  # Pink
-            linewidth=2.0,
-        )
-        ax.plot(
-            thresholds,
-            g_mean,
-            label="G-mean",
-            color=OKABE_ITO[3],  # Purple
-            linewidth=2.0,
-        )
-
-        # Mark default threshold ERUPTION_PROBABILITY_THRESHOLD (0.5)
-        ax.axvline(
-            ERUPTION_PROBABILITY_THRESHOLD,
-            color=NATURE_COLORS["gray"],
-            linestyle=":",
-            linewidth=1.5,
-            label=f"Default ({ERUPTION_PROBABILITY_THRESHOLD})",
-            alpha=0.7,
-        )
-
-        # Mark optimal threshold by G-mean
-        ax.axvline(
-            optimal_threshold,
-            color=NATURE_COLORS["red"],
-            linestyle="--",
-            linewidth=1.5,
-            label=f"Optimal G-mean ({optimal_threshold:.2f})",
-            alpha=0.8,
-        )
-
-        # Mark optimal threshold by f1
-        ax.axvline(
-            f1_optimal_threshold,
-            color=NATURE_COLORS["purple"],
-            linestyle="--",
-            linewidth=1.5,
-            label=f"Optimal f1 ({f1_optimal_threshold:.2f})",
-            alpha=0.8,
-        )
-
-        configure_spine(ax)
-        ax.set_xlabel("Decision Threshold")
-        ax.set_ylabel("Score")
-        ax.set_title(title or "Threshold Analysis")
-        ax.legend(loc="best", frameon=False, ncol=2)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     return fig
 
@@ -390,7 +375,7 @@ def plot_g_mean_curve(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     title: str | None = None,
-    figsize: tuple[float, float] = (5, 5),
+    figsize: tuple[float, float] = (6, 6),
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot G-mean, sensitivity, and specificity vs. decision threshold.
@@ -421,8 +406,7 @@ def plot_g_mean_curve(
     """
     thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
 
-    g_mean = compute_g_mean(metrics)
-    optimal_idx = np.argmax(g_mean)
+    optimal_idx = np.argmax(metrics["g_mean"])
     optimal_threshold = thresholds[optimal_idx]
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
@@ -444,10 +428,10 @@ def plot_g_mean_curve(
         )
         ax.plot(
             thresholds,
-            g_mean,
+            metrics["g_mean"],
             label="G-mean",
             color=OKABE_ITO[3],
-            linewidth=2.5,
+            linewidth=0.7,
         )
 
         ax.axvline(
@@ -463,7 +447,7 @@ def plot_g_mean_curve(
             color=NATURE_COLORS["red"],
             linestyle="--",
             linewidth=1.5,
-            label=f"Optimal G-mean ({optimal_threshold:.2f})",
+            label=f"Optimal ({optimal_threshold:.2f})",
             alpha=0.8,
         )
 
@@ -472,8 +456,8 @@ def plot_g_mean_curve(
         ax.set_ylabel("Score")
         ax.set_title(title or "G-mean Curve")
         ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     return fig
 
@@ -482,7 +466,7 @@ def plot_mcc_curve(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     title: str | None = None,
-    figsize: tuple[float, float] = (5, 5),
+    figsize: tuple[float, float] = (6, 6),
     dpi: int = 150,
 ) -> plt.Figure:
     """Plot MCC, sensitivity, and specificity vs. decision threshold.
@@ -520,26 +504,10 @@ def plot_mcc_curve(
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
         ax.plot(
             thresholds,
-            metrics["recall"],
-            label="Sensitivity",
-            color=OKABE_ITO[0],
-            linewidth=1.5,
-            alpha=0.7,
-        )
-        ax.plot(
-            thresholds,
-            metrics["specificity"],
-            label="Specificity",
-            color=OKABE_ITO[4],
-            linewidth=1.5,
-            alpha=0.7,
-        )
-        ax.plot(
-            thresholds,
             mcc,
             label="MCC",
             color=OKABE_ITO[5],
-            linewidth=2.5,
+            linewidth=1.5,
         )
 
         ax.axvline(
@@ -555,7 +523,7 @@ def plot_mcc_curve(
             color=NATURE_COLORS["red"],
             linestyle="--",
             linewidth=1.5,
-            label=f"Optimal MCC ({optimal_threshold:.2f})",
+            label=f"Optimal ({optimal_threshold:.2f})",
             alpha=0.8,
         )
 
@@ -564,7 +532,7 @@ def plot_mcc_curve(
         ax.set_ylabel("Score")
         ax.set_title(title or "MCC Curve")
         ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
+        ax.set_xlim((0.0, 1.025))
         ax.set_ylim((0.0, 1.0))
 
     return fig
@@ -672,169 +640,6 @@ def plot_feature_importance(
     return fig
 
 
-def plot_calibration(
-    y_true: np.ndarray,
-    y_proba: np.ndarray,
-    n_bins: int = 10,
-    title: str | None = None,
-    figsize: tuple[float, float] = (6, 5),
-    dpi: int = 150,
-) -> plt.Figure:
-    """Plot calibration curve.
-
-    Creates a calibration plot showing predicted probability vs. observed frequency.
-    Well-calibrated models have points along the diagonal. Bins probabilities into
-    n_bins and plots fraction of positives vs. mean predicted probability per bin.
-
-    Args:
-        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
-        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
-            Values should be in [0, 1]. Shape: (n_samples,).
-        n_bins (int, optional): Number of bins for calibration curve. More bins
-            give finer resolution but require more data. Defaults to 10.
-        title (str | None, optional): Plot title. If None, uses "Calibration Curve".
-            Defaults to None.
-        figsize (tuple[float, float], optional): Figure size as (width, height)
-            in inches. Defaults to (6, 5).
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
-
-    Returns:
-        plt.Figure: Matplotlib figure object with calibration curve showing model
-            performance (blue line with square markers) vs. perfect calibration
-            (diagonal gray dashed line).
-
-    Examples:
-        >>> import numpy as np
-        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1, 0])
-        >>> y_proba = np.array([0.1, 0.9, 0.2, 0.85, 0.7, 0.3, 0.8, 0.15])
-        >>> fig = plot_calibration(y_true, y_proba, n_bins=5)
-        >>> fig.savefig("calibration.png")
-    """
-    fraction_of_positives, mean_predicted_value = calibration_curve(
-        y_true, y_proba, n_bins=n_bins, strategy="uniform"
-    )
-
-    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-        # Plot calibration curve
-        ax.plot(
-            mean_predicted_value,
-            fraction_of_positives,
-            marker="s",
-            markersize=6,
-            linewidth=2.0,
-            color=OKABE_ITO[4],  # Blue
-            label="Model",
-        )
-
-        # Add perfectly calibrated reference line
-        ax.plot(
-            [0, 1],
-            [0, 1],
-            color=NATURE_COLORS["gray"],
-            linestyle="--",
-            linewidth=1.5,
-            label="Perfectly Calibrated",
-            alpha=0.7,
-        )
-
-        configure_spine(ax)
-        ax.set_xlabel("Mean Predicted Probability")
-        ax.set_ylabel("Fraction of Positives")
-        ax.set_title(title or "Calibration Curve")
-        ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.0))
-
-    return fig
-
-
-def plot_prediction_distribution(
-    y_true: np.ndarray,
-    y_proba: np.ndarray,
-    title: str | None = None,
-    figsize: tuple[float, float] = (8, 5),
-    dpi: int = 150,
-) -> plt.Figure:
-    """Plot histogram of predicted probabilities by true class.
-
-    Creates overlapping histograms showing the distribution of predicted probabilities
-    for each true class. Well-separated distributions indicate good model discrimination.
-    Includes vertical line at ``ERUPTION_PROBABILITY_THRESHOLD``.
-
-    Args:
-        y_true (np.ndarray): True binary labels (0 or 1). Shape: (n_samples,).
-        y_proba (np.ndarray): Predicted probabilities for the positive class (1).
-            Values should be in [0, 1]. Shape: (n_samples,).
-        title (str | None, optional): Plot title. If None, uses
-            "Prediction Distribution by True Class". Defaults to None.
-        figsize (tuple[float, float], optional): Figure size as (width, height)
-            in inches. Defaults to (8, 5).
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
-
-    Returns:
-        plt.Figure: Matplotlib figure object with overlapping histograms for
-            "Not Erupted" (blue) and "Erupted" (orange) classes.
-
-    Examples:
-        >>> import numpy as np
-        >>> y_true = np.array([0, 1, 0, 1, 1, 0, 1, 0])
-        >>> y_proba = np.array([0.1, 0.9, 0.2, 0.85, 0.7, 0.3, 0.8, 0.15])
-        >>> fig = plot_prediction_distribution(y_true, y_proba)
-        >>> fig.savefig("prediction_distribution.png")
-    """
-    proba_0 = y_proba[y_true == 0]
-    proba_1 = y_proba[y_true == 1]
-
-    # Cap bins to unique values in each class to avoid "too many bins" errors
-    # when predicted probabilities cluster in a narrow range.
-    bins = max(1, min(20, len(np.unique(proba_0)), len(np.unique(proba_1))))
-
-    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
-        # Plot histograms for each class
-        ax.hist(
-            proba_0,
-            bins=bins,
-            alpha=0.6,
-            color=OKABE_ITO[4],  # Blue
-            label=f"Not Erupted (n={len(proba_0)})",
-            edgecolor="black",
-            linewidth=0.5,
-        )
-        ax.hist(
-            proba_1,
-            bins=bins,
-            alpha=0.6,
-            color=OKABE_ITO[0],  # Orange
-            label=f"Erupted (n={len(proba_1)})",
-            edgecolor="black",
-            linewidth=0.5,
-        )
-
-        # Mark ERUPTION_PROBABILITY_THRESHOLD
-        ax.axvline(
-            ERUPTION_PROBABILITY_THRESHOLD,
-            color=NATURE_COLORS["gray"],
-            linestyle="--",
-            linewidth=1.5,
-            label=f"Threshold ({ERUPTION_PROBABILITY_THRESHOLD})",
-            alpha=0.7,
-        )
-
-        configure_spine(ax)
-        ax.set_xlabel("Predicted Probability")
-        ax.set_ylabel("Count")
-        ax.set_title(title or "Prediction Distribution by True Class")
-        ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-
-    return fig
-
-
-# ---------------------------------------------------------------------------
-# Aggregate (multi-seed) plot functions
-# ---------------------------------------------------------------------------
-
-
 def plot_aggregate_roc_curve(
     y_trues: np.ndarray | list[np.ndarray],
     y_probas: list[np.ndarray],
@@ -909,7 +714,7 @@ def plot_aggregate_roc_curve(
             fpr_grid,
             mean_tpr,
             color=OKABE_ITO[4],
-            linewidth=2.0,
+            linewidth=1.5,
             label=f"Mean ROC (AUC = {mean_auc:.3f} ± {std_auc:.3f})",
         )
         ax.fill_between(
@@ -934,8 +739,8 @@ def plot_aggregate_roc_curve(
         ax.set_ylabel("True Positive Rate")
         ax.set_title(title or "Aggregate ROC Curve")
         ax.legend(loc="lower right", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     data = pd.DataFrame({"fpr": fpr_grid, "mean_tpr": mean_tpr, "std_tpr": std_tpr})
     return fig, data
@@ -1011,7 +816,7 @@ def plot_aggregate_precision_recall_curve(
             recall_grid,
             mean_prec,
             color=OKABE_ITO[0],
-            linewidth=2.0,
+            linewidth=1.5,
             label=f"Mean PR (AP = {mean_ap:.3f} ± {std_ap:.3f})",
         )
         ax.fill_between(
@@ -1027,286 +832,11 @@ def plot_aggregate_precision_recall_curve(
         ax.set_ylabel("Precision")
         ax.set_title(title or "Aggregate Precision-Recall Curve")
         ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     data = pd.DataFrame(
         {"recall": recall_grid, "mean_precision": mean_prec, "std_precision": std_prec}
-    )
-    return fig, data
-
-
-def plot_aggregate_calibration(
-    y_trues: np.ndarray | list[np.ndarray],
-    y_probas: list[np.ndarray],
-    n_bins: int = 10,
-    title: str | None = None,
-    figsize: tuple[float, float] = (6, 5),
-    dpi: int = 150,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot an aggregate calibration curve averaged across multiple seeds.
-
-    Computes each seed's calibration curve on a uniform bin grid, then
-    plots the mean fraction of positives with a ±1 std band against the
-    perfect calibration diagonal.
-
-    Args:
-        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
-            single array broadcast to all seeds, or a list of per-seed arrays.
-        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
-            for the positive class.
-        n_bins (int, optional): Number of calibration bins. Defaults to 10.
-        title (str | None, optional): Plot title. Defaults to
-            "Aggregate Calibration Curve".
-        figsize (tuple[float, float], optional): Figure size in inches.
-            Defaults to (6, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
-
-    Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
-            with columns ``prob_bin``, ``mean_frac_positives``,
-            ``std_frac_positives``.
-
-    Examples:
-        >>> fig, data = plot_aggregate_calibration(y_true, y_probas_list, n_bins=10)
-        >>> fig.savefig("aggregate_calibration.png")
-        >>> data.to_csv("calibration_data.csv", index=False)
-    """
-    if isinstance(y_trues, np.ndarray):
-        y_trues = [y_trues] * len(y_probas)
-
-    # Use uniform mean_predicted_value grid for consistent alignment
-    prob_grid = np.linspace(0, 1, n_bins)
-    fracs: list[np.ndarray] = []
-
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-
-        for y_true, y_proba in zip(y_trues, y_probas, strict=False):
-            frac, mean_pred = calibration_curve(
-                y_true, y_proba, n_bins=n_bins, strategy="uniform"
-            )
-            frac_interp = np.interp(prob_grid, mean_pred, frac)
-            fracs.append(frac_interp)
-
-        mean_frac = np.mean(fracs, axis=0)
-        std_frac = np.std(fracs, axis=0)
-
-        ax.plot(
-            prob_grid,
-            mean_frac,
-            marker="s",
-            markersize=5,
-            linewidth=2.0,
-            color=OKABE_ITO[4],
-            label="Mean Model",
-        )
-        ax.fill_between(
-            prob_grid,
-            np.clip(mean_frac - std_frac, 0, 1),
-            np.clip(mean_frac + std_frac, 0, 1),
-            color=OKABE_ITO[4],
-            alpha=0.2,
-        )
-        ax.plot(
-            [0, 1],
-            [0, 1],
-            color=NATURE_COLORS["gray"],
-            linestyle="--",
-            linewidth=1.5,
-            label="Perfectly Calibrated",
-            alpha=0.7,
-        )
-
-        configure_spine(ax)
-        ax.set_xlabel("Mean Predicted Probability")
-        ax.set_ylabel("Fraction of Positives")
-        ax.set_title(title or "Aggregate Calibration Curve")
-        ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.0))
-
-    data = pd.DataFrame(
-        {
-            "prob_bin": prob_grid,
-            "mean_frac_positives": mean_frac,
-            "std_frac_positives": std_frac,
-        }
-    )
-    return fig, data
-
-
-def plot_aggregate_prediction_distribution(
-    y_trues: np.ndarray | list[np.ndarray],
-    y_probas: list[np.ndarray],
-    title: str | None = None,
-    figsize: tuple[float, float] = (8, 5),
-    dpi: int = 150,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot overlaid KDE distributions of predicted probabilities across all seeds.
-
-    Pools predicted probabilities from all seeds by true class and plots
-    kernel density estimates. This gives a smooth ensemble-level view of
-    model discrimination.
-
-    Args:
-        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
-            single array broadcast to all seeds, or a list of per-seed arrays.
-        y_probas (list[np.ndarray]): List of per-seed predicted probabilities
-            for the positive class.
-        title (str | None, optional): Plot title. Defaults to
-            "Aggregate Prediction Distribution".
-        figsize (tuple[float, float], optional): Figure size in inches.
-            Defaults to (8, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
-
-    Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
-            with columns ``y_proba`` and ``y_true`` containing the pooled
-            probabilities and labels from all seeds.
-
-    Examples:
-        >>> fig, data = plot_aggregate_prediction_distribution(y_true, y_probas_list)
-        >>> fig.savefig("aggregate_pred_dist.png")
-        >>> data.to_csv("prediction_distribution_data.csv", index=False)
-    """
-    if isinstance(y_trues, np.ndarray):
-        y_trues = [y_trues] * len(y_probas)
-
-    all_proba_0: list[float] = []
-    all_proba_1: list[float] = []
-
-    for y_true, y_proba in zip(y_trues, y_probas, strict=False):
-        all_proba_0.extend(y_proba[y_true == 0].tolist())
-        all_proba_1.extend(y_proba[y_true == 1].tolist())
-
-    proba_0 = np.array(all_proba_0)
-    proba_1 = np.array(all_proba_1)
-
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-
-        sns.kdeplot(
-            proba_0,
-            ax=ax,
-            color=OKABE_ITO[4],
-            fill=True,
-            alpha=0.4,
-            linewidth=2.0,
-            label=f"Not Erupted (n={len(proba_0)})",
-        )
-        sns.kdeplot(
-            proba_1,
-            ax=ax,
-            color=OKABE_ITO[0],
-            fill=True,
-            alpha=0.4,
-            linewidth=2.0,
-            label=f"Erupted (n={len(proba_1)})",
-        )
-        ax.axvline(
-            ERUPTION_PROBABILITY_THRESHOLD,
-            color=NATURE_COLORS["gray"],
-            linestyle="--",
-            linewidth=1.5,
-            label=f"Threshold ({ERUPTION_PROBABILITY_THRESHOLD})",
-            alpha=0.7,
-        )
-
-        configure_spine(ax)
-        ax.set_xlabel("Predicted Probability")
-        ax.set_ylabel("Density")
-        ax.set_title(title or "Aggregate Prediction Distribution")
-        ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-
-    pooled_probas = np.concatenate([proba_0, proba_1])
-    pooled_trues = np.concatenate([np.zeros(len(proba_0)), np.ones(len(proba_1))])
-    data = pd.DataFrame({"y_proba": pooled_probas, "y_true": pooled_trues.astype(int)})
-    return fig, data
-
-
-def plot_aggregate_confusion_matrix(
-    y_trues: np.ndarray | list[np.ndarray],
-    y_preds: list[np.ndarray],
-    normalize: str | None = None,
-    title: str | None = None,
-    figsize: tuple[float, float] = (6, 5),
-    dpi: int = 150,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot a summed confusion matrix across all seeds.
-
-    Accumulates raw confusion matrices from every seed, then optionally
-    normalises the result and displays it as a heatmap. The returned DataFrame
-    always contains raw (un-normalised) counts so the data can be re-analysed
-    independently of the display normalization.
-
-    Args:
-        y_trues (np.ndarray | list[np.ndarray]): True binary labels. Either a
-            single array broadcast to all seeds, or a list of per-seed arrays.
-        y_preds (list[np.ndarray]): List of per-seed binary predictions.
-        normalize (str | None, optional): Normalisation mode: ``"true"``,
-            ``"pred"``, ``"all"``, or None (raw counts). Defaults to None.
-        title (str | None, optional): Plot title. Defaults to
-            "Aggregate Confusion Matrix".
-        figsize (tuple[float, float], optional): Figure size in inches.
-            Defaults to (6, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
-
-    Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame
-            containing the raw summed confusion matrix with index and columns
-            ``["not_erupted", "erupted"]``.
-
-    Examples:
-        >>> fig, data = plot_aggregate_confusion_matrix(y_true, y_preds_list)
-        >>> fig.savefig("aggregate_cm.png")
-        >>> data.to_csv("confusion_matrix_data.csv")
-    """
-    if isinstance(y_trues, np.ndarray):
-        y_trues = [y_trues] * len(y_preds)
-
-    # Sum raw confusion matrices across all seeds
-    cm_sum = np.zeros((2, 2), dtype=np.int64)
-    for y_true, y_pred in zip(y_trues, y_preds, strict=False):
-        cm_sum += confusion_matrix(y_true, y_pred)
-
-    labels = CLASS_LABELS
-
-    if normalize == "true":
-        cm_display = cm_sum.astype(float) / cm_sum.sum(axis=1, keepdims=True)
-        fmt = ".2f"
-    elif normalize == "pred":
-        cm_display = cm_sum.astype(float) / cm_sum.sum(axis=0, keepdims=True)
-        fmt = ".2f"
-    elif normalize == "all":
-        cm_display = cm_sum.astype(float) / cm_sum.sum()
-        fmt = ".2f"
-    else:
-        cm_display = cm_sum
-        fmt = "d"
-
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-        sns.heatmap(
-            cm_display,
-            annot=True,
-            fmt=fmt,
-            cmap="Blues",
-            xticklabels=labels,
-            yticklabels=labels,
-            ax=ax,
-            cbar_kws={"label": "Normalized" if normalize else "Count (summed)"},
-        )
-        ax.set_xlabel("Predicted Label")
-        ax.set_ylabel("True Label")
-        ax.set_title(title or "Aggregate Confusion Matrix")
-
-    # Always save raw counts regardless of display normalization
-    data = pd.DataFrame(
-        cm_sum,
-        index=["not_erupted", "erupted"],
-        columns=["not_erupted", "erupted"],
     )
     return fig, data
 
@@ -1316,14 +846,14 @@ def plot_aggregate_threshold_analysis(
     y_probas: list[np.ndarray],
     show_individual: bool = True,
     title: str | None = None,
-    figsize: tuple[float, float] = (10, 6),
+    figsize: tuple[float, float] = (8, 8),
     dpi: int = 150,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Plot mean metric curves vs. decision threshold across multiple seeds.
 
     Sweeps thresholds from 0 to 1 and computes precision, recall, F1, balanced
-    accuracy, and G-mean per seed via ``compute_threshold_metrics``. Plots the
-    mean of each metric with a ±1 std confidence band and marks the optimal
+    accuracy, G-mean, and MCC per seed via ``compute_threshold_metrics``. Plots
+    the mean of each metric with a ±1 std confidence band and marks the optimal
     G-mean threshold.
 
     Args:
@@ -1344,20 +874,21 @@ def plot_aggregate_threshold_analysis(
             with columns ``threshold``, ``mean_precision``, ``std_precision``,
             ``mean_recall``, ``std_recall``, ``mean_f1``, ``std_f1``,
             ``mean_balanced_accuracy``, ``std_balanced_accuracy``,
-            ``mean_g_mean``, ``std_g_mean``.
+            ``mean_g_mean``, ``std_g_mean``, ``mean_mcc``, ``std_mcc``.
 
     Examples:
         >>> fig, data = plot_aggregate_threshold_analysis(y_true, y_probas_list)
         >>> fig.savefig("aggregate_threshold.png")
         >>> data.to_csv("threshold_data.csv", index=False)
     """
-    metric_keys = ["precision", "recall", "f1", "balanced_accuracy", "g_mean"]
+    metric_keys = ["precision", "recall", "f1", "balanced_accuracy", "g_mean", "mcc"]
     colors = {
-        "precision": OKABE_ITO[4],
-        "recall": OKABE_ITO[0],
-        "f1": OKABE_ITO[2],
-        "balanced_accuracy": OKABE_ITO[6],
-        "g_mean": OKABE_ITO[3],  # Purple
+        "precision": OKABE_ITO[4],  # Blue
+        "recall": OKABE_ITO[0],  # Orange
+        "f1": OKABE_ITO[2],  # Bluish green
+        "balanced_accuracy": OKABE_ITO[6],  # Reddish purple
+        "g_mean": OKABE_ITO[3],  # Yellow
+        "mcc": OKABE_ITO[5],  # Sky blue
     }
     labels_map = {
         "precision": "Precision",
@@ -1365,32 +896,13 @@ def plot_aggregate_threshold_analysis(
         "f1": "F1 Score",
         "balanced_accuracy": "Balanced Accuracy",
         "g_mean": "G-mean",
+        "mcc": "MCC",
     }
 
-    if isinstance(y_trues, np.ndarray):
-        y_trues = [y_trues] * len(y_probas)
+    thresholds, mean_curves, std_curves, per_seed_curves = (
+        compute_aggregate_threshold_metrics(y_trues=y_trues, y_probas=y_probas)
+    )
 
-    # all_curves[key] is a list of 1-D arrays, one per seed
-    all_curves: dict[str, list[np.ndarray]] = {k: [] for k in metric_keys}
-    thresholds: np.ndarray | None = None
-
-    for y_true, y_proba in zip(y_trues, y_probas, strict=False):
-        thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
-        g_mean = compute_g_mean(metrics)
-        for k in ["precision", "recall", "f1", "balanced_accuracy"]:
-            all_curves[k].append(np.array(metrics[k]))
-        all_curves["g_mean"].append(g_mean)
-
-    # Compute mean and std per metric
-    mean_curves: dict[str, np.ndarray] = {}
-    std_curves: dict[str, np.ndarray] = {}
-    for key in metric_keys:
-        matrix = np.stack(all_curves[key], axis=0)
-        mean_curves[key] = matrix.mean(axis=0)
-        std_curves[key] = matrix.std(axis=0)
-
-    # Optimal threshold from mean G-mean curve
-    assert thresholds is not None
     optimal_idx = int(np.argmax(mean_curves["g_mean"]))
     optimal_threshold = float(thresholds[optimal_idx])
     f1_optimal_idx = int(np.argmax(mean_curves["f1"]))
@@ -1404,7 +916,7 @@ def plot_aggregate_threshold_analysis(
             std_curve = std_curves[key]
 
             if show_individual:
-                for seed_curve in all_curves[key]:
+                for seed_curve in per_seed_curves[key]:
                     ax.plot(
                         thresholds,
                         seed_curve,
@@ -1417,7 +929,7 @@ def plot_aggregate_threshold_analysis(
                 thresholds,
                 mean_curve,
                 color=colors[key],
-                linewidth=2.0,
+                linewidth=1.5,
                 label=labels_map[key],
             )
             ax.fill_between(
@@ -1458,8 +970,8 @@ def plot_aggregate_threshold_analysis(
         ax.set_ylabel("Score")
         ax.set_title(title or "Aggregate Threshold Analysis")
         ax.legend(loc="best", frameon=False, ncol=2)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     data = pd.DataFrame(
         {
@@ -1474,6 +986,8 @@ def plot_aggregate_threshold_analysis(
             "std_balanced_accuracy": std_curves["balanced_accuracy"],
             "mean_g_mean": mean_curves["g_mean"],
             "std_g_mean": std_curves["g_mean"],
+            "mean_mcc": mean_curves["mcc"],
+            "std_mcc": std_curves["mcc"],
         }
     )
     return fig, data
@@ -1527,7 +1041,7 @@ def plot_aggregate_g_mean_curve(
 
     for y_true, y_proba in zip(y_trues, y_probas, strict=False):
         thresholds, metrics = compute_threshold_metrics(y_true, y_proba)
-        all_g_mean.append(compute_g_mean(metrics))
+        all_g_mean.append(np.array(metrics["g_mean"]))
         all_sensitivity.append(np.array(metrics["recall"]))
         all_specificity.append(np.array(metrics["specificity"]))
 
@@ -1612,8 +1126,8 @@ def plot_aggregate_g_mean_curve(
         ax.set_ylabel("Score")
         ax.set_title(title or "Aggregate G-mean Curve")
         ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
-        ax.set_ylim((0.0, 1.05))
+        ax.set_xlim((0.0, 1.025))
+        ax.set_ylim((0.0, 1.025))
 
     data = pd.DataFrame(
         {
@@ -1761,7 +1275,7 @@ def plot_aggregate_mcc_curve(
         ax.set_ylabel("Score")
         ax.set_title(title or "Aggregate MCC Curve")
         ax.legend(loc="best", frameon=False)
-        ax.set_xlim((0.0, 1.0))
+        ax.set_xlim((0.0, 1.025))
         ax.set_ylim((0.0, 1.0))
 
     data = pd.DataFrame(
@@ -1885,541 +1399,148 @@ def plot_aggregate_feature_importance(
     return fig, data
 
 
-# ---------------------------------------------------------------------------
-# Cross-classifier comparison plots
-# ---------------------------------------------------------------------------
-
-_DEFAULT_METRICS = [
-    "balanced_accuracy",
-    "f1_score",
-    "precision",
-    "recall",
-    "roc_auc",
-    "pr_auc",
-]
+PER_SEED_PLOT_DISPATCHER: dict[str, Callable[..., plt.Figure]] = {
+    "roc_curve": plot_roc_curve,
+    "precision_recall": plot_precision_recall_curve,
+    "threshold_analysis": plot_threshold_analysis,
+    "confusion_matrix": plot_confusion_matrix,
+    "g_mean_curve": plot_g_mean_curve,
+    "mcc_curve": plot_mcc_curve,
+}
 
 
-def plot_classifier_comparison(
-    metrics_by_classifier: dict[str, list[dict[str, Any]]],
-    metrics_to_show: list[str] | None = None,
-    figsize: tuple[float, float] = (12, 5),
+def render_one_plot(
+    classifier_name: str,
+    random_state: int,
+    plot_name: str,
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    output_dir: str,
     dpi: int = 150,
-    title: str | None = None,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot a heatmap comparing metrics across multiple classifiers.
-
-    Computes mean and standard deviation of each metric across seeds for
-    every classifier, then renders a heatmap where each cell shows
-    ``mean ± std``. Classifiers are sorted by mean F1 descending.
-
-    Args:
-        metrics_by_classifier (dict[str, list[dict[str, Any]]]): Mapping
-            from classifier name to a list of per-seed metrics dicts.
-            Each dict must contain numeric keys matching ``metrics_to_show``.
-        metrics_to_show (list[str] | None, optional): Metric keys to include
-            as heatmap columns. Defaults to
-            ``["balanced_accuracy", "f1_score", "precision", "recall",
-            "roc_auc", "pr_auc"]``.
-        figsize (tuple[float, float], optional): Figure size in inches.
-            Defaults to (12, 5).
-        dpi (int, optional): Figure resolution. Defaults to 150.
-        title (str | None, optional): Plot title. If None, uses
-            "Classifier Comparison". Defaults to None.
-
-    Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a summary
-            DataFrame with MultiIndex ``(classifier, metric)`` and columns
-            ``mean`` and ``std``.
-
-    Examples:
-        >>> metrics_by_clf = {
-        ...     "rf":  [{"f1_score": 0.8, "precision": 0.75, ...}, ...],
-        ...     "xgb": [{"f1_score": 0.85, "precision": 0.80, ...}, ...],
-        ... }
-        >>> fig, df = plot_classifier_comparison(metrics_by_clf)
-        >>> fig.savefig("classifier_comparison.png")
-        >>> df.to_csv("comparison_summary.csv")
-    """
-    if metrics_to_show is None:
-        metrics_to_show = _DEFAULT_METRICS
-
-    # Build summary: mean and std per (classifier, metric)
-    records: list[dict[str, Any]] = []
-    for clf_name, seeds_list in metrics_by_classifier.items():
-        for metric in metrics_to_show:
-            values = [s[metric] for s in seeds_list if metric in s]
-            if values:
-                records.append(
-                    {
-                        "classifier": clf_name,
-                        "metric": metric,
-                        "mean": float(np.mean(values)),
-                        "std": float(np.std(values)),
-                    }
-                )
-
-    summary_df = pd.DataFrame(records).set_index(["classifier", "metric"])
-
-    # Build mean matrix (rows = classifiers, cols = metrics)
-    classifiers = list(metrics_by_classifier.keys())
-
-    # Sort classifiers by mean F1
-    def _mean_f1(classifier: str) -> float:
-        """Return the mean F1 score for a classifier from the summary DataFrame.
-
-        Used as a sort key to order classifiers by descending mean F1 score.
-        Returns 0.0 when the classifier has no F1 entry in the summary.
-
-        Args:
-            classifier (str): Classifier name as it appears in the summary_df index.
-
-        Returns:
-            float: Mean F1 score, or 0.0 if the entry is missing.
-        """
-        try:
-            return float(summary_df.loc[(classifier, "f1_score"), "mean"])  # ty:ignore[invalid-argument-type]
-        except KeyError:
-            return 0.0
-
-    classifiers = sorted(classifiers, key=_mean_f1, reverse=True)
-
-    mean_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=float)
-    std_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=float)
-    annot_matrix = pd.DataFrame(index=classifiers, columns=metrics_to_show, dtype=str)
-
-    for clf in classifiers:
-        for metric in metrics_to_show:
-            try:
-                m = float(summary_df.loc[(clf, metric), "mean"])  # ty:ignore[invalid-argument-type]
-                s = float(summary_df.loc[(clf, metric), "std"])  # ty:ignore[invalid-argument-type]
-            except KeyError:
-                m, s = float("nan"), 0.0
-            mean_matrix.loc[clf, metric] = m
-            std_matrix.loc[clf, metric] = s
-            annot_matrix.loc[clf, metric] = f"{m:.3f}\n±{s:.3f}"
-
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-        sns.heatmap(
-            mean_matrix.astype(float),
-            annot=annot_matrix,
-            fmt="",
-            cmap="viridis",
-            vmin=0.0,
-            vmax=1.0,
-            ax=ax,
-            linewidths=0.5,
-            cbar_kws={"label": "Mean Score"},
-            annot_kws={"size": 8},
-        )
-        ax.set_xlabel("Metric")
-        ax.set_ylabel("Classifier")
-        ax.set_title(title or "Classifier Comparison")
-
-    return fig, summary_df
-
-
-def plot_learning_curve(
-    json_filepath: str,
-    plot_filepath: str,
-    scoring: str = "balanced_accuracy",
     overwrite: bool = False,
-    dpi: int = 150,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Load a learning-curve JSON and render it as a train vs. validation plot.
+    verbose: bool = False,
+) -> str:
+    """Render and persist a single per-seed plot.
 
-    Reads the per-seed JSON file produced by
-    ``ModelTrainer._compute_all_learning_curves``, then renders train and
-    validation scores for the requested ``scoring`` metric as a function of
-    training-set size with ±1 std shaded bands around each line.
-
-    Backward-compatible: if the JSON uses the old flat format (no ``"metrics"``
-    key), it falls back to reading the top-level score keys directly.
+    Module-level so ``joblib`` workers under the ``loky`` backend can pickle
+    it. Saves to ``{output_dir}/{classifier_name}/figures/{plot_name}/{random_state:05d}.{ext}``
+    (extension appended by ``save_figure``).
 
     Args:
-        json_filepath (str): Path to the learning-curve JSON file.
-        plot_filepath (str): Destination path for the saved PNG file.
-        scoring (str, optional): Scoring metric to plot. Must be one of the
-            keys in the ``"metrics"`` dict. Defaults to
-            ``"balanced_accuracy"``.
-        overwrite (bool, optional): When False, skip saving if the PNG already
-            exists. Defaults to False.
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+        classifier_name (str): Classifier identifier used as the first path
+            segment under ``output_dir``.
+        random_state (int): Seed value, formatted to a zero-padded 5-digit
+            file stem.
+        plot_name (str): Key into ``PER_SEED_PLOT_DISPATCHER``.
+        y_true (np.ndarray): Ground-truth binary labels of shape
+            ``(n_samples,)``.
+        y_proba (np.ndarray): One seed's positive-class probability column
+            of shape ``(n_samples,)``.
+        output_dir (str): Root directory for figure output.
+        dpi (int): Figure resolution. Defaults to ``150``.
+        overwrite (bool): When ``True``, regenerate the figure even if a
+            ``.png`` already exists at the destination stem; when
+            ``False``, the existing file is kept and the stem is
+            returned without re-rendering. Defaults to ``False``.
+        verbose (bool): Forwarded to ``save_figure``. Defaults to ``False``.
 
     Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame with
-            columns ``train_sizes``, ``train_scores_mean``, ``train_scores_std``,
-            ``test_scores_mean``, ``test_scores_std``.
+        str: Filepath stem (without extension) written by ``save_figure``.
     """
-    with open(json_filepath) as f:
-        data = json.load(f)
+    plot_function = PER_SEED_PLOT_DISPATCHER[plot_name]
 
-    train_sizes = np.array(data["train_sizes"])
-
-    # Support both new multi-metric format and legacy flat format.
-    if "metrics" in data:
-        scores = data["metrics"][scoring]
+    if plot_name == "confusion_matrix":
+        y_pred = (y_proba >= 0.5).astype(int)
+        fig = plot_function(y_true=y_true, y_pred=y_pred)
     else:
-        scores = data
+        fig = plot_function(y_true=y_true, y_proba=y_proba)
 
-    train_mean = np.array(scores["train_scores_mean"])
-    train_std = np.array(scores["train_scores_std"])
-    test_mean = np.array(scores["test_scores_mean"])
-    test_std = np.array(scores["test_scores_std"])
-
-    ylabel = scoring.replace("_", " ").title()
-
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=(6, 5), dpi=dpi)
-
-        ax.plot(
-            train_sizes, train_mean, color=OKABE_ITO[0], linewidth=2.0, label="Train"
-        )
-        ax.fill_between(
-            train_sizes,
-            train_mean - train_std,
-            train_mean + train_std,
-            alpha=0.2,
-            color=OKABE_ITO[0],
-        )
-
-        ax.plot(
-            train_sizes,
-            test_mean,
-            color=OKABE_ITO[1],
-            linewidth=2.0,
-            linestyle="--",
-            label="Validation",
-        )
-        ax.fill_between(
-            train_sizes,
-            test_mean - test_std,
-            test_mean + test_std,
-            alpha=0.2,
-            color=OKABE_ITO[1],
-        )
-
-        ax.set_xlabel("Training set size")
-        ax.set_ylabel(ylabel)
-        ax.set_title("Learning Curve")
-        ax.legend(frameon=False, fontsize=8)
-        configure_spine(ax)
-
-    df = pd.DataFrame(
-        {
-            "train_sizes": train_sizes,
-            "train_scores_mean": train_mean,
-            "train_scores_std": train_std,
-            "test_scores_mean": test_mean,
-            "test_scores_std": test_std,
-        }
+    filepath = os.path.join(
+        output_dir,
+        classifier_name,
+        "figures",
+        plot_name,
+        f"{random_state:05d}",
     )
 
-    if overwrite or not os.path.isfile(plot_filepath):
-        ensure_dir(os.path.dirname(plot_filepath))
-        fig.savefig(plot_filepath, dpi=dpi, bbox_inches="tight")
+    if not overwrite and os.path.exists(f"{filepath}.png"):
+        if verbose:
+            logger.info(f"[Seed Plot/{plot_name}/{random_state:05d}] exists.")
+        return filepath
 
-    return fig, df
+    save_figure(fig, filepath, dpi, verbose=verbose)
+    return filepath
 
 
-def plot_aggregate_learning_curve(
-    all_data: list[dict],
-    filepath: str,
-    scoring: str = "balanced_accuracy",
+AGGREGATE_PLOT_DISPATCHER: dict[str, Callable[..., tuple[plt.Figure, pd.DataFrame]]] = {
+    "roc_curve": plot_aggregate_roc_curve,
+    "precision_recall": plot_aggregate_precision_recall_curve,
+    "threshold_analysis": plot_aggregate_threshold_analysis,
+    "g_mean_curve": plot_aggregate_g_mean_curve,
+    "mcc_curve": plot_aggregate_mcc_curve,
+}
+
+
+def render_one_aggregate_plot(
+    classifier_name: str,
+    plot_name: str,
+    y_true: np.ndarray,
+    y_probas: np.ndarray,
+    output_dir: str,
+    dpi: int = 150,
     overwrite: bool = False,
-    dpi: int = 150,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot aggregate learning curves across multiple seeds with mean ± std bands.
+    verbose: bool = False,
+) -> str:
+    """Render and persist one aggregate plot for one classifier.
 
-    Interpolates each seed's learning curve onto a shared training-size grid,
-    then plots mean train and validation score lines with ±1 std shaded bands.
-
-    Backward-compatible: if dicts use the old flat format (no ``"metrics"``
-    key), it falls back to reading the top-level score keys directly.
-
-    Args:
-        all_data (list[dict]): List of per-seed dicts in the new multi-metric
-            format (keys: ``train_sizes``, ``metrics``) or the legacy flat
-            format (keys: ``train_sizes``, ``train_scores_mean``, etc.).
-        filepath (str): Destination path for the saved PNG file.
-        scoring (str, optional): Scoring metric to plot. Must be one of the
-            keys in each seed's ``"metrics"`` dict. Defaults to
-            ``"balanced_accuracy"``.
-        overwrite (bool, optional): When False, skip saving if the file already
-            exists. Defaults to False.
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
-
-    Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a DataFrame with
-            columns ``train_sizes``, ``mean_train``, ``std_train``, ``mean_val``,
-            ``std_val``.
-    """
-    # Build shared grid from the largest train_sizes array
-    max_sizes = max(len(d["train_sizes"]) for d in all_data)
-    size_grid = np.linspace(
-        max(d["train_sizes"][0] for d in all_data),
-        min(d["train_sizes"][-1] for d in all_data),
-        max_sizes,
-    )
-
-    train_interps: list[np.ndarray] = []
-    test_interps: list[np.ndarray] = []
-
-    for d in all_data:
-        sizes = np.array(d["train_sizes"])
-        # Support both new multi-metric format and legacy flat format.
-        scores = d["metrics"][scoring] if "metrics" in d else d
-        train_interps.append(np.interp(size_grid, sizes, scores["train_scores_mean"]))
-        test_interps.append(np.interp(size_grid, sizes, scores["test_scores_mean"]))
-
-    mean_train = np.mean(train_interps, axis=0)
-    std_train = np.std(train_interps, axis=0)
-    mean_test = np.mean(test_interps, axis=0)
-    std_test = np.std(test_interps, axis=0)
-
-    ylabel = scoring.replace("_", " ").title()
-
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=(6, 5), dpi=dpi)
-
-        ax.plot(size_grid, mean_train, color=OKABE_ITO[0], linewidth=2.0, label="Train")
-        ax.fill_between(
-            size_grid,
-            mean_train - std_train,
-            mean_train + std_train,
-            alpha=0.2,
-            color=OKABE_ITO[0],
-        )
-
-        ax.plot(
-            size_grid,
-            mean_test,
-            color=OKABE_ITO[1],
-            linewidth=2.0,
-            linestyle="--",
-            label="Validation",
-        )
-        ax.fill_between(
-            size_grid,
-            mean_test - std_test,
-            mean_test + std_test,
-            alpha=0.2,
-            color=OKABE_ITO[1],
-        )
-
-        ax.set_xlabel("Training set size")
-        ax.set_ylabel(ylabel)
-        ax.set_title("Aggregate Learning Curve")
-        ax.legend(frameon=False, fontsize=8)
-        configure_spine(ax)
-
-    df = pd.DataFrame(
-        {
-            "train_sizes": size_grid,
-            "mean_train": mean_train,
-            "std_train": std_train,
-            "mean_val": mean_test,
-            "std_val": std_test,
-        }
-    )
-
-    if overwrite or not os.path.isfile(filepath):
-        fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
-
-    return fig, df
-
-
-def plot_learning_curve_grid(
-    json_filepath: str,
-    plot_filepath: str,
-    scorings: list[str],
-    overwrite: bool = False,
-    dpi: int = 150,
-) -> plt.Figure:
-    """Plot all scoring metrics as side-by-side subplots in a single figure.
-
-    Reads the multi-metric learning-curve JSON produced by
-    ``ModelTrainer._compute_all_learning_curves`` and renders one subplot per
-    scoring metric, each with train and validation lines and ±1 std shaded
-    bands.
-
-    Backward-compatible: if the JSON uses the old flat format (no ``"metrics"``
-    key), only one subplot is rendered using the top-level score keys.
+    Module-level so ``joblib`` workers under the ``loky`` backend can pickle
+    it. Slices the ``(n_samples, n_seeds)`` probability matrix into per-seed
+    columns, delegates to the function registered in
+    :data:`AGGREGATE_PLOT_DISPATCHER`, and saves the figure plus the returned
+    mean/std DataFrame to disk.
 
     Args:
-        json_filepath (str): Path to the learning-curve JSON file.
-        plot_filepath (str): Destination path for the saved PNG file.
-        scorings (list[str]): Ordered list of scoring keys to plot
-            (e.g. ``["balanced_accuracy", "recall", "f1_weighted"]``).
-        overwrite (bool, optional): When False, skip saving if the file already
-            exists. Defaults to False.
-        dpi (int, optional): Figure resolution in dots per inch. Defaults to 150.
+        classifier_name (str): Classifier identifier used as the first path
+            segment under ``output_dir``.
+        plot_name (str): Key into ``AGGREGATE_PLOT_DISPATCHER``.
+        y_true (np.ndarray): Ground-truth binary labels of shape
+            ``(n_samples,)``.
+        y_probas (np.ndarray): Probability matrix of shape
+            ``(n_samples, n_seeds)``.
+        output_dir (str): Root directory for figure output.
+        dpi (int): Figure resolution. Defaults to ``150``.
+        overwrite (bool): When ``True``, regenerate the figure and CSV
+            even if both already exist at the destination stem; when
+            ``False``, the existing files are kept and the stem is
+            returned without re-rendering. Defaults to ``False``.
+        verbose (bool): Forwarded to ``save_figure``. Defaults to ``False``.
 
     Returns:
-        plt.Figure: Matplotlib figure containing one subplot per scoring metric.
+        str: Filepath stem (without extension). The PNG figure and the CSV
+            data table share this stem.
     """
-    with open(json_filepath) as f:
-        data = json.load(f)
+    plot_function = AGGREGATE_PLOT_DISPATCHER[plot_name]
+    per_seed_list = [y_probas[:, idx] for idx in range(y_probas.shape[1])]
 
-    train_sizes = np.array(data["train_sizes"])
-    n = len(scorings)
+    fig, data = plot_function(y_trues=y_true, y_probas=per_seed_list, dpi=dpi)
 
-    with apply_nature_style():
-        fig, axes = plt.subplots(
-            1, n, figsize=(5 * n, 5), dpi=dpi, layout="constrained"
-        )
-        if n == 1:
-            axes = [axes]
-
-        for ax, scoring in zip(axes, scorings, strict=True):
-            scores = data["metrics"][scoring] if "metrics" in data else data
-
-            train_mean = np.array(scores["train_scores_mean"])
-            train_std = np.array(scores["train_scores_std"])
-            test_mean = np.array(scores["test_scores_mean"])
-            test_std = np.array(scores["test_scores_std"])
-            ylabel = scoring.replace("_", " ").title()
-
-            ax.plot(
-                train_sizes,
-                train_mean,
-                color=OKABE_ITO[0],
-                linewidth=2.0,
-                label="Train",
-            )
-            ax.fill_between(
-                train_sizes,
-                train_mean - train_std,
-                train_mean + train_std,
-                alpha=0.2,
-                color=OKABE_ITO[0],
-            )
-            ax.plot(
-                train_sizes,
-                test_mean,
-                color=OKABE_ITO[1],
-                linewidth=2.0,
-                linestyle="--",
-                label="Validation",
-            )
-            ax.fill_between(
-                train_sizes,
-                test_mean - test_std,
-                test_mean + test_std,
-                alpha=0.2,
-                color=OKABE_ITO[1],
-            )
-
-            ax.set_xlabel("Training set size")
-            ax.set_ylabel(ylabel)
-            ax.set_title(f"Learning Curve — {ylabel}")
-            ax.legend(frameon=False, fontsize=8)
-            configure_spine(ax)
-
-    if overwrite or not os.path.isfile(plot_filepath):
-        ensure_dir(os.path.dirname(plot_filepath))
-        fig.savefig(plot_filepath, dpi=dpi, bbox_inches="tight")
-
-    return fig
-
-
-def plot_seed_stability(
-    metrics_by_classifier: dict[str, list[dict[str, Any]]],
-    metric: str = "f1_score",
-    figsize: tuple[float, float] | None = None,
-    dpi: int = 150,
-    title: str | None = None,
-) -> tuple[plt.Figure, pd.DataFrame]:
-    """Plot a violin plot showing metric stability across random seeds per classifier.
-
-    Renders one violin per classifier with individual seed dots overlaid as a
-    jittered strip plot. Classifiers are sorted by mean descending. The mean
-    across seeds is marked with a horizontal white line.
-
-    Args:
-        metrics_by_classifier (dict[str, list[dict[str, Any]]]): Mapping
-            from classifier name to a list of per-seed metrics dicts.
-        metric (str, optional): Metric key to plot. Must be present in each
-            seed dict. Defaults to ``"f1_score"``.
-        figsize (tuple[float, float] | None, optional): Figure size in inches.
-            If None, auto-sizes based on number of classifiers using
-            ``(10, max(5, n * 0.6))``. Defaults to None.
-        dpi (int, optional): Figure resolution. Defaults to 150.
-        title (str | None, optional): Plot title. If None, uses
-            ``"Seed Stability — {metric}"``. Defaults to None.
-
-    Returns:
-        tuple[plt.Figure, pd.DataFrame]: Matplotlib figure and a long-form
-            DataFrame with columns ``classifier``, ``seed_idx``, and
-            ``value``.
-
-    Examples:
-        >>> metrics_by_clf = {
-        ...     "rf":  [{"f1_score": 0.8}, {"f1_score": 0.82}, ...],
-        ...     "xgb": [{"f1_score": 0.85}, {"f1_score": 0.84}, ...],
-        ... }
-        >>> fig, df = plot_seed_stability(metrics_by_clf, metric="balanced_accuracy")
-        >>> fig.savefig("seed_stability.png")
-    """
-    # Build long-form DataFrame
-    rows: list[dict[str, Any]] = []
-    for clf_name, seeds_list in metrics_by_classifier.items():
-        for seed_idx, seed_metrics in enumerate(seeds_list):
-            if metric in seed_metrics:
-                rows.append(
-                    {
-                        "classifier": clf_name,
-                        "seed_idx": seed_idx,
-                        "value": seed_metrics[metric],
-                    }
-                )
-    long_df = pd.DataFrame(rows)
-
-    # Sort classifiers by mean descending
-    order = (
-        long_df.groupby("classifier")["value"]
-        .mean()
-        .sort_values(ascending=False)
-        .index.tolist()
+    filepath = os.path.join(
+        output_dir,
+        classifier_name,
+        "figures",
+        "aggregate",
+        plot_name,
     )
 
-    n_classifiers = len(order)
-    if figsize is None:
-        figsize = (10, max(5, n_classifiers * 0.6))
+    if (
+        not overwrite
+        and os.path.exists(f"{filepath}.png")
+        and os.path.exists(f"{filepath}.csv")
+    ):
+        if verbose:
+            logger.info(f"[Aggregate Plot/{plot_name}] exists.")
+        return filepath
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-
-        sns.violinplot(
-            data=long_df,
-            x="classifier",
-            y="value",
-            order=order,
-            ax=ax,
-            color=OKABE_ITO[4],
-            alpha=0.7,
-            inner=None,
-        )
-        sns.stripplot(
-            data=long_df,
-            x="classifier",
-            y="value",
-            order=order,
-            ax=ax,
-            color="black",
-            size=3,
-            alpha=0.5,
-            jitter=True,
-        )
-
-        # Mark mean per classifier
-        for i, clf in enumerate(order):
-            mean_val = long_df.loc[long_df["classifier"] == clf, "value"].mean()
-            ax.hlines(mean_val, i - 0.3, i + 0.3, colors="white", linewidths=1.0)
-
-        configure_spine(ax)
-        ax.set_xlabel("Classifier")
-        ax.set_ylabel(metric.replace("_", " ").title())
-        ax.set_title(title or f"Seed Stability — {metric}")
-
-    return fig, long_df
+    save_figure(fig, filepath, dpi, verbose=verbose)
+    data.to_csv(f"{filepath}.csv", index=False)
+    return filepath
