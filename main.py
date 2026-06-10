@@ -1,7 +1,10 @@
 # %%
+from eruption_forecast.decorators import timer, notify
 from eruption_forecast.model.forecast_model import ForecastModel
 
 
+@timer("Run Forecasting")
+@notify("Run Forecasting")
 def main(sds_dir: str, n_jobs: int = 2):
     # %%
     fm = ForecastModel(
