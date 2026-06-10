@@ -210,40 +210,6 @@ class MetricsEnsemble:
             verbose=verbose,
         )
 
-    def save(self, path: str | None = None) -> str:
-        """Persist the computed MetricsEnsemble to disk via joblib.
-
-        Writes a single ``.pkl`` containing the full instance — including the
-        embedded ``ClassifierEnsemble``, ``features_df``, ``y_true``, and the
-        populated ``metrics`` / ``y_probas`` / ``y_preds`` dicts — so
-        :meth:`load` can reconstitute everything without recomputation.
-
-        Args:
-            path (str | None, optional): Destination ``.pkl`` path. ``None``
-                resolves to ``{self.output_dir}/MetricsEnsemble.pkl``.
-                Defaults to ``None``.
-
-        Returns:
-            str: The absolute path the instance was written to.
-
-        Example:
-            >>> me = MetricsEnsemble.from_file(...).compute()
-            >>> me.save()
-            '.../output/evaluation/prediction/MetricsEnsemble.pkl'
-        """
-        if path is None:
-            os.makedirs(self.output_dir, exist_ok=True)
-            path = os.path.join(self.output_dir, "MetricsEnsemble.pkl")
-        else:
-            parent = dirname(path)
-            if parent:
-                os.makedirs(parent, exist_ok=True)
-
-        joblib.dump(self, path)
-        if self.verbose:
-            logger.info(f"Saved MetricsEnsemble to {path}")
-        return path
-
     @classmethod
     def load(cls, path: str) -> "MetricsEnsemble":
         """Reconstitute a saved MetricsEnsemble from a joblib ``.pkl``.
@@ -365,40 +331,6 @@ class MetricsEnsemble:
 
         return self._plot_jobs(plots)
 
-    def _plot_jobs(self, plots: list[str]) -> list[str]:
-        """Render the requested per-seed plots in parallel.
-
-        Builds a flat list of ``(classifier_name, seed_idx, plot_name)`` jobs
-        and dispatches them to ``joblib.Parallel`` with the ``loky`` backend.
-        Caller is responsible for restricting ``plots`` to names registered
-        in ``PER_SEED_PLOT_DISPATCHER``.
-
-        Args:
-            plots (list[str]): Per-seed plot names to render.
-
-        Returns:
-            list[str]: Saved figure filepath stems, one per executed job.
-        """
-        jobs: list[tuple[str, int, str]] = []
-        for classifier_name, y_probas in self.y_probas.items():
-            n_seeds = y_probas.shape[1]
-            for seed_idx in range(n_seeds):
-                for plot_name in plots:
-                    jobs.append((classifier_name, seed_idx, plot_name))
-
-        return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
-            joblib.delayed(render_one_plot)(
-                classifier_name=classifier_name,
-                random_state=int(self.metrics[classifier_name].index[seed_idx]),
-                plot_name=plot_name,
-                y_true=self.y_true,
-                y_proba=self.y_probas[classifier_name][:, seed_idx],
-                output_dir=self.classifiers_dir,
-                verbose=self.verbose,
-            )
-            for classifier_name, seed_idx, plot_name in jobs
-        )
-
     def plot_aggregate(
         self,
         include_plots: list[str] | None = None,
@@ -441,6 +373,75 @@ class MetricsEnsemble:
             plots = [name for name in plots if name not in exclude_plots]
 
         return self._plot_aggregate_jobs(plots)
+
+    def save(self, path: str | None = None) -> str:
+        """Persist the computed MetricsEnsemble to disk via joblib.
+
+        Writes a single ``.pkl`` containing the full instance — including the
+        embedded ``ClassifierEnsemble``, ``features_df``, ``y_true``, and the
+        populated ``metrics`` / ``y_probas`` / ``y_preds`` dicts — so
+        :meth:`load` can reconstitute everything without recomputation.
+
+        Args:
+            path (str | None, optional): Destination ``.pkl`` path. ``None``
+                resolves to ``{self.output_dir}/MetricsEnsemble.pkl``.
+                Defaults to ``None``.
+
+        Returns:
+            str: The absolute path the instance was written to.
+
+        Example:
+            >>> me = MetricsEnsemble.from_file(...).compute()
+            >>> me.save()
+            '.../output/evaluation/prediction/MetricsEnsemble.pkl'
+        """
+        if path is None:
+            os.makedirs(self.output_dir, exist_ok=True)
+            path = os.path.join(self.output_dir, "MetricsEnsemble.pkl")
+        else:
+            parent = dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+
+        joblib.dump(self, path)
+        if self.verbose:
+            logger.info(f"Saved MetricsEnsemble to {path}")
+
+        return path
+
+    def _plot_jobs(self, plots: list[str]) -> list[str]:
+        """Render the requested per-seed plots in parallel.
+
+        Builds a flat list of ``(classifier_name, seed_idx, plot_name)`` jobs
+        and dispatches them to ``joblib.Parallel`` with the ``loky`` backend.
+        Caller is responsible for restricting ``plots`` to names registered
+        in ``PER_SEED_PLOT_DISPATCHER``.
+
+        Args:
+            plots (list[str]): Per-seed plot names to render.
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
+        """
+        jobs: list[tuple[str, int, str]] = []
+        for classifier_name, y_probas in self.y_probas.items():
+            n_seeds = y_probas.shape[1]
+            for seed_idx in range(n_seeds):
+                for plot_name in plots:
+                    jobs.append((classifier_name, seed_idx, plot_name))
+
+        return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
+            joblib.delayed(render_one_plot)(
+                classifier_name=classifier_name,
+                random_state=int(self.metrics[classifier_name].index[seed_idx]),
+                plot_name=plot_name,
+                y_true=self.y_true,
+                y_proba=self.y_probas[classifier_name][:, seed_idx],
+                output_dir=self.classifiers_dir,
+                verbose=self.verbose,
+            )
+            for classifier_name, seed_idx, plot_name in jobs
+        )
 
     def _plot_aggregate_jobs(self, plots: list[str]) -> list[str]:
         """Render the requested aggregate plots in parallel.
