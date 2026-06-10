@@ -35,7 +35,7 @@ class TrainingConfig(BaseConfig):
         cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified"]):
             Cross-validation strategy. Defaults to ``"shuffle-stratified"``.
         cv_splits (int): Number of CV folds. Defaults to ``5``.
-        number_of_features (int): Top-N features retained per seed after
+        top_n_features (int): Top-N features retained per seed after
             feature selection. Defaults to ``20``.
         include_eruption_date (bool): If ``True``, the eruption date itself
             is labeled as erupted. Defaults to ``False``.
@@ -64,7 +64,7 @@ class TrainingConfig(BaseConfig):
         "shuffle-stratified"
     )
     cv_splits: int = 5
-    number_of_features: int = 20
+    top_n_features: int = 20
     include_eruption_date: bool = False
     output_dir: str | None = None
     root_dir: str | None = None
@@ -100,7 +100,7 @@ class TrainingConfig(BaseConfig):
             "window_size",
             "cv_strategy",
             "cv_splits",
-            "number_of_features",
+            "top_n_features",
             "include_eruption_date",
             "output_dir",
             "root_dir",

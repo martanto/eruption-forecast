@@ -230,7 +230,7 @@ class TestForecastTrainConfig:
         assert cfg.cv_strategy == "shuffle-stratified"
         assert cfg.cv_splits == 5
         assert cfg.scoring == "balanced_accuracy"
-        assert cfg.number_of_features == 20
+        assert cfg.top_n_features == 20
         assert cfg.include_eruption_date is True
         assert cfg.save_tremor_matrix_per_method is True
         assert cfg.minimum_completion == 1.0

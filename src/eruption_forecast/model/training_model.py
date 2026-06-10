@@ -60,7 +60,7 @@ class TrainingModel(BaseModel, CacheModel):
             Cross-validation strategy passed to each ``ClassifierModel``.
             Defaults to ``"shuffle-stratified"``.
         cv_splits (int): Number of CV folds. Defaults to 5.
-        number_of_features (int): Top-N features retained after feature
+        top_n_features (int): Top-N features retained after feature
             selection. Defaults to 20.
         include_eruption_date (bool): Whether to include the eruption day
             itself as a positive label. Defaults to False.
@@ -103,7 +103,7 @@ class TrainingModel(BaseModel, CacheModel):
             "shuffle", "stratified", "shuffle-stratified"
         ] = "shuffle-stratified",
         cv_splits: int = 5,
-        number_of_features: int = 20,
+        top_n_features: int = 20,
         include_eruption_date: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -144,7 +144,7 @@ class TrainingModel(BaseModel, CacheModel):
         self.classifiers = classifiers
         self.cv_strategy = cv_strategy
         self.cv_splits = cv_splits
-        self.number_of_features = number_of_features
+        self.top_n_features = top_n_features
         self.include_eruption_date: bool = include_eruption_date
         self.overwrite: bool = overwrite
         self.n_grids: int = n_grids
@@ -206,7 +206,7 @@ class TrainingModel(BaseModel, CacheModel):
             window_size=window_size,
             cv_strategy=cv_strategy,
             cv_splits=cv_splits,
-            number_of_features=number_of_features,
+            top_n_features=top_n_features,
             include_eruption_date=include_eruption_date,
             output_dir=output_dir,
             root_dir=root_dir,
@@ -343,7 +343,7 @@ class TrainingModel(BaseModel, CacheModel):
             f"window_size={self.window_size}d, "
             f"classifiers=[{classifier_names}], "
             f"cv={self.cv_strategy}/{self.cv_splits}-fold, "
-            f"top_features={self.number_of_features}, "
+            f"top_n_features={self.top_n_features}, "
             f"eruptions={len(self.eruption_dates) if self.eruption_dates is not None else 0}"
             f")"
         )
@@ -355,7 +355,7 @@ class TrainingModel(BaseModel, CacheModel):
             dict: Mapping of parameter names to their current values. Always
                 includes ``start_date``, ``end_date``, ``classifiers``,
                 ``eruption_dates``, ``window_size``, ``cv_strategy``,
-                ``cv_splits``, ``number_of_features``,
+                ``cv_splits``, ``top_n_features``,
                 ``include_eruption_date``, ``overwrite``, ``output_dir``,
                 ``root_dir``, ``n_jobs``, ``n_grids``, and ``verbose``. Also
                 includes ``basename`` once ``build_label()`` has been called.
@@ -375,7 +375,7 @@ class TrainingModel(BaseModel, CacheModel):
             "window_size": self.window_size,
             "cv_strategy": self.cv_strategy,
             "cv_splits": self.cv_splits,
-            "number_of_features": self.number_of_features,
+            "top_n_features": self.top_n_features,
             "include_eruption_date": self.include_eruption_date,
             "overwrite": self.overwrite,
             "output_dir": self.output_dir,
@@ -415,7 +415,7 @@ class TrainingModel(BaseModel, CacheModel):
             f"Window size: {self.window_size} day(s). "
             f"Classifiers: {classifier_names}. "
             f"CV strategy: {self.cv_strategy} with {self.cv_splits} folds. "
-            f"Top features retained: {self.number_of_features}. "
+            f"Top features retained: {self.top_n_features}. "
             f"Include eruption date: {self.include_eruption_date}. "
             f"Overwrite: {self.overwrite}. "
             f"Output dir: {self.output_dir}. "
@@ -474,7 +474,7 @@ class TrainingModel(BaseModel, CacheModel):
         cv_strategy: str,
         cv_splits: int,
         scoring: str,
-        number_of_features: int,
+        top_n_features: int,
         include_eruption_date: bool,
         build_label_params: dict,
         extract_features_params: dict,
@@ -503,7 +503,7 @@ class TrainingModel(BaseModel, CacheModel):
             cv_strategy (str): Cross-validation strategy name.
             cv_splits (int): Number of CV folds.
             scoring (str): GridSearchCV scoring name.
-            number_of_features (int): Top-N features retained.
+            top_n_features (int): Top-N features retained.
             include_eruption_date (bool): Whether the eruption day itself is
                 labelled positive.
             build_label_params (dict): Kwargs passed to ``build_label()``
@@ -531,7 +531,7 @@ class TrainingModel(BaseModel, CacheModel):
         if raw_select_features is not None:
             extract_features_params["select_features"] = sorted(
                 load_select_features(
-                    raw_select_features, number_of_features=number_of_features
+                    raw_select_features, number_of_features=top_n_features
                 )
             )
 
@@ -548,7 +548,7 @@ class TrainingModel(BaseModel, CacheModel):
                 "cv_strategy": cv_strategy,
                 "cv_splits": cv_splits,
                 "scoring": scoring,
-                "number_of_features": number_of_features,
+                "top_n_features": top_n_features,
                 "include_eruption_date": include_eruption_date,
             },
             "build_label": build_label_params,
@@ -744,7 +744,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         resolved_select_features = (
             load_select_features(
-                select_features, number_of_features=self.number_of_features
+                select_features, number_of_features=self.top_n_features
             )
             if select_features is not None
             else None
@@ -859,7 +859,9 @@ class TrainingModel(BaseModel, CacheModel):
             )
 
         if self.verbose:
-            logger.info(f"[Training Model]: Loading feature matrix {features_matrix_csv}")
+            logger.info(
+                f"[Training Model]: Loading feature matrix {features_matrix_csv}"
+            )
 
         self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
         self.labels = load_label_csv(label_features_csv)
@@ -867,7 +869,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         if select_features is not None:
             resolved = load_select_features(
-                select_features, number_of_features=self.number_of_features
+                select_features, number_of_features=self.top_n_features
             )
             matrix_columns = set(self.features_df.columns)
             present = [name for name in resolved if name in matrix_columns]
@@ -1092,16 +1094,18 @@ class TrainingModel(BaseModel, CacheModel):
         self.features_selected_df = concat_significant_features(
             features_csvs=self.features_csvs,
             features_dir=self.features_dir,
-            number_of_features=self.number_of_features,
+            number_of_features=self.top_n_features,
         )
 
         if plot_features and not self.features_selected_df.empty:
             plot_significant_features(
                 df=self.features_selected_df.reset_index(),
                 filepath=os.path.join(
-                    self.features_dir, f"top_{self.number_of_features}_features"
+                    self.features_dir, f"top_{self.top_n_features}_features"
                 ),
-                overwrite=True,
+                top_features=self.top_n_features,
+                overwrite=self.overwrite,
+                legend_loc="bottom right",
                 values_column="score",
             )
 
@@ -1123,7 +1127,7 @@ class TrainingModel(BaseModel, CacheModel):
                 records=records_per_classifier[classifier_slug],
                 classifier_dir=self.classifier_dirs[classifier_slug],
                 classifier_model=classifier_model,
-                number_of_features=self.number_of_features,
+                number_of_features=self.top_n_features,
                 prefix_filename="trained-model",
                 verbose=self.verbose,
             )
@@ -1472,7 +1476,7 @@ class TrainingModel(BaseModel, CacheModel):
             features=features_resampled,
             labels=labels_resampled,
             random_state=random_state,
-            number_of_features=self.number_of_features,
+            number_of_features=self.top_n_features,
             features_seed_path=features_seed_path,
             figures_seed_path=figures_seed_path,
             overwrite=self.overwrite,

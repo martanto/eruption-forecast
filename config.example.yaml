@@ -49,7 +49,7 @@ train:
   cv_strategy: shuffle-stratified  # 'shuffle', 'stratified', 'shuffle-stratified'
   cv_splits: 5              # Number of CV splits
   scoring: balanced_accuracy   # sklearn scoring metric for GridSearchCV
-  number_of_features: 20    # Top-N features retained per seed
+  top_n_features: 20        # Top-N features retained per seed
   include_eruption_date: true   # Label the eruption date itself as erupted
   select_tremor_columns: null   # Subset of tremor columns (null = all)
   save_tremor_matrix_per_method: true  # Save a separate tremor matrix per column

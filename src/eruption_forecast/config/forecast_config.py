@@ -143,7 +143,7 @@ class ForecastTrainConfig(BaseConfig):
         cv_splits (int): Number of CV splits. Defaults to ``5``.
         scoring (str): Sklearn scoring identifier passed to ``GridSearchCV``.
             Defaults to ``"balanced_accuracy"``.
-        number_of_features (int): Top-N features retained per seed after
+        top_n_features (int): Top-N features retained per seed after
             feature selection. Defaults to ``20``.
         include_eruption_date (bool): If ``True``, the eruption date itself is
             labeled as erupted. Defaults to ``True``.
@@ -202,7 +202,7 @@ class ForecastTrainConfig(BaseConfig):
     )
     cv_splits: int = 5
     scoring: str = "balanced_accuracy"
-    number_of_features: int = 20
+    top_n_features: int = 20
     include_eruption_date: bool = True
     select_tremor_columns: list[str] | None = None
     save_tremor_matrix_per_method: bool = True
