@@ -1,5 +1,4 @@
 import os
-from typing import Any
 from collections.abc import Callable
 
 import numpy as np
@@ -639,11 +638,6 @@ def plot_feature_importance(
             )
 
     return fig
-
-
-# ---------------------------------------------------------------------------
-# Aggregate (multi-seed) plot functions
-# ---------------------------------------------------------------------------
 
 
 def plot_aggregate_roc_curve(

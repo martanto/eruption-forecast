@@ -1105,7 +1105,7 @@ class TrainingModel(BaseModel, CacheModel):
                 ),
                 top_features=self.top_n_features,
                 overwrite=self.overwrite,
-                legend_loc="bottom right",
+                legend_loc="lower right",
                 values_column="score",
             )
 

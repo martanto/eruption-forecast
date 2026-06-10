@@ -219,36 +219,59 @@ def load_select_features(
     return cleaned
 
 
-def concat_features(csv_list: list[str], filepath: str) -> tuple[str, pd.DataFrame]:
-    """Concatenate feature CSVs into one DataFrame and save.
+def concat_features(
+    csv_list: list[str],
+    filepath: str,
+    frames: list[pd.DataFrame] | None = None,
+) -> tuple[str, pd.DataFrame]:
+    """Concatenate feature CSVs (and optional in-memory frames) into one DataFrame and save.
 
-    Reads multiple feature CSV files, concatenates them column-wise (axis=1),
-    and saves the combined DataFrame to the specified filepath. This is used
-    to merge per-column tsfresh feature extractions.
+    Reads each path in ``csv_list``, optionally combines them with already-loaded
+    DataFrames in ``frames``, concatenates everything column-wise (``axis=1``),
+    and saves the merged DataFrame to ``filepath``. Used to merge per-column
+    tsfresh feature extractions; ``frames`` lets callers skip a disk round-trip
+    for columns whose DataFrames are already in memory.
 
     Args:
-        csv_list (list[str]): List of CSV file paths to concatenate.
-        filepath (str): Output filepath to save the concatenated CSV.
+        csv_list (list[str]): Paths to feature CSV files to read and concatenate.
+        filepath (str): Output filepath for the merged CSV.
+        frames (list[pd.DataFrame] | None, optional): Pre-loaded feature
+            DataFrames to include in the concatenation alongside the CSVs.
+            Defaults to ``None`` (CSV-only behaviour).
 
     Returns:
         tuple[str, pd.DataFrame]: Tuple containing:
-            - filepath (str): Path where the CSV was saved.
+            - filepath (str): Path where the merged CSV was saved.
             - df (pd.DataFrame): Concatenated DataFrame.
 
     Raises:
-        ValueError: If csv_list has fewer than 2 files or if all CSVs are empty.
+        ValueError: If the combined input count (``len(csv_list) + len(frames)``)
+            is fewer than 2, or if all inputs concatenate to an empty frame.
 
     Examples:
         >>> csv_files = ["features_f0.csv", "features_f1.csv"]
         >>> path, df = concat_features(csv_files, "all_features.csv")
         >>> print(df.shape)
+        >>> # mix in already-loaded frames
+        >>> path, df = concat_features(
+        ...     ["features_f0.csv"],
+        ...     "all_features.csv",
+        ...     frames=[fresh_df_f1, fresh_df_f2],
+        ... )
     """
-    if len(csv_list) <= 1:
+    frames = frames or []
+    total_inputs = len(csv_list) + len(frames)
+    if total_inputs <= 1:
         raise ValueError(
-            f"Requires at least 2 CSV files. Total your CSV file is {len(csv_list)}"
+            f"Requires at least 2 inputs (csv_list + frames). Got {total_inputs}."
         )
 
-    df = pd.concat([pd.read_csv(file, index_col=0) for file in csv_list], axis=1)
+    pieces: list[pd.DataFrame] = [
+        pd.read_csv(file, index_col=0) for file in csv_list
+    ]
+    pieces.extend(frames)
+
+    df = pd.concat(pieces, axis=1)
 
     if df.empty:
         raise ValueError("There is no data in the csv files.")
