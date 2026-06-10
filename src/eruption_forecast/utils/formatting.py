@@ -171,8 +171,8 @@ def shorten_feature_name(name: str) -> str:
         values.append(match.group(1).strip('"') if match else param)
 
     if values:
-        return f"{column} · {short_calc}({', '.join(values)})"
-    return f"{column} · {short_calc}"
+        return f"{column} | {short_calc}({', '.join(values)})"
+    return f"{column} | {short_calc}"
 
 
 def get_classifier_label(classifier_name: str) -> str:
