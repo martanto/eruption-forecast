@@ -353,7 +353,6 @@ def concat_significant_features(
     features_csvs: list[str],
     features_dir: str,
     number_of_features: int | None = None,
-    filename: str = "significant_features",
 ) -> pd.DataFrame:
     """Concatenate per-seed significant-feature CSVs and save a ranked summary.
 
@@ -374,8 +373,6 @@ def concat_significant_features(
             additional ranked CSV limited to the top N features by occurrence
             count. If ``None`` or ``<= 0``, only the combined CSV is written.
             Defaults to ``None``.
-        filename (str, optional): Base filename (without extension) for the
-            combined CSV. Defaults to ``"significant_features"``.
 
     Returns:
         pd.DataFrame: The combined DataFrame (all seeds concatenated), or the
@@ -399,7 +396,7 @@ def concat_significant_features(
         raise ValueError("No data found inside csv files.")
 
     combined_features_df.to_csv(
-        os.path.join(features_dir, f"{filename}.csv"), index=False
+        os.path.join(features_dir, "significant_features.csv"), index=False
     )
 
     if number_of_features is not None and number_of_features > 0:
