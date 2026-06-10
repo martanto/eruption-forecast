@@ -1,410 +1,737 @@
 # API Reference
 
-Full constructor and method parameter tables. For narrative usage examples, see [Pipeline Walkthrough](Pipeline-Walkthrough) and [Training Workflows](Training-Workflows).
+Parameter tables and method signatures for every public class exported from `eruption_forecast`. Imports throughout this page:
+
+```python
+from eruption_forecast import (
+    ForecastModel,
+    TrainingModel,
+    PredictionModel,
+    EvaluationModel,
+    CalculateTremor,
+    LabelBuilder,
+    DynamicLabelBuilder,
+    FeaturesBuilder,
+    TremorMatrixBuilder,
+    TremorData,
+    LabelData,
+    enable_logging,
+    disable_logging,
+    notify,
+    send_telegram_notification,
+)
+from eruption_forecast.ensemble import SeedEnsemble, ClassifierEnsemble
+from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
+from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
+from eruption_forecast.model.classifier_comparator import ClassifierComparator
+from eruption_forecast.features.feature_selector import FeatureSelector
+```
 
 ---
 
 ## ForecastModel
 
-High-level orchestrator. All pipeline stages available via method chaining.
-
-```python
-from eruption_forecast import ForecastModel
-```
+Top-level pipeline orchestrator. See [Pipeline Walkthrough](Pipeline-Walkthrough) for full examples.
 
 ### Constructor
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `station` | `str` | — | Seismic station code (e.g. `"OJN"`) |
-| `channel` | `str` | — | Seismic channel code (e.g. `"EHZ"`) |
-| `network` | `str` | — | Seismic network code |
-| `window_size` | `int` | — | Duration (days) of each tremor window fed into tsfresh |
-| `volcano_id` | `str` | — | Identifier used in output filenames |
-| `location` | `str \| None` | `None` | Seismic location code. `None` and `""` are both treated as an empty location code |
-| `output_dir` | `str \| None` | `None` | Base output directory (relative → resolved against `root_dir`) |
-| `root_dir` | `str \| None` | `None` | Anchor for path resolution. Defaults to `os.getcwd()` |
-| `overwrite` | `bool` | `False` | Re-run and overwrite existing output files |
-| `n_jobs` | `int` | `1` | Parallel workers propagated to all pipeline stages |
-| `verbose` | `bool` | `False` | Enable verbose logging |
+```python
+ForecastModel(
+    station: str,
+    channel: str,
+    network: str,
+    location: str = "",
+    day_to_forecast: int = 2,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    verbose: bool = False,
+)
+```
 
-### Additional Methods
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `station` | `str` | — | Station code (uppercased) |
+| `channel` | `str` | — | Channel code (uppercased) |
+| `network` | `str` | — | FDSN network code |
+| `location` | `str` | `""` | FDSN location code |
+| `day_to_forecast` | `int` | `2` | Look-ahead window in days; threaded into `TrainingModel`/`PredictionModel` as `window_size` |
+| `output_dir` | `str \| None` | `None` | Defaults to `{cwd}/output` (or `{root_dir}/output` when `root_dir` set) |
+| `root_dir` | `str \| None` | `None` | Anchor for relative `output_dir` |
+| `overwrite` | `bool` | `False` | Default for stage methods |
+| `n_jobs` | `int` | `1` | Default for stage methods; clamped to `cpu_count - 2` |
+| `verbose` | `bool` | `False` | Default for stage methods |
 
-| Method | Description |
-|--------|-------------|
-| `load_tremor_data(tremor_csv)` | Load pre-calculated tremor CSV instead of calling `calculate()` |
-| `set_feature_selection_method(using)` | Override feature selection method (`"tsfresh"`, `"random_forest"`, `"combined"`) |
-| `save_config(path=None, fmt="yaml")` | Save pipeline config to YAML/JSON |
-| `save_model(path=None)` | Serialise full instance with joblib |
-| `ForecastModel.from_config(path)` | Load config and construct instance |
-| `ForecastModel.load_model(path)` | Restore a serialised instance |
-| `run()` | Replay all stages from a loaded config |
+### `calculate(...)`
+
+```python
+fm.calculate(
+    start_date: str | datetime,
+    end_date: str | datetime,
+    source: Literal["sds", "fdsn"] = "sds",
+    methods: str | list[str] | None = None,
+    remove_outlier_method: Literal["all", "maximum"] = "maximum",
+    remove_tremor_anomalies: bool = False,
+    interpolate: bool = True,
+    value_multiplier: float | None = None,
+    cleanup_daily_dir: bool = False,
+    plot_daily: bool = False,
+    save_plot: bool = False,
+    overwrite_plot: bool = False,
+    sds_dir: str | None = None,
+    client_url: str = "https://service.iris.edu",
+    minimum_completion_ratio: float = 0.3,
+    overwrite: bool | None = None,
+    n_jobs: int | None = None,
+    verbose: bool | None = None,
+) -> Self
+```
+
+`start_date` is internally pushed back by `day_to_forecast` days for full lead-in coverage. `sds_dir` is required when `source="sds"`. `None` for `overwrite`/`n_jobs`/`verbose` means "inherit from constructor". Sets `self.CalculateTremor`, `self.tremor_df`, `self.tremor_start_date`, `self.tremor_end_date`.
+
+### `train(...)`
+
+```python
+fm.train(
+    start_date: str | datetime,
+    end_date: str | datetime,
+    eruption_dates: list[str],
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+    label_builder: Literal["standard", "dynamic"] = "standard",
+    days_before_eruption: int | None = None,
+    classifiers: str | list[str] = "rf",
+    cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"] = "shuffle-stratified",
+    cv_splits: int = 5,
+    scoring: str = "balanced_accuracy",
+    top_n_features: int = 20,
+    include_eruption_date: bool = True,
+    select_tremor_columns: list[str] | None = None,
+    save_tremor_matrix_per_method: bool = True,
+    exclude_features: list[str] | None = None,
+    select_features: str | list[str] | None = None,
+    minimum_completion: float = 1.0,
+    seeds: int = 10,
+    resample_method: Literal["under", "over", "auto"] | None = "auto",
+    minority_threshold: float = 0.15,
+    sampling_strategy: str | float = 0.75,
+    plot_features: bool = True,
+    output_dir: str | None = None,
+    overwrite: bool | None = None,
+    n_jobs: int | None = None,
+    n_grids: int = 1,
+    use_cache: bool = True,
+    verbose: bool | None = None,
+) -> Self
+```
+
+Requires `calculate()` to have populated tremor data first. `label_builder="dynamic"` requires `days_before_eruption`. `use_cache=True` short-circuits via `TrainingModel.load_from_cache` when the cache identity matches. Sets `self.TrainingModel`, `self.ClassifierEnsemble`, and `self._training_cache_hash`.
+
+### `predict(...)`
+
+```python
+fm.predict(
+    start_date: str | datetime,
+    end_date: str | datetime,
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+    save_seed_result: bool = True,
+    plot_threshold: float = 0.5,
+    plot_title: str | None = None,
+    plot_pdf: bool = True,
+    output_dir: str | None = None,
+    overwrite: bool | None = None,
+    n_jobs: int | None = None,
+    use_cache: bool = True,
+    verbose: bool | None = None,
+    **plot_kwargs: Any,
+) -> Self
+```
+
+Requires `train()` first. `**plot_kwargs` is forwarded to `plot_forecast` (see [Visualization](Visualization#forecast--plot_forecast) for keys) and is **not** captured in `ForecastConfig` because matplotlib objects do not round-trip through YAML. Sets `self.PredictionModel`, `self.results`.
+
+### `evaluate(...)`
+
+```python
+fm.evaluate(
+    model: Literal["training", "prediction"] = "prediction",
+    eruption_dates: list[str] | None = None,
+    plot_per_seed: bool = False,
+    plot_aggregate: bool = True,
+    output_dir: str | None = None,
+    overwrite: bool | None = None,
+    n_jobs: int | None = None,
+    verbose: bool | None = None,
+) -> Self
+```
+
+`eruption_dates=None` falls back to the dates captured during `train()`. Always auto-calls `save_config()` at the end. Sets `self.EvaluationModel`, `self.evaluation_results`.
+
+### Config round-trip
+
+| Method | Returns | Notes |
+|--------|---------|-------|
+| `fm.save_config(path=None, fmt="yaml")` | `str` | Defaults to `{station_dir}/forecast.config.{yaml,json}` |
+| `ForecastModel.from_config(path)` | `ForecastModel` | Classmethod; restores the captured `ForecastConfig` |
+| `fm.run()` | `Self` | Idempotent replay of every captured non-`None` stage |
 
 ---
 
-## ModelTrainer
+## TrainingModel
 
-Multi-seed classifier training.
-
-```python
-from eruption_forecast.model.model_trainer import ModelTrainer
-```
+`BaseModel + CacheModel` subclass. Use standalone when running outside `ForecastModel`; otherwise `fm.train(...)` constructs it for you.
 
 ### Constructor
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `extracted_features_csv` | `str` | — | Path to features CSV (output of `FeaturesBuilder`) |
-| `label_features_csv` | `str` | — | Path to aligned labels CSV (output of `FeaturesBuilder`) |
-| `output_dir` | `str \| None` | `None` | Output directory |
-| `root_dir` | `str \| None` | `None` | Anchor for path resolution |
-| `prefix_filename` | `str \| None` | `None` | Optional prefix on every output filename |
-| `classifier` | `str` | `"rf"` | Classifier key (see [Classifiers and CV](Classifiers-and-CV)) |
-| `cv_strategy` | `str` | `"shuffle-stratified"` | CV strategy — `"shuffle"`, `"stratified"`, `"shuffle-stratified"`, `"timeseries"` |
-| `cv_splits` | `int` | `5` | Number of CV folds |
-| `number_of_significant_features` | `int` | `20` | Top-N features retained per seed |
-| `feature_selection_method` | `str` | `"tsfresh"` | Feature selection — `"tsfresh"`, `"random_forest"`, `"combined"` |
-| `overwrite` | `bool` | `False` | Re-run even if output already exists |
-| `n_jobs` | `int` | `1` | Outer parallel workers (one per seed). `-1` = all cores. Enforced: `n_jobs × grid_search_n_jobs ≤ cpu_count` |
-| `grid_search_n_jobs` | `int` | `1` | Parallel jobs inside `GridSearchCV` and `FeatureSelector`. When `use_gpu=True` this is still used by `FeatureSelector` (CPU-only), but `GridSearchCV` is forced to `1` |
-| `use_gpu` | `bool` | `False` | Enable GPU acceleration for XGBoost via `device="cuda:<gpu_id>"`. Forces `n_jobs=1` and `GridSearchCV` `n_jobs=1` to prevent VRAM contention. Has no effect for non-XGBoost classifiers |
-| `gpu_id` | `int` | `0` | GPU device index when `use_gpu=True`. Use `0` for the first GPU, `1` for the second, etc. |
-| `verbose` | `bool` | `False` | Print progress messages |
-| `debug` | `bool` | `False` | Enable debug-level logging |
+```python
+TrainingModel(
+    tremor_data: str | pd.DataFrame,
+    start_date: str | datetime,
+    end_date: str | datetime,
+    classifiers: str | list[str],
+    eruption_dates: list[str],
+    window_size: int = 2,
+    cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"] = "shuffle-stratified",
+    cv_splits: int = 5,
+    top_n_features: int = 20,
+    include_eruption_date: bool = False,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    n_grids: int = 1,
+    verbose: bool = False,
+)
+```
 
-### `evaluate()` Parameters
+### Pipeline methods (all return `Self`)
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `random_state` | `int` | `0` | Starting seed; runs `random_state … random_state + total_seed − 1` |
-| `total_seed` | `int` | `500` | Number of seeds to run |
-| `sampling_strategy` | `str \| float` | `0.75` | `RandomUnderSampler` ratio (training data only) |
-| `save_all_features` | `bool` | `False` | Save all ranked features per seed |
-| `plot_significant_features` | `bool` | `False` | Save feature-importance plot per seed |
+```python
+tm.build_label(
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+    builder: Literal["standard", "dynamic"] = "standard",
+    days_before_eruption: int | None = None,
+    verbose: bool | None = None,
+)
 
-### `train()` Parameters
+tm.extract_features(
+    select_tremor_columns: list[str] | None = None,
+    save_tremor_matrix_per_method: bool = False,
+    exclude_features: list[str] | None = None,
+    select_features: str | list[str] | None = None,
+    save_tremor_matrix_per_id: bool = False,
+    minimum_completion: float = 1.0,
+    overwrite: bool = False,
+    n_jobs: int | None = None,
+    verbose: bool | None = None,
+)
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `random_state` | `int` | `0` | Starting seed |
-| `total_seed` | `int` | `500` | Number of seeds to run |
-| `sampling_strategy` | `str \| float` | `0.75` | `RandomUnderSampler` ratio (full dataset) |
-| `save_all_features` | `bool` | `False` | Save all ranked features per seed |
-| `plot_significant_features` | `bool` | `False` | Save feature-importance plot per seed |
+tm.fit(
+    seeds: int = 25,
+    resample_method: Literal["under", "over", "auto"] | None = "auto",
+    minority_threshold: float = 0.15,
+    sampling_strategy: str | float = 0.75,
+    plot_features: bool = False,
+    scoring: str = "balanced_accuracy",
+    compute_learning_curve: bool = False,
+)
+```
 
-### `fit()` Parameters
+### Cache + persistence
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `with_evaluation` | `bool` | `True` | `True` → `evaluate()`; `False` → `train()` |
-| `**kwargs` | — | — | Forwarded to the dispatched method |
+| Method | Notes |
+|--------|-------|
+| `TrainingModel.build_cache_identity(**kwargs)` | Classmethod; returns canonical identity dict for hashing |
+| `tm.save_to_cache(identity)` | Writes `{output_dir}/cache/TrainingModel/{hash}.pkl` (+ `.params.json`) |
+| `TrainingModel.load_from_cache(output_dir, identity)` | Classmethod; returns the instance or `None` |
+| `tm.save(path=None)` | `{output_dir}/TrainingModel_{basename}.pkl` |
+| `TrainingModel.load(path)` | Classmethod |
+| `tm.save_config(path=None)` | Standalone `training.config.yaml` |
 
-### Merge Methods
-
-| Method | Description |
-|--------|-------------|
-| `merge_models(output_path=None)` | Bundle all seed models for this classifier into a single `SeedEnsemble` `.pkl`. Default output: same directory as the registry CSV, named `SeedEnsemble_{suffix}.pkl`. Requires training to have been run first (`self.csv` must be set). |
-| `merge_classifier_models(trained_models, output_path=None)` | Bundle multiple classifier registry CSVs into one `dict[str, SeedEnsemble]` `.pkl`. Accepts `{"rf": "path/to/rf.csv", "xgb": "path/to/xgb.csv"}`. |
+Populated attributes after `fit()`: `tm.results` (per-classifier registry CSV paths), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels`.
 
 ---
 
-## SeedEnsemble
+## PredictionModel
 
-Bundles all seed models for a single classifier into one serialisable object. Subclasses `sklearn.base.BaseEstimator` and `ClassifierMixin`.
+`BaseModel + CacheModel` subclass.
 
-```python
-from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
-# or
-from eruption_forecast.model import SeedEnsemble
-```
-
-### Construction
+### Constructor
 
 ```python
-# Build from a trained-model registry CSV
-ensemble = SeedEnsemble.from_registry("path/to/trained_model_*.csv")
-
-# Load a previously saved ensemble
-ensemble = SeedEnsemble.load("path/to/SeedEnsemble_*.pkl")
+PredictionModel(
+    model: str | ClassifierEnsemble | SeedEnsemble,
+    tremor_data: str | pd.DataFrame,
+    start_date: str | datetime,
+    end_date: str | datetime,
+    window_size: int = 2,
+    overwrite: bool = False,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+)
 ```
+
+`model` accepts a live `ClassifierEnsemble` / `SeedEnsemble`, a `ClassifierEnsemble.json` / `.pkl`, a `SeedEnsemble_*.pkl`, or a trained-model registry `.csv` — resolved via `ClassifierEnsemble.from_any(...)`.
+
+### Pipeline methods
+
+```python
+pm.build_label(
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+) -> Self
+
+pm.extract_features(
+    select_tremor_columns: list[str] | None = None,
+    save_tremor_matrix_per_method: bool = False,
+    exclude_features: list[str] | None = None,
+    overwrite: bool = False,
+    n_jobs: int | None = None,
+    verbose: bool | None = None,
+) -> Self
+
+pm.forecast(
+    save_seed_result: bool = True,
+    plot_threshold: float = 0.5,
+    plot_title: str | None = None,
+    plot_pdf: bool = True,
+    **plot_kwargs,
+) -> pd.DataFrame
+```
+
+`forecast()` returns the results DataFrame indexed by datetime with one column per `{classifier}_{eruption_probability|uncertainty|confidence|prediction}` plus the four `consensus_*` columns. Also sets `pm.results` and `pm.forecast_plot_path`.
+
+### Cache + persistence
+
+Same surface as `TrainingModel`: `build_cache_identity`, `save_to_cache`, `load_from_cache`, `save`, `load`. The cache identity embeds the upstream `training_hash`.
+
+---
+
+## EvaluationModel
+
+`BaseModel` subclass (no cache).
+
+### Constructor
+
+```python
+EvaluationModel(
+    model: TrainingModel | PredictionModel,
+    eruption_dates: list[str] | None = None,
+    overwrite: bool = False,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+)
+```
+
+Raises `ValueError` if `model` is a `PredictionModel` and `eruption_dates is None`, or if `model.ClassifierEnsemble is None`. Output is namespaced to `evaluation/{model.kind}/`.
 
 ### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `SeedEnsemble.from_registry(registry_csv)` | `SeedEnsemble` | Load all seeds from a registry CSV into memory |
-| `SeedEnsemble.load(path)` | `SeedEnsemble` | Restore from a `.pkl` file written by `save()` |
-| `predict_proba(X)` | `np.ndarray (n, 2)` | sklearn-compatible class probabilities — column 0: P(non-eruption), column 1: mean P(eruption) across seeds |
-| `predict(X)` | `np.ndarray (n,)` | Binary predictions using 0.5 threshold on mean P(eruption) |
-| `predict_with_uncertainty(X, threshold)` | `tuple[ndarray × 4]` | `(mean_probability, std, confidence, prediction)` — richer output than `predict_proba()` |
-| `save(path)` | `None` | Serialise with joblib to a single `.pkl` |
-| `len(ensemble)` | `int` | Number of seeds in the bundle |
-
-### Standalone merge functions
-
 ```python
-from eruption_forecast.utils.ml import merge_seed_models, merge_all_classifiers
+em.evaluate(
+    plot_aggregate: bool = True,
+    plot_per_seed: bool = False,
+    plot_shap: bool = False,
+    compare_classifiers: bool = True,
+) -> dict[str, pd.DataFrame]
+
+em.compare(
+    metrics: str | list[str] | None = None,
+) -> ClassifierComparator
 ```
 
-| Function | Description |
-|----------|-------------|
-| `merge_seed_models(registry_csv, output_path=None)` | One classifier → one `SeedEnsemble` `.pkl`. Default name: `SeedEnsemble_{suffix}.pkl` alongside the registry CSV. |
-| `merge_all_classifiers(trained_models, output_path=None)` | Multiple classifiers → one `dict[str, SeedEnsemble]` `.pkl`. `trained_models` is `{"rf": "rf_registry.csv", ...}`. Default name: `merged_classifiers_{suffix}.pkl` in the `trainings/` root. |
+```python
+EvaluationModel.from_file(
+    filepath: str,
+    eruption_dates: list[str] | None = None,
+    overwrite: bool = False,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+) -> EvaluationModel
+```
+
+Classmethod. Loads a `.pkl` produced by `TrainingModel.save()` or `PredictionModel.save()` and dispatches on `kind`.
+
+`plot_per_seed=True` and `plot_shap=True` currently emit a warning and are no-ops (reserved for a follow-up that rebuilds plots from `MetricsEnsemble`'s persisted matrices).
 
 ---
 
-## ModelPredictor
-
-Inference on new data — evaluation mode or forecast mode.
-
-```python
-from eruption_forecast.model.model_predictor import ModelPredictor
-```
+## CalculateTremor
 
 ### Constructor
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `start_date` | `str \| datetime` | — | Start of prediction period |
-| `end_date` | `str \| datetime` | — | End of prediction period |
-| `trained_models` | `str \| dict[str, str]` | — | Single registry CSV path, path to a merged `.pkl` (`SeedEnsemble` or `dict[str, SeedEnsemble]`), or `{name: path}` dict for multi-model consensus |
-| `overwrite` | `bool` | `False` | Overwrite existing output files |
-| `n_jobs` | `int` | `1` | Parallel jobs |
-| `output_dir` | `str \| None` | `None` | Output directory |
-| `root_dir` | `str \| None` | `None` | Root directory for path resolution |
-| `verbose` | `bool` | `False` | Verbose logging |
-
-### `predict()` — Evaluation Mode
-
 ```python
-df_metrics = predictor.predict(
-    future_features_csv="path/to/features.csv",
-    future_labels_csv="path/to/labels.csv",
-    plot=False,
+CalculateTremor(
+    start_date: str | datetime,
+    end_date: str | datetime,
+    station: str,
+    channel: str,
+    network: str,
+    location: str | None = None,
+    channel_type: str = "D",
+    methods: list[str] | None = None,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    remove_outlier_method: Literal["all", "maximum"] = "maximum",
+    remove_tremor_anomalies: bool = False,
+    interpolate: bool = False,
+    value_multiplier: float | None = None,
+    cleanup_daily_dir: bool = False,
+    plot_daily: bool = False,
+    save_plot: bool = False,
+    overwrite_plot: bool = False,
+    filename_prefix: str | None = None,
+    minimum_completion_ratio: float = 0.3,
+    n_jobs: int = 1,
+    verbose: bool = False,
+    debug: bool = False,
 )
 ```
 
-Returns a DataFrame with one row per (classifier, seed) and columns: `accuracy`, `balanced_accuracy`, `f1_score`, `precision`, `recall`, `roc_auc`, `pr_auc`.
-
-### `predict_best()` — Best Seed
+### Source binding + execution (all return `Self`)
 
 ```python
-evaluator = predictor.predict_best(
-    future_features_csv="path/to/features.csv",
-    future_labels_csv="path/to/labels.csv",
-    criterion="balanced_accuracy",   # any metric column
-)
+ct.from_sds(sds_dir: str)
+ct.from_fdsn(client_url: str | None = None)
+ct.change_freq_bands(freq_bands: list[tuple[float, float]])
+ct.run()
 ```
 
-Returns a `ModelEvaluator` for the best-performing seed.
-
-### `predict_proba()` — Forecast Mode
-
-```python
-df_forecast = predictor.predict_proba(tremor_data="path/to/tremor.csv", window_size=2, window_step=12,
-                                      window_step_unit="hours")
-```
+After `run()`: `ct.df` (the tremor DataFrame), `ct.csv` (path to the merged file), `ct.daily_files`, `ct.daily_dir`.
 
 ---
 
-## ModelEvaluator
-
-Single-seed evaluation.
+## LabelBuilder / DynamicLabelBuilder
 
 ```python
-from eruption_forecast import ModelEvaluator
+LabelBuilder(
+    start_date: str | datetime,
+    end_date: str | datetime,
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+    day_to_forecast: int,
+    eruption_dates: list[str] | list[datetime],
+    volcano_id: str | None = None,
+    include_eruption_date: bool = True,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    verbose: bool = False,
+    debug: bool = False,
+)
+
+DynamicLabelBuilder(
+    days_before_eruption: int,
+    window_step: int,
+    window_step_unit: Literal["minutes", "hours"],
+    day_to_forecast: int,
+    eruption_dates: list[str],
+    volcano_id: str | None = None,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    prefix_filename: str | None = None,
+    verbose: bool = False,
+    debug: bool = False,
+)
 ```
 
-### Constructor Parameters
+Both expose `.build() -> Self`. After `build()`: `lb.df` (DateTime-indexed `id`/`is_erupted` frame), `lb.csv` (path to the label CSV).
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `model` | `BaseEstimator \| GridSearchCV` | — | Fitted sklearn estimator |
-| `X_test` | `pd.DataFrame` | — | Test feature DataFrame |
-| `y_test` | `pd.Series` | — | True test labels |
-| `model_name` | `str` | `"model"` | Identifier used in filenames and plot titles |
-| `output_dir` | `str \| None` | `None` | Output directory; when `None`, auto-constructed as `output/trainings/evaluations/{clf-slug}/{cv-slug}/` |
-| `cv_name` | `str` | `"cv"` | CV strategy name slugified into the default output path (e.g. `"StratifiedKFold"` → `stratified-k-fold`) |
-| `selected_features` | `list[str] \| None` | `None` | Filter `X_test` to these columns before predicting |
-| `random_state` | `int \| None` | `None` | Seed for filename prefix |
-| `root_dir` | `str \| None` | `None` | Anchor for resolving relative `output_dir` |
-| `plot_shap` | `bool` | `False` | Enable SHAP plots in `plot_all()` |
-| `verbose` | `bool` | `False` | Emit progress log messages |
-
-### Key Methods
-
-| Method | Description |
-|--------|-------------|
-| `ModelEvaluator.from_files(model_path, X_test, y_test, ...)` | Load from disk |
-| `get_metrics()` | Returns dict with all metrics |
-| `summary()` | Prints formatted summary |
-| `plot_all()` | Generates all evaluation plots (SHAP plots require `plot_shap=True`) |
-| `plot_shap_summary(max_display)` | SHAP beeswarm for the test set |
-| `plot_shap_waterfall(max_display)` | SHAP waterfall for the highest-probability sample |
-| `save_metrics(path=None)` | Saves metrics dict to JSON |
-| `optimize_threshold(criterion="f1")` | Returns optimal threshold and metrics at that threshold |
-
-### Available Metrics
-
-`accuracy`, `balanced_accuracy`, `precision`, `recall`, `f1_score`, `roc_auc`, `pr_auc`, `true_positives`, `true_negatives`, `false_positives`, `false_negatives`, `sensitivity`, `specificity`, `optimal_threshold`, `f1_at_optimal`, `recall_at_optimal`, `precision_at_optimal`
+Note that within `TrainingModel`, `include_eruption_date` defaults to `False` (training pipeline behaviour); the `LabelBuilder` constructor's own default is `True`. The difference is intentional — see [Training Workflow](Training-Workflow).
 
 ---
 
-## MultiModelEvaluator
-
-Aggregate evaluation across all seeds.
+## FeaturesBuilder
 
 ```python
-from eruption_forecast import MultiModelEvaluator
-```
-
-### Constructor
-
-Pass `trained_model_csv` (for plots) and/or `metrics_dir` (for statistics) — or both.
-
-```python
-ev = MultiModelEvaluator(
-    trained_model_csv="output/.../trained_model_*.csv",
-    metrics_dir="output/.../metrics",
-    output_dir="output/eval",
+FeaturesBuilder(
+    tremor_matrix_df: pd.DataFrame,
+    output_dir: str | None = None,
+    label_df: pd.DataFrame | None = None,
+    select_features: list[str] | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    verbose: bool = False,
 )
+
+fb.extract_features(
+    select_tremor_columns: list[str] | None = None,
+    exclude_features: list[str] | None = None,
+) -> pd.DataFrame
 ```
 
-### Key Methods
-
-| Method | Requires | Description |
-|--------|----------|-------------|
-| `plot_all(dpi, show_individual)` | `trained_model_csv` | Runs all 10 aggregate plots |
-| `plot_roc()` | `trained_model_csv` | Mean ROC ± std band |
-| `plot_precision_recall()` | `trained_model_csv` | Mean PR curve ± std band |
-| `plot_calibration()` | `trained_model_csv` | Mean calibration ± std band |
-| `plot_confusion_matrix()` | `trained_model_csv` | Summed confusion matrix |
-| `plot_threshold_analysis()` | `trained_model_csv` | Mean metrics vs threshold ± std |
-| `plot_feature_importance()` | `trained_model_csv` | Mean importance ± std error bars |
-| `plot_shap_summary()` | `trained_model_csv` | Aggregate SHAP beeswarm across seeds |
-| `plot_shap_waterfall()` | `trained_model_csv` | Mean SHAP waterfall for highest-prob sample |
-| `plot_seed_stability()` | `trained_model_csv` | Violin plot of a metric across seeds |
-| `plot_frequency_band_contribution()` | `trained_model_csv` | Feature counts per seismic band |
-| `get_aggregate_metrics()` | `metrics_dir` | DataFrame: metric × mean/std/min/max |
-| `get_metrics_list()` | `metrics_dir` | Raw per-seed metrics as list of dicts |
-| `save_aggregate_metrics(path=None)` | `metrics_dir` | Saves summary to CSV |
+`label_df=None` switches the builder to **prediction mode** (no tsfresh relevance filtering). `select_features` pre-filters tsfresh to the supplied fully-qualified feature names.
 
 ---
 
-## ClassifierComparator
-
-Compare multiple classifiers side-by-side with ranking tables and comparison plots.
+## TremorMatrixBuilder
 
 ```python
-from eruption_forecast.model import ClassifierComparator
-```
-
-### Constructor
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `classifiers` | `dict[str, str]` | required | Mapping of classifier name → trained-model registry CSV path |
-| `output_dir` | `str \| None` | `None` | Root output directory (defaults to `cwd/output/comparison/`) |
-| `metrics` | `str \| list[str] \| None` | `None` | Metrics for plots; `None` uses all `DEFAULT_METRICS` |
-
-```python
-# From a dict
-comparator = ClassifierComparator(
-    classifiers={
-        "rf":  "output/.../trained_model_rf_...csv",
-        "xgb": "output/.../trained_model_xgb_...csv",
-    },
-    metrics=["f1_score", "roc_auc"],  # or None for all DEFAULT_METRICS
+TremorMatrixBuilder(
+    tremor_df: pd.DataFrame,
+    label_df: pd.DataFrame,
+    output_dir: str | None = None,
+    window_size: int = 1,
+    root_dir: str | None = None,
+    minimum_completion: float = 1.0,
+    overwrite: bool = False,
+    verbose: bool = False,
 )
 
-# From a JSON file  {name: csv_path, ...}
-comparator = ClassifierComparator.from_json(
-    "output/VG.OJN.00.EHZ/evaluations_trained_models.json",
-    metrics=["f1_score", "roc_auc"],
-)
+tmb.build(
+    select_tremor_columns: list[str] | None = None,
+    save_tremor_matrix_per_method: bool = False,
+    save_tremor_matrix_per_id: bool = False,
+) -> Self
 ```
 
-### Key Methods
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `ClassifierComparator.from_json(json_path, output_dir, metrics)` | `Self` | Load classifiers from a JSON file and construct instance |
-| `get_metrics_table()` | `pd.DataFrame` | Aggregate metrics for all classifiers (one row per classifier) |
-| `get_ranking(metric, by)` | `pd.DataFrame` | Sorted ranking with rank column; default metric `"recall"`; saved to `metrics/ranking_{metric}.csv` |
-| `plot_metric_bar(metrics, save, filename, dpi)` | `dict[str, Figure]` | Bar chart per metric (mean ± std) + `"all"` overview; saved to `figures/metric_bar_{metric}.png` + `metric_bar_all.png` |
-| `plot_seed_stability(metrics, save, filename, dpi)` | `dict[str, Figure]` | Violin + strip per metric + `"all"` overview; saved to `figures/seed_stability_{metric}.png` + `seed_stability_all.png` |
-| `plot_comparison_grid(metrics, save, filename, dpi)` | `Figure` | Grid of subplots (rows = classifiers, cols = metrics); saved to `figures/comparison_grid.png` |
-| `plot_roc(save, filename, dpi, show_individual)` | `Figure` | Overlaid mean ROC curves with ± std bands; saved to `figures/comparison_roc.png` |
-| `plot_all(dpi)` | `dict[str, Any]` | All plots + ranking; keys: `metric_bar`, `seed_stability`, `comparison_grid`, `roc`, `ranking` |
+After `build()`: `tmb.df` is the matrix with `id`, `datetime`, and tremor columns.
 
 ---
 
 ## FeatureSelector
 
 ```python
-from eruption_forecast.features import FeatureSelector
+FeatureSelector(
+    method: Literal["tsfresh", "random_forest", "combined"] = "tsfresh",
+    random_state: int = 42,
+    output_dir: str | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+)
 ```
 
-### Constructor
+Used internally by `TrainingModel.fit()` per-seed; surfaced publicly for ad-hoc selection experiments. Populated after `fit(X, y)`: `selected_features_`, `p_values_`, `importance_scores_`, `n_features_tsfresh`, `n_features_rf`, `n_features`, `feature_names_`.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `method` | `str` | `"tsfresh"` | `"tsfresh"`, `"random_forest"`, or `"combined"` |
-| `n_jobs` | `int` | `1` | Parallel workers |
-| `verbose` | `bool` | `False` | Progress messages |
+---
 
-### Methods
+## SeedEnsemble
 
 ```python
-X_selected = selector.fit_transform(
-    X_train, y_train,
-    fdr_level=0.05,   # tsfresh stage (ignored for random_forest)
-    top_n=20,         # RandomForest stage (ignored for tsfresh)
+class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
+    classifier_name: str
+    seeds: list[dict]
+```
+
+### Construction
+
+```python
+SeedEnsemble(classifier_name: str)
+
+SeedEnsemble.from_registry(
+    registry_csv: str,
+    classifier_name: str | None = None,
+    verbose: bool = False,
+) -> SeedEnsemble
+```
+
+### Inference
+
+```python
+se.predict_proba(X: pd.DataFrame) -> np.ndarray   # (n_samples, 2)
+
+se.predict_with_uncertainty(
+    X: pd.DataFrame,
+    threshold: float = 0.5,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+# returns (mean_proba, std_proba, confidence, prediction)
+```
+
+`save(path)` / `load(path)` inherited from `BaseEnsemble`.
+
+---
+
+## ClassifierEnsemble
+
+```python
+class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin)
+```
+
+### Construction (classmethods)
+
+| Factory | Accepts |
+|---------|---------|
+| `from_any(source, verbose=False)` | `ClassifierEnsemble.{json,pkl}`, `SeedEnsemble_*.pkl`, trained-model registry CSV, or a live `SeedEnsemble` |
+| `from_seed_ensembles(seed_ensembles)` | Pre-built `SeedEnsemble` instances |
+| `from_dict(registry_csvs, verbose=False)` | Dict mapping classifier name → registry CSV path |
+| `from_json(json_path, verbose=False)` | JSON registry written by `TrainingModel.fit()` |
+
+### Inference
+
+```python
+ce.predict_proba(X: pd.DataFrame) -> np.ndarray             # consensus, (n_samples, 2)
+ce.predict_with_uncertainty(X: pd.DataFrame, threshold: float = 0.5)
+# → (mean, std, confidence, prediction, per_classifier_dict)
+```
+
+### Inspection
+
+```python
+ce.classifiers          # list[str]: classifier class names in registration order
+ce[name]                # SeedEnsemble for the named classifier
+len(ce)                 # number of classifiers
+```
+
+`save(path)` / `load(path)` inherited from `BaseEnsemble`.
+
+---
+
+## MetricsEnsemble
+
+```python
+MetricsEnsemble(
+    classifier_ensemble: ClassifierEnsemble,
+    features_df: pd.DataFrame,
+    y_true: pd.Series | np.ndarray,
+    kind: Literal["prediction", "training"] = "prediction",
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    verbose: bool = False,
 )
-scores = selector.get_feature_scores()   # DataFrame with feature rankings
+
+MetricsEnsemble.from_file(
+    model_filepath: str,
+    features_csv: str,
+    features_label_csv: str,
+    eruption_dates: list[str] | None = None,
+    kind: Literal["prediction", "training"] = "prediction",
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    verbose: bool = False,
+) -> MetricsEnsemble
+```
+
+| Method | Notes |
+|--------|-------|
+| `me.compute() -> Self` | Per-seed metric loop; writes JSON + `y_proba/y_pred/y_true` CSV matrices |
+| `me.plot_aggregate()` | Aggregate plots per classifier — ROC, PR, confusion, threshold, importance |
+| `me.plot_seed()` | Per-seed plots (currently reserved) |
+| `me.metrics` | `dict[str, pd.DataFrame]` — populated after `compute()` |
+
+Imported from `eruption_forecast.ensemble.metrics_ensemble` (intentionally **not** in `ensemble/__init__.py` to avoid an import cycle).
+
+---
+
+## BaseEnsemble
+
+```python
+class BaseEnsemble:
+    def save(self, path: str) -> None
+    @classmethod
+    def load(cls, path: str) -> Self
+```
+
+Joblib save/load mixin inherited by `SeedEnsemble` and `ClassifierEnsemble`. Imported from `eruption_forecast.ensemble.base_ensemble`.
+
+---
+
+## ClassifierComparator
+
+```python
+ClassifierComparator(
+    metrics_ensemble: MetricsEnsemble,
+    metrics: str | list[str] | None = None,
+    output_dir: str | None = None,
+)
+
+ClassifierComparator.from_classifier_ensemble(
+    classifier_ensemble: ClassifierEnsemble,
+    features_df: pd.DataFrame,
+    y_true: pd.Series | np.ndarray,
+    kind: Literal["training", "prediction"] = "training",
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    metrics: str | list[str] | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+) -> ClassifierComparator
+```
+
+| Method | Returns |
+|--------|---------|
+| `cc.get_ranking()` | `pd.DataFrame` — cross-classifier ranking |
+| `cc.plot_all()` | `None` — writes ranking plots under `{output_dir}/comparison/figures/` |
+
+Imported from `eruption_forecast.model.classifier_comparator`. Usually instantiated indirectly via `em.compare()` or `fm.EvaluationModel.compare()`.
+
+---
+
+## TremorData
+
+Thin wrapper around a tremor CSV. Imported as `TremorData` from the package root.
+
+```python
+TremorData(df: pd.DataFrame)                  # wrap an in-memory frame
+TremorData.from_csv(path: str) -> TremorData  # classmethod
+```
+
+`@cached_property` accessors: `df`, `start_date`, `end_date`, `filename`, `basename`, `filetype`.
+
+---
+
+## LabelData
+
+Thin wrapper around a label CSV. Imported as `LabelData` from the package root.
+
+```python
+LabelData(df: pd.DataFrame)
+LabelData.from_csv(path: str) -> LabelData
+```
+
+`@cached_property` accessors: `df`, `parameters` (dict parsed from filename — `window_size`, `window_step`, `window_step_unit`, `day_to_forecast`), `filename`, `basename`.
+
+---
+
+## Logger helpers
+
+```python
+from eruption_forecast import enable_logging, disable_logging
+from eruption_forecast.logger import set_log_level, set_log_directory
+
+enable_logging()              # restore console + file handlers
+disable_logging()             # remove every loguru handler
+set_log_level(level: str)     # "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+set_log_directory(dir: str)   # move the log file to a new directory (created if absent)
 ```
 
 ---
 
-## Logger Utilities
-
-Functions for controlling package-wide logging output at runtime.
+## Telegram helpers
 
 ```python
-from eruption_forecast import disable_logging, enable_logging
-# or
-from eruption_forecast.logger import disable_logging, enable_logging, set_log_level, set_log_directory
+from eruption_forecast import notify, send_telegram_notification
+
+@notify(label: str)
+def my_func(): ...
+
+send_telegram_notification(
+    message: str,
+    files: list[str] | None = None,
+    file_caption: str | None = None,
+    send_as_document: bool = False,
+)
 ```
 
-### `disable_logging()`
+Credentials are read from environment (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). Both helpers degrade gracefully when the env vars are absent — they emit a warning and skip the network call instead of raising.
 
-Removes all active loguru handlers so no messages are written to the console or log files.
+---
 
-```python
-disable_logging()
-fm.calculate(...)  # Silent — no output
-```
+## Cross-references
 
-### `enable_logging()`
-
-Restores console and file handlers using the current log directory. Has no effect if logging is already enabled.
-
-```python
-enable_logging()
-```
-
-### `set_log_level(level)`
-
-Changes the console log level dynamically. File handlers retain their original levels.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `level` | `str` | `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, or `"CRITICAL"`. Case-insensitive. |
-
-### `set_log_directory(log_dir)`
-
-Changes the log file output directory. Creates the directory if it does not exist.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `log_dir` | `str` | Absolute or relative path to the new log directory. |
+- High-level pipeline overview: [Architecture](Architecture#2-pipeline-overview)
+- End-to-end example: [Usage](Usage)
+- Caching internals: [Architecture](Architecture#34-model-model) and [Training Workflow](Training-Workflow#caching)
+- Output paths for every artefact: [Output Structure](Output-Structure)
