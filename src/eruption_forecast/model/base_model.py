@@ -433,6 +433,7 @@ class BaseModel(ABC):
         overwrite: bool = False,
         n_jobs: int | None = None,
         verbose: bool | None = None,
+        select_features: list[str] | None = None,
     ) -> FeaturesBuilder:
         """Build a tremor matrix and return a configured ``FeaturesBuilder``.
 
@@ -473,6 +474,10 @@ class BaseModel(ABC):
             verbose (bool | None, optional): Emit verbose log messages.
                 Falls back to ``self.verbose`` when ``None``. Defaults to
                 ``None``.
+            select_features (list[str] | None, optional): Pre-filter tsfresh to
+                this list of fully-qualified feature names; forwarded straight
+                to :class:`FeaturesBuilder`. ``None`` keeps the default
+                ``ComprehensiveFCParameters`` behaviour. Defaults to ``None``.
 
         Returns:
             FeaturesBuilder: Configured builder ready to run feature
@@ -503,6 +508,7 @@ class BaseModel(ABC):
             overwrite=overwrite or self.overwrite,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
             verbose=self.verbose,
+            select_features=select_features,
         )
 
         return features_builder

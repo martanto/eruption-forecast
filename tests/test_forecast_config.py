@@ -255,7 +255,7 @@ class TestForecastTrainConfig:
         # From legacy BuildLabelConfig
         assert {"window_step", "window_step_unit", "eruption_dates"} <= names
         # From legacy ExtractFeaturesConfig
-        assert {"select_tremor_columns", "exclude_features"} <= names
+        assert {"select_tremor_columns", "exclude_features", "select_features"} <= names
         # From legacy ForecastTrainConfig
         assert {"classifiers", "cv_strategy", "seeds"} <= names
 

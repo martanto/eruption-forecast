@@ -54,6 +54,7 @@ train:
   select_tremor_columns: null   # Subset of tremor columns (null = all)
   save_tremor_matrix_per_method: true  # Save a separate tremor matrix per column
   exclude_features: null    # tsfresh feature names to skip (null = none)
+  select_features: null     # Pre-filter tsfresh to a curated set — path to a prior top_{N}_features.csv or a list[str]; null disables pre-filtering
   minimum_completion: 1.0   # Minimum fraction of valid samples per window
   seeds: 10                 # Number of independent training seeds
   resample_method: auto     # 'under', 'over', null, or 'auto'

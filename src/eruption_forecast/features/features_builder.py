@@ -6,7 +6,10 @@ from tsfresh import (
     extract_features as tsfresh_extract_features,
     extract_relevant_features,
 )
-from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
+from tsfresh.feature_extraction.settings import (
+    ComprehensiveFCParameters,
+    from_columns,
+)
 from tsfresh.utilities.dataframe_functions import impute
 
 from eruption_forecast.logger import logger
@@ -79,6 +82,10 @@ class FeaturesBuilder:
             Defaults to 1.
         verbose (bool, optional): Emit progress log messages. Defaults to False.
         debug (bool, optional): Emit debug log messages. Defaults to False.
+        select_features (list[str] | None, optional): Pre-filter tsfresh to a
+            curated set of fully-qualified feature names. When provided, each
+            per-column tsfresh call uses only the calculators present for that
+            column in the parsed ``kind_to_fc_parameters`` dict. Defaults to None.
 
     Raises:
         ValueError: If tremor_matrix_df or label_df is not a pd.DataFrame.
@@ -120,6 +127,7 @@ class FeaturesBuilder:
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
+        select_features: list[str] | None = None,
     ) -> None:
         """Initialize the FeaturesBuilder with tremor matrix, labels, and output settings.
 
@@ -143,6 +151,14 @@ class FeaturesBuilder:
             n_jobs (int, optional): Number of parallel jobs for tsfresh. Defaults to 1.
             verbose (bool, optional): Emit progress log messages. Defaults to False.
             debug (bool, optional): Emit debug log messages. Defaults to False.
+            select_features (list[str] | None, optional): Restrict tsfresh to
+                this exact set of fully-qualified feature names (e.g.
+                ``"rsam_f0__mean"``, ``"rsam_f1__autocorrelation__lag_1"``).
+                Parsed via :func:`tsfresh.feature_extraction.settings.from_columns`
+                into a per-column ``kind_to_fc_parameters`` dict and applied
+                in the per-column extraction loop in place of the
+                comprehensive default. ``None`` keeps the default
+                ``ComprehensiveFCParameters`` behaviour. Defaults to ``None``.
 
         Raises:
             ValueError: If tremor_matrix_df or label_df is not a pd.DataFrame.
@@ -172,6 +188,14 @@ class FeaturesBuilder:
         # Initialize feature parameters
         self.default_fc_parameters, self.excludes_features = (
             self._initialize_feature_parameters()
+        )
+
+        # When ``select_features`` is supplied, pre-compute the per-column
+        # tsfresh calculator spec once so the per-column extraction loop can
+        # swap ``default_fc_parameters`` without re-parsing on each iteration.
+        self.select_features: list[str] | None = select_features
+        self.kind_to_fc_parameters: dict[str, dict] | None = (
+            from_columns(select_features) if select_features else None
         )
 
         # ------------------------------------------------------------------
@@ -684,8 +708,33 @@ class FeaturesBuilder:
         else:
             dates_str, label_df = self._prepare_prediction_mode(tremor_matrix_df)
 
+        # ``select_features`` already curates a list that passed tsfresh's
+        # relevance filter in a prior run; re-applying it via
+        # ``extract_relevant_features`` would only re-rank the same set and
+        # could silently drop names whose p-value is no longer significant in
+        # the current sample.
+        if self.kind_to_fc_parameters and use_relevant_features:
+            if self.verbose:
+                logger.info(
+                    "select_features supplied — forcing use_relevant_features=False"
+                )
+            use_relevant_features = False
+
         # Get params for features extraction
         extract_params = self._prepare_extraction_parameters(exclude_features)
+
+        # Apply ``exclude_features`` to the curated per-column spec as well.
+        kind_to_fc_parameters = self.kind_to_fc_parameters
+        if kind_to_fc_parameters is not None and self.excludes_features:
+            excluded = self.excludes_features
+            kind_to_fc_parameters = {
+                kind: {
+                    calc: spec
+                    for calc, spec in calc_dict.items()
+                    if calc not in excluded
+                }
+                for kind, calc_dict in kind_to_fc_parameters.items()
+            }
 
         # Setup extraction directory - mode-specific subdir prevents train/forecast collisions
         extract_features_dir = os.path.join(self.output_dir, "extracted")
@@ -707,11 +756,32 @@ class FeaturesBuilder:
             if column_method in [ID_COLUMN, DATETIME_COLUMN]:
                 continue
 
+            # Per-column override: when ``select_features`` is supplied, swap
+            # the comprehensive default for the column-specific calculator
+            # spec produced by :func:`from_columns` (already filtered against
+            # ``exclude_features`` above). Columns absent from the selection,
+            # or whose entries were entirely removed by the exclude filter,
+            # are skipped.
+            column_extract_params = extract_params
+            if kind_to_fc_parameters is not None:
+                column_fc_parameters = kind_to_fc_parameters.get(column_method)
+                if not column_fc_parameters:
+                    logger.warning(
+                        f"{column_method} :: no entries in select_features "
+                        "(or all filtered by exclude_features); skipping "
+                        "extraction for this column."
+                    )
+                    continue
+                column_extract_params = {
+                    **extract_params,
+                    "default_fc_parameters": column_fc_parameters,
+                }
+
             extracted_csv_path = self._extract_features_for_column(
                 tremor_matrix_df=tremor_matrix_df,
                 column_method=column_method,
                 y=label_df,
-                extract_params=extract_params,
+                extract_params=column_extract_params,
                 use_relevant_features=use_relevant_features,
                 prefix_filename=prefix_filename,
                 extract_features_dir=extract_features_dir,
