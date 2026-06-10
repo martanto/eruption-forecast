@@ -1,34 +1,3 @@
-"""Bundle all seed models for a single classifier into one serialisable object.
-
-Provides :class:`SeedEnsemble`, a serialisable sklearn-compatible estimator
-that aggregates all per-seed estimators produced by ``ModelTrainer`` for one
-classifier type.
-
-Averaging predictions across seeds reduces variance and provides an uncertainty
-estimate (standard deviation of per-seed probabilities).  This mirrors the
-file-based logic in
-:func:`eruption_forecast.utils.ml.compute_model_probabilities` but operates
-entirely on in-memory estimators so the ``.pkl`` files do not need to be
-re-loaded on every inference call.
-
-Key capabilities:
-    - ``from_registry(registry_csv)``: Construct a ``SeedEnsemble`` by loading
-      all seed model ``.pkl`` files listed in a model registry CSV.
-    - ``predict_proba(X)``: Average ``predict_proba`` output across seeds;
-      each seed uses only its own significant feature subset.
-    - ``predict_with_uncertainty(X)``: Return mean probability, standard
-      deviation across seeds, confidence score, and binary prediction array.
-    - ``compute_metrics(X, y_true)``: Per-seed classification metrics
-      against ``y_true``, returned as a ``DataFrame`` indexed by
-      ``random_state``.
-    - ``save_seed_matrices(output_dir, probabilities, predictions)``: Persist
-      the full ``(n_samples, n_seeds)`` probability and prediction matrices
-      as two Parquet files (``seed_probabilities.parquet`` /
-      ``seed_predictions.parquet``).
-    - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
-      from :class:`~eruption_forecast.ensemble.base_ensemble.BaseEnsemble`).
-"""
-
 import os
 from typing import Self
 

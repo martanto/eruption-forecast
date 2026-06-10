@@ -561,8 +561,8 @@ class ForecastModel:
                 during ``train()`` when ``None``. Defaults to ``None``.
             plot_per_seed (bool): Render per-seed evaluation plots. Expensive
                 across many seeds. Defaults to ``False``.
-            plot_aggregate (bool): Render aggregate plots per classifier via
-                ``MultiModelEvaluator``. Defaults to ``True``.
+            plot_aggregate (bool): Render aggregate plots per classifier.
+                Defaults to ``True``.
             output_dir (str | None): Root output directory for evaluation
                 artefacts. Defaults to the station directory.
             overwrite (bool | None): Overwrite cached results. Falls back to

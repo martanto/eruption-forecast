@@ -1,13 +1,3 @@
-"""Standalone configuration dataclass for the ``TrainingModel`` API.
-
-Mirrors the constructor surface of
-:class:`eruption_forecast.model.training_model.TrainingModel` so a
-standalone training run can persist its initialisation parameters to disk
-without going through :class:`~eruption_forecast.model.forecast.ForecastModel`.
-
-This module targets ``eruption_forecast.model.training_model.TrainingModel``.
-"""
-
 import os
 import json
 from typing import Any, Self, Literal
@@ -70,9 +60,9 @@ class TrainingConfig(BaseConfig):
     classifiers: str | list[str] = "rf"
     eruption_dates: list[str] = field(default_factory=list)
     window_size: int = 2
-    cv_strategy: Literal[
-        "shuffle", "stratified", "shuffle-stratified"
-    ] = "shuffle-stratified"
+    cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"] = (
+        "shuffle-stratified"
+    )
     cv_splits: int = 5
     number_of_features: int = 20
     include_eruption_date: bool = False

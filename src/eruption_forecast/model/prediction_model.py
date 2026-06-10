@@ -1,13 +1,3 @@
-"""Forecast eruption probabilities from a trained classifier ensemble.
-
-This module provides :class:`PredictionModel`, the inference-stage subclass of
-:class:`~eruption_forecast.model.base_model.BaseModel`. Given a trained
-ensemble produced by :class:`~eruption_forecast.model.training_model.TrainingModel`,
-it builds an unlabelled forecast window grid, extracts tsfresh features over
-that grid, and writes per-seed, per-classifier, and consensus eruption
-probabilities to disk together with a forecast plot.
-"""
-
 import os
 from typing import Any, Self, Literal
 from datetime import datetime

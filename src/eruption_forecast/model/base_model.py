@@ -1,13 +1,3 @@
-"""Abstract base for eruption forecast model stages.
-
-This module provides :class:`BaseModel`, the shared ABC inherited by
-:class:`TrainingModel`, :class:`PredictionModel`, and :class:`EvaluationModel`.
-It centralises construction-time validation, tremor-data loading, output
-directory resolution, ``n_jobs`` clamping, and joblib-based persistence so
-that each concrete subclass only implements its stage-specific behaviour:
-label building, feature extraction, training, prediction, or evaluation.
-"""
-
 import os
 import multiprocessing
 from abc import ABC, abstractmethod

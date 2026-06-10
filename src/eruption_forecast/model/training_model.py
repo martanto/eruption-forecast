@@ -436,7 +436,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         Writes the parameter snapshot captured during ``__init__`` so a
         standalone training run can save its constructor surface without
-        going through :class:`~eruption_forecast.model.forecast.ForecastModel`.
+        going through :class:`~eruption_forecast.model.forecast_model.ForecastModel`.
 
         Args:
             path (str | None): Destination file path. ``None`` resolves to

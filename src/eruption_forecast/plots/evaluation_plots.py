@@ -1,34 +1,3 @@
-"""Model evaluation plots with Nature/Science journal styling.
-
-Provides a comprehensive suite of per-seed and aggregate classifier evaluation
-charts. Single-seed functions accept pre-computed arrays or dicts; aggregate
-functions accept lists of per-seed results and plot mean ± std envelopes.
-
-Key functions (single-seed):
-
-- ``plot_confusion_matrix`` — annotated normalised confusion matrix heatmap.
-- ``plot_roc_curve`` — ROC curve with AUC annotation.
-- ``plot_precision_recall_curve`` — precision-recall curve with average precision.
-- ``plot_calibration`` — calibration (reliability) diagram.
-- ``plot_threshold_analysis`` — precision/recall/F1 vs. decision threshold.
-- ``plot_g_mean_curve`` — G-mean with sensitivity/specificity vs. threshold.
-- ``plot_mcc_curve`` — MCC with sensitivity/specificity vs. threshold.
-- ``plot_feature_importance`` — horizontal bar chart of top-N features.
-- ``plot_prediction_distribution`` — histogram of predicted probabilities by class.
-- ``plot_learning_curve`` — training vs. validation score against training set size.
-- ``plot_seed_stability`` — scatter/box plot of metric values across seeds.
-
-Key functions (aggregate / multi-seed):
-
-- ``plot_aggregate_roc_curve``, ``plot_aggregate_precision_recall_curve``,
-  ``plot_aggregate_calibration``, ``plot_aggregate_confusion_matrix``,
-  ``plot_aggregate_threshold_analysis``, ``plot_aggregate_g_mean_curve``,
-  ``plot_aggregate_mcc_curve``,
-  ``plot_aggregate_feature_importance``,
-  ``plot_aggregate_prediction_distribution``, ``plot_aggregate_learning_curve``,
-  ``plot_learning_curve_grid`` — ensemble-level variants with mean ± std shading.
-"""
-
 import os
 import json
 from typing import Any
@@ -2086,9 +2055,7 @@ def render_one_plot(
     return filepath
 
 
-AGGREGATE_PLOT_DISPATCHER: dict[
-    str, Callable[..., tuple[plt.Figure, pd.DataFrame]]
-] = {
+AGGREGATE_PLOT_DISPATCHER: dict[str, Callable[..., tuple[plt.Figure, pd.DataFrame]]] = {
     "roc_curve": plot_aggregate_roc_curve,
     "precision_recall": plot_aggregate_precision_recall_curve,
     "threshold_analysis": plot_aggregate_threshold_analysis,

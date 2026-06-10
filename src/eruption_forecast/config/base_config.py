@@ -1,12 +1,3 @@
-"""Shared serialization mixin for eruption-forecast config dataclasses.
-
-Provides :class:`BaseConfig`, a small ``@dataclass`` base used by every
-section in :mod:`eruption_forecast.config.forecast_config` and by
-:mod:`eruption_forecast.config.training_config`. Centralising the
-``to_dict`` / ``from_dict`` contract here keeps the serialisation surface
-identical across all config dataclasses.
-"""
-
 from typing import Any, Self
 from dataclasses import asdict, fields, dataclass
 

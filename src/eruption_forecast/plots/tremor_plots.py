@@ -1,5 +1,3 @@
-"""Tremor time-series visualization with Nature/Science journal styling."""
-
 import os
 from typing import Literal
 from pathlib import Path

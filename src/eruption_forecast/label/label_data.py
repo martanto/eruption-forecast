@@ -8,8 +8,6 @@ from eruption_forecast.logger import logger
 from eruption_forecast.data_container import BaseDataContainer
 from eruption_forecast.label.constants import (
     DATE_FORMAT,
-    LABEL_PREFIX,
-    LABEL_EXTENSION,
     WINDOW_STEP_PREFIX,
     DAY_TO_FORECAST_PREFIX,
     EXAMPLE_LABEL_FILENAME,
@@ -19,62 +17,7 @@ from eruption_forecast.utils.date_utils import parse_label_filename
 
 
 class LabelData(BaseDataContainer):
-    """Wrapper class for loading and parsing label CSV files.
-
-    This class handles loading pre-built label CSV files and extracts metadata
-    from the standardized filename format. Use this class to load existing labels
-    for model training or evaluation without rebuilding them.
-
-    Inherits from :class:`BaseDataContainer`, providing `csv_path`, `start_date_str`,
-    `end_date_str`, and `data` as part of the shared data-container interface.
-
-    The filename must follow the format:
-        label_{start_date}_{end_date}_step-{window_step}-{unit}_dtf-{day_to_forecast}_ie-{0|1}.csv
-
-    Legacy filenames without the ``_ie-`` segment are accepted and default to
-    ``include_eruption_date=False``.
-
-    Attributes:
-        csv (str): Path to the label CSV file.
-        start_date (datetime.datetime): Start date extracted from filename.
-        end_date (datetime.datetime): End date extracted from filename.
-        start_date_str (str): Start date string in YYYY-MM-DD format.
-        end_date_str (str): End date string in YYYY-MM-DD format.
-        window_step (int): Window step size (e.g., 12 for 12 hours).
-        window_unit (str): Unit of window step ('hours' or 'minutes').
-        day_to_forecast (int): Days before eruption to start labeling as positive.
-        include_eruption_date (bool): Whether the eruption date counts as a positive day.
-        df (pd.DataFrame): Cached label DataFrame with datetime index and columns
-            'id' (int) and 'is_erupted' (0 or 1).
-        data (pd.DataFrame): Alias for :attr:`df` — satisfies the
-            :class:`BaseDataContainer` interface.
-        filename (str): Basename of the label CSV file with extension.
-        basename (str): Filename without extension.
-        filetype (str): File extension without the dot.
-        parameters (dict): Dictionary of all extracted parameters.
-
-    Examples:
-        >>> # Load existing label file
-        >>> label_data = LabelData("output/labels/label_2020-01-01_2020-12-31_step-12-hours_dtf-2_ie-0.csv")
-        >>> print(label_data.window_step)
-        12
-        >>> print(label_data.window_unit)
-        'hours'
-        >>> print(label_data.day_to_forecast)
-        2
-
-        >>> # Access the DataFrame
-        >>> df = label_data.df
-        >>> print(df.columns.tolist())
-        ['id', 'is_erupted']
-        >>> print(df.index.name)
-        'datetime'
-
-        >>> # Get all parameters as dict
-        >>> params = label_data.parameters
-        >>> print(params['start_date_str'])
-        '2020-01-01'
-    """
+    """Wrapper class for loading and parsing label CSV files."""
 
     def __init__(self, csv: str) -> None:
         """Initialize LabelData with a label CSV file path.
@@ -173,16 +116,14 @@ class LabelData(BaseDataContainer):
         if self.csv is not None and not os.path.exists(self.csv):
             raise ValueError(f"Label file not found at {self.csv}")
 
-        if not self.basename.startswith(LABEL_PREFIX):
+        if not self.basename.startswith("label"):
             raise ValueError(
-                f"Label filename is invalid. Filename should start with '{LABEL_PREFIX}'. "
+                f"Label filename is invalid. Filename should start with 'label'. "
                 f"Example: {EXAMPLE_LABEL_FILENAME}"
             )
 
-        if not self.filename.endswith(LABEL_EXTENSION):
-            raise ValueError(
-                f"Label file extension is invalid. Expected '{LABEL_EXTENSION}'"
-            )
+        if not self.filename.endswith(".csv"):
+            raise ValueError("Label file extension is invalid. Expected '.csv'")
 
         parts = self.basename.split("_")
         if len(parts) not in (5, 6):
@@ -191,7 +132,7 @@ class LabelData(BaseDataContainer):
                 f"Expected format: label_YYYY-MM-DD_YYYY-MM-DD_step-X-unit_dtf-X_ie-{{0|1}}.csv "
                 f"(step-12-hours -> window_step=12, unit=hours; dtf-2 -> day_to_forecast=2; "
                 f"ie-0 -> include_eruption_date=False). "
-                f"Got: {self.basename}{LABEL_EXTENSION}. Example: {EXAMPLE_LABEL_FILENAME}"
+                f"Got: {self.basename}.csv. Example: {EXAMPLE_LABEL_FILENAME}"
             )
 
         if len(parts) == 6:

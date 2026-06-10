@@ -1,10 +1,3 @@
-"""Cross-classifier comparison for volcanic eruption forecasting models.
-
-This module provides ``ClassifierComparator``, which consumes a fitted
-:class:`MetricsEnsemble` and produces side-by-side comparison plots and a
-ranking table across the classifiers it covers.
-"""
-
 import os
 import math
 from typing import Self, Literal
@@ -28,8 +21,8 @@ from eruption_forecast.plots.styles import (
     apply_nature_style,
 )
 from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
-from eruption_forecast.ensemble.new_metrics_ensemble import MetricsEnsemble
 
 
 #: Metrics shown by default when ``metrics=None`` is passed to the constructor

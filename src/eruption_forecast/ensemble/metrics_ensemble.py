@@ -1,673 +1,402 @@
-"""Per-seed metrics computation for a :class:`ClassifierEnsemble`.
-
-Provides :class:`MetricsEnsemble`, the ensemble-level metric engine that lifts
-the per-classifier / per-seed metric loop out of
-:class:`~eruption_forecast.model.evaluation_model.EvaluationModel`.
-
-For every seed of every classifier in a fitted ``ClassifierEnsemble`` it:
-    - Computes ``y_proba`` and ``y_pred`` against the supplied ``features_df``
-      by delegating to
-      :meth:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble.compute_probabilities_and_predictions`.
-    - Runs :class:`~eruption_forecast.model.metrics_computer.MetricsComputer`
-      to obtain scalar metrics (accuracy, balanced_accuracy, precision, recall,
-      F1, MCC, ROC-AUC, PR-AUC, average precision, plus G-mean and threshold-
-      optimised variants).
-    - Persists per-seed metrics as ``{classifiers_dir}/{clf}/metrics/json/{seed:05d}.json``
-      so the existing
-      :class:`~eruption_forecast.model.multi_model_evaluator.MultiModelEvaluator`
-      aggregator and downstream plots keep working unchanged.
-    - Persists the raw ``(n_samples, n_seeds)`` ``y_proba`` and ``y_pred``
-      matrices plus the aligned ``y_true`` vector under
-      ``{classifiers_dir}/{clf}/predictions/`` so downstream plotting can be
-      rebuilt from disk without re-predicting.
-
-The class intentionally only depends on ``ClassifierEnsemble`` so it stays in
-the ``ensemble/`` package. The caller (typically ``EvaluationModel``) is
-responsible for resolving ``y_true`` from labels and ``eruption_dates``.
-"""
-
 import os
-import json
-from typing import TYPE_CHECKING, Any, Self
+from typing import Self, Literal
+from os.path import dirname
+from datetime import datetime
 
 import numpy as np
 import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir
-from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
-from eruption_forecast.model.metrics_computer import MetricsComputer
+from eruption_forecast.utils.ml import build_y_true, compute_seed
+from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.plots.evaluation_plots import (
+    PER_SEED_PLOT_DISPATCHER,
+    AGGREGATE_PLOT_DISPATCHER,
+    render_one_plot,
+    render_one_aggregate_plot,
+)
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
-if TYPE_CHECKING:
-    from eruption_forecast.model.training_model import TrainingModel
-    from eruption_forecast.model.prediction_model import PredictionModel
-
-
 class MetricsEnsemble:
-    """Compute and persist per-seed metrics for every classifier in an ensemble.
-
-    Wraps a fitted ``ClassifierEnsemble`` together with the feature matrix and
-    ground-truth labels needed to evaluate it. :meth:`compute` produces, for
-    every classifier:
-
-        - a per-seed scalar metrics dictionary saved to JSON,
-        - a ``(n_samples, n_seeds)`` ``y_proba`` and ``y_pred`` CSV matrix,
-        - a ``mean ± std`` aggregate summary CSV and a tidy per-seed CSV.
-
-    Attributes:
-        ClassifierEnsemble (ClassifierEnsemble): Fitted ensemble whose seeds
-            are evaluated.
-        features_df (pd.DataFrame): Feature matrix indexed by window id.
-        y_true (pd.Series): Ground-truth ``is_erupted`` labels aligned to the
-            index of ``features_df``.
-        n_jobs (int): Number of parallel workers used for the per-seed metric
-            computation (``joblib.Parallel``).
-        output_dir (str): Root directory for evaluation artefacts. The class
-            writes under ``{output_dir}/classifiers/{classifier}/``.
-        classifiers_dir (str): ``{output_dir}/classifiers``.
-        basename (str | None): Optional suffix appended to aggregate filenames
-            (``metrics_summary_{basename}.csv`` etc.). When ``None`` the
-            filenames carry no suffix.
-        overwrite (bool): When ``True``, recompute and overwrite cached JSONs
-            and prediction CSVs. When ``False``, cached per-seed JSONs are
-            reused and prediction matrices are re-read from disk.
-        verbose (bool): Emit per-classifier progress messages.
-        metrics (dict[str, pd.DataFrame]): Populated by :meth:`compute`.
-            Classifier name → DataFrame with one row per seed.
-        aggregates (dict[str, pd.DataFrame]): Populated by :meth:`compute`.
-            Classifier name → ``DataFrame.describe().T`` summary.
-        predictions (dict[str, dict[str, pd.DataFrame | pd.Series]]): Populated
-            by :meth:`compute`. Classifier name → ``{"y_proba": df, "y_pred":
-            df, "y_true": series}``.
-
-    Args:
-        classifier_ensemble (ClassifierEnsemble): Fitted ensemble to evaluate.
-        features_df (pd.DataFrame): Feature matrix indexed by window id.
-        y_true (pd.Series | np.ndarray): Ground-truth labels. When an
-            ``np.ndarray`` is passed it is assumed to be aligned positionally
-            with ``features_df.index``.
-        n_jobs (int, optional): Parallel workers for the per-seed metric loop.
-            Defaults to ``1``.
-        output_dir (str | None, optional): Root output directory. Required for
-            :meth:`compute` to persist artefacts. Defaults to ``None``.
-        basename (str | None, optional): Suffix appended to aggregate CSV
-            filenames. Defaults to ``None``.
-        overwrite (bool, optional): Recompute and overwrite cached artefacts.
-            Defaults to ``False``.
-        verbose (bool, optional): Verbose logging. Defaults to ``False``.
-
-    Raises:
-        ValueError: If ``output_dir`` is ``None``.
-
-    Examples:
-        >>> me = MetricsEnsemble(
-        ...     classifier_ensemble=fm.TrainingModel.ClassifierEnsemble,
-        ...     features_df=fm.TrainingModel.features_df,
-        ...     y_true=fm.TrainingModel.labels,
-        ...     output_dir="output/VG.OJN.00.EHZ/evaluation/training",
-        ...     basename="2025-03-16_2025-03-22",
-        ...     n_jobs=4,
-        ... ).compute()
-        >>> me.metrics["rf"].head()
-    """
-
     def __init__(
         self,
         classifier_ensemble: ClassifierEnsemble,
         features_df: pd.DataFrame,
         y_true: pd.Series | np.ndarray,
-        n_jobs: int = 1,
+        kind: Literal["prediction", "training"] = "prediction",
         output_dir: str | None = None,
-        basename: str | None = None,
-        overwrite: bool = False,
+        root_dir: str | None = None,
+        n_jobs: int = 1,
         verbose: bool = False,
     ):
-        """Validate inputs, align ``y_true`` to a ``pd.Series``, and resolve output paths.
+        output_dir = resolve_output_dir(
+            output_dir=output_dir,
+            root_dir=root_dir,
+            default_subpath=os.path.join("output", "evaluation", kind),
+        )
 
-        Args:
-            classifier_ensemble (ClassifierEnsemble): Fitted ensemble to evaluate.
-            features_df (pd.DataFrame): Feature matrix indexed by window id.
-            y_true (pd.Series | np.ndarray): Ground-truth ``is_erupted`` labels.
-            n_jobs (int, optional): Parallel workers. Defaults to ``1``.
-            output_dir (str | None, optional): Root output directory. Required
-                for persistence. Defaults to ``None``.
-            basename (str | None, optional): Suffix for aggregate filenames.
-                Defaults to ``None``.
-            overwrite (bool, optional): Recompute and overwrite cached files.
-                Defaults to ``False``.
-            verbose (bool, optional): Verbose logging. Defaults to ``False``.
+        if isinstance(y_true, pd.Series):
+            y_true = y_true.to_numpy()
 
-        Raises:
-            ValueError: If ``output_dir`` is ``None``.
-        """
-        if output_dir is None:
-            raise ValueError(
-                "output_dir is required — MetricsEnsemble persists per-seed "
-                "JSONs and (n_samples, n_seeds) prediction matrices to disk."
-            )
-
-        if not isinstance(y_true, pd.Series):
-            y_true = pd.Series(
-                np.asarray(y_true), index=features_df.index, name="is_erupted"
-            )
-
-        self.ClassifierEnsemble: ClassifierEnsemble = classifier_ensemble
-        self.features_df: pd.DataFrame = features_df
-        self.y_true: pd.Series = y_true
-        self.n_jobs: int = n_jobs
-        self.output_dir: str = output_dir
-        self.basename: str | None = basename
-        self.overwrite: bool = overwrite
-        self.verbose: bool = verbose
-
-        self.classifiers_dir: str = os.path.join(output_dir, "classifiers")
+        self.ClassifierEnsemble = classifier_ensemble
+        self.features_df = features_df
+        self.y_true: np.ndarray = y_true
+        self.kind: Literal["prediction", "training"] = kind
+        self.n_jobs = n_jobs
+        self.output_dir = output_dir
+        self.classifiers_dir = os.path.join(output_dir, "classifiers")
+        self.verbose = verbose
 
         self.metrics: dict[str, pd.DataFrame] = {}
-        self.aggregates: dict[str, pd.DataFrame] = {}
-        self.predictions: dict[str, dict[str, pd.DataFrame | pd.Series]] = {}
-
-    @classmethod
-    def from_training_model(
-        cls,
-        training_model: "TrainingModel",
-        n_jobs: int = 1,
-        output_dir: str | None = None,
-        basename: str | None = None,
-        overwrite: bool = False,
-        verbose: bool = False,
-    ) -> Self:
-        """Build a :class:`MetricsEnsemble` from a completed ``TrainingModel``.
-
-        Pulls ``training_model.ClassifierEnsemble``, ``features_df``, and
-        ``labels`` (in-sample ground truth) into a new instance.
-
-        Args:
-            training_model (TrainingModel): Completed training stage.
-            n_jobs (int, optional): Parallel workers. Defaults to ``1``.
-            output_dir (str | None, optional): Output directory. Defaults to
-                ``None``.
-            basename (str | None, optional): Suffix for aggregate filenames.
-                Defaults to ``None``.
-            overwrite (bool, optional): Recompute cached files. Defaults to
-                ``False``.
-            verbose (bool, optional): Verbose logging. Defaults to ``False``.
-
-        Returns:
-            MetricsEnsemble: Ready for :meth:`compute`.
-
-        Raises:
-            ValueError: If ``training_model.ClassifierEnsemble`` is ``None``
-                (training has not been run yet).
-        """
-        ensemble = training_model.ClassifierEnsemble
-        if ensemble is None:
-            raise ValueError(
-                "training_model.ClassifierEnsemble is None — call fit() first."
-            )
-        return cls(
-            classifier_ensemble=ensemble,
-            features_df=training_model.features_df,
-            y_true=training_model.labels,
-            n_jobs=n_jobs,
-            output_dir=output_dir,
-            basename=basename,
-            overwrite=overwrite,
-            verbose=verbose,
-        )
-
-    @classmethod
-    def from_prediction_model(
-        cls,
-        prediction_model: "PredictionModel",
-        y_true: pd.Series | np.ndarray,
-        n_jobs: int = 1,
-        output_dir: str | None = None,
-        basename: str | None = None,
-        overwrite: bool = False,
-        verbose: bool = False,
-    ) -> Self:
-        """Build a :class:`MetricsEnsemble` from a completed ``PredictionModel``.
-
-        ``y_true`` must be supplied by the caller — ``PredictionModel.labels``
-        carries only the window-id mapping with all-zero ``is_erupted``, so
-        ground-truth labels have to be rebuilt upstream (typically by
-        ``EvaluationModel.build_label()`` from ``eruption_dates``).
-
-        Args:
-            prediction_model (PredictionModel): Completed prediction stage.
-            y_true (pd.Series | np.ndarray): Ground-truth labels aligned to
-                ``prediction_model.features_df``.
-            n_jobs (int, optional): Parallel workers. Defaults to ``1``.
-            output_dir (str | None, optional): Output directory. Defaults to
-                ``None``.
-            basename (str | None, optional): Suffix for aggregate filenames.
-                Defaults to ``None``.
-            overwrite (bool, optional): Recompute cached files. Defaults to
-                ``False``.
-            verbose (bool, optional): Verbose logging. Defaults to ``False``.
-
-        Returns:
-            MetricsEnsemble: Ready for :meth:`compute`.
-
-        Raises:
-            ValueError: If ``prediction_model.ClassifierEnsemble`` is ``None``.
-        """
-        ensemble = prediction_model.ClassifierEnsemble
-        if ensemble is None:
-            raise ValueError(
-                "prediction_model.ClassifierEnsemble is None — "
-                "load a model before constructing PredictionModel."
-            )
-        return cls(
-            classifier_ensemble=ensemble,
-            features_df=prediction_model.features_df,
-            y_true=y_true,
-            n_jobs=n_jobs,
-            output_dir=output_dir,
-            basename=basename,
-            overwrite=overwrite,
-            verbose=verbose,
-        )
+        self.y_probas: dict[str, np.ndarray] = {}
+        self.y_preds: dict[str, np.ndarray] = {}
 
     @classmethod
     def from_file(
         cls,
         model_filepath: str,
-        features_filepath: str,
-        y_true_filepath: str,
-        n_jobs: int = 1,
+        features_csv: str,
+        features_label_csv: str,
+        eruption_dates: list[str] | list[datetime],
+        kind: Literal["prediction", "training"] = "prediction",
         output_dir: str | None = None,
-        basename: str | None = None,
-        overwrite: bool = False,
+        root_dir: str | None = None,
+        n_jobs: int = 1,
         verbose: bool = False,
-    ) -> Self:
-        """Build a :class:`MetricsEnsemble` by loading inputs from disk.
-
-        ``model_filepath`` is normalised via
-        :meth:`ClassifierEnsemble.from_any` so it accepts ``.pkl``, ``.json``,
-        and registry ``.csv`` paths uniformly.
-
-        Args:
-            model_filepath (str): Path to a serialised ``ClassifierEnsemble``
-                (``.pkl`` / ``.json``) or a trained-model registry ``.csv``.
-            features_filepath (str): Path to a CSV of extracted features with
-                the window id as the index.
-            y_true_filepath (str): Path to a CSV holding the ground-truth
-                ``is_erupted`` column. When the column ``is_erupted`` is not
-                present the first column is used.
-            n_jobs (int, optional): Parallel workers. Defaults to ``1``.
-            output_dir (str | None, optional): Output directory. Defaults to
-                ``None``.
-            basename (str | None, optional): Suffix for aggregate filenames.
-                Defaults to ``None``.
-            overwrite (bool, optional): Recompute cached files. Defaults to
-                ``False``.
-            verbose (bool, optional): Verbose logging. Defaults to ``False``.
-
-        Returns:
-            MetricsEnsemble: Ready for :meth:`compute`.
-
-        Raises:
-            FileNotFoundError: If any of the three input files does not exist.
-        """
+    ) -> "MetricsEnsemble":
         for label, path in (
-            ("model", model_filepath),
-            ("features", features_filepath),
-            ("y_true", y_true_filepath),
+            ("Model Filepath", model_filepath),
+            ("Features CSV", features_csv),
+            ("Features Label CSV", features_label_csv),
         ):
-            if not os.path.isfile(path):
+            if not os.path.exists(path):
                 raise FileNotFoundError(f"{label} file not found: {path}")
 
-        ce = ClassifierEnsemble.from_any(model_filepath, verbose=verbose)
-
-        features_df = pd.read_csv(features_filepath, index_col=0)
-        y_true_df = pd.read_csv(y_true_filepath, index_col=0)
-        y_true = (
-            y_true_df["is_erupted"]
-            if "is_erupted" in y_true_df.columns
-            else y_true_df.iloc[:, 0]
+        classifier_ensemble = ClassifierEnsemble.from_any(
+            model_filepath, verbose=verbose
         )
+        features_df = pd.read_csv(features_csv, index_col=0)
+        y_true = build_y_true(features_label_csv, eruption_dates)
 
         return cls(
-            classifier_ensemble=ce,
+            classifier_ensemble=classifier_ensemble,
             features_df=features_df,
             y_true=y_true,
-            n_jobs=n_jobs,
+            kind=kind,
             output_dir=output_dir,
-            basename=basename,
-            overwrite=overwrite,
+            root_dir=root_dir,
+            n_jobs=n_jobs,
             verbose=verbose,
         )
 
-    def compute(self) -> Self:
-        """Compute, persist, and aggregate per-seed metrics for every classifier.
+    def save(self, path: str | None = None) -> str:
+        """Persist the computed MetricsEnsemble to disk via joblib.
 
-        Aligns ``features_df`` and ``y_true`` on their common index, then for
-        each classifier in ``self.ClassifierEnsemble.ensembles``:
+        Writes a single ``.pkl`` containing the full instance — including the
+        embedded ``ClassifierEnsemble``, ``features_df``, ``y_true``, and the
+        populated ``metrics`` / ``y_probas`` / ``y_preds`` dicts — so
+        :meth:`load` can reconstitute everything without recomputation.
 
-            - Runs ``compute_probabilities_and_predictions`` once to obtain
-              ``(n_samples, n_seeds)`` matrices.
-            - Writes ``y_proba.csv`` / ``y_pred.csv`` / ``y_true.csv`` under
-              ``{classifiers_dir}/{classifier}/predictions/``.
-            - Computes scalar metrics per seed via :class:`MetricsComputer`
-              and persists ``{classifiers_dir}/{classifier}/metrics/json/{seed:05d}.json``.
-            - Writes ``metrics_summary[_{basename}].csv`` and
-              ``all_metrics[_{basename}].csv`` under
-              ``{classifiers_dir}/{classifier}/``.
-
-        Populates ``self.metrics``, ``self.aggregates``, and
-        ``self.predictions``.
+        Args:
+            path (str | None, optional): Destination ``.pkl`` path. ``None``
+                resolves to ``{self.output_dir}/MetricsEnsemble.pkl``.
+                Defaults to ``None``.
 
         Returns:
-            Self: The current instance, enabling method chaining.
+            str: The absolute path the instance was written to.
+        """
+        if path is None:
+            os.makedirs(self.output_dir, exist_ok=True)
+            path = os.path.join(self.output_dir, "MetricsEnsemble.pkl")
+        else:
+            parent = dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+
+        joblib.dump(self, path)
+        if self.verbose:
+            logger.info(f"Saved MetricsEnsemble to {path}")
+        return path
+
+    @classmethod
+    def load(cls, path: str) -> "MetricsEnsemble":
+        """Reconstitute a saved MetricsEnsemble from a joblib ``.pkl``.
+
+        Args:
+            path (str): Path to a ``.pkl`` previously written by :meth:`save`.
+
+        Returns:
+            MetricsEnsemble: The deserialised instance, with ``metrics`` /
+                ``y_probas`` / ``y_preds`` populated as of the save.
 
         Raises:
-            ValueError: If ``y_true`` or ``features_df`` is empty.
-            ValueError: If the index intersection of ``features_df`` and
-                ``y_true`` is empty.
+            FileNotFoundError: If ``path`` does not exist.
+            TypeError: If the loaded object is not a ``MetricsEnsemble``.
         """
-        if self.y_true.empty:
-            raise ValueError("y_true is empty — nothing to evaluate.")
-        if self.features_df.empty:
-            raise ValueError("features_df is empty — nothing to evaluate.")
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"MetricsEnsemble file not found: {path}")
 
-        common_index = self.features_df.index.intersection(self.y_true.index)
+        obj = joblib.load(path)
+        if not isinstance(obj, cls):
+            raise TypeError(
+                f"Loaded object is not a MetricsEnsemble (got {type(obj).__name__})."
+            )
+        return obj
+
+    def compute(self) -> Self:
+        if self.y_probas:
+            if self.verbose:
+                logger.info(
+                    "MetricsEnsemble.compute(): y_probas already populated; "
+                    "skipping recomputation."
+                )
+            return self
+
+        y_true = pd.Series(self.y_true, index=self.features_df.index, name="is_erupted")
+
+        common_index = self.features_df.index.intersection(y_true.index)
         if len(common_index) == 0:
             raise ValueError(
-                "features_df and y_true have no overlapping index entries."
+                "features_df and y_true have no overlapping index entries. "
+                "Check your features_df.index and y_true.index."
             )
 
         features_df = self.features_df.loc[common_index]
-        y_true_series = self.y_true.loc[common_index].astype(int)
-        y_true_array = y_true_series.to_numpy()
+        y_true_series = y_true.loc[common_index].astype(int)
+        self.y_true = y_true_series.to_numpy()
 
-        for classifier_name, seed_ensemble in self.ClassifierEnsemble.ensembles.items():
-            self._compute_for_classifier(
-                classifier_name=classifier_name,
-                seed_ensemble=seed_ensemble,
-                features_df=features_df,
-                y_true_series=y_true_series,
-                y_true_array=y_true_array,
-            )
+        (
+            self.metrics,
+            self.y_probas,
+            self.y_preds,
+        ) = self._compute_job(X=features_df, y_true=self.y_true)
+
+        self._persist_predictions(features_df=features_df)
 
         return self
 
-    def _compute_for_classifier(
+    def plot(
         self,
-        classifier_name: str,
-        seed_ensemble: SeedEnsemble,
-        features_df: pd.DataFrame,
-        y_true_series: pd.Series,
-        y_true_array: np.ndarray,
-    ) -> None:
-        """Evaluate every seed of one classifier and persist artefacts.
+        include_plots: list[str] | None = None,
+        exclude_plots: list[str] | None = None,
+    ):
+        """Render per-seed plots registered in the dispatcher.
+
+        Auto-runs :meth:`compute` first if probabilities have not been
+        materialised yet. ``include_plots`` narrows to a positive subset (when
+        provided); ``exclude_plots`` then drops names from whatever remains.
 
         Args:
-            classifier_name (str): Classifier identifier used in the output
-                directory tree.
-            seed_ensemble (SeedEnsemble): Per-classifier bundle of seed models.
-            features_df (pd.DataFrame): Index-aligned feature matrix.
-            y_true_series (pd.Series): Index-aligned ground-truth labels.
-            y_true_array (np.ndarray): Same as ``y_true_series`` as an ndarray
-                (cached to avoid repeated conversion inside the per-seed loop).
+            include_plots (list[str] | None): Positive opt-in list of plot
+                names. When ``None``, starts from the full dispatcher
+                registry. Defaults to ``None``.
+            exclude_plots (list[str] | None): Plot names to omit. Applied
+                after ``include_plots``. Defaults to ``None``.
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
         """
-        clf_dir = os.path.join(self.classifiers_dir, classifier_name)
-        metrics_dir = os.path.join(clf_dir, "metrics")
-        json_dir = os.path.join(metrics_dir, "json")
-        predictions_dir = os.path.join(clf_dir, "predictions")
-        ensure_dir(json_dir)
-        ensure_dir(predictions_dir)
+        if len(self.y_probas) == 0:
+            self.compute()
 
-        seed_states: list[int] = [seed["random_state"] for seed in seed_ensemble.seeds]
-        json_paths: list[str] = [
-            os.path.join(json_dir, f"{rs:05d}.json") for rs in seed_states
-        ]
-        y_proba_path = os.path.join(predictions_dir, "y_proba.csv")
-        y_pred_path = os.path.join(predictions_dir, "y_pred.csv")
-        y_true_path = os.path.join(predictions_dir, "y_true.csv")
+        plots = list(PER_SEED_PLOT_DISPATCHER.keys())
+        if include_plots:
+            plots = [name for name in plots if name in include_plots]
+        if exclude_plots:
+            plots = [name for name in plots if name not in exclude_plots]
 
-        # Fast path: every per-seed JSON and the proba matrix already exist.
-        # Reuse them without re-predicting.
-        cache_hit = (
-            not self.overwrite
-            and len(json_paths) > 0
-            and all(os.path.isfile(p) for p in json_paths)
-            and os.path.isfile(y_proba_path)
-            and os.path.isfile(y_pred_path)
+        return self._plot_jobs(plots)
+
+    def _plot_jobs(self, plots: list[str]) -> list[str]:
+        """Render the requested per-seed plots in parallel.
+
+        Builds a flat list of ``(classifier_name, seed_idx, plot_name)`` jobs
+        and dispatches them to ``joblib.Parallel`` with the ``loky`` backend.
+        Caller is responsible for restricting ``plots`` to names registered
+        in ``PER_SEED_PLOT_DISPATCHER``.
+
+        Args:
+            plots (list[str]): Per-seed plot names to render.
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
+        """
+        jobs: list[tuple[str, int, str]] = []
+        for classifier_name, y_probas in self.y_probas.items():
+            n_seeds = y_probas.shape[1]
+            for seed_idx in range(n_seeds):
+                for plot_name in plots:
+                    jobs.append((classifier_name, seed_idx, plot_name))
+
+        return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
+            joblib.delayed(render_one_plot)(
+                classifier_name=classifier_name,
+                random_state=int(self.metrics[classifier_name].index[seed_idx]),
+                plot_name=plot_name,
+                y_true=self.y_true,
+                y_proba=self.y_probas[classifier_name][:, seed_idx],
+                output_dir=self.classifiers_dir,
+                verbose=self.verbose,
+            )
+            for classifier_name, seed_idx, plot_name in jobs
         )
 
-        if cache_hit:
-            all_metrics: list[dict[str, Any]] = []
-            for json_path in json_paths:
-                with open(json_path) as f:
-                    all_metrics.append(json.load(f))
-            y_proba_df = pd.read_csv(y_proba_path, index_col=0)
-            y_pred_df = pd.read_csv(y_pred_path, index_col=0)
-            if self.verbose:
-                logger.info(
-                    f"{classifier_name}: loaded cached metrics for {len(all_metrics)} seeds."
-                )
-        else:
-            try:
-                y_proba_matrix, y_pred_matrix = (
-                    seed_ensemble.compute_probabilities_and_predictions(features_df)
-                )
-            except KeyError as exc:
-                logger.warning(
-                    f"{classifier_name}: feature mismatch ({exc!s}); "
-                    "skipping classifier."
-                )
-                return
+    def plot_aggregate(
+        self,
+        include_plots: list[str] | None = None,
+        exclude_plots: list[str] | None = None,
+    ) -> list[str]:
+        """Render aggregate plots registered in the dispatcher.
 
-            seed_columns = [f"seed_{rs:05d}" for rs in seed_states]
+        For each ``(classifier_name, plot_name)`` pair, hands the full
+        ``(n_samples, n_seeds)`` probability matrix to
+        :func:`render_one_aggregate_plot`, which slices it into per-seed
+        columns and writes both the figure and the returned mean/std
+        DataFrame to disk. Auto-runs :meth:`compute` first if probabilities
+        have not been materialised yet. ``include_plots`` narrows to a
+        positive subset (when provided); ``exclude_plots`` then drops names
+        from whatever remains.
+
+        Args:
+            include_plots (list[str] | None): Positive opt-in list of plot
+                names. When ``None``, starts from the full dispatcher
+                registry. Defaults to ``None``.
+            exclude_plots (list[str] | None): Plot names to omit. Applied
+                after ``include_plots``. Defaults to ``None``.
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
+                The ``.png`` figure and the ``.csv`` data table share each
+                stem.
+        """
+        if len(self.y_probas) == 0:
+            self.compute()
+
+        plots = list(AGGREGATE_PLOT_DISPATCHER.keys())
+        if include_plots:
+            plots = [name for name in plots if name in include_plots]
+        if exclude_plots:
+            plots = [name for name in plots if name not in exclude_plots]
+
+        return self._plot_aggregate_jobs(plots)
+
+    def _plot_aggregate_jobs(self, plots: list[str]) -> list[str]:
+        """Render the requested aggregate plots in parallel.
+
+        Builds a flat list of ``(classifier_name, plot_name)`` jobs and
+        dispatches them to ``joblib.Parallel`` with the ``loky`` backend.
+        Caller is responsible for restricting ``plots`` to names registered
+        in ``AGGREGATE_PLOT_DISPATCHER``.
+
+        Args:
+            plots (list[str]): Aggregate plot names to render.
+
+        Returns:
+            list[str]: Saved figure filepath stems, one per executed job.
+        """
+        jobs: list[tuple[str, str]] = [
+            (cls, name) for cls in self.y_probas for name in plots
+        ]
+
+        return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
+            joblib.delayed(render_one_aggregate_plot)(
+                classifier_name=cls,
+                plot_name=name,
+                y_true=self.y_true,
+                y_probas=self.y_probas[cls],
+                output_dir=self.classifiers_dir,
+                verbose=self.verbose,
+            )
+            for cls, name in jobs
+        )
+
+    def _compute_job(
+        self,
+        X: pd.DataFrame,
+        y_true: np.ndarray,
+    ) -> tuple[
+        dict[str, pd.DataFrame],
+        dict[str, np.ndarray],
+        dict[str, np.ndarray],
+    ]:
+        """Handling parallel job to calculate metrics.
+
+        Args:
+            X (pd.DataFrame): Extracted features DataFrame of shape
+                ``(n_samples, n_features)``.
+            y_true (np.ndarray | pd.Series): Ground-truth binary labels
+                aligned positionally with ``X``. Length must equal
+                ``n_samples``.
+
+        Returns:
+            tuple: A 3-tuple of per-classifier dicts —
+                ``(metrics, y_probas, y_preds)`` — keyed by classifier name.
+        """
+        classifier_names = list(self.ClassifierEnsemble.ensembles.keys())
+        seed_ensembles = list(self.ClassifierEnsemble.ensembles.values())
+
+        results = joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
+            joblib.delayed(compute_seed)(
+                seed_ensemble=seed_ensemble,
+                X=X,
+                y_true=y_true,
+                output_dir=self.classifiers_dir,
+                verbose=self.verbose,
+            )
+            for seed_ensemble in seed_ensembles
+        )
+
+        metrics_dfs, y_probas_arrs, y_preds_arrs = zip(*results, strict=True)
+
+        metrics = dict(zip(classifier_names, metrics_dfs, strict=True))
+        y_probas = dict(zip(classifier_names, y_probas_arrs, strict=True))
+        y_preds = dict(zip(classifier_names, y_preds_arrs, strict=True))
+
+        return metrics, y_probas, y_preds
+
+    def _persist_predictions(
+        self,
+        features_df: pd.DataFrame,
+    ) -> None:
+        """Write per-classifier ``y_proba`` / ``y_pred`` / ``y_true`` CSVs.
+
+        For every classifier in :attr:`y_probas`, materialises the
+        ``(n_samples, n_seeds)`` probability and prediction matrices as
+        DataFrames indexed by ``features_df.index`` with one column per seed
+        (``seed_{random_state:05d}``), and writes them alongside the aligned
+        ground-truth Series under
+        ``{classifiers_dir}/{classifier_name}/predictions/``.
+
+        Args:
+            features_df (pd.DataFrame): Index-aligned feature matrix; supplies
+                the row index for the saved matrices.
+        """
+        for classifier_name, y_proba_matrix in self.y_probas.items():
+            predictions_dir = os.path.join(
+                self.classifiers_dir, classifier_name, "predictions"
+            )
+            ensure_dir(predictions_dir)
+
+            seed_columns = [
+                f"seed_{int(rs):05d}" for rs in self.metrics[classifier_name].index
+            ]
             y_proba_df = pd.DataFrame(
-                y_proba_matrix, index=features_df.index, columns=seed_columns
+                y_proba_matrix,
+                index=features_df.index,
+                columns=seed_columns,
             )
             y_pred_df = pd.DataFrame(
-                y_pred_matrix.astype(int),
+                self.y_preds[classifier_name].astype(int),
                 index=features_df.index,
                 columns=seed_columns,
             )
 
-            y_proba_df.to_csv(y_proba_path)
-            y_pred_df.to_csv(y_pred_path)
-            y_true_series.to_csv(y_true_path, header=True)
+            y_proba_df.to_csv(os.path.join(predictions_dir, "y_proba.csv"))
+            y_pred_df.to_csv(os.path.join(predictions_dir, "y_pred.csv"))
 
-            all_metrics = self._compute_seed_metrics(
-                classifier_name=classifier_name,
-                seed_states=seed_states,
-                json_paths=json_paths,
-                y_proba_matrix=y_proba_matrix,
-                y_pred_matrix=y_pred_matrix,
-                y_true_array=y_true_array,
-            )
-
-        self._finalize_classifier(
-            classifier_name=classifier_name,
-            clf_dir=clf_dir,
-            all_metrics=all_metrics,
-        )
-        self.predictions[classifier_name] = {
-            "y_proba": y_proba_df,
-            "y_pred": y_pred_df,
-            "y_true": y_true_series,
-        }
-
-    def _compute_seed_metrics(
-        self,
-        classifier_name: str,
-        seed_states: list[int],
-        json_paths: list[str],
-        y_proba_matrix: np.ndarray,
-        y_pred_matrix: np.ndarray,
-        y_true_array: np.ndarray,
-    ) -> list[dict[str, Any]]:
-        """Run :class:`MetricsComputer` per seed and persist the JSON files.
-
-        Honours ``self.overwrite``: a per-seed JSON that already exists is
-        loaded from disk instead of recomputed. The metric computation itself
-        is parallelised with ``joblib.Parallel`` when ``self.n_jobs > 1``.
-
-        Args:
-            classifier_name (str): Classifier name (added to each metric dict
-                under ``model_name``).
-            seed_states (list[int]): Random-state ints, one per seed.
-            json_paths (list[str]): Per-seed JSON output paths, aligned with
-                ``seed_states``.
-            y_proba_matrix (np.ndarray): Shape ``(n_samples, n_seeds)``.
-            y_pred_matrix (np.ndarray): Shape ``(n_samples, n_seeds)``.
-            y_true_array (np.ndarray): Shape ``(n_samples,)``.
-
-        Returns:
-            list[dict[str, Any]]: Per-seed metrics in seed order.
-        """
-        n_jobs = max(1, self.n_jobs)
-        overwrite = self.overwrite
-        verbose = self.verbose
-
-        if n_jobs > 1:
-            return joblib.Parallel(n_jobs=n_jobs, backend="loky")(
-                joblib.delayed(_compute_one_seed_metrics)(
-                    classifier_name=classifier_name,
-                    random_state=seed_states[i],
-                    json_path=json_paths[i],
-                    y_proba=y_proba_matrix[:, i],
-                    y_pred=y_pred_matrix[:, i],
-                    y_true=y_true_array,
-                    overwrite=overwrite,
-                    verbose=verbose,
+            if self.verbose:
+                logger.info(
+                    f"{classifier_name}: y_proba and y_pred saved to {predictions_dir}"
                 )
-                for i in range(len(seed_states))
-            )
-
-        return [
-            _compute_one_seed_metrics(
-                classifier_name=classifier_name,
-                random_state=seed_states[i],
-                json_path=json_paths[i],
-                y_proba=y_proba_matrix[:, i],
-                y_pred=y_pred_matrix[:, i],
-                y_true=y_true_array,
-                overwrite=overwrite,
-                verbose=verbose,
-            )
-            for i in range(len(seed_states))
-        ]
-
-    def _finalize_classifier(
-        self,
-        classifier_name: str,
-        clf_dir: str,
-        all_metrics: list[dict[str, Any]],
-    ) -> None:
-        """Aggregate per-seed metrics and write the summary CSVs.
-
-        Computes ``DataFrame.describe().T`` across seeds, writes
-        ``metrics_summary[_{basename}].csv`` and ``all_metrics[_{basename}].csv``,
-        and logs the ``mean ± std`` of the headline metrics.
-
-        Args:
-            classifier_name (str): Classifier name for log output and the
-                ``self.metrics`` / ``self.aggregates`` keys.
-            clf_dir (str): Per-classifier output directory.
-            all_metrics (list[dict[str, Any]]): Per-seed metric dicts.
-        """
-        if not all_metrics:
-            logger.warning(f"{classifier_name}: no seed results — skipping.")
-            return
-
-        ensure_dir(clf_dir)
-        df_metrics = pd.DataFrame(all_metrics)
-
-        suffix = f"_{self.basename}" if self.basename else ""
-        summary = df_metrics.describe().T
-        summary_filepath = os.path.join(clf_dir, f"metrics_summary{suffix}.csv")
-        summary.to_csv(summary_filepath)
-
-        all_metrics_filepath = os.path.join(clf_dir, f"all_metrics{suffix}.csv")
-        if "random_state" in df_metrics.columns:
-            df_metrics_indexed = df_metrics.set_index("random_state")
-        else:
-            df_metrics_indexed = df_metrics
-        df_metrics_indexed.to_csv(all_metrics_filepath, index=True)
-
-        logger.info("=" * 60)
-        logger.info(f"Metrics Summary — {classifier_name} (mean ± std across seeds)")
-        logger.info("=" * 60)
-        for metric in (
-            "accuracy",
-            "balanced_accuracy",
-            "f1_score",
-            "precision",
-            "recall",
-        ):
-            if metric not in df_metrics_indexed.columns:
-                continue
-            mean = df_metrics_indexed[metric].mean()
-            std = df_metrics_indexed[metric].std()
-            logger.info(f"{metric:20s}: {mean:.4f} ± {std:.4f}")
-        logger.info("=" * 60)
-
-        if self.verbose:
-            logger.info(f"Summary metrics saved to: {summary_filepath}")
-            logger.info(f"All metrics saved to: {all_metrics_filepath}")
-
-        self.metrics[classifier_name] = df_metrics
-        self.aggregates[classifier_name] = summary
-
-
-def _compute_one_seed_metrics(
-    classifier_name: str,
-    random_state: int,
-    json_path: str,
-    y_proba: np.ndarray,
-    y_pred: np.ndarray,
-    y_true: np.ndarray,
-    overwrite: bool,
-    verbose: bool,
-) -> dict[str, Any]:
-    """Compute and persist the metric dict for a single seed.
-
-    Top-level function so it can be pickled by ``joblib.Parallel`` (a method
-    bound to ``MetricsEnsemble`` would re-serialise ``self`` for every worker).
-
-    Args:
-        classifier_name (str): Stored in the output dict under ``model_name``.
-        random_state (int): Seed identifier. Stored under ``random_state``.
-        json_path (str): Output path. Loaded instead of recomputed when the
-            file already exists and ``overwrite`` is ``False``.
-        y_proba (np.ndarray): Positive-class probabilities for this seed,
-            shape ``(n_samples,)``.
-        y_pred (np.ndarray): Binary predictions for this seed, shape
-            ``(n_samples,)``.
-        y_true (np.ndarray): Ground-truth labels, shape ``(n_samples,)``.
-        overwrite (bool): Recompute even when ``json_path`` exists.
-        verbose (bool): When ``True``, log cache hits.
-
-    Returns:
-        dict[str, Any]: The metrics dictionary written to ``json_path``.
-    """
-    if not overwrite and os.path.isfile(json_path):
-        with open(json_path) as f:
-            cached: dict[str, Any] = json.load(f)
-        if verbose:
-            logger.info(f"{classifier_name}/{random_state:05d}: cached metrics loaded.")
-        return cached
-
-    metrics: dict[str, Any] = {
-        **MetricsComputer(
-            y_true=y_true,
-            y_proba=y_proba,
-            y_pred=y_pred,
-        ).compute_all_metrics(),
-        "random_state": int(random_state),
-        "model_name": classifier_name,
-    }
-
-    with open(json_path, "w") as f:
-        json.dump(metrics, f, indent=4)
-
-    return metrics

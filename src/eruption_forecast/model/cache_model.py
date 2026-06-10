@@ -1,16 +1,3 @@
-"""Content-addressable cache for model pipeline stages.
-
-This module provides :class:`CacheModel`, an abstract base for model classes
-whose expensive build artefacts (trained ensembles, extracted feature matrices,
-forecast results) should be reusable across runs when their identity-defining
-parameters match exactly.
-
-Subclasses declare which parameters define a unique cache entry via the
-abstract :meth:`CacheModel.build_cache_identity` classmethod. The base provides
-the canonical-JSON hashing and the on-disk read/write layer underneath
-``{output_dir}/cache/{ClassName}/``.
-"""
-
 import os
 import json
 import hashlib

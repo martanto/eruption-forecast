@@ -25,9 +25,9 @@ from sklearn.model_selection import GridSearchCV
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
-from eruption_forecast.model.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.config.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.date_utils import sort_dates
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
@@ -142,7 +142,7 @@ def compute_threshold_metrics(
     Iterates over ``resolution`` evenly-spaced thresholds from 0.0 to 1.0,
     binarises ``y_proba`` at each step, and records precision, recall, F1,
     balanced accuracy, and MCC. This is the single source of truth for threshold
-    analysis used by both ``MetricsComputer`` and ``plot_threshold_analysis``.
+    analysis used by both :class:`MetricsEnsemble` and ``plot_threshold_analysis``.
 
     Args:
         y_true (np.ndarray): Ground-truth binary labels (0 or 1).

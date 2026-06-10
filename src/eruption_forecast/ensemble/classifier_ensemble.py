@@ -1,29 +1,3 @@
-"""Wrap multiple SeedEnsemble objects for cross-classifier consensus inference.
-
-Provides :class:`ClassifierEnsemble`, a serialisable sklearn-compatible
-estimator that bundles one :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble`
-per classifier type.
-
-Each :class:`SeedEnsemble` already averages predictions across random seeds for
-a single classifier.  ``ClassifierEnsemble`` adds a second aggregation layer:
-it collects the per-classifier mean probabilities and computes a consensus
-prediction (mean of means) together with an uncertainty estimate (standard
-deviation across classifiers).
-
-Key capabilities:
-    - ``from_seed_ensembles(ensembles)``: Construct from an existing dict of
-      ``SeedEnsemble`` objects.
-    - ``from_registry_dict(registry_dict)``: Load from a mapping of classifier
-      names to registry CSV paths (delegates to ``SeedEnsemble.from_registry()``).
-    - ``predict_proba(X)``: Return per-classifier probabilities and consensus
-      probability array.
-    - ``predict_with_uncertainty(X)``: Return mean probability, standard
-      deviation, mean binary vote, confidence, and a per-classifier breakdown
-      dict.
-    - ``save(path)`` / ``load(path)``: Persist and restore via joblib (inherited
-      from :class:`~eruption_forecast.ensemble.base_ensemble.BaseEnsemble`).
-"""
-
 import os
 import json
 from typing import Self

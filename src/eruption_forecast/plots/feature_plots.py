@@ -1,22 +1,3 @@
-"""Feature importance and selection visualisation.
-
-Provides plotting functions for inspecting the tsfresh features selected during
-training, including bar charts of top features ranked by importance score and
-frequency-band contribution summaries. Supports both single-seed and batch
-(multi-seed) workflows.
-
-Key functions:
-
-- ``plot_significant_features(features_df, ...)`` — horizontal bar chart of the
-  top-N significant features for a single seed, coloured by tremor column origin
-  (RSAM, DSAR, entropy).
-- ``replot_significant_features(features_dir, ...)`` — batch replot all feature
-  importance CSVs in a directory, with optional parallel processing via ``n_jobs``.
-- ``plot_frequency_band_contribution(features_df, ...)`` — stacked bar chart showing
-  what proportion of selected features comes from each frequency band, broken down
-  by metric type (RSAM vs. DSAR vs. entropy).
-"""
-
 import os
 import re
 from typing import Any, Literal, cast

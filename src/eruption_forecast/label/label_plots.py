@@ -1,5 +1,3 @@
-"""Label distribution visualization."""
-
 import os
 from typing import Any
 

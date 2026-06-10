@@ -1,12 +1,3 @@
-"""Pipeline configuration dataclasses for the ``ForecastModel`` API.
-
-Each pipeline stage (``calculate``, ``train``, ``predict``, ``evaluate``) has
-a dedicated config section. The top-level ``ForecastConfig`` holds all
-sections and knows how to save/load itself as YAML or JSON.
-
-This module targets ``eruption_forecast.model.forecast.ForecastModel``.
-"""
-
 import os
 import json
 from typing import Any, Self, Literal
@@ -24,7 +15,7 @@ class BaseForecastConfig(BaseConfig):
     """Configuration for ``ForecastModel.__init__`` parameters.
 
     Mirrors the constructor surface of
-    :class:`eruption_forecast.model.forecast.ForecastModel` so a pipeline can
+    :class:`eruption_forecast.model.forecast_model.ForecastModel` so a pipeline can
     be reconstructed from a saved configuration file.
 
     Attributes:
@@ -206,9 +197,9 @@ class ForecastTrainConfig(BaseConfig):
     label_builder: Literal["standard", "dynamic"] = "standard"
     days_before_eruption: int | None = None
     classifiers: str | list[str] = "rf"
-    cv_strategy: Literal[
-        "shuffle", "stratified", "shuffle-stratified"
-    ] = "shuffle-stratified"
+    cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"] = (
+        "shuffle-stratified"
+    )
     cv_splits: int = 5
     scoring: str = "balanced_accuracy"
     number_of_features: int = 20

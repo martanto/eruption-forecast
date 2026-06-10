@@ -1,28 +1,3 @@
-"""Evaluation of pre-trained ensemble models on labeled seismic data.
-
-Provides :class:`EvaluationModel`, the final stage of the
-**Training → Prediction → Evaluate** pipeline.  It evaluates an already-trained
-``ClassifierEnsemble`` against ground-truth labels **without re-extracting
-features or re-fitting any model**.
-
-Two operating modes:
-
-- **Training reuse** (``model`` is a ``TrainingModel``): features, the loaded
-  ``ClassifierEnsemble``, the window grid, and ground-truth labels are taken
-  directly from the training stage.  ``eruption_dates`` is not required.
-- **Prediction reuse** (``model`` is a ``PredictionModel``): features, the
-  loaded ``ClassifierEnsemble``, and the window grid are taken from the
-  prediction stage.  ``eruption_dates`` is required so that true labels can be
-  built on the prediction window grid.
-
-The constructor expects a live ``TrainingModel`` or ``PredictionModel``
-instance.  Use :meth:`EvaluationModel.from_file` to construct an instance from
-a saved ``.pkl`` produced by ``TrainingModel.save()`` or
-``PredictionModel.save()``.  Output artefacts are written to
-``{output_dir}/evaluation/{kind}/`` so that training-window and
-prediction-window results never share the same directory.
-"""
-
 import os
 from typing import Self, Literal
 
@@ -35,9 +10,9 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
-from eruption_forecast.ensemble.new_metrics_ensemble import MetricsEnsemble
 
 
 class EvaluationModel(BaseModel):
@@ -467,11 +442,11 @@ class EvaluationModel(BaseModel):
         """Evaluate every seed model against the true labels and aggregate.
 
         Delegates the per-seed metric loop to
-        :class:`~eruption_forecast.ensemble.new_metrics_ensemble.MetricsEnsemble`,
+        :class:`~eruption_forecast.ensemble.metrics_ensemble.MetricsEnsemble`,
         which computes ``(n_samples, n_seeds)`` ``y_proba`` / ``y_pred``
         matrices once per classifier, persists them as
         ``{classifiers_dir}/{classifier}/predictions/{y_proba,y_pred,y_true}.csv``,
-        and runs :class:`MetricsComputer` per seed to produce a per-classifier
+        and computes per-seed classification metrics to produce a per-classifier
         ``DataFrame`` of seed-level metrics that is assigned to
         ``self.metrics``.  Re-calling :meth:`evaluate` on the same instance
         reuses the cached in-memory :class:`MetricsEnsemble` and skips the
@@ -546,8 +521,10 @@ class EvaluationModel(BaseModel):
             if self.verbose:
                 logger.info("Comparing classifier ...")
             self.comparator = self.compare()
-            self.comparator.get_ranking()
-            self.comparator.plot_all()
+
+            if self.comparator:
+                self.comparator.get_ranking()
+                self.comparator.plot_all()
 
         self.metrics = me.metrics
         return me.metrics

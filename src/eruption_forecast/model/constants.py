@@ -1,12 +1,3 @@
-"""Default hyperparameter grids for all supported classifiers.
-
-This module defines ``DEFAULT_GRID_PARAMS``, a mapping from classifier
-short-names to hyperparameter search grids compatible with
-``sklearn.model_selection.GridSearchCV``.  Each entry covers a curated
-range of values that balance search breadth with computational cost and
-are tuned for imbalanced volcanic-eruption datasets.
-"""
-
 from typing import Any
 
 from sklearn.metrics import f1_score, make_scorer, recall_score
@@ -49,9 +40,6 @@ def safe_f1_weighted(y_true, y_pred, **kwargs) -> float:
     """
     return f1_score(y_true, y_pred, average="weighted", zero_division=0, **kwargs)
 
-
-GPU_CLASSIFIERS = {"xgb", "voting"}
-"""Use GPU if classifier is either one of these"""
 
 # Module-level callables are picklable by loky workers (unlike lambdas or
 # make_scorer objects built inside __init__).

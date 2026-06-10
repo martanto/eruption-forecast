@@ -146,7 +146,7 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     Args:
         data (Any): Object to persist. Pass a ``pd.DataFrame`` with
             ``filetype="csv"``; pass any joblib-serialisable object
-            (e.g. ``shap.Explanation``) with ``filetype="pkl"``.
+            with ``filetype="pkl"``.
         path (str): Destination path WITHOUT a file extension.
         filetype (str): File extension without a leading dot, also
             determines the serialisation method. Defaults to ``"csv"``.

@@ -1,25 +1,3 @@
-"""Eruption probability forecast visualisation with multi-classifier panels.
-
-Renders the output of ``ModelPredictor.predict_proba()`` as time-series charts
-showing per-classifier eruption probability, uncertainty bands, and consensus
-statistics. Eruption event dates are marked with vertical lines when provided.
-
-Key functions:
-
-- ``plot_forecast(df, ...)`` — main entry point; creates one subplot panel per
-  classifier present in the DataFrame plus a consensus panel at the bottom.
-  Shades uncertainty envelopes and draws a horizontal probability threshold line.
-  Accepts an optional list of eruption dates to annotate.
-- ``plot_forecast_from_file(csv_path, ...)`` — convenience wrapper that loads a
-  forecast CSV produced by ``ModelPredictor`` and delegates to ``plot_forecast``.
-
-Internal helpers (not exported):
-
-- ``_ax_per_classifier`` — renders a single classifier panel onto a given ``Axes``.
-- ``_ax_forecast`` — renders the consensus probability panel.
-- ``_ax_eruption`` — adds vertical eruption-event annotations to any ``Axes``.
-"""
-
 from typing import Any
 from datetime import datetime
 

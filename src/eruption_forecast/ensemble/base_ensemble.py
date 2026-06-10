@@ -1,10 +1,3 @@
-"""BaseEnsemble: shared save/load logic for ensemble classes.
-
-Provides :class:`BaseEnsemble`, a mixin that implements ``save`` and ``load``
-via joblib so that :class:`SeedEnsemble` and :class:`ClassifierEnsemble` do not
-duplicate the persistence boilerplate.
-"""
-
 import os
 from typing import Self
 

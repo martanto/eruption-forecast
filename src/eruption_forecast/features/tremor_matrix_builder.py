@@ -71,7 +71,6 @@ class TremorMatrixBuilder:
         overwrite (bool, optional): Overwrite existing output files.
             Defaults to False.
         verbose (bool, optional): Enable verbose logging. Defaults to False.
-        debug (bool, optional): Enable debug mode. Defaults to False.
 
     Raises:
         TypeError: If tremor_df or label_df index is not a DatetimeIndex.
