@@ -434,8 +434,8 @@ class EvaluationModel(BaseModel):
 
     def evaluate(
         self,
-        plot_per_seed: bool = False,
         plot_aggregate: bool = True,
+        plot_per_seed: bool = False,
         plot_shap: bool = False,
         compare_classifiers: bool = True,
     ) -> dict[str, pd.DataFrame]:
@@ -502,10 +502,10 @@ class EvaluationModel(BaseModel):
                 "before being passed to EvaluationModel."
             )
 
-        # TODO: Per seed plot and plot SHAP
-        if plot_per_seed or plot_shap:
+        # TODO: Plot SHAP
+        if plot_shap:
             logger.warning(
-                "plot_per_seed/plot_shap are not yet supported by the "
+                "plot_shap are not yet supported by the "
                 "MetricsEnsemble-backed evaluate(). The per-seed prediction "
                 "matrices are now persisted under "
                 "{classifiers_dir}/{classifier}/predictions/ — a follow-up "
@@ -516,6 +516,9 @@ class EvaluationModel(BaseModel):
 
         if plot_aggregate:
             me.plot_aggregate()
+
+        if plot_per_seed:
+            me.plot_seed()
 
         if compare_classifiers:
             if self.verbose:

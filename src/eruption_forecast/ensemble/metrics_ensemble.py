@@ -43,6 +43,10 @@ class MetricsEnsemble:
         classifiers_dir (str): ``{output_dir}/classifiers`` —
             per-classifier artefact root.
         n_jobs (int): Outer joblib worker count.
+        overwrite (bool): When ``True``, regenerate per-seed and aggregate
+            plot artefacts even if the destination files already exist.
+            When ``False``, existing ``.png`` (and ``.csv`` for aggregate
+            plots) outputs are kept and the render call is short-circuited.
         verbose (bool): When ``True``, emits progress logs.
         metrics (dict[str, pd.DataFrame]): Per-classifier per-seed
             metric tables, keyed by classifier name. Populated by
@@ -76,6 +80,7 @@ class MetricsEnsemble:
         kind: Literal["prediction", "training"] = "prediction",
         output_dir: str | None = None,
         root_dir: str | None = None,
+        overwrite: bool = False,
         n_jobs: int = 1,
         verbose: bool = False,
     ):
@@ -99,6 +104,11 @@ class MetricsEnsemble:
             root_dir (str | None, optional): Project root used to
                 resolve ``output_dir`` when no explicit path is given.
                 Defaults to ``None``.
+            overwrite (bool, optional): When ``True``, force-regenerate
+                per-seed and aggregate plot artefacts even when the
+                target files already exist; when ``False``, existing
+                ``.png`` (and ``.csv`` for aggregate plots) outputs are
+                kept and rendering is skipped. Defaults to ``False``.
             n_jobs (int, optional): Outer joblib worker count for the
                 metric and plot loops. Defaults to ``1``.
             verbose (bool, optional): When ``True``, emits progress
@@ -120,6 +130,7 @@ class MetricsEnsemble:
         self.n_jobs = n_jobs
         self.output_dir = output_dir
         self.classifiers_dir = os.path.join(output_dir, "classifiers")
+        self.overwrite = overwrite
         self.verbose = verbose
 
         self.metrics: dict[str, pd.DataFrame] = {}
@@ -295,7 +306,7 @@ class MetricsEnsemble:
 
         return self
 
-    def plot(
+    def plot_seed(
         self,
         include_plots: list[str] | None = None,
         exclude_plots: list[str] | None = None,
@@ -318,7 +329,7 @@ class MetricsEnsemble:
 
         Example:
             >>> me = MetricsEnsemble.from_file(...)
-            >>> me.plot(include_plots=["roc_curve", "confusion_matrix"])
+            >>> me.plot_seed(include_plots=["roc_curve", "confusion_matrix"])
         """
         if len(self.y_probas) == 0:
             self.compute()
@@ -329,7 +340,7 @@ class MetricsEnsemble:
         if exclude_plots:
             plots = [name for name in plots if name not in exclude_plots]
 
-        return self._plot_jobs(plots)
+        return self._plot_seed_jobs(plots)
 
     def plot_aggregate(
         self,
@@ -409,7 +420,7 @@ class MetricsEnsemble:
 
         return path
 
-    def _plot_jobs(self, plots: list[str]) -> list[str]:
+    def _plot_seed_jobs(self, plots: list[str]) -> list[str]:
         """Render the requested per-seed plots in parallel.
 
         Builds a flat list of ``(classifier_name, seed_idx, plot_name)`` jobs
@@ -438,6 +449,7 @@ class MetricsEnsemble:
                 y_true=self.y_true,
                 y_proba=self.y_probas[classifier_name][:, seed_idx],
                 output_dir=self.classifiers_dir,
+                overwrite=self.overwrite,
                 verbose=self.verbose,
             )
             for classifier_name, seed_idx, plot_name in jobs
@@ -468,6 +480,7 @@ class MetricsEnsemble:
                 y_true=self.y_true,
                 y_probas=self.y_probas[cls],
                 output_dir=self.classifiers_dir,
+                overwrite=self.overwrite,
                 verbose=self.verbose,
             )
             for cls, name in jobs

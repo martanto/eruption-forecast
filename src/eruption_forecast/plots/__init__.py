@@ -31,14 +31,10 @@ from eruption_forecast.plots.forecast_plots import (
 # Evaluation plotting
 from eruption_forecast.plots.evaluation_plots import (
     plot_roc_curve,
-    plot_calibration,
-    plot_learning_curve,
-    plot_seed_stability,
     plot_confusion_matrix,
     plot_feature_importance,
     plot_threshold_analysis,
     plot_precision_recall_curve,
-    plot_aggregate_learning_curve,
 )
 
 
@@ -63,10 +59,6 @@ __all__ = [
     "plot_precision_recall_curve",
     "plot_threshold_analysis",
     "plot_feature_importance",
-    "plot_calibration",
-    "plot_seed_stability",
-    "plot_learning_curve",
-    "plot_aggregate_learning_curve",
     # Forecast plotting
     "plot_forecast",
     "plot_forecast_from_file",
