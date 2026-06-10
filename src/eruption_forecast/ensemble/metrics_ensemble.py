@@ -20,6 +20,54 @@ from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 class MetricsEnsemble:
+    """Per-seed metric engine over a fitted ``ClassifierEnsemble``.
+
+    Wraps a trained ``ClassifierEnsemble`` with the feature matrix and
+    ground-truth labels needed to compute, persist, and plot per-seed
+    metrics. :meth:`compute` materialises the ``(n_samples, n_seeds)``
+    probability and prediction matrices for every classifier and writes
+    the per-classifier CSV artefacts under :attr:`classifiers_dir`;
+    downstream plotting methods reuse the cached arrays in memory.
+
+    Attributes:
+        ClassifierEnsemble (ClassifierEnsemble): Fitted ensemble whose
+            per-classifier ``SeedEnsemble`` instances drive the metric
+            loop.
+        features_df (pd.DataFrame): Feature matrix aligned with
+            :attr:`y_true`. Shape ``(n_samples, n_features)``.
+        y_true (np.ndarray): Ground-truth binary labels of length
+            ``n_samples``.
+        kind (Literal["prediction", "training"]): Reuse mode. Drives
+            the default ``output_dir`` subpath.
+        output_dir (str): Resolved evaluation root for this instance.
+        classifiers_dir (str): ``{output_dir}/classifiers`` —
+            per-classifier artefact root.
+        n_jobs (int): Outer joblib worker count.
+        verbose (bool): When ``True``, emits progress logs.
+        metrics (dict[str, pd.DataFrame]): Per-classifier per-seed
+            metric tables, keyed by classifier name. Populated by
+            :meth:`compute`.
+        y_probas (dict[str, np.ndarray]): Per-classifier
+            ``(n_samples, n_seeds)`` probability matrices. Populated by
+            :meth:`compute`.
+        y_preds (dict[str, np.ndarray]): Per-classifier
+            ``(n_samples, n_seeds)`` thresholded prediction matrices.
+            Populated by :meth:`compute`.
+
+    Example:
+        >>> from eruption_forecast.ensemble.metrics_ensemble import (
+        ...     MetricsEnsemble,
+        ... )
+        >>> me = MetricsEnsemble.from_file(
+        ...     model_filepath="output/VG.OJN.00.EHZ/ClassifierEnsemble.json",
+        ...     features_csv="output/VG.OJN.00.EHZ/features.csv",
+        ...     features_label_csv="output/VG.OJN.00.EHZ/labels.csv",
+        ...     eruption_dates=["2025-03-20"],
+        ...     n_jobs=4,
+        ... )
+        >>> me.compute().plot_aggregate()
+    """
+
     def __init__(
         self,
         classifier_ensemble: ClassifierEnsemble,
@@ -31,6 +79,31 @@ class MetricsEnsemble:
         n_jobs: int = 1,
         verbose: bool = False,
     ):
+        """Bind a fitted ensemble to the data needed to score it.
+
+        Args:
+            classifier_ensemble (ClassifierEnsemble): Fitted ensemble
+                whose per-classifier ``SeedEnsemble`` instances drive
+                the metric loop.
+            features_df (pd.DataFrame): Feature matrix aligned with
+                ``y_true``. Shape ``(n_samples, n_features)``.
+            y_true (pd.Series | np.ndarray): Ground-truth binary labels.
+                ``pd.Series`` inputs are converted to ``np.ndarray``.
+            kind (Literal["prediction", "training"], optional): Reuse
+                mode used to derive the default ``output_dir`` subpath.
+                Defaults to ``"prediction"``.
+            output_dir (str | None, optional): Explicit evaluation root.
+                When ``None``, resolves to
+                ``{root_dir}/output/evaluation/{kind}``. Defaults to
+                ``None``.
+            root_dir (str | None, optional): Project root used to
+                resolve ``output_dir`` when no explicit path is given.
+                Defaults to ``None``.
+            n_jobs (int, optional): Outer joblib worker count for the
+                metric and plot loops. Defaults to ``1``.
+            verbose (bool, optional): When ``True``, emits progress
+                logs. Defaults to ``False``.
+        """
         output_dir = resolve_output_dir(
             output_dir=output_dir,
             root_dir=root_dir,
@@ -66,6 +139,52 @@ class MetricsEnsemble:
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> "MetricsEnsemble":
+        """Construct a ``MetricsEnsemble`` from on-disk artefacts.
+
+        Loads a serialised ``ClassifierEnsemble`` together with the
+        feature matrix and the label CSV needed to derive ``y_true``,
+        then forwards everything to the standard constructor.
+
+        Args:
+            model_filepath (str): Path to a ``ClassifierEnsemble``
+                artefact — ``.json``, ``.pkl``, or a trained-model
+                registry CSV — accepted by
+                :meth:`ClassifierEnsemble.from_any`.
+            features_csv (str): Path to the feature matrix CSV used for
+                scoring. The first column is treated as the index.
+            features_label_csv (str): Path to the label CSV consumed by
+                :func:`build_y_true` to derive the binary ground truth.
+            eruption_dates (list[str] | list[datetime]): Eruption dates
+                forwarded to :func:`build_y_true` to mark positive
+                samples.
+            kind (Literal["prediction", "training"], optional): Reuse
+                mode. Defaults to ``"prediction"``.
+            output_dir (str | None, optional): Explicit evaluation
+                root. Defaults to ``None``.
+            root_dir (str | None, optional): Project root used to
+                resolve ``output_dir`` when no explicit path is given.
+                Defaults to ``None``.
+            n_jobs (int, optional): Outer joblib worker count. Defaults
+                to ``1``.
+            verbose (bool, optional): When ``True``, emits progress
+                logs. Defaults to ``False``.
+
+        Returns:
+            MetricsEnsemble: A fresh instance ready for :meth:`compute`.
+
+        Raises:
+            FileNotFoundError: If ``model_filepath``, ``features_csv``,
+                or ``features_label_csv`` does not exist.
+
+        Example:
+            >>> me = MetricsEnsemble.from_file(
+            ...     model_filepath="output/VG.OJN.00.EHZ/ClassifierEnsemble.json",
+            ...     features_csv="output/VG.OJN.00.EHZ/features.csv",
+            ...     features_label_csv="output/VG.OJN.00.EHZ/labels.csv",
+            ...     eruption_dates=["2025-03-20"],
+            ... )
+            >>> me.compute()
+        """
         for label, path in (
             ("Model Filepath", model_filepath),
             ("Features CSV", features_csv),
@@ -106,6 +225,11 @@ class MetricsEnsemble:
 
         Returns:
             str: The absolute path the instance was written to.
+
+        Example:
+            >>> me = MetricsEnsemble.from_file(...).compute()
+            >>> me.save()
+            '.../output/evaluation/prediction/MetricsEnsemble.pkl'
         """
         if path is None:
             os.makedirs(self.output_dir, exist_ok=True)
@@ -134,6 +258,12 @@ class MetricsEnsemble:
         Raises:
             FileNotFoundError: If ``path`` does not exist.
             TypeError: If the loaded object is not a ``MetricsEnsemble``.
+
+        Example:
+            >>> me = MetricsEnsemble.load(
+            ...     "output/evaluation/prediction/MetricsEnsemble.pkl"
+            ... )
+            >>> me.plot_aggregate()
         """
         if not os.path.isfile(path):
             raise FileNotFoundError(f"MetricsEnsemble file not found: {path}")
@@ -146,6 +276,28 @@ class MetricsEnsemble:
         return obj
 
     def compute(self) -> Self:
+        """Materialise per-seed metrics and probability matrices.
+
+        Aligns :attr:`features_df` and :attr:`y_true` on their shared
+        index, dispatches the per-classifier metric loop to
+        :meth:`_compute_job`, and writes per-classifier ``y_proba`` /
+        ``y_pred`` CSVs via :meth:`_persist_predictions`. Idempotent —
+        once :attr:`y_probas` is populated, subsequent calls return
+        without recomputing.
+
+        Returns:
+            Self: This instance, with :attr:`metrics`, :attr:`y_probas`,
+                and :attr:`y_preds` populated.
+
+        Raises:
+            ValueError: If :attr:`features_df` and the index-aligned
+                ``y_true`` share no common index entries.
+
+        Example:
+            >>> me = MetricsEnsemble.from_file(...)
+            >>> me.compute()
+            >>> me.metrics["rf"].head()
+        """
         if self.y_probas:
             if self.verbose:
                 logger.info(
@@ -197,6 +349,10 @@ class MetricsEnsemble:
 
         Returns:
             list[str]: Saved figure filepath stems, one per executed job.
+
+        Example:
+            >>> me = MetricsEnsemble.from_file(...)
+            >>> me.plot(include_plots=["roc_curve", "confusion_matrix"])
         """
         if len(self.y_probas) == 0:
             self.compute()
@@ -270,6 +426,10 @@ class MetricsEnsemble:
             list[str]: Saved figure filepath stems, one per executed job.
                 The ``.png`` figure and the ``.csv`` data table share each
                 stem.
+
+        Example:
+            >>> me = MetricsEnsemble.from_file(...)
+            >>> me.plot_aggregate(exclude_plots=["calibration_curve"])
         """
         if len(self.y_probas) == 0:
             self.compute()
