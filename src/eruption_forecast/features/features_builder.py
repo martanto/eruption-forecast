@@ -228,6 +228,69 @@ class FeaturesBuilder:
         if debug:
             logger.info("⚠️ Debug mode is ON")
 
+    @staticmethod
+    def _initialize_feature_parameters() -> tuple[ComprehensiveFCParameters, set[str]]:
+        """Initialize tsfresh feature extraction parameters with defaults.
+
+        Sets up default feature calculators from tsfresh's ComprehensiveFCParameters
+        and defines a set of features to exclude from calculation based on
+        DEFAULT_EXCLUDE_FEATURES constant.
+
+        Returns:
+            tuple[ComprehensiveFCParameters, set[str]]: A tuple containing:
+                - default_fc_parameters: tsfresh's comprehensive feature calculators
+                - excludes_features: Set of feature names to exclude from extraction
+
+        Examples:
+            >>> fc_params, excludes = FeaturesBuilder._initialize_feature_parameters()
+            >>> print(type(fc_params))
+            <class 'tsfresh.feature_extraction.settings.ComprehensiveFCParameters'>
+            >>> print('length' in excludes)
+            True
+        """
+        default_fc_parameters = ComprehensiveFCParameters()
+        excludes_features: set[str] = set(DEFAULT_EXCLUDE_FEATURES)
+
+        return default_fc_parameters, excludes_features
+
+    @staticmethod
+    def _prepare_prediction_mode(
+        tremor_matrix_df: pd.DataFrame,
+    ) -> tuple[str, pd.DataFrame]:
+        """Compute date range from tremor datetimes for prediction mode (no labels).
+
+        Extracts the date range from the tremor matrix's 'datetime' column when
+        no labels are provided. This mode is used for future predictions where
+        eruption labels are not yet available.
+
+        Args:
+            tremor_matrix_df (pd.DataFrame): Tremor matrix whose 'datetime'
+                column is used to derive the date range.
+
+        Returns:
+            tuple[str, pd.DataFrame]: A tuple containing:
+                - dates_str (str): Date range string in format "YYYY-MM-DD-YYYY-MM-DD"
+                - empty_df (pd.DataFrame): Empty DataFrame (no labels available)
+
+        Examples:
+            >>> builder = FeaturesBuilder(tremor_matrix_df, label_df=None)
+            >>> dates_str, empty_labels = builder._prepare_prediction_mode(tremor_matrix_df)
+            >>> print(dates_str)
+            '2025-04-01-2025-04-30'
+            >>> print(empty_labels.empty)
+            True
+        """
+        if not isinstance(tremor_matrix_df[DATETIME_COLUMN], pd.Timestamp):
+            tremor_matrix_df[DATETIME_COLUMN] = pd.to_datetime(
+                tremor_matrix_df[DATETIME_COLUMN]
+            )
+
+        tremor_dates = tremor_matrix_df[DATETIME_COLUMN].sort_values().unique().tolist()
+        start_date_str = tremor_dates[0].strftime("%Y-%m-%d")
+        end_date_str = tremor_dates[-1].strftime("%Y-%m-%d")
+        dates_str = f"{start_date_str}-{end_date_str}"
+        return dates_str, pd.DataFrame()
+
     def validate(self) -> None:
         """Validate input DataFrame types and required column presence.
 
@@ -536,69 +599,6 @@ class FeaturesBuilder:
         )
 
         return self.df
-
-    @staticmethod
-    def _initialize_feature_parameters() -> tuple[ComprehensiveFCParameters, set[str]]:
-        """Initialize tsfresh feature extraction parameters with defaults.
-
-        Sets up default feature calculators from tsfresh's ComprehensiveFCParameters
-        and defines a set of features to exclude from calculation based on
-        DEFAULT_EXCLUDE_FEATURES constant.
-
-        Returns:
-            tuple[ComprehensiveFCParameters, set[str]]: A tuple containing:
-                - default_fc_parameters: tsfresh's comprehensive feature calculators
-                - excludes_features: Set of feature names to exclude from extraction
-
-        Examples:
-            >>> fc_params, excludes = FeaturesBuilder._initialize_feature_parameters()
-            >>> print(type(fc_params))
-            <class 'tsfresh.feature_extraction.settings.ComprehensiveFCParameters'>
-            >>> print('length' in excludes)
-            True
-        """
-        default_fc_parameters = ComprehensiveFCParameters()
-        excludes_features: set[str] = set(DEFAULT_EXCLUDE_FEATURES)
-
-        return default_fc_parameters, excludes_features
-
-    @staticmethod
-    def _prepare_prediction_mode(
-        tremor_matrix_df: pd.DataFrame,
-    ) -> tuple[str, pd.DataFrame]:
-        """Compute date range from tremor datetimes for prediction mode (no labels).
-
-        Extracts the date range from the tremor matrix's 'datetime' column when
-        no labels are provided. This mode is used for future predictions where
-        eruption labels are not yet available.
-
-        Args:
-            tremor_matrix_df (pd.DataFrame): Tremor matrix whose 'datetime'
-                column is used to derive the date range.
-
-        Returns:
-            tuple[str, pd.DataFrame]: A tuple containing:
-                - dates_str (str): Date range string in format "YYYY-MM-DD-YYYY-MM-DD"
-                - empty_df (pd.DataFrame): Empty DataFrame (no labels available)
-
-        Examples:
-            >>> builder = FeaturesBuilder(tremor_matrix_df, label_df=None)
-            >>> dates_str, empty_labels = builder._prepare_prediction_mode(tremor_matrix_df)
-            >>> print(dates_str)
-            '2025-04-01-2025-04-30'
-            >>> print(empty_labels.empty)
-            True
-        """
-        if not isinstance(tremor_matrix_df[DATETIME_COLUMN], pd.Timestamp):
-            tremor_matrix_df[DATETIME_COLUMN] = pd.to_datetime(
-                tremor_matrix_df[DATETIME_COLUMN]
-            )
-
-        tremor_dates = tremor_matrix_df[DATETIME_COLUMN].sort_values().unique().tolist()
-        start_date_str = tremor_dates[0].strftime("%Y-%m-%d")
-        end_date_str = tremor_dates[-1].strftime("%Y-%m-%d")
-        dates_str = f"{start_date_str}-{end_date_str}"
-        return dates_str, pd.DataFrame()
 
     def _prepare_extraction_parameters(
         self,
