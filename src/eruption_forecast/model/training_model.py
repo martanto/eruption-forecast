@@ -17,7 +17,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
     resample,
     grid_search_cv,
-    save_model_csv,
+    save_model_json,
     get_classifier_models,
 )
 from eruption_forecast.utils.dataframe import (
@@ -44,7 +44,8 @@ class TrainingModel(BaseModel, CacheModel):
     Orchestrates the full training pipeline: label building, tremor matrix
     construction, tsfresh feature extraction, per-seed resampling and feature
     selection, and parallel GridSearchCV model fitting. Trained models and a
-    model registry CSV are written to the configured output directory.
+    per-classifier trained-model JSON registry are written to the configured
+    output directory.
 
     Args:
         tremor_data (str | pd.DataFrame): Path to a tremor CSV file or a
@@ -937,8 +938,10 @@ class TrainingModel(BaseModel, CacheModel):
         For each seed, resamples the extracted features, selects the top-N
         features, and fits every configured classifier via ``GridSearchCV``.
         Existing feature and model files are reused unless ``overwrite=True``.
-        Populates ``self.results`` with the registry CSV path for each classifier
-        and ``self.features_selected_df`` with the aggregated top-N feature
+        Populates ``self.results`` with the trained-model JSON registry path
+        for each classifier (written by
+        :func:`~eruption_forecast.utils.ml.save_model_json`) and
+        ``self.features_selected_df`` with the aggregated top-N feature
         importance DataFrame.
 
         Args:
@@ -975,7 +978,7 @@ class TrainingModel(BaseModel, CacheModel):
             >>> model.build_label(window_step=6, window_step_unit="hours")
             >>> model.extract_features()
             >>> model.fit(seeds=25, resample_method="auto", plot_features=True)
-            >>> model.results  # {"RandomForestClassifier": "path/to/trained_model_*.csv"}
+            >>> model.results  # {"RandomForestClassifier": "path/to/trained-model__*.json"}
         """
         if self.features_df.empty and self.features_csv is None:
             raise ValueError(
@@ -1068,7 +1071,13 @@ class TrainingModel(BaseModel, CacheModel):
             if result is None:
                 continue
 
-            classifier_slug, _random_state, features_seed_path, model_seed_path = result
+            (
+                classifier_slug,
+                _random_state,
+                features_seed_path,
+                model_seed_path,
+                top_n_features,
+            ) = result
 
             if classifier_slug not in records_per_classifier:
                 records_per_classifier[classifier_slug] = []
@@ -1079,7 +1088,7 @@ class TrainingModel(BaseModel, CacheModel):
             records_per_classifier[classifier_slug].append(
                 {
                     "random_state": _random_state,
-                    "features_csv": features_seed_path,
+                    "features": top_n_features,
                     "model_filepath": model_seed_path,
                 }
             )
@@ -1122,7 +1131,7 @@ class TrainingModel(BaseModel, CacheModel):
             if not records_per_classifier[classifier_slug]:
                 continue
 
-            trained_model_csv = save_model_csv(
+            trained_model_json = save_model_json(
                 seeds=seeds,
                 records=records_per_classifier[classifier_slug],
                 classifier_dir=self.classifier_dirs[classifier_slug],
@@ -1135,13 +1144,13 @@ class TrainingModel(BaseModel, CacheModel):
             seed_ensemble_path, seed_ensemble = self.build_seed_ensemble(
                 output_dir=self.classifier_dirs[classifier_slug],
                 classifier_name=classifier_model.name,
-                registry_csv=trained_model_csv,
+                registry_path=trained_model_json,
                 verbose=self.verbose,
             )
 
             seed_ensembles[classifier_model.name] = seed_ensemble
             self.seed_ensembles[classifier_model.name] = seed_ensemble_path
-            self.results[classifier_model.name] = trained_model_csv
+            self.results[classifier_model.name] = trained_model_json
 
         filename = f"ClassifierEnsemble_{cv_name}"
         if self.results:
@@ -1201,24 +1210,27 @@ class TrainingModel(BaseModel, CacheModel):
     def build_seed_ensemble(
         output_dir: str,
         classifier_name: str,
-        registry_csv: str,
+        registry_path: str,
         verbose: bool = False,
     ) -> tuple[str, SeedEnsemble]:
-        """Build and save a SeedEnsemble from a trained-model registry CSV.
+        """Build and save a SeedEnsemble from a trained-model registry.
 
-        Loads all per-seed model paths from ``registry_csv`` via
-        :meth:`SeedEnsemble.from_registry`, saves the ensemble to
+        Loads all per-seed model paths from ``registry_path`` via
+        :meth:`SeedEnsemble.from_any` (dispatches on extension — ``.json`` for
+        the new inline-features registry, ``.csv`` for the legacy registry),
+        saves the ensemble to
         ``{output_dir}/SeedEnsemble_{classifier_name}.pkl``, and returns both
-        the path and the in-memory object so the caller can pass it directly to
-        :meth:`build_classifier_ensemble` without a disk reload.
+        the path and the in-memory object so the caller can pass it directly
+        to :meth:`build_classifier_ensemble` without a disk reload.
 
         Args:
             output_dir (str): Directory where ``SeedEnsemble_{classifier_name}.pkl``
                 is written.
             classifier_name (str): Human-readable classifier name used as the
                 filename suffix (e.g. ``"RandomForestClassifier"``).
-            registry_csv (str): Path to the ``trained_model_*.csv`` registry
-                produced by :func:`~eruption_forecast.utils.ml.save_model_csv`.
+            registry_path (str): Path to the trained-model registry produced by
+                :func:`~eruption_forecast.utils.ml.save_model_json` (``.json``)
+                or the legacy CSV writer (``.csv``).
             verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
 
         Returns:
@@ -1230,16 +1242,17 @@ class TrainingModel(BaseModel, CacheModel):
             >>> path, ensemble = TrainingModel.build_seed_ensemble(
             ...     output_dir="training/classifiers",
             ...     classifier_name="RandomForestClassifier",
-            ...     registry_csv="training/classifiers/trained_model_rf.csv",
+            ...     registry_path="training/classifiers/trained-model__rf.json",
             ... )
         """
-        # Example registry_csv filename:
-        # trained-model__XGBClassifier_StratifiedShuffleSplit_seeds-25_features-20.csv
-        suffix = os.path.basename(registry_csv).split(".csv")[0].split("__")[-1]
+        # Strip the extension and split on the ``__`` separator to recover the
+        # ``{Classifier}_{CV}_seeds-{N}_features-{K}`` suffix used by the
+        # ensemble filename.
+        suffix = os.path.splitext(os.path.basename(registry_path))[0].split("__")[-1]
 
         filepath = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
-        seed_ensemble = SeedEnsemble.from_registry(
-            registry_csv, classifier_name=classifier_name, verbose=verbose
+        seed_ensemble = SeedEnsemble.from_any(
+            registry_path, classifier_name=classifier_name, verbose=verbose
         )
         seed_ensemble.save(filepath)
         return filepath, seed_ensemble
@@ -1365,10 +1378,13 @@ class TrainingModel(BaseModel, CacheModel):
                 e.g. ``"random-forest-classifier"``.
 
         Returns:
-            tuple | None: A four-element tuple
+            tuple | None: A five-element tuple
                 ``(classifier_slug, random_state, features_seed_path,
-                model_seed_path)`` on success, or ``None`` when the feature
-                file is missing or contains no features.
+                model_seed_path, top_n_features)`` on success, or ``None``
+                when the feature file is missing or contains no features.
+                ``top_n_features`` is the inline list of selected column names
+                used at fit time, embedded in the trained-model JSON registry
+                by ``save_model_json``.
         """
         filename = f"{random_state:05d}"
         features_seed_path = os.path.join(self.features_seed_dir, f"{filename}.csv")
@@ -1399,7 +1415,13 @@ class TrainingModel(BaseModel, CacheModel):
             logger.info(
                 f"Seed {random_state:05d} / {classifier_slug}: model exists, skipping."
             )
-            return classifier_slug, random_state, features_seed_path, model_seed_path
+            return (
+                classifier_slug,
+                random_state,
+                features_seed_path,
+                model_seed_path,
+                top_n_features,
+            )
 
         _resampled_df = pd.read_csv(features_resampled_path, index_col=0)
         labels_resampled = _resampled_df["is_erupted"]
@@ -1424,7 +1446,13 @@ class TrainingModel(BaseModel, CacheModel):
                 f"Fitted Model {random_state:05d} / {classifier_slug} : {model_seed_path}"
             )
 
-        return classifier_slug, random_state, features_seed_path, model_seed_path
+        return (
+            classifier_slug,
+            random_state,
+            features_seed_path,
+            model_seed_path,
+            top_n_features,
+        )
 
     def _features_selection(
         self,
@@ -1588,6 +1616,9 @@ class TrainingModel(BaseModel, CacheModel):
             if can_skip:
                 existing_feature_paths.append(features_seed_path)
                 filename = f"{random_state:05d}"
+                cached_top_n_features = pd.read_csv(
+                    features_seed_path, index_col=0
+                ).index.tolist()
                 for classifier_model in self.classifier_models:
                     classifier_slug = classifier_model.slug_name
                     model_seed_path = os.path.join(
@@ -1601,7 +1632,7 @@ class TrainingModel(BaseModel, CacheModel):
                         records_per_classifier[classifier_slug].append(
                             {
                                 "random_state": random_state,
-                                "features_csv": features_seed_path,
+                                "features": cached_top_n_features,
                                 "model_filepath": model_seed_path,
                             }
                         )

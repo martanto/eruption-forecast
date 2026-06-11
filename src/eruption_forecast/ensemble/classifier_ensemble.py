@@ -28,8 +28,9 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     def __init__(self) -> None:
         """Initialise an empty ClassifierEnsemble.
 
-        Creates an empty container ready to be populated via
-        :meth:`from_seed_ensembles` or :meth:`from_registry_dict`.
+        Creates an empty container ready to be populated via one of the
+        factories — :meth:`from_any` (recommended), :meth:`from_seed_ensembles`,
+        :meth:`from_dict`, or :meth:`from_json`.
         """
         self.ensembles: dict[str, SeedEnsemble] = {}
 
@@ -88,28 +89,34 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """Load a ``ClassifierEnsemble`` from any supported model source.
 
         Normalises a ``SeedEnsemble`` object or a file path (``*.json``,
-        ``*.pkl``, or ``*.csv``) into a ``ClassifierEnsemble``.  A ``*.csv``
-        path is treated as a trained-model registry produced by
-        ``TrainingModel`` and loaded via ``SeedEnsemble.from_registry()``.
+        ``*.pkl``, or ``*.csv``) into a ``ClassifierEnsemble``. Per-classifier
+        trained-model registries (``.json`` list or ``.csv``) are routed
+        through :meth:`SeedEnsemble.from_any`, which dispatches on the file
+        extension to the appropriate loader.
 
         Args:
-            source (str | SeedEnsemble): Source to load from.  Accepted forms:
+            source (str | SeedEnsemble): Source to load from. Accepted forms:
 
                 - ``SeedEnsemble`` object — wrapped directly.
-                - ``str`` path ending in ``".json"`` — loaded via
-                  :meth:`from_json`.  ``TrainingModel.fit()`` writes this file
-                  to ``{training_dir}/ClassifierEnsemble.json``, e.g.
-                  ``output/VG.OJN.00.EHZ/training/classifier/ClassifierEnsemble_StratifiedShuffleSplit.json``.
+                - ``str`` path ending in ``".json"`` — payload type decides:
+
+                  * Top-level ``dict`` → top-level results map produced by
+                    ``TrainingModel.fit()`` at
+                    ``{training_dir}/classifier/ClassifierEnsemble_{cv}.json``;
+                    loaded via :meth:`from_json`.
+                  * Top-level ``list`` → per-classifier trained-model registry
+                    produced by
+                    :func:`~eruption_forecast.utils.ml.save_model_json`;
+                    loaded via :meth:`SeedEnsemble.from_any` and wrapped.
                 - ``str`` path ending in ``".pkl"`` — deserialised via
                   :meth:`~BaseEnsemble.load`; if the result is a
-                  ``SeedEnsemble`` it is wrapped automatically.  Examples:
+                  ``SeedEnsemble`` it is wrapped automatically. Examples:
                   ``{training_dir}/classifiers/ClassifierEnsemble.pkl`` or
                   ``{classifier_dir}/random-forest-classifier/SeedEnsemble_RandomForestClassifier.pkl``.
-                - ``str`` path ending in ``".csv"`` — registry CSV loaded via
-                  :meth:`SeedEnsemble.from_registry` then wrapped.  One value
-                  from ``TrainingModel.results``, e.g.
-                  ``{classifier_dir}/random-forest-classifier/stratified-shuffle-split/trained_model_RandomForestClassifier-StratifiedShuffleSplit_rs-0_ts-25_top-20.csv``.
-            verbose (bool, optional): Wether to show more informations.
+                - ``str`` path ending in ``".csv"`` — legacy trained-model
+                  registry CSV loaded via :meth:`SeedEnsemble.from_any` (which
+                  dispatches to the legacy CSV loader) then wrapped.
+            verbose (bool, optional): Whether to emit load progress logs.
                 Defaults to ``False``.
 
         Returns:
@@ -118,13 +125,31 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         Raises:
             ValueError: If ``source`` is a string with an unrecognised
-                extension.
+                extension or a JSON payload of an unexpected shape.
         """
         if isinstance(source, SeedEnsemble):
             return cls.from_seed_ensembles({source.classifier_name: source}, verbose)
 
         if source.endswith(".json"):
-            return cls.from_json(source)
+            if not os.path.isfile(source):
+                raise FileNotFoundError(f"JSON file not found: {source}")
+            with open(source) as f:
+                payload = json.load(f)
+
+            if isinstance(payload, dict):
+                return cls.from_dict(payload, verbose=verbose)
+
+            if isinstance(payload, list):
+                seed_ensemble = SeedEnsemble.from_any(source, verbose=verbose)
+                return cls.from_seed_ensembles(
+                    {seed_ensemble.classifier_name: seed_ensemble}, verbose
+                )
+
+            raise ValueError(
+                f"Unsupported JSON payload type in {source!r}: "
+                f"expected dict (top-level results map) or list "
+                f"(per-classifier registry), got {type(payload).__name__}."
+            )
 
         if source.endswith(".pkl"):
             loaded = cls.load(source)
@@ -135,7 +160,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             return loaded
 
         if source.endswith(".csv"):
-            seed_ensemble = SeedEnsemble.from_registry(source, verbose=verbose)
+            seed_ensemble = SeedEnsemble.from_any(source, verbose=verbose)
             return cls.from_seed_ensembles(
                 {seed_ensemble.classifier_name: seed_ensemble}
             )
@@ -154,7 +179,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         Args:
             ensembles (dict[str, SeedEnsemble]): Mapping from classifier name to
                 its already-constructed ``SeedEnsemble``.
-            verbose (bool, optional): Wether to show more informations.
+            verbose (bool, optional): Whether to emit load progress logs.
                 Defaults to ``False``.
 
         Returns:
@@ -178,16 +203,21 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         return obj
 
     @classmethod
-    def from_dict(cls, registry_csvs: dict[str, str], verbose: bool = False) -> Self:
-        """Build a ClassifierEnsemble directly from registry CSV paths.
+    def from_dict(
+        cls, trained_model_paths: dict[str, str], verbose: bool = False
+    ) -> Self:
+        """Build a ClassifierEnsemble directly from registry paths.
 
-        Calls :meth:`SeedEnsemble.from_registry` for each entry and assembles
-        the result into a :class:`ClassifierEnsemble`.
+        Calls :meth:`SeedEnsemble.from_any` for each entry, which dispatches
+        on the file extension (``.json`` for the new inline-features registry,
+        ``.csv`` for the legacy registry), and assembles the result into a
+        :class:`ClassifierEnsemble`.
 
         Args:
-            registry_csvs (dict[str, str]): Mapping from classifier name to the
-                path of its trained-model registry CSV.
-            verbose (bool, optional): Wether to show more informations.
+            trained_model_paths (dict[str, str]): Mapping from classifier name
+                to the path of its trained-model registry (``.json`` or
+                ``.csv``).
+            verbose (bool, optional): Whether to emit load progress logs.
                 Defaults to ``False``.
 
         Returns:
@@ -195,24 +225,29 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 from disk.
 
         Raises:
-            ValueError: If ``registry_csvs`` is empty.
-            FileNotFoundError: If any registry CSV path does not exist.
+            ValueError: If ``trained_model_paths`` is empty.
+            FileNotFoundError: If any registry path does not exist.
         """
-        if not registry_csvs:
-            raise ValueError("registry_csvs must not be empty.")
+        if not trained_model_paths:
+            raise ValueError("trained_model_paths must not be empty.")
         ensembles: dict[str, SeedEnsemble] = {}
-        for name, csv_path in registry_csvs.items():
-            ensembles[name] = SeedEnsemble.from_registry(csv_path)
+        for name, path in trained_model_paths.items():
+            ensembles[name] = SeedEnsemble.from_any(path, classifier_name=name)
             if verbose:
-                logger.info(f"[ClassifierEnsemble] Loaded from: {registry_csvs}")
+                logger.info(
+                    f"[ClassifierEnsemble] Loaded {name} from: {path}"
+                )
         return cls.from_seed_ensembles(ensembles)
 
     @classmethod
     def from_json(cls, json_path: str, verbose: bool = False) -> Self:
         """Build a ClassifierEnsemble from a JSON results file.
 
-        Loads the classifier-name-to-registry-CSV mapping produced by
-        ``TrainingModel.fit()`` and delegates to :meth:`from_registry_dict`.
+        Loads the classifier-name-to-registry-path mapping produced by
+        ``TrainingModel.fit()`` and delegates to :meth:`from_dict`. The
+        mapping's values may point at either the new ``.json`` trained-model
+        registry or the legacy ``.csv`` registry; both are dispatched through
+        :meth:`SeedEnsemble.from_any`.
 
         Args:
             json_path (str): Path to the ``results.json`` file written by
@@ -231,8 +266,14 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         if not os.path.isfile(json_path):
             raise FileNotFoundError(f"JSON file not found: {json_path}")
         with open(json_path) as f:
-            registry_csvs: dict[str, str] = json.load(f)
-        return cls.from_dict(registry_csvs, verbose=verbose)
+            trained_model_paths = json.load(f)
+        if not isinstance(trained_model_paths, dict):
+            raise ValueError(
+                f"Top-level results JSON must contain a "
+                f"{{classifier_name: registry_path}} mapping, got "
+                f"{type(trained_model_paths).__name__}: {json_path}"
+            )
+        return cls.from_dict(trained_model_paths, verbose=verbose)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Return consensus class probabilities across all classifiers.
@@ -276,6 +317,33 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         overwrite: bool = False,
         verbose: bool = False,
     ) -> dict[str, dict[str, np.ndarray]]:
+        """Run :meth:`SeedEnsemble.predict_with_uncertainty` for every classifier.
+
+        Loops over the registered ``SeedEnsemble`` instances and collects the
+        per-seed-aggregated probability/uncertainty/prediction/confidence
+        arrays. Used internally by :meth:`predict_proba` and
+        :meth:`predict_with_uncertainty` to build the cross-classifier consensus.
+
+        Args:
+            X (pd.DataFrame): Extracted features DataFrame with shape
+                ``(n_samples, n_features)``.
+            save (bool, optional): Forwarded to
+                :meth:`SeedEnsemble.predict_with_uncertainty`. When ``True``,
+                per-seed CSVs land under ``{output_dir}/{classifier_name}/``.
+                Defaults to ``False``.
+            output_dir (str | None, optional): Base directory for per-seed
+                output. Required when ``save`` is ``True``. Defaults to ``None``.
+            overwrite (bool, optional): Overwrite existing per-seed files.
+                Defaults to ``False``.
+            verbose (bool, optional): Log per-classifier progress. Defaults to
+                ``False``.
+
+        Returns:
+            dict[str, dict[str, np.ndarray]]: Mapping from classifier name to a
+                dict with keys ``"probability"``, ``"uncertainty"``,
+                ``"prediction"``, and ``"confidence"`` — each a 1-D
+                ``np.ndarray`` of shape ``(n_samples,)``.
+        """
         clf_results: dict[str, dict[str, np.ndarray]] = {}
         for classifier_name, seed_ensemble in self.ensembles.items():
             clf_output_dir = (
@@ -341,21 +409,24 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 Defaults to ``False``.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict]: A 5-tuple:
+            dict[str, np.ndarray]: Flat mapping ready to be wrapped in a
+                ``pd.DataFrame`` (one ndarray of shape ``(n_samples,)`` per
+                key). Contains four cross-classifier consensus columns:
 
-                - ``consensus_probability`` (np.ndarray): Shape ``(n_samples,)`` —
-                  mean P(eruption) averaged across all classifiers.
-                - ``consensus_uncertainty`` (np.ndarray): Shape ``(n_samples,)`` —
-                  std of per-classifier mean probabilities (inter-classifier
-                  uncertainty).
-                - ``consensus_prediction`` (np.ndarray): Shape ``(n_samples,)`` —
-                  mean of per-classifier binary votes (continuous, ``[0, 1]``).
-                - ``consensus_confidence`` (np.ndarray): Shape ``(n_samples,)`` —
-                  CI-like metric: ``1.96 * sqrt(p * (1 - p) / n_classifiers)``.
-                - ``per_classifier_results`` (dict): Mapping from classifier name to
-                  a dict with keys ``"probability"``, ``"uncertainty"``,
-                  ``"prediction"``, ``"confidence"`` — each a 1-D ``np.ndarray``
-                  of shape ``(n_samples,)``.
+                - ``"consensus_probability"`` — mean P(eruption) averaged across
+                  all classifiers.
+                - ``"consensus_uncertainty"`` — std of per-classifier mean
+                  probabilities (inter-classifier uncertainty).
+                - ``"consensus_prediction"`` — mean of per-classifier binary
+                  votes (continuous, ``[0, 1]``).
+                - ``"consensus_confidence"`` — CI-like metric
+                  ``1.96 * sqrt(p * (1 - p) / n_classifiers)``.
+
+                Plus four per-classifier columns for each registered
+                classifier (``{name}`` is the classifier key):
+
+                - ``"{name}_probability"``, ``"{name}_uncertainty"``,
+                  ``"{name}_prediction"``, ``"{name}_confidence"``.
         """
         clf_results = self.predict_per_classifier(
             X, save=save, output_dir=output_dir, overwrite=overwrite, verbose=verbose
