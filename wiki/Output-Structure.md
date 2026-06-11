@@ -36,7 +36,7 @@ Every pipeline run writes under a single station directory:
 │       ├── ClassifierEnsemble_{cv-slug}.json                 # Registry of per-classifier paths
 │       └── {clf-slug}/{cv-slug}/
 │           ├── models/{seed:05d}.pkl                         # One best_estimator_ per seed
-│           ├── trained-model__{suffix}.csv                   # Per-classifier registry
+│           ├── trained-model__{suffix}.json                  # Per-classifier trained-model registry (records with inline top-N features)
 │           └── SeedEnsemble_{suffix}.pkl                     # Single-classifier SeedEnsemble
 │
 ├── prediction/                                               # PredictionModel
@@ -109,19 +109,30 @@ Inside `evaluation/`, the per-classifier folder uses the **unslugified** sklearn
 
 ## Filename Conventions
 
-Registry CSVs and ensemble pickles share a single suffix scheme:
+The trained-model registry JSON and ensemble pickle share a single suffix scheme:
 
 ```
-trained-model__{ClassifierName}_{CVName}_seeds-{N}_features-{K}.csv
+trained-model__{ClassifierName}_{CVName}_seeds-{N}_features-{K}.json
 SeedEnsemble_{ClassifierName}_{CVName}_seeds-{N}_features-{K}.pkl
 ```
 
 Example:
 
 ```
-trained-model__RandomForestClassifier_StratifiedShuffleSplit_seeds-25_features-20.csv
+trained-model__RandomForestClassifier_StratifiedShuffleSplit_seeds-25_features-20.json
 SeedEnsemble_RandomForestClassifier_StratifiedShuffleSplit_seeds-25_features-20.pkl
 ```
+
+Each `trained-model__*.json` is a list of per-seed records:
+
+```json
+[
+  {"random_state": 0, "features": ["f_0", "f_1", "..."], "model_filepath": ".../models/00000.pkl"},
+  {"random_state": 1, "features": ["..."], "model_filepath": ".../models/00001.pkl"}
+]
+```
+
+`SeedEnsemble.from_json` (or `SeedEnsemble.from_any`, which dispatches on extension) reads this file as the single source of truth for the seed bundle. The legacy `.csv` registry remains loadable via `SeedEnsemble.from_registry` so older training outputs still work.
 
 The `ClassifierEnsemble` is named with the CV slug only (one ensemble holds every classifier):
 

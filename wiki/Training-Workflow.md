@@ -129,8 +129,8 @@ For each random_state in 0 .. seeds-1:
          grid_search_cv      (GridSearchCV over ClassifierModel.grid)
          save best_estimator to seed:05d.pkl
 After the loop:
-    save_model_csv  → trained-model__{Clf}_{CV}_seeds-{N}_features-{K}.csv
-    build_seed_ensemble → SeedEnsemble_{suffix}.pkl
+    save_model_json → trained-model__{Clf}_{CV}_seeds-{N}_features-{K}.json
+    build_seed_ensemble → SeedEnsemble_{suffix}.pkl   (via SeedEnsemble.from_any)
     build_classifier_ensemble → ClassifierEnsemble_{CV}.pkl
 ```
 
@@ -224,7 +224,7 @@ Hash → `{station_dir}/cache/TrainingModel/{hash}.pkl` (+ a sidecar `{hash}.par
 │   ├── features/{cv-slug}/...                                    (above)
 │   └── classifiers/{clf-slug}/{cv-slug}/
 │       ├── models/{seed:05d}.pkl                                 (per-seed best estimators)
-│       ├── trained-model__{Clf}_{CV}_seeds-{N}_features-{K}.csv  (registry CSV)
+│       ├── trained-model__{Clf}_{CV}_seeds-{N}_features-{K}.json (trained-model registry, records with inline top-N features)
 │       └── SeedEnsemble_{suffix}.pkl                             (joblib-bundled SeedEnsemble)
 └── training/
     └── classifiers/

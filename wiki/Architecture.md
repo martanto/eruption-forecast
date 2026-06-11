@@ -231,7 +231,7 @@ The model layer follows a **mixin** pattern:
 
 - **`BaseModel`** - abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, and joblib `save()` / `load()`. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`.
 - **`CacheModel`** - abstract mixin that adds a content-addressable cache layer. Implementers declare `build_cache_identity(**kwargs) -> dict`; the mixin canonicalises the dict, SHA-256-hashes it, and reads/writes `{output_dir}/cache/{ClassName}/{hash}.pkl` (with a `.params.json` sidecar for debugging).
-- **`TrainingModel(BaseModel, CacheModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, then auto-merges every seed via `merge_seed_models` and every classifier via `merge_all_classifiers`.
+- **`TrainingModel(BaseModel, CacheModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, writes a per-classifier trained-model JSON registry via `save_model_json`, then bundles every seed into a `SeedEnsemble` (`build_seed_ensemble` → `SeedEnsemble.from_any`) and every classifier into a `ClassifierEnsemble` (`build_classifier_ensemble`).
 - **`PredictionModel(BaseModel, CacheModel)`** - `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash`, so re-training automatically invalidates downstream forecasts.
 - **`EvaluationModel(BaseModel)`** - no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
 - **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the three stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
@@ -250,8 +250,7 @@ SeedEnsemble       ClassifierEnsemble
 1 classifier ×     N classifiers ×
 N fitted seeds     1 SeedEnsemble each
 + feature lists    + factories (from_any, from_json,
-                     from_dict, from_seed_ensembles,
-                     from_registry_dict)
+                     from_dict, from_seed_ensembles)
 
            MetricsEnsemble  (standalone - not a BaseEnsemble subclass)
            wraps ClassifierEnsemble + features + y_true
@@ -448,13 +447,12 @@ Evaluation is **never cached** - the metric JSONs themselves act as the cache vi
 | `utils/array.py`     | `detect_maximum_outlier`, `remove_outliers`, `detect_anomalies_zscore`, `aggregate_seed_probabilities`, `predict_proba_from_estimator` |
 | `utils/window.py`    | `construct_windows`, `calculate_window_metrics`                                                                |
 | `utils/date_utils.py`| `to_datetime`, `normalize_dates`, `sort_dates`, `parse_label_filename`, `set_datetime_index`, `label_id_to_datetime` |
-| `utils/ml.py`        | `random_under_sampler`, `get_significant_features`, `load_labels_from_csv`, `merge_seed_models`, `merge_all_classifiers`, `compute_seed_eruption_probability`, `compute_model_probabilities`, `get_classifier_models`, `compute_g_mean`, `compute_seed`, `build_y_true` |
+| `utils/ml.py`        | `random_under_sampler`, `get_significant_features`, `load_labels_from_csv`, `save_model_json`, `compute_seed_eruption_probability`, `compute_model_probabilities`, `get_classifier_models`, `compute_g_mean`, `compute_seed`, `build_y_true` |
 | `utils/validation.py`| `validate_random_state`, `validate_date_ranges`, `validate_window_step`, `validate_columns`, `check_sampling_consistency` |
 | `utils/pathutils.py` | `resolve_output_dir`, `ensure_dir`, `save_figure`, `save_data`, `load_json`                                    |
 | `utils/dataframe.py` | `load_label_csv`, DataFrame shape and column helpers                                                           |
 | `utils/formatting.py`| `slugify`, human-readable elapsed time and file sizes                                                          |
 
-`utils/ml.merge_seed_models` and `utils/ml.merge_all_classifiers` are the bridge between the per-seed `.pkl` outputs 
-and the `SeedEnsemble` / `ClassifierEnsemble` packaging - both are invoked at the end of `TrainingModel.fit()`.
+`utils/ml.save_model_json` writes the per-classifier trained-model JSON registry (one record per seed, each with the inline top-N feature list and the path to the seed's `.pkl`). `TrainingModel.build_seed_ensemble` reads that registry via `SeedEnsemble.from_any` to package every seed into a `SeedEnsemble`, and the per-classifier `SeedEnsemble`s are then merged into a `ClassifierEnsemble` (`build_classifier_ensemble`). All three steps run at the end of `TrainingModel.fit()`.
 
 `utils/formatting.slugify` is what turns `"Scenario 1"` into `scenario-1` for the per-scenario `output_dir` used in `scenarios.py`.

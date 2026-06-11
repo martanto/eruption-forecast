@@ -43,7 +43,7 @@ Driver: `PredictionModel` (`src/eruption_forecast/model/prediction_model.py`). W
 | Path to `ClassifierEnsemble*.pkl` | `output/.../training/classifiers/ClassifierEnsemble_StratifiedShuffleSplit.pkl` |
 | Path to `ClassifierEnsemble*.json` | the JSON registry written next to the `.pkl` |
 | Path to a `SeedEnsemble_*.pkl` | bundle for a single classifier |
-| Path to a trained-model registry CSV | `trained-model__RandomForestClassifier_...csv` |
+| Path to a trained-model registry `.json` (new) or `.csv` (legacy) | `trained-model__RandomForestClassifier_...json` |
 
 When called via `fm.predict(...)`, the in-memory `fm.ClassifierEnsemble` is passed directly - no disk round-trip.
 
