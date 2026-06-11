@@ -22,7 +22,8 @@ This page covers config persistence, the dataclass layout, Telegram notification
    │   ├── calculate:  ForecastCalculateConfig | None             │
    │   ├── train:      ForecastTrainConfig     | None             │
    │   ├── predict:    ForecastPredictConfig   | None             │
-   │   └── evaluate:   ForecastEvaluateConfig  | None             │
+   │   ├── evaluate:   ForecastEvaluateConfig  | None             │
+   │   └── explain:    ForecastExplainConfig   | None             │
    └────────────────────────┬─────────────────────────────────────┘
                             │
                 ┌───────────┴───────────┐
@@ -33,7 +34,7 @@ This page covers config persistence, the dataclass layout, Telegram notification
 ```
 
 - A stage that hasn't run yet is `None` in the YAML - the produced config is "partial" and can be loaded + continued.
-- `fm.evaluate(...)` calls `save_config()` automatically before returning. Call it manually at earlier points to checkpoint a partial pipeline.
+- `fm.evaluate(...)` and `fm.explain(...)` each call `save_config()` automatically before returning. Call it manually at earlier points to checkpoint a partial pipeline.
 
 ### Default path
 
@@ -131,9 +132,18 @@ evaluate:
   model: prediction
   plot_per_seed: true
   plot_aggregate: true
+
+explain:
+  model: prediction
+  n_seeds_to_explain: 10
+  n_observations_to_explain: 5
+  top_k_features: 5
+  plot_local: true
+  plot_global: true
+  plot_profile: true
 ```
 
-The keys mirror the kwargs accepted by each method 1:1 - see [API Reference](API-Reference) for the per-stage signatures.
+The keys mirror the kwargs accepted by each method 1:1 - see [API Reference](API-Reference) for the per-stage signatures. The `explain` block drives `ForecastModel.explain()`, which runs DALEX SHAP / permutation importance / Partial Dependence Profiles on the tree classifiers in the ensemble (`rf`, `xgb`, `gb`); non-tree classifiers are skipped with a single INFO log line.
 
 ### `None`-as-inherit
 

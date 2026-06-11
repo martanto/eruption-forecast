@@ -67,6 +67,13 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 │  fm.EvaluationModel │  ClassifierComparator
 │      .compare()     │    ranking CSV + comparison plots
 └─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  fm.explain(        │  ExplanationModel(model="prediction")
+│    model=           │    DalexExplainerEnsemble.compute()
+│    "prediction")    │    SHAP / VI / PDP per tree-classifier seed
+└─────────────────────┘
 ```
 
 ### Per-stage notes
@@ -100,6 +107,13 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 - One `MultiModelEvaluator` per classifier → fed to a `ClassifierComparator`.
 - `comparator.get_ranking()` writes `comparison/metrics/ranking_recall.csv` (defaults to recall ranking - matches the training `scoring`).
 - `comparator.plot_all()` writes ROC overlay, metric bars, seed stability violins, and a comparison grid under `evaluation/prediction/comparison/figures/`.
+
+#### `fm.explain(model="prediction")`
+- Reuses the in-memory `PredictionModel` - no re-extraction of features, no re-fit.
+- Restricted to tree classifiers (`RandomForestClassifier`, `XGBClassifier`, `GradientBoostingClassifier`); any other classifier in the ensemble is skipped with a single INFO-level log line.
+- Per-seed scope is a deterministic even-stride subset of the trained seeds (`n_seeds_to_explain`, default 10) so DALEX doesn't have to run on every single seed.
+- Three DALEX analyses per sampled seed: `predict_parts(type='shap')` for local attribution, `model_parts(loss_function='1-auc')` for global permutation importance, and `model_profile(type='partial')` for Partial Dependence Profiles on the top-`k` features ranked by VI.
+- Plots are saved as standalone Plotly HTML (`include_plotlyjs="cdn"`) under `explanation/{kind}/classifiers/{Clf}/{shap,variable_importance,partial_dependence}/seeds/{seed:05d}.html` — no `kaleido`/Chromium PNG pipeline.
 
 ---
 

@@ -14,14 +14,17 @@ from eruption_forecast.config.forecast_config import (
     ForecastConfig,
     BaseForecastConfig,
     ForecastTrainConfig,
+    ForecastExplainConfig,
     ForecastPredictConfig,
     ForecastEvaluateConfig,
     ForecastCalculateConfig,
 )
 from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.model.explanation_model import ExplanationModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.ensemble.dalex_explainer_ensemble import DalexExplainerEnsemble
 
 
 class ForecastModel:
@@ -101,6 +104,10 @@ class ForecastModel:
         # Will be set after evaluate() run
         self.EvaluationModel: EvaluationModel | None = None
         self.evaluation_results: dict[str, pd.DataFrame] = {}
+
+        # Will be set after explain() run
+        self.ExplanationModel: ExplanationModel | None = None
+        self.DalexExplainerEnsemble: DalexExplainerEnsemble | None = None
 
         # Pipeline configuration — populated incrementally as each stage runs.
         # ``save_config()`` serialises whatever stages have executed so far.
@@ -642,6 +649,132 @@ class ForecastModel:
 
         return self
 
+    def explain(
+        self,
+        model: Literal["training", "prediction"] = "prediction",
+        eruption_dates: list[str] | None = None,
+        n_seeds_to_explain: int = 10,
+        n_observations_to_explain: int = 5,
+        top_k_features: int = 5,
+        plot_local: bool = True,
+        plot_global: bool = True,
+        plot_profile: bool = True,
+        output_dir: str | None = None,
+        overwrite: bool | None = None,
+        n_jobs: int | None = None,
+        verbose: bool | None = None,
+    ) -> Self:
+        """Run DALEX-based Explanatory Model Analysis on the ensemble.
+
+        Reuses the ``TrainingModel`` or ``PredictionModel`` already produced
+        in the current session. DALEX explanations (SHAP attribution,
+        permutation variable importance, and partial dependence profiles)
+        are computed for tree classifiers only — non-tree classifiers in
+        the ensemble are skipped with one INFO-level log line each.
+
+        Args:
+            model (Literal["training", "prediction"]): Which model in the
+                current pipeline to explain. Defaults to ``"prediction"``.
+            eruption_dates (list[str] | None): Ground-truth eruption dates in
+                ``YYYY-MM-DD`` format. Falls back to the dates captured
+                during ``train()`` when ``None``. Defaults to ``None``.
+            n_seeds_to_explain (int): Seeds sampled per classifier via
+                even-stride selection over sorted ``random_state``. Defaults
+                to ``10``.
+            n_observations_to_explain (int): Observations fed to
+                ``predict_parts`` per seed. Defaults to ``5``.
+            top_k_features (int): Number of top features fed to
+                ``model_profile`` per seed. Defaults to ``5``.
+            plot_local (bool): Save per-seed SHAP HTML plots. Defaults to
+                ``True``.
+            plot_global (bool): Save per-seed permutation-importance HTML
+                plots. Defaults to ``True``.
+            plot_profile (bool): Save per-feature PDP HTML plots. Defaults to
+                ``True``.
+            output_dir (str | None): Root output directory. Defaults to the
+                station directory.
+            overwrite (bool | None): Overwrite cached results. Falls back to
+                ``self.overwrite`` when ``None``. Defaults to ``None``.
+            n_jobs (int | None): Parallel workers (reserved). Falls back to
+                ``self.n_jobs`` when ``None``. Defaults to ``None``.
+            verbose (bool | None): Verbose logging. Falls back to
+                ``self.verbose`` when ``None``. Defaults to ``None``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If the required upstream model for the selected
+                ``model`` mode has not been produced yet.
+        """
+        if model == "training" and self.TrainingModel is None:
+            raise ValueError(
+                "TrainingModel is required for model='training'. "
+                "Please run train() first."
+            )
+        if model == "prediction" and self.PredictionModel is None:
+            raise ValueError(
+                "PredictionModel is required for model='prediction'. "
+                "Please run train() then predict()."
+            )
+
+        self._config.explain = ForecastExplainConfig(
+            model=model,
+            eruption_dates=list(eruption_dates) if eruption_dates is not None else None,
+            n_seeds_to_explain=n_seeds_to_explain,
+            n_observations_to_explain=n_observations_to_explain,
+            top_k_features=top_k_features,
+            plot_local=plot_local,
+            plot_global=plot_global,
+            plot_profile=plot_profile,
+            output_dir=output_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
+        n_jobs = n_jobs if n_jobs is not None else self.n_jobs
+        verbose = verbose if verbose is not None else self.verbose
+        overwrite = overwrite if overwrite is not None else self.overwrite
+
+        eruption_dates = (
+            eruption_dates if eruption_dates is not None else self._eruption_dates
+        )
+
+        model_object: TrainingModel | PredictionModel
+        if model == "prediction" and self.PredictionModel is not None:
+            model_object = self.PredictionModel
+        elif self.TrainingModel is not None:
+            model_object = self.TrainingModel
+        else:
+            raise ValueError(
+                f"Model {model} is not supported. Choose between "
+                f"'prediction' and 'training'"
+            )
+
+        explanation_model = ExplanationModel(
+            model=model_object,
+            eruption_dates=eruption_dates,
+            n_seeds_to_explain=n_seeds_to_explain,
+            n_observations_to_explain=n_observations_to_explain,
+            top_k_features=top_k_features,
+            output_dir=output_dir or self.station_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
+        self.ExplanationModel = explanation_model
+        self.DalexExplainerEnsemble = explanation_model.explain(
+            plot_local=plot_local,
+            plot_global=plot_global,
+            plot_profile=plot_profile,
+        )
+
+        self.save_config()
+
+        return self
+
     def save_config(
         self,
         path: str | None = None,
@@ -713,4 +846,6 @@ class ForecastModel:
             self.predict(**self._config.predict.to_dict())
         if self._config.evaluate is not None:
             self.evaluate(**self._config.evaluate.to_dict())
+        if self._config.explain is not None:
+            self.explain(**self._config.explain.to_dict())
         return self

@@ -5,7 +5,8 @@
 [![License](https://img.shields.io/pypi/l/eruption-forecast?label=license)](https://pypi.org/project/eruption-forecast/)
 [![Status](https://img.shields.io/badge/status-active%20development-orange)](https://github.com/martanto/eruption-forecast)
 [![PyPI](https://img.shields.io/pypi/v/eruption-forecast?label=pypi)](https://pypi.org/project/eruption-forecast/)
-[![Downloads](https://static.pepy.tech/personalized-badge/eruption-forecast?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLUE&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/eruption-forecast)
+![Total Downloads](https://img.shields.io/pepy/dt/eruption-forecast)
+
 
 Process raw seismic tremor, extract time-series features, train multi-seed classifier ensembles, and produce probabilistic volcanic eruption forecasts. Forked from [ddempsey/whakaari](https://github.com/ddempsey/whakaari) and substantially extended.
 
@@ -110,6 +111,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface.
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` writes per-seed JSON; `ClassifierComparator` ranks classifiers head-to-head.
+- **Explanatory Model Analysis (DALEX)** — `ExplanationModel` wraps tree-classifier seeds in a `dx.Explainer` and runs SHAP (`predict_parts`), permutation variable importance (`model_parts`), and Partial Dependence Profiles (`model_profile`) on a deterministic seed subset. Restricted to `rf`/`xgb`/`gb`; non-tree classifiers are skipped with one INFO log line.
 - **Content-Addressable Caching** — `TrainingModel` and `PredictionModel` cache their fitted state under `{output_dir}/cache/` so repeated runs with identical kwargs short-circuit.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline.
 - **Telegram Notifications** — `@notify` decorator + `send_telegram_notification()` for start/finish/error messages and file attachments.
@@ -186,9 +188,15 @@ src/eruption_forecast/
    ┌──────────────────────┐
    │ ClassifierComparator │   ranking_*.csv + comparison figures
    └──────────────────────┘
+              │
+              ▼
+   ┌──────────────────────┐
+   │   ExplanationModel   │   DalexExplainerEnsemble:
+   │ (tree classifiers)   │   SHAP + VI + PDP per sampled seed
+   └──────────────────────┘
 ```
 
-`ForecastModel.calculate() → train() → predict() → evaluate()` is the fluent entry point. Each stage caches and persists, so a repeated run with identical kwargs short-circuits via the on-disk cache.
+`ForecastModel.calculate() → train() → predict() → evaluate() → explain()` is the fluent entry point. Each stage caches and persists, so a repeated run with identical kwargs short-circuits via the on-disk cache.
 
 ## Installation
 

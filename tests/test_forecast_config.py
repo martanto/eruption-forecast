@@ -28,11 +28,12 @@ from dataclasses import fields
 
 import pytest
 
-from eruption_forecast.model.forecast import ForecastModel
+from eruption_forecast.model.forecast_model import ForecastModel
 from eruption_forecast.config.forecast_config import (
     ForecastConfig,
     BaseForecastConfig,
     ForecastTrainConfig,
+    ForecastExplainConfig,
     ForecastPredictConfig,
     ForecastEvaluateConfig,
     ForecastCalculateConfig,
@@ -94,6 +95,12 @@ def _full_forecast_config() -> ForecastConfig:
         evaluate=ForecastEvaluateConfig(
             model="prediction",
             eruption_dates=["2025-03-20"],
+        ),
+        explain=ForecastExplainConfig(
+            model="prediction",
+            eruption_dates=["2025-03-20"],
+            n_seeds_to_explain=5,
+            top_k_features=8,
         ),
     )
 
@@ -369,6 +376,61 @@ class TestForecastEvaluateConfig:
 
 
 # ---------------------------------------------------------------------------
+# ForecastExplainConfig
+# ---------------------------------------------------------------------------
+
+
+class TestForecastExplainConfig:
+    """Tests for ``ForecastExplainConfig`` dataclass."""
+
+    def test_defaults(self) -> None:
+        """``ForecastExplainConfig`` has expected default values."""
+        cfg = ForecastExplainConfig()
+        assert cfg.model == "prediction"
+        assert cfg.eruption_dates is None
+        assert cfg.n_seeds_to_explain == 10
+        assert cfg.n_observations_to_explain == 5
+        assert cfg.top_k_features == 5
+        assert cfg.plot_local is True
+        assert cfg.plot_global is True
+        assert cfg.plot_profile is True
+        assert cfg.output_dir is None
+        assert cfg.overwrite is None
+        assert cfg.n_jobs is None
+        assert cfg.verbose is None
+
+    def test_to_dict_from_dict_round_trip(self) -> None:
+        """All fields survive a round-trip."""
+        cfg = ForecastExplainConfig(
+            model="training",
+            eruption_dates=["2025-03-20"],
+            n_seeds_to_explain=20,
+            n_observations_to_explain=3,
+            top_k_features=12,
+            plot_local=False,
+            plot_global=True,
+            plot_profile=False,
+        )
+        restored = ForecastExplainConfig.from_dict(cfg.to_dict())
+        assert restored.model == "training"
+        assert restored.eruption_dates == ["2025-03-20"]
+        assert restored.n_seeds_to_explain == 20
+        assert restored.n_observations_to_explain == 3
+        assert restored.top_k_features == 12
+        assert restored.plot_local is False
+        assert restored.plot_global is True
+        assert restored.plot_profile is False
+
+    def test_from_dict_ignores_unknown_keys(self) -> None:
+        """Unknown keys do not raise."""
+        cfg = ForecastExplainConfig.from_dict(
+            {"model": "prediction", "n_seeds_to_explain": 7, "extra": True}
+        )
+        assert cfg.model == "prediction"
+        assert cfg.n_seeds_to_explain == 7
+
+
+# ---------------------------------------------------------------------------
 # ForecastConfig — to_dict
 # ---------------------------------------------------------------------------
 
@@ -387,12 +449,13 @@ class TestForecastConfigToDict:
         assert "train" not in d
         assert "predict" not in d
         assert "evaluate" not in d
+        assert "explain" not in d
 
     def test_all_sections_present_when_set(self) -> None:
         """``to_dict()`` includes every section when all are set."""
         config = _full_forecast_config()
         d = config.to_dict()
-        for key in ("model", "calculate", "train", "predict", "evaluate"):
+        for key in ("model", "calculate", "train", "predict", "evaluate", "explain"):
             assert key in d
 
     def test_nested_values_correct(self) -> None:
@@ -406,6 +469,8 @@ class TestForecastConfigToDict:
         assert d["train"]["classifiers"] == ["xgb"]
         assert d["predict"]["window_step"] == 12
         assert d["evaluate"]["model"] == "prediction"
+        assert d["explain"]["n_seeds_to_explain"] == 5
+        assert d["explain"]["top_k_features"] == 8
 
 
 # ---------------------------------------------------------------------------
@@ -459,6 +524,10 @@ class TestForecastConfigYaml:
         assert loaded.evaluate is not None
         assert loaded.evaluate.model == "prediction"
         assert loaded.evaluate.eruption_dates == ["2025-03-20"]
+        assert loaded.explain is not None
+        assert loaded.explain.model == "prediction"
+        assert loaded.explain.n_seeds_to_explain == 5
+        assert loaded.explain.top_k_features == 8
 
     def test_load_partial_config(self) -> None:
         """Loading a config with only model + train sections works."""
@@ -578,6 +647,7 @@ class TestForecastBaseForecastConfigInit:
             assert fm._config.train is None
             assert fm._config.predict is None
             assert fm._config.evaluate is None
+            assert fm._config.explain is None
 
 
 # ---------------------------------------------------------------------------
@@ -723,6 +793,7 @@ class TestForecastModelRun:
             assert fm.TrainingModel is None
             assert fm.PredictionModel is None
             assert fm.EvaluationModel is None
+            assert fm.ExplanationModel is None
 
     def test_run_no_op_after_from_config_without_stages(self) -> None:
         """A config with no stage sections means ``run()`` is a no-op after ``from_config()``."""

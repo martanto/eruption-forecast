@@ -60,6 +60,19 @@ Every pipeline run writes under a single station directory:
 │   └── prediction/                                           # When model.kind == "prediction"
 │       └── (identical sub-tree)
 │
+├── explanation/                                              # ExplanationModel (tree classifiers only)
+│   ├── training/                                             # When model.kind == "training"
+│   │   ├── classifiers/{ClassifierName}/
+│   │   │   ├── shap/seeds/{seed:05d}.{csv,html}              # Per-seed predict_parts(type='shap')
+│   │   │   ├── shap/aggregate.csv                            # Concatenated across sampled seeds
+│   │   │   ├── variable_importance/seeds/{seed:05d}.{csv,html}
+│   │   │   ├── variable_importance/aggregate.csv             # mean / std / count per variable
+│   │   │   └── partial_dependence/{feature}/seeds/{seed:05d}.html
+│   │   └── DalexExplainerEnsemble.pkl                        # Optional, via .save()
+│   └── prediction/
+│       ├── labels/y_true.csv                                 # Built by ExplanationModel.build_label()
+│       └── classifiers/{ClassifierName}/                     # Same layout as training/
+│
 ├── cache/                                                    # CacheModel
 │   ├── TrainingModel/{hash}.pkl                              # Cached fitted TrainingModel
 │   ├── TrainingModel/{hash}.params.json                      # Sidecar identity dump
@@ -71,7 +84,8 @@ Every pipeline run writes under a single station directory:
 ├── result_all_model_predictions_{basename}.csv               # PredictionModel.forecast() top-level dump
 ├── TrainingModel_{basename}.pkl                              # Optional, via fm.TrainingModel.save()
 ├── PredictionModel_{basename}.pkl                            # Optional, via fm.PredictionModel.save()
-└── EvaluationModel_{basename}.pkl                            # Optional, via fm.EvaluationModel.save()
+├── EvaluationModel_{basename}.pkl                            # Optional, via fm.EvaluationModel.save()
+└── ExplanationModel_{basename}.pkl                           # Optional, via fm.ExplanationModel.save()
 ```
 
 Where `basename` is typically `{start_date}_{end_date}` (training) or `{start_date}_{end_date}_ws-{window_size}` (prediction).

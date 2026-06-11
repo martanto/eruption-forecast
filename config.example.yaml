@@ -92,3 +92,17 @@ evaluate:
   overwrite: null           # null = inherit from model.overwrite
   n_jobs: null              # null = inherit from model.n_jobs
   verbose: null             # null = inherit from model.verbose
+
+explain:
+  model: prediction         # 'prediction' or 'training' — which model to explain
+  eruption_dates: null      # null = reuse the dates captured during train()
+  n_seeds_to_explain: 10    # Seeds sampled per classifier (even-stride)
+  n_observations_to_explain: 5   # Observations fed to predict_parts (SHAP) per seed
+  top_k_features: 5         # Top features fed to model_profile (PDP) per seed
+  plot_local: true          # Save per-seed SHAP HTML plots
+  plot_global: true         # Save per-seed permutation-importance HTML plots
+  plot_profile: true        # Save per-feature PDP HTML plots
+  output_dir: null          # null = use station_dir
+  overwrite: null           # null = inherit from model.overwrite
+  n_jobs: null              # null = inherit from model.n_jobs
+  verbose: null             # null = inherit from model.verbose

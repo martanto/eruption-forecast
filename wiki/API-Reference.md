@@ -168,6 +168,27 @@ fm.evaluate(
 
 `eruption_dates=None` falls back to the dates captured during `train()`. Always auto-calls `save_config()` at the end. Sets `self.EvaluationModel`, `self.evaluation_results`.
 
+### `explain(...)`
+
+```python
+fm.explain(
+    model: Literal["training", "prediction"] = "prediction",
+    eruption_dates: list[str] | None = None,
+    n_seeds_to_explain: int = 10,
+    n_observations_to_explain: int = 5,
+    top_k_features: int = 5,
+    plot_local: bool = True,
+    plot_global: bool = True,
+    plot_profile: bool = True,
+    output_dir: str | None = None,
+    overwrite: bool | None = None,
+    n_jobs: int | None = None,
+    verbose: bool | None = None,
+) -> Self
+```
+
+Runs DALEX-based Explanatory Model Analysis on the tree classifiers (`rf`, `xgb`, `gb`) in the ensemble. Non-tree classifiers are skipped with a single INFO log line. `eruption_dates=None` falls back to the dates captured during `train()`. Always auto-calls `save_config()` at the end. Sets `self.ExplanationModel` and `self.DalexExplainerEnsemble`. See [Pipeline Walkthrough](Pipeline-Walkthrough#fmexplainmodelprediction) for per-seed sampling semantics.
+
 ### Config round-trip
 
 | Method | Returns | Notes |

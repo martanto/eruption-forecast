@@ -311,6 +311,56 @@ class ForecastEvaluateConfig(BaseConfig):
 
 
 @dataclass
+class ForecastExplainConfig(BaseConfig):
+    """Configuration for ``ForecastModel.explain()`` parameters.
+
+    Mirrors :class:`ForecastEvaluateConfig` so the same training/prediction
+    reuse dispatch applies. ``n_seeds_to_explain``, ``n_observations_to_explain``,
+    and ``top_k_features`` are the only DALEX-specific knobs at the
+    orchestrator surface; deeper tuning is exposed directly on
+    :class:`~eruption_forecast.ensemble.dalex_explainer_ensemble.DalexExplainerEnsemble`.
+
+    Attributes:
+        model (Literal["training", "prediction"]): Which model in the current
+            pipeline to explain. Defaults to ``"prediction"``.
+        eruption_dates (list[str] | None): Ground-truth eruption dates in
+            ``"YYYY-MM-DD"`` format. ``None`` falls back to the dates captured
+            during ``train()``. Defaults to ``None``.
+        n_seeds_to_explain (int): Number of seeds sampled per classifier.
+            Defaults to ``10``.
+        n_observations_to_explain (int): Number of observations fed to
+            ``predict_parts`` per seed. Defaults to ``5``.
+        top_k_features (int): Number of top-ranked features fed to
+            ``model_profile``. Defaults to ``5``.
+        plot_local (bool): Render per-seed SHAP plots. Defaults to ``True``.
+        plot_global (bool): Render per-seed permutation-importance plots.
+            Defaults to ``True``.
+        plot_profile (bool): Render per-feature PDP plots. Defaults to ``True``.
+        output_dir (str | None): Root output directory. ``None`` uses
+            ``ForecastModel.station_dir``. Defaults to ``None``.
+        overwrite (bool | None): Overwrite cached explanation outputs. ``None``
+            inherits from ``ForecastModel.overwrite``. Defaults to ``None``.
+        n_jobs (int | None): Parallel workers (reserved). ``None`` inherits
+            from ``ForecastModel.n_jobs``. Defaults to ``None``.
+        verbose (bool | None): Enable verbose logging. ``None`` inherits from
+            ``ForecastModel.verbose``. Defaults to ``None``.
+    """
+
+    model: Literal["training", "prediction"] = "prediction"
+    eruption_dates: list[str] | None = None
+    n_seeds_to_explain: int = 10
+    n_observations_to_explain: int = 5
+    top_k_features: int = 5
+    plot_local: bool = True
+    plot_global: bool = True
+    plot_profile: bool = True
+    output_dir: str | None = None
+    overwrite: bool | None = None
+    n_jobs: int | None = None
+    verbose: bool | None = None
+
+
+@dataclass
 class ForecastConfig(BaseConfig):
     """Full ``ForecastModel`` configuration container.
 
@@ -327,6 +377,7 @@ class ForecastConfig(BaseConfig):
         train (ForecastTrainConfig | None): Training parameters.
         predict (ForecastPredictConfig | None): Prediction parameters.
         evaluate (ForecastEvaluateConfig | None): Evaluation parameters.
+        explain (ForecastExplainConfig | None): Explanation parameters.
     """
 
     version: str = "1.0"
@@ -338,6 +389,7 @@ class ForecastConfig(BaseConfig):
     train: ForecastTrainConfig | None = None
     predict: ForecastPredictConfig | None = None
     evaluate: ForecastEvaluateConfig | None = None
+    explain: ForecastExplainConfig | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the full config to a nested plain dictionary.
@@ -354,7 +406,7 @@ class ForecastConfig(BaseConfig):
             "saved_at": self.saved_at,
             "model": self.model.to_dict(),
         }
-        for section_name in ("calculate", "train", "predict", "evaluate"):
+        for section_name in ("calculate", "train", "predict", "evaluate", "explain"):
             section = getattr(self, section_name)
             if section is not None:
                 data[section_name] = section.to_dict()
@@ -430,6 +482,7 @@ class ForecastConfig(BaseConfig):
             "train": ForecastTrainConfig,
             "predict": ForecastPredictConfig,
             "evaluate": ForecastEvaluateConfig,
+            "explain": ForecastExplainConfig,
         }
         for section_name, section_cls in section_map.items():
             if section_name in data:
