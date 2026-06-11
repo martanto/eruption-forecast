@@ -1,6 +1,7 @@
 # Prediction Workflow
 
-The prediction stage runs forecast inference on a future (or held-out) time window using a previously trained `ClassifierEnsemble`. No labels are required at this stage — predictions are produced over an evenly-spaced window grid.
+The prediction stage runs forecast inference on a future (or held-out) time window using 
+a previously trained `ClassifierEnsemble`. No labels are required at this stage - predictions are produced over an evenly-spaced window grid.
 
 Driver: `PredictionModel` (`src/eruption_forecast/model/prediction_model.py`). Wrapped by `ForecastModel.predict(...)`.
 
@@ -18,7 +19,7 @@ Driver: `PredictionModel` (`src/eruption_forecast/model/prediction_model.py`). W
                   ┌────────────┼─────────────┐
                   ▼            ▼             ▼
         ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-        │ build_label │→│ extract_    │→│  forecast   │
+        │ build_label │→ │ extract_    │→ │  forecast   │
         │             │  │ features    │  │             │
         └─────────────┘  └─────────────┘  └─────────────┘
             unlabelled       prediction-      ClassifierEnsemble
@@ -44,28 +45,34 @@ Driver: `PredictionModel` (`src/eruption_forecast/model/prediction_model.py`). W
 | Path to a `SeedEnsemble_*.pkl` | bundle for a single classifier |
 | Path to a trained-model registry CSV | `trained-model__RandomForestClassifier_...csv` |
 
-When called via `fm.predict(...)`, the in-memory `fm.ClassifierEnsemble` is passed directly — no disk round-trip.
+When called via `fm.predict(...)`, the in-memory `fm.ClassifierEnsemble` is passed directly - no disk round-trip.
 
 ---
 
 ## Build Forecast Grid (`build_label`)
 
-Despite the name, prediction labels are placeholders — every `is_erupted` value is `0`. The role of `build_label()` here is to lay out the *window grid* the model will score against.
+Despite the name, prediction labels are placeholders - every `is_erupted` value is `0`. 
+The role of `build_label()` here is to lay out the *window grid* the model will score against.
 
 | Param | Type | Notes |
 |-------|------|-------|
 | `window_step` | `int` | Stride between consecutive forecast windows |
 | `window_step_unit` | `"minutes"` \| `"hours"` | A 10-minute step produces 144 forecasts/day |
 
-The grid is cached as `{prediction_dir}/features/features-label_{basename}_step-{N}-{unit}.csv`. On a re-run the cached grid is loaded unless `overwrite=True`.
+The grid is cached as `{prediction_dir}/features/features-label_{basename}_step-{N}-{unit}.csv`. 
+On a re-run the cached grid is loaded unless `overwrite=True`.
 
 ---
 
 ## Extract Features (`extract_features`)
 
-Runs the same `TremorMatrixBuilder → FeaturesBuilder` chain as training, but in **prediction mode** — no tsfresh relevance filtering, because there are no labels to test relevance against.
+Runs the same `TremorMatrixBuilder → FeaturesBuilder` chain as training, 
+but in **prediction mode** - no tsfresh relevance filtering, because there are no labels to test relevance against.
 
-`select_tremor_columns`, `save_tremor_matrix_per_method`, and `exclude_features` are mirrored from the training call so that the prediction feature columns line up with the trained model's input schema. `ForecastModel.predict(...)` forwards `self.select_tremor_columns`, `self.save_tremor_matrix_per_method`, and `self.exclude_features` from the upstream `train()` call automatically.
+`select_tremor_columns`, `save_tremor_matrix_per_method`, and `exclude_features` 
+are mirrored from the training call so that the prediction feature columns line up with the 
+trained model's input schema. `ForecastModel.predict(...)` forwards 
+`self.select_tremor_columns`, `self.save_tremor_matrix_per_method`, and `self.exclude_features` from the upstream `train()` call automatically.
 
 ---
 
@@ -108,7 +115,7 @@ prediction/figures/forecast_{basename}.pdf       # when plot_pdf=True (default)
 | `plot_threshold` | `0.5` | Horizontal threshold line on the forecast plot |
 | `plot_title` | `None` | Optional title |
 | `plot_pdf` | `True` | Also save a vector PDF |
-| `**plot_kwargs` | — | Forwarded to `eruption_forecast.plots.plot_forecast` — e.g. `eruption_dates=[...]` to render eruption markers |
+| `**plot_kwargs` | - | Forwarded to `eruption_forecast.plots.plot_forecast` - e.g. `eruption_dates=[...]` to render eruption markers |
 
 ---
 
@@ -118,7 +125,7 @@ prediction/figures/forecast_{basename}.pdf       # when plot_pdf=True (default)
 
 - NSLC
 - tremor DataFrame fingerprint
-- **`training_hash`** — the cache hash of the upstream `TrainingModel`
+- **`training_hash`** - the cache hash of the upstream `TrainingModel`
 - `start_date`, `end_date`, `window_size`
 - `build_label` kwargs (`window_step`, `window_step_unit`)
 - `extract_features` kwargs (`select_tremor_columns`, `save_tremor_matrix_per_method`, `exclude_features`)
@@ -141,7 +148,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 └── cache/PredictionModel/{hash}.pkl                        # CacheModel artefact
 ```
 
-`fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot — used by `scenarios.py` to attach the figure to a Telegram notification.
+`fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `scenarios.py` to attach the figure to a Telegram notification.
 
 ---
 
@@ -184,4 +191,4 @@ pm = PredictionModel.load("output/VG.OJN.00.EHZ/PredictionModel_2025-07-27_2025-
 df = pm.results
 ```
 
-The reloaded `pm.results` is the same DataFrame returned by `forecast()` — no re-inference needed for downstream analysis.
+The reloaded `pm.results` is the same DataFrame returned by `forecast()` - no re-inference needed for downstream analysis.

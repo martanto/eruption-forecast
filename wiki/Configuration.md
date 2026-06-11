@@ -1,19 +1,21 @@
 # Configuration
 
-Every `ForecastModel` stage auto-captures its kwargs into a `ForecastConfig` object, which can be saved to YAML/JSON and replayed via `from_config() → run()`. This page covers config persistence, the dataclass layout, Telegram notifications, and runtime logging.
+Every `ForecastModel` stage auto-captures its kwargs into a `ForecastConfig` object, 
+which can be saved to YAML/JSON and replayed via `from_config() → run()`. 
+This page covers config persistence, the dataclass layout, Telegram notifications, and runtime logging.
 
 ---
 
 ## ForecastConfig Lifecycle
 
 ```
-                   ┌────────────────────────────────────────┐
-                   │            ForecastModel               │
-                   │   _config: ForecastConfig              │
-                   └────────────┬───────────────────────────┘
-                                │ stage methods auto-capture kwargs
-                                ▼
-   ┌─────────────────────────────────────────────────────────────┐
+              ┌────────────────────────────────────────┐
+              │            ForecastModel               │
+              │   _config: ForecastConfig              │
+              └────────────┬───────────────────────────┘
+                           │ stage methods auto-capture kwargs
+                           ▼
+   ┌──────────────────────────────────────────────────────────────┐
    │  ForecastConfig                                              │
    │   ├── version, saved_at                                      │
    │   ├── model:      BaseForecastConfig                         │
@@ -30,7 +32,7 @@ Every `ForecastModel` stage auto-captures its kwargs into a `ForecastConfig` obj
                                   → fm.run() replays each non-None section
 ```
 
-- A stage that hasn't run yet is `None` in the YAML — the produced config is "partial" and can be loaded + continued.
+- A stage that hasn't run yet is `None` in the YAML - the produced config is "partial" and can be loaded + continued.
 - `fm.evaluate(...)` calls `save_config()` automatically before returning. Call it manually at earlier points to checkpoint a partial pipeline.
 
 ### Default path
@@ -40,14 +42,14 @@ Every `ForecastModel` stage auto-captures its kwargs into a `ForecastConfig` obj
 {station_dir}/forecast.config.json      # fm.save_config(fmt="json")
 ```
 
-`{station_dir} = {output_dir}/{network}.{station}.{location}.{channel}` — sibling of the per-stage `cache/` directories.
+`{station_dir} = {output_dir}/{network}.{station}.{location}.{channel}` - sibling of the per-stage `cache/` directories.
 
 ### Round-trip
 
 ```python
 fm.save_config("output/config.yaml")
 fm2 = ForecastModel.from_config("output/config.yaml")
-fm2.run()    # idempotent — replays every captured stage
+fm2.run()    # idempotent - replays every captured stage
 ```
 
 ---
@@ -131,29 +133,35 @@ evaluate:
   plot_aggregate: true
 ```
 
-The keys mirror the kwargs accepted by each method 1:1 — see [API Reference](API-Reference) for the per-stage signatures.
+The keys mirror the kwargs accepted by each method 1:1 - see [API Reference](API-Reference) for the per-stage signatures.
 
 ### `None`-as-inherit
 
-For `overwrite`, `n_jobs`, and `verbose`, a YAML value of `null` means "inherit the value `ForecastModel.__init__` was constructed with". This is the same semantics applied at runtime when the kwarg is omitted, so a replay behaves identically.
+For `overwrite`, `n_jobs`, and `verbose`, a YAML value of `null` means "inherit the 
+value `ForecastModel.__init__` was constructed with". This is the same semantics 
+applied at runtime when the kwarg is omitted, so a replay behaves identically.
 
 ---
 
 ## TrainingConfig (Standalone)
 
-`TrainingModel.__init__` captures its own kwargs into a `TrainingConfig` dataclass (`config/training_config.py`), independent of `ForecastConfig`. Use this when you run `TrainingModel` outside of `ForecastModel`:
+`TrainingModel.__init__` captures its own kwargs into a `TrainingConfig` dataclass 
+(`config/training_config.py`), independent of `ForecastConfig`. 
+Use this when you run `TrainingModel` outside of `ForecastModel`:
 
 ```python
 tm.save_config()      # → {output_dir}/training.config.yaml
 ```
 
-The shape mirrors the `TrainingModel.__init__` signature — see [Training Workflow](Training-Workflow#standalone-use).
+The shape mirrors the `TrainingModel.__init__` signature - see [Training Workflow](Training-Workflow#standalone-use).
 
 ---
 
 ## `config.example.yaml`
 
-A fully annotated example config ships at the repo root: [`config.example.yaml`](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml). Project Rule 11 keeps it in sync with `forecast_config.py` — when any `ForecastConfig` field is added, renamed, or has its default changed, the example YAML is updated in the same commit.
+A fully annotated example config ships at the repo root: [`config.example.yaml`](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml). 
+Project Rule 11 keeps it in sync with `forecast_config.py` - when any `ForecastConfig` 
+field is added, renamed, or has its default changed, the example YAML is updated in the same commit.
 
 ---
 
@@ -188,7 +196,7 @@ send_telegram_notification(
     message=f"{name}: {description}",
     files=[fm.PredictionModel.forecast_plot_path],
     file_caption=f"{name}: {description}",
-    send_as_document=True,        # preserves DPI — Telegram does not re-encode
+    send_as_document=True,        # preserves DPI - Telegram does not re-encode
 )
 ```
 
@@ -202,7 +210,7 @@ TELEGRAM_CHAT_ID=your_chat_id_here
 - Bot token from [@BotFather](https://t.me/BotFather)
 - Chat ID from [@userinfobot](https://t.me/userinfobot)
 
-Both primitives degrade gracefully when the env vars are absent — they emit a warning and skip the network call instead of raising.
+Both primitives degrade gracefully when the env vars are absent - they emit a warning and skip the network call instead of raising.
 
 ---
 
@@ -213,19 +221,19 @@ The package wraps [`loguru`](https://github.com/Delgan/loguru) behind `eruption_
 | Function | Purpose |
 |----------|---------|
 | `enable_logging()` | Restore console + file handlers using the current log directory |
-| `disable_logging()` | Remove every active loguru handler — no console, no file |
+| `disable_logging()` | Remove every active loguru handler - no console, no file |
 | `set_log_level(level)` | Change the console handler level (`"DEBUG"` / `"INFO"` / `"WARNING"` / `"ERROR"` / `"CRITICAL"`) |
-| `set_log_directory(dir)` | Move the log file to a new directory — created if missing |
+| `set_log_directory(dir)` | Move the log file to a new directory - created if missing |
 
 ```python
 from eruption_forecast import enable_logging, disable_logging
 from eruption_forecast.logger import set_log_level, set_log_directory
 
 set_log_directory("logs/2026-06-10")
-set_log_level("DEBUG")        # console only — file handlers keep their level
+set_log_level("DEBUG")        # console only - file handlers keep their level
 
 disable_logging()
-fm.calculate(...)             # silent — useful during tests
+fm.calculate(...)             # silent - useful during tests
 enable_logging()              # restore handlers
 ```
 
@@ -237,12 +245,13 @@ enable_logging()              # restore handlers
 
 ```
 {station_dir}/
-├── forecast.config.yaml                 # fm.save_config()  — full pipeline
-├── training.config.yaml                 # tm.save_config()  — standalone TrainingModel
+├── forecast.config.yaml                 # fm.save_config()  - full pipeline
+├── training.config.yaml                 # tm.save_config()  - standalone TrainingModel
 ├── cache/
 │   ├── TrainingModel/{hash}.params.json # CacheModel identity dumps (diff-able)
 │   └── PredictionModel/{hash}.params.json
 └── ...
 ```
 
-The `*.params.json` files inside `cache/` capture **exactly** what went into the cache hash. They are handy when debugging a cache miss — `diff` two of them to see which kwarg differed.
+The `*.params.json` files inside `cache/` capture **exactly** what went into the cache hash. 
+They are handy when debugging a cache miss - `diff` two of them to see which kwarg differed.

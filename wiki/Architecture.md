@@ -1,6 +1,8 @@
 # Architecture
 
-This page is the structural reference for `eruption_forecast`: every module under `src/`, the top-level pipeline, how the model and ensemble classes relate, what flows between stages on disk, and the utility surface that holds the rest together.
+This page is the structural reference for `eruption_forecast`: every module under `src/`, 
+the top-level pipeline, how the model and ensemble classes relate, what flows between 
+stages on disk, and the utility surface that holds the rest together.
 
 ---
 
@@ -8,69 +10,69 @@ This page is the structural reference for `eruption_forecast`: every module unde
 
 ```
 src/eruption_forecast/
-├── __init__.py            — public exports
-├── logger.py              — loguru wrapper (enable/disable/set_level/set_directory)
-├── data_container.py      — BaseDataContainer ABC for TremorData / LabelData
+├── __init__.py            - public exports
+├── logger.py              - loguru wrapper (enable/disable/set_level/set_directory)
+├── data_container.py      - BaseDataContainer ABC for TremorData / LabelData
 │
 ├── config/
-│   ├── base_config.py         — shared config primitives
-│   ├── constants.py           — ERUPTION_PROBABILITY_THRESHOLD, defaults
-│   ├── forecast_config.py     — ForecastConfig + per-stage sub-configs
-│   └── training_config.py     — TrainingConfig (standalone TrainingModel)
+│   ├── base_config.py         - shared config primitives
+│   ├── constants.py           - ERUPTION_PROBABILITY_THRESHOLD, defaults
+│   ├── forecast_config.py     - ForecastConfig + per-stage sub-configs
+│   └── training_config.py     - TrainingConfig (standalone TrainingModel)
 │
 ├── dataclass/
-│   └── station_data.py        — StationData (immutable nslc identity)
+│   └── station_data.py        - StationData (immutable nslc identity)
 │
 ├── decorators/
-│   ├── decorator_class.py     — base decorator scaffolding
-│   └── notify.py              — Telegram notify + send_telegram_notification
+│   ├── decorator_class.py     - base decorator scaffolding
+│   └── notify.py              - Telegram notify + send_telegram_notification
 │
 ├── ensemble/
-│   ├── base_ensemble.py       — BaseEnsemble (joblib save/load mixin)
-│   ├── seed_ensemble.py       — SeedEnsemble (one classifier × N seeds)
-│   ├── classifier_ensemble.py — ClassifierEnsemble (N classifiers)
-│   └── metrics_ensemble.py    — MetricsEnsemble (metrics engine)
+│   ├── base_ensemble.py       - BaseEnsemble (joblib save/load mixin)
+│   ├── seed_ensemble.py       - SeedEnsemble (one classifier × N seeds)
+│   ├── classifier_ensemble.py - ClassifierEnsemble (N classifiers)
+│   └── metrics_ensemble.py    - MetricsEnsemble (metrics engine)
 │
 ├── features/
 │   ├── constants.py
-│   ├── tremor_matrix_builder.py — TremorMatrixBuilder (windowed alignment)
-│   ├── features_builder.py      — FeaturesBuilder (tsfresh extraction)
-│   └── feature_selector.py      — FeatureSelector (tsfresh FDR + RF importance)
+│   ├── tremor_matrix_builder.py - TremorMatrixBuilder (windowed alignment)
+│   ├── features_builder.py      - FeaturesBuilder (tsfresh extraction)
+│   └── feature_selector.py      - FeatureSelector (tsfresh FDR + RF importance)
 │
 ├── label/
 │   ├── constants.py
-│   ├── label_builder.py         — LabelBuilder (sliding window)
-│   ├── dynamic_label_builder.py — DynamicLabelBuilder (per-eruption build)
-│   ├── label_data.py            — LabelData (CSV wrapper)
-│   └── label_plots.py           — plot_label_distribution
+│   ├── label_builder.py         - LabelBuilder (sliding window)
+│   ├── dynamic_label_builder.py - DynamicLabelBuilder (per-eruption build)
+│   ├── label_data.py            - LabelData (CSV wrapper)
+│   └── label_plots.py           - plot_label_distribution
 │
 ├── model/
 │   ├── constants.py
-│   ├── base_model.py            — BaseModel ABC (dates, I/O, save/load)
-│   ├── cache_model.py           — CacheModel mixin (content-addressed cache)
-│   ├── forecast_model.py        — ForecastModel orchestrator
-│   ├── training_model.py        — TrainingModel(BaseModel, CacheModel)
-│   ├── prediction_model.py      — PredictionModel(BaseModel, CacheModel)
-│   ├── evaluation_model.py      — EvaluationModel(BaseModel)
-│   ├── classifier_model.py      — ClassifierModel (estimator + grid)
-│   └── classifier_comparator.py — ClassifierComparator (cross-classifier rank)
+│   ├── base_model.py            - BaseModel ABC (dates, I/O, save/load)
+│   ├── cache_model.py           - CacheModel mixin (content-addressed cache)
+│   ├── forecast_model.py        - ForecastModel orchestrator
+│   ├── training_model.py        - TrainingModel(BaseModel, CacheModel)
+│   ├── prediction_model.py      - PredictionModel(BaseModel, CacheModel)
+│   ├── evaluation_model.py      - EvaluationModel(BaseModel)
+│   ├── classifier_model.py      - ClassifierModel (estimator + grid)
+│   └── classifier_comparator.py - ClassifierComparator (cross-classifier rank)
 │
 ├── plots/
 │   ├── styles.py
-│   ├── tremor_plots.py          — plot_tremor
-│   ├── feature_plots.py         — feature-importance plots
-│   ├── forecast_plots.py        — plot_forecast, plot_forecast_from_file
-│   └── evaluation_plots.py      — ROC, PR, confusion, threshold, importance
+│   ├── tremor_plots.py          - plot_tremor
+│   ├── feature_plots.py         - feature-importance plots
+│   ├── forecast_plots.py        - plot_forecast, plot_forecast_from_file
+│   └── evaluation_plots.py      - ROC, PR, confusion, threshold, importance
 │
 ├── sources/
-│   ├── base.py                  — SeismicDataSource ABC
-│   ├── sds.py                   — Local SeisComP archive reader
-│   └── fdsn.py                  — FDSN client with local SDS caching
+│   ├── base.py                  - SeismicDataSource ABC
+│   ├── sds.py                   - Local SeisComP archive reader
+│   └── fdsn.py                  - FDSN client with local SDS caching
 │
 ├── tremor/
-│   ├── calculate_tremor.py      — CalculateTremor (orchestrator)
-│   ├── rsam.py, dsar.py, shannon_entropy.py — per-metric kernels
-│   └── tremor_data.py           — TremorData (CSV wrapper)
+│   ├── calculate_tremor.py      - CalculateTremor (orchestrator)
+│   ├── rsam.py, dsar.py, shannon_entropy.py - per-metric kernels
+│   └── tremor_data.py           - TremorData (CSV wrapper)
 │
 └── utils/
     ├── array.py, dataframe.py, date_utils.py
@@ -116,10 +118,10 @@ src/eruption_forecast/
                                   │   build_label →              │
                                   │   extract_features →         │
                                   │   forecast (per-seed proba)  │
-                                  └──────────┬───────────────────┘
-                                             │
-            ┌────────────────────────────────┴──────────────────────┐
-            ▼                                                       ▼
+                                  └──────────────┬───────────────┘
+                                                 │
+             ┌───────────────────────────────────┴──────────────────┐
+             ▼                                                      ▼
    ┌──────────────────────┐                          ┌────────────────────────┐
    │   EvaluationModel    │                          │  result_all_model_     │
    │  dispatch on .kind:  │                          │  predictions_*.csv +   │
@@ -132,7 +134,9 @@ src/eruption_forecast/
    └──────────────────────┘
 ```
 
-`ForecastModel` is the orchestrator that calls every box in sequence. The dashed arrows are also the **method-chain order**: `fm.calculate(...).train(...).predict(...).evaluate(...)`.
+`ForecastModel` is the orchestrator that calls every box in sequence. 
+The dashed arrows are also the **method-chain order**: 
+`fm.calculate(...).train(...).predict(...).evaluate(...)`.
 
 ---
 
@@ -140,17 +144,21 @@ src/eruption_forecast/
 
 ### 3.1 Tremor (`tremor/`)
 
-`CalculateTremor` reads seismic traces day-by-day from a `SeismicDataSource` and dispatches each day to the configured tremor kernels (`rsam.py`, `dsar.py`, `shannon_entropy.py`). Per-day CSVs are written to `tremor/daily/`, then concatenated into the merged tremor CSV at the station root. `TremorData` is a thin wrapper that exposes `df`, `start_date`, `end_date`, sampling-rate validation, and the CSV `filename` / `basename` / `filetype` triple.
+`CalculateTremor` reads seismic traces day-by-day from a `SeismicDataSource` and 
+dispatches each day to the configured tremor kernels (`rsam.py`, `dsar.py`, `shannon_entropy.py`). 
+Per-day CSVs are written to `tremor/daily/`, then concatenated into the merged tremor 
+CSV at the station root. `TremorData` is a thin wrapper that exposes `df`, `start_date`, `end_date`, 
+sampling-rate validation, and the CSV `filename` / `basename` / `filetype` triple.
 
 ### 3.2 Labels (`label/`)
 
 Two builders share the same output shape (`id`, `is_erupted`) but differ in how positives are placed:
 
-- **`LabelBuilder`** — sliding window over the full date range; `day_to_forecast` controls the look-ahead window. `include_eruption_date=False` (default) still marks the eruption day as positive, giving `day_to_forecast + 1` positive days per eruption.
-- **`DynamicLabelBuilder`** — extends `LabelBuilder` with a per-eruption three-phase build: (1) zero frames per eruption, (2) concat + deduplicate datetimes, (3) mark positives per eruption. Solves the issue where overlapping look-ahead windows collide in `LabelBuilder`.
+- **`LabelBuilder`** - sliding window over the full date range; `day_to_forecast` controls the look-ahead window. `include_eruption_date=False` (default) still marks the eruption day as positive, giving `day_to_forecast + 1` positive days per eruption.
+- **`DynamicLabelBuilder`** - extends `LabelBuilder` with a per-eruption three-phase build: (1) zero frames per eruption, (2) concat + deduplicate datetimes, (3) mark positives per eruption. Solves the issue where overlapping look-ahead windows collide in `LabelBuilder`.
 
 ```
-LabelBuilder — one global window over the full date range
+LabelBuilder - one global window over the full date range
 ─────────────────────────────────────────────────────────
  include_eruption_date=False  (default)
    0 0 0 0 0 0 0 0 0 0  1  1  1  1  1  1  1
@@ -166,7 +174,7 @@ LabelBuilder — one global window over the full date range
    → exactly dtf days ending on the eruption day
 
 
-DynamicLabelBuilder — per-eruption build, overlapping windows deduped
+DynamicLabelBuilder - per-eruption build, overlapping windows deduped
 ─────────────────────────────────────────────────────────────────────
  Phase 1: initiate (all zeros)
    Eruption A window           Eruption B window
@@ -183,7 +191,8 @@ DynamicLabelBuilder — per-eruption build, overlapping windows deduped
                           Erup A  Erup B
 ```
 
-`LabelData` parses parameters (`window_size`, `window_step`, `window_step_unit`, `day_to_forecast`) directly out of the label filename so a CSV alone is enough to rehydrate the build context.
+`LabelData` parses parameters (`window_size`, `window_step`, `window_step_unit`, `day_to_forecast`) 
+directly out of the label filename so a CSV alone is enough to rehydrate the build context.
 
 ### 3.3 Features (`features/`)
 
@@ -211,20 +220,24 @@ DynamicLabelBuilder — per-eruption build, overlapping windows deduped
         └────────────────────────────────────────┘
 ```
 
-`TremorMatrixBuilder.build()` validates sample counts per window against `minimum_completion` and skips short windows so tsfresh never sees ragged input. `FeaturesBuilder` runs per-column independent extractions so adding a new tremor band does not invalidate the cached results for the others.
+`TremorMatrixBuilder.build()` validates sample counts per window against `minimum_completion` 
+and skips short windows so tsfresh never sees ragged input. 
+`FeaturesBuilder` runs per-column independent extractions so adding a new tremor 
+band does not invalidate the cached results for the others.
 
 ### 3.4 Model (`model/`)
 
 The model layer follows a **mixin** pattern:
 
-- **`BaseModel`** — abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, and joblib `save()` / `load()`. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`.
-- **`CacheModel`** — abstract mixin that adds a content-addressable cache layer. Implementers declare `build_cache_identity(**kwargs) -> dict`; the mixin canonicalises the dict, SHA-256-hashes it, and reads/writes `{output_dir}/cache/{ClassName}/{hash}.pkl` (with a `.params.json` sidecar for debugging).
-- **`TrainingModel(BaseModel, CacheModel)`** — `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, then auto-merges every seed via `merge_seed_models` and every classifier via `merge_all_classifiers`.
-- **`PredictionModel(BaseModel, CacheModel)`** — `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash`, so re-training automatically invalidates downstream forecasts.
-- **`EvaluationModel(BaseModel)`** — no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
-- **`ForecastModel`** — the orchestrator. Not a `BaseModel` subclass — it owns `CalculateTremor`, builds the three stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
+- **`BaseModel`** - abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, and joblib `save()` / `load()`. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`.
+- **`CacheModel`** - abstract mixin that adds a content-addressable cache layer. Implementers declare `build_cache_identity(**kwargs) -> dict`; the mixin canonicalises the dict, SHA-256-hashes it, and reads/writes `{output_dir}/cache/{ClassName}/{hash}.pkl` (with a `.params.json` sidecar for debugging).
+- **`TrainingModel(BaseModel, CacheModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, then auto-merges every seed via `merge_seed_models` and every classifier via `merge_all_classifiers`.
+- **`PredictionModel(BaseModel, CacheModel)`** - `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash`, so re-training automatically invalidates downstream forecasts.
+- **`EvaluationModel(BaseModel)`** - no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
+- **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the three stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
 
-`ClassifierModel` is the per-classifier descriptor (sklearn estimator + hyperparameter grid + slug). `ClassifierComparator` consumes the metric JSON tree written by `EvaluationModel` to rank classifiers head-to-head.
+`ClassifierModel` is the per-classifier descriptor (sklearn estimator + hyperparameter grid + slug). 
+`ClassifierComparator` consumes the metric JSON tree written by `EvaluationModel` to rank classifiers head-to-head.
 
 ### 3.5 Ensemble (`ensemble/`)
 
@@ -240,23 +253,25 @@ N fitted seeds     1 SeedEnsemble each
                      from_dict, from_seed_ensembles,
                      from_registry_dict)
 
-           MetricsEnsemble  (standalone — not a BaseEnsemble subclass)
+           MetricsEnsemble  (standalone - not a BaseEnsemble subclass)
            wraps ClassifierEnsemble + features + y_true
            writes per-seed metrics JSON and y_proba / y_pred matrices
 ```
 
-`MetricsEnsemble` is deliberately not exported from `ensemble/__init__.py` and is imported via `eruption_forecast.ensemble.metrics_ensemble` to break a `MetricsEnsemble → MetricsComputer → utils.ml → SeedEnsemble` cycle.
+`MetricsEnsemble` is deliberately not exported from `ensemble/__init__.py` and is imported via `eruption_forecast.ensemble.metrics_ensemble` 
+to break a `MetricsEnsemble → MetricsComputer → utils.ml → SeedEnsemble` cycle.
 
 ### 3.6 Sources (`sources/`)
 
 `SeismicDataSource` is the read interface: `get(date) -> obspy.Stream`. Two concrete implementations:
 
-- **`SDS`** — pure local read from `{root}/{year}/{network}/{station}/{channel}.D/{file}`.
-- **`FDSN`** — pulls from a remote FDSN service, then caches the downloaded MSEED into a local SDS layout (`download_dir`). Repeat calls with the same date hit the local cache.
+- **`SDS`** - pure local read from `{root}/{year}/{network}/{station}/{channel}.D/{file}`.
+- **`FDSN`** - pulls from a remote FDSN service, then caches the downloaded MSEED into a local SDS layout (`download_dir`). Repeat calls with the same date hit the local cache.
 
 ### 3.7 Plots (`plots/`)
 
-`apply_nature_style()` normalises every figure to a Nature/Science-friendly palette and font stack. Each plot module is a thin functional wrapper around `matplotlib` (and `seaborn` where appropriate) — see [Visualization](Visualization) for the catalog and output paths.
+`apply_nature_style()` normalises every figure to a Nature/Science-friendly palette and font stack. 
+Each plot module is a thin functional wrapper around `matplotlib` (and `seaborn` where appropriate) - see [Visualization](Visualization) for the catalog and output paths.
 
 ### 3.8 Config (`config/`)
 
@@ -275,11 +290,12 @@ ForecastConfig
 
 ### 3.9 Decorators (`decorators/`)
 
-`notify(label)` wraps a function with start/finish/error Telegram messages. `send_telegram_notification(message, files, file_caption)` is the one-off helper used inside `scenarios.py` to ship each per-scenario plot.
+`notify(label)` wraps a function with start/finish/error Telegram messages. `send_telegram_notification(message, files, file_caption)` 
+is the one-off helper used inside `scenarios.py` to ship each per-scenario plot.
 
 ### 3.10 Utils (`utils/`)
 
-Eight focused modules that the rest of the codebase pulls from — see the table in [§6](#6-utility-modules).
+Eight focused modules that the rest of the codebase pulls from - see the table in [6](#6-utility-modules).
 
 ---
 
@@ -303,7 +319,7 @@ Eight focused modules that the rest of the codebase pulls from — see the table
   │                   │       │                    │      │                    │
   │ build_label →     │       │ build_label →      │      │ dispatch on        │
   │ extract_features →│       │ extract_features → │      │ model.kind:        │
-  │ fit (N seeds)     │       │ forecast           │      │   training |       │
+  │ fit (N seeds)     │       │ forecast           │      │   training/        │
   └────────┬──────────┘       └─────────┬──────────┘      │   prediction       │
            │                            │                 │ evaluate / compare │
            │ produces                   │ consumes        └──────────┬─────────┘
@@ -314,31 +330,31 @@ Eight focused modules that the rest of the codebase pulls from — see the table
   │  • from_any            │                          │ • per-seed metrics     │
   │  • from_json           │                          │ • y_proba / y_pred CSV │
   │  • from_seed_ensembles │                          └───────────┬────────────┘
-  └────────┬───────────────┘                                      │ aggregates
-           │ bundles                                              ▼
-           ▼                                          ┌───────────────────────┐
-  ┌────────────────────────┐                          │ ClassifierComparator  │
-  │   SeedEnsemble × M     │                          │ • get_ranking()       │
-  │ ───────────────────    │                          │ • plot_all()          │
-  │ • predict_proba        │                          └───────────────────────┘
+  └──────────┬─────────────┘                                      │ aggregates
+             │ bundles                                            ▼
+             ▼                                        ┌────────────────────────┐
+  ┌────────────────────────┐                          │ ClassifierComparator   │
+  │   SeedEnsemble × M     │                          │ • get_ranking()        │
+  │ ─────────────────────  │                          │ • plot_all()           │
+  │ • predict_proba        │                          └────────────────────────┘
   │ • predict_with_        │
   │   uncertainty          │
   └──────────┬─────────────┘
              │ inherits
              ▼
-       ┌──────────────────────┐
-       │    BaseEnsemble      │
-       │  (joblib save/load)  │
-       └──────────────────────┘
+ ┌─────────────────────────┐
+ │      BaseEnsemble       │
+ │    (joblib save/load)   │
+ └─────────────────────────┘
 ```
 
 **Scope cheat-sheet**:
 
 | Class                  | Scope (per …)              | Mixin / Inheritance          | Cache |
 |------------------------|----------------------------|------------------------------|-------|
-| `BaseModel`            | —                          | ABC                          | ✗ |
-| `CacheModel`           | —                          | ABC mixin                    | self |
-| `BaseEnsemble`         | —                          | mixin                        | ✗ |
+| `BaseModel`            | -                          | ABC                          | ✗ |
+| `CacheModel`           | -                          | ABC mixin                    | self |
+| `BaseEnsemble`         | -                          | mixin                        | ✗ |
 | `TrainingModel`        | One date span              | `BaseModel + CacheModel`     | ✓ |
 | `PredictionModel`      | One forecast window grid   | `BaseModel + CacheModel`     | ✓ |
 | `EvaluationModel`      | One trained model          | `BaseModel`                  | ✗ |
@@ -375,7 +391,7 @@ Eight focused modules that the rest of the codebase pulls from — see the table
             └─────────┬──────────────────────────────┘
                       │ used by Training / Prediction / Evaluation
                       ▼
-    ┌──────────────────────────────────────────────────────────────┐
+    ┌───────────────────────────────────────────────────────────────┐
     │ training/                                                     │
     │  features/{cv}/                                               │
     │    features-matrix_*.csv ──► features-label_*.csv             │
@@ -391,7 +407,7 @@ Eight focused modules that the rest of the codebase pulls from — see the table
     └─────────┬─────────────────────────────────────────────────────┘
               │ ClassifierEnsemble bundle
               ▼
-    ┌──────────────────────────────────────────────────────────────┐
+    ┌───────────────────────────────────────────────────────────────┐
     │ prediction/                                                   │
     │   features/{features-matrix,features-label}_*.csv             │
     │   results/{clf}/{seed:05d}.csv                                │
@@ -400,7 +416,7 @@ Eight focused modules that the rest of the codebase pulls from — see the table
     └─────────┬─────────────────────────────────────────────────────┘
               │ ClassifierEnsemble + features + y_true (rebuilt or training-derived)
               ▼
-    ┌──────────────────────────────────────────────────────────────┐
+    ┌───────────────────────────────────────────────────────────────┐
     │ evaluation/{training|prediction}/                             │
     │   classifiers/{Clf}/                                          │
     │     predictions/{y_proba,y_pred,y_true}.csv                   │
@@ -410,16 +426,18 @@ Eight focused modules that the rest of the codebase pulls from — see the table
     │   comparison/                                                 │
     │     metrics/ranking_*.csv                                     │
     │     figures/*.png                                             │
-    └──────────────────────────────────────────────────────────────┘
+    └───────────────────────────────────────────────────────────────┘
 
-           ┌──────────────────────────────────────────────────┐
-           │  cache/                                           │
-           │    TrainingModel/{hash}.pkl + {hash}.params.json  │  ← CacheModel
-           │    PredictionModel/{hash}.pkl + {hash}.params.json│
-           └──────────────────────────────────────────────────┘
+           ┌─────────────────────────────────────────────────────┐
+           │  cache/                                             │
+           │    TrainingModel/{hash}.pkl + {hash}.params.json    │  ← CacheModel
+           │    PredictionModel/{hash}.pkl + {hash}.params.json  │
+           └─────────────────────────────────────────────────────┘
 ```
 
-A cache hit on `TrainingModel` short-circuits everything in the `training/` box; a cache hit on `PredictionModel` short-circuits the `prediction/` box. Evaluation is **never cached** — the metric JSONs themselves act as the cache via the `overwrite` flag.
+A cache hit on `TrainingModel` short-circuits everything in the `training/` box; 
+a cache hit on `PredictionModel` short-circuits the `prediction/` box. 
+Evaluation is **never cached** - the metric JSONs themselves act as the cache via the `overwrite` flag.
 
 ---
 
@@ -436,6 +454,7 @@ A cache hit on `TrainingModel` short-circuits everything in the `training/` box;
 | `utils/dataframe.py` | `load_label_csv`, DataFrame shape and column helpers                                                           |
 | `utils/formatting.py`| `slugify`, human-readable elapsed time and file sizes                                                          |
 
-`utils/ml.merge_seed_models` and `utils/ml.merge_all_classifiers` are the bridge between the per-seed `.pkl` outputs and the `SeedEnsemble` / `ClassifierEnsemble` packaging — both are invoked at the end of `TrainingModel.fit()`.
+`utils/ml.merge_seed_models` and `utils/ml.merge_all_classifiers` are the bridge between the per-seed `.pkl` outputs 
+and the `SeedEnsemble` / `ClassifierEnsemble` packaging - both are invoked at the end of `TrainingModel.fit()`.
 
 `utils/formatting.slugify` is what turns `"Scenario 1"` into `scenario-1` for the per-scenario `output_dir` used in `scenarios.py`.

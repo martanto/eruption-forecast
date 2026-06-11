@@ -1,6 +1,7 @@
 # Getting Started
 
-This page covers everything needed to install `eruption-forecast` and run the bundled examples. For per-stage detail jump to [Pipeline Walkthrough](Pipeline-Walkthrough); for an end-to-end snippet see [Usage](Usage).
+This page covers everything needed to install `eruption-forecast` and run the bundled examples. 
+For per-stage detail jump to [Pipeline Walkthrough](Pipeline-Walkthrough); for an end-to-end snippet see [Usage](Usage).
 
 ---
 
@@ -12,9 +13,9 @@ This page covers everything needed to install `eruption-forecast` and run the bu
 | **[`uv`](https://docs.astral.sh/uv/)** | The project's only supported package manager. `pip` workflows are not tested |
 | **Git** | Required for cloning the repository |
 | **Seismic data archive** | An [SDS-formatted](Data-Sources#sds) local directory, **or** access to an FDSN web service (default: `https://service.iris.edu`) |
-| **Eruption dates** | Known absolute eruption timestamps for the target volcano — supervised labelling is keyed off these dates |
-| **GPU** *(optional)* | CUDA-capable device for XGBoost — toggled per-classifier via `ClassifierModel(use_gpu=True, gpu_id=0)` |
-| **Telegram bot** *(optional)* | Push notifications when long-running stages finish — see [Configuration](Configuration#telegram-notifications) |
+| **Eruption dates** | Known absolute eruption timestamps for the target volcano - supervised labelling is keyed off these dates |
+| **GPU** *(optional)* | CUDA-capable device for XGBoost - toggled per-classifier via `ClassifierModel(use_gpu=True, gpu_id=0)` |
+| **Telegram bot** *(optional)* | Push notifications when long-running stages finish - see [Configuration](Configuration#telegram-notifications) |
 
 ---
 
@@ -59,7 +60,7 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 | `shap` (≥ 0.46) | Model interpretability (used by evaluation plots) |
 | `joblib` | Parallel workers + ensemble serialisation |
 | `matplotlib`, `seaborn` | Plotting backends |
-| `loguru` | Structured logging — wrapped by `eruption_forecast.logger` |
+| `loguru` | Structured logging - wrapped by `eruption_forecast.logger` |
 | `python-dotenv` | `.env` loading for Telegram credentials |
 
 ## Development Dependencies (`--group dev`)
@@ -67,7 +68,7 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 | Package | Role |
 |---------|------|
 | `ruff` | Linting + autofix (`uv run ruff check --fix src/`) |
-| `ty` | Type checking (`uvx ty check src/` — note the forward slash) |
+| `ty` | Type checking (`uvx ty check src/` - note the forward slash) |
 | `pytest` | Test runner (`uv run pytest tests/`) |
 
 ---
@@ -85,7 +86,7 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 | `uv run python main.py` | Run the bundled Research Workflow |
 | `uv run python scenarios.py` | Run the bundled Scenarios Workflow |
 
-All `uv`, `uvx`, and `python` commands are pre-approved in the project hooks — no permission prompt will be shown.
+All `uv`, `uvx`, and `python` commands are pre-approved in the project hooks - no permission prompt will be shown.
 
 ---
 
@@ -107,6 +108,6 @@ Full usage is documented in [Configuration → Telegram Notifications](Configura
 
 ## Next Steps
 
-1. Confirm a seismic data archive is reachable — see [Data Sources](Data-Sources).
+1. Confirm a seismic data archive is reachable - see [Data Sources](Data-Sources).
 2. Run the [Usage](Usage) Quick Start to produce your first forecast.
 3. Dive into [Pipeline Walkthrough](Pipeline-Walkthrough) for the annotated `main.py` / `scenarios.py` tours.

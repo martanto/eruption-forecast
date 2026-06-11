@@ -28,7 +28,7 @@ Every concrete adapter must implement `get()` and may rely on the shared `_make_
 
 ---
 
-## SDS — Local SeisComP Archive
+## SDS - Local SeisComP Archive
 
 The SDS layout is the de-facto standard for ObsPy / SeisComP archives:
 
@@ -81,9 +81,11 @@ trace  = sds.get_trace(datetime(2025, 3, 20))  # merged single Trace or None
 
 ---
 
-## FDSN — Web Service with Local Cache
+## FDSN - Web Service with Local Cache
 
-`FDSN` wraps `obspy.clients.fdsn.Client` and writes every successful download into an **SDS cache** at `download_dir`. The next call for the same `(date, nslc)` is served from disk — no network round-trip.
+`FDSN` wraps `obspy.clients.fdsn.Client` and writes every successful download into 
+an **SDS cache** at `download_dir`. The next call for the same `(date, nslc)` 
+is served from disk - no network round-trip.
 
 ### Read path
 
@@ -141,10 +143,10 @@ fdsn = FDSN(
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| `station`, `channel`, `network`, `location` | — | Standard NSLC components. `location=None` and `""` are equivalent |
+| `station`, `channel`, `network`, `location` | - | Standard NSLC components. `location=None` and `""` are equivalent |
 | `channel_type` | `"D"` | SDS channel-type suffix |
 | `client_url` | `"https://service.iris.edu"` | Any FDSN endpoint accepted by `obspy.clients.fdsn.Client` |
-| `download_dir` | `<cwd>/downloads` | Cache root — created automatically if absent |
+| `download_dir` | `<cwd>/downloads` | Cache root - created automatically if absent |
 | `overwrite` | `False` | When `True`, re-download even when cached |
 | `verbose`, `debug` | `False` | Forwarded to loguru |
 
@@ -155,12 +157,13 @@ fdsn = FDSN(
 |                       | `SDS` | `FDSN` |
 |-----------------------|-------|--------|
 | Source of truth | Local archive | Remote web service |
-| Network required | No | First time only — subsequent calls hit the SDS cache |
+| Network required | No | First time only - subsequent calls hit the SDS cache |
 | Where data ends up | Already on disk | Written to `download_dir` in SDS layout |
 | Failure mode | Empty `Stream` if file missing | Empty `Stream` if FDSN raises `FDSNException` |
 | Best for | Offline pipelines, large pre-existing archives | Ad-hoc fetches, missing days in a partial SDS |
 
-Because `FDSN` caches into an SDS directory, you can start a pipeline against FDSN and later switch to `source="sds"` pointing at the same `download_dir` once the archive is complete.
+Because `FDSN` caches into an SDS directory, you can start a pipeline against FDSN and 
+later switch to `source="sds"` pointing at the same `download_dir` once the archive is complete.
 
 ---
 
@@ -176,4 +179,5 @@ Because `FDSN` caches into an SDS directory, you can start a pipeline against FD
 | `f3`  | 4.5 – 8    | RSAM, DSAR |
 | `f4`  | 8 – 16     | RSAM, DSAR |
 
-The resulting CSV columns are `rsam_f0..f4`, `dsar_f0-f1..f3-f4`, and `entropy`. Override the band list with `CalculateTremor(...).change_freq_bands([(0.1, 1.0), (1.0, 5.0)])`.
+The resulting CSV columns are `rsam_f0..f4`, `dsar_f0-f1..f3-f4`, and `entropy`. 
+Override the band list with `CalculateTremor(...).change_freq_bands([(0.1, 1.0), (1.0, 5.0)])`.

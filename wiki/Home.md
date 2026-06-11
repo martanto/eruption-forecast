@@ -6,7 +6,8 @@ A Python package for volcanic eruption forecasting from continuous seismic tremo
 
 ## ⚠️ Research Use Only
 
-`eruption-forecast` produces **probabilistic** eruption likelihoods, not deterministic warnings. It is a research tool and must not be used as the sole basis for public safety decisions. Always consult qualified volcanologists and official observatory bulletins.
+`eruption-forecast` produces **probabilistic** eruption likelihoods, not deterministic warnings. 
+It is a research tool and must not be used as the sole basis for public safety decisions. Always consult qualified volcanologists and official observatory bulletins.
 
 ---
 
@@ -86,8 +87,8 @@ eruption-forecast/
 ├── src/eruption_forecast/      Package source (64 .py files)
 ├── wiki/                       This wiki (Markdown sources)
 ├── tests/                      Unit tests
-├── main.py                     Research Workflow — single train + predict
-├── scenarios.py                Scenarios Workflow — loop over date-split scenarios
+├── main.py                     Research Workflow - single train + predict
+├── scenarios.py                Scenarios Workflow - loop over date-split scenarios
 ├── config.example.yaml         Annotated ForecastConfig template
 ├── CLAUDE.md                   Project rules and architecture cheatsheet
 └── WIKI.md                     Local wiki-rewrite progress tracker
@@ -98,6 +99,6 @@ eruption-forecast/
 ## Key Links
 
 - [README](https://github.com/martanto/eruption-forecast/blob/master/README.md)
-- [`main.py` — Research Workflow](https://github.com/martanto/eruption-forecast/blob/master/main.py)
-- [`scenarios.py` — Scenarios Workflow](https://github.com/martanto/eruption-forecast/blob/master/scenarios.py)
-- [`config.example.yaml` — config template](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml)
+- [`main.py` - Research Workflow](https://github.com/martanto/eruption-forecast/blob/master/main.py)
+- [`scenarios.py` - Scenarios Workflow](https://github.com/martanto/eruption-forecast/blob/master/scenarios.py)
+- [`config.example.yaml` - config template](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml)

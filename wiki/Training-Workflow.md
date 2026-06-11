@@ -1,6 +1,7 @@
 # Training Workflow
 
-The training stage turns labelled tremor windows into a `ClassifierEnsemble` — N classifiers × M random seeds — that the [Prediction Workflow](Prediction-Workflow) reuses for inference and the [Evaluation Workflow](Evaluation-Workflow) scores against ground truth.
+The training stage turns labelled tremor windows into a `ClassifierEnsemble` - N classifiers × M random seeds - that the [Prediction Workflow](Prediction-Workflow) 
+reuses for inference and the [Evaluation Workflow](Evaluation-Workflow) scores against ground truth.
 
 Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapped by `ForecastModel.train(...)`.
 
@@ -19,7 +20,7 @@ Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapp
                   ┌────────────┼─────────────┐
                   ▼            ▼             ▼
         ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-        │ build_label │→│ extract_    │→│    fit      │
+        │ build_label │ →│ extract_    │ →│    fit      │
         │             │  │ features    │  │             │
         └─────────────┘  └─────────────┘  └─────────────┘
             LabelBuilder    TremorMatrix     per-seed
@@ -31,7 +32,8 @@ Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapp
                                              → ClassifierEnsemble
 ```
 
-`ForecastModel.train(...)` calls all three in one go; the standalone `TrainingModel(...)` lets you call them separately for fine-grained debugging.
+`ForecastModel.train(...)` calls all three in one go; the standalone `TrainingModel(...)` 
+lets you call them separately for fine-grained debugging.
 
 ---
 
@@ -39,21 +41,21 @@ Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapp
 
 | Param | Type | Default | Purpose |
 |-------|------|---------|---------|
-| `window_step` | `int` | — | Stride between consecutive labelled windows |
-| `window_step_unit` | `"minutes"` \| `"hours"` | — | Unit for `window_step` |
+| `window_step` | `int` | - | Stride between consecutive labelled windows |
+| `window_step_unit` | `"minutes"` \| `"hours"` | - | Unit for `window_step` |
 | `builder` | `"standard"` \| `"dynamic"` | `"standard"` | `LabelBuilder` vs `DynamicLabelBuilder` |
 | `days_before_eruption` | `int \| None` | `None` | Required when `builder="dynamic"` |
 
 Two builder variants live in `src/eruption_forecast/label/`:
 
-### `LabelBuilder` — single global window
+### `LabelBuilder` - single global window
 
 ```
  start_date                                                  end_date
  │                                                              │
- ├──── window stepping at window_step ─────────────────────────┤
- │  0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1                        │
- │                       ↑                                      │
+ ├──── window stepping at window_step ──────────────────────────┤
+ │  0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1                         │
+ │                        ↑                                     │
  │                  positive region                             │
  │                  starts day_to_forecast                      │
  │                  days before eruption                        │
@@ -64,20 +66,20 @@ Two builder variants live in `src/eruption_forecast/label/`:
  │    → exactly day_to_forecast positive days ending on E       │
 ```
 
-### `DynamicLabelBuilder` — one window per eruption, with overlap dedup
+### `DynamicLabelBuilder` - one window per eruption, with overlap dedup
 
 ```
 Phase 1: initiate
     Eruption A window         Eruption B window
-    [0 0 0 0 0 0 0 0]        [0 0 0 0 0 0 0 0]
+    [0 0 0 0 0 0 0 0]         [0 0 0 0 0 0 0 0]
 
-Phase 2: concat + dedup datetimes (sorted)
+Phase 2: concat + deduplicate datetimes (sorted)
     [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
 
 Phase 3: mark positives per eruption
     [0 0 0 0 0 0 1 1 1 0 0 0 1 1 1]
-                  ↑       ↑   ↑       ↑
-                  Erup A      Erup B
+                   ↑ ↑         ↑ ↑
+                 Erup A      Erup B
 ```
 
 `ForecastModel.train(..., label_builder="dynamic", days_before_eruption=N)` triggers the dynamic builder.
@@ -89,7 +91,7 @@ Phase 3: mark positives per eruption
 `extract_features()` chains three steps:
 
 1. **`TremorMatrixBuilder`** slices the tremor DataFrame into label-aligned windows. Each window becomes a row block with `id`, `datetime`, and the tremor columns.
-2. **`FeaturesBuilder`** runs tsfresh over the tremor matrix — one extraction per tremor column, ~700 features per column.
+2. **`FeaturesBuilder`** runs tsfresh over the tremor matrix - one extraction per tremor column, ~700 features per column.
 3. **`FeatureSelector`** is configured here (`method="tsfresh"`, `n_jobs=n_grids`) but only fires during `fit()`, per seed.
 
 Key kwargs:
@@ -168,16 +170,16 @@ Configured in `ClassifierModel` (`model/classifier_model.py`). Grid params come 
 
 | Key | sklearn class | Folder slug | GPU |
 |-----|---------------|-------------|-----|
-| `rf` | `RandomForestClassifier` (balanced class weights) | `random-forest-classifier` | — |
-| `lite-rf` | `RandomForestClassifier` with a slimmer grid | `lite-random-forest-classifier` | — |
-| `gb` | `GradientBoostingClassifier` | `gradient-boosting-classifier` | — |
+| `rf` | `RandomForestClassifier` (balanced class weights) | `random-forest-classifier` | - |
+| `lite-rf` | `RandomForestClassifier` with a slimmer grid | `lite-random-forest-classifier` | - |
+| `gb` | `GradientBoostingClassifier` | `gradient-boosting-classifier` | - |
 | `xgb` | `XGBClassifier` | `xgb-classifier` | ✓ via `use_gpu=True, gpu_id=0` |
-| `svm` | `SVC` (balanced) | `svc` | — |
-| `lr` | `LogisticRegression` (balanced) | `logistic-regression` | — |
-| `nn` | `MLPClassifier` | `mlp-classifier` | — |
-| `dt` | `DecisionTreeClassifier` (balanced) | `decision-tree-classifier` | — |
-| `knn` | `KNeighborsClassifier` | `k-neighbors-classifier` | — |
-| `nb` | `GaussianNB` | `gaussian-nb` | — |
+| `svm` | `SVC` (balanced) | `svc` | - |
+| `lr` | `LogisticRegression` (balanced) | `logistic-regression` | - |
+| `nn` | `MLPClassifier` | `mlp-classifier` | - |
+| `dt` | `DecisionTreeClassifier` (balanced) | `decision-tree-classifier` | - |
+| `knn` | `KNeighborsClassifier` | `k-neighbors-classifier` | - |
+| `nb` | `GaussianNB` | `gaussian-nb` | - |
 | `voting` | `VotingClassifier` over `rf + xgb` | `voting-classifier` | ✓ (delegates to XGB) |
 
 Pass `classifiers="rf"` or `classifiers=["rf", "xgb", "gb"]` to `fm.train(...)`. Each classifier produces one `SeedEnsemble`; together they form a `ClassifierEnsemble`.
@@ -194,7 +196,8 @@ Pass `classifiers="rf"` or `classifiers=["rf", "xgb", "gb"]` to `fm.train(...)`.
 | `"stratified"` | `StratifiedKFold` | `stratified-k-fold` |
 | `"shuffle-stratified"` *(default)* | `StratifiedShuffleSplit` | `stratified-shuffle-split` |
 
-`cv_splits` (default `5`) controls the fold count. `TimeSeriesSplit` is also wired into `ClassifierModel(cv_strategy="timeseries")` for ad-hoc direct use, but `ForecastModel.train` does not expose it.
+`cv_splits` (default `5`) controls the fold count. `TimeSeriesSplit` is also wired into `ClassifierModel(cv_strategy="timeseries")` 
+for ad-hoc direct use, but `ForecastModel.train` does not expose it.
 
 ---
 
@@ -235,7 +238,7 @@ Hash → `{station_dir}/cache/TrainingModel/{hash}.pkl` (+ a sidecar `{hash}.par
 
 ## Standalone Use
 
-`TrainingModel` is a public class — call it directly when you want to skip `ForecastModel`:
+`TrainingModel` is a public class - call it directly when you want to skip `ForecastModel`:
 
 ```python
 from eruption_forecast import TrainingModel
@@ -263,7 +266,8 @@ print(tm.classifier_ensemble_path) # path to the saved ClassifierEnsemble
 
 ### Reuse a feature matrix from a prior run
 
-`TrainingModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix_*.csv` + `features-label_*.csv`. Pair with `select_features="path/to/top_20_features.csv"` to refit on the curated subset:
+`TrainingModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix_*.csv` + `features-label_*.csv`. 
+Pair with `select_features="path/to/top_20_features.csv"` to refit on the curated subset:
 
 ```python
 tm.load_features(
@@ -277,4 +281,4 @@ tm.load_features(
 tm.save_config()   # → {output_dir}/training.config.yaml
 ```
 
-Round-trips through `TrainingConfig.load(path)` for reproducibility — see [Configuration](Configuration#trainingconfig).
+Round-trips through `TrainingConfig.load(path)` for reproducibility - see [Configuration](Configuration#trainingconfig).

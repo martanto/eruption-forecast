@@ -1,6 +1,7 @@
 # Usage
 
-This page walks from a 20-line Quick Start to a fully annotated example mirroring the bundled `main.py`. For a per-stage internal tour, see [Pipeline Walkthrough](Pipeline-Walkthrough); for parameter-level detail, see [API Reference](API-Reference).
+This page walks from a 20-line Quick Start to a fully annotated example mirroring the bundled `main.py`. 
+For a per-stage internal tour, see [Pipeline Walkthrough](Pipeline-Walkthrough); for parameter-level detail, see [API Reference](API-Reference).
 
 ---
 
@@ -38,7 +39,7 @@ fm = ForecastModel(
 )
 ```
 
-That's the whole pipeline. The four stages — `calculate → train → predict → evaluate` — each return `self`, so they chain.
+That's the whole pipeline. The four stages - `calculate → train → predict → evaluate` - each return `self`, so they chain.
 
 ---
 
@@ -51,7 +52,7 @@ That's the whole pipeline. The four stages — `calculate → train → predict 
 | `predict()` | Re-extracts features over the forecast grid → runs ensemble inference | `prediction/...` + `cache/PredictionModel/` |
 | `evaluate()` | Re-uses the in-session `TrainingModel` or `PredictionModel` for per-seed metrics + aggregate plots | `evaluation/{training\|prediction}/...` |
 
-All paths root at `{output_dir}/{nslc}/`, where `nslc = "{network}.{station}.{location}.{channel}"` — see [Output Structure](Output-Structure) for the full tree.
+All paths root at `{output_dir}/{nslc}/`, where `nslc = "{network}.{station}.{location}.{channel}"` - see [Output Structure](Output-Structure) for the full tree.
 
 ---
 
@@ -77,7 +78,7 @@ def main(sds_dir: str, n_jobs: int = 2):
         verbose=True,
     )
 
-    # 1. Tremor metrics — RSAM + DSAR + Shannon Entropy
+    # 1. Tremor metrics - RSAM + DSAR + Shannon Entropy
     fm.calculate(
         start_date="2025-01-01",
         end_date="2025-12-31",
@@ -151,7 +152,7 @@ if __name__ == "__main__":
 |-----------|-----|
 | `day_to_forecast=2` | Mark the 2-day window before each eruption as positive; doubles as the tsfresh `window_size` |
 | `window_step=6, "hours"` *(train)* | Coarse stride keeps the labelled set manageable while preserving multiple windows per eruption |
-| `window_step=10, "minutes"` *(predict)* | Dense stride during forecasting — 144 forecasts/day |
+| `window_step=10, "minutes"` *(predict)* | Dense stride during forecasting - 144 forecasts/day |
 | `scoring="recall"` | False negatives are far more costly than false positives in eruption forecasting |
 | `select_tremor_columns=[...]` | High-frequency RSAM bands and entropy carry most of the precursor signal at OJN |
 | `resample_method="under"` | Eruption-positive windows are < 5 % of the training set → undersample the majority |
@@ -165,13 +166,13 @@ if __name__ == "__main__":
 After the pipeline runs, every artefact is reachable from the `fm` object:
 
 ```python
-fm.tremor_df                  # pd.DataFrame — merged tremor CSV
-fm.TrainingModel              # TrainingModel — labels, features, fit state
-fm.ClassifierEnsemble         # ClassifierEnsemble — fitted across classifiers + seeds
-fm.PredictionModel            # PredictionModel — forecast grid + caching state
-fm.results                    # pd.DataFrame — per-window forecast probabilities
-fm.EvaluationModel            # EvaluationModel — per-seed JSON + aggregates
-fm.evaluation_results         # dict[classifier_name, pd.DataFrame] — per-seed metrics
+fm.tremor_df                  # pd.DataFrame - merged tremor CSV
+fm.TrainingModel              # TrainingModel - labels, features, fit state
+fm.ClassifierEnsemble         # ClassifierEnsemble - fitted across classifiers + seeds
+fm.PredictionModel            # PredictionModel - forecast grid + caching state
+fm.results                    # pd.DataFrame - per-window forecast probabilities
+fm.EvaluationModel            # EvaluationModel - per-seed JSON + aggregates
+fm.evaluation_results         # dict[classifier_name, pd.DataFrame] - per-seed metrics
 ```
 
 Probability columns in `fm.results`:
@@ -200,7 +201,7 @@ fm.calculate(
 )
 ```
 
-Downloads are cached locally as SDS — see [Data Sources](Data-Sources#fdsn--web-service-with-local-cache).
+Downloads are cached locally as SDS - see [Data Sources](Data-Sources#fdsn--web-service-with-local-cache).
 
 ### Skip recomputation by replaying a saved config
 
@@ -236,4 +237,4 @@ em.compare().plot_all()
 
 ### Loop over multiple training/prediction splits
 
-Use `scenarios.py` — see [Pipeline Walkthrough → Scenarios Workflow](Pipeline-Walkthrough#scenarios-workflow-scenariospy).
+Use `scenarios.py` - see [Pipeline Walkthrough → Scenarios Workflow](Pipeline-Walkthrough#scenarios-workflow-scenariospy).

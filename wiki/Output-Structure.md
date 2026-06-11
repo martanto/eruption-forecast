@@ -103,7 +103,7 @@ Folder slugs come from `ClassifierModel.slug_name` and `ClassifierModel.slug_cv_
 | `shuffle-stratified` | `stratified-shuffle-split` |
 | `timeseries` *(direct `ClassifierModel` only)* | `time-series-split` |
 
-Inside `evaluation/`, the per-classifier folder uses the **unslugified** sklearn class name (`RandomForestClassifier`) — separate from training's slug (`random-forest-classifier`).
+Inside `evaluation/`, the per-classifier folder uses the **unslugified** sklearn class name (`RandomForestClassifier`) - separate from training's slug (`random-forest-classifier`).
 
 ---
 
@@ -152,9 +152,11 @@ cache/
     └── 9c12d04f...88.params.json
 ```
 
-The `.params.json` is what was hashed to produce the filename. When `use_cache=True` and the next run computes the same identity, the `.pkl` is loaded instead of recomputed.
+The `.params.json` is what was hashed to produce the filename. When `use_cache=True` 
+and the next run computes the same identity, the `.pkl` is loaded instead of recomputed.
 
-`fm.train(..., use_cache=True)` (default) and `fm.predict(..., use_cache=True)` (default) use the cache; flip to `False` to force a clean run.
+`fm.train(..., use_cache=True)` (default) and `fm.predict(..., use_cache=True)` 
+(default) use the cache; flip to `False` to force a clean run.
 
 ---
 
@@ -179,13 +181,16 @@ output/
         └── scenario-9/
 ```
 
-Each scenario directory mirrors a full `{station_dir}` sub-tree, just rooted at `output/{nslc}/scenarios/{slug}/` instead of `output/{nslc}/`. Slugify is from `utils/formatting.py:slugify`: `"Scenario 1"` → `scenario-1`.
+Each scenario directory mirrors a full `{station_dir}` sub-tree, just rooted at 
+`output/{nslc}/scenarios/{slug}/` instead of `output/{nslc}/`. 
+Slugify is from `utils/formatting.py:slugify`: `"Scenario 1"` → `scenario-1`.
 
-The shared `tremor/` at the top means re-running scenarios never recomputes tremor — only the train/predict/evaluate legs are repeated.
+The shared `tremor/` at the top means re-running scenarios never recomputes 
+tremor - only the train/predict/evaluate legs are repeated.
 
 ---
 
-## What Lives Where — Cheat Sheet
+## What Lives Where - Cheat Sheet
 
 | You want to inspect... | Look here |
 |------------------------|-----------|

@@ -1,6 +1,8 @@
 # Evaluation Workflow
 
-The evaluation stage scores a fitted `ClassifierEnsemble` against ground truth, never re-fitting. It reuses the upstream `TrainingModel` or `PredictionModel` (in-memory or from a `.pkl`) and writes per-seed JSON + aggregate CSV + plots per classifier, plus cross-classifier ranking via `ClassifierComparator`.
+The evaluation stage scores a fitted `ClassifierEnsemble` against ground truth, never re-fitting. 
+It reuses the upstream `TrainingModel` or `PredictionModel` (in-memory or from a `.pkl`) and \
+writes per-seed JSON + aggregate CSV + plots per classifier, plus cross-classifier ranking via `ClassifierComparator`.
 
 Driver: `EvaluationModel` (`src/eruption_forecast/model/evaluation_model.py`). Wrapped by `ForecastModel.evaluate(...)`.
 
@@ -17,7 +19,7 @@ Driver: `EvaluationModel` (`src/eruption_forecast/model/evaluation_model.py`). W
                   ▼                           ▼
        model.kind == "training"       model.kind == "prediction"
                   │                           │
-   ┌──────────────┴────────────┐  ┌───────────┴────────────────────┐
+   ┌──────────────┴────────────┐  ┌───────────┴─────────────────────┐
    │ Training reuse            │  │ Prediction reuse                │
    │                           │  │                                 │
    │ y_true ← TrainingModel    │  │ y_true ← fresh LabelBuilder     │
@@ -25,18 +27,18 @@ Driver: `EvaluationModel` (`src/eruption_forecast/model/evaluation_model.py`). W
    │ (already ground truth on  │  │   joined to PredictionModel     │
    │  the labelled grid)       │  │   .labels by datetime           │
    │                           │  │                                 │
-   │ eruption_dates: optional  │  │ eruption_dates: REQUIRED         │
+   │ eruption_dates: optional  │  │ eruption_dates: REQUIRED        │
    └──────────────┬────────────┘  └───────────────┬─────────────────┘
                   │                               │
                   ▼                               ▼
-       output to evaluation/training/    output to evaluation/prediction/
+   output to evaluation/training/   output to evaluation/prediction/
 ```
 
 Both modes share the same per-seed scoring engine (`MetricsEnsemble`) and aggregation step.
 
 | Mode | When to use | `eruption_dates` |
 |------|-------------|------------------|
-| `model="training"` | In-sample / training-window diagnostics | optional — embedded in training labels |
+| `model="training"` | In-sample / training-window diagnostics | optional - embedded in training labels |
 | `model="prediction"` | Forecast-window evaluation after `predict()` | **required** to build truth on the prediction grid |
 
 ---
@@ -59,7 +61,7 @@ For each classifier in ClassifierEnsemble:
                 → returned to caller as pd.DataFrame
 ```
 
-The result of `evaluate()` is a `dict[classifier_name, pd.DataFrame]` — one DataFrame per classifier, one row per seed, one column per metric.
+The result of `evaluate()` is a `dict[classifier_name, pd.DataFrame]` - one DataFrame per classifier, one row per seed, one column per metric.
 
 Available metrics (from `MetricsComputer`):
 
@@ -77,7 +79,7 @@ f1_at_optimal   recall_at_optimal   precision_at_optimal
 em.evaluate(
     plot_aggregate=True,         # mean ± std plots per classifier
     plot_per_seed=False,         # one plot set per seed (expensive)
-    plot_shap=False,             # reserved — currently a warning
+    plot_shap=False,             # reserved - currently a warning
     compare_classifiers=True,    # also run ClassifierComparator at the end
 ) -> dict[str, pd.DataFrame]
 ```
@@ -94,7 +96,8 @@ comparator.get_ranking()       # → comparison/metrics/ranking_recall.csv
 comparator.plot_all()          # → comparison/figures/*.png
 ```
 
-`ClassifierComparator` works on the metrics already computed by `MetricsEnsemble` — repeat `em.compare()` calls reuse the cached `MetricsEnsemble`, so the per-classifier `predict_proba` pass is only paid once.
+`ClassifierComparator` works on the metrics already computed by `MetricsEnsemble` - repeat `em.compare()` 
+calls reuse the cached `MetricsEnsemble`, so the per-classifier `predict_proba` pass is only paid once.
 
 Outputs land under `{evaluation_dir}/comparison/`:
 
@@ -107,7 +110,8 @@ Outputs land under `{evaluation_dir}/comparison/`:
 | `figures/comparison_grid.png` | Classifier × metric grid |
 | `figures/comparison_roc.png` | Overlaid mean ROC curves with ± std bands |
 
-When invoked through `fm.EvaluationModel.compare()`, the live `(ClassifierEnsemble, features_df, y_true)` triple is forwarded as `ensemble_source` so the ROC overlay computes from in-memory probabilities rather than re-reading CSVs.
+When invoked through `fm.EvaluationModel.compare()`, the live `(ClassifierEnsemble, features_df, y_true)` 
+triple is forwarded as `ensemble_source` so the ROC overlay computes from in-memory probabilities rather than re-reading CSVs.
 
 ---
 
@@ -131,13 +135,16 @@ When invoked through `fm.EvaluationModel.compare()`, the live `(ClassifierEnsemb
     └── figures/*.png
 ```
 
-Per-classifier folder names use the *unslugified* sklearn class name (e.g. `RandomForestClassifier`), distinct from the slug used by `TrainingModel` (`random-forest-classifier`).
+Per-classifier folder names use the *unslugified* sklearn class name (e.g. `RandomForestClassifier`), 
+distinct from the slug used by `TrainingModel` (`random-forest-classifier`).
 
 ---
 
 ## Cache Semantics
 
-`EvaluationModel` does **not** mix in `CacheModel` — it has no parameter-cache. What it does instead is **reuse on-disk JSON metrics**: per-seed metrics files are only re-computed when missing or when `overwrite=True`. Re-running `evaluate()` on the same instance is therefore very fast once the JSON tree exists.
+`EvaluationModel` does **not** mix in `CacheModel` - it has no parameter-cache. What it does instead 
+is **reuse on-disk JSON metrics**: per-seed metrics files are only re-computed when missing or 
+when `overwrite=True`. Re-running `evaluate()` on the same instance is therefore very fast once the JSON tree exists.
 
 ---
 
@@ -154,7 +161,7 @@ em = EvaluationModel.from_file(
 )
 metrics = em.evaluate(plot_aggregate=True)
 
-# forecast-window evaluation — eruption_dates required
+# forecast-window evaluation - eruption_dates required
 em = EvaluationModel.from_file(
     "output/VG.OJN.00.EHZ/PredictionModel_2025-07-27_2025-08-22.pkl",
     eruption_dates=["2025-08-02", "2025-08-18"],
@@ -186,17 +193,17 @@ ranking = em.compare(metrics="balanced_accuracy").get_ranking(metric="balanced_a
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│             EvaluationModel  (no CacheModel mix-in)              │
-│                                                                  │
-│   ┌─────────────────────────────────────────┐                    │
-│   │ MetricsEnsemble.compute()                │                    │
-│   │   per-classifier predict_proba           │                    │
-│   │   per-seed JSON + (y_proba,y_pred,y_true)│                    │
-│   │   aggregate mean ± std → CSV             │                    │
-│   └────────────────────┬────────────────────┘                    │
-│                        │ cached on self.MetricsEnsemble          │
-│                        ▼                                          │
-│                em.compare() → ClassifierComparator               │
-│                    ranking CSV + comparison plots                │
+│             EvaluationModel  (no CacheModel mix-in)             │
+│                                                                 │
+│   ┌──────────────────────────────────────────┐                  │
+│   │ MetricsEnsemble.compute()                │                  │
+│   │   per-classifier predict_proba           │                  │
+│   │   per-seed JSON + (y_proba,y_pred,y_true)│                  │
+│   │   aggregate mean ± std → CSV             │                  │
+│   └────────────────────┬─────────────────────┘                  │
+│                        │ cached on self.MetricsEnsemble         │
+│                        ▼                                        │
+│                em.compare() → ClassifierComparator              │
+│                    ranking CSV + comparison plots               │
 └─────────────────────────────────────────────────────────────────┘
 ```

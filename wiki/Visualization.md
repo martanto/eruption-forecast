@@ -1,6 +1,7 @@
 # Visualization
 
-All plots are produced by the modules under `src/eruption_forecast/plots/` plus `src/eruption_forecast/label/label_plots.py`. The pipeline auto-renders the most useful plots; you can also invoke each helper directly for ad-hoc figures.
+All plots are produced by the modules under `src/eruption_forecast/plots/` plus `src/eruption_forecast/label/label_plots.py`. 
+The pipeline auto-renders the most useful plots; you can also invoke each helper directly for ad-hoc figures.
 
 | Module | Re-exported as | Used by |
 |--------|----------------|---------|
@@ -22,7 +23,7 @@ from eruption_forecast.plots import (
 
 ---
 
-## Tremor — `plot_tremor`
+## Tremor - `plot_tremor`
 
 Multi-panel band-decomposed tremor plot. One panel per band/method (RSAM/DSAR/entropy).
 
@@ -39,7 +40,7 @@ Auto-rendered when `fm.calculate(plot_daily=True, save_plot=True)`:
 
 ---
 
-## Features — `plot_significant_features` & friends
+## Features - `plot_significant_features` & friends
 
 | Function | Purpose | Output |
 |----------|---------|--------|
@@ -51,7 +52,7 @@ Auto-rendered by `fm.train(..., plot_features=True)`.
 
 ---
 
-## Forecast — `plot_forecast`
+## Forecast - `plot_forecast`
 
 Three-panel forecast figure consumed by `PredictionModel.forecast()`:
 
@@ -99,7 +100,7 @@ fig.savefig("forecast.png", dpi=200, bbox_inches="tight")
 
 ---
 
-## Evaluation — `plot_roc_curve` etc.
+## Evaluation - `plot_roc_curve` etc.
 
 These are the aggregate plots `EvaluationModel.evaluate(plot_aggregate=True)` renders per classifier:
 
@@ -108,7 +109,7 @@ These are the aggregate plots `EvaluationModel.evaluate(plot_aggregate=True)` re
 | `plot_roc_curve` | Mean ROC + ± std band across seeds |
 | `plot_precision_recall_curve` | Mean PR + ± std band |
 | `plot_confusion_matrix` | Summed confusion matrix |
-| `plot_threshold_analysis` | Precision, recall, F1, balanced accuracy, G-mean vs threshold — marks `ERUPTION_PROBABILITY_THRESHOLD` (`config/constants.py`) and the optimal G-mean threshold |
+| `plot_threshold_analysis` | Precision, recall, F1, balanced accuracy, G-mean vs threshold - marks `ERUPTION_PROBABILITY_THRESHOLD` (`config/constants.py`) and the optimal G-mean threshold |
 | `plot_feature_importance` | Mean feature importance with std error bars |
 
 Auto-rendered at:
@@ -117,11 +118,11 @@ Auto-rendered at:
 {station_dir}/evaluation/{kind}/classifiers/{classifier}/figures/*.png
 ```
 
-`ClassifierComparator.plot_all()` adds cross-classifier figures under `evaluation/{kind}/comparison/figures/` — see [Evaluation Workflow → Cross-Classifier Comparison](Evaluation-Workflow#cross-classifier-comparison).
+`ClassifierComparator.plot_all()` adds cross-classifier figures under `evaluation/{kind}/comparison/figures/` - see [Evaluation Workflow → Cross-Classifier Comparison](Evaluation-Workflow#cross-classifier-comparison).
 
 ---
 
-## Labels — `plot_label_distribution`
+## Labels - `plot_label_distribution`
 
 Debug-friendly bar plot showing the positive/negative class balance across the labelled window range:
 
@@ -131,17 +132,19 @@ fig = plot_label_distribution(label_df)
 fig.savefig("labels.png", dpi=150)
 ```
 
-Useful when tuning `window_step` and `day_to_forecast` — flips the imbalance immediately visible.
+Useful when tuning `window_step` and `day_to_forecast` - flips the imbalance immediately visible.
 
 ---
 
 ## SHAP Status
 
-The current evaluation flow has SHAP plotting stubbed via `evaluate(plot_shap=True)` — the call is accepted but emits a warning instead of rendering. Per-seed SHAP plots will return once the follow-up rebuilds them from the `(y_proba, y_pred, y_true)` matrices persisted by `MetricsEnsemble`. When that happens, remember to pass `plot_size=None` to `shap.plots.beeswarm` so SHAP does not override the pre-created `figsize`.
+The current evaluation flow has SHAP plotting stubbed via `evaluate(plot_shap=True)` - the call is accepted 
+but emits a warning instead of rendering. Per-seed SHAP plots will return once the follow-up rebuilds them from the `(y_proba, y_pred, y_true)` 
+matrices persisted by `MetricsEnsemble`. When that happens, remember to pass `plot_size=None` to `shap.plots.beeswarm` so SHAP does not override the pre-created `figsize`.
 
 ---
 
-## Styling — Nature-Style Defaults
+## Styling - Nature-Style Defaults
 
 Every figure goes through `apply_nature_style()` from `plots/styles.py`, which sets:
 

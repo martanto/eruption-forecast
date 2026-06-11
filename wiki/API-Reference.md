@@ -52,9 +52,9 @@ ForecastModel(
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
-| `station` | `str` | — | Station code (uppercased) |
-| `channel` | `str` | — | Channel code (uppercased) |
-| `network` | `str` | — | FDSN network code |
+| `station` | `str` | - | Station code (uppercased) |
+| `channel` | `str` | - | Channel code (uppercased) |
+| `network` | `str` | - | FDSN network code |
 | `location` | `str` | `""` | FDSN location code |
 | `day_to_forecast` | `int` | `2` | Look-ahead window in days; threaded into `TrainingModel`/`PredictionModel` as `window_size` |
 | `output_dir` | `str \| None` | `None` | Defaults to `{cwd}/output` (or `{root_dir}/output` when `root_dir` set) |
@@ -275,7 +275,7 @@ PredictionModel(
 )
 ```
 
-`model` accepts a live `ClassifierEnsemble` / `SeedEnsemble`, a `ClassifierEnsemble.json` / `.pkl`, a `SeedEnsemble_*.pkl`, or a trained-model registry `.csv` — resolved via `ClassifierEnsemble.from_any(...)`.
+`model` accepts a live `ClassifierEnsemble` / `SeedEnsemble`, a `ClassifierEnsemble.json` / `.pkl`, a `SeedEnsemble_*.pkl`, or a trained-model registry `.csv` - resolved via `ClassifierEnsemble.from_any(...)`.
 
 ### Pipeline methods
 
@@ -445,7 +445,7 @@ DynamicLabelBuilder(
 
 Both expose `.build() -> Self`. After `build()`: `lb.df` (DateTime-indexed `id`/`is_erupted` frame), `lb.csv` (path to the label CSV).
 
-Note that within `TrainingModel`, `include_eruption_date` defaults to `False` (training pipeline behaviour); the `LabelBuilder` constructor's own default is `True`. The difference is intentional — see [Training Workflow](Training-Workflow).
+Note that within `TrainingModel`, `include_eruption_date` defaults to `False` (training pipeline behaviour); the `LabelBuilder` constructor's own default is `True`. The difference is intentional - see [Training Workflow](Training-Workflow).
 
 ---
 
@@ -617,9 +617,9 @@ MetricsEnsemble.from_file(
 | Method | Notes |
 |--------|-------|
 | `me.compute() -> Self` | Per-seed metric loop; writes JSON + `y_proba/y_pred/y_true` CSV matrices |
-| `me.plot_aggregate()` | Aggregate plots per classifier — ROC, PR, confusion, threshold, importance |
+| `me.plot_aggregate()` | Aggregate plots per classifier - ROC, PR, confusion, threshold, importance |
 | `me.plot_seed()` | Per-seed plots (currently reserved) |
-| `me.metrics` | `dict[str, pd.DataFrame]` — populated after `compute()` |
+| `me.metrics` | `dict[str, pd.DataFrame]` - populated after `compute()` |
 
 Imported from `eruption_forecast.ensemble.metrics_ensemble` (intentionally **not** in `ensemble/__init__.py` to avoid an import cycle).
 
@@ -662,8 +662,8 @@ ClassifierComparator.from_classifier_ensemble(
 
 | Method | Returns |
 |--------|---------|
-| `cc.get_ranking()` | `pd.DataFrame` — cross-classifier ranking |
-| `cc.plot_all()` | `None` — writes ranking plots under `{output_dir}/comparison/figures/` |
+| `cc.get_ranking()` | `pd.DataFrame` - cross-classifier ranking |
+| `cc.plot_all()` | `None` - writes ranking plots under `{output_dir}/comparison/figures/` |
 
 Imported from `eruption_forecast.model.classifier_comparator`. Usually instantiated indirectly via `em.compare()` or `fm.EvaluationModel.compare()`.
 
@@ -691,7 +691,7 @@ LabelData(df: pd.DataFrame)
 LabelData.from_csv(path: str) -> LabelData
 ```
 
-`@cached_property` accessors: `df`, `parameters` (dict parsed from filename — `window_size`, `window_step`, `window_step_unit`, `day_to_forecast`), `filename`, `basename`.
+`@cached_property` accessors: `df`, `parameters` (dict parsed from filename - `window_size`, `window_step`, `window_step_unit`, `day_to_forecast`), `filename`, `basename`.
 
 ---
 
@@ -725,7 +725,7 @@ send_telegram_notification(
 )
 ```
 
-Credentials are read from environment (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). Both helpers degrade gracefully when the env vars are absent — they emit a warning and skip the network call instead of raising.
+Credentials are read from environment (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). Both helpers degrade gracefully when the env vars are absent - they emit a warning and skip the network call instead of raising.
 
 ---
 
