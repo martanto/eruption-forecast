@@ -4,7 +4,6 @@
 [![Python](https://img.shields.io/pypi/pyversions/eruption-forecast?label=python)](https://pypi.org/project/eruption-forecast/)
 [![License](https://img.shields.io/pypi/l/eruption-forecast?label=license)](https://pypi.org/project/eruption-forecast/)
 [![Status](https://img.shields.io/badge/status-active%20development-orange)](https://github.com/martanto/eruption-forecast)
-[![PyPI](https://img.shields.io/pypi/v/eruption-forecast?label=pypi)](https://pypi.org/project/eruption-forecast/)
 [![Downloads](https://static.pepy.tech/personalized-badge/eruption-forecast?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLUE&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/eruption-forecast)
 
 Process raw seismic tremor, extract time-series features, train multi-seed classifier ensembles, and produce probabilistic volcanic eruption forecasts. Forked from [ddempsey/whakaari](https://github.com/ddempsey/whakaari) and substantially extended.
