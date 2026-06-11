@@ -39,8 +39,9 @@ class PredictionModel(BaseModel, CacheModel):
             - ``SeedEnsemble`` object — wrapped into a ``ClassifierEnsemble``.
             - Path to ``ClassifierEnsemble.json`` (from ``TrainingModel``).
             - Path to ``ClassifierEnsemble.pkl`` or ``SeedEnsemble_*.pkl``.
-            - Path to a trained-model registry ``*.csv`` (one value from
-              ``TrainingModel.results``).
+            - Path to a trained-model registry ``*.json`` (new, written by
+              :func:`~eruption_forecast.utils.ml.save_model_json`; one value
+              from ``TrainingModel.results``) or legacy ``*.csv``.
         tremor_data (str | pd.DataFrame): Path to a tremor CSV file or a
             pre-loaded tremor DataFrame.
         start_date (str | datetime): Inclusive start of the forecast period.
@@ -73,6 +74,10 @@ class PredictionModel(BaseModel, CacheModel):
             ``build_label()`` is called.
         forecast_plot_path (str): Path to the saved forecast plot (PDF when
             ``plot_pdf=True``, otherwise PNG). Set by ``forecast()``.
+        results (pd.DataFrame): Forecast results indexed by datetime, with
+            one ``{classifier}_{probability|uncertainty|prediction|confidence}``
+            column per registered classifier plus the four ``consensus_*``
+            columns. Empty until ``forecast()`` is called.
 
     Example:
         >>> prediction = (
@@ -221,11 +226,11 @@ class PredictionModel(BaseModel, CacheModel):
         Returns:
             str: One-line description such as
                 ``"PredictionModel(period=2025-03-16 → 2025-03-22,
-                window_size=2d, classifiers=[rf, xgb])"``.
+                window_size=2d, classifiers=[RandomForestClassifier, XGBClassifier])"``.
 
         Example:
             >>> print(prediction.describe())
-            PredictionModel(period=2025-03-16 → 2025-03-22, window_size=2d, classifiers=[rf, xgb])
+            PredictionModel(period=2025-03-16 → 2025-03-22, window_size=2d, classifiers=[RandomForestClassifier, XGBClassifier])
         """
         classifier_names = ", ".join(self.ClassifierEnsemble.classifiers)
         return (
@@ -444,9 +449,10 @@ class PredictionModel(BaseModel, CacheModel):
         if os.path.exists(label_csv) and not self.overwrite:
             labels_df = pd.read_csv(label_csv, index_col=0, parse_dates=True)
 
-            # Backward compat
+            # Backward compat: legacy cached forecast grids predate the
+            # ``is_erupted`` placeholder column.
             if "is_erupted" not in labels_df.columns:
-                labels_df["is_eruped"] = 0
+                labels_df["is_erupted"] = 0
 
             self._labels = labels_df
             self.labels = labels_df["id"]

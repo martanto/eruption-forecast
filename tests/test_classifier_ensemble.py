@@ -13,7 +13,6 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from eruption_forecast.utils.ml import merge_all_classifiers
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
@@ -221,60 +220,6 @@ def test_load_missing_file_raises() -> None:
     """ClassifierEnsemble.load raises FileNotFoundError for missing path."""
     with pytest.raises(FileNotFoundError):
         ClassifierEnsemble.load("/nonexistent/path/ensemble.pkl")
-
-
-# ---------------------------------------------------------------------------
-# merge_all_classifiers output type test
-# ---------------------------------------------------------------------------
-
-
-def test_merge_all_classifiers_produces_classifier_ensemble(
-    tmp_path: pathlib.Path,
-) -> None:
-    """merge_all_classifiers saves a ClassifierEnsemble, not a plain dict."""
-    # Build fake registry CSVs so merge_all_classifiers can load them
-    clf_names = ["clf_a", "clf_b"]
-    trained_models: dict[str, str] = {}
-
-    for clf_name in clf_names:
-        clf_dir = os.path.join(str(tmp_path), clf_name)
-        os.makedirs(clf_dir, exist_ok=True)
-
-        rows = {}
-        for seed in range(3):
-            # Save a tiny model
-            rng = np.random.default_rng(seed)
-            X_train = rng.standard_normal((20, N_FEATURES))
-            y_train = np.array([0] * 10 + [1] * 10)
-            model = LogisticRegression(max_iter=200, random_state=seed)
-            model.fit(X_train, y_train)
-            model_path = os.path.join(clf_dir, f"model_{seed}.pkl")
-            joblib.dump(model, model_path)
-
-            # Save a tiny significant-features CSV
-            sig_df = pd.DataFrame(index=FEATURE_NAMES)
-            sig_csv = os.path.join(clf_dir, f"sig_feat_{seed}.csv")
-            sig_df.to_csv(sig_csv)
-
-            rows[seed] = {
-                "significant_features_csv": sig_csv,
-                "trained_model_filepath": model_path,
-            }
-
-        registry_df = pd.DataFrame(rows).T
-        registry_df.index.name = "random_state"
-        registry_csv = os.path.join(clf_dir, f"trained_model_{clf_name}.csv")
-        registry_df.to_csv(registry_csv)
-        trained_models[clf_name] = registry_csv
-
-    output_path = os.path.join(str(tmp_path), "merged.pkl")
-    merge_all_classifiers(trained_models, output_path=output_path)
-
-    loaded = joblib.load(output_path)
-    assert isinstance(loaded, ClassifierEnsemble), (
-        f"Expected ClassifierEnsemble, got {type(loaded)}"
-    )
-    assert set(loaded.classifiers) == set(clf_names)
 
 
 # ---------------------------------------------------------------------------

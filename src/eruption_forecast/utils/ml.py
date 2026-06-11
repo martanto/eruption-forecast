@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Any, Literal
 from datetime import datetime
 
@@ -22,7 +23,6 @@ from tsfresh.transformers import FeatureSelector
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import GridSearchCV
-from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
@@ -31,7 +31,6 @@ from eruption_forecast.config.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.date_utils import sort_dates
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
-from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 def build_y_true(
@@ -106,30 +105,61 @@ def build_y_true(
     return y_true
 
 
-def split_eruption_dates(
-    eruption_dates: list[str] | list[datetime], test_size: float = 0.2
-):
-    """Split eruption dates into training and testing sets.
+def temporal_train_test_split(
+    eruption_dates: list[str] | list[datetime],
+    test_size: float = 0.2,
+) -> tuple[list[str] | list[datetime], list[str] | list[datetime]]:
+    """Split eruption dates into train and test sets while preserving order.
+
+    Time-series analogue of :func:`sklearn.model_selection.train_test_split`.
+    Sorts ``eruption_dates`` chronologically and assigns the most recent
+    ``test_size`` fraction to the test split — never shuffles, so the train
+    split is strictly older than the test split and no future leakage occurs.
+    The split index is clamped to ``[1, n - 1]`` so neither side is ever empty.
 
     Args:
-        eruption_dates (list[str] | list[datetime]): Eruption dates.
-        test_size (float, optional): Fraction of test data.
+        eruption_dates (list[str] | list[datetime]): Eruption dates in any
+            order. Mixed-type lists are sorted via :func:`sort_dates`.
+        test_size (float, optional): Fraction of dates assigned to the test
+            split (most recent dates). Must lie in ``[0, 1]``. Defaults to
+            ``0.2``.
+
+    Returns:
+        tuple[list, list]: ``(train_dates, test_dates)``. ``train_dates``
+            contains the older dates; ``test_dates`` contains the most recent
+            dates. Both lists are sorted chronologically and preserve the
+            input element type.
+
+    Raises:
+        ValueError: If ``test_size`` is outside ``[0, 1]``.
+
+    Examples:
+        >>> train, test = temporal_train_test_split(
+        ...     ["2024-06-15", "2025-03-20", "2024-12-01", "2025-08-10"],
+        ...     test_size=0.25,
+        ... )
+        >>> train
+        ['2024-06-15', '2024-12-01', '2025-03-20']
+        >>> test
+        ['2025-08-10']
     """
     if test_size < 0 or test_size > 1:
         raise ValueError(f"test_size must be between 0 and 1. You provided {test_size}")
 
     eruption_dates = sort_dates(eruption_dates, as_datetime=False)
 
-    # Clip to ensure not used all data as test
+    # Clamp to ``[1, n - 1]`` so the call always yields a non-empty train
+    # split AND a non-empty test split, even when ``test_size`` rounds to 0
+    # or n on small inputs.
     split_idx = np.clip(
         np.ceil(len(eruption_dates) * test_size),
         a_min=1,
         a_max=len(eruption_dates) - 1,
     ).astype(int)
 
-    X_train = eruption_dates[:-split_idx]
-    X_test = eruption_dates[-split_idx:]
-    return X_train, X_test
+    train_dates = eruption_dates[:-split_idx]
+    test_dates = eruption_dates[-split_idx:]
+    return train_dates, test_dates
 
 
 def compute_threshold_metrics(
@@ -153,15 +183,14 @@ def compute_threshold_metrics(
         tuple[np.ndarray, dict[str, list[float]]]: A 2-tuple of:
             - thresholds: 1-D array of length ``resolution`` from 0.0 to 1.0.
             - metrics_dict: dict with keys ``"precision"``, ``"recall"``,
-              ``"f1"``, ``"balanced_accuracy"``, ``"specificity"``, and
-              ``"mcc"``, each a list of floats.
+              ``"f1"``, ``"balanced_accuracy"``, ``"specificity"``,
+              ``"mcc"``, and ``"g_mean"``, each a list of floats.
     """
     thresholds = np.linspace(0.0, 1.0, resolution)
     metrics: dict[str, list[float]] = {
         "precision": [],
         "recall": [],
         "f1": [],
-        "roc_auc": [],
         "balanced_accuracy": [],
         "specificity": [],
         "mcc": [],
@@ -229,7 +258,8 @@ def compute_aggregate_threshold_metrics(
               shape ``(n_seeds, resolution)``.
 
             Metric keys come from :func:`compute_threshold_metrics`; keys
-            whose lists were never populated (e.g. ``"roc_auc"``) are skipped.
+            whose lists were never populated are skipped (a defensive
+            guard — every metric key is currently populated on every call).
 
     Raises:
         ValueError: If ``y_probas`` is empty, or if ``y_trues`` is a list whose
@@ -468,140 +498,6 @@ def get_significant_features(
     return features_filtered, _significant_features
 
 
-def _extract_trained_model_suffix(csv_path: str) -> str:
-    """Extract the suffix portion from a trained-model registry CSV filename.
-
-    Strips the ``trained_model_`` prefix (if present) from the basename of
-    ``csv_path`` and returns the remainder as a plain string.  Used by
-    :func:`merge_seed_models` and :func:`merge_all_classifiers` to derive
-    output filenames without duplicating the stripping logic.
-
-    Args:
-        csv_path (str): Path to a trained-model registry CSV file.
-
-    Returns:
-        str: The suffix after ``"trained_model_"``, or the full basename
-            (without extension) if the prefix is absent.
-    """
-    basename = os.path.splitext(os.path.basename(csv_path))[0]
-    if basename.startswith("trained-model_"):
-        return basename[len("trained-model_") :]
-    return basename
-
-
-def merge_seed_models(
-    trained_model_csv: str,
-    output_dir: str | None = None,
-) -> str:
-    """Load all seed models from a registry CSV and bundle into one SeedEnsemble pkl.
-
-    Reads the trained-model registry CSV produced by ``ModelTrainer``, loads
-    every seed estimator and its significant-feature list into memory, and
-    serialises the resulting :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble`
-    to a single ``.pkl`` file.  This eliminates the per-seed I/O overhead at
-    prediction time.
-
-    Args:
-        trained_model_csv (str): Path to the trained-model registry CSV (the
-            ``trained_model_{suffix}.csv`` file written by ``ModelTrainer``).
-        output_dir (str | None, optional): Destination path for the merged
-            ``.pkl`` file.  If ``None``, the file is written to the same
-            directory as ``trained_model_csv`` with the name
-            ``merged_model_{suffix}.pkl``, where ``{suffix}`` is derived from
-            the registry CSV filename.  Defaults to ``None``.
-
-    Returns:
-        str: Absolute path to the saved merged ``.pkl`` file.
-
-    Raises:
-        FileNotFoundError: If ``registry_csv`` does not exist.
-    """
-    output_dir = (
-        output_dir
-        if output_dir is not None
-        else os.path.dirname(os.path.abspath(trained_model_csv))
-    )
-
-    suffix = _extract_trained_model_suffix(trained_model_csv)
-    output_path = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
-
-    ensemble = SeedEnsemble.from_registry(trained_model_csv)
-    ensemble.save(output_path)
-
-    logger.info(f"Saved SeedEnsemble model to: {output_path}")
-
-    return output_path
-
-
-def merge_all_classifiers(
-    trained_models: dict[str, str],
-    output_path: str | None = None,
-) -> str:
-    """Merge multiple classifier registry CSVs into a single multi-classifier pkl.
-
-    Calls :func:`merge_seed_models` for each classifier, bundles the resulting
-    :class:`~eruption_forecast.ensemble.seed_ensemble.SeedEnsemble` objects into a
-    plain ``dict[str, SeedEnsemble]``, and serialises the dict to one ``.pkl``
-    file.  ``ModelPredictor`` detects this dict type automatically when the path
-    is passed as the ``trained_models`` parameter.
-
-    Args:
-        trained_models (dict[str, str]): Mapping of classifier name to the path
-            of its trained-model registry CSV (e.g.
-            ``{"rf": "path/to/rf_registry.csv", "xgb": "path/to/xgb_registry.csv"}``).
-        output_path (str | None, optional): Destination path for the combined
-            ``.pkl`` file.  If ``None``, the file is placed one directory above
-            the first registry CSV (i.e. in the ``trainings/`` root) and named
-            ``merged_classifiers_{suffix}.pkl``, where ``{suffix}`` is derived
-            from the first registry CSV filename.  Defaults to ``None``.
-
-    Returns:
-        str: Absolute path to the saved combined ``.pkl`` file.
-
-    Raises:
-        ValueError: If ``trained_models`` is empty.
-        FileNotFoundError: If any registry CSV does not exist.
-    """
-    if not trained_models:
-        raise ValueError("trained_models must not be empty.")
-
-    if output_path is None:
-        first_csv = next(iter(trained_models.values()))
-        # Go one level up from the classifier dir to the trainings root
-        trainings_dir = os.path.dirname(os.path.dirname(os.path.abspath(first_csv)))
-        suffix = _extract_trained_model_suffix(first_csv)
-        output_path = os.path.join(trainings_dir, f"merged_classifiers_{suffix}.pkl")
-
-    ensembles: dict[str, SeedEnsemble] = {}
-    for name, csv_path in trained_models.items():
-        logger.info(f"[merge_all_classifiers] Merging classifier: {name}")
-        ensembles[name] = SeedEnsemble.from_registry(csv_path)
-
-    classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(ensembles)
-    classifier_ensemble.save(output_path)
-
-    logger.info(f"Saved merged classifier model to: {output_path}")
-
-    return output_path
-
-
-def get_default_features() -> list[str]:
-    """Return the sorted list of tsfresh ComprehensiveFCParameters feature names.
-
-    Instantiates ``ComprehensiveFCParameters`` and extracts its keys, giving the
-    full set of features that tsfresh can compute. See the tsfresh documentation
-    for the complete feature catalogue.
-
-    Returns:
-        list[str]: Sorted list of tsfresh feature name strings.
-    """
-    default_fc_parameters = ComprehensiveFCParameters()
-    default_fc_parameters_keys = default_fc_parameters.data
-    keys: list[str] = list(default_fc_parameters_keys.keys())
-    keys.sort()
-    return keys
-
-
 def get_classifier_models(
     classifiers: list[str],
     cv_strategy: Literal[
@@ -704,7 +600,7 @@ def grid_search_cv(
     return classifier, grid_search, grid_search.best_estimator_
 
 
-def save_model_csv(
+def save_model_json(
     seeds: int,
     records: list[dict],
     classifier_dir: str,
@@ -713,51 +609,57 @@ def save_model_csv(
     prefix_filename: str = "trained-model",
     verbose: bool = False,
 ) -> str:
-    """Build and save the trained-models registry CSV for one classifier.
+    """Build and save the trained-models registry JSON for one classifier.
 
-    Constructs a ``pandas.DataFrame`` from ``records``, sets ``random_state``
-    as the index, and writes it to a CSV file inside ``classifier_dir``. The
-    filename encodes the classifier name, CV strategy, total seed count, and
-    feature count so that downstream utilities can reconstruct all metadata
+    Writes a list of per-seed records to a JSON file inside ``classifier_dir``.
+    Each record contains ``random_state``, ``features`` (inline list of top-N
+    feature names), and ``model_filepath``. Inlining the feature list lets
+    :meth:`SeedEnsemble.from_json` rebuild the ensemble with a single registry
+    read instead of one extra CSV per seed at load time.
+
+    The filename encodes the classifier name, CV strategy, total seed count,
+    and feature count so that downstream utilities can reconstruct all metadata
     from the path alone.
 
     Args:
         seeds (int): Total number of random seeds used during training; written
-            into the filename as ``rs-{seeds}``.
-        records (list[dict]): List of per-seed result dicts, each containing at
-            least a ``"random_state"`` key plus model and feature-path fields.
-        classifier_dir (str): Directory in which to write the registry CSV.
+            into the filename as ``seeds-{seeds}``.
+        records (list[dict]): Per-seed result dicts. Each must contain
+            ``random_state`` (int), ``features`` (list of column names), and
+            ``model_filepath`` (str).
+        classifier_dir (str): Directory in which to write the registry JSON.
         classifier_model (ClassifierModel): Trained classifier wrapper; its
             ``name`` and ``cv_name`` attributes form the filename prefix.
         number_of_features (int): Number of top significant features selected;
-            written into the filename as ``top-{number_of_features}``.
-        prefix_filename (str, optional): Filename prefix for saved training model CSV.
-            Defaults to ``"trained_model"``.
-        verbose (bool, optional): Show detailed information. Defaults to False.
+            written into the filename as ``features-{number_of_features}``.
+        prefix_filename (str, optional): Filename prefix for the saved
+            registry. Defaults to ``"trained-model"``.
+        verbose (bool, optional): Emit a log line on save. Defaults to ``False``.
 
     Returns:
-        str: Absolute path to the saved registry CSV file.
+        str: Absolute path to the saved registry JSON file.
 
     Raises:
         ValueError: If ``records`` is empty (no models were successfully
             trained), which would produce an empty registry.
     """
-    classifier_id = f"{classifier_model.name}_{classifier_model.cv_name}"
-
-    suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
-    filename = f"{prefix_filename}__{suffix}.csv"
-
-    registry_df = pd.DataFrame(records).set_index("random_state")
-    if registry_df.empty:
+    if not records:
         raise ValueError("No significant features or trained models found.")
 
-    csv = os.path.join(classifier_dir, filename)
-    registry_df.to_csv(csv, index=True)
+    classifier_id = f"{classifier_model.name}_{classifier_model.cv_name}"
+    suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
+    filename = f"{prefix_filename}__{suffix}.json"
+
+    json_path = os.path.join(classifier_dir, filename)
+    with open(json_path, "w") as f:
+        json.dump(records, f, indent=2)
 
     if verbose:
-        logger.info(f"{classifier_model.name}: CSV trained model saved to {csv}")
+        logger.info(
+            f"{classifier_model.name}: JSON trained model saved to {json_path}"
+        )
 
-    return csv
+    return json_path
 
 
 def compute_seed(

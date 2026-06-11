@@ -250,7 +250,7 @@ tm.fit(
 | `TrainingModel.load(path)` | Classmethod |
 | `tm.save_config(path=None)` | Standalone `training.config.yaml` |
 
-Populated attributes after `fit()`: `tm.results` (per-classifier registry CSV paths), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels`.
+Populated attributes after `fit()`: `tm.results` (per-classifier trained-model JSON registry paths written by `save_model_json`), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels`.
 
 ---
 
@@ -527,6 +527,21 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 ```python
 SeedEnsemble(classifier_name: str)
 
+# Recommended: dispatch on file extension (.json or .csv).
+SeedEnsemble.from_any(
+    trained_model_path: str,
+    classifier_name: str | None = None,
+    verbose: bool = False,
+) -> SeedEnsemble
+
+# New JSON trained-model registry written by utils.ml.save_model_json.
+SeedEnsemble.from_json(
+    trained_model_json: str,
+    classifier_name: str | None = None,
+    verbose: bool = False,
+) -> SeedEnsemble
+
+# Legacy CSV registry loader (kept for backwards compatibility).
 SeedEnsemble.from_registry(
     registry_csv: str,
     classifier_name: str | None = None,
@@ -560,10 +575,10 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin)
 
 | Factory | Accepts |
 |---------|---------|
-| `from_any(source, verbose=False)` | `ClassifierEnsemble.{json,pkl}`, `SeedEnsemble_*.pkl`, trained-model registry CSV, or a live `SeedEnsemble` |
+| `from_any(source, verbose=False)` | `ClassifierEnsemble.{json,pkl}`, `SeedEnsemble_*.pkl`, trained-model registry `.json` (list) or `.csv`, or a live `SeedEnsemble` |
 | `from_seed_ensembles(seed_ensembles)` | Pre-built `SeedEnsemble` instances |
-| `from_dict(registry_csvs, verbose=False)` | Dict mapping classifier name → registry CSV path |
-| `from_json(json_path, verbose=False)` | JSON registry written by `TrainingModel.fit()` |
+| `from_dict(trained_model_paths, verbose=False)` | Dict mapping classifier name → trained-model registry path (`.json` or `.csv`); each value is dispatched through `SeedEnsemble.from_any` |
+| `from_json(json_path, verbose=False)` | Top-level results map (`ClassifierEnsemble_{cv}.json`) written by `TrainingModel.fit()` |
 
 ### Inference
 

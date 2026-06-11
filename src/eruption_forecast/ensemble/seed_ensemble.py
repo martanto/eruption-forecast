@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Self
 
 import numpy as np
@@ -18,8 +19,8 @@ from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     """Bundle of seed models for a single classifier type.
 
-    Wraps all trained estimators produced by ``ModelTrainer`` for one
-    classifier — along with their per-seed significant feature lists — into a
+    Wraps all trained estimators produced by ``TrainingModel.fit()`` for one
+    classifier — along with their per-seed top-N feature lists — into a
     single serialisable object.
 
     Attributes:
@@ -36,8 +37,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     def __init__(self, classifier_name: str) -> None:
         """Initialise an empty SeedEnsemble for the given classifier.
 
-        Creates an empty container ready to have seeds added via
-        :meth:`from_registry`.
+        Creates an empty container ready to have seeds added via one of the
+        registry factories — :meth:`from_any` (recommended; dispatches on
+        extension), :meth:`from_json` (new JSON registry), or
+        :meth:`from_registry` (legacy CSV registry).
 
         Args:
             classifier_name (str): Human-readable classifier name (e.g.
@@ -80,20 +83,24 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         classifier_name: str | None = None,
         verbose: bool = False,
     ) -> Self:
-        """Load all seed models from a registry CSV and bundle into a SeedEnsemble.
+        """Load all seed models from a legacy CSV registry and bundle into a SeedEnsemble.
 
-        Reads the registry CSV produced by ``ModelTrainer._save_models_registry``,
-        then for each row loads the significant features CSV and the trained model
-        ``.pkl`` file into memory.  The resulting ``SeedEnsemble`` contains all
-        seeds as in-memory objects and can be serialised with :meth:`save`.
+        Reads the legacy registry CSV produced by older training runs (prior
+        to the JSON registry switch), then for each row loads the per-seed
+        top-N feature CSV (column ``features_csv``) and the trained model
+        ``.pkl`` (column ``model_filepath``) into memory. The resulting
+        ``SeedEnsemble`` contains all seeds as in-memory objects and can be
+        serialised with :meth:`save`. New runs should use :meth:`from_json`
+        (or the format-agnostic :meth:`from_any`) instead.
 
         Args:
-            registry_csv (str): Path to the trained-model registry CSV.  Must
-                have ``random_state`` as index and columns
-                ``significant_features_csv`` and ``trained_model_filepath``.
+            registry_csv (str): Path to the legacy trained-model registry CSV.
+                Must have ``random_state`` as index and columns
+                ``features_csv`` and ``model_filepath``.
             classifier_name (str, optional): Human-readable classifier name.
-                Defaults to None.
-            verbose (bool, optional): If ``True``, log a message for each saved file.
+                If ``None``, derived from ``type(model).__name__`` of the
+                first loaded estimator. Defaults to None.
+            verbose (bool, optional): If ``True``, log a load summary.
                 Defaults to ``False``.
 
         Returns:
@@ -101,7 +108,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         Raises:
             FileNotFoundError: If ``registry_csv`` does not exist.
-            KeyError: If required columns are absent from the CSV.
+            ValueError: If the CSV is empty or a required column is missing.
         """
         if not os.path.isfile(registry_csv):
             raise FileNotFoundError(f"Registry CSV not found: {registry_csv}")
@@ -144,9 +151,149 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         ensemble.seeds = seeds
 
         if verbose:
-            logger.info(f"SeedEnsemble: {classifier_name} — Loaded {len(seeds)} seeds.")
+            logger.info(
+                f"SeedEnsemble: {_classifier_name} — Loaded {len(seeds)} "
+                f"seeds from CSV registry."
+            )
 
         return ensemble
+
+    @classmethod
+    def from_json(
+        cls,
+        trained_model_json: str,
+        classifier_name: str | None = None,
+        verbose: bool = False,
+    ) -> Self:
+        """Build a SeedEnsemble from a JSON trained-model registry.
+
+        Reads the JSON registry produced by
+        :func:`~eruption_forecast.utils.ml.save_model_json`, then for each
+        record loads the trained model ``.pkl`` and takes the inline
+        ``features`` list as the per-seed feature subset. Avoids the extra
+        per-seed CSV read that :meth:`from_registry` performs against the
+        legacy CSV registry.
+
+        Args:
+            trained_model_json (str): Path to the trained-model registry JSON
+                file. Must contain a list of per-seed records, each with
+                ``random_state`` (int), ``features`` (list[str]), and
+                ``model_filepath`` (str).
+            classifier_name (str, optional): Human-readable classifier name.
+                If ``None``, derived from ``type(model).__name__`` of the
+                first loaded estimator. Defaults to ``None``.
+            verbose (bool, optional): If ``True``, log a load summary.
+                Defaults to ``False``.
+
+        Returns:
+            SeedEnsemble: Populated ensemble with all seeds loaded.
+
+        Raises:
+            FileNotFoundError: If ``trained_model_json`` does not exist.
+            ValueError: If the JSON payload is empty or any record is missing
+                a required key.
+        """
+        if not os.path.isfile(trained_model_json):
+            raise FileNotFoundError(
+                f"Trained-model JSON not found: {trained_model_json}"
+            )
+
+        with open(trained_model_json) as f:
+            records = json.load(f)
+
+        if not isinstance(records, list):
+            raise ValueError(
+                f"Trained-model JSON must contain a list of records, got "
+                f"{type(records).__name__}: {trained_model_json}"
+            )
+
+        if not records:
+            raise ValueError(
+                f"Trained-model JSON is empty: {trained_model_json}"
+            )
+
+        required_keys = {"random_state", "features", "model_filepath"}
+        _classifier_name = "Unknown" if classifier_name is None else classifier_name
+
+        seeds: list[dict] = []
+        for record in records:
+            missing = required_keys - set(record)
+            if missing:
+                raise ValueError(
+                    f"Record missing required key(s) {sorted(missing)} "
+                    f"in {trained_model_json}"
+                )
+
+            model = joblib.load(record["model_filepath"])
+
+            if _classifier_name == "Unknown":
+                _classifier_name = type(model).__name__
+
+            seeds.append(
+                {
+                    "random_state": int(record["random_state"]),
+                    "model": model,
+                    "feature_names": list(record["features"]),
+                }
+            )
+
+        ensemble = cls(classifier_name=_classifier_name)
+        ensemble.seeds = seeds
+
+        if verbose:
+            logger.info(
+                f"SeedEnsemble: {_classifier_name} — Loaded {len(seeds)} "
+                f"seeds from JSON registry."
+            )
+
+        return ensemble
+
+    @classmethod
+    def from_any(
+        cls,
+        trained_model_path: str,
+        classifier_name: str | None = None,
+        verbose: bool = False,
+    ) -> Self:
+        """Build a SeedEnsemble from any supported trained-model registry.
+
+        Dispatches on the file extension — ``.json`` routes to
+        :meth:`from_json` (new inline-features registry), ``.csv`` routes to
+        :meth:`from_registry` (legacy registry). Callers can stop branching
+        on the on-disk format.
+
+        Args:
+            trained_model_path (str): Path to a trained-model registry file.
+                Must end in ``.json`` or ``.csv``.
+            classifier_name (str, optional): Forwarded to the underlying
+                factory. Defaults to ``None``.
+            verbose (bool, optional): Forwarded to the underlying factory.
+                Defaults to ``False``.
+
+        Returns:
+            SeedEnsemble: Populated ensemble with all seeds loaded.
+
+        Raises:
+            ValueError: If the file extension is neither ``.json`` nor
+                ``.csv``.
+        """
+        ext = os.path.splitext(trained_model_path)[1].lower()
+        if ext == ".json":
+            return cls.from_json(
+                trained_model_path,
+                classifier_name=classifier_name,
+                verbose=verbose,
+            )
+        if ext == ".csv":
+            return cls.from_registry(
+                trained_model_path,
+                classifier_name=classifier_name,
+                verbose=verbose,
+            )
+        raise ValueError(
+            f"Unsupported trained-model registry extension {ext!r}. "
+            f"Expected '.json' or '.csv'."
+        )
 
     def compute_probabilities_and_predictions(
         self, X: pd.DataFrame
