@@ -536,7 +536,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │       ├── ClassifierEnsemble_{cv}.{pkl,json}
 │       └── {clf-slug}/{cv-slug}/
 │           ├── models/{seed:05d}.pkl
-│           ├── trained-model__{suffix}.csv
+│           ├── trained-model__{suffix}.json
 │           └── SeedEnsemble_{suffix}.pkl
 │
 ├── prediction/                              # PredictionModel
@@ -638,6 +638,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Status:** Active Development
-**Last Updated:** 2026-06-10 (full rewrite against the post-`ft/metrics-ensemble` `model/` refactor)
+**Last Updated:** 2026-06-11
