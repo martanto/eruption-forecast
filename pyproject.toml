@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "eruption-forecast"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
     {name = "Martanto", email = "martanto@live.com"},
 ]
@@ -31,7 +31,6 @@ dependencies = [
     "pyarrow>=18.0.0",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
