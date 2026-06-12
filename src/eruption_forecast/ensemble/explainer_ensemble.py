@@ -31,6 +31,7 @@ from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.plots.explanation_plots import (
     PER_SEED_PLOT_DISPATCHER,
     AGGREGATE_PLOT_DISPATCHER,
+    AGGREGATE_PLOT_INPUT_KIND,
     render_one_seed_plot,
     render_one_aggregate_plot,
     render_one_waterfall_plot,
@@ -531,11 +532,18 @@ class ExplainerEnsemble:
             (clf, name) for clf in self.results for name in plots
         ]
 
+        #  Build each plot's input on the orchestrator side so the workers
+        #  remain pure renderers. The input shape varies per plot:
+        #  ``"dataframe"`` for the bar, ``"explanation"`` for the beeswarm.
         return joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
             joblib.delayed(render_one_aggregate_plot)(
                 classifier_name=clf,
                 plot_name=name,
-                aggregate_df=self._aggregate_importance(clf),
+                aggregate_input=(
+                    self._aggregate_importance(clf)
+                    if AGGREGATE_PLOT_INPUT_KIND[name] == "dataframe"
+                    else self._aggregate_explanation(clf)
+                ),
                 output_dir=self.classifiers_dir,
                 overwrite=self.overwrite,
                 verbose=self.verbose,
@@ -710,6 +718,78 @@ class ExplainerEnsemble:
             .reset_index(drop=True)
         )
         return df
+
+    def _aggregate_explanation(
+        self, classifier_name: str
+    ) -> tuple[shap.Explanation, list[int], list[int]]:
+        """Stack per-seed SHAP into one union-of-features ``shap.Explanation``.
+
+        For each seed, the per-seed ``(n_obs, n_features_seed)`` block is
+        placed into the corresponding columns of a ``(n_obs, |union|)``
+        NaN-filled block; the per-seed blocks are then stacked vertically to
+        form a ``(n_seeds × n_obs, |union|)`` matrix. Feature axis order
+        matches :meth:`_aggregate_importance` (``mean_abs_shap`` descending)
+        so the aggregate bar and beeswarm rank features identically.
+
+        Args:
+            classifier_name (str): Classifier whose per-seed results are
+                aggregated.
+
+        Returns:
+            tuple[shap.Explanation, list[int], list[int]]: The stacked
+                explanation, the seed identifier for each row, and the
+                observation id for each row. Row alignment lets callers
+                rebuild a tidy long-form table without re-walking the
+                per-seed dicts.
+        """
+        payload = self.results[classifier_name]
+        seeds: dict[int, dict] = payload["seeds"]
+        obs_ids: list[int] = list(payload["observation_ids"])
+        n_obs = len(obs_ids)
+
+        #  Sort feature axis to match the bar plot so the two aggregate
+        #  views rank features the same way.
+        union_features: list[str] = (
+            self._aggregate_importance(classifier_name)["feature"].tolist()
+        )
+        col_index = {name: i for i, name in enumerate(union_features)}
+
+        seed_blocks: list[np.ndarray] = []
+        data_blocks: list[np.ndarray] = []
+        base_blocks: list[np.ndarray] = []
+        row_seed: list[int] = []
+        row_obs: list[int] = []
+
+        for random_state, seed_data in seeds.items():
+            shap_values = seed_data["shap_values"]
+            feature_values = seed_data["feature_values"]
+            feature_names: list[str] = list(seed_data["feature_names"])
+            base_value = float(seed_data["base_value"])
+
+            cols = np.array([col_index[name] for name in feature_names], dtype=int)
+
+            block_values = np.full((n_obs, len(union_features)), np.nan)
+            block_data = np.full((n_obs, len(union_features)), np.nan)
+            block_values[:, cols] = shap_values
+            block_data[:, cols] = feature_values
+
+            seed_blocks.append(block_values)
+            data_blocks.append(block_data)
+            base_blocks.append(np.full(n_obs, base_value))
+            row_seed.extend([int(random_state)] * n_obs)
+            row_obs.extend(int(obs_id) for obs_id in obs_ids)
+
+        values = np.vstack(seed_blocks)
+        data = np.vstack(data_blocks)
+        base_values = np.concatenate(base_blocks)
+
+        explanation = shap.Explanation(
+            values=values,
+            base_values=base_values,
+            data=data,
+            feature_names=union_features,
+        )
+        return explanation, row_seed, row_obs
 
     def _persist_explanations(self) -> None:
         """Write per-classifier explanation pickles + aggregate CSVs.

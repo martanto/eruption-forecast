@@ -533,6 +533,173 @@ class TestValidation:
 # ---------------------------------------------------------------------------
 
 
+class TestAggregateExplanation:
+    """Stacked ``shap.Explanation`` aggregate path used by the beeswarm plot."""
+
+    @staticmethod
+    def _build_partial_overlap_ensemble(
+        train_data: tuple[pd.DataFrame, np.ndarray],
+    ) -> tuple[ClassifierEnsemble, list[list[str]]]:
+        """Build a three-seed RF ensemble with partial-overlap feature subsets."""
+        X_train, y_train = train_data
+        per_seed_features = [
+            ["feat_0", "feat_1", "feat_2"],
+            ["feat_1", "feat_2", "feat_3"],
+            ["feat_0", "feat_2", "feat_4"],
+        ]
+        ensemble = SeedEnsemble(classifier_name="RandomForestClassifier")
+        for rs, feats in enumerate(per_seed_features):
+            model = RandomForestClassifier(random_state=rs, n_estimators=10)
+            model.fit(X_train[feats].to_numpy(), y_train)
+            ensemble.seeds.append(
+                {"random_state": rs, "model": model, "feature_names": feats}
+            )
+        ce = ClassifierEnsemble.from_seed_ensembles(
+            {"RandomForestClassifier": ensemble}
+        )
+        return ce, per_seed_features
+
+    def test_stacked_shape_and_feature_axis(
+        self, train_data, feature_df
+    ) -> None:
+        """Stacked explanation matches ``(n_seeds × n_obs, |union|)`` shape."""
+        ce, per_seed_features = self._build_partial_overlap_ensemble(train_data)
+        obs_ids = feature_df.index[:5].tolist()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ee = ExplainerEnsemble(
+                classifier_ensemble=ce,
+                features_df=feature_df,
+                observation_ids={"RandomForestClassifier": obs_ids},
+                output_dir=tmp,
+            ).compute()
+
+            explanation, row_seed, row_obs = ee._aggregate_explanation(
+                "RandomForestClassifier"
+            )
+
+            union = sorted({f for feats in per_seed_features for f in feats})
+            assert explanation.values.shape == (3 * 5, len(union))
+            assert set(explanation.feature_names) == set(union)
+
+            #  Feature axis must match the bar plot ranking exactly so the
+            #  two aggregate views stay aligned.
+            agg = ee._aggregate_importance("RandomForestClassifier")
+            assert list(explanation.feature_names) == agg["feature"].tolist()
+
+            assert row_seed == [0] * 5 + [1] * 5 + [2] * 5
+            assert row_obs == obs_ids * 3
+
+    def test_nan_positions_match_unselected_features(
+        self, train_data, feature_df
+    ) -> None:
+        """A seed's block is NaN exactly on the features it did not select."""
+        ce, per_seed_features = self._build_partial_overlap_ensemble(train_data)
+        obs_ids = feature_df.index[:5].tolist()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ee = ExplainerEnsemble(
+                classifier_ensemble=ce,
+                features_df=feature_df,
+                observation_ids={"RandomForestClassifier": obs_ids},
+                output_dir=tmp,
+            ).compute()
+
+            explanation, _, _ = ee._aggregate_explanation("RandomForestClassifier")
+            feature_names = list(explanation.feature_names)
+
+            for seed_index, feats in enumerate(per_seed_features):
+                start = seed_index * 5
+                stop = start + 5
+                block = explanation.values[start:stop, :]
+                for col_index, feature in enumerate(feature_names):
+                    if feature in feats:
+                        assert not np.isnan(block[:, col_index]).any(), (
+                            f"seed {seed_index} should have values for {feature}"
+                        )
+                    else:
+                        assert np.isnan(block[:, col_index]).all(), (
+                            f"seed {seed_index} should have NaN for unselected "
+                            f"feature {feature}"
+                        )
+
+    def test_non_nan_values_match_per_seed_shap(
+        self, train_data, feature_df
+    ) -> None:
+        """Stacked non-NaN values mirror the per-seed ``shap_values`` exactly."""
+        ce, per_seed_features = self._build_partial_overlap_ensemble(train_data)
+        obs_ids = feature_df.index[:5].tolist()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ee = ExplainerEnsemble(
+                classifier_ensemble=ce,
+                features_df=feature_df,
+                observation_ids={"RandomForestClassifier": obs_ids},
+                output_dir=tmp,
+            ).compute()
+
+            explanation, _, _ = ee._aggregate_explanation("RandomForestClassifier")
+            stacked_feature_names = list(explanation.feature_names)
+            seeds = ee.results["RandomForestClassifier"]["seeds"]
+
+            for seed_index, (rs, seed_data) in enumerate(seeds.items()):
+                start = seed_index * 5
+                stop = start + 5
+                block = explanation.values[start:stop, :]
+                seed_features = list(seed_data["feature_names"])
+                for seed_col_index, feature in enumerate(seed_features):
+                    stacked_col = stacked_feature_names.index(feature)
+                    np.testing.assert_array_equal(
+                        block[:, stacked_col],
+                        seed_data["shap_values"][:, seed_col_index],
+                    )
+                assert rs == seed_data.get(
+                    "random_state", rs
+                )  # tolerate either keying convention
+
+    def test_beeswarm_plot_writes_png_and_csv(
+        self, train_data, feature_df
+    ) -> None:
+        """``plot_aggregate(include_plots=['beeswarm'])`` writes png + csv."""
+        ce, _ = self._build_partial_overlap_ensemble(train_data)
+        obs_ids = feature_df.index[:5].tolist()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ee = ExplainerEnsemble(
+                classifier_ensemble=ce,
+                features_df=feature_df,
+                observation_ids={"RandomForestClassifier": obs_ids},
+                output_dir=tmp,
+            ).compute()
+            ee.plot_aggregate(include_plots=["beeswarm"])
+
+            base = os.path.join(
+                tmp,
+                "classifiers",
+                "RandomForestClassifier",
+                "figures",
+                "aggregate",
+                "beeswarm",
+            )
+            assert os.path.isfile(f"{base}.png")
+            assert os.path.isfile(f"{base}.csv")
+
+            tidy = pd.read_csv(f"{base}.csv")
+            assert list(tidy.columns) == [
+                "feature",
+                "random_state",
+                "obs_id",
+                "shap_value",
+                "feature_value",
+            ]
+            #  Tidy row count equals the non-NaN cell count of the stacked
+            #  values matrix — one row per (seed, obs, feature) cell that
+            #  the seed actually selected.
+            explanation, _, _ = ee._aggregate_explanation("RandomForestClassifier")
+            expected_rows = int((~np.isnan(explanation.values)).sum())
+            assert len(tidy) == expected_rows
+
+
 class TestSaveLoad:
     """Joblib save/load round-trips the populated ``results`` dict."""
 

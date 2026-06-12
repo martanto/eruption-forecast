@@ -8,6 +8,7 @@ pickle them.
 """
 
 import os
+from typing import Literal
 from collections.abc import Callable
 
 import shap
@@ -63,39 +64,68 @@ def plot_shap_bar(
 def plot_shap_beeswarm(
     explanation: shap.Explanation,
     max_display: int = 20,
-    figsize: tuple[float, float] = (8, 6),
+    figsize: tuple[float, float] | None = None,
     dpi: int = 150,
     title: str | None = None,
+    dot_size: float = 32.0,
 ) -> plt.Figure:
     """Render a single-seed SHAP beeswarm plot for the positive class.
 
     Always forwards ``plot_size=None`` to :func:`shap.plots.beeswarm` so the
-    pre-created figure size from :func:`nature_figure` is respected, per the
-    project's standing SHAP rule.
+    pre-created figure size is respected, per the project's standing SHAP
+    rule. The figure is created via :func:`matplotlib.pyplot.figure` (no
+    pre-built axes) so SHAP can lay out its own main + colorbar axes; the
+    title is then centered horizontally on the main axes via
+    :meth:`fig.suptitle` because long tsfresh feature names push the
+    SHAP-drawn axes off-center inside the figure.
 
     Args:
         explanation (shap.Explanation): Per-seed SHAP explanation. Already
             sliced to the positive class by the worker.
         max_display (int, optional): Maximum features to display. Defaults
             to ``20``.
-        figsize (tuple[float, float], optional): Figure size in inches.
-            Defaults to ``(8, 6)``.
+        figsize (tuple[float, float] | None, optional): Figure size in
+            inches. ``None`` auto-sizes to ``(16, max(8, max_display * 0.5))``
+            so long y-tick labels remain readable. Defaults to ``None``.
         dpi (int, optional): Figure resolution in dots per inch. Defaults
             to ``150``.
-        title (str | None, optional): Plot title. Defaults to ``None``.
+        title (str | None, optional): Plot title. Falls back to ``"SHAP
+            Summary Plot"`` when omitted. Defaults to ``None``.
+        dot_size (float, optional): Marker size for individual SHAP dots,
+            forwarded to ``shap.plots.beeswarm(s=...)``. SHAP's default is
+            ``16``; bumped here so dots remain visible inside the wider
+            figure. Defaults to ``32.0``.
 
     Returns:
         plt.Figure: The rendered matplotlib figure.
     """
-    with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):
+    fig_size: tuple[float, float] = (
+        figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
+    )
+
+    with apply_nature_style():
+        fig = plt.figure(figsize=fig_size, dpi=dpi)
+
         shap.plots.beeswarm(
             explanation,
             max_display=max_display,
+            s=dot_size,
             plot_size=None,
             show=False,
         )
-        if title:
-            ax.set_title(title)
+
+        #  SHAP draws into the current axes and then adds a colorbar axes,
+        #  so ``fig.axes[0]`` is the beeswarm panel itself. Center the title
+        #  on it rather than on the whole figure — long feature labels push
+        #  the panel rightward and a figure-centered title looks misaligned.
+        ax = fig.axes[0]
+        pos = ax.get_position()
+        fig.suptitle(
+            title or "SHAP Summary Plot",
+            x=(pos.x0 + pos.x1) / 2,
+            y=0.9,
+            ha="center",
+        )
         configure_spine(ax)
     return fig
 
@@ -208,6 +238,121 @@ def plot_aggregate_shap_bar(
     return fig, aggregate_df
 
 
+def plot_aggregate_shap_beeswarm(
+    explanation: shap.Explanation,
+    row_seed: list[int],
+    row_obs: list[int],
+    max_display: int = 20,
+    figsize: tuple[float, float] | None = None,
+    dpi: int = 150,
+    title: str | None = None,
+    dot_size: float = 32.0,
+) -> tuple[plt.Figure, pd.DataFrame]:
+    """Render a stacked-seeds aggregate SHAP beeswarm.
+
+    Consumes the union-of-features Explanation produced by
+    :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble._aggregate_explanation`.
+    Cells where a seed did not select a feature carry NaN and are skipped by
+    SHAP's beeswarm internals. Returns a tidy long-form sidecar DataFrame so
+    external tools can redraw the swarm without the worker pickle.
+
+    Args:
+        explanation (shap.Explanation): Stacked positive-class explanation
+            with shape ``(n_seeds × n_obs, |union features|)``.
+        row_seed (list[int]): Seed ``random_state`` for each row of
+            ``explanation.values``.
+        row_obs (list[int]): Window id for each row of
+            ``explanation.values``.
+        max_display (int, optional): Maximum features to display. Defaults
+            to ``20``.
+        figsize (tuple[float, float] | None, optional): Figure size in
+            inches. ``None`` auto-sizes to ``(16, max(8, max_display * 0.5))``.
+            Defaults to ``None``.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to ``150``.
+        title (str | None, optional): Plot title. Falls back to ``"SHAP
+            Summary Plot"`` when omitted. Defaults to ``None``.
+        dot_size (float, optional): Marker size for individual SHAP dots,
+            forwarded to ``shap.plots.beeswarm(s=...)``. SHAP's default is
+            ``16``; bumped here so dots remain visible inside the wider
+            figure. Defaults to ``32.0``.
+
+    Returns:
+        tuple[plt.Figure, pd.DataFrame]: The figure and a tidy DataFrame
+            with columns ``feature``, ``random_state``, ``obs_id``,
+            ``shap_value``, ``feature_value`` covering only the non-NaN
+            cells.
+    """
+    fig_size: tuple[float, float] = (
+        figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
+    )
+
+    with apply_nature_style():
+        fig = plt.figure(figsize=fig_size, dpi=dpi)
+
+        shap.plots.beeswarm(
+            explanation,
+            max_display=max_display,
+            s=dot_size,
+            plot_size=None,
+            show=False,
+        )
+
+        #  SHAP draws into the current axes and then adds a colorbar axes,
+        #  so ``fig.axes[0]`` is the beeswarm panel itself. Center the title
+        #  on it rather than on the whole figure — long feature labels push
+        #  the panel rightward and a figure-centered title looks misaligned.
+        ax = fig.axes[0]
+        pos = ax.get_position()
+        fig.suptitle(
+            title or "SHAP Summary Plot",
+            x=(pos.x0 + pos.x1) / 2,
+            y=0.9,
+            ha="center",
+        )
+        configure_spine(ax)
+
+    #  Tidy long-form sidecar: one row per non-NaN cell. Lets a downstream
+    #  consumer rebuild the swarm or query a specific (seed, obs, feature)
+    #  triple without re-loading the explanation pickle.
+    values = np.asarray(explanation.values)
+    data = np.asarray(explanation.data)
+    feature_names = list(explanation.feature_names)
+
+    seed_arr = np.asarray(row_seed)
+    obs_arr = np.asarray(row_obs)
+
+    tidy_rows: list[dict] = []
+    for col_index, feature in enumerate(feature_names):
+        col_values = values[:, col_index]
+        col_data = data[:, col_index]
+        mask = ~np.isnan(col_values)
+        if not mask.any():
+            continue
+        for shap_value, feature_value, seed_value, obs_value in zip(
+            col_values[mask],
+            col_data[mask],
+            seed_arr[mask],
+            obs_arr[mask],
+            strict=True,
+        ):
+            tidy_rows.append(
+                {
+                    "feature": feature,
+                    "random_state": int(seed_value),
+                    "obs_id": int(obs_value),
+                    "shap_value": float(shap_value),
+                    "feature_value": float(feature_value),
+                }
+            )
+
+    tidy_df = pd.DataFrame(
+        tidy_rows,
+        columns=["feature", "random_state", "obs_id", "shap_value", "feature_value"],
+    )
+    return fig, tidy_df
+
+
 PER_SEED_PLOT_DISPATCHER: dict[str, Callable[..., plt.Figure]] = {
     "bar": plot_shap_bar,
     "beeswarm": plot_shap_beeswarm,
@@ -216,6 +361,17 @@ PER_SEED_PLOT_DISPATCHER: dict[str, Callable[..., plt.Figure]] = {
 
 AGGREGATE_PLOT_DISPATCHER: dict[str, Callable[..., tuple[plt.Figure, pd.DataFrame]]] = {
     "bar": plot_aggregate_shap_bar,
+    "beeswarm": plot_aggregate_shap_beeswarm,
+}
+
+
+#  Each aggregate plot consumes a different input shape — the bar takes the
+#  feature-level summary DataFrame, the beeswarm takes the stacked
+#  ``shap.Explanation``. This sibling registry tells the orchestrator and the
+#  render worker which builder to invoke for each plot.
+AGGREGATE_PLOT_INPUT_KIND: dict[str, Literal["dataframe", "explanation"]] = {
+    "bar": "dataframe",
+    "beeswarm": "explanation",
 }
 
 
@@ -368,7 +524,7 @@ def render_one_waterfall_plot(
 def render_one_aggregate_plot(
     classifier_name: str,
     plot_name: str,
-    aggregate_df: pd.DataFrame,
+    aggregate_input: pd.DataFrame | tuple[shap.Explanation, list[int], list[int]],
     output_dir: str,
     dpi: int = 150,
     overwrite: bool = False,
@@ -379,14 +535,22 @@ def render_one_aggregate_plot(
     Module-level so ``joblib`` workers under the ``loky`` backend can pickle
     it. Saves to
     ``{output_dir}/{classifier_name}/figures/aggregate/{plot_name}.{png,csv}``.
+    Dispatches the second-argument shape on
+    :data:`AGGREGATE_PLOT_INPUT_KIND` so each plot receives the input type
+    it actually needs (feature-level DataFrame for the bar, stacked
+    ``shap.Explanation`` for the beeswarm).
 
     Args:
         classifier_name (str): Classifier identifier used as the first path
             segment under ``output_dir``.
         plot_name (str): Key into :data:`AGGREGATE_PLOT_DISPATCHER`.
-        aggregate_df (pd.DataFrame): Aggregate importance DataFrame
-            produced by
-            :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble._aggregate_importance`.
+        aggregate_input (pd.DataFrame | tuple[shap.Explanation, list[int],
+            list[int]]): Plot-specific input. ``"dataframe"`` plots take the
+            aggregate-importance DataFrame produced by
+            :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble._aggregate_importance`;
+            ``"explanation"`` plots take the
+            ``(stacked_explanation, row_seed, row_obs)`` tuple produced by
+            :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble._aggregate_explanation`.
         output_dir (str): Root directory for figure output.
         dpi (int, optional): Figure resolution. Defaults to ``150``.
         overwrite (bool, optional): When ``True``, regenerate the figure
@@ -399,7 +563,15 @@ def render_one_aggregate_plot(
             data table share this stem.
     """
     plot_function = AGGREGATE_PLOT_DISPATCHER[plot_name]
-    fig, data = plot_function(aggregate_df, dpi=dpi)
+    input_kind = AGGREGATE_PLOT_INPUT_KIND[plot_name]
+
+    if input_kind == "dataframe":
+        fig, data = plot_function(aggregate_input, dpi=dpi)
+    else:
+        explanation, row_seed, row_obs = aggregate_input
+        fig, data = plot_function(
+            explanation, row_seed=row_seed, row_obs=row_obs, dpi=dpi
+        )
 
     filepath = os.path.join(
         output_dir,
