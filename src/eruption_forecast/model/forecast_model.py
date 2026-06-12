@@ -14,12 +14,14 @@ from eruption_forecast.config.forecast_config import (
     ForecastConfig,
     BaseForecastConfig,
     ForecastTrainConfig,
+    ForecastExplainConfig,
     ForecastPredictConfig,
     ForecastEvaluateConfig,
     ForecastCalculateConfig,
 )
 from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.model.explanation_model import ExplanationModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
@@ -101,6 +103,9 @@ class ForecastModel:
         # Will be set after evaluate() run
         self.EvaluationModel: EvaluationModel | None = None
         self.evaluation_results: dict[str, pd.DataFrame] = {}
+
+        # Will be set after explain() run
+        self.ExplanationModel: ExplanationModel | None = None
 
         # Pipeline configuration — populated incrementally as each stage runs.
         # ``save_config()`` serialises whatever stages have executed so far.
@@ -642,6 +647,146 @@ class ForecastModel:
 
         return self
 
+    def explain(
+        self,
+        model: Literal["training", "prediction"] = "prediction",
+        n_observations_to_explain: int = 10,
+        method: Literal["shap"] = "shap",
+        feature_perturbation: Literal[
+            "tree_path_dependent", "interventional"
+        ] = "tree_path_dependent",
+        model_output: Literal["raw", "probability", "log_loss"] = "raw",
+        background_size: int = 100,
+        check_additivity: bool = True,
+        selection: Literal["top_proba", "near_threshold"] = "top_proba",
+        plot_aggregate: bool = True,
+        plot_per_seed: bool = False,
+        plot_waterfall: bool = True,
+        output_dir: str | None = None,
+        overwrite: bool | None = None,
+        n_jobs: int | None = None,
+        verbose: bool | None = None,
+    ) -> Self:
+        """Explain a previously trained ensemble via SHAP TreeExplainer.
+
+        Reuses the ``TrainingModel`` or ``PredictionModel`` already produced
+        in the current session.  No tsfresh re-run or model re-fit is
+        performed — the window grid and extracted features are taken
+        directly from the chosen reuse source.
+
+        Args:
+            model (Literal["training", "prediction"]): Which model in the
+                current pipeline to explain. Defaults to ``"prediction"``.
+            n_observations_to_explain (int): Top-N observations per
+                classifier forwarded to ``ExplainerEnsemble``. Defaults to
+                ``10``.
+            method (Literal["shap"]): Explanation method. Reserved for
+                future additions. Defaults to ``"shap"``.
+            feature_perturbation (Literal["tree_path_dependent",
+                "interventional"]): SHAP perturbation mode. Defaults to
+                ``"tree_path_dependent"``.
+            model_output (Literal["raw", "probability", "log_loss"]):
+                SHAP output unit. ``"probability"`` and ``"log_loss"``
+                require ``feature_perturbation="interventional"``.
+                Defaults to ``"raw"``.
+            background_size (int): Background sample size for the
+                interventional path. Defaults to ``100``.
+            check_additivity (bool): Forwarded to the inner
+                ``explainer(X, ...)`` call. Defaults to ``True``.
+            selection (Literal["top_proba", "near_threshold"]):
+                Observation-ranking strategy. Defaults to ``"top_proba"``.
+            plot_aggregate (bool): Render aggregate plots per classifier.
+                Defaults to ``True``.
+            plot_per_seed (bool): Render per-seed bar / beeswarm plots.
+                Defaults to ``False``.
+            plot_waterfall (bool): When ``plot_per_seed=True``, also
+                render per-(seed, observation) waterfall plots. Defaults
+                to ``True``.
+            output_dir (str | None): Root output directory for explanation
+                artefacts. Defaults to the station directory.
+            overwrite (bool | None): Overwrite existing files. ``None``
+                inherits from ``self.overwrite``. Defaults to ``None``.
+            n_jobs (int | None): Parallel workers. ``None`` inherits from
+                ``self.n_jobs``. Defaults to ``None``.
+            verbose (bool | None): Verbose logging. ``None`` inherits from
+                ``self.verbose``. Defaults to ``None``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If the required model for the selected ``model``
+                mode has not been produced yet.
+        """
+        if model == "training" and self.TrainingModel is None:
+            raise ValueError(
+                "TrainingModel is required for model='training'. "
+                "Please run train() first."
+            )
+        if model == "prediction" and self.PredictionModel is None:
+            raise ValueError(
+                "PredictionModel is required for model='prediction'. "
+                "Please run train() then predict()."
+            )
+
+        self._config.explain = ForecastExplainConfig(
+            model=model,
+            n_observations_to_explain=n_observations_to_explain,
+            method=method,
+            feature_perturbation=feature_perturbation,
+            model_output=model_output,
+            background_size=background_size,
+            check_additivity=check_additivity,
+            selection=selection,
+            plot_aggregate=plot_aggregate,
+            plot_per_seed=plot_per_seed,
+            plot_waterfall=plot_waterfall,
+            output_dir=output_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
+        n_jobs = n_jobs if n_jobs is not None else self.n_jobs
+        verbose = verbose if verbose is not None else self.verbose
+        overwrite = overwrite if overwrite is not None else self.overwrite
+
+        model_object: TrainingModel | PredictionModel
+        if model == "prediction" and self.PredictionModel is not None:
+            model_object = self.PredictionModel
+        elif self.TrainingModel is not None:
+            model_object = self.TrainingModel
+        else:
+            raise ValueError(
+                f"Model {model} is not supported. Choose between "
+                f"'prediction' and 'training'"
+            )
+
+        explanation_model = ExplanationModel(
+            model=model_object,
+            n_observations_to_explain=n_observations_to_explain,
+            method=method,
+            feature_perturbation=feature_perturbation,
+            model_output=model_output,
+            background_size=background_size,
+            check_additivity=check_additivity,
+            selection=selection,
+            output_dir=output_dir or self.station_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        ).explain(
+            plot_aggregate=plot_aggregate,
+            plot_per_seed=plot_per_seed,
+            plot_waterfall=plot_waterfall,
+        )
+
+        self.ExplanationModel = explanation_model
+
+        self.save_config()
+
+        return self
+
     def save_config(
         self,
         path: str | None = None,
@@ -713,4 +858,6 @@ class ForecastModel:
             self.predict(**self._config.predict.to_dict())
         if self._config.evaluate is not None:
             self.evaluate(**self._config.evaluate.to_dict())
+        if self._config.explain is not None:
+            self.explain(**self._config.explain.to_dict())
         return self
