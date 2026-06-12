@@ -252,15 +252,15 @@ class TrainingModel(BaseModel, CacheModel):
         learning_curve_dirs: dict[str, str] = {}
 
         for classifier_model in self.classifier_models:
-            classifier_slug_name = classifier_model.slug_name
-            classifier_dirs[classifier_slug_name] = os.path.join(
-                classifier_dir, classifier_slug_name, self.cv_name
+            classifier_name = classifier_model.name
+            classifier_dirs[classifier_name] = os.path.join(
+                classifier_dir, classifier_name, self.cv_name
             )
-            model_dir = os.path.join(classifier_dirs[classifier_slug_name], "models")
+            model_dir = os.path.join(classifier_dirs[classifier_name], "models")
             ensure_dir(classifier_dir)
-            models_dir[classifier_slug_name] = model_dir
-            learning_curve_dirs[classifier_slug_name] = os.path.join(
-                classifier_dirs[classifier_slug_name], "learning_curves"
+            models_dir[classifier_name] = model_dir
+            learning_curve_dirs[classifier_name] = os.path.join(
+                classifier_dirs[classifier_name], "learning_curves"
             )
 
         return (
@@ -337,7 +337,7 @@ class TrainingModel(BaseModel, CacheModel):
             >>> print(model.describe())
             TrainingModel(period=2025-01-01 → 2025-12-31, window_size=2d, ...)
         """
-        classifier_names = ", ".join(m.slug_name for m in self.classifier_models)
+        classifier_names = ", ".join(m.name for m in self.classifier_models)
         return (
             f"TrainingModel("
             f"period={self.start_date_str} → {self.end_date_str}, "
@@ -402,7 +402,7 @@ class TrainingModel(BaseModel, CacheModel):
             >>> "Training period" in prompt
             True
         """
-        classifier_names = ", ".join(m.slug_name for m in self.classifier_models)
+        classifier_names = ", ".join(m.name for m in self.classifier_models)
         eruption_list = (
             ", ".join(self.eruption_dates)
             if self.eruption_dates is not None
@@ -1053,9 +1053,7 @@ class TrainingModel(BaseModel, CacheModel):
                 continue
             _random_state = pending_feature_selection_job[0]
             for classifier_model in self.classifier_models:
-                new_training_model_jobs.append(
-                    (_random_state, classifier_model.slug_name)
-                )
+                new_training_model_jobs.append((_random_state, classifier_model.name))
 
         all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs
         training_model_results: list[str | None] = self._run_jobs(
@@ -1072,20 +1070,20 @@ class TrainingModel(BaseModel, CacheModel):
                 continue
 
             (
-                classifier_slug,
+                classifier_name,
                 _random_state,
                 features_seed_path,
                 model_seed_path,
                 top_n_features,
             ) = result
 
-            if classifier_slug not in records_per_classifier:
-                records_per_classifier[classifier_slug] = []
+            if classifier_name not in records_per_classifier:
+                records_per_classifier[classifier_name] = []
 
             if features_seed_path not in self.features_csvs:
                 self.features_csvs.append(features_seed_path)
 
-            records_per_classifier[classifier_slug].append(
+            records_per_classifier[classifier_name].append(
                 {
                     "random_state": _random_state,
                     "features": top_n_features,
@@ -1127,14 +1125,14 @@ class TrainingModel(BaseModel, CacheModel):
                     f"Training: Saving SeedEnsemble for {classifier_model.name} model ..."
                 )
 
-            classifier_slug = classifier_model.slug_name
-            if not records_per_classifier[classifier_slug]:
+            classifier_name = classifier_model.name
+            if not records_per_classifier[classifier_name]:
                 continue
 
             trained_model_json = save_model_json(
                 seeds=seeds,
-                records=records_per_classifier[classifier_slug],
-                classifier_dir=self.classifier_dirs[classifier_slug],
+                records=records_per_classifier[classifier_name],
+                classifier_dir=self.classifier_dirs[classifier_name],
                 classifier_model=classifier_model,
                 number_of_features=self.top_n_features,
                 prefix_filename="trained-model",
@@ -1142,7 +1140,7 @@ class TrainingModel(BaseModel, CacheModel):
             )
 
             seed_ensemble_path, seed_ensemble = self.build_seed_ensemble(
-                output_dir=self.classifier_dirs[classifier_slug],
+                output_dir=self.classifier_dirs[classifier_name],
                 classifier_name=classifier_model.name,
                 registry_path=trained_model_json,
                 verbose=self.verbose,
@@ -1317,22 +1315,22 @@ class TrainingModel(BaseModel, CacheModel):
 
         jobs: list[tuple] = []
         for classifier_model in self.classifier_models:
-            classifier_slug = classifier_model.slug_name
+            classifier_name = classifier_model.name
             seed_ensemble = ensemble.ensembles.get(classifier_model.name)
             if seed_ensemble is None:
                 continue
-            lc_dir = self.learning_curve_dirs[classifier_slug]
+            lc_dir = self.learning_curve_dirs[classifier_name]
             for seed_record in seed_ensemble.seeds:
                 random_state = seed_record["random_state"]
                 lc_path = os.path.join(lc_dir, f"{random_state:05d}.json")
                 if not overwrite and os.path.isfile(lc_path):
                     if self.verbose:
                         logger.info(
-                            f"Learning curve {random_state:05d} / {classifier_slug}: "
+                            f"Learning curve {random_state:05d} / {classifier_name}: "
                             f"exists, skipping."
                         )
                     continue
-                jobs.append((random_state, classifier_slug))
+                jobs.append((random_state, classifier_name))
 
         if not jobs:
             logger.info("Learning Curve: nothing to compute (all JSONs present).")
@@ -1362,7 +1360,7 @@ class TrainingModel(BaseModel, CacheModel):
     def _train(
         self,
         random_state: int,
-        classifier_slug: str,
+        classifier_name: str,
     ) -> tuple | None:
         """Fit a single classifier for one random seed and persist the model.
 
@@ -1374,12 +1372,12 @@ class TrainingModel(BaseModel, CacheModel):
         Args:
             random_state (int): Seed index identifying the feature and
                 resampled data files to use.
-            classifier_slug (str): Slug name of the classifier to train,
+            classifier_name (str): Slug name of the classifier to train,
                 e.g. ``"random-forest-classifier"``.
 
         Returns:
             tuple | None: A five-element tuple
-                ``(classifier_slug, random_state, features_seed_path,
+                ``(classifier_name, random_state, features_seed_path,
                 model_seed_path, top_n_features)`` on success, or ``None``
                 when the feature file is missing or contains no features.
                 ``top_n_features`` is the inline list of selected column names
@@ -1403,20 +1401,20 @@ class TrainingModel(BaseModel, CacheModel):
             return None
 
         classifier_model = next(
-            m for m in self.classifier_models if m.slug_name == classifier_slug
+            m for m in self.classifier_models if m.name == classifier_name
         )
 
         model_seed_path = os.path.join(
-            self.models_dir[classifier_slug], f"{filename}.pkl"
+            self.models_dir[classifier_name], f"{filename}.pkl"
         )
 
         # Return cached result without re-training if the model already exists.
         if not self.overwrite and os.path.isfile(model_seed_path):
             logger.info(
-                f"Seed {random_state:05d} / {classifier_slug}: model exists, skipping."
+                f"Seed {random_state:05d} / {classifier_name}: model exists, skipping."
             )
             return (
-                classifier_slug,
+                classifier_name,
                 random_state,
                 features_seed_path,
                 model_seed_path,
@@ -1428,7 +1426,7 @@ class TrainingModel(BaseModel, CacheModel):
         features_resampled = _resampled_df.drop(columns=["is_erupted"])
 
         if self.verbose:
-            logger.info(f"Fitting Seed: {random_state:05d} / {classifier_slug}...")
+            logger.info(f"Fitting Seed: {random_state:05d} / {classifier_name}...")
 
         _, _, best_model = grid_search_cv(
             random_state,
@@ -1443,11 +1441,11 @@ class TrainingModel(BaseModel, CacheModel):
 
         if self.verbose:
             logger.info(
-                f"Fitted Model {random_state:05d} / {classifier_slug} : {model_seed_path}"
+                f"Fitted Model {random_state:05d} / {classifier_name} : {model_seed_path}"
             )
 
         return (
-            classifier_slug,
+            classifier_name,
             random_state,
             features_seed_path,
             model_seed_path,
@@ -1581,7 +1579,7 @@ class TrainingModel(BaseModel, CacheModel):
                   figures_seed_path, resample_method, sampling_strategy)``.
                 - pending_training_model_jobs: Jobs that still need model
                   training for seeds whose feature files already exist on disk.
-                  Each entry is a tuple of ``(random_state, classifier_slug)``.
+                  Each entry is a tuple of ``(random_state, classifier_name)``.
                 - records_per_classifier: Classifier-slug → list of record
                   dicts for seeds whose models already exist on disk.
                 - existing_feature_paths: Feature CSV paths that already exist
@@ -1594,8 +1592,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         # Init records per classifier
         records_per_classifier: dict[str, list[dict]] = {
-            classifier_model.slug_name: []
-            for classifier_model in self.classifier_models
+            classifier_model.name: [] for classifier_model in self.classifier_models
         }
 
         for random_state in random_states:
@@ -1620,16 +1617,16 @@ class TrainingModel(BaseModel, CacheModel):
                     features_seed_path, index_col=0
                 ).index.tolist()
                 for classifier_model in self.classifier_models:
-                    classifier_slug = classifier_model.slug_name
+                    classifier_name = classifier_model.name
                     model_seed_path = os.path.join(
-                        self.models_dir[classifier_slug], f"{filename}.pkl"
+                        self.models_dir[classifier_name], f"{filename}.pkl"
                     )
 
                     # Check if seed model per classifier exists
-                    # Should be exists in: <self.models_dir[classifier_slug]>/models
+                    # Should be exists in: <self.models_dir[classifier_name]>/models
                     # Example: training\classifiers\lite-random-forest-classifier\stratified-shuffle-split\models
                     if os.path.isfile(model_seed_path):
-                        records_per_classifier[classifier_slug].append(
+                        records_per_classifier[classifier_name].append(
                             {
                                 "random_state": random_state,
                                 "features": cached_top_n_features,
@@ -1638,7 +1635,7 @@ class TrainingModel(BaseModel, CacheModel):
                         )
                     else:
                         pending_training_model_jobs.append(
-                            (random_state, classifier_slug)
+                            (random_state, classifier_name)
                         )
                 continue
 
@@ -1749,7 +1746,7 @@ class TrainingModel(BaseModel, CacheModel):
         self,
         classifier_ensemble: ClassifierEnsemble,
         random_state: int,
-        classifier_slug: str,
+        classifier_name: str,
         scoring: list[str],
         train_sizes: np.ndarray,
     ) -> str | None:
@@ -1770,7 +1767,7 @@ class TrainingModel(BaseModel, CacheModel):
                 guarantees this is non-None.
             random_state (int): Seed identifying the resampled CSV and
                 in-memory seed record.
-            classifier_slug (str): Slug name of the classifier to evaluate.
+            classifier_name (str): Slug name of the classifier to evaluate.
             scoring (list[str]): sklearn scoring keys to evaluate.
             train_sizes (np.ndarray): Fractions of the training set to evaluate.
 
@@ -1786,18 +1783,18 @@ class TrainingModel(BaseModel, CacheModel):
 
         if not os.path.isfile(features_resampled_path):
             logger.warning(
-                f"Learning curve {filename} / {classifier_slug}: "
+                f"Learning curve {filename} / {classifier_name}: "
                 f"missing {features_resampled_path}, skipping."
             )
             return None
 
         classifier_model = next(
-            m for m in self.classifier_models if m.slug_name == classifier_slug
+            m for m in self.classifier_models if m.name == classifier_name
         )
         seed_ensemble = classifier_ensemble.ensembles.get(classifier_model.name)
         if seed_ensemble is None:
             logger.warning(
-                f"Learning curve {filename} / {classifier_slug}: "
+                f"Learning curve {filename} / {classifier_name}: "
                 f"{classifier_model.name} missing from ClassifierEnsemble, skipping."
             )
             return None
@@ -1808,7 +1805,7 @@ class TrainingModel(BaseModel, CacheModel):
         )
         if seed_record is None:
             logger.warning(
-                f"Learning curve {filename} / {classifier_slug}: "
+                f"Learning curve {filename} / {classifier_name}: "
                 f"seed not found in SeedEnsemble (likely skipped during fit), skipping."
             )
             return None
@@ -1849,7 +1846,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         payload = {
             "random_state": random_state,
-            "classifier_slug": classifier_slug,
+            "classifier_name": classifier_name,
             "train_sizes": train_sizes_abs.tolist()
             if train_sizes_abs is not None
             else [],
@@ -1857,14 +1854,14 @@ class TrainingModel(BaseModel, CacheModel):
         }
 
         lc_path = os.path.join(
-            self.learning_curve_dirs[classifier_slug], f"{filename}.json"
+            self.learning_curve_dirs[classifier_name], f"{filename}.json"
         )
         with open(lc_path, "w") as f:
             json.dump(payload, f, indent=2)
 
         if self.verbose:
             logger.info(
-                f"Learning curve {filename} / {classifier_slug}: wrote {lc_path}"
+                f"Learning curve {filename} / {classifier_name}: wrote {lc_path}"
             )
 
         return lc_path
