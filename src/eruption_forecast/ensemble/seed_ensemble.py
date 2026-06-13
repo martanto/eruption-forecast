@@ -6,6 +6,7 @@ import numpy as np
 import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils._repr_html.estimator import _VisualBlock
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
@@ -48,6 +49,9 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.classifier_name = classifier_name
         self.seeds: list[dict] = []
+
+    def __getitem__(self, seed_index: int):
+        return self.seeds[seed_index]
 
     def __len__(self) -> int:
         """Return the number of seeds in this ensemble.
@@ -208,9 +212,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             )
 
         if not records:
-            raise ValueError(
-                f"Trained-model JSON is empty: {trained_model_json}"
-            )
+            raise ValueError(f"Trained-model JSON is empty: {trained_model_json}")
 
         required_keys = {"random_state", "features", "model_filepath"}
         _classifier_name = "Unknown" if classifier_name is None else classifier_name
@@ -518,3 +520,39 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 logger.info(f"Saved seed predictions matrix: {predictions_path}")
 
         return probabilities_path, predictions_path
+
+    def _sk_visual_block_(self) -> _VisualBlock:
+        """Return a sklearn ``_VisualBlock`` describing the bundled seed models.
+
+        Picked up by :func:`sklearn.utils.estimator_html_repr` (and therefore by
+        ``BaseEstimator._repr_html_``) so that Jupyter renders the ensemble as
+        a single nested estimator. All seeds share the same classifier type
+        (only ``random_state`` differs), so a single representative model is
+        sufficient and avoids the unreadable explosion of 100–500 boxes that a
+        one-per-seed layout would produce.
+
+        Returns:
+            _VisualBlock: A ``"single"`` block whose nested estimator is the
+                first seed's fitted model. When the ensemble is empty, the
+                block wraps ``self`` instead so the rich display still renders.
+        """
+        if not self.seeds:
+            return _VisualBlock(
+                "single",
+                self,
+                names=self.classifier_name,
+                name_details="n_seeds=0",
+            )
+
+        representative = self.seeds[0]["model"]
+        first_random_state = self.seeds[0]["random_state"]
+        last_random_state = self.seeds[-1]["random_state"]
+        return _VisualBlock(
+            "single",
+            representative,
+            names=f"{self.classifier_name}",
+            name_details=(
+                f"n_seeds={len(self.seeds)}, "
+                f"random_states=[{first_random_state}...{last_random_state}]"
+            ),
+        )
