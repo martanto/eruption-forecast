@@ -1,0 +1,17 @@
+graph LR
+    calculate["Calculate Stage\nCalculateTremor"]
+    train["Train Stage\nTrainingModel"]
+    predict["Predict Stage\nPredictionModel"]
+    evaluate["Evaluate Stage\nEvaluationModel"]
+    explain["Explain Stage (optional)\nExplanationModel"]
+
+    calculate -->|"tremor CSV\n(rsam, dsar, entropy)"| train
+    train -->|"ClassifierEnsemble\n(per-classifier x per-seed)"| predict
+    train -->|"in-sample labels + features"| evaluate
+    predict -->|"forecast-grid features + ensemble"| evaluate
+    predict -->|"trained ensemble + features"| explain
+    train -->|"trained ensemble + features"| explain
+
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class calculate entry

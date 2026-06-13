@@ -1,0 +1,9 @@
+graph LR
+    source-pull["Source Pull\nfrom_sds() / from_fdsn()"]
+    per-day-loop["Per-day Worker Pool\nmultiprocessing.Pool(n_jobs)"]
+    metric-compute["Metric Compute\nRSAM + DSAR + ShannonEntropy"]
+    merge-and-clean["Merge + Clean\nconcat daily CSVs"]
+
+    source-pull -->|"Stream per date"| per-day-loop
+    per-day-loop -->|"bandpassed traces"| metric-compute
+    metric-compute -->|"per-day CSV"| merge-and-clean

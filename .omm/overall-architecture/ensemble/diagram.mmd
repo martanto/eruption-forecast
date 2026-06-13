@@ -1,0 +1,12 @@
+graph LR
+    base-ensemble["BaseEnsemble\nsrc/eruption_forecast/ensemble/base_ensemble.py"]
+    seed-ensemble["SeedEnsemble\nsrc/eruption_forecast/ensemble/seed_ensemble.py"]
+    classifier-ensemble["ClassifierEnsemble\nsrc/eruption_forecast/ensemble/classifier_ensemble.py"]
+    metrics-ensemble["MetricsEnsemble\nsrc/eruption_forecast/ensemble/metrics_ensemble.py"]
+    explainer-ensemble["ExplainerEnsemble\nsrc/eruption_forecast/ensemble/explainer_ensemble.py"]
+
+    seed-ensemble -->|"inherits"| base-ensemble
+    classifier-ensemble -->|"inherits"| base-ensemble
+    classifier-ensemble -->|"holds dict of"| seed-ensemble
+    metrics-ensemble -->|"wraps fitted"| classifier-ensemble
+    explainer-ensemble -->|"mirrors per-classifier shape of"| seed-ensemble

@@ -1,0 +1,9 @@
+created: 2026-06-13T16:16:00.268Z
+updated: 2026-06-13T16:16:00.269Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: explanation-model
+children: []
+parentPath:
+  - model

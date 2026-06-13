@@ -1,0 +1,1 @@
+miniSEED waveform files. Either on disk (SDS hierarchy `{sds}/{year}/{net}/{sta}/{cha}.D/{nslc}.D.{year}.{julian}`) or remote (FDSN web service). One ObsPy `Stream` per (net, sta, loc, cha, date) is the unit of consumption — both adapters expose `get(date) -> Stream`.

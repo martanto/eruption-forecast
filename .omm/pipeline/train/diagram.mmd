@@ -1,0 +1,9 @@
+graph LR
+    build-label["Build Label\nLabelBuilder / DynamicLabelBuilder"]
+    extract-features["Extract Features\nTremorMatrixBuilder + FeaturesBuilder"]
+    seed-fit["Per-Seed Fit\nFeatureSelector + resample + GridSearchCV"]
+    merge-seeds["Merge Seeds\nmerge_seed_models + merge_all_classifiers"]
+
+    build-label -->|"window grid\n+ is_erupted"| extract-features
+    extract-features -->|"feature matrix"| seed-fit
+    seed-fit -->|"per-seed fitted estimators"| merge-seeds

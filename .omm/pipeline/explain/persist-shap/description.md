@@ -1,0 +1,1 @@
+SHAP values, base values, and the explained feature rows are persisted under `explanation/{kind}/`. Cache identity ties to `training_hash` so re-training invalidates downstream explanations; `ExplanationModel.save()`/`load()` round-trip the whole instance via joblib.

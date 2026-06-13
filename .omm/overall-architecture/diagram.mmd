@@ -1,0 +1,28 @@
+graph LR
+    forecast-model["ForecastModel\nsrc/eruption_forecast/model/forecast_model.py"]
+    sources["Seismic Sources\nsrc/eruption_forecast/sources/"]
+    tremor["Tremor Calculation\nsrc/eruption_forecast/tremor/"]
+    label["Label Builder\nsrc/eruption_forecast/label/"]
+    features["Feature Engineering\nsrc/eruption_forecast/features/"]
+    model["Model Stack\nsrc/eruption_forecast/model/"]
+    ensemble["Ensemble Layer\nsrc/eruption_forecast/ensemble/"]
+    config["Config Layer\nsrc/eruption_forecast/config/"]
+    plots["Plotting\nsrc/eruption_forecast/plots/"]
+    utils["Utilities\nsrc/eruption_forecast/utils/"]
+
+    forecast-model -->|"calculate stage"| tremor
+    tremor -->|"reads day Streams"| sources
+    forecast-model -->|"train stage"| model
+    model -->|"builds windows"| label
+    model -->|"extracts windows"| features
+    model -->|"merges seeds into"| ensemble
+    forecast-model -->|"predict + evaluate"| ensemble
+    forecast-model -->|"save_config/from_config"| config
+    model -->|"renders figures via"| plots
+    tremor -->|"renders daily plots via"| plots
+    forecast-model -->|"path/date/ml helpers"| utils
+
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class forecast-model entry
+    class ensemble store

@@ -1,0 +1,1 @@
+Local SeisComP Data Structure (SDS) miniSEED reader. Builds the canonical SDS path from `(year, julian_day, network, station, location, channel)`, reads the day via ObsPy, and returns an empty `Stream` if the file is absent/unreadable. Used both as a standalone source and as the on-disk cache backend for the `FDSN` source.

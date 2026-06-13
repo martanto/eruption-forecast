@@ -1,0 +1,16 @@
+created: 2026-06-13T16:12:02.029Z
+updated: 2026-06-13T16:12:49.504Z
+update_count: 3
+last_field: context
+git_commit: 6141b5d
+git_branch: ft/sklearn-estimator-html-repr
+children:
+  - config
+  - ensemble
+  - features
+  - label
+  - model
+  - plots
+  - sources
+  - tremor
+  - utils

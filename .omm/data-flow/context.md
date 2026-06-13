@@ -1,0 +1,3 @@
+The shape of these stores is deliberately frozen so that mid-pipeline stages can be saved (joblib pickle of the `BaseModel` subclass) and re-loaded later without re-running upstream — e.g. `EvaluationModel.from_file(prediction_model.pkl)` resurrects a full prediction stage and lets the user run new metrics or comparisons without paying tsfresh or fit costs again.
+
+The cache store is a second, finer-grained level of reuse: same params + same tremor frame → no re-fit at all. `PredictionModel`'s cache identity transitively includes `training_hash`, so re-training automatically invalidates downstream forecasts.

@@ -1,0 +1,3 @@
+- `plot_aggregate=True` → `MetricsEnsemble.plot_aggregate()` writes `figures/aggregate/{plot_name}.{png,csv}` per classifier (ROC, PR, threshold analysis, g-mean, MCC).
+- `plot_per_seed=True` → `MetricsEnsemble.plot_seed()` writes `figures/{plot_name}/{seed:05d}.png` per classifier.
+- `compare_classifiers=True` → builds `ClassifierComparator` on `self.comparator`. `EvaluationModel.compare()` reuses the cached ensemble and writes rankings + plots under `comparison/`.

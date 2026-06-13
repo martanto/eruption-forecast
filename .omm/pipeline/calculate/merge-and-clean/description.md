@@ -1,0 +1,1 @@
+Once every per-day CSV exists, `CalculateTremor.run()` concatenates them in date order, writes the merged tremor CSV at `{station_dir}/tremor/{nslc}_{start}_{end}.csv`, optionally renders a tremor figure via `plots.tremor_plots.plot_tremor`, and deletes the per-day directory when `cleanup_daily_dir=True`.

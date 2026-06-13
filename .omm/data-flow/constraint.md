@@ -1,0 +1,4 @@
+- Sampling interval is hard-coded to 10 minutes everywhere downstream of `CalculateTremor` — window sizes, label horizons, and feature matrix shapes all assume it.
+- Tremor and label CSVs join on DateTime index; misaligned datetimes silently drop rows.
+- `TremorMatrixBuilder` validates per-window sample counts; partial windows are dropped before tsfresh sees them.
+- `(n_samples, n_seeds)` matrices in `MetricsEnsemble` replace the old per-seed JSON files — never write per-seed metric JSONs to that directory.

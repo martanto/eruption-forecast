@@ -1,0 +1,9 @@
+graph LR
+    label-builder["LabelBuilder\nsrc/eruption_forecast/label/label_builder.py"]
+    dynamic-label-builder["DynamicLabelBuilder\nsrc/eruption_forecast/label/dynamic_label_builder.py"]
+    label-data["LabelData\nsrc/eruption_forecast/label/label_data.py"]
+    label-plots["label_plots\nsrc/eruption_forecast/label/label_plots.py"]
+
+    dynamic-label-builder -->|"extends"| label-builder
+    label-builder -->|"writes/reads CSV via"| label-data
+    label-builder -->|"renders distribution via"| label-plots

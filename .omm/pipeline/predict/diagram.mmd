@@ -1,0 +1,9 @@
+graph LR
+    build-grid["Build Forecast Grid\nLabelBuilder (no truth)"]
+    extract-features-pred["Extract Features\nTremorMatrixBuilder + FeaturesBuilder\n(prediction mode)"]
+    inference["Inference\nClassifierEnsemble.predict_proba"]
+    consensus["Consensus + Persist\naggregate_seed_probabilities"]
+
+    build-grid -->|"window grid"| extract-features-pred
+    extract-features-pred -->|"feature matrix"| inference
+    inference -->|"per-seed probabilities"| consensus

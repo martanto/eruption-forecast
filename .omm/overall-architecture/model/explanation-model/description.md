@@ -1,0 +1,1 @@
+SHAP explanation stage. Mirrors `EvaluationModel`'s upstream-model-as-input shape but inherits `CacheModel` because SHAP is expensive (per-classifier × per-seed × per-observation). Builds an `ExplainerEnsemble` of `shap.TreeExplainer` instances and limits work to `n_observations_to_explain` rows. Output goes to `{output_dir}/explanation/{kind}/`.

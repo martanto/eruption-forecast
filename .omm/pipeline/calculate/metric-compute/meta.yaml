@@ -1,0 +1,9 @@
+created: 2026-06-13T16:18:21.339Z
+updated: 2026-06-13T16:18:21.339Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: metric-compute
+children: []
+parentPath:
+  - calculate

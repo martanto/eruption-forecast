@@ -1,0 +1,9 @@
+created: 2026-06-13T16:19:54.346Z
+updated: 2026-06-13T16:19:54.347Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: tree-filter
+children: []
+parentPath:
+  - explain

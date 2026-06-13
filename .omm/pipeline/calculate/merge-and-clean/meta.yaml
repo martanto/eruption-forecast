@@ -1,0 +1,9 @@
+created: 2026-06-13T16:18:21.614Z
+updated: 2026-06-13T16:18:21.614Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: merge-and-clean
+children: []
+parentPath:
+  - calculate

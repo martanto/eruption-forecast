@@ -1,0 +1,12 @@
+created: 2026-06-13T16:17:06.994Z
+updated: 2026-06-13T16:17:28.696Z
+update_count: 4
+last_field: constraint
+git_commit: 6141b5d
+git_branch: ft/sklearn-estimator-html-repr
+children:
+  - calculate
+  - evaluate
+  - explain
+  - predict
+  - train

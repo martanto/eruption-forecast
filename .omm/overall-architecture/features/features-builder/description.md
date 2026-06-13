@@ -1,0 +1,1 @@
+Runs tsfresh feature extraction column-by-column on the tremor matrix. In training mode it filters windows down to those present in the label DataFrame and saves an aligned label CSV; in prediction mode it disables tsfresh relevance filtering so unlabelled forecast windows aren't dropped. Outputs one CSV per tremor column, then concatenates them into a unified feature matrix.

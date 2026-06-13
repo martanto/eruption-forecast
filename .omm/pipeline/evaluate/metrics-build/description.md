@@ -1,0 +1,1 @@
+`MetricsEnsemble(ClassifierEnsemble, features_df, y_true, kind, output_dir)` is built once and reused. `compute()` runs `ClassifierEnsemble.predict_proba` per classifier, fans `(samples, seeds)` matrices, persists them as `classifiers/{clf}/predictions/{y_proba,y_pred}.csv`, and is idempotent once the in-memory arrays are populated (`overwrite` only controls plot regeneration).

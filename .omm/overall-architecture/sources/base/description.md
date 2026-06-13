@@ -1,0 +1,1 @@
+Abstract base class for seismic data sources. Defines the single-method contract `get(date) -> Stream` and an internal `_make_log_prefix()` helper. Holds the `nslc` identifier as a class attribute that subclasses must set to `"{net}.{sta}.{loc}.{cha}"`.

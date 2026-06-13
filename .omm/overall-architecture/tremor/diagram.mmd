@@ -1,0 +1,11 @@
+graph LR
+    calculate-tremor["CalculateTremor\nsrc/eruption_forecast/tremor/calculate_tremor.py"]
+    rsam["RSAM\nsrc/eruption_forecast/tremor/rsam.py"]
+    dsar["DSAR\nsrc/eruption_forecast/tremor/dsar.py"]
+    shannon-entropy["Shannon Entropy\nsrc/eruption_forecast/tremor/shannon_entropy.py"]
+    tremor-data["TremorData\nsrc/eruption_forecast/tremor/tremor_data.py"]
+
+    calculate-tremor -->|"per-band amplitude"| rsam
+    calculate-tremor -->|"band-ratio"| dsar
+    calculate-tremor -->|"broadband entropy"| shannon-entropy
+    calculate-tremor -->|"writes/reads"| tremor-data

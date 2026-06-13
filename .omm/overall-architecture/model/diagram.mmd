@@ -1,0 +1,24 @@
+graph LR
+    base-model["BaseModel (ABC)\nsrc/eruption_forecast/model/base_model.py"]
+    cache-model["CacheModel\nsrc/eruption_forecast/model/cache_model.py"]
+    forecast-model["ForecastModel\nsrc/eruption_forecast/model/forecast_model.py"]
+    training-model["TrainingModel\nsrc/eruption_forecast/model/training_model.py"]
+    prediction-model["PredictionModel\nsrc/eruption_forecast/model/prediction_model.py"]
+    evaluation-model["EvaluationModel\nsrc/eruption_forecast/model/evaluation_model.py"]
+    explanation-model["ExplanationModel\nsrc/eruption_forecast/model/explanation_model.py"]
+    classifier-model["ClassifierModel\nsrc/eruption_forecast/model/classifier_model.py"]
+    classifier-comparator["ClassifierComparator\nsrc/eruption_forecast/model/classifier_comparator.py"]
+
+    forecast-model -->|"runs"| training-model
+    forecast-model -->|"runs"| prediction-model
+    forecast-model -->|"runs"| evaluation-model
+    forecast-model -->|"optional"| explanation-model
+    training-model -->|"inherits"| base-model
+    training-model -->|"inherits"| cache-model
+    prediction-model -->|"inherits"| base-model
+    prediction-model -->|"inherits"| cache-model
+    evaluation-model -->|"inherits"| base-model
+    explanation-model -->|"inherits"| base-model
+    explanation-model -->|"inherits"| cache-model
+    training-model -->|"per-seed fit"| classifier-model
+    evaluation-model -->|"cross-classifier rank"| classifier-comparator

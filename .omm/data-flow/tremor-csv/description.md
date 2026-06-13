@@ -1,0 +1,1 @@
+DateTime-indexed CSV at 10-minute sampling. Columns: `rsam_f0..f4` (per-band amplitude), `dsar_f0-f1..f3-f4` (band-ratio displacement), `entropy` (broadband Shannon entropy). Written by `CalculateTremor.run()` at `{station_dir}/tremor/{nslc}_{start}_{end}.csv`. `TremorData` wraps it with `@cached_property` accessors.

@@ -1,0 +1,8 @@
+graph LR
+    base["SeismicDataSource (ABC)\nsrc/eruption_forecast/sources/base.py"]
+    sds-source["SDS\nsrc/eruption_forecast/sources/sds.py"]
+    fdsn-source["FDSN\nsrc/eruption_forecast/sources/fdsn.py"]
+
+    sds-source -->|"implements"| base
+    fdsn-source -->|"implements"| base
+    fdsn-source -->|"caches days into"| sds-source

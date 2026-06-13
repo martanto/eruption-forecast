@@ -1,0 +1,1 @@
+Per-window tsfresh features. Written column-by-column by `FeaturesBuilder` then concatenated into the unified matrix. Training mode aligns rows to a label CSV; prediction mode keeps every window. Stored under `{stage}/features/{cv-slug}/seed/` (training, per seed top-N selections) and `{stage}/features/` (prediction).

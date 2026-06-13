@@ -1,0 +1,1 @@
+`PredictionModel.build_label()` uses `LabelBuilder` purely as a window-grid generator over `(start_date, end_date, window_size, window_step, window_step_unit)`. No eruption marking happens here; the resulting frame's `is_erupted` column is filled later (in evaluation) only if ground truth becomes available.

@@ -1,0 +1,9 @@
+created: 2026-06-13T16:16:00.793Z
+updated: 2026-06-13T16:16:00.793Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: classifier-comparator
+children: []
+parentPath:
+  - model

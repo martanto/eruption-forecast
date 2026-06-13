@@ -1,0 +1,1 @@
+Per-eruption labelling that extends `LabelBuilder`. Builds in three phases: (1) build a zero-filled frame per eruption, (2) concat and de-duplicate datetimes across eruptions, (3) mark positives per eruption independently. Preferred when eruption dates are close enough that their forecast windows would overlap and the global builder would conflate them.

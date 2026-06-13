@@ -1,0 +1,1 @@
+`SeedEnsemble_{suffix}.pkl` (one per classifier) and `ClassifierEnsemble.pkl` / `.json` (cross-classifier). Created by `merge_seed_models` + `merge_all_classifiers` at the end of training. `ClassifierEnsemble.from_any()` accepts any of the supported handles (object, `.pkl`, `.json`, or trained-model `.csv`) so `PredictionModel(model=...)` is forgiving.

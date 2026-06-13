@@ -1,0 +1,4 @@
+- Train/test split must happen inside `TrainingModel` (never externally) so resampling and feature selection don't leak across folds.
+- `PredictionModel`'s cache identity includes the upstream `training_hash`; re-training therefore invalidates downstream forecasts automatically.
+- `evaluate(model="prediction")` requires `eruption_dates` — without them there is no truth to compare against on the forecast grid.
+- `explain` is only meaningful for tree-based classifiers (rf, gb, xgb); non-tree members are skipped by `ExplainerEnsemble`.

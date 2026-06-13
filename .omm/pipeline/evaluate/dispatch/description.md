@@ -1,0 +1,1 @@
+`EvaluationModel.__init__` reads `model.kind` and stores it on `self.kind`. Output paths (`{output_dir}/evaluation/{kind}/`) and the truth-preparation strategy both branch on this value. `EvaluationModel.from_file(path)` loads either a `TrainingModel.pkl` or `PredictionModel.pkl` and uses the loaded `kind` to dispatch.

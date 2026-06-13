@@ -1,0 +1,9 @@
+graph LR
+    explain-dispatch["Mode Dispatch\nmodel.kind = training | prediction"]
+    tree-filter["Tree-classifier Filter\n_is_tree_classifier"]
+    explainer-build["Build ExplainerEnsemble\nshap.TreeExplainer per (clf, seed)"]
+    persist-shap["Persist SHAP Values\nexplanation/{kind}/"]
+
+    explain-dispatch -->|"selects upstream features"| tree-filter
+    tree-filter -->|"rf/gb/xgb only"| explainer-build
+    explainer-build -->|"shap_values per observation"| persist-shap

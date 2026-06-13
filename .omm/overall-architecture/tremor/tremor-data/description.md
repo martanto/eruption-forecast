@@ -1,0 +1,1 @@
+`TremorData` wraps the saved tremor CSV. Subclasses `BaseDataContainer` and exposes `@cached_property` accessors for start/end dates, sampling rate, columns, etc. Used downstream by `TrainingModel`/`PredictionModel` to avoid re-reading the CSV.

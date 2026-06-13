@@ -1,0 +1,9 @@
+created: 2026-06-13T16:18:46.567Z
+updated: 2026-06-13T16:18:46.567Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: build-label
+children: []
+parentPath:
+  - train

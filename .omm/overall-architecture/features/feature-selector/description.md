@@ -1,0 +1,1 @@
+Two-stage feature selection: tsfresh FDR filtering keeps statistically relevant features, then a RandomForest importance pass ranks them and keeps the top-N. Strategy is configurable (`tsfresh` | `random_forest` | `combined`). Driven per seed by `TrainingModel.fit()` so each seed's selected features become its own contribution to `SeedEnsemble`.

@@ -1,0 +1,1 @@
+Per-seed fitted estimators saved as `classifiers/{clf-slug}/{cv-slug}/models/{seed:05d}.pkl`, plus a per-classifier `trained_model_{suffix}.csv` registry mapping seed → selected feature list. Produced by `TrainingModel.fit()` after every parallel worker finishes.

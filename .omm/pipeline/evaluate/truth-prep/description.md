@@ -1,0 +1,2 @@
+- Training reuse: pull `y_true` directly from `model.labels` (the labels already produced during training).
+- Prediction reuse: instantiate a fresh `LabelBuilder` over the prediction window grid using user-supplied `eruption_dates`, join the result onto `model.labels` by window id, and persist at `evaluation/prediction/labels/y_true.csv`. Without `eruption_dates`, the stage raises.

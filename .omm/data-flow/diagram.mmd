@@ -1,0 +1,29 @@
+graph LR
+    raw-seismic["Raw Seismic\nSDS / FDSN miniSEED"]
+    tremor-csv["Tremor CSV\n{station_dir}/tremor/{nslc}_{start}_{end}.csv"]
+    label-csv["Label CSV\n{station_dir}/training|prediction/labels/"]
+    feature-matrix["Feature Matrix\n{station_dir}/training|prediction/features/"]
+    seed-artifacts["Seed Artefacts\nclassifiers/{clf}/models/{seed:05d}.pkl + registry"]
+    ensemble-bundle["Ensemble Bundle\nClassifierEnsemble.{pkl,json}"]
+    cache-store["Cache Store\n{station_dir}/cache/{Stage}/{hash}.pkl"]
+    forecast-results["Forecast Results\nprediction/results/ + figures/forecast_*.png"]
+    eval-artifacts["Evaluation Artefacts\nevaluation/{kind}/classifiers + comparison/"]
+    shap-artifacts["SHAP Artefacts\nexplanation/{kind}/"]
+
+    raw-seismic -->|"per-day Stream\n(ObsPy)"| tremor-csv
+    tremor-csv -->|"sliding windows"| label-csv
+    tremor-csv -->|"per-window slices\n(TremorMatrixBuilder)"| feature-matrix
+    label-csv -->|"is_erupted alignment"| feature-matrix
+    feature-matrix -->|"per-seed top-N + fit"| seed-artifacts
+    seed-artifacts -->|"merge_seed_models + merge_all_classifiers"| ensemble-bundle
+    feature-matrix -->|"cache identity input"| cache-store
+    ensemble-bundle -->|"predict_proba"| forecast-results
+    forecast-results -->|"vs ground truth"| eval-artifacts
+    feature-matrix -->|"in-sample evaluate"| eval-artifacts
+    ensemble-bundle -->|"shap.TreeExplainer"| shap-artifacts
+    feature-matrix -->|"explain rows"| shap-artifacts
+
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    class tremor-csv,label-csv,feature-matrix,seed-artifacts,ensemble-bundle,cache-store,forecast-results,eval-artifacts,shap-artifacts store
+    class raw-seismic entry

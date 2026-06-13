@@ -1,0 +1,1 @@
+DateTime-indexed CSV with `id` (int) + `is_erupted` (0/1). Filename encodes start, end, window size, window step, and `day_to_forecast` (parsed back by `LabelData.parameters` and `utils.date_utils.parse_label_filename`). Written under `training/labels/` (with truth) or `prediction/labels/` (forecast grid; truth added later by `EvaluationModel` if available).

@@ -1,0 +1,1 @@
+After all seeds finish, `merge_seed_models(registry_csv)` joblib-dumps each per-classifier `SeedEnsemble_{suffix}.pkl`. `merge_all_classifiers(trained_models)` bundles those into a single `ClassifierEnsemble` that downstream stages consume as a drop-in sklearn-compatible classifier. The path is exposed as `TrainingModel.classifier_ensemble_path`.

@@ -1,0 +1,1 @@
+`ensemble.explainer_ensemble._is_tree_classifier` decides whether a classifier is SHAP-TreeExplainer-compatible (RF, GB, XGB). Non-tree members of the `ClassifierEnsemble` are skipped — the rest of the pipeline still works because explanation is optional.

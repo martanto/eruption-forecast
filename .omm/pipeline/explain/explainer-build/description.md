@@ -1,0 +1,1 @@
+For each (classifier, seed) survivor, build a `shap.TreeExplainer` and run it on the first `n_observations_to_explain` rows of the feature matrix (limited because SHAP scales with `seeds × samples`). The collection is bundled into an `ExplainerEnsemble` that mirrors the `SeedEnsemble` shape so it can be saved and reloaded.

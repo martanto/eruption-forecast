@@ -1,0 +1,9 @@
+created: 2026-06-13T16:14:21.987Z
+updated: 2026-06-13T16:14:21.987Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: calculate-tremor
+children: []
+parentPath:
+  - tremor

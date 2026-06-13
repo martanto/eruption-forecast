@@ -1,0 +1,1 @@
+`ClassifierEnsemble.predict_proba(X)` (resolved via `from_any(model)` from the constructor's `model` argument) dispatches to each `SeedEnsemble`, which in turn calls every seed's fitted estimator on the seed's own selected feature columns. Each seed returns a probability vector; the matrix shape per classifier is `(n_windows, n_seeds)`.

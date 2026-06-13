@@ -1,0 +1,1 @@
+`LabelData(BaseDataContainer)` wraps a saved label CSV. Caches the DataFrame and parses parameters (`window_size`, `window_step`, `window_step_unit`, `day_to_forecast`) out of the canonical filename so downstream stages can rebuild the same grid without round-tripping through `LabelBuilder`.

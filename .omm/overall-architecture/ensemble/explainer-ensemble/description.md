@@ -1,0 +1,1 @@
+Bundle of `shap.TreeExplainer` instances — one per (classifier, seed) for tree-based classifiers (RF, GB, XGB). Built by `ExplanationModel`. Provides a uniform interface so SHAP outputs can be persisted and re-loaded like the trained ensembles themselves.

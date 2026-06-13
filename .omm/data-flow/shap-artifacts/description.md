@@ -1,0 +1,1 @@
+Under `explanation/{training|prediction}/`. SHAP value arrays, base values, and the explained feature rows for tree-based classifiers. The whole `ExplanationModel` instance is also joblib-dumpable so an explanation run can be re-loaded later.

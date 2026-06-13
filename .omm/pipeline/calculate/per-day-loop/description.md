@@ -1,0 +1,1 @@
+`multiprocessing.Pool(n_jobs)` fan-out: each worker pulls one day's Stream from the source, applies the user-selected methods, and writes a per-day CSV under `tremor/daily/`. Independent days means the pool can scale to the host's full CPU count without coordination.

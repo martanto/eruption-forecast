@@ -1,0 +1,1 @@
+Same `TremorMatrixBuilder` + `FeaturesBuilder` path as training, but `FeaturesBuilder` runs in prediction mode — `use_relevant_features` is forced to False and no label-based filtering happens. This keeps every forecast window in the feature matrix so unseen windows aren't accidentally dropped.

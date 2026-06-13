@@ -1,0 +1,1 @@
+Shared ABC for the per-stage models. Resolves `output_dir` / `root_dir` / `n_jobs`, loads the tremor source (CSV path or in-memory DataFrame) into a `TremorData`, and provides joblib `save()` / `load()` to round-trip an instance to/from `{output_dir}/{ClassName}_{basename}.pkl`.

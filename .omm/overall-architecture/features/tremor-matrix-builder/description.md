@@ -1,0 +1,1 @@
+Builds the long-form tremor matrix the way tsfresh expects it: one row per `(window_id, datetime)` with one column per tremor metric. Validates per-window sample counts so partial windows don't poison the feature matrix. Optionally writes per-tremor-column matrices to `per_method/` for easier debugging.

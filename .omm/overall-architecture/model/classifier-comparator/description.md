@@ -1,0 +1,1 @@
+Reads the per-classifier metrics produced by a `MetricsEnsemble`, ranks classifiers under a user-chosen metric, and writes cross-classifier ranking tables + plots under `{evaluation_dir}/comparison/`. Built lazily by `EvaluationModel.compare()`.

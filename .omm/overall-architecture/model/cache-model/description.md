@@ -1,0 +1,1 @@
+Mixin that gives a stage content-addressable caching. `build_cache_identity()` returns the dict of inputs that identify a run; `compute_hash()` hashes it; `save_to_cache()` / `load_from_cache()` round-trip the instance + `{hash}.params.json` under `{output_dir}/cache/{ClassName}/`. Mixed into `TrainingModel`, `PredictionModel`, and `ExplanationModel`.

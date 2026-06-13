@@ -1,0 +1,1 @@
+Minimal mixin: `save(path)` joblib-dumps the instance, `load(path)` (classmethod) restores it. Shared by `SeedEnsemble`, `ClassifierEnsemble`, and (indirectly via `MetricsEnsemble.save()`) the metrics layer.

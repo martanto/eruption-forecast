@@ -1,0 +1,1 @@
+Per-seed probability CSVs under `prediction/results/{clf-slug}/` (when `save_seed_result=True`), plus the aggregated table on `PredictionModel.results` with columns `{clf}_eruption_probability`, `_uncertainty`, `_confidence`, `_prediction`, and `consensus_*`. Forecast plot at `prediction/figures/forecast_{start}_{end}.{png,pdf}`.

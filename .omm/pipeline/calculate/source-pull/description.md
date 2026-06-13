@@ -1,0 +1,1 @@
+`CalculateTremor.from_sds(sds_dir)` instantiates an `SDS` source; `from_fdsn(client_url)` instantiates an `FDSN` source that caches successful fetches back into a local SDS tree. Both expose the same `get(date) -> Stream` contract so the per-day worker doesn't care which source is in use.

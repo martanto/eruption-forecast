@@ -1,0 +1,1 @@
+FDSN web-service reader (defaults to IRIS). Wraps `obspy.clients.fdsn.Client` so any FDSN-compliant data center can be queried by `(net, sta, loc, cha, date)`. Every successful fetch is written into a local SDS hierarchy via `SDS`, making subsequent runs offline-capable.

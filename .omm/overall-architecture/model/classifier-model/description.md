@@ -1,0 +1,1 @@
+sklearn-compatible wrapper around one of 11 supported estimators. Owns the default hyperparameter grid (from `model.constants.DEFAULT_GRID_PARAMS`), the CV splitter (`ShuffleSplit` / `StratifiedKFold` / `StratifiedShuffleSplit` / `TimeSeriesSplit`), and the `slug_name` / `slug_cv_name` strings that drive output directory naming. `use_gpu=True` is honoured for `xgb` and `voting`.

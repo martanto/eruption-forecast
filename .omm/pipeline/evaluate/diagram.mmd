@@ -1,0 +1,9 @@
+graph LR
+    dispatch["Mode Dispatch\nmodel.kind = training | prediction"]
+    truth-prep["Truth Preparation\nTrainingModel.labels OR LabelBuilder + eruption_dates"]
+    metrics-build["MetricsEnsemble\ncompute() per classifier"]
+    plot-and-compare["Plot + Compare\nplot_aggregate / plot_seed / ClassifierComparator"]
+
+    dispatch -->|"selects truth source"| truth-prep
+    truth-prep -->|"y_true + features + ensemble"| metrics-build
+    metrics-build -->|"per-seed matrices"| plot-and-compare

@@ -1,0 +1,1 @@
+Reads `model.kind` exactly like `EvaluationModel`. Selects the upstream `ClassifierEnsemble`, features matrix, and label/grid context from either a `TrainingModel` or `PredictionModel`. Output directory: `{output_dir}/explanation/{kind}/`.

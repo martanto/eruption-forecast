@@ -1,0 +1,7 @@
+graph LR
+    tremor-matrix-builder["TremorMatrixBuilder\nsrc/eruption_forecast/features/tremor_matrix_builder.py"]
+    features-builder["FeaturesBuilder\nsrc/eruption_forecast/features/features_builder.py"]
+    feature-selector["FeatureSelector\nsrc/eruption_forecast/features/feature_selector.py"]
+
+    tremor-matrix-builder -->|"long-form matrix\nid+datetime"| features-builder
+    features-builder -->|"tsfresh feature columns"| feature-selector
