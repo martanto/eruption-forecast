@@ -36,7 +36,7 @@ class FeatureSelector:
         - Better interpretability (p-values AND importance scores)
 
     Attributes:
-        method (str): Feature selection method ("tsfresh", "random_forest", or "combined").
+        method (str): Feature selection method ("tsfresh" or "random_forest").
         n_jobs (int): Number of parallel jobs for computation.
         random_state (int): Random seed for reproducibility.
         output_dir (str): Directory for saving selected features.
@@ -50,11 +50,10 @@ class FeatureSelector:
         feature_names_ (list[str]): List of selected feature names (set after fit).
 
     Args:
-        method (Literal["tsfresh", "random_forest", "combined"], optional):
+        method (Literal["tsfresh", "random_forest"], optional):
             Feature selection method. Options:
-            - "tsfresh": Statistical significance only (Stage 1). Fast and model-agnostic.
-            - "random_forest": Permutation importance only (Stage 2). Captures interactions.
-            - "combined": Two-stage pipeline (tsfresh → RandomForest). **RECOMMENDED**.
+            - "tsfresh": Statistical significance via FDR. Fast, model-agnostic.
+            - "random_forest": Permutation importance from a RandomForest probe.
             Defaults to "tsfresh".
         random_state (int, optional): Random seed for reproducibility.
             Applies to RandomForest classifier and permutation importance.
@@ -70,32 +69,21 @@ class FeatureSelector:
         ValueError: If n_jobs is less than 1.
 
     Examples:
-        >>> # Two-stage selection (recommended for best results)
-        >>> selector = FeatureSelector(method="combined", n_jobs=4)
-        >>> selector.fit(X_train, y_train, fdr_level=0.05, top_n=30)
+        >>> # tsfresh statistical filtering (default)
+        >>> selector = FeatureSelector(method="tsfresh", n_jobs=4)
+        >>> selector.fit(X_train, y_train, fdr_level=0.05)
         >>> X_selected = selector.transform(X_train)
-        >>> print(f"Reduced: {X_train.shape[1]} → {X_selected.shape[1]} features")
-        Reduced: 5000 → 30 features
-        >>>
-        >>> # Access selection results
-        >>> print("Top features by p-value:")
         >>> print(selector.p_values_.head(10))
-        >>> print("Top features by importance:")
-        >>> print(selector.importance_scores_.head(10))
         >>>
-        >>> # Compare with tsfresh-only selection
-        >>> selector_tsfresh = FeatureSelector(method="tsfresh")
-        >>> selector_tsfresh.fit(X_train, y_train, fdr_level=0.05)
-        >>> X_tsfresh = selector_tsfresh.transform(X_train)
-        >>>
-        >>> # Use fit_transform for one-step operation
-        >>> selector = FeatureSelector(method="combined")
-        >>> X_selected = selector.fit_transform(X_train, y_train, top_n=20)
+        >>> # RandomForest permutation importance
+        >>> selector_rf = FeatureSelector(method="random_forest")
+        >>> X_rf = selector_rf.fit_transform(X_train, y_train, top_n=20)
+        >>> print(selector_rf.importance_scores_.head(10))
     """
 
     def __init__(
         self,
-        method: Literal["tsfresh", "random_forest", "combined"] = "tsfresh",
+        method: Literal["tsfresh", "random_forest"] = "tsfresh",
         random_state: int = 42,
         output_dir: str | None = None,
         n_jobs: int = 1,
@@ -107,7 +95,7 @@ class FeatureSelector:
         Calls validate() to check that n_jobs is at least 1.
 
         Args:
-            method (Literal["tsfresh", "random_forest", "combined"], optional):
+            method (Literal["tsfresh", "random_forest"], optional):
                 Feature selection strategy. Defaults to "tsfresh".
             random_state (int, optional): Random seed for reproducibility.
                 Defaults to 42.
@@ -180,7 +168,7 @@ class FeatureSelector:
             ValueError: If random_state is less than 0.
 
         Examples:
-            >>> selector = FeatureSelector(method="combined", random_state=42)
+            >>> selector = FeatureSelector(method="random_forest", random_state=42)
             >>> selector.set_random_state(123)
             >>> selector.fit(X_train, y_train)
         """
@@ -256,9 +244,9 @@ class FeatureSelector:
         X: pd.DataFrame,
         y: pd.Series,
         top_n: int = 20,
-        n_estimators: int = 200,
-        max_depth: int | None = 10,
-        min_samples_leaf: int = 20,
+        n_estimators: int = 100,
+        max_depth: int | None = 5,
+        min_samples_leaf: int = 5,
         n_repeats: int = 10,
     ) -> tuple[pd.DataFrame, pd.Series]:
         """Stage 2: RandomForest permutation importance selection.
@@ -369,21 +357,18 @@ class FeatureSelector:
     ) -> Self:
         """Fit the feature selector on training data.
 
-        Performs feature selection according to the specified method ("tsfresh",
-        "random_forest", or "combined"). For "combined" method, runs two-stage
-        selection: tsfresh statistical filtering followed by RandomForest
-        permutation importance.
+        Performs feature selection according to the specified method ("tsfresh"
+        for FDR-controlled statistical filtering, or "random_forest" for
+        permutation importance from a RandomForest probe).
 
         Args:
             X (pd.DataFrame): Extracted features DataFrame with shape (n_samples, n_features).
             y (pd.Series): Target labels with shape (n_samples,). Must have same
                 length as X.
             fdr_level (float, optional): False Discovery Rate level for tsfresh
-                selection (Stage 1). Only used when method is "tsfresh" or "combined".
-                Defaults to 0.05.
-            top_n (int, optional): Number of top features for final selection.
-                Used in RandomForest selection (Stage 2). Only used when method is
-                "random_forest" or "combined". Defaults to 20.
+                selection. Only used when method is "tsfresh". Defaults to 0.05.
+            top_n (int, optional): Number of top features to retain. Only used
+                when method is "random_forest". Defaults to 20.
             **rf_kwargs: Additional keyword arguments for RandomForest permutation
                 importance. Supported arguments:
                 - n_estimators (int): Number of trees (default: 200)
@@ -397,14 +382,9 @@ class FeatureSelector:
         Raises:
             ValueError: If X or y are empty.
             ValueError: If X and y have different lengths.
-            ValueError: If method is not one of "tsfresh", "random_forest", or "combined".
+            ValueError: If method is not one of "tsfresh" or "random_forest".
 
         Examples:
-            >>> # Combined two-stage selection
-            >>> selector = FeatureSelector(method="combined", verbose=True)
-            >>> selector.fit(X_train, y_train, fdr_level=0.05, top_n=20)
-            >>> X_selected = selector.transform(X_train)
-            >>>
             >>> # tsfresh-only selection
             >>> selector = FeatureSelector(method="tsfresh")
             >>> selector.fit(X_train, y_train, fdr_level=0.01)
@@ -421,49 +401,21 @@ class FeatureSelector:
                 f"X and y must have same length. X: {X.shape[0]}, y: {y.shape[0]}"
             )
 
-        n_features_initial = X.shape[1]
-
         if self.method == "tsfresh":
-            # Stage 1 only: tsfresh statistical selection
             X_filtered, p_values = self._select_tsfresh(X, y, fdr_level=fdr_level)
             self.selected_features_ = p_values.rename("score")
             self.feature_names_ = X_filtered.columns.tolist()
 
         elif self.method == "random_forest":
-            # Stage 2 only: RandomForest permutation importance
             X_selected, importance_scores = self._select_random_forest(
                 X, y, top_n=top_n, **rf_kwargs
             )
             self.selected_features_ = importance_scores.rename("score")
             self.feature_names_ = X_selected.columns.tolist()
 
-        elif self.method == "combined":
-            # Two-stage: tsfresh → RandomForest
-            if self.verbose:
-                logger.info("Running two-stage feature selection...")
-
-            # Stage 1: tsfresh
-            X_filtered, p_values = self._select_tsfresh(
-                X, y, fdr_level=fdr_level, top_n=top_n
-            )
-
-            # Stage 2: RandomForest on filtered features
-            X_selected, importance_scores = self._select_random_forest(
-                X_filtered, y, top_n=top_n, **rf_kwargs
-            )
-
-            self.selected_features_ = importance_scores.rename("score")
-            self.feature_names_ = X_selected.columns.tolist()
-
-            if self.verbose:
-                logger.info(
-                    f"Two-stage selection: {n_features_initial} → "
-                    f"{self.n_features_tsfresh} → {self.n_features_rf} features"
-                )
-
         else:
             raise ValueError(
-                f"Invalid method: {self.method}. Must be 'tsfresh', 'random_forest', or 'combined'"
+                f"Invalid method: {self.method}. Must be 'tsfresh' or 'random_forest'"
             )
 
         return self
@@ -488,7 +440,7 @@ class FeatureSelector:
                 mismatch between training and transform data).
 
         Examples:
-            >>> selector = FeatureSelector(method="combined")
+            >>> selector = FeatureSelector(method="random_forest")
             >>> selector.fit(X_train, y_train)
             >>> X_train_selected = selector.transform(X_train)
             >>> X_test_selected = selector.transform(X_test)
@@ -535,7 +487,7 @@ class FeatureSelector:
             pd.DataFrame: Transformed DataFrame containing only the selected features.
 
         Examples:
-            >>> selector = FeatureSelector(method="combined")
+            >>> selector = FeatureSelector(method="random_forest")
             >>> X_selected = selector.fit_transform(X_train, y_train, top_n=20)
             >>> print(X_selected.shape)
             (100, 20)
@@ -558,21 +510,21 @@ class FeatureSelector:
         Returns:
             pd.DataFrame: DataFrame with 'feature' as index and columns for
                 available scores:
-                - 'p_value': P-value from tsfresh (if method is "tsfresh" or "combined")
-                - 'importance': Permutation importance (if method is "random_forest" or "combined")
+                - 'p_value': P-value (if method is "tsfresh")
+                - 'importance': Permutation importance (if method is "random_forest")
 
         Raises:
             ValueError: If selector hasn't been fitted yet (call fit() first).
 
         Examples:
-            >>> selector = FeatureSelector(method="combined")
-            >>> selector.fit(X_train, y_train)
+            >>> selector = FeatureSelector(method="random_forest")
+            >>> selector.fit(X_train, y_train, top_n=20)
             >>> scores = selector.get_feature_scores()
             >>> print(scores.head(10))
-                                       p_value  importance
+                                       importance
             feature
-            rsam_f2__quantile__q_0.9  0.000001    0.045123
-            dsar_f3-f4__median        0.000002    0.038456
+            rsam_f2__quantile__q_0.9     0.045123
+            dsar_f3-f4__median           0.038456
             ...
             >>>
             >>> # Sort by importance

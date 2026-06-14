@@ -104,7 +104,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 
 - **Tremor Calculation** — RSAM, DSAR, and Shannon Entropy across configurable frequency bands, from SDS archives or FDSN web services (with transparent local caching).
 - **Label Building** — Standard sliding-window (`LabelBuilder`) or per-eruption (`DynamicLabelBuilder`) generation from known eruption dates.
-- **Feature Extraction** — tsfresh feature engineering on windowed tremor matrices, with two-stage selection (tsfresh FDR + RandomForest importance).
+- **Feature Extraction** — tsfresh feature engineering on windowed tremor matrices, with FDR-controlled selection (tsfresh statistical filter; RandomForest permutation importance available as an alternative).
 - **Multi-seed Training** — 11 classifier families (`rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`, `lite-rf`), three CV strategies, automatic imbalance handling, and per-seed `GridSearchCV`.
 - **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface.
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.

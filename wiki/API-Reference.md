@@ -502,7 +502,7 @@ After `build()`: `tmb.df` is the matrix with `id`, `datetime`, and tremor column
 
 ```python
 FeatureSelector(
-    method: Literal["tsfresh", "random_forest", "combined"] = "tsfresh",
+    method: Literal["tsfresh", "random_forest"] = "tsfresh",
     random_state: int = 42,
     output_dir: str | None = None,
     n_jobs: int = 1,
@@ -510,7 +510,7 @@ FeatureSelector(
 )
 ```
 
-Used internally by `TrainingModel.fit()` per-seed; surfaced publicly for ad-hoc selection experiments. Populated after `fit(X, y)`: `selected_features_`, `p_values_`, `importance_scores_`, `n_features_tsfresh`, `n_features_rf`, `n_features`, `feature_names_`.
+Used internally by `TrainingModel.fit()` per-seed (hardcoded `method="tsfresh"`); surfaced publicly for ad-hoc selection experiments. Pick `method="tsfresh"` for FDR-controlled p-value filtering (fast, model-agnostic) or `method="random_forest"` for permutation importance from a RandomForest probe. Populated after `fit(X, y)`: `selected_features_`, `p_values_`, `importance_scores_`, `n_features_tsfresh`, `n_features_rf`, `n_features`, `feature_names_`.
 
 ---
 
