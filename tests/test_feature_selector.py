@@ -1,8 +1,8 @@
 """
 Unit tests for FeatureSelector class.
 
-Tests all three feature selection methods (tsfresh, random_forest, combined)
-using synthetic data.
+Tests both feature selection methods (tsfresh, random_forest) using synthetic
+data.
 """
 
 # Third party imports
@@ -90,38 +90,6 @@ def test_random_forest_selection(synthetic_data):
     assert len(selector.feature_names_) == 30
 
 
-def test_combined_selection(synthetic_data):
-    """Test combined two-stage feature selection."""
-    X, y = synthetic_data
-
-    selector = FeatureSelector(
-        method="combined", n_jobs=2, random_state=42, verbose=False
-    )
-    X_selected = selector.fit_transform(
-        X,
-        y,
-        fdr_level=0.05,
-        top_n=20,
-        n_estimators=50,
-        max_depth=5,
-        n_repeats=5,
-    )
-
-    # Check that features were selected in two stages
-    # Note: top_n is a maximum - if tsfresh filters to fewer features, that's fine
-    assert X_selected.shape[1] <= 20, "Should select at most 20 features"
-    assert X_selected.shape[1] > 0, "Should select at least some features"
-    assert X_selected.shape[0] == X.shape[0], "Should keep all samples"
-
-    # Check that both p-values and importance scores were computed
-    assert not selector.p_values_.empty, "Should have p-values from stage 1"
-    assert not selector.importance_scores_.empty, "Should have importance from stage 2"
-
-    # Check stage tracking via n_features_tsfresh and n_features_rf
-    assert selector.n_features_tsfresh > 0, "Stage 1 (tsfresh) should reduce features"
-    assert selector.n_features_rf > 0, "Stage 2 (random forest) should select features"
-
-
 def test_fit_transform_separate(synthetic_data):
     """Test fit() and transform() as separate operations."""
     X, y = synthetic_data
@@ -144,23 +112,21 @@ def test_get_feature_scores(synthetic_data):
     """Test get_feature_scores() method."""
     X, y = synthetic_data
 
-    selector = FeatureSelector(method="combined", n_jobs=2, random_state=42)
-    selector.fit(X, y, fdr_level=0.05, top_n=15, n_estimators=50, n_repeats=3)
+    selector = FeatureSelector(method="random_forest", n_jobs=2, random_state=42)
+    selector.fit(X, y, top_n=15, n_estimators=50, n_repeats=3)
 
     scores = selector.get_feature_scores()
 
-    # Check that scores DataFrame has correct structure
     assert isinstance(scores, pd.DataFrame), "Should return DataFrame"
     assert len(scores) > 0, "Should have feature scores"
     assert len(scores) <= 15, "Should have at most 15 feature scores"
-    assert "p_values" in scores.columns, "Should have p-values column"
     assert "importance" in scores.columns, "Should have importance column"
 
 
 def test_invalid_method():
     """Test that invalid method raises ValueError."""
     with pytest.raises(ValueError, match="Invalid method"):
-        selector = FeatureSelector(method="invalid")
+        selector = FeatureSelector(method="invalid")  # ty:ignore[invalid-argument-type]
         X = pd.DataFrame(np.random.rand(100, 10))
         y = pd.Series(np.random.randint(0, 2, 100))
         selector.fit(X, y)
