@@ -37,7 +37,7 @@ src/eruption_forecast/
 │   ├── constants.py
 │   ├── tremor_matrix_builder.py - TremorMatrixBuilder (windowed alignment)
 │   ├── features_builder.py      - FeaturesBuilder (tsfresh extraction)
-│   └── feature_selector.py      - FeatureSelector (tsfresh FDR + RF importance)
+│   └── feature_selector.py      - FeatureSelector (tsfresh FDR or RF importance)
 │
 ├── label/
 │   ├── constants.py
@@ -96,7 +96,7 @@ src/eruption_forecast/
        ┌─────────────────────────── feature pipeline ──────────┴─────┐
        │   LabelBuilder            TremorMatrixBuilder               │
        │   DynamicLabelBuilder ──► FeaturesBuilder (tsfresh)         │
-       │                           FeatureSelector (FDR+RF)          │
+       │                           FeatureSelector (FDR or RF)       │
        └────────────────────────────┬────────────────────────────────┘
                                     ▼
                        ┌────────────────────────┐
@@ -214,8 +214,9 @@ directly out of the label filename so a CSV alone is enough to rehydrate the bui
                              ▼
         ┌────────────────────────────────────────┐
         │           FeatureSelector              │
-        │  1. tsfresh FDR filter                 │
-        │  2. RandomForest importance            │
+        │  method="tsfresh": FDR p-value filter  │
+        │  method="random_forest": permutation   │
+        │                          importance    │
         │  → top-N feature names per seed        │
         └────────────────────────────────────────┘
 ```
