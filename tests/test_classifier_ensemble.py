@@ -268,3 +268,61 @@ def test_repr(clf_ensemble: ClassifierEnsemble) -> None:
 def test_len(clf_ensemble: ClassifierEnsemble) -> None:
     """len returns number of classifiers."""
     assert len(clf_ensemble) == 2
+
+
+# ---------------------------------------------------------------------------
+# HTML repr (_sk_visual_block_ / _repr_html_)
+# ---------------------------------------------------------------------------
+
+
+def test_sk_visual_block_kind_and_children(
+    clf_ensemble: ClassifierEnsemble,
+    two_ensembles: dict[str, SeedEnsemble],
+) -> None:
+    """_sk_visual_block_ returns a parallel block of the registered SeedEnsembles."""
+    block = clf_ensemble._sk_visual_block_()
+    assert block.kind == "parallel"
+    assert list(block.names) == ["rf", "xgb"]
+    assert list(block.estimators) == [two_ensembles["rf"], two_ensembles["xgb"]]
+    for detail in block.name_details:
+        assert "SeedEnsemble" in detail
+        assert "n_seeds=5" in detail
+
+
+def test_sk_visual_block_empty_ensemble_is_single() -> None:
+    """An empty ClassifierEnsemble still renders without crashing."""
+    empty = ClassifierEnsemble()
+    block = empty._sk_visual_block_()
+    assert block.kind == "single"
+    assert block.estimators is empty
+    assert block.name_details == "n_classifiers=0"
+
+
+def test_repr_html_contains_classifier_names(clf_ensemble: ClassifierEnsemble) -> None:
+    """_repr_html_ returns a non-empty HTML string mentioning each classifier key."""
+    html = clf_ensemble._repr_html_()
+    assert isinstance(html, str)
+    assert html
+    assert "rf" in html
+    assert "xgb" in html
+
+
+def test_seed_ensemble_sk_visual_block_uses_representative(
+    two_ensembles: dict[str, SeedEnsemble],
+) -> None:
+    """SeedEnsemble._sk_visual_block_ exposes the first seed model as a single block."""
+    seed_ensemble = two_ensembles["rf"]
+    block = seed_ensemble._sk_visual_block_()
+    assert block.kind == "single"
+    assert block.estimators is seed_ensemble.seeds[0]["model"]
+    assert "n_seeds=5" in block.name_details
+    assert "representative seed" in block.names
+
+
+def test_seed_ensemble_sk_visual_block_empty() -> None:
+    """An empty SeedEnsemble renders as a single block on itself."""
+    empty = SeedEnsemble(classifier_name="LogisticRegression")
+    block = empty._sk_visual_block_()
+    assert block.kind == "single"
+    assert block.estimators is empty
+    assert block.name_details == "n_seeds=0"
