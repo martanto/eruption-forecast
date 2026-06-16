@@ -71,7 +71,7 @@ def plot_shap_beeswarm(
         #  on it rather than on the whole figure; long feature labels push
         #  the panel rightward and a figure-centered title looks misaligned.
         ax = fig.axes[0]
-        ax.set_xlabel("Mean SHAP value", fontsize=16)
+        ax.set_xlabel("Mean SHAP value", fontsize=12)
         pos = ax.get_position()
 
         fig.suptitle(
