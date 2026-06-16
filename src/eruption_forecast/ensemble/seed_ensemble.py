@@ -30,6 +30,14 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         seeds (list[dict]): List of seed records.  Each record is a dict with
             keys ``random_state`` (int), ``model`` (fitted estimator), and
             ``feature_names`` (list[str]).
+        probabilities (pd.DataFrame | None): Per-seed eruption probability
+            matrix cached by :meth:`save_matrices`. Shape
+            ``(n_samples, n_seeds)`` with columns ``seed_{random_state:05d}``.
+            ``None`` until the first prediction call.
+        predictions (pd.DataFrame | None): Per-seed binary prediction matrix
+            cached by :meth:`save_matrices`. Same shape and column scheme as
+            ``probabilities``; values cast to ``int8``. ``None`` until the
+            first prediction call.
 
     Args:
         classifier_name (str): Human-readable classifier name.
@@ -49,6 +57,8 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.classifier_name = classifier_name
         self.seeds: list[dict] = []
+        self.probabilities: pd.DataFrame | None = None
+        self.predictions: pd.DataFrame | None = None
 
     def __getitem__(self, seed_index: int):
         return self.seeds[seed_index]
@@ -446,7 +456,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             probabilities=probabilities,
             predictions=predictions,
             index=X.index,
-            overwrite=overwrite,
             verbose=verbose,
         )
 
@@ -458,7 +467,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         probabilities: np.ndarray,
         predictions: np.ndarray,
         index: pd.Index | None = None,
-        overwrite: bool = False,
         verbose: bool = False,
     ) -> tuple[str, str]:
         """Persist the per-seed probability and prediction matrices as Parquet.
@@ -475,6 +483,11 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         file compact. Existing files are skipped unless ``overwrite`` is
         ``True``.
 
+        Also caches the assembled DataFrames on ``self.probabilities`` /
+        ``self.predictions`` so downstream callers that already hold the
+        ensemble in memory (e.g. SHAP waterfall builders) can read the data
+        directly instead of re-loading the Parquet file.
+
         Args:
             output_dir (str): Directory where the Parquet files are written.
                 Created if it does not exist.
@@ -486,8 +499,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 DataFrames (typically the feature-matrix index used to compute
                 the matrices). When ``None``, a default ``RangeIndex`` is used.
                 Defaults to ``None``.
-            overwrite (bool, optional): If ``True``, overwrite existing files.
-                Defaults to ``False``.
             verbose (bool, optional): If ``True``, log the written paths.
                 Defaults to ``False``.
 
@@ -505,15 +516,19 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             output_dir, f"{self.classifier_name}_seed_predictions.parquet"
         )
 
-        # Save seed probabilities
-        pd.DataFrame(probabilities, index=index, columns=seed_columns).to_parquet(
-            probabilities_path
+        probabilities_df = pd.DataFrame(
+            probabilities, index=index, columns=seed_columns
+        )
+        predictions_df = pd.DataFrame(
+            predictions.astype(np.int8), index=index, columns=seed_columns
         )
 
-        # Save seed predictions
-        pd.DataFrame(
-            predictions.astype(np.int8), index=index, columns=seed_columns
-        ).to_parquet(predictions_path)
+        self.probabilities = probabilities_df
+        self.predictions = predictions_df
+
+        # Save seed probabilities and predictions
+        probabilities_df.to_parquet(probabilities_path)
+        predictions_df.to_parquet(predictions_path)
 
         if verbose:
             logger.info(f"Saved seed probabilities matrix: {probabilities_path}")
