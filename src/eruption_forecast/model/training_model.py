@@ -1401,7 +1401,7 @@ class TrainingModel(BaseModel, CacheModel):
             return None
 
         classifier_model = next(
-            m for m in self.classifier_models if m.slug_name == classifier_name
+            m for m in self.classifier_models if m.name == classifier_name
         )
 
         model_seed_path = os.path.join(
