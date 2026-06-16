@@ -379,7 +379,7 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
 | Feature selection  | `FeatureSelector`          | Features + labels              | `training/features/{cv}/seed/{seed:05d}.csv` + `top_N_features.csv`                          |
 | Training fit       | `TrainingModel`            | Selected features + labels     | `training/classifiers/{clf}/{cv}/models/*.pkl` + `SeedEnsemble_*.pkl` + `ClassifierEnsemble_*.{pkl,json}` |
 | Prediction grid    | `PredictionModel`          | Tremor CSV + window grid       | `prediction/features/features-{matrix,label}_*.csv`                                          |
-| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{clf}/{seed:05d}.csv` + `result_all_model_predictions_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
+| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{clf}/{seed:05d}.csv` + `forecast-results_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
 | Evaluation         | `EvaluationModel.evaluate` | y_proba + y_true               | `evaluation/{kind}/classifiers/{Clf}/metrics/json/{seed:05d}.json` + `predictions/{y_proba,y_pred,y_true}.csv` + `metrics_summary_*.csv` + `figures/*.png` |
 | Compare            | `ClassifierComparator`     | Metrics JSON tree              | `evaluation/{kind}/comparison/metrics/ranking_*.csv` + `comparison/figures/*.png`            |
 
@@ -412,7 +412,7 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
     │   features/{features-matrix,features-label}_*.csv             │
     │   results/{clf}/{seed:05d}.csv                                │
     │   figures/forecast_*.{png,pdf}                                │
-    │ result_all_model_predictions_*.csv  (top-level dump)          │
+    │ forecast-results_*.csv  (top-level dump)          │
     └─────────┬─────────────────────────────────────────────────────┘
               │ ClassifierEnsemble + features + y_true (rebuilt or training-derived)
               ▼

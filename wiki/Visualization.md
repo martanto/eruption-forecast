@@ -92,7 +92,7 @@ To re-render a forecast plot from the persisted CSV:
 ```python
 from eruption_forecast.plots import plot_forecast_from_file
 fig = plot_forecast_from_file(
-    "output/VG.OJN.00.EHZ/result_all_model_predictions_2025-07-27_2025-08-22.csv",
+    "output/VG.OJN.00.EHZ/forecast-results_2025-07-27_2025-08-22.csv",
     eruption_dates=["2025-08-02"],
 )
 fig.savefig("forecast.png", dpi=200, bbox_inches="tight")

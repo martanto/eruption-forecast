@@ -68,7 +68,7 @@ Every pipeline run writes under a single station directory:
 │
 ├── forecast.config.yaml                                      # fm.save_config()
 ├── training.config.yaml                                      # tm.save_config()  (standalone)
-├── result_all_model_predictions_{basename}.csv               # PredictionModel.forecast() top-level dump
+├── forecast-results_{basename}.csv               # PredictionModel.forecast() top-level dump
 ├── TrainingModel_{basename}.pkl                              # Optional, via fm.TrainingModel.save()
 ├── PredictionModel_{basename}.pkl                            # Optional, via fm.PredictionModel.save()
 └── EvaluationModel_{basename}.pkl                            # Optional, via fm.EvaluationModel.save()
@@ -186,7 +186,7 @@ output/
         │   ├── evaluation/prediction/...
         │   ├── cache/...
         │   ├── forecast.config.yaml
-        │   └── result_all_model_predictions_*.csv
+        │   └── forecast-results_*.csv
         ├── scenario-2/
         ...
         └── scenario-9/
@@ -215,7 +215,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 | The all-classifiers ensemble | `training/classifiers/ClassifierEnsemble_{cv}.pkl` |
 | Forecast grid + features | `prediction/features/` |
 | Per-seed forecast probabilities | `prediction/results/{clf}/{seed:05d}.csv` |
-| Combined forecast CSV (consensus + per-classifier) | `result_all_model_predictions_{basename}.csv` |
+| Combined forecast CSV (consensus + per-classifier) | `forecast-results_{basename}.csv` |
 | Forecast PNG/PDF | `prediction/figures/forecast_{basename}.{png,pdf}` |
 | Per-seed metrics (training mode) | `evaluation/training/classifiers/{Clf}/metrics/json/{seed:05d}.json` |
 | Per-seed metrics (prediction mode) | `evaluation/prediction/classifiers/{Clf}/metrics/json/{seed:05d}.json` |

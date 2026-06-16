@@ -558,7 +558,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │   └── PredictionModel/{hash}.pkl + {hash}.params.json
 │
 ├── forecast.config.yaml                     # fm.save_config()
-├── result_all_model_predictions_{basename}.csv
+├── forecast-results_{basename}.csv
 └── {Training,Prediction,Evaluation}Model_*.pkl   # optional, via .save()
 ```
 

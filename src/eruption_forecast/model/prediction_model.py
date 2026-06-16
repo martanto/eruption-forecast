@@ -614,7 +614,7 @@ class PredictionModel(BaseModel, CacheModel):
 
         df_forecast = pd.DataFrame(results, index=self.features_df.index)
         csv_path = os.path.join(
-            self.output_dir, f"result_all_model_predictions_{self.basename}.csv"
+            self.result_dir, f"forecast-results_{self.basename}.csv"
         )
 
         df_forecast = set_datetime_index(self._labels, df_forecast)
