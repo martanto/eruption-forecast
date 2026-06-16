@@ -12,13 +12,12 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.formatting import shorten_feature_name
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.plots.explanation_plots import render_seed_plot
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
-#  isinstance tuple (not a set of class names) — keeps lite-rf transparent and
-#  survives sklearn-API subclasses like BalancedRandomForestClassifier.
 TREE_CLASSIFIERS: tuple[type, ...] = (
     RandomForestClassifier,
     XGBClassifier,
@@ -30,7 +29,7 @@ class SeedExplanation(TypedDict):
     """Per-seed SHAP explanation payload."""
 
     random_state: int
-    explanation: shap.Explanation
+    shape_values: shap.Explanation
 
 
 class ClassifierExplanation(TypedDict):
@@ -92,7 +91,7 @@ class ExplainerEnsemble:
         seed_explanation_filepath: str | None = None,
     ) -> shap.Explanation:
         model = seed["model"]
-        feature_names = seed["feature_names"]
+        feature_names: list[str] = seed["feature_names"]
         selected_features_df = features_df[feature_names]
 
         try:
@@ -115,7 +114,7 @@ class ExplainerEnsemble:
                 values=shap_values,
                 base_values=base_value,
                 data=explanation.data,
-                feature_names=feature_names,
+                feature_names=[shorten_feature_name(name) for name in feature_names],
             )
 
             if save_per_seed and seed_explanation_filepath:
@@ -175,7 +174,7 @@ class ExplainerEnsemble:
                     seed_explanation_filepath
                 )
                 seed_ensemble_explanations["seeds"].append(
-                    {"random_state": int(seed_idx), "explanation": seed_explanation}
+                    {"random_state": int(seed_idx), "shape_values": seed_explanation}
                 )
                 continue
 
@@ -197,7 +196,7 @@ class ExplainerEnsemble:
                 )
 
             seed_ensemble_explanations["seeds"].append(
-                {"random_state": int(seed_idx), "explanation": seed_explanation}
+                {"random_state": int(seed_idx), "shape_values": seed_explanation}
             )
 
         return seed_ensemble_explanations
@@ -258,19 +257,21 @@ class ExplainerEnsemble:
 
             for seed in explanation["seeds"]:
                 seed_id = int(seed["random_state"])
-                shap_explanation = seed["explanation"]
+                shape_values = seed["shape_values"]
                 title = f"{classifier_name}[{seed_id:05d}]"
 
                 for plot_kind in ("beeswarm", "bar"):
                     save_filepath = os.path.join(
                         figures_dir, plot_kind, f"{seed_id:05d}.png"
                     )
+
                     if os.path.exists(save_filepath) and not self.overwrite:
                         continue
+
                     jobs.append(
                         (
                             plot_kind,
-                            shap_explanation,
+                            shape_values,
                             save_filepath,
                             title,
                             max_display,
