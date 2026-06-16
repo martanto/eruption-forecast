@@ -643,6 +643,8 @@ class ForecastModel:
             compare_classifiers=True,
         )
 
+        # Persist for callers who stop at evaluate(); explain() repeats this
+        # write but content is identical.
         self.save_config()
 
         return self
@@ -730,13 +732,15 @@ class ForecastModel:
             overwrite=overwrite,
             n_jobs=n_jobs,
             verbose=verbose,
-        ).explain(
-            save_per_seed=save_per_seed,
-            plot_per_seed=plot_per_seed,
-        )
+        ).explain(save_per_seed=save_per_seed)
+
+        if plot_per_seed:
+            explanation_model.plot(plot_per_seed=True)
 
         self.ExplanationModel = explanation_model
 
+        # Persist for callers who stop at explain(); when evaluate() ran
+        # first, this write repeats it with the now-complete config.
         self.save_config()
 
         return self
@@ -749,10 +753,15 @@ class ForecastModel:
         """Persist the captured pipeline configuration to disk.
 
         Each stage method (``calculate``, ``train``, ``predict``,
-        ``evaluate``) auto-captures its kwargs into ``self._config`` as it
-        runs, so calling ``save_config()`` at any point writes whatever has
-        run so far.  A partial pipeline produces a partial config that
-        ``run()`` can resume.
+        ``evaluate``, ``explain``) auto-captures its kwargs into
+        ``self._config`` as it runs, so calling ``save_config()`` at any
+        point writes whatever has run so far. A partial pipeline produces a
+        partial config that ``run()`` can resume.
+
+        ``evaluate()`` and ``explain()`` both call ``save_config()`` at the
+        end so the config persists from whichever terminal stage the caller
+        stops at. When both stages run the write fires twice with identical
+        content — intentional and idempotent.
 
         Args:
             path (str | None): Destination file path.  ``None`` resolves to

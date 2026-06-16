@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import shap
 import numpy as np
 import pandas as pd
@@ -11,6 +13,18 @@ from eruption_forecast.plots.styles import (
     apply_nature_style,
 )
 from eruption_forecast.utils.pathutils import save_figure
+from eruption_forecast.dataclass.classifier_ensemble_summary import (
+    ClassifierEnsembleSummary,
+)
+
+
+#  ``ClassifierExplanation`` is a ``TypedDict`` defined in
+#  ``ensemble.explainer_ensemble``, which already imports
+#  ``render_seed_plot`` from this module. A direct import would cycle, so the
+#  symbol is pulled in for type checking only and used as a string annotation
+#  on ``plot_classifier_waterfall`` — never resolved at runtime.
+if TYPE_CHECKING:
+    from eruption_forecast.ensemble.explainer_ensemble import ClassifierExplanation
 
 
 def plot_shap_waterfall(
@@ -357,3 +371,71 @@ def plot_aggregate_shap_beeswarm(
         columns=["feature", "random_state", "obs_id", "shap_value", "feature_value"],
     )
     return fig, tidy_df
+
+
+def plot_classifier_waterfall(
+    summary: ClassifierEnsembleSummary,
+    classifier_explanation: "ClassifierExplanation",
+    max_display: int = 20,
+    figsize: tuple[float, float] | None = None,
+    dpi: int = 150,
+) -> plt.Figure:
+    """Render the SHAP waterfall for the top pick on ``summary``.
+
+    Looks up the seed identified by
+    :attr:`ClassifierEnsembleSummary.highest.random_state` inside
+    ``classifier_explanation["seeds"]`` (by ``random_state``, not list
+    position), then renders ``shap.plots.waterfall`` for the corresponding
+    explanation row.
+
+    Args:
+        summary (ClassifierEnsembleSummary): Summary returned by
+            :func:`eruption_forecast.utils.ml.build_classifier_ensemble_summary`.
+        classifier_explanation (ClassifierExplanation): One of the
+            ``TypedDict`` payloads produced by
+            :class:`ExplainerEnsemble.explain`. Must contain a ``seeds`` list of
+            ``{"random_state": int, "shape_values": shap.Explanation}``.
+        max_display (int, optional): Maximum number of features in the
+            waterfall. Defaults to 20.
+        figsize (tuple[float, float] | None, optional): Figure size in inches.
+            When ``None`` uses ``(16.0, max(8.0, max_display * 0.5))`` so long
+            tsfresh labels remain readable. Defaults to ``None``.
+        dpi (int, optional): Figure resolution. Defaults to 150.
+
+    Returns:
+        plt.Figure: The figure containing the rendered waterfall.
+
+    Raises:
+        RuntimeError: If ``summary.highest`` is ``None`` — no eruption window
+            intersected the prediction grid, so there is no row to render.
+        KeyError: If the seed identified by ``summary.highest.random_state`` is
+            absent from ``classifier_explanation["seeds"]``.
+    """
+    if summary.highest is None:
+        raise RuntimeError(
+            f"{summary.classifier_name}: no eruption windows intersected the "
+            f"prediction grid; nothing to render."
+        )
+
+    seeds_by_random_state = {
+        int(seed["random_state"]): seed for seed in classifier_explanation["seeds"]
+    }
+    seed = seeds_by_random_state[summary.highest.random_state]
+    explanation: shap.Explanation = seed["shape_values"][summary.highest.index]
+
+    fig_size = figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
+
+    with shap_figure(figsize=fig_size, dpi=dpi) as fig:
+        shap.plots.waterfall(
+            shap_values=explanation,
+            max_display=max_display,
+            show=False,
+        )
+        fig.suptitle(
+            f"{summary.classifier_name} "
+            f"[s={summary.highest.random_state}|p={summary.highest.value:.4f}]\n"
+            f"{summary.highest.datetime:%Y-%m-%d %H:%M:%S}",
+            fontsize=12,
+        )
+
+    return fig

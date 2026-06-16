@@ -1,16 +1,16 @@
-from eruption_forecast.dataclass.waterfall import (
-    SeedWaterfall,
-    EruptionWindow,
-    WaterfallPoint,
-    ClassifierWaterfall,
-)
 from eruption_forecast.dataclass.station_data import StationData
+from eruption_forecast.dataclass.classifier_ensemble_summary import (
+    SeedSummary,
+    EruptionWindow,
+    ProbabilityPick,
+    ClassifierEnsembleSummary,
+)
 
 
 __all__ = [
     "StationData",
-    "WaterfallPoint",
-    "SeedWaterfall",
+    "ProbabilityPick",
+    "SeedSummary",
     "EruptionWindow",
-    "ClassifierWaterfall",
+    "ClassifierEnsembleSummary",
 ]

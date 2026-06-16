@@ -455,9 +455,7 @@ class PredictionModel(BaseModel, CacheModel):
                 label_df["is_erupted"] = 0
 
             self._labels = label_df
-            labels = label_df["id"]
-            labels.name = "datetime"
-            self.labels = labels
+            self.labels = label_df["id"]
 
             return self
 
@@ -479,9 +477,7 @@ class PredictionModel(BaseModel, CacheModel):
 
         # Label with ``is_erupted`` values are 0.
         self._labels = label_df
-        labels = label_df["id"]
-        labels.name = "datetime"
-        self.labels = labels
+        self.labels = label_df["id"]
 
         if self.verbose:
             logger.info(f"Label for prediction: {label_csv}")
