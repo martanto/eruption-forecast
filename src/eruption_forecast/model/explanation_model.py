@@ -249,7 +249,7 @@ class ExplanationModel(BaseModel, CacheModel):
         }
         return CacheModel.compute_hash(fingerprint)
 
-    def explain(self, save_per_seed: bool = True, plot_per_seed: bool = True) -> Self:
+    def explain(self, save_per_seed: bool = True) -> Self:
         identity = type(self).build_cache_identity(
             upstream_hash=self._upstream_hash(),
             explain_params={"save_per_seed": save_per_seed},
@@ -260,17 +260,29 @@ class ExplanationModel(BaseModel, CacheModel):
             if cached is not None:
                 self.explanations = cached.explanations
                 self.ExplainerEnsemble.explanations = cached.explanations
-                if plot_per_seed:
-                    self.ExplainerEnsemble.plot_seed()
                 return self
 
         self.create_directories()
         self.ExplainerEnsemble.explain(save_per_seed=save_per_seed)
 
-        if plot_per_seed:
-            self.ExplainerEnsemble.plot_seed()
-
         self.explanations = self.ExplainerEnsemble.explanations
         self.save_to_cache(identity)
 
         return self
+
+    def plot(
+        self,
+        plot_per_seed: bool = True,
+        max_display: int = 20,
+        group_remaining_features: bool = False,
+        dpi: int = 150,
+    ):
+        if len(self.explanations) == 0:
+            raise ValueError("No explanations found. Please run explain() first.")
+
+        if plot_per_seed:
+            self.ExplainerEnsemble.plot_seed(
+                max_display=max_display,
+                group_remaining_features=group_remaining_features,
+                dpi=dpi,
+            )
