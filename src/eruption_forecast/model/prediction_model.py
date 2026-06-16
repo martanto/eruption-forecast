@@ -447,15 +447,17 @@ class PredictionModel(BaseModel, CacheModel):
         ensure_dir(self.features_dir)
 
         if os.path.exists(label_csv) and not self.overwrite:
-            labels_df = pd.read_csv(label_csv, index_col=0, parse_dates=True)
+            label_df = pd.read_csv(label_csv, index_col=0, parse_dates=True)
 
             # Backward compat: legacy cached forecast grids predate the
             # ``is_erupted`` placeholder column.
-            if "is_erupted" not in labels_df.columns:
-                labels_df["is_erupted"] = 0
+            if "is_erupted" not in label_df.columns:
+                label_df["is_erupted"] = 0
 
-            self._labels = labels_df
-            self.labels = labels_df["id"]
+            self._labels = label_df
+            labels = label_df["id"]
+            labels.name = "datetime"
+            self.labels = labels
 
             return self
 
@@ -477,7 +479,9 @@ class PredictionModel(BaseModel, CacheModel):
 
         # Label with ``is_erupted`` values are 0.
         self._labels = label_df
-        self.labels = label_df["id"]
+        labels = label_df["id"]
+        labels.name = "datetime"
+        self.labels = labels
 
         if self.verbose:
             logger.info(f"Label for prediction: {label_csv}")
