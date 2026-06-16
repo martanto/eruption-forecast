@@ -1,25 +1,3 @@
-"""Date and time conversion, normalisation, and label-filename parsing utilities.
-
-This module standardises all date handling across the pipeline.  Every public
-function accepts either a ``datetime`` object or a ``"YYYY-MM-DD"`` string and
-returns a well-typed result.  Validation of date ranges and window step
-constraints is intentionally delegated to
-:mod:`eruption_forecast.utils.validation` to avoid circular imports.
-
-Key functions
--------------
-- ``to_datetime`` — coerce a string or ``datetime`` to a ``datetime``; raises a
-  descriptive ``ValueError`` for malformed inputs
-- ``normalize_dates`` — anchor start to 00:00:00 and end to 23:59:59; returns both
-  ``datetime`` objects and ``"YYYY-MM-DD"`` strings
-- ``sort_dates`` — sort a list of date strings chronologically; optionally return
-  ``datetime`` objects
-- ``parse_label_filename`` — extract all structured parameters (start/end date,
-  window step, unit, day-to-forecast) from a label CSV basename
-- ``set_datetime_index`` — attach a ``DatetimeIndex`` to a DataFrame by joining with
-  an ``id → datetime`` mapping; used for features and forecast outputs
-"""
-
 from typing import Literal, overload
 from datetime import datetime
 

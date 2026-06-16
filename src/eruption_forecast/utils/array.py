@@ -1,25 +1,3 @@
-"""Array operations, outlier detection, and seed-probability aggregation utilities.
-
-This module provides low-level array helpers used throughout the pipeline for
-seismic data quality control, probabilistic inference, and per-seed output
-management.
-
-Key functions
--------------
-- ``detect_maximum_outlier`` — z-score test on the array maximum; returns index and value
-- ``remove_maximum_outlier`` — removes a single maximum outlier per call
-- ``remove_outliers`` — removes all z-score outliers in one pass
-- ``detect_anomalies_zscore`` — returns a boolean mask of anomalous positions using
-  the modified z-score (MAD-based)
-- ``mask_zero_values`` / ``filter_nans`` — array cleaning helpers
-- ``count_valid_values`` / ``get_completeness`` — data-quality metrics for ObsPy
-  streams and traces
-- ``predict_proba_from_estimator`` — unified ``predict_proba`` / ``decision_function``
-  interface; the single entry point for per-seed inference
-- ``compute_model_probabilities`` — reduces a seed × sample matrix to mean, std,
-  confidence, and vote statistics
-"""
-
 import os
 from typing import Any
 
@@ -70,69 +48,6 @@ def save_forecast_seed(
     df.to_csv(filepath, index=True)
     if verbose:
         logger.info(f"Saved seed {random_state:05d} probability to: {filepath}")
-
-
-def predict_proba_from_estimator(
-    model: Any,
-    X: pd.DataFrame,
-    identifier: str | int | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Call ``predict_proba`` or ``decision_function`` on a fitted estimator.
-
-    Abstracts away the two common sklearn output conventions — probabilistic
-    classifiers (``predict_proba``) and margin-based classifiers
-    (``decision_function``) — into a single interface.  The ``ndim`` of the
-    ``predict_proba`` output is validated to guard against estimators that
-    return a 1-D array instead of the expected ``(n_samples, 2)`` shape.
-
-    For the ``decision_function`` case the raw scores are converted to
-    probabilities via the logistic sigmoid, and a ``(n_samples, 2)`` scores
-    array is reconstructed so both return values always have the same shape.
-
-    Args:
-        model (Any): Fitted sklearn-compatible estimator.
-        X (pd.DataFrame): Feature subset to predict on.
-        identifier (str | int | None, optional): Label used in error messages
-            to identify the model (e.g. the random state or file path).
-            Defaults to ``None``.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: A 3-tuple:
-
-            - ``eruption_proba`` (np.ndarray): 1-D array of shape
-              ``(n_samples,)`` with P(eruption).
-            - ``scores`` (np.ndarray): 2-D array of shape ``(n_samples, 2)``
-              with columns ``[P(non-eruption), P(eruption)]``.
-            - ``eruption_predict`` (np.ndarray): 1-D array of shape
-              ``(n_samples,)`` binary prediction (0 or 1).
-
-    Raises:
-        ValueError: If ``predict_proba`` returns a 1-D array.
-        RuntimeError: If the estimator supports neither ``predict_proba``
-            nor ``decision_function``.
-    """
-    identifier = str(identifier) if identifier is not None else "model"
-
-    if hasattr(model, "predict_proba"):
-        scores: np.ndarray = model.predict_proba(X)
-        if scores.ndim == 1:
-            raise ValueError(
-                f"Probability scores for {identifier} have 1 dimension; "
-                "expected 2 dimensions [P(non-eruption), P(eruption)]."
-            )
-        eruption_proba: np.ndarray = scores[:, 1]
-        eruption_predict = model.predict(X)
-    elif hasattr(model, "decision_function"):
-        raw: np.ndarray = model.decision_function(X)
-        eruption_proba = 1.0 / (1.0 + np.exp(-raw))
-        scores = np.column_stack([1.0 - eruption_proba, eruption_proba])
-        eruption_predict = (eruption_proba >= 0.5).astype(int)
-    else:
-        raise RuntimeError(
-            f"{identifier} supports neither predict_proba nor decision_function."
-        )
-
-    return eruption_proba, scores, eruption_predict
 
 
 def compute_model_probabilities(
