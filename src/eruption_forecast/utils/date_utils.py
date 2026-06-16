@@ -334,12 +334,19 @@ def set_datetime_index(
         return df
 
     if isinstance(datetime_map, pd.Series):
-        if datetime_map.name != "datetime":
+        if not isinstance(datetime_map.index, pd.DatetimeIndex):
             raise ValueError(
-                f"Series passed as datetime_map must be named 'datetime'. Got: {datetime_map.name!r}. "
-                f"{datetime_map}"
+                f"Series passed as datetime_map must have pd.DatetimeIndex. Got: {type(datetime_map.index)!r}. "
+                f"{datetime_map}\n\n"
             )
+
         datetime_map = datetime_map.to_frame()
+
+    if len(datetime_map) != len(df):
+        raise ValueError(
+            f"Length of datetime_map ({len(datetime_map)}) does not match "
+            f"length of DataFrame: {len(df)}"
+        )
 
     if isinstance(datetime_map.index, pd.DatetimeIndex):
         if "id" not in datetime_map.columns:
