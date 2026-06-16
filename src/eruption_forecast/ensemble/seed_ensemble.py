@@ -505,19 +505,19 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             output_dir, f"{self.classifier_name}_seed_predictions.parquet"
         )
 
-        if overwrite or not os.path.exists(probabilities_path):
-            pd.DataFrame(probabilities, index=index, columns=seed_columns).to_parquet(
-                probabilities_path
-            )
-            if verbose:
-                logger.info(f"Saved seed probabilities matrix: {probabilities_path}")
+        # Save seed probabilities
+        pd.DataFrame(probabilities, index=index, columns=seed_columns).to_parquet(
+            probabilities_path
+        )
 
-        if overwrite or not os.path.exists(predictions_path):
-            pd.DataFrame(
-                predictions.astype(np.int8), index=index, columns=seed_columns
-            ).to_parquet(predictions_path)
-            if verbose:
-                logger.info(f"Saved seed predictions matrix: {predictions_path}")
+        # Save seed predictions
+        pd.DataFrame(
+            predictions.astype(np.int8), index=index, columns=seed_columns
+        ).to_parquet(predictions_path)
+
+        if verbose:
+            logger.info(f"Saved seed probabilities matrix: {probabilities_path}")
+            logger.info(f"Saved seed predictions matrix: {predictions_path}")
 
         return probabilities_path, predictions_path
 
