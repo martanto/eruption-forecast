@@ -412,26 +412,6 @@ class EvaluationModel(BaseModel):
 
         return self
 
-    def extract_features(self) -> Self:
-        """Return immediately — features are always reused from the upstream stage.
-
-        Implemented to satisfy the :class:`BaseModel` interface and to allow
-        ``EvaluationModel`` to be dropped into method chains that call
-        ``extract_features()``.  The upstream ``TrainingModel`` or
-        ``PredictionModel`` already carries the extracted ``features_df``; no
-        tsfresh re-run is ever performed here.
-
-        Returns:
-            Self: The current instance, enabling method chaining.
-        """
-        if self.verbose:
-            logger.info(
-                f"{self.model_kind} reuse: features already available, "
-                "skipping tsfresh extraction."
-            )
-
-        return self
-
     def evaluate(
         self,
         plot_aggregate: bool = True,

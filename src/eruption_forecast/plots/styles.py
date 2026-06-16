@@ -215,6 +215,38 @@ def apply_nature_style():
 
 
 @contextmanager
+def shap_figure(
+    figsize: tuple[float, float] = (10, 6),
+    dpi: int | None = None,
+):
+    """Context manager that yields a plain matplotlib ``Figure`` for SHAP plots.
+
+    Intentionally bypasses :func:`apply_nature_style` — SHAP's own colour and
+    typographic choices already form a coherent visual style; layering Nature
+    rcParams on top breaks SHAP's spacing and double-styles the dots. The
+    ``subplots_adjust(left=0.35)`` reserves room for long tsfresh feature
+    labels on the y-axis.
+
+    Args:
+        figsize: Figure width and height in inches.
+        dpi: Figure resolution; ``None`` keeps matplotlib's default.
+
+    Yields:
+        plt.Figure: The freshly created figure. The caller owns the figure
+            lifecycle — close it after saving, or let ``save_figure`` do so.
+    """
+    kwargs: dict = {"figsize": figsize}
+    if dpi is not None:
+        kwargs["dpi"] = dpi
+    fig = plt.figure(**kwargs)
+    try:
+        fig.subplots_adjust(left=0.35)
+        yield fig
+    finally:
+        pass
+
+
+@contextmanager
 def nature_figure(
     figsize: tuple[float, float] = (10, 6),
     dpi: int | None = None,

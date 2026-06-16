@@ -650,18 +650,8 @@ class ForecastModel:
     def explain(
         self,
         model: Literal["training", "prediction"] = "prediction",
-        n_observations_to_explain: int = 10,
-        method: Literal["shap"] = "shap",
-        feature_perturbation: Literal[
-            "tree_path_dependent", "interventional"
-        ] = "tree_path_dependent",
-        model_output: Literal["raw", "probability", "log_loss"] = "raw",
-        background_size: int = 100,
-        check_additivity: bool = True,
-        selection: Literal["top_proba", "near_threshold"] = "top_proba",
-        plot_aggregate: bool = True,
-        plot_per_seed: bool = False,
-        plot_waterfall: bool = True,
+        save_per_seed: bool = True,
+        plot_per_seed: bool = True,
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
@@ -677,31 +667,11 @@ class ForecastModel:
         Args:
             model (Literal["training", "prediction"]): Which model in the
                 current pipeline to explain. Defaults to ``"prediction"``.
-            n_observations_to_explain (int): Top-N observations per
-                classifier forwarded to ``ExplainerEnsemble``. Defaults to
-                ``10``.
-            method (Literal["shap"]): Explanation method. Reserved for
-                future additions. Defaults to ``"shap"``.
-            feature_perturbation (Literal["tree_path_dependent",
-                "interventional"]): SHAP perturbation mode. Defaults to
-                ``"tree_path_dependent"``.
-            model_output (Literal["raw", "probability", "log_loss"]):
-                SHAP output unit. ``"probability"`` and ``"log_loss"``
-                require ``feature_perturbation="interventional"``.
-                Defaults to ``"raw"``.
-            background_size (int): Background sample size for the
-                interventional path. Defaults to ``100``.
-            check_additivity (bool): Forwarded to the inner
-                ``explainer(X, ...)`` call. Defaults to ``True``.
-            selection (Literal["top_proba", "near_threshold"]):
-                Observation-ranking strategy. Defaults to ``"top_proba"``.
-            plot_aggregate (bool): Render aggregate plots per classifier.
+            save_per_seed (bool): Persist each per-seed
+                ``shap.Explanation`` to disk so a subsequent run can
+                short-circuit recomputation. Defaults to ``True``.
+            plot_per_seed (bool): Render per-seed bar and beeswarm plots.
                 Defaults to ``True``.
-            plot_per_seed (bool): Render per-seed bar / beeswarm plots.
-                Defaults to ``False``.
-            plot_waterfall (bool): When ``plot_per_seed=True``, also
-                render per-(seed, observation) waterfall plots. Defaults
-                to ``True``.
             output_dir (str | None): Root output directory for explanation
                 artefacts. Defaults to the station directory.
             overwrite (bool | None): Overwrite existing files. ``None``
@@ -731,16 +701,8 @@ class ForecastModel:
 
         self._config.explain = ForecastExplainConfig(
             model=model,
-            n_observations_to_explain=n_observations_to_explain,
-            method=method,
-            feature_perturbation=feature_perturbation,
-            model_output=model_output,
-            background_size=background_size,
-            check_additivity=check_additivity,
-            selection=selection,
-            plot_aggregate=plot_aggregate,
+            save_per_seed=save_per_seed,
             plot_per_seed=plot_per_seed,
-            plot_waterfall=plot_waterfall,
             output_dir=output_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
@@ -764,21 +726,13 @@ class ForecastModel:
 
         explanation_model = ExplanationModel(
             model=model_object,
-            n_observations_to_explain=n_observations_to_explain,
-            method=method,
-            feature_perturbation=feature_perturbation,
-            model_output=model_output,
-            background_size=background_size,
-            check_additivity=check_additivity,
-            selection=selection,
             output_dir=output_dir or self.station_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
             verbose=verbose,
         ).explain(
-            plot_aggregate=plot_aggregate,
+            save_per_seed=save_per_seed,
             plot_per_seed=plot_per_seed,
-            plot_waterfall=plot_waterfall,
         )
 
         self.ExplanationModel = explanation_model

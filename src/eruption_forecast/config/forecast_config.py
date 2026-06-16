@@ -321,29 +321,11 @@ class ForecastExplainConfig(BaseConfig):
     Attributes:
         model (Literal["training", "prediction"]): Which model in the
             current pipeline to explain. Defaults to ``"prediction"``.
-        n_observations_to_explain (int): Top-N observations per classifier
-            forwarded to :class:`ExplainerEnsemble`. Defaults to ``10``.
-        method (Literal["shap"]): Explanation method. Reserved for future
-            additions. Defaults to ``"shap"``.
-        feature_perturbation (Literal["tree_path_dependent",
-            "interventional"]): SHAP perturbation mode. Defaults to
-            ``"tree_path_dependent"``.
-        model_output (Literal["raw", "probability", "log_loss"]): SHAP
-            output unit. ``"probability"`` and ``"log_loss"`` require
-            ``feature_perturbation="interventional"``. Defaults to
-            ``"raw"``.
-        background_size (int): Background sample size for interventional
-            mode. Defaults to ``100``.
-        check_additivity (bool): Forwarded to the inner
-            ``explainer(X, ...)`` call. Defaults to ``True``.
-        selection (Literal["top_proba", "near_threshold"]):
-            Observation-ranking strategy. Defaults to ``"top_proba"``.
-        plot_aggregate (bool): Render aggregate plots per classifier.
+        save_per_seed (bool): Persist each per-seed ``shap.Explanation``
+            to disk so a subsequent run can short-circuit recomputation.
             Defaults to ``True``.
-        plot_per_seed (bool): Render per-seed bar / beeswarm plots.
-            Defaults to ``False``.
-        plot_waterfall (bool): When ``plot_per_seed=True``, also render
-            per-(seed, observation) waterfall plots. Defaults to ``True``.
+        plot_per_seed (bool): Render per-seed bar and beeswarm plots.
+            Defaults to ``True``.
         output_dir (str | None): Override for the explanation output
             directory. ``None`` uses ``ForecastModel.station_dir``.
             Defaults to ``None``.
@@ -357,18 +339,8 @@ class ForecastExplainConfig(BaseConfig):
     """
 
     model: Literal["training", "prediction"] = "prediction"
-    n_observations_to_explain: int = 10
-    method: Literal["shap"] = "shap"
-    feature_perturbation: Literal["tree_path_dependent", "interventional"] = (
-        "tree_path_dependent"
-    )
-    model_output: Literal["raw", "probability", "log_loss"] = "raw"
-    background_size: int = 100
-    check_additivity: bool = True
-    selection: Literal["top_proba", "near_threshold"] = "top_proba"
-    plot_aggregate: bool = True
-    plot_per_seed: bool = False
-    plot_waterfall: bool = True
+    save_per_seed: bool = True
+    plot_per_seed: bool = True
     output_dir: str | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None

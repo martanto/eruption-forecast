@@ -650,14 +650,13 @@ def save_model_json(
     suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
     filename = f"{prefix_filename}__{suffix}.json"
 
+    ensure_dir(classifier_dir)
     json_path = os.path.join(classifier_dir, filename)
     with open(json_path, "w") as f:
         json.dump(records, f, indent=2)
 
     if verbose:
-        logger.info(
-            f"{classifier_model.name}: JSON trained model saved to {json_path}"
-        )
+        logger.info(f"{classifier_model.name}: JSON trained model saved to {json_path}")
 
     return json_path
 
