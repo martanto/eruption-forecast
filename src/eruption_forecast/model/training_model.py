@@ -336,7 +336,7 @@ class TrainingModel(BaseModel, CacheModel):
             >>> print(model.describe())
             TrainingModel(period=2025-01-01 → 2025-12-31, window_size=2d, ...)
         """
-        classifier_names = ", ".join(m.slug_name for m in self.classifier_models)
+        classifier_names = ", ".join(m.name for m in self.classifier_models)
         return (
             f"TrainingModel("
             f"period={self.start_date_str} → {self.end_date_str}, "
@@ -401,7 +401,7 @@ class TrainingModel(BaseModel, CacheModel):
             >>> "Training period" in prompt
             True
         """
-        classifier_names = ", ".join(m.slug_name for m in self.classifier_models)
+        classifier_names = ", ".join(m.name for m in self.classifier_models)
         eruption_list = (
             ", ".join(self.eruption_dates)
             if self.eruption_dates is not None
@@ -1789,7 +1789,7 @@ class TrainingModel(BaseModel, CacheModel):
             return None
 
         classifier_model = next(
-            m for m in self.classifier_models if m.slug_name == classifier_name
+            m for m in self.classifier_models if m.name == classifier_name
         )
         seed_ensemble = classifier_ensemble.ensembles.get(classifier_model.name)
         if seed_ensemble is None:
