@@ -98,10 +98,12 @@ def _full_forecast_config() -> ForecastConfig:
         ),
         explain=ForecastExplainConfig(
             model="prediction",
-            n_observations_to_explain=5,
-            feature_perturbation="interventional",
-            model_output="probability",
-            selection="near_threshold",
+            eruption_dates=["2025-03-20"],
+            save_per_seed=True,
+            plot_per_seed=False,
+            max_display=15,
+            check_additivity=True,
+            overwrite_classifier_explanation=True,
         ),
     )
 
@@ -388,16 +390,15 @@ class TestForecastExplainConfig:
         """``ForecastExplainConfig`` has the expected default values."""
         cfg = ForecastExplainConfig()
         assert cfg.model == "prediction"
-        assert cfg.n_observations_to_explain == 10
-        assert cfg.method == "shap"
-        assert cfg.feature_perturbation == "tree_path_dependent"
-        assert cfg.model_output == "raw"
-        assert cfg.background_size == 100
-        assert cfg.check_additivity is True
-        assert cfg.selection == "top_proba"
-        assert cfg.plot_aggregate is True
-        assert cfg.plot_per_seed is False
-        assert cfg.plot_waterfall is True
+        assert cfg.eruption_dates is None
+        assert cfg.save_per_seed is True
+        assert cfg.plot_per_seed is True
+        assert cfg.figsize is None
+        assert cfg.max_display == 20
+        assert cfg.group_remaining_features is False
+        assert cfg.dpi == 150
+        assert cfg.check_additivity is False
+        assert cfg.overwrite_classifier_explanation is False
         assert cfg.output_dir is None
         assert cfg.overwrite is None
         assert cfg.n_jobs is None
@@ -407,23 +408,25 @@ class TestForecastExplainConfig:
         """All fields survive a ``to_dict()`` / ``from_dict()`` round-trip."""
         cfg = ForecastExplainConfig(
             model="training",
-            n_observations_to_explain=20,
-            feature_perturbation="interventional",
-            model_output="probability",
-            background_size=200,
-            check_additivity=False,
-            selection="near_threshold",
-            plot_per_seed=True,
+            eruption_dates=["2025-03-20"],
+            save_per_seed=False,
+            plot_per_seed=False,
+            max_display=15,
+            group_remaining_features=True,
+            dpi=200,
+            check_additivity=True,
+            overwrite_classifier_explanation=True,
         )
         restored = ForecastExplainConfig.from_dict(cfg.to_dict())
         assert restored.model == "training"
-        assert restored.n_observations_to_explain == 20
-        assert restored.feature_perturbation == "interventional"
-        assert restored.model_output == "probability"
-        assert restored.background_size == 200
-        assert restored.check_additivity is False
-        assert restored.selection == "near_threshold"
-        assert restored.plot_per_seed is True
+        assert restored.eruption_dates == ["2025-03-20"]
+        assert restored.save_per_seed is False
+        assert restored.plot_per_seed is False
+        assert restored.max_display == 15
+        assert restored.group_remaining_features is True
+        assert restored.dpi == 200
+        assert restored.check_additivity is True
+        assert restored.overwrite_classifier_explanation is True
 
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Unknown keys do not raise."""
@@ -463,8 +466,8 @@ class TestForecastConfigToDict:
         """``to_dict()`` includes ``explain`` when set and omits it otherwise."""
         config = ForecastConfig(model=BaseForecastConfig(station="OJN"))
         assert "explain" not in config.to_dict()
-        config.explain = ForecastExplainConfig(selection="near_threshold")
-        assert config.to_dict()["explain"]["selection"] == "near_threshold"
+        config.explain = ForecastExplainConfig(max_display=15)
+        assert config.to_dict()["explain"]["max_display"] == 15
 
     def test_nested_values_correct(self) -> None:
         """Nested section values are serialised correctly."""
@@ -477,8 +480,10 @@ class TestForecastConfigToDict:
         assert d["train"]["classifiers"] == ["xgb"]
         assert d["predict"]["window_step"] == 12
         assert d["evaluate"]["model"] == "prediction"
-        assert d["explain"]["feature_perturbation"] == "interventional"
-        assert d["explain"]["selection"] == "near_threshold"
+        assert d["explain"]["model"] == "prediction"
+        assert d["explain"]["eruption_dates"] == ["2025-03-20"]
+        assert d["explain"]["max_display"] == 15
+        assert d["explain"]["check_additivity"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -533,10 +538,11 @@ class TestForecastConfigYaml:
         assert loaded.evaluate.model == "prediction"
         assert loaded.evaluate.eruption_dates == ["2025-03-20"]
         assert loaded.explain is not None
-        assert loaded.explain.feature_perturbation == "interventional"
-        assert loaded.explain.model_output == "probability"
-        assert loaded.explain.selection == "near_threshold"
-        assert loaded.explain.n_observations_to_explain == 5
+        assert loaded.explain.model == "prediction"
+        assert loaded.explain.eruption_dates == ["2025-03-20"]
+        assert loaded.explain.max_display == 15
+        assert loaded.explain.check_additivity is True
+        assert loaded.explain.overwrite_classifier_explanation is True
 
     def test_load_partial_config(self) -> None:
         """Loading a config with only model + train sections works."""
