@@ -321,11 +321,31 @@ class ForecastExplainConfig(BaseConfig):
     Attributes:
         model (Literal["training", "prediction"]): Which model in the
             current pipeline to explain. Defaults to ``"prediction"``.
+        eruption_dates (list[str] | None): Ground-truth eruption dates in
+            ``"YYYY-MM-DD"`` format. Required for prediction-mode
+            explanation when the upstream ``PredictionModel`` does not
+            carry them. ``None`` falls back to the dates captured during
+            ``train()``. Defaults to ``None``.
         save_per_seed (bool): Persist each per-seed ``shap.Explanation``
             to disk so a subsequent run can short-circuit recomputation.
             Defaults to ``True``.
         plot_per_seed (bool): Render per-seed bar and beeswarm plots.
             Defaults to ``True``.
+        figsize (tuple[float, float] | None): Figure size in inches for
+            SHAP plots. ``None`` auto-sizes from ``max_display``. Defaults
+            to ``None``.
+        max_display (int): Maximum number of features to display in SHAP
+            plots. Defaults to ``20``.
+        group_remaining_features (bool): Forwarded to
+            ``shap.plots.beeswarm`` to group features beyond
+            ``max_display``. Defaults to ``False``.
+        dpi (int): Figure resolution in dots per inch. Defaults to ``150``.
+        check_additivity (bool): Forwarded to ``shap.TreeExplainer`` to
+            verify SHAP additivity against the model output. Defaults to
+            ``False``.
+        overwrite_classifier_explanation (bool): Overwrite the cached
+            per-classifier ``ClassifierExplanation.pkl`` artefact. Falls
+            back to ``overwrite`` when ``False``. Defaults to ``False``.
         output_dir (str | None): Override for the explanation output
             directory. ``None`` uses ``ForecastModel.station_dir``.
             Defaults to ``None``.
@@ -339,8 +359,15 @@ class ForecastExplainConfig(BaseConfig):
     """
 
     model: Literal["training", "prediction"] = "prediction"
+    eruption_dates: list[str] | None = None
     save_per_seed: bool = True
     plot_per_seed: bool = True
+    figsize: tuple[float, float] | None = None
+    max_display: int = 20
+    group_remaining_features: bool = False
+    dpi: int = 150
+    check_additivity: bool = False
+    overwrite_classifier_explanation: bool = False
     output_dir: str | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None
@@ -364,6 +391,7 @@ class ForecastConfig(BaseConfig):
         train (ForecastTrainConfig | None): Training parameters.
         predict (ForecastPredictConfig | None): Prediction parameters.
         evaluate (ForecastEvaluateConfig | None): Evaluation parameters.
+        explain (ForecastExplainConfig | None): SHAP explanation parameters.
     """
 
     version: str = "1.0"

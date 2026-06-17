@@ -652,8 +652,15 @@ class ForecastModel:
     def explain(
         self,
         model: Literal["training", "prediction"] = "prediction",
+        eruption_dates: list[str] | None = None,
         save_per_seed: bool = True,
         plot_per_seed: bool = True,
+        figsize: tuple[float, float] | None = None,
+        max_display: int = 20,
+        group_remaining_features: bool = False,
+        dpi: int = 150,
+        check_additivity: bool = False,
+        overwrite_classifier_explanation: bool = False,
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
@@ -669,11 +676,32 @@ class ForecastModel:
         Args:
             model (Literal["training", "prediction"]): Which model in the
                 current pipeline to explain. Defaults to ``"prediction"``.
+            eruption_dates (list[str] | None): Ground-truth eruption dates
+                in ``"YYYY-MM-DD"`` format. Required for prediction-mode
+                explanation when the upstream ``PredictionModel`` does not
+                carry them. Falls back to the dates captured during
+                ``train()`` when ``None``. Defaults to ``None``.
             save_per_seed (bool): Persist each per-seed
                 ``shap.Explanation`` to disk so a subsequent run can
                 short-circuit recomputation. Defaults to ``True``.
             plot_per_seed (bool): Render per-seed bar and beeswarm plots.
                 Defaults to ``True``.
+            figsize (tuple[float, float] | None): Figure size in inches
+                for SHAP plots. ``None`` auto-sizes from ``max_display``.
+                Defaults to ``None``.
+            max_display (int): Maximum number of features to display in
+                SHAP plots. Defaults to ``20``.
+            group_remaining_features (bool): Forwarded to
+                ``shap.plots.beeswarm`` to group features beyond
+                ``max_display``. Defaults to ``False``.
+            dpi (int): Figure resolution in dots per inch. Defaults to
+                ``150``.
+            check_additivity (bool): Forwarded to ``shap.TreeExplainer``
+                to verify SHAP additivity against the model output.
+                Defaults to ``False``.
+            overwrite_classifier_explanation (bool): Overwrite the cached
+                per-classifier ``ClassifierExplanation.pkl`` artefact.
+                Defaults to ``False``.
             output_dir (str | None): Root output directory for explanation
                 artefacts. Defaults to the station directory.
             overwrite (bool | None): Overwrite existing files. ``None``
@@ -703,8 +731,15 @@ class ForecastModel:
 
         self._config.explain = ForecastExplainConfig(
             model=model,
+            eruption_dates=list(eruption_dates) if eruption_dates is not None else None,
             save_per_seed=save_per_seed,
             plot_per_seed=plot_per_seed,
+            figsize=figsize,
+            max_display=max_display,
+            group_remaining_features=group_remaining_features,
+            dpi=dpi,
+            check_additivity=check_additivity,
+            overwrite_classifier_explanation=overwrite_classifier_explanation,
             output_dir=output_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
@@ -714,6 +749,13 @@ class ForecastModel:
         n_jobs = n_jobs if n_jobs is not None else self.n_jobs
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
+
+        # Caller-supplied eruption_dates win over the values captured from
+        # train(); prediction-mode ``ExplanationModel`` raises when neither
+        # source provides them.
+        eruption_dates = (
+            eruption_dates if eruption_dates is not None else self._eruption_dates
+        )
 
         model_object: TrainingModel | PredictionModel
         if model == "prediction" and self.PredictionModel is not None:
@@ -726,16 +768,28 @@ class ForecastModel:
                 f"'prediction' and 'training'"
             )
 
-        explanation_model = ExplanationModel(
-            model=model_object,
-            output_dir=output_dir or self.station_dir,
-            overwrite=overwrite,
-            n_jobs=n_jobs,
-            verbose=verbose,
-        ).explain(save_per_seed=save_per_seed)
-
-        if plot_per_seed:
-            explanation_model.plot(plot_per_seed=True)
+        explanation_model = (
+            ExplanationModel(
+                model=model_object,
+                eruption_dates=eruption_dates,
+                output_dir=output_dir or self.station_dir,
+                overwrite=overwrite,
+                n_jobs=n_jobs,
+                verbose=verbose,
+            )
+            .explain(
+                save_per_seed=save_per_seed,
+                check_additivity=check_additivity,
+                overwrite_classifier_explanation=overwrite_classifier_explanation,
+            )
+            .plot(
+                figsize=figsize,
+                max_display=max_display,
+                group_remaining_features=group_remaining_features,
+                dpi=dpi,
+                plot_per_seed=plot_per_seed,
+            )
+        )
 
         self.ExplanationModel = explanation_model
 

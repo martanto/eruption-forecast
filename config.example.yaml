@@ -92,3 +92,19 @@ evaluate:
   overwrite: null           # null = inherit from model.overwrite
   n_jobs: null              # null = inherit from model.n_jobs
   verbose: null             # null = inherit from model.verbose
+
+explain:
+  model: prediction         # 'prediction' or 'training' — which model to explain
+  eruption_dates: null      # null = reuse the dates captured during train()
+  save_per_seed: true       # Persist each per-seed shap.Explanation to disk
+  plot_per_seed: true       # Render per-seed bar and beeswarm SHAP plots
+  figsize: null             # Figure size in inches; null auto-sizes from max_display
+  max_display: 20           # Maximum number of features to display in SHAP plots
+  group_remaining_features: false   # Forwarded to shap.plots.beeswarm
+  dpi: 150                  # Figure resolution in dots per inch
+  check_additivity: false   # Verify SHAP additivity against the model output
+  overwrite_classifier_explanation: false   # Overwrite cached ClassifierExplanation.pkl
+  output_dir: null          # null = use station_dir
+  overwrite: null           # null = inherit from model.overwrite
+  n_jobs: null              # null = inherit from model.n_jobs
+  verbose: null             # null = inherit from model.verbose
