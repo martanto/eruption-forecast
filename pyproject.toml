@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "eruption-forecast"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
     {name = "Martanto", email = "martanto@live.com"},
 ]

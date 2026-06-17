@@ -171,8 +171,10 @@ fm.TrainingModel              # TrainingModel - labels, features, fit state
 fm.ClassifierEnsemble         # ClassifierEnsemble - fitted across classifiers + seeds
 fm.PredictionModel            # PredictionModel - forecast grid + caching state
 fm.results                    # pd.DataFrame - per-window forecast probabilities
-fm.EvaluationModel            # EvaluationModel - per-seed JSON + aggregates
+fm.EvaluationModel            # EvaluationModel - matrix CSVs + in-memory metrics
 fm.evaluation_results         # dict[classifier_name, pd.DataFrame] - per-seed metrics
+fm.ExplanationModel           # ExplanationModel (after .explain()) - SHAP payloads
+fm.ExplanationModel.explanations  # list[ClassifierExplanation] - per-classifier SHAP
 ```
 
 Probability columns in `fm.results`:
