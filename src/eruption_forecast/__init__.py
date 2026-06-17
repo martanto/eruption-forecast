@@ -42,6 +42,7 @@ from eruption_forecast.model.forecast_model import ForecastModel
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.evaluation_model import EvaluationModel
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.model.explanation_model import ExplanationModel
 from eruption_forecast.tremor.calculate_tremor import CalculateTremor
 from eruption_forecast.features.features_builder import FeaturesBuilder
 from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
@@ -68,6 +69,7 @@ __all__ = [
     "ForecastModel",
     "TrainingModel",
     "EvaluationModel",
+    "ExplanationModel",
     "PredictionModel",
     "CalculateTremor",
     "FeaturesBuilder",

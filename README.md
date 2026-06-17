@@ -92,6 +92,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - [Training Workflow](wiki/Training-Workflow.md) — Classifiers, CV strategies, imbalance handling
 - [Prediction Workflow](wiki/Prediction-Workflow.md) — Forecast outputs and consensus probabilities
 - [Evaluation Workflow](wiki/Evaluation-Workflow.md) — `MetricsEnsemble`, `ClassifierComparator`
+- [Explanation Workflow](wiki/Explanation-Workflow.md) — `ExplanationModel`, `ExplainerEnsemble`, per-seed SHAP
 - [Configuration](wiki/Configuration.md) — YAML save/replay, Telegram notifications, logging
 - [Visualization](wiki/Visualization.md) — Plot catalog and output paths
 - [Output Structure](wiki/Output-Structure.md) — Full directory tree
@@ -104,11 +105,12 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 
 - **Tremor Calculation** — RSAM, DSAR, and Shannon Entropy across configurable frequency bands, from SDS archives or FDSN web services (with transparent local caching).
 - **Label Building** — Standard sliding-window (`LabelBuilder`) or per-eruption (`DynamicLabelBuilder`) generation from known eruption dates.
-- **Feature Extraction** — tsfresh feature engineering on windowed tremor matrices, with two-stage selection (tsfresh FDR + RandomForest importance).
+- **Feature Extraction** — tsfresh feature engineering on windowed tremor matrices, with FDR-controlled selection (tsfresh statistical filter; RandomForest permutation importance available as an alternative).
 - **Multi-seed Training** — 11 classifier families (`rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`, `lite-rf`), three CV strategies, automatic imbalance handling, and per-seed `GridSearchCV`.
 - **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface.
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.
-- **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` writes per-seed JSON; `ClassifierComparator` ranks classifiers head-to-head.
+- **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
+- **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
 - **Content-Addressable Caching** — `TrainingModel` and `PredictionModel` cache their fitted state under `{output_dir}/cache/` so repeated runs with identical kwargs short-circuit.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline.
 - **Telegram Notifications** — `@notify` decorator + `send_telegram_notification()` for start/finish/error messages and file attachments.
@@ -120,15 +122,18 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 src/eruption_forecast/
 ├── __init__.py, logger.py, data_container.py
 ├── config/        forecast_config, training_config, constants
-├── dataclass/     station_data
+├── dataclass/     station_data, classifier_ensemble_summary,
+│                  classifier_explanation
 ├── decorators/    notify, decorator_class
-├── ensemble/      base_ensemble, seed_ensemble, classifier_ensemble, metrics_ensemble
+├── ensemble/      base_ensemble, seed_ensemble, classifier_ensemble,
+│                  metrics_ensemble, explainer_ensemble
 ├── features/      tremor_matrix_builder, features_builder, feature_selector
 ├── label/         label_builder, dynamic_label_builder, label_data, label_plots
 ├── model/         base_model, cache_model, forecast_model,
 │                  training_model, prediction_model, evaluation_model,
-│                  classifier_model, classifier_comparator
-├── plots/         styles, tremor_plots, feature_plots, forecast_plots, evaluation_plots
+│                  explanation_model, classifier_model, classifier_comparator
+├── plots/         styles, tremor_plots, feature_plots, forecast_plots,
+│                  evaluation_plots, explanation_plots
 ├── sources/       base, sds, fdsn
 ├── tremor/        calculate_tremor, rsam, dsar, shannon_entropy, tremor_data
 └── utils/         array, dataframe, date_utils, formatting, ml,
@@ -176,18 +181,27 @@ src/eruption_forecast/
             ┌────────────────────────────────┴──────────────────────┐
             ▼                                                       ▼
    ┌──────────────────────┐                          ┌────────────────────────┐
-   │   EvaluationModel    │                          │  result_all_model_     │
-   │  training | predict  │  ── MetricsEnsemble ──►  │  predictions_*.csv +   │
-   │                      │                          │  forecast PNG/PDF      │
+   │   EvaluationModel    │                          │  forecast-results_     │
+   │  training | predict  │  ── MetricsEnsemble ──►  │  *.csv + forecast      │
+   │                      │                          │  PNG/PDF               │
    └──────────┬───────────┘                          └────────────────────────┘
+              │ writes (n_samples × n_seeds) y_proba / y_pred CSVs
               │
               ▼
    ┌──────────────────────┐
    │ ClassifierComparator │   ranking_*.csv + comparison figures
    └──────────────────────┘
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │     ExplanationModel    (BaseModel + CacheModel)             │
+   │     ExplainerEnsemble                                        │
+   │       ── per-seed shap.TreeExplainer (RF / lite-rf / GB /XGB)│
+   │       ── ClassifierExplanation.pkl per classifier            │
+   │       ── per-seed bar + beeswarm, per-eruption waterfall     │
+   └──────────────────────────────────────────────────────────────┘
 ```
 
-`ForecastModel.calculate() → train() → predict() → evaluate()` is the fluent entry point. Each stage caches and persists, so a repeated run with identical kwargs short-circuits via the on-disk cache.
+`ForecastModel.calculate() → train() → predict() → evaluate() → explain()` is the fluent entry point. Each stage caches and persists, so a repeated run with identical kwargs short-circuits via the on-disk cache.
 
 ## Installation
 
@@ -319,11 +333,18 @@ fm = ForecastModel(
         eruption_dates=["2025-08-02"],   # falls back to train() dates when omitted
         plot_aggregate=True,
     )
+    .explain(
+        model="prediction",
+        eruption_dates=["2025-08-02"],   # falls back to train() dates when omitted
+        plot_per_seed=True,
+        max_display=20,
+    )
 )
 
 # Pipeline outputs
 print(fm.results)                         # forecast DataFrame
 print(fm.evaluation_results)              # per-classifier per-seed metrics
+print(fm.ExplanationModel.explanations)   # list[ClassifierExplanation]
 print(fm.TrainingModel.classifier_ensemble_path)
 ```
 
@@ -332,7 +353,8 @@ print(fm.TrainingModel.classifier_ensemble_path)
 1. **Calculate tremor** — RSAM, DSAR, and Shannon Entropy from raw seismic, with outlier removal and daily plots.
 2. **Train** — build labels around the 5 eruption dates, extract tsfresh features over a 6-hour window grid, fit 25 seeds × 4 classifiers under stratified-shuffle CV with `"auto"` imbalance handling.
 3. **Predict** — apply the bundled `ClassifierEnsemble` to a fresh 10-minute window grid over the forecast period and emit per-classifier + consensus probabilities.
-4. **Evaluate** — score the forecast against the held-out eruption date with per-seed metric JSONs, aggregate CSVs, and ranking plots.
+4. **Evaluate** — score the forecast against the held-out eruption date by writing `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices per classifier and aggregate metric plots; cross-classifier ranking via `ClassifierComparator`.
+5. **Explain** — produce per-seed SHAP explanations for the tree classifiers in the ensemble, bundled into `ClassifierExplanation_*.pkl` per classifier and rendered as per-seed bar / beeswarm + per-eruption waterfall plots.
 
 See [`main.py`](main.py) for the full working example and [`scenarios.py`](scenarios.py) for the multi-scenario variant.
 
@@ -547,18 +569,30 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │   ├── training/                            # when model="training"
 │   └── prediction/                          # when model="prediction"
 │       ├── classifiers/{ClfName}/
-│       │   ├── predictions/{y_proba,y_pred,y_true}.csv
-│       │   ├── metrics/json/{seed:05d}.json
-│       │   ├── metrics_summary_*.csv
+│       │   ├── predictions/{y_proba,y_pred}.csv   # (n_samples × n_seeds)
 │       │   └── figures/
-│       └── comparison/                      # ClassifierComparator
+│       │       ├── aggregate/{plot_name}.{png,csv}
+│       │       └── {plot_name}/{seed:05d}.png      # plot_per_seed=True
+│       ├── labels/y_true.csv                       # prediction reuse only
+│       └── comparison/                             # ClassifierComparator
+│
+├── explanation/                             # ExplanationModel
+│   ├── training/                            # when upstream model.kind=="training"
+│   └── prediction/                          # when upstream model.kind=="prediction"
+│       ├── classifiers/{ClfName}/
+│       │   ├── ClassifierExplanation_{ClfName}.pkl
+│       │   ├── shap_values/{seed:05d}.pkl
+│       │   └── figures/{bar,beeswarm}/{seed:05d}.png
+│       └── eruptions/{YYYY-MM-DD}/
+│           └── {ClfName}_{datetime}_seed=_index=.png
 │
 ├── cache/                                   # CacheModel
 │   ├── TrainingModel/{hash}.pkl + {hash}.params.json
-│   └── PredictionModel/{hash}.pkl + {hash}.params.json
+│   ├── PredictionModel/{hash}.pkl + {hash}.params.json
+│   └── ExplanationModel/{hash}.pkl + {hash}.params.json
 │
 ├── forecast.config.yaml                     # fm.save_config()
-├── result_all_model_predictions_{basename}.csv
+├── forecast-results_{basename}.csv
 └── {Training,Prediction,Evaluation}Model_*.pkl   # optional, via .save()
 ```
 
@@ -637,6 +671,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Status:** Active Development
-**Last Updated:** 2026-06-11
+**Last Updated:** 2026-06-17

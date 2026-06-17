@@ -1,8 +1,10 @@
 # Evaluation Workflow
 
 The evaluation stage scores a fitted `ClassifierEnsemble` against ground truth, never re-fitting. 
-It reuses the upstream `TrainingModel` or `PredictionModel` (in-memory or from a `.pkl`) and \
-writes per-seed JSON + aggregate CSV + plots per classifier, plus cross-classifier ranking via `ClassifierComparator`.
+It reuses the upstream `TrainingModel` or `PredictionModel` (in-memory or from a `.pkl`) and 
+writes per-classifier `(n_samples, n_seeds)` `y_proba` / `y_pred` CSV matrices plus aggregate 
+metric plots, with cross-classifier ranking via `ClassifierComparator`. Per-classifier per-seed
+metric tables stay in memory on `self.metrics` — no per-seed JSON tree is produced.
 
 Driver: `EvaluationModel` (`src/eruption_forecast/model/evaluation_model.py`). Wrapped by `ForecastModel.evaluate(...)`.
 
@@ -52,18 +54,16 @@ For each classifier in ClassifierEnsemble:
         │       → (n_samples, n_seeds) probability matrix
         ├── threshold at 0.5
         │       → (n_samples, n_seeds) prediction matrix
-        ├── persist: predictions/{y_proba,y_pred,y_true}.csv
-        ├── per-seed MetricsComputer.compute_all_metrics()
-        │       → metrics/json/{seed:05d}.json
-        └── aggregate mean ± std across seeds
-                → metrics_summary_{start}_{end}.csv
-                → all_metrics_{start}_{end}.csv
-                → returned to caller as pd.DataFrame
+        ├── persist predictions/{y_proba,y_pred}.csv
+        ├── per-seed metric loop in joblib (compute_seed)
+        │       → in-memory metrics: dict[classifier, pd.DataFrame(seed × metric)]
+        └── idempotent fast-path: re-running compute() with populated
+            y_probas is a no-op
 ```
 
-The result of `evaluate()` is a `dict[classifier_name, pd.DataFrame]` - one DataFrame per classifier, one row per seed, one column per metric.
+The result of `evaluate()` is a `dict[classifier_name, pd.DataFrame]` — one DataFrame per classifier, one row per seed, one column per metric. The dict is also cached on `self.metrics` for downstream use.
 
-Available metrics (from `MetricsComputer`):
+Available metric columns (per seed):
 
 ```
 accuracy        balanced_accuracy   precision       recall
@@ -77,14 +77,14 @@ f1_at_optimal   recall_at_optimal   precision_at_optimal
 
 ```python
 em.evaluate(
-    plot_aggregate=True,         # mean ± std plots per classifier
-    plot_per_seed=False,         # one plot set per seed (expensive)
-    plot_shap=False,             # reserved - currently a warning
+    plot_aggregate=True,         # ROC, PR, threshold, g-mean, MCC per classifier
+    plot_per_seed=False,         # same dispatcher, one plot file per seed
+    plot_shap=False,             # reserved no-op; SHAP moved to ExplanationModel
     compare_classifiers=True,    # also run ClassifierComparator at the end
 ) -> dict[str, pd.DataFrame]
 ```
 
-`fm.evaluate(...)` forwards `plot_per_seed` and `plot_aggregate` from its own kwargs.
+`fm.evaluate(...)` forwards `plot_per_seed` and `plot_aggregate` from its own kwargs. `plot_shap=True` is reserved and emits a warning — SHAP plots are produced by the dedicated [Explanation Workflow](Explanation-Workflow) via `ExplanationModel.explain()`.
 
 ---
 
@@ -123,28 +123,27 @@ triple is forwarded as `ensemble_source` so the ROC overlay computes from in-mem
 │   └── {classifier-name}/
 │       ├── predictions/
 │       │   ├── y_proba.csv          # (n_samples, n_seeds)
-│       │   ├── y_pred.csv           # (n_samples, n_seeds)
-│       │   └── y_true.csv           # (n_samples,)
-│       ├── metrics/
-│       │   ├── json/{seed:05d}.json # per-seed metrics
-│       │   ├── metrics_summary_{start}_{end}.csv
-│       │   └── all_metrics_{start}_{end}.csv
-│       └── figures/                  # aggregate plots when plot_aggregate=True
+│       │   └── y_pred.csv           # (n_samples, n_seeds)
+│       └── figures/
+│           ├── aggregate/{plot_name}.{png,csv}  # plot_aggregate=True
+│           └── {plot_name}/{seed:05d}.png        # plot_per_seed=True
+├── labels/y_true.csv                 # prediction-reuse mode only
+├── MetricsEnsemble.pkl               # optional, via em.MetricsEnsemble.save()
 └── comparison/                       # populated when em.compare() runs
     ├── metrics/ranking_*.csv
     └── figures/*.png
 ```
 
 Per-classifier folder names use the *unslugified* sklearn class name (e.g. `RandomForestClassifier`), 
-distinct from the slug used by `TrainingModel` (`random-forest-classifier`).
+distinct from the slug used by `TrainingModel` (`random-forest-classifier`). Aggregate / per-seed
+plot names come from `evaluation_plots.AGGREGATE_PLOT_DISPATCHER` and
+`PER_SEED_PLOT_DISPATCHER` (`roc_curve`, `precision_recall`, `threshold_analysis`, `g_mean_curve`, `mcc_curve`, `confusion_matrix`).
 
 ---
 
 ## Cache Semantics
 
-`EvaluationModel` does **not** mix in `CacheModel` - it has no parameter-cache. What it does instead 
-is **reuse on-disk JSON metrics**: per-seed metrics files are only re-computed when missing or 
-when `overwrite=True`. Re-running `evaluate()` on the same instance is therefore very fast once the JSON tree exists.
+`EvaluationModel` does **not** mix in `CacheModel` — it has no parameter cache. Re-runs are gated by `MetricsEnsemble.compute()`'s in-memory idempotency fast-path: once `self.y_probas` is populated, repeated `compute()` calls short-circuit immediately. `overwrite` only controls plot regeneration — passing `overwrite=False` keeps existing `figures/.../{plot}.png` files in place. The on-disk `predictions/{y_proba,y_pred}.csv` matrices themselves are the persistent layer; deleting them forces the next `compute()` to refit from scratch.
 
 ---
 
@@ -198,8 +197,9 @@ ranking = em.compare(metrics="balanced_accuracy").get_ranking(metric="balanced_a
 │   ┌──────────────────────────────────────────┐                  │
 │   │ MetricsEnsemble.compute()                │                  │
 │   │   per-classifier predict_proba           │                  │
-│   │   per-seed JSON + (y_proba,y_pred,y_true)│                  │
-│   │   aggregate mean ± std → CSV             │                  │
+│   │   (n_samples × n_seeds) y_proba / y_pred │                  │
+│   │   per-seed metrics → self.metrics (mem)  │                  │
+│   │   idempotent once y_probas is populated  │                  │
 │   └────────────────────┬─────────────────────┘                  │
 │                        │ cached on self.MetricsEnsemble         │
 │                        ▼                                        │

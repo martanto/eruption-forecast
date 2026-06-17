@@ -100,7 +100,7 @@ The DataFrame returned by `forecast()` (also stored on `self.results` and `fm.re
 | `consensus_confidence` | `1 - normalised consensus uncertainty` |
 | `consensus_prediction` | Binary prediction on the consensus mean |
 
-The result CSV is written at `{station_dir}/result_all_model_predictions_{basename}.csv`.
+The result CSV is written at `{station_dir}/forecast-results_{basename}.csv`.
 
 ### Plotting
 
@@ -144,7 +144,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 │   │   └── features-matrix_*.csv                           # tsfresh matrix
 │   ├── results/{clf-slug}/{seed:05d}.csv                   # per-seed probability (save_seed_result=True)
 │   └── figures/forecast_{basename}.{png,pdf}               # forecast plot
-├── result_all_model_predictions_{basename}.csv             # top-level results dump
+├── forecast-results_{basename}.csv             # top-level results dump
 └── cache/PredictionModel/{hash}.pkl                        # CacheModel artefact
 ```
 

@@ -280,13 +280,14 @@ class BaseModel(ABC):
         stages can write into them without manual setup.
         """
 
-    @abstractmethod
     def validate(self) -> Self:
         """Validate model-specific parameters.
 
-        Subclasses extend ``_validate()`` with stage-specific checks
-        (e.g. that ``eruption_dates`` is provided when required, or that
-        a pre-fitted ensemble is available before prediction).
+        Concrete subclasses that need stage-specific checks (e.g. that
+        ``eruption_dates`` is provided when required, or that a pre-fitted
+        ensemble is available before prediction) override this hook. Stages
+        whose invariants are already enforced inline in ``__init__`` (such
+        as ``ExplanationModel``) inherit this no-op.
 
         Returns:
             Self: The current instance, for method chaining.
@@ -294,6 +295,7 @@ class BaseModel(ABC):
         Raises:
             ValueError: When stage-specific validation fails.
         """
+        return self
 
     @abstractmethod
     def describe(self) -> str:
@@ -390,25 +392,30 @@ class BaseModel(ABC):
         logger.info(f"[{cls.__name__}] Loaded from: {path}")
         return obj
 
-    @abstractmethod
     def build_label(
         self, window_step: int, window_step_unit: Literal["minutes", "hours"]
     ) -> Self:
         """Build the label set for this model stage.
 
-        Concrete subclasses construct a label DataFrame appropriate to
-        their stage (training labels, forecast-grid labels, or
-        evaluation-window labels) and store the supplied window
-        configuration on the instance.
+        Concrete subclasses that need to construct a stage-specific label
+        DataFrame (training labels, forecast-grid labels, or
+        evaluation-window labels) override this hook and store the supplied
+        window configuration on the instance. Reuse stages such as
+        ``ExplanationModel`` inherit this no-op so the same kwargs can be
+        passed uniformly across mixed pipelines.
 
         Args:
             window_step (int): Step size between consecutive windows.
+                Ignored by the no-op default; consumed by overriding
+                subclasses.
             window_step_unit (Literal["minutes", "hours"]): Unit for
-                ``window_step``.
+                ``window_step``. Ignored by the no-op default; consumed by
+                overriding subclasses.
 
         Returns:
             Self: The current instance, for method chaining.
         """
+        return self
 
     def _build_features(
         self,
@@ -503,14 +510,17 @@ class BaseModel(ABC):
 
         return features_builder
 
-    @abstractmethod
     def extract_features(self) -> Self:
         """Extract tsfresh features from the tremor data.
 
-        Concrete subclasses build a tremor matrix aligned to their labels
-        (typically via ``_build_features()``), run tsfresh extraction, and
-        populate ``features_df`` and ``features_csv`` on the instance.
+        Concrete subclasses that own a feature-extraction pass override this
+        hook to build a tremor matrix aligned to their labels (typically via
+        ``_build_features()``), run tsfresh extraction, and populate
+        ``features_df`` and ``features_csv`` on the instance. Reuse stages
+        such as ``ExplanationModel`` inherit this no-op so they can still be
+        dropped into chains that call ``extract_features()``.
 
         Returns:
             Self: The current instance, for method chaining.
         """
+        return self

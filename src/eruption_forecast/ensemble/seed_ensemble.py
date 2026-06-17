@@ -6,6 +6,7 @@ import numpy as np
 import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils._repr_html.estimator import _VisualBlock
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
@@ -29,6 +30,14 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         seeds (list[dict]): List of seed records.  Each record is a dict with
             keys ``random_state`` (int), ``model`` (fitted estimator), and
             ``feature_names`` (list[str]).
+        probabilities (pd.DataFrame | None): Per-seed eruption probability
+            matrix cached by :meth:`save_matrices`. Shape
+            ``(n_samples, n_seeds)`` with columns ``seed_{random_state:05d}``.
+            ``None`` until the first prediction call.
+        predictions (pd.DataFrame | None): Per-seed binary prediction matrix
+            cached by :meth:`save_matrices`. Same shape and column scheme as
+            ``probabilities``; values cast to ``int8``. ``None`` until the
+            first prediction call.
 
     Args:
         classifier_name (str): Human-readable classifier name.
@@ -48,6 +57,11 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.classifier_name = classifier_name
         self.seeds: list[dict] = []
+        self.probabilities: pd.DataFrame | None = None
+        self.predictions: pd.DataFrame | None = None
+
+    def __getitem__(self, seed_index: int):
+        return self.seeds[seed_index]
 
     def __len__(self) -> int:
         """Return the number of seeds in this ensemble.
@@ -208,9 +222,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             )
 
         if not records:
-            raise ValueError(
-                f"Trained-model JSON is empty: {trained_model_json}"
-            )
+            raise ValueError(f"Trained-model JSON is empty: {trained_model_json}")
 
         required_keys = {"random_state", "features", "model_filepath"}
         _classifier_name = "Unknown" if classifier_name is None else classifier_name
@@ -444,7 +456,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             probabilities=probabilities,
             predictions=predictions,
             index=X.index,
-            overwrite=overwrite,
             verbose=verbose,
         )
 
@@ -456,7 +467,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         probabilities: np.ndarray,
         predictions: np.ndarray,
         index: pd.Index | None = None,
-        overwrite: bool = False,
         verbose: bool = False,
     ) -> tuple[str, str]:
         """Persist the per-seed probability and prediction matrices as Parquet.
@@ -473,6 +483,11 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         file compact. Existing files are skipped unless ``overwrite`` is
         ``True``.
 
+        Also caches the assembled DataFrames on ``self.probabilities`` /
+        ``self.predictions`` so downstream callers that already hold the
+        ensemble in memory (e.g. SHAP waterfall builders) can read the data
+        directly instead of re-loading the Parquet file.
+
         Args:
             output_dir (str): Directory where the Parquet files are written.
                 Created if it does not exist.
@@ -484,8 +499,6 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 DataFrames (typically the feature-matrix index used to compute
                 the matrices). When ``None``, a default ``RangeIndex`` is used.
                 Defaults to ``None``.
-            overwrite (bool, optional): If ``True``, overwrite existing files.
-                Defaults to ``False``.
             verbose (bool, optional): If ``True``, log the written paths.
                 Defaults to ``False``.
 
@@ -503,18 +516,58 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             output_dir, f"{self.classifier_name}_seed_predictions.parquet"
         )
 
-        if overwrite or not os.path.exists(probabilities_path):
-            pd.DataFrame(probabilities, index=index, columns=seed_columns).to_parquet(
-                probabilities_path
-            )
-            if verbose:
-                logger.info(f"Saved seed probabilities matrix: {probabilities_path}")
+        probabilities_df = pd.DataFrame(
+            probabilities, index=index, columns=seed_columns
+        )
+        predictions_df = pd.DataFrame(
+            predictions.astype(np.int8), index=index, columns=seed_columns
+        )
 
-        if overwrite or not os.path.exists(predictions_path):
-            pd.DataFrame(
-                predictions.astype(np.int8), index=index, columns=seed_columns
-            ).to_parquet(predictions_path)
-            if verbose:
-                logger.info(f"Saved seed predictions matrix: {predictions_path}")
+        self.probabilities = probabilities_df
+        self.predictions = predictions_df
+
+        # Save seed probabilities and predictions
+        probabilities_df.to_parquet(probabilities_path)
+        predictions_df.to_parquet(predictions_path)
+
+        if verbose:
+            logger.info(f"Saved seed probabilities matrix: {probabilities_path}")
+            logger.info(f"Saved seed predictions matrix: {predictions_path}")
 
         return probabilities_path, predictions_path
+
+    def _sk_visual_block_(self) -> _VisualBlock:
+        """Return a sklearn ``_VisualBlock`` describing the bundled seed models.
+
+        Picked up by :func:`sklearn.utils.estimator_html_repr` (and therefore by
+        ``BaseEstimator._repr_html_``) so that Jupyter renders the ensemble as
+        a single nested estimator. All seeds share the same classifier type
+        (only ``random_state`` differs), so a single representative model is
+        sufficient and avoids the unreadable explosion of 100–500 boxes that a
+        one-per-seed layout would produce.
+
+        Returns:
+            _VisualBlock: A ``"single"`` block whose nested estimator is the
+                first seed's fitted model. When the ensemble is empty, the
+                block wraps ``self`` instead so the rich display still renders.
+        """
+        if not self.seeds:
+            return _VisualBlock(
+                "single",
+                self,
+                names=self.classifier_name,
+                name_details="n_seeds=0",
+            )
+
+        representative = self.seeds[0]["model"]
+        first_random_state = self.seeds[0]["random_state"]
+        last_random_state = self.seeds[-1]["random_state"]
+        return _VisualBlock(
+            "single",
+            representative,
+            names=f"{self.classifier_name}",
+            name_details=(
+                f"n_seeds={len(self.seeds)}, "
+                f"random_states=[{first_random_state}...{last_random_state}]"
+            ),
+        )

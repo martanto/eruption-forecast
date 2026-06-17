@@ -5,6 +5,7 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils._repr_html.estimator import _VisualBlock
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import compute_model_probabilities
@@ -234,9 +235,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         for name, path in trained_model_paths.items():
             ensembles[name] = SeedEnsemble.from_any(path, classifier_name=name)
             if verbose:
-                logger.info(
-                    f"[ClassifierEnsemble] Loaded {name} from: {path}"
-                )
+                logger.info(f"[ClassifierEnsemble] Loaded {name} from: {path}")
         return cls.from_seed_ensembles(ensembles)
 
     @classmethod
@@ -463,3 +462,38 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             results[f"{classifier_name}_confidence"] = clf_result["confidence"]
 
         return results
+
+    def _sk_visual_block_(self) -> _VisualBlock:
+        """Return a sklearn ``_VisualBlock`` describing the bundled classifiers.
+
+        Picked up by :func:`sklearn.utils.estimator_html_repr` (and therefore by
+        ``BaseEstimator._repr_html_``) so that Jupyter renders the ensemble as
+        one labelled box per registered ``SeedEnsemble`` — mirroring how
+        :class:`~sklearn.ensemble.VotingClassifier` exposes its child
+        estimators.
+
+        When no classifiers are registered, returns a ``"single"`` block on
+        ``self`` so the rich display still renders gracefully.
+
+        Returns:
+            _VisualBlock: A ``"parallel"`` block whose child estimators are the
+                registered ``SeedEnsemble`` instances, or a ``"single"`` block
+                on ``self`` when the ensemble is empty.
+        """
+        if not self.ensembles:
+            return _VisualBlock(
+                "single",
+                self,
+                names="ClassifierEnsemble",
+                name_details="n_classifiers=0",
+            )
+
+        names = list(self.ensembles.keys())
+        estimators = list(self.ensembles.values())
+        name_details = [repr(seed_ensemble) for seed_ensemble in estimators]
+        return _VisualBlock(
+            "parallel",
+            estimators,
+            names=names,
+            name_details=name_details,
+        )

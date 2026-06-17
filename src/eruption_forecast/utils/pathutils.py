@@ -105,14 +105,17 @@ def save_figure(
 ) -> None:
     """Save a matplotlib figure to disk and always close it.
 
-    The file extension is determined by ``filetype`` and appended to
-    ``filepath``; do not include an extension in ``filepath``. The figure
-    is closed unconditionally after saving so it cannot be reused by
-    subsequent plot calls.
+    Accepts ``filepath`` either with or without a trailing extension. When
+    the filename already ends in ``.{filetype}`` it is used as-is; otherwise
+    the extension is appended. A directory in the path that contains a dot
+    (e.g. ``output/foo.png-debug/figure``) is not mistaken for an extension.
+    The figure is closed unconditionally after saving so it cannot be reused
+    by subsequent plot calls.
 
     Args:
         fig (plt.Figure): Figure to save and close.
-        filepath (str): Destination path WITHOUT a file extension.
+        filepath (str): Destination path, with or without the trailing
+            ``.{filetype}`` extension.
         dpi (int): Resolution in dots per inch.
         filetype (str): File extension without a leading dot. Defaults to
             ``"png"``.
@@ -122,7 +125,11 @@ def save_figure(
     Returns:
         None
     """
-    full_path = f"{filepath}.{filetype}"
+    existing_ext = os.path.splitext(filepath)[1].lstrip(".").lower()
+    full_path = (
+        filepath if existing_ext == filetype.lower() else f"{filepath}.{filetype}"
+    )
+
     ensure_dir(os.path.dirname(full_path))
 
     fig.savefig(

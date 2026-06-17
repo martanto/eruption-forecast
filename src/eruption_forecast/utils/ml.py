@@ -28,9 +28,19 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.config.constants import GPU_CLASSIFIERS
-from eruption_forecast.utils.date_utils import sort_dates
+from eruption_forecast.utils.date_utils import (
+    sort_dates,
+    to_datetime,
+    set_datetime_index,
+)
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
+from eruption_forecast.dataclass.classifier_ensemble_summary import (
+    SeedSummary,
+    EruptionWindow,
+    ProbabilityPick,
+    ClassifierEnsembleSummary,
+)
 
 
 def build_y_true(
@@ -650,14 +660,13 @@ def save_model_json(
     suffix = f"{classifier_id}_seeds-{seeds}_features-{number_of_features}"
     filename = f"{prefix_filename}__{suffix}.json"
 
+    ensure_dir(classifier_dir)
     json_path = os.path.join(classifier_dir, filename)
     with open(json_path, "w") as f:
         json.dump(records, f, indent=2)
 
     if verbose:
-        logger.info(
-            f"{classifier_model.name}: JSON trained model saved to {json_path}"
-        )
+        logger.info(f"{classifier_model.name}: JSON trained model saved to {json_path}")
 
     return json_path
 
@@ -772,3 +781,126 @@ def compute_seed(
         logger.info(f"Saved {classifier_name} metrics: {save_filepath}")
 
     return df, y_probas, y_preds
+
+
+def build_classifier_ensemble_summary(
+    seed_ensemble: SeedEnsemble,
+    labels: pd.Series | pd.DataFrame,
+    eruption_dates: list[str],
+) -> ClassifierEnsembleSummary:
+    """Walk every seed × eruption-window and assemble the per-classifier summary.
+
+    For each eruption date the day window ``[00:00, 23:59:59]`` is sliced from
+    the per-seed probability matrix cached on
+    :attr:`SeedEnsemble.probabilities`. Within that slice each seed contributes
+    one :class:`SeedSummary` (highest + lowest probability rows). The
+    across-windows extrema are tracked in a single pass and exposed on
+    :attr:`ClassifierEnsembleSummary.highest` / ``.lowest`` so callers do not
+    have to re-scan the structure to find the row to render.
+
+    Args:
+        seed_ensemble (SeedEnsemble): Fitted seed ensemble whose
+            :attr:`probabilities` attribute has been populated by a prior
+            ``predict_with_uncertainty`` / ``save_matrices`` call.
+        labels (pd.Series | pd.DataFrame): Datetime-indexed label container
+            from the upstream :class:`TrainingModel` / :class:`PredictionModel`
+            — used to attach a ``datetime`` column to the probability matrix
+            via :func:`set_datetime_index`.
+        eruption_dates (list[str]): Eruption dates in ``YYYY-MM-DD`` form.
+            Dates that do not intersect the prediction grid are skipped.
+
+    Returns:
+        ClassifierEnsembleSummary: Per-classifier summary.
+
+    Raises:
+        RuntimeError: If ``seed_ensemble.probabilities`` is ``None`` — the
+            ensemble has not run a prediction yet.
+    """
+    if seed_ensemble.probabilities is None:
+        raise RuntimeError(
+            f"{seed_ensemble.classifier_name}: SeedEnsemble has no cached "
+            f"probabilities. Run predict_with_uncertainty / forecast first."
+        )
+
+    df_probas = set_datetime_index(
+        datetime_map=labels.sort_index(),
+        df=seed_ensemble.probabilities,
+    ).reset_index()
+
+    summary = ClassifierEnsembleSummary(classifier_name=seed_ensemble.classifier_name)
+
+    for eruption_date in eruption_dates:
+        start_date = to_datetime(eruption_date).replace(hour=0, minute=0, second=0)
+        end_date = start_date.replace(hour=23, minute=59, second=59)
+        window = df_probas[
+            (df_probas["datetime"] >= start_date) & (df_probas["datetime"] <= end_date)
+        ]
+        if window.empty:
+            continue
+
+        seed_summaries: list[SeedSummary] = []
+        window_highest: ProbabilityPick | None = None
+        window_lowest: ProbabilityPick | None = None
+        for seed in seed_ensemble.seeds:
+            random_state = int(seed["random_state"])
+            column_name = f"seed_{random_state:05d}"
+
+            sorted_window = window.sort_values(column_name, ascending=False)
+            top_row = sorted_window.iloc[0]
+            bottom_row = sorted_window.iloc[-1]
+
+            seed_summary = SeedSummary(
+                random_state=random_state,
+                highest=ProbabilityPick(
+                    random_state=random_state,
+                    index=int(sorted_window.index[0]),
+                    datetime=top_row["datetime"],
+                    value=float(top_row[column_name]),
+                ),
+                lowest=ProbabilityPick(
+                    random_state=random_state,
+                    index=int(sorted_window.index[-1]),
+                    datetime=bottom_row["datetime"],
+                    value=float(bottom_row[column_name]),
+                ),
+            )
+            seed_summaries.append(seed_summary)
+
+            # Summarize per eruption date
+            if (
+                window_highest is None
+                or seed_summary.highest.value > window_highest.value
+            ):
+                window_highest = seed_summary.highest
+            if window_lowest is None or seed_summary.lowest.value < window_lowest.value:
+                window_lowest = seed_summary.lowest
+
+            # Summarize per classifier
+            if (
+                summary.highest is None
+                or seed_summary.highest.value > summary.highest.value
+            ):
+                summary.highest = seed_summary.highest
+            if (
+                summary.lowest is None
+                or seed_summary.lowest.value < summary.lowest.value
+            ):
+                summary.lowest = seed_summary.lowest
+
+        if window_highest is None or window_lowest is None:
+            raise RuntimeError(
+                f"{seed_ensemble.classifier_name}: window for {eruption_date} "
+                f"contributed no seed summaries — unreachable under the "
+                f"upstream ``window.empty`` guard."
+            )
+
+        summary.eruption_windows.append(
+            EruptionWindow(
+                eruption_date=eruption_date,
+                highest=window_highest,
+                lowest=window_lowest,
+                seeds=seed_summaries,
+            )
+        )
+
+    return summary

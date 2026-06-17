@@ -257,7 +257,6 @@ class TrainingModel(BaseModel, CacheModel):
                 classifier_dir, classifier_name, self.cv_name
             )
             model_dir = os.path.join(classifier_dirs[classifier_name], "models")
-            ensure_dir(classifier_dir)
             models_dir[classifier_name] = model_dir
             learning_curve_dirs[classifier_name] = os.path.join(
                 classifier_dirs[classifier_name], "learning_curves"
@@ -1248,6 +1247,7 @@ class TrainingModel(BaseModel, CacheModel):
         # ensemble filename.
         suffix = os.path.splitext(os.path.basename(registry_path))[0].split("__")[-1]
 
+        ensure_dir(output_dir)
         filepath = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
         seed_ensemble = SeedEnsemble.from_any(
             registry_path, classifier_name=classifier_name, verbose=verbose

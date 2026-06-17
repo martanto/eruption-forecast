@@ -1447,14 +1447,6 @@ def render_one_plot(
     Returns:
         str: Filepath stem (without extension) written by ``save_figure``.
     """
-    plot_function = PER_SEED_PLOT_DISPATCHER[plot_name]
-
-    if plot_name == "confusion_matrix":
-        y_pred = (y_proba >= 0.5).astype(int)
-        fig = plot_function(y_true=y_true, y_pred=y_pred)
-    else:
-        fig = plot_function(y_true=y_true, y_proba=y_proba)
-
     filepath = os.path.join(
         output_dir,
         classifier_name,
@@ -1467,6 +1459,14 @@ def render_one_plot(
         if verbose:
             logger.info(f"[Seed Plot/{plot_name}/{random_state:05d}] exists.")
         return filepath
+
+    plot_function = PER_SEED_PLOT_DISPATCHER[plot_name]
+
+    if plot_name == "confusion_matrix":
+        y_pred = (y_proba >= 0.5).astype(int)
+        fig = plot_function(y_true=y_true, y_pred=y_pred)
+    else:
+        fig = plot_function(y_true=y_true, y_proba=y_proba)
 
     save_figure(fig, filepath, dpi, verbose=verbose)
     return filepath
@@ -1519,11 +1519,6 @@ def render_one_aggregate_plot(
         str: Filepath stem (without extension). The PNG figure and the CSV
             data table share this stem.
     """
-    plot_function = AGGREGATE_PLOT_DISPATCHER[plot_name]
-    per_seed_list = [y_probas[:, idx] for idx in range(y_probas.shape[1])]
-
-    fig, data = plot_function(y_trues=y_true, y_probas=per_seed_list, dpi=dpi)
-
     filepath = os.path.join(
         output_dir,
         classifier_name,
@@ -1540,6 +1535,11 @@ def render_one_aggregate_plot(
         if verbose:
             logger.info(f"[Aggregate Plot/{plot_name}] exists.")
         return filepath
+
+    plot_function = AGGREGATE_PLOT_DISPATCHER[plot_name]
+    per_seed_list = [y_probas[:, idx] for idx in range(y_probas.shape[1])]
+
+    fig, data = plot_function(y_trues=y_true, y_probas=per_seed_list, dpi=dpi)
 
     save_figure(fig, filepath, dpi, verbose=verbose)
     data.to_csv(f"{filepath}.csv", index=False)

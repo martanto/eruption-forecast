@@ -21,7 +21,9 @@ src/eruption_forecast/
 │   └── training_config.py     - TrainingConfig (standalone TrainingModel)
 │
 ├── dataclass/
-│   └── station_data.py        - StationData (immutable nslc identity)
+│   ├── station_data.py                 - StationData (immutable nslc identity)
+│   ├── classifier_ensemble_summary.py  - ClassifierEnsembleSummary, EruptionWindow, ProbabilityPick
+│   └── classifier_explanation.py       - SeedExplanation, ClassifierExplanation (SHAP payloads)
 │
 ├── decorators/
 │   ├── decorator_class.py     - base decorator scaffolding
@@ -31,13 +33,14 @@ src/eruption_forecast/
 │   ├── base_ensemble.py       - BaseEnsemble (joblib save/load mixin)
 │   ├── seed_ensemble.py       - SeedEnsemble (one classifier × N seeds)
 │   ├── classifier_ensemble.py - ClassifierEnsemble (N classifiers)
-│   └── metrics_ensemble.py    - MetricsEnsemble (metrics engine)
+│   ├── metrics_ensemble.py    - MetricsEnsemble (metrics engine)
+│   └── explainer_ensemble.py  - ExplainerEnsemble (per-seed SHAP engine)
 │
 ├── features/
 │   ├── constants.py
 │   ├── tremor_matrix_builder.py - TremorMatrixBuilder (windowed alignment)
 │   ├── features_builder.py      - FeaturesBuilder (tsfresh extraction)
-│   └── feature_selector.py      - FeatureSelector (tsfresh FDR + RF importance)
+│   └── feature_selector.py      - FeatureSelector (tsfresh FDR or RF importance)
 │
 ├── label/
 │   ├── constants.py
@@ -54,6 +57,7 @@ src/eruption_forecast/
 │   ├── training_model.py        - TrainingModel(BaseModel, CacheModel)
 │   ├── prediction_model.py      - PredictionModel(BaseModel, CacheModel)
 │   ├── evaluation_model.py      - EvaluationModel(BaseModel)
+│   ├── explanation_model.py     - ExplanationModel(BaseModel, CacheModel)
 │   ├── classifier_model.py      - ClassifierModel (estimator + grid)
 │   └── classifier_comparator.py - ClassifierComparator (cross-classifier rank)
 │
@@ -62,7 +66,8 @@ src/eruption_forecast/
 │   ├── tremor_plots.py          - plot_tremor
 │   ├── feature_plots.py         - feature-importance plots
 │   ├── forecast_plots.py        - plot_forecast, plot_forecast_from_file
-│   └── evaluation_plots.py      - ROC, PR, confusion, threshold, importance
+│   ├── evaluation_plots.py      - ROC, PR, confusion, threshold, importance
+│   └── explanation_plots.py     - SHAP waterfall / beeswarm / bar / aggregate
 │
 ├── sources/
 │   ├── base.py                  - SeismicDataSource ABC
@@ -80,7 +85,7 @@ src/eruption_forecast/
     ├── validation.py, window.py
 ```
 
-64 `.py` files in total.
+70 `.py` files in total.
 
 ---
 
@@ -96,7 +101,7 @@ src/eruption_forecast/
        ┌─────────────────────────── feature pipeline ──────────┴─────┐
        │   LabelBuilder            TremorMatrixBuilder               │
        │   DynamicLabelBuilder ──► FeaturesBuilder (tsfresh)         │
-       │                           FeatureSelector (FDR+RF)          │
+       │                           FeatureSelector (FDR or RF)       │
        └────────────────────────────┬────────────────────────────────┘
                                     ▼
                        ┌────────────────────────┐
@@ -123,20 +128,31 @@ src/eruption_forecast/
              ┌───────────────────────────────────┴──────────────────┐
              ▼                                                      ▼
    ┌──────────────────────┐                          ┌────────────────────────┐
-   │   EvaluationModel    │                          │  result_all_model_     │
-   │  dispatch on .kind:  │                          │  predictions_*.csv +   │
-   │  training | predict  │  ── MetricsEnsemble ──►  │  forecast PNG/PDF      │
+   │   EvaluationModel    │                          │  forecast-results_     │
+   │  dispatch on .kind:  │                          │  *.csv + forecast      │
+   │  training | predict  │  ── MetricsEnsemble ──►  │  PNG/PDF               │
    └──────────┬───────────┘                          └────────────────────────┘
-              │ writes per-seed JSON + aggregate CSVs
+              │ writes (n_samples, n_seeds) y_proba / y_pred matrices
               ▼
    ┌──────────────────────┐
    │ ClassifierComparator │   ranking_*.csv + comparison figures
    └──────────────────────┘
+
+   ┌────────────────────────────────────────────────────────────────┐
+   │    ExplanationModel  (BaseModel + CacheModel)                  │
+   │    dispatch on upstream model.kind: training | prediction      │
+   │                                                                │
+   │    ExplainerEnsemble                                           │
+   │      ─ per-seed shap.TreeExplainer (RF / lite-rf / GB / XGB)   │
+   │      ─ ClassifierExplanation.pkl per classifier                │
+   │      ─ per-seed bar + beeswarm under classifiers/{Clf}/figures │
+   │      ─ per-eruption waterfall under eruptions/{date}/          │
+   └────────────────────────────────────────────────────────────────┘
 ```
 
 `ForecastModel` is the orchestrator that calls every box in sequence. 
 The dashed arrows are also the **method-chain order**: 
-`fm.calculate(...).train(...).predict(...).evaluate(...)`.
+`fm.calculate(...).train(...).predict(...).evaluate(...).explain(...)`.
 
 ---
 
@@ -214,8 +230,9 @@ directly out of the label filename so a CSV alone is enough to rehydrate the bui
                              ▼
         ┌────────────────────────────────────────┐
         │           FeatureSelector              │
-        │  1. tsfresh FDR filter                 │
-        │  2. RandomForest importance            │
+        │  method="tsfresh": FDR p-value filter  │
+        │  method="random_forest": permutation   │
+        │                          importance    │
         │  → top-N feature names per seed        │
         └────────────────────────────────────────┘
 ```
@@ -234,10 +251,11 @@ The model layer follows a **mixin** pattern:
 - **`TrainingModel(BaseModel, CacheModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, writes a per-classifier trained-model JSON registry via `save_model_json`, then bundles every seed into a `SeedEnsemble` (`build_seed_ensemble` → `SeedEnsemble.from_any`) and every classifier into a `ClassifierEnsemble` (`build_classifier_ensemble`).
 - **`PredictionModel(BaseModel, CacheModel)`** - `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash`, so re-training automatically invalidates downstream forecasts.
 - **`EvaluationModel(BaseModel)`** - no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
-- **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the three stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
+- **`ExplanationModel(BaseModel, CacheModel)`** - per-seed SHAP explanations over a fitted `ClassifierEnsemble`. Reuses the upstream `TrainingModel` or `PredictionModel` and dispatches on `model.kind`. Restricted to tree classifiers (RF / lite-rf / GB / XGB); non-tree classifiers are skipped at the `ExplainerEnsemble` loop with a warning. Output is namespaced under `explanation/{kind}/`.
+- **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the four stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
 
 `ClassifierModel` is the per-classifier descriptor (sklearn estimator + hyperparameter grid + slug). 
-`ClassifierComparator` consumes the metric JSON tree written by `EvaluationModel` to rank classifiers head-to-head.
+`ClassifierComparator` consumes the in-memory `MetricsEnsemble` cached on `EvaluationModel` to rank classifiers head-to-head.
 
 ### 3.5 Ensemble (`ensemble/`)
 
@@ -254,11 +272,17 @@ N fitted seeds     1 SeedEnsemble each
 
            MetricsEnsemble  (standalone - not a BaseEnsemble subclass)
            wraps ClassifierEnsemble + features + y_true
-           writes per-seed metrics JSON and y_proba / y_pred matrices
+           writes only (n_samples, n_seeds) y_proba / y_pred CSV matrices
+           metrics / y_probas / y_preds stay in memory
+
+           ExplainerEnsemble  (standalone - not a BaseEnsemble subclass)
+           wraps ClassifierEnsemble + features
+           writes per-classifier ClassifierExplanation.pkl
+           + per-seed shap_values/{seed:05d}.pkl
+           + per-seed bar / beeswarm + per-eruption waterfall plots
 ```
 
-`MetricsEnsemble` is deliberately not exported from `ensemble/__init__.py` and is imported via `eruption_forecast.ensemble.metrics_ensemble` 
-to break a `MetricsEnsemble → MetricsComputer → utils.ml → SeedEnsemble` cycle.
+`MetricsEnsemble` and `ExplainerEnsemble` are both deliberately kept out of `ensemble/__init__.py` and imported via their full module paths (`eruption_forecast.ensemble.metrics_ensemble`, `eruption_forecast.ensemble.explainer_ensemble`) to keep the subpackage free of import cycles back through `utils.ml` and `plots/`.
 
 ### 3.6 Sources (`sources/`)
 
@@ -274,7 +298,7 @@ Each plot module is a thin functional wrapper around `matplotlib` (and `seaborn`
 
 ### 3.8 Config (`config/`)
 
-`ForecastConfig` is the round-trip record for `ForecastModel`. Its five sub-configs match the stage method signatures one-for-one:
+`ForecastConfig` is the round-trip record for `ForecastModel`. Its six sub-configs match the stage method signatures one-for-one:
 
 ```
 ForecastConfig
@@ -282,7 +306,8 @@ ForecastConfig
 ├── calculate: ForecastCalculateConfig | None
 ├── train:     ForecastTrainConfig     | None
 ├── predict:   ForecastPredictConfig   | None
-└── evaluate:  ForecastEvaluateConfig  | None
+├── evaluate:  ForecastEvaluateConfig  | None
+└── explain:   ForecastExplainConfig   | None
 ```
 
 `TrainingConfig` mirrors `TrainingModel.__init__` directly and is the standalone equivalent used when `TrainingModel` runs outside `ForecastModel`.
@@ -310,35 +335,35 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
                             │ • save() / load()       │
                             └────────────┬────────────┘
                                          │ inherits
-            ┌────────────────────────────┼────────────────────────────┐
-            ▼                            ▼                            ▼
-  ┌───────────────────┐       ┌────────────────────┐      ┌────────────────────┐
-  │  TrainingModel    │       │  PredictionModel   │      │  EvaluationModel   │
-  │ + CacheModel mix  │       │ + CacheModel mix   │      │ (BaseModel only)   │
-  │                   │       │                    │      │                    │
-  │ build_label →     │       │ build_label →      │      │ dispatch on        │
-  │ extract_features →│       │ extract_features → │      │ model.kind:        │
-  │ fit (N seeds)     │       │ forecast           │      │   training/        │
-  └────────┬──────────┘       └─────────┬──────────┘      │   prediction       │
-           │                            │                 │ evaluate / compare │
-           │ produces                   │ consumes        └──────────┬─────────┘
-           ▼                            │                            │ uses
-  ┌────────────────────────┐            │                            ▼
-  │  ClassifierEnsemble    │ ◄──────────┘             ┌────────────────────────┐
-  │ ───────────────────    │                          │   MetricsEnsemble      │
-  │  • from_any            │                          │ • per-seed metrics     │
-  │  • from_json           │                          │ • y_proba / y_pred CSV │
-  │  • from_seed_ensembles │                          └───────────┬────────────┘
-  └──────────┬─────────────┘                                      │ aggregates
-             │ bundles                                            ▼
-             ▼                                        ┌────────────────────────┐
-  ┌────────────────────────┐                          │ ClassifierComparator   │
-  │   SeedEnsemble × M     │                          │ • get_ranking()        │
-  │ ─────────────────────  │                          │ • plot_all()           │
-  │ • predict_proba        │                          └────────────────────────┘
-  │ • predict_with_        │
-  │   uncertainty          │
-  └──────────┬─────────────┘
+            ┌────────────────┬───────────┼───────────────┬────────────────┐
+            ▼                ▼           ▼               ▼                ▼
+  ┌───────────────┐ ┌───────────────┐ ┌──────────────┐ ┌───────────────────┐
+  │ TrainingModel │ │PredictionModel│ │EvaluationMdl │ │ ExplanationModel  │
+  │ + CacheModel  │ │ + CacheModel  │ │(BaseModel)   │ │ + CacheModel      │
+  │               │ │               │ │              │ │                   │
+  │ build_label → │ │ build_label → │ │ dispatch on  │ │ explain →         │
+  │ extract_feat →│ │ extract_feat →│ │ model.kind   │ │   ExplainerEns.   │
+  │ fit (N seeds) │ │ forecast      │ │ evaluate/    │ │ plot →            │
+  │               │ │               │ │ compare      │ │   per-seed +      │
+  │               │ │               │ │              │ │   waterfall       │
+  └────────┬──────┘ └────────┬──────┘ └──────┬───────┘ └────────┬──────────┘
+           │ produces        │ consumes      │ uses             │ reuses
+           ▼                 │               ▼                  │
+  ┌────────────────────────┐ │  ┌────────────────────────┐      │
+  │  ClassifierEnsemble    │◄┘  │   MetricsEnsemble      │      │
+  │ ───────────────────    │    │ • (n_samples × n_seeds)│      │
+  │  • from_any / from_json│    │   y_proba / y_pred CSV │      │
+  │  • from_seed_ensembles │    │ • metrics in memory    │      │
+  └──────────┬─────────────┘    └───────────┬────────────┘      │
+             │ bundles                      │ aggregates        │
+             ▼                              ▼                   ▼
+  ┌────────────────────────┐    ┌────────────────────────┐ ┌──────────────────┐
+  │   SeedEnsemble × M     │    │ ClassifierComparator   │ │ ExplainerEnsemble│
+  │ ─────────────────────  │    │ • get_ranking()        │ │ • TreeExplainer  │
+  │ • predict_proba        │    │ • plot_all()           │ │   per seed       │
+  │ • predict_with_        │    └────────────────────────┘ │ • ClassifierExpln│
+  │   uncertainty          │                               │   per classifier │
+  └──────────┬─────────────┘                               └──────────────────┘
              │ inherits
              ▼
  ┌─────────────────────────┐
@@ -357,9 +382,11 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
 | `TrainingModel`        | One date span              | `BaseModel + CacheModel`     | ✓ |
 | `PredictionModel`      | One forecast window grid   | `BaseModel + CacheModel`     | ✓ |
 | `EvaluationModel`      | One trained model          | `BaseModel`                  | ✗ |
+| `ExplanationModel`     | One trained ensemble       | `BaseModel + CacheModel`     | ✓ |
 | `SeedEnsemble`         | 1 classifier × N seeds     | `BaseEnsemble`               | ✗ |
 | `ClassifierEnsemble`   | M classifiers × N seeds    | `BaseEnsemble`               | ✗ |
 | `MetricsEnsemble`      | 1 ensemble × 1 dataset     | standalone                   | ✗ |
+| `ExplainerEnsemble`    | 1 ensemble × 1 dataset     | standalone                   | ✗ |
 | `ClassifierComparator` | M classifiers, post-eval   | standalone                   | ✗ |
 | `ForecastModel`        | Full pipeline              | standalone orchestrator      | via stages |
 
@@ -378,9 +405,11 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
 | Feature selection  | `FeatureSelector`          | Features + labels              | `training/features/{cv}/seed/{seed:05d}.csv` + `top_N_features.csv`                          |
 | Training fit       | `TrainingModel`            | Selected features + labels     | `training/classifiers/{clf}/{cv}/models/*.pkl` + `SeedEnsemble_*.pkl` + `ClassifierEnsemble_*.{pkl,json}` |
 | Prediction grid    | `PredictionModel`          | Tremor CSV + window grid       | `prediction/features/features-{matrix,label}_*.csv`                                          |
-| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{clf}/{seed:05d}.csv` + `result_all_model_predictions_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
-| Evaluation         | `EvaluationModel.evaluate` | y_proba + y_true               | `evaluation/{kind}/classifiers/{Clf}/metrics/json/{seed:05d}.json` + `predictions/{y_proba,y_pred,y_true}.csv` + `metrics_summary_*.csv` + `figures/*.png` |
-| Compare            | `ClassifierComparator`     | Metrics JSON tree              | `evaluation/{kind}/comparison/metrics/ranking_*.csv` + `comparison/figures/*.png`            |
+| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{clf}/{seed:05d}.csv` + `forecast-results_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
+| Evaluation         | `EvaluationModel.evaluate` | y_proba + y_true               | `evaluation/{kind}/classifiers/{Clf}/predictions/{y_proba,y_pred}.csv` + `figures/aggregate/{plot}.{png,csv}` + (when `plot_per_seed=True`) `figures/{plot}/{seed:05d}.png` |
+| Compare            | `ClassifierComparator`     | Cached `MetricsEnsemble`       | `evaluation/{kind}/comparison/metrics/ranking_*.csv` + `comparison/figures/*.png`            |
+| Explanation        | `ExplanationModel.explain` | `ClassifierEnsemble` + features| `explanation/{kind}/classifiers/{Clf}/ClassifierExplanation_*.pkl` + `shap_values/{seed:05d}.pkl` + `figures/{bar,beeswarm}/{seed:05d}.png` |
+| Waterfalls         | `ExplainerEnsemble.plot_waterfall` | `ClassifierExplanation` + eruption dates | `explanation/{kind}/eruptions/{date}/{Clf}_{datetime}_seed=_index=.png` |
 
 ### 5.2 On-disk artefact graph
 
@@ -411,32 +440,46 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
     │   features/{features-matrix,features-label}_*.csv             │
     │   results/{clf}/{seed:05d}.csv                                │
     │   figures/forecast_*.{png,pdf}                                │
-    │ result_all_model_predictions_*.csv  (top-level dump)          │
+    │ forecast-results_*.csv  (top-level dump)          │
     └─────────┬─────────────────────────────────────────────────────┘
               │ ClassifierEnsemble + features + y_true (rebuilt or training-derived)
               ▼
     ┌───────────────────────────────────────────────────────────────┐
     │ evaluation/{training|prediction}/                             │
     │   classifiers/{Clf}/                                          │
-    │     predictions/{y_proba,y_pred,y_true}.csv                   │
-    │     metrics/json/{seed:05d}.json                              │
-    │     metrics_summary_*.csv  + all_metrics_*.csv                │
-    │     figures/*.png                                             │
+    │     predictions/{y_proba,y_pred}.csv   (n_samples × n_seeds)  │
+    │     figures/aggregate/{plot_name}.{png,csv}                   │
+    │     figures/{plot_name}/{seed:05d}.png   (plot_per_seed=True) │
+    │   labels/y_true.csv                    (prediction reuse only)│
+    │   MetricsEnsemble.pkl                  (optional, via save()) │
     │   comparison/                                                 │
     │     metrics/ranking_*.csv                                     │
     │     figures/*.png                                             │
+    └─────────┬─────────────────────────────────────────────────────┘
+              │ ClassifierEnsemble + features
+              ▼
+    ┌───────────────────────────────────────────────────────────────┐
+    │ explanation/{training|prediction}/                            │
+    │   classifiers/{Clf}/                                          │
+    │     ClassifierExplanation_{Clf}.pkl                           │
+    │     shap_values/{seed:05d}.pkl                                │
+    │     figures/{bar,beeswarm}/{seed:05d}.png                     │
+    │   eruptions/{YYYY-MM-DD}/                                     │
+    │     {Clf}_{datetime}_seed=_index=.png                         │
     └───────────────────────────────────────────────────────────────┘
 
            ┌─────────────────────────────────────────────────────┐
            │  cache/                                             │
            │    TrainingModel/{hash}.pkl + {hash}.params.json    │  ← CacheModel
            │    PredictionModel/{hash}.pkl + {hash}.params.json  │
+           │    ExplanationModel/{hash}.pkl + {hash}.params.json │
            └─────────────────────────────────────────────────────┘
 ```
 
 A cache hit on `TrainingModel` short-circuits everything in the `training/` box; 
-a cache hit on `PredictionModel` short-circuits the `prediction/` box. 
-Evaluation is **never cached** - the metric JSONs themselves act as the cache via the `overwrite` flag.
+a cache hit on `PredictionModel` short-circuits the `prediction/` box; 
+a cache hit on `ExplanationModel` short-circuits the per-classifier SHAP pass. 
+Evaluation is **never cached** - the on-disk matrices act as the cache and `MetricsEnsemble.compute()` is idempotent in memory once `y_probas` is populated.
 
 ---
 

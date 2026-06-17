@@ -87,9 +87,9 @@ def shorten_feature_name(name: str) -> str:
 
     Examples:
         >>> shorten_feature_name('dsar_f3-f4__fft_coefficient__attr_"abs"__coeff_91')
-        'dsar_f3-f4 · fft_coef(abs, 91)'
+        'dsar_f3-f4 | fft_coef(abs, 91)'
         >>> shorten_feature_name("entropy__variance")
-        'entropy · variance'
+        'entropy | variance'
     """
     calc_abbrev: dict[str, str] = {
         "fft_coefficient": "fft_coef",

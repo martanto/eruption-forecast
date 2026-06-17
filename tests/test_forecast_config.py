@@ -28,11 +28,12 @@ from dataclasses import fields
 
 import pytest
 
-from eruption_forecast.model.forecast import ForecastModel
+from eruption_forecast.model.forecast_model import ForecastModel
 from eruption_forecast.config.forecast_config import (
     ForecastConfig,
     BaseForecastConfig,
     ForecastTrainConfig,
+    ForecastExplainConfig,
     ForecastPredictConfig,
     ForecastEvaluateConfig,
     ForecastCalculateConfig,
@@ -94,6 +95,15 @@ def _full_forecast_config() -> ForecastConfig:
         evaluate=ForecastEvaluateConfig(
             model="prediction",
             eruption_dates=["2025-03-20"],
+        ),
+        explain=ForecastExplainConfig(
+            model="prediction",
+            eruption_dates=["2025-03-20"],
+            save_per_seed=True,
+            plot_per_seed=False,
+            max_display=15,
+            check_additivity=True,
+            overwrite_classifier_explanation=True,
         ),
     )
 
@@ -369,6 +379,62 @@ class TestForecastEvaluateConfig:
 
 
 # ---------------------------------------------------------------------------
+# ForecastExplainConfig
+# ---------------------------------------------------------------------------
+
+
+class TestForecastExplainConfig:
+    """Tests for ``ForecastExplainConfig`` dataclass."""
+
+    def test_defaults(self) -> None:
+        """``ForecastExplainConfig`` has the expected default values."""
+        cfg = ForecastExplainConfig()
+        assert cfg.model == "prediction"
+        assert cfg.eruption_dates is None
+        assert cfg.save_per_seed is True
+        assert cfg.plot_per_seed is True
+        assert cfg.figsize is None
+        assert cfg.max_display == 20
+        assert cfg.group_remaining_features is False
+        assert cfg.dpi == 150
+        assert cfg.check_additivity is False
+        assert cfg.overwrite_classifier_explanation is False
+        assert cfg.output_dir is None
+        assert cfg.overwrite is None
+        assert cfg.n_jobs is None
+        assert cfg.verbose is None
+
+    def test_to_dict_from_dict_round_trip(self) -> None:
+        """All fields survive a ``to_dict()`` / ``from_dict()`` round-trip."""
+        cfg = ForecastExplainConfig(
+            model="training",
+            eruption_dates=["2025-03-20"],
+            save_per_seed=False,
+            plot_per_seed=False,
+            max_display=15,
+            group_remaining_features=True,
+            dpi=200,
+            check_additivity=True,
+            overwrite_classifier_explanation=True,
+        )
+        restored = ForecastExplainConfig.from_dict(cfg.to_dict())
+        assert restored.model == "training"
+        assert restored.eruption_dates == ["2025-03-20"]
+        assert restored.save_per_seed is False
+        assert restored.plot_per_seed is False
+        assert restored.max_display == 15
+        assert restored.group_remaining_features is True
+        assert restored.dpi == 200
+        assert restored.check_additivity is True
+        assert restored.overwrite_classifier_explanation is True
+
+    def test_from_dict_ignores_unknown_keys(self) -> None:
+        """Unknown keys do not raise."""
+        cfg = ForecastExplainConfig.from_dict({"model": "training", "extra": True})
+        assert cfg.model == "training"
+
+
+# ---------------------------------------------------------------------------
 # ForecastConfig — to_dict
 # ---------------------------------------------------------------------------
 
@@ -387,13 +453,21 @@ class TestForecastConfigToDict:
         assert "train" not in d
         assert "predict" not in d
         assert "evaluate" not in d
+        assert "explain" not in d
 
     def test_all_sections_present_when_set(self) -> None:
         """``to_dict()`` includes every section when all are set."""
         config = _full_forecast_config()
         d = config.to_dict()
-        for key in ("model", "calculate", "train", "predict", "evaluate"):
+        for key in ("model", "calculate", "train", "predict", "evaluate", "explain"):
             assert key in d
+
+    def test_explain_section_included_only_when_populated(self) -> None:
+        """``to_dict()`` includes ``explain`` when set and omits it otherwise."""
+        config = ForecastConfig(model=BaseForecastConfig(station="OJN"))
+        assert "explain" not in config.to_dict()
+        config.explain = ForecastExplainConfig(max_display=15)
+        assert config.to_dict()["explain"]["max_display"] == 15
 
     def test_nested_values_correct(self) -> None:
         """Nested section values are serialised correctly."""
@@ -406,6 +480,10 @@ class TestForecastConfigToDict:
         assert d["train"]["classifiers"] == ["xgb"]
         assert d["predict"]["window_step"] == 12
         assert d["evaluate"]["model"] == "prediction"
+        assert d["explain"]["model"] == "prediction"
+        assert d["explain"]["eruption_dates"] == ["2025-03-20"]
+        assert d["explain"]["max_display"] == 15
+        assert d["explain"]["check_additivity"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -459,6 +537,12 @@ class TestForecastConfigYaml:
         assert loaded.evaluate is not None
         assert loaded.evaluate.model == "prediction"
         assert loaded.evaluate.eruption_dates == ["2025-03-20"]
+        assert loaded.explain is not None
+        assert loaded.explain.model == "prediction"
+        assert loaded.explain.eruption_dates == ["2025-03-20"]
+        assert loaded.explain.max_display == 15
+        assert loaded.explain.check_additivity is True
+        assert loaded.explain.overwrite_classifier_explanation is True
 
     def test_load_partial_config(self) -> None:
         """Loading a config with only model + train sections works."""

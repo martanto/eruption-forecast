@@ -311,6 +311,70 @@ class ForecastEvaluateConfig(BaseConfig):
 
 
 @dataclass
+class ForecastExplainConfig(BaseConfig):
+    """Configuration for ``ForecastModel.explain()`` parameters.
+
+    Captures every argument accepted by ``explain()`` so the SHAP
+    explanation stage can be replayed identically through ``from_config()``
+    + ``run()``.
+
+    Attributes:
+        model (Literal["training", "prediction"]): Which model in the
+            current pipeline to explain. Defaults to ``"prediction"``.
+        eruption_dates (list[str] | None): Ground-truth eruption dates in
+            ``"YYYY-MM-DD"`` format. Required for prediction-mode
+            explanation when the upstream ``PredictionModel`` does not
+            carry them. ``None`` falls back to the dates captured during
+            ``train()``. Defaults to ``None``.
+        save_per_seed (bool): Persist each per-seed ``shap.Explanation``
+            to disk so a subsequent run can short-circuit recomputation.
+            Defaults to ``True``.
+        plot_per_seed (bool): Render per-seed bar and beeswarm plots.
+            Defaults to ``True``.
+        figsize (tuple[float, float] | None): Figure size in inches for
+            SHAP plots. ``None`` auto-sizes from ``max_display``. Defaults
+            to ``None``.
+        max_display (int): Maximum number of features to display in SHAP
+            plots. Defaults to ``20``.
+        group_remaining_features (bool): Forwarded to
+            ``shap.plots.beeswarm`` to group features beyond
+            ``max_display``. Defaults to ``False``.
+        dpi (int): Figure resolution in dots per inch. Defaults to ``150``.
+        check_additivity (bool): Forwarded to ``shap.TreeExplainer`` to
+            verify SHAP additivity against the model output. Defaults to
+            ``False``.
+        overwrite_classifier_explanation (bool): Overwrite the cached
+            per-classifier ``ClassifierExplanation.pkl`` artefact. Falls
+            back to ``overwrite`` when ``False``. Defaults to ``False``.
+        output_dir (str | None): Override for the explanation output
+            directory. ``None`` uses ``ForecastModel.station_dir``.
+            Defaults to ``None``.
+        overwrite (bool | None): Overwrite existing files. ``None``
+            inherits from ``ForecastModel.overwrite``. Defaults to
+            ``None``.
+        n_jobs (int | None): Parallel workers. ``None`` inherits from
+            ``ForecastModel.n_jobs``. Defaults to ``None``.
+        verbose (bool | None): Enable verbose logging. ``None`` inherits
+            from ``ForecastModel.verbose``. Defaults to ``None``.
+    """
+
+    model: Literal["training", "prediction"] = "prediction"
+    eruption_dates: list[str] | None = None
+    save_per_seed: bool = True
+    plot_per_seed: bool = True
+    figsize: tuple[float, float] | None = None
+    max_display: int = 20
+    group_remaining_features: bool = False
+    dpi: int = 150
+    check_additivity: bool = False
+    overwrite_classifier_explanation: bool = False
+    output_dir: str | None = None
+    overwrite: bool | None = None
+    n_jobs: int | None = None
+    verbose: bool | None = None
+
+
+@dataclass
 class ForecastConfig(BaseConfig):
     """Full ``ForecastModel`` configuration container.
 
@@ -327,6 +391,7 @@ class ForecastConfig(BaseConfig):
         train (ForecastTrainConfig | None): Training parameters.
         predict (ForecastPredictConfig | None): Prediction parameters.
         evaluate (ForecastEvaluateConfig | None): Evaluation parameters.
+        explain (ForecastExplainConfig | None): SHAP explanation parameters.
     """
 
     version: str = "1.0"
@@ -338,6 +403,7 @@ class ForecastConfig(BaseConfig):
     train: ForecastTrainConfig | None = None
     predict: ForecastPredictConfig | None = None
     evaluate: ForecastEvaluateConfig | None = None
+    explain: ForecastExplainConfig | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the full config to a nested plain dictionary.
@@ -354,7 +420,7 @@ class ForecastConfig(BaseConfig):
             "saved_at": self.saved_at,
             "model": self.model.to_dict(),
         }
-        for section_name in ("calculate", "train", "predict", "evaluate"):
+        for section_name in ("calculate", "train", "predict", "evaluate", "explain"):
             section = getattr(self, section_name)
             if section is not None:
                 data[section_name] = section.to_dict()
@@ -430,6 +496,7 @@ class ForecastConfig(BaseConfig):
             "train": ForecastTrainConfig,
             "predict": ForecastPredictConfig,
             "evaluate": ForecastEvaluateConfig,
+            "explain": ForecastExplainConfig,
         }
         for section_name, section_cls in section_map.items():
             if section_name in data:

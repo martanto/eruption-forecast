@@ -49,29 +49,48 @@ Every pipeline run writes under a single station directory:
 ├── evaluation/                                               # EvaluationModel
 │   ├── training/                                             # When model.kind == "training"
 │   │   ├── classifiers/{ClassifierName}/
-│   │   │   ├── predictions/{y_proba,y_pred,y_true}.csv
-│   │   │   ├── metrics/json/{seed:05d}.json
-│   │   │   ├── metrics_summary_{start}_{end}.csv
-│   │   │   ├── all_metrics_{start}_{end}.csv
-│   │   │   └── figures/                                      # plot_aggregate=True
-│   │   └── comparison/                                       # em.compare()
-│   │       ├── metrics/ranking_*.csv
-│   │       └── figures/
+│   │   │   ├── predictions/
+│   │   │   │   ├── y_proba.csv                               # (n_samples, n_seeds) matrix
+│   │   │   │   └── y_pred.csv                                # (n_samples, n_seeds) matrix
+│   │   │   └── figures/
+│   │   │       ├── aggregate/{plot_name}.{png,csv}           # plot_aggregate=True
+│   │   │       └── {plot_name}/{seed:05d}.png                # plot_per_seed=True
+│   │   ├── comparison/                                       # em.compare()
+│   │   │   ├── metrics/ranking_*.csv
+│   │   │   └── figures/
+│   │   └── MetricsEnsemble.pkl                               # Optional, via me.save()
 │   └── prediction/                                           # When model.kind == "prediction"
+│       ├── labels/y_true.csv                                 # Built by EvaluationModel.build_label()
+│       └── classifiers/{ClassifierName}/…                    # Same shape as training/
+│
+├── explanation/                                              # ExplanationModel
+│   ├── training/                                             # When upstream model.kind == "training"
+│   │   ├── classifiers/{ClassifierName}/
+│   │   │   ├── ClassifierExplanation_{ClassifierName}.pkl    # Bundled SHAP payload
+│   │   │   ├── shap_values/{seed:05d}.pkl                    # Per-seed shap.Explanation (save_per_seed=True)
+│   │   │   └── figures/
+│   │   │       ├── bar/{seed:05d}.png                        # plot_per_seed=True
+│   │   │       └── beeswarm/{seed:05d}.png                   # plot_per_seed=True
+│   │   └── eruptions/{YYYY-MM-DD}/                           # Per-eruption waterfall sibling
+│   │       └── {ClassifierName}_{datetime}_seed={i}_index={j}.png
+│   └── prediction/                                           # When upstream model.kind == "prediction"
 │       └── (identical sub-tree)
 │
 ├── cache/                                                    # CacheModel
 │   ├── TrainingModel/{hash}.pkl                              # Cached fitted TrainingModel
 │   ├── TrainingModel/{hash}.params.json                      # Sidecar identity dump
 │   ├── PredictionModel/{hash}.pkl                            # Cached PredictionModel
-│   └── PredictionModel/{hash}.params.json
+│   ├── PredictionModel/{hash}.params.json
+│   ├── ExplanationModel/{hash}.pkl                           # Cached ExplanationModel
+│   └── ExplanationModel/{hash}.params.json
 │
 ├── forecast.config.yaml                                      # fm.save_config()
 ├── training.config.yaml                                      # tm.save_config()  (standalone)
-├── result_all_model_predictions_{basename}.csv               # PredictionModel.forecast() top-level dump
+├── forecast-results_{basename}.csv               # PredictionModel.forecast() top-level dump
 ├── TrainingModel_{basename}.pkl                              # Optional, via fm.TrainingModel.save()
 ├── PredictionModel_{basename}.pkl                            # Optional, via fm.PredictionModel.save()
-└── EvaluationModel_{basename}.pkl                            # Optional, via fm.EvaluationModel.save()
+├── EvaluationModel_{basename}.pkl                            # Optional, via fm.EvaluationModel.save()
+└── ExplanationModel_{basename}.pkl                           # Optional, via fm.ExplanationModel.save()
 ```
 
 Where `basename` is typically `{start_date}_{end_date}` (training) or `{start_date}_{end_date}_ws-{window_size}` (prediction).
@@ -103,7 +122,7 @@ Folder slugs come from `ClassifierModel.slug_name` and `ClassifierModel.slug_cv_
 | `shuffle-stratified` | `stratified-shuffle-split` |
 | `timeseries` *(direct `ClassifierModel` only)* | `time-series-split` |
 
-Inside `evaluation/`, the per-classifier folder uses the **unslugified** sklearn class name (`RandomForestClassifier`) - separate from training's slug (`random-forest-classifier`).
+Inside `evaluation/` and `explanation/`, the per-classifier folder uses the **unslugified** sklearn class name (`RandomForestClassifier`) - separate from training's slug (`random-forest-classifier`).
 
 ---
 
@@ -158,9 +177,12 @@ cache/
 ├── TrainingModel/
 │   ├── 3b7a98e6...c2.pkl              # joblib-pickled fitted TrainingModel
 │   └── 3b7a98e6...c2.params.json      # canonical identity dict (diff-friendly)
-└── PredictionModel/
-    ├── 9c12d04f...88.pkl
-    └── 9c12d04f...88.params.json
+├── PredictionModel/
+│   ├── 9c12d04f...88.pkl
+│   └── 9c12d04f...88.params.json
+└── ExplanationModel/
+    ├── 4e6f2a31...77.pkl              # joblib-pickled ExplanationModel
+    └── 4e6f2a31...77.params.json
 ```
 
 The `.params.json` is what was hashed to produce the filename. When `use_cache=True` 
@@ -186,7 +208,7 @@ output/
         │   ├── evaluation/prediction/...
         │   ├── cache/...
         │   ├── forecast.config.yaml
-        │   └── result_all_model_predictions_*.csv
+        │   └── forecast-results_*.csv
         ├── scenario-2/
         ...
         └── scenario-9/
@@ -215,11 +237,16 @@ tremor - only the train/predict/evaluate legs are repeated.
 | The all-classifiers ensemble | `training/classifiers/ClassifierEnsemble_{cv}.pkl` |
 | Forecast grid + features | `prediction/features/` |
 | Per-seed forecast probabilities | `prediction/results/{clf}/{seed:05d}.csv` |
-| Combined forecast CSV (consensus + per-classifier) | `result_all_model_predictions_{basename}.csv` |
+| Combined forecast CSV (consensus + per-classifier) | `forecast-results_{basename}.csv` |
 | Forecast PNG/PDF | `prediction/figures/forecast_{basename}.{png,pdf}` |
-| Per-seed metrics (training mode) | `evaluation/training/classifiers/{Clf}/metrics/json/{seed:05d}.json` |
-| Per-seed metrics (prediction mode) | `evaluation/prediction/classifiers/{Clf}/metrics/json/{seed:05d}.json` |
-| Aggregate metrics CSV | `evaluation/{kind}/classifiers/{Clf}/metrics_summary_*.csv` |
+| Per-seed probability matrix | `evaluation/{kind}/classifiers/{Clf}/predictions/y_proba.csv` |
+| Per-seed prediction matrix | `evaluation/{kind}/classifiers/{Clf}/predictions/y_pred.csv` |
+| Aggregate metric plots + sidecar CSV | `evaluation/{kind}/classifiers/{Clf}/figures/aggregate/{plot}.{png,csv}` |
+| Per-seed metric plots | `evaluation/{kind}/classifiers/{Clf}/figures/{plot}/{seed:05d}.png` |
 | Comparison ranking CSV | `evaluation/{kind}/comparison/metrics/ranking_*.csv` |
+| Bundled SHAP per classifier | `explanation/{kind}/classifiers/{Clf}/ClassifierExplanation_{Clf}.pkl` |
+| Per-seed SHAP explanations | `explanation/{kind}/classifiers/{Clf}/shap_values/{seed:05d}.pkl` |
+| Per-seed bar / beeswarm plots | `explanation/{kind}/classifiers/{Clf}/figures/{bar,beeswarm}/{seed:05d}.png` |
+| Per-eruption waterfall plots | `explanation/{kind}/eruptions/{YYYY-MM-DD}/{Clf}_*.png` |
 | Cache identity (diff-friendly) | `cache/{Stage}/{hash}.params.json` |
 | Replayable pipeline config | `forecast.config.yaml` |
