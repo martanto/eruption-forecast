@@ -59,10 +59,18 @@ class EruptionWindow:
 
     Attributes:
         eruption_date (str): Eruption date in ``YYYY-MM-DD`` form.
+        highest (ProbabilityPick): Highest-probability pick across all seeds in
+            this window. Guaranteed to be set: the builder only constructs an
+            :class:`EruptionWindow` when at least one seed contributed.
+        lowest (ProbabilityPick): Lowest-probability pick across all seeds in
+            this window. Guaranteed to be set under the same construction
+            invariant as ``highest``.
         seeds (list[SeedSummary]): One :class:`SeedSummary` per seed.
     """
 
     eruption_date: str
+    highest: ProbabilityPick
+    lowest: ProbabilityPick
     seeds: list[SeedSummary]
 
 

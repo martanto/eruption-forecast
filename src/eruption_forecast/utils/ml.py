@@ -839,6 +839,8 @@ def build_classifier_ensemble_summary(
             continue
 
         seed_summaries: list[SeedSummary] = []
+        window_highest: ProbabilityPick | None = None
+        window_lowest: ProbabilityPick | None = None
         for seed in seed_ensemble.seeds:
             random_state = int(seed["random_state"])
             column_name = f"seed_{random_state:05d}"
@@ -864,13 +866,41 @@ def build_classifier_ensemble_summary(
             )
             seed_summaries.append(seed_summary)
 
-            if summary.highest is None or seed_summary.highest.value > summary.highest.value:
+            # Summarize per eruption date
+            if (
+                window_highest is None
+                or seed_summary.highest.value > window_highest.value
+            ):
+                window_highest = seed_summary.highest
+            if window_lowest is None or seed_summary.lowest.value < window_lowest.value:
+                window_lowest = seed_summary.lowest
+
+            # Summarize per classifier
+            if (
+                summary.highest is None
+                or seed_summary.highest.value > summary.highest.value
+            ):
                 summary.highest = seed_summary.highest
-            if summary.lowest is None or seed_summary.lowest.value < summary.lowest.value:
+            if (
+                summary.lowest is None
+                or seed_summary.lowest.value < summary.lowest.value
+            ):
                 summary.lowest = seed_summary.lowest
 
+        if window_highest is None or window_lowest is None:
+            raise RuntimeError(
+                f"{seed_ensemble.classifier_name}: window for {eruption_date} "
+                f"contributed no seed summaries — unreachable under the "
+                f"upstream ``window.empty`` guard."
+            )
+
         summary.eruption_windows.append(
-            EruptionWindow(eruption_date=eruption_date, seeds=seed_summaries)
+            EruptionWindow(
+                eruption_date=eruption_date,
+                highest=window_highest,
+                lowest=window_lowest,
+                seeds=seed_summaries,
+            )
         )
 
     return summary
