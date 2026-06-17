@@ -1,3 +1,5 @@
+import os
+
 import shap
 import numpy as np
 import pandas as pd
@@ -5,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from eruption_forecast.ensemble import ClassifierEnsemble
 from eruption_forecast.utils.ml import build_classifier_ensemble_summary
+from eruption_forecast.dataclass import EruptionWindow
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -14,9 +17,60 @@ from eruption_forecast.plots.styles import (
 )
 from eruption_forecast.utils.pathutils import save_figure
 from eruption_forecast.dataclass.classifier_explanation import ClassifierExplanation
-from eruption_forecast.dataclass.classifier_ensemble_summary import (
-    ClassifierEnsembleSummary,
-)
+
+
+def plot_shap_waterfall(
+    explanation: shap.Explanation,
+    max_display: int = 20,
+    title: str | None = None,
+    figsize: tuple[float, float] | None = None,
+    save_filepath: str | None = None,
+    dpi: int = 150,
+    verbose: bool = False,
+) -> plt.Figure:
+    """Render a single SHAP waterfall plot for one observation.
+
+    Wraps ``shap.plots.waterfall`` inside the project's
+    :func:`shap_figure` context manager so the figure size and DPI are set
+    before SHAP draws.
+
+    Args:
+        explanation (shap.Explanation): Single-row SHAP explanation to
+            visualise.
+        max_display (int, optional): Maximum number of features to
+            display. Defaults to ``20``.
+        title (str | None, optional): Plot suptitle. ``None`` leaves the
+            figure title blank. Defaults to ``None``.
+        figsize (tuple[float, float] | None, optional): Figure size in
+            inches. ``None`` auto-sizes to ``(16, max(8, max_display *
+            0.5))``. Defaults to ``None``.
+        save_filepath (str | None, optional): Destination path. ``None``
+            skips saving. Defaults to ``None``.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to ``150``.
+        verbose (bool, optional): Forwarded to :func:`save_figure`.
+            Defaults to ``False``.
+
+    Returns:
+        plt.Figure: The rendered figure.
+    """
+    figsize: tuple[float, float] = (
+        figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
+    )
+
+    with shap_figure(figsize=figsize, dpi=150) as fig:
+        shap.plots.waterfall(
+            shap_values=explanation,
+            max_display=max_display,
+            show=False,
+        )
+
+        fig.suptitle(title, y=0.9)
+
+        if save_filepath:
+            save_figure(fig, save_filepath, dpi, verbose=verbose)
+
+    return fig
 
 
 def plot_shap_beeswarm(
@@ -29,11 +83,11 @@ def plot_shap_beeswarm(
     verbose: bool = True,
     group_remaining_features: bool = False,
 ) -> plt.Figure:
-    fig_size: tuple[float, float] = (
+    figsize: tuple[float, float] = (
         figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
     )
 
-    with shap_figure(figsize=fig_size, dpi=dpi) as fig:
+    with shap_figure(figsize=figsize, dpi=dpi) as fig:
         shap.plots.beeswarm(
             shap_values=(
                 explanation[..., 1] if explanation.values.ndim == 3 else explanation
@@ -63,6 +117,8 @@ def plot_shap_beeswarm(
         if save_filepath:
             save_figure(fig, save_filepath, dpi, verbose=verbose)
 
+    plt.close(fig)
+
     return fig
 
 
@@ -75,11 +131,11 @@ def plot_shap_bar(
     dpi: int = 150,
     verbose: bool = True,
 ) -> plt.Figure:
-    fig_size: tuple[float, float] = (
+    figsize: tuple[float, float] = (
         figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
     )
 
-    with shap_figure(figsize=fig_size, dpi=dpi) as fig:
+    with shap_figure(figsize=figsize, dpi=dpi) as fig:
         shap.plots.bar(
             explanation,
             max_display=max_display,
@@ -179,14 +235,14 @@ def plot_aggregate_shap_bar(
     """
     df = aggregate_df.head(top_n).copy()
     figheight = max(4.0, top_n * 0.35)
-    fig_size: tuple[float, float] = figsize if figsize is not None else (8.0, figheight)
+    figsize: tuple[float, float] = figsize if figsize is not None else (8.0, figheight)
 
     #  Reverse so the most important feature ends up at the top of the bar
     #  chart — matplotlib draws ``barh`` bottom-up.
     df_plot = df.iloc[::-1].reset_index(drop=True)
 
     with apply_nature_style():
-        fig, ax = plt.subplots(figsize=fig_size, dpi=dpi)
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
         bars = ax.barh(
             range(len(df_plot)),
@@ -268,12 +324,12 @@ def plot_aggregate_shap_beeswarm(
             ``shap_value``, ``feature_value`` covering only the non-NaN
             cells.
     """
-    fig_size: tuple[float, float] = (
+    figsize: tuple[float, float] = (
         figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
     )
 
     with apply_nature_style():
-        fig = plt.figure(figsize=fig_size, dpi=dpi)
+        fig = plt.figure(figsize=figsize, dpi=dpi)
 
         shap.plots.beeswarm(
             explanation,
@@ -338,87 +394,134 @@ def plot_aggregate_shap_beeswarm(
     return fig, tidy_df
 
 
-def plot_shap_waterfall(
-    eruption_dates: list[str],
-    labels: pd.Series | pd.DataFrame,
+def _build_explanation_plot(
+    classifier_explanation: ClassifierExplanation,
+    eruption_window: EruptionWindow,
+    eruption_dir: str,
+    classifier_name: str,
+) -> tuple[shap.Explanation, str, str]:
+    """Pick the highest-probability window for one eruption and prepare its plot inputs.
+
+    Resolves the seed index and window index of the highest-probability
+    observation for a given eruption, then derives a deterministic save
+    path and figure title from those identifiers.
+
+    Args:
+        classifier_explanation (ClassifierExplanation): Per-classifier
+            SHAP explanations indexed by ``random_state``.
+        eruption_window (EruptionWindow): Eruption summary carrying the
+            ``highest`` ``ProbabilityPick`` used to locate the SHAP row.
+        eruption_dir (str): Root directory under which a
+            ``{eruption_date}/`` subdirectory is created for the saved
+            figure.
+        classifier_name (str): Classifier identifier used in the filename
+            and figure title.
+
+    Returns:
+        tuple[shap.Explanation, str, str]: ``(explanation, save_filepath,
+            title)`` ready for :func:`plot_shap_waterfall`.
+    """
+    eruption_date = eruption_window.eruption_date
+    eruption_date_dir = os.path.join(eruption_dir, eruption_date)
+
+    seed_idx = eruption_window.highest.random_state
+    eruption_window_index = eruption_window.highest.index
+    proba_value = eruption_window.highest.value
+    eruption_datetime = f"{eruption_window.highest.datetime:%Y-%m-%d_%H-%M-%S}"
+
+    filename = f"{classifier_name}_{eruption_datetime}_seed={seed_idx}_index={eruption_window_index}.png"
+    save_filepath = os.path.join(eruption_date_dir, filename)
+
+    explanation = classifier_explanation.seeds[seed_idx].shap_values[
+        eruption_window_index
+    ]
+
+    title = (
+        f"{classifier_name} [s={seed_idx}|idx={eruption_window_index}|p={proba_value:.2f}]\n"
+        f"{eruption_window.highest.datetime:%Y-%m-%d %H:%M:%S}"
+    )
+
+    return explanation, save_filepath, title
+
+
+def plot_classifier_waterfall(
     classifier_explanation: ClassifierExplanation,
     classifier_ensemble: ClassifierEnsemble,
-):
-    classifier_name = classifier_explanation.classifier_name
-    seed_ensemble = classifier_ensemble[classifier_name]
+    labels: pd.Series | pd.DataFrame,
+    eruption_dates: list[str],
+    figsize: tuple[float, float] | None = None,
+    max_display: int = 20,
+    output_dir: str | None = None,
+    dpi: int = 150,
+    verbose: bool = False,
+) -> None:
+    """Render the highest-probability waterfall plot per eruption for one classifier.
 
-    classifier_ensemble_summary = build_classifier_ensemble_summary(
+    Picks the highest-probability window for each eruption from the
+    classifier's seed ensemble and renders a SHAP waterfall plot for it.
+    Plots land under ``{output_dir}/{eruption_date}/``; the caller is
+    responsible for passing an ``eruptions`` root (see
+    :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble.plot_waterfall`).
+
+    Args:
+        classifier_explanation (ClassifierExplanation): Per-classifier
+            SHAP explanations indexed by ``random_state``.
+        classifier_ensemble (ClassifierEnsemble): Full ensemble; used to
+            pull the matching ``SeedEnsemble`` for
+            :func:`~eruption_forecast.utils.ml.build_classifier_ensemble_summary`.
+        labels (pd.Series | pd.DataFrame): Ground-truth label series
+            indexed by window id.
+        eruption_dates (list[str]): Ground-truth eruption dates in
+            ``"YYYY-MM-DD"`` format.
+        figsize (tuple[float, float] | None, optional): Figure size in
+            inches. ``None`` auto-sizes from ``max_display``. Defaults to
+            ``None``.
+        max_display (int, optional): Maximum number of features to
+            display. Defaults to ``20``.
+        output_dir (str | None, optional): Root directory for waterfall
+            plots — treated as the ``eruptions/`` root. ``None`` falls
+            back to ``{cwd}/output/explanation/eruptions``. Defaults to
+            ``None``.
+        dpi (int, optional): Figure resolution in dots per inch. Defaults
+            to ``150``.
+        verbose (bool, optional): Forwarded to :func:`save_figure`.
+            Defaults to ``False``.
+
+    Returns:
+        None: The function persists its output to disk and has no return
+            value.
+    """
+    eruption_dir = (
+        output_dir
+        if output_dir is not None
+        else os.path.join(os.getcwd(), "output", "explanation", "eruptions")
+    )
+
+    classifier_name = classifier_explanation.classifier_name
+    seed_ensemble = classifier_ensemble.ensembles[classifier_name]
+
+    classifier_summary = build_classifier_ensemble_summary(
         seed_ensemble=seed_ensemble,
         labels=labels,
         eruption_dates=eruption_dates,
     )
 
-    return None
-
-
-def plot_classifier_waterfall(
-    summary: ClassifierEnsembleSummary,
-    classifier_explanation: ClassifierExplanation,
-    max_display: int = 20,
-    figsize: tuple[float, float] | None = None,
-    dpi: int = 150,
-) -> plt.Figure:
-    """Render the SHAP waterfall for the top pick on ``summary``.
-
-    Looks up the seed identified by
-    :attr:`ClassifierEnsembleSummary.highest.random_state` inside
-    ``classifier_explanation.seeds`` (by ``random_state``, not list
-    position), then renders ``shap.plots.waterfall`` for the corresponding
-    explanation row.
-
-    Args:
-        summary (ClassifierEnsembleSummary): Summary returned by
-            :func:`eruption_forecast.utils.ml.build_classifier_ensemble_summary`.
-        classifier_explanation (ClassifierExplanation): One of the dataclass
-            payloads produced by :class:`ExplainerEnsemble.explain`. Its
-            ``seeds`` attribute is a list of ``SeedExplanation`` records
-            exposing ``random_state`` and ``shap_values``.
-        max_display (int, optional): Maximum number of features in the
-            waterfall. Defaults to 20.
-        figsize (tuple[float, float] | None, optional): Figure size in inches.
-            When ``None`` uses ``(16.0, max(8.0, max_display * 0.5))`` so long
-            tsfresh labels remain readable. Defaults to ``None``.
-        dpi (int, optional): Figure resolution. Defaults to 150.
-
-    Returns:
-        plt.Figure: The figure containing the rendered waterfall.
-
-    Raises:
-        RuntimeError: If ``summary.highest`` is ``None`` — no eruption window
-            intersected the prediction grid, so there is no row to render.
-        KeyError: If the seed identified by ``summary.highest.random_state`` is
-            absent from ``classifier_explanation.seeds``.
-    """
-    if summary.highest is None:
-        raise RuntimeError(
-            f"{summary.classifier_name}: no eruption windows intersected the "
-            f"prediction grid; nothing to render."
+    for eruption_window in classifier_summary.eruption_windows:
+        explanation, save_filepath, title = _build_explanation_plot(
+            classifier_explanation=classifier_explanation,
+            eruption_window=eruption_window,
+            eruption_dir=eruption_dir,
+            classifier_name=classifier_name,
         )
 
-    seeds_by_random_state = {
-        int(seed.random_state): seed for seed in classifier_explanation.seeds
-    }
-    seed = seeds_by_random_state[summary.highest.random_state]
-    explanation: shap.Explanation = seed.shap_values[summary.highest.index]
-
-    fig_size = figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
-
-    with shap_figure(figsize=fig_size, dpi=dpi) as fig:
-        shap.plots.waterfall(
-            shap_values=explanation,
+        plot_shap_waterfall(
+            explanation=explanation,
             max_display=max_display,
-            show=False,
-        )
-        fig.suptitle(
-            f"{summary.classifier_name} "
-            f"[s={summary.highest.random_state}|p={summary.highest.value:.4f}]\n"
-            f"{summary.highest.datetime:%Y-%m-%d %H:%M:%S}",
-            fontsize=12,
+            title=title,
+            figsize=figsize,
+            save_filepath=save_filepath,
+            dpi=dpi,
+            verbose=verbose,
         )
 
-    return fig
+    return None

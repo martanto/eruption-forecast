@@ -15,25 +15,93 @@ from eruption_forecast.dataclass.classifier_explanation import ClassifierExplana
 
 
 class ExplanationModel(BaseModel, CacheModel):
+    """Per-classifier SHAP explanation stage built on a fitted upstream model.
+
+    Reuses ``tremor_data``, ``start_date``, ``end_date``, ``window_size``,
+    the loaded ``ClassifierEnsemble``, and the extracted ``features_df``
+    from the supplied ``TrainingModel`` or ``PredictionModel``. No tsfresh
+    re-run or model re-fit is performed.
+
+    Output is namespaced by upstream-stage marker so that training and
+    prediction explanations never share a classifiers directory:
+
+    - ``{output_dir}/explanation/training/`` for training-reuse mode
+    - ``{output_dir}/explanation/prediction/`` for prediction-reuse mode
+
+    Attributes:
+        kind (Literal["explanation"]): Stage identity tag.
+        model (TrainingModel | PredictionModel): Upstream model being explained.
+        model_kind (Literal["training", "prediction"]): Upstream stage marker.
+        ClassifierEnsemble (ClassifierEnsemble): Fitted ensemble pulled
+            from ``model``.
+        features_df (pd.DataFrame): Feature matrix pulled from ``model``.
+        eruption_dates (list[str] | None): Ground-truth eruption dates.
+        explanation_dir (str): Root explanation directory.
+        classifiers_dir (str): Per-classifier output directory.
+        ExplainerEnsemble (ExplainerEnsemble): SHAP worker instance.
+        explanations (list[ClassifierExplanation]): Populated by
+            :meth:`explain`.
+    """
+
     def __init__(
         self,
         model: TrainingModel | PredictionModel,
+        eruption_dates: list[str] | None = None,
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ):
+        """Initialize ExplanationModel in training-reuse or prediction-reuse mode.
+
+        Args:
+            model (TrainingModel | PredictionModel): Live fitted model
+                source. Must carry a non-``None`` ``ClassifierEnsemble``.
+            eruption_dates (list[str] | None): Ground-truth eruption dates
+                in ``"YYYY-MM-DD"`` format. Optional for training reuse
+                (the dates are read from ``model.eruption_dates``); required
+                for prediction reuse because ``PredictionModel`` does not
+                carry them. Defaults to ``None``.
+            overwrite (bool): Overwrite cached outputs. Defaults to
+                ``False``.
+            output_dir (str | None): Root output directory. Derived from
+                ``model`` when ``None``. Defaults to ``None``.
+            root_dir (str | None): Project root used to anchor relative
+                output paths. Defaults to ``None``.
+            n_jobs (int): Parallel workers. Defaults to ``1``.
+            verbose (bool): Verbose logging. Defaults to ``False``.
+
+        Raises:
+            ValueError: If ``model.ClassifierEnsemble`` is ``None``.
+            ValueError: If ``eruption_dates`` is ``None`` when ``model`` is
+                a ``PredictionModel``.
+        """
         if model.ClassifierEnsemble is None:
             raise ValueError(
                 f"ClassifierEnsemble is not found for {type(model).__name__}"
             )
+
+        if model.kind == "prediction" and eruption_dates is None:
+            raise ValueError(
+                "Parameter `eruption_dates` cannot be None. Please set eruption_dates=['2025-01-01', ...]"
+            )
+
+        # In prediction reuse the upstream ``PredictionModel`` does not
+        # carry eruption_dates, so the caller-supplied value is the only
+        # source. In training reuse we prefer the upstream model's own
+        # eruption_dates so explain() does not require the caller to pass
+        # them a second time.
+        resolved_eruption_dates = (
+            eruption_dates if model.kind == "prediction" else model.eruption_dates
+        )
 
         super().__init__(
             tremor_data=model._tremor_data,
             start_date=model.start_date,
             end_date=model.end_date,
             window_size=model.window_size,
+            eruption_dates=resolved_eruption_dates,
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
@@ -57,6 +125,7 @@ class ExplanationModel(BaseModel, CacheModel):
             features_df=self.features_df,
             kind=self.model_kind,
             output_dir=self.classifiers_dir,
+            explanation_dir=self.explanation_dir,
             overwrite=self.overwrite,
             n_jobs=self.n_jobs,
             verbose=self.verbose,
@@ -103,13 +172,43 @@ class ExplanationModel(BaseModel, CacheModel):
     def from_file(
         cls,
         filepath: str,
+        eruption_dates: list[str] | None = None,
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> "ExplanationModel":
+        """Construct an ExplanationModel from a saved upstream ``.pkl``.
 
+        Loads the pickle, validates it is a ``TrainingModel`` or
+        ``PredictionModel``, and forwards every argument to
+        :meth:`__init__`. Use this when the upstream stage was persisted
+        to disk via :meth:`BaseModel.save`.
+
+        Args:
+            filepath (str): Path to a ``.pkl`` file produced by
+                ``TrainingModel.save()`` or ``PredictionModel.save()``.
+            eruption_dates (list[str] | None): Ground-truth eruption dates
+                in ``"YYYY-MM-DD"`` format. Required when the loaded model
+                is a ``PredictionModel``. Defaults to ``None``.
+            overwrite (bool): Overwrite cached outputs. Defaults to
+                ``False``.
+            output_dir (str | None): Root output directory. Defaults to
+                ``None``.
+            root_dir (str | None): Project root used to anchor relative
+                output paths. Defaults to ``None``.
+            n_jobs (int): Parallel workers. Defaults to ``1``.
+            verbose (bool): Verbose logging. Defaults to ``False``.
+
+        Returns:
+            ExplanationModel: Ready-to-explain instance.
+
+        Raises:
+            FileNotFoundError: If ``filepath`` does not exist.
+            TypeError: If the loaded pickle is not a ``TrainingModel`` or
+                ``PredictionModel``.
+        """
         if not os.path.isfile(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
@@ -123,6 +222,7 @@ class ExplanationModel(BaseModel, CacheModel):
 
         return cls(
             model=model,
+            eruption_dates=eruption_dates,
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
@@ -253,6 +353,27 @@ class ExplanationModel(BaseModel, CacheModel):
         check_additivity: bool = False,
         overwrite_classifier_explanation: bool = False,
     ) -> Self:
+        """Compute per-classifier SHAP explanations for every seed.
+
+        Delegates to :meth:`ExplainerEnsemble.explain` and caches the
+        result via :class:`CacheModel`. On a cache hit the stored
+        ``explanations`` list is restored without re-running SHAP.
+
+        Args:
+            save_per_seed (bool): Persist each per-seed
+                ``shap.Explanation`` to disk so a subsequent run can
+                short-circuit recomputation. Defaults to ``True``.
+            check_additivity (bool): Forwarded to ``shap.TreeExplainer``
+                to verify SHAP additivity against the model output.
+                Defaults to ``False``.
+            overwrite_classifier_explanation (bool): Overwrite the cached
+                per-classifier ``ClassifierExplanation.pkl`` artefact.
+                Falls back to ``self.overwrite`` when ``False``. Defaults
+                to ``False``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+        """
         identity = type(self).build_cache_identity(
             upstream_hash=self._upstream_hash(),
             explain_params={"save_per_seed": save_per_seed},
@@ -282,17 +403,56 @@ class ExplanationModel(BaseModel, CacheModel):
 
     def plot(
         self,
-        plot_per_seed: bool = True,
+        figsize: tuple[float, float] | None = None,
         max_display: int = 20,
         group_remaining_features: bool = False,
         dpi: int = 150,
+        plot_per_seed: bool = True,
     ):
+        """Render every SHAP plot the stage produces.
+
+        Renders per-eruption waterfall plots (when ``eruption_dates`` is
+        available) and, optionally, per-seed bar and beeswarm plots.
+
+        Args:
+            figsize (tuple[float, float] | None): Figure size in inches
+                for SHAP plots. ``None`` auto-sizes from ``max_display``.
+                Defaults to ``None``.
+            max_display (int): Maximum number of features to display.
+                Defaults to ``20``.
+            group_remaining_features (bool): Forwarded to
+                ``shap.plots.beeswarm`` to group features beyond
+                ``max_display``. Defaults to ``False``.
+            dpi (int): Figure resolution in dots per inch. Defaults to
+                ``150``.
+            plot_per_seed (bool): Render per-seed bar and beeswarm plots
+                in parallel under ``classifiers/{name}/figures/``. Defaults
+                to ``True``.
+
+        Raises:
+            ValueError: If :meth:`explain` has not yet been called.
+        """
         if len(self.explanations) == 0:
             raise ValueError("No explanations found. Please run explain() first.")
 
+        explainer_ensemble = self.ExplainerEnsemble
+
+        if self.eruption_dates is None:
+            logger.warning(
+                "Eruption dates not found. Please add eruption_dates when init the model."
+            )
+        else:
+            explainer_ensemble.plot_waterfall(
+                labels=self.model.labels,
+                eruption_dates=self.eruption_dates,
+                figsize=figsize,
+                max_display=max_display,
+                dpi=dpi,
+            )
+
         # Plot SHAP beeswarm and bar per seed
         if plot_per_seed:
-            self.ExplainerEnsemble.plot_seed(
+            explainer_ensemble.plot_seed(
                 max_display=max_display,
                 group_remaining_features=group_remaining_features,
                 dpi=dpi,
