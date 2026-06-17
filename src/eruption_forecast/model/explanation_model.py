@@ -9,11 +9,9 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
-from eruption_forecast.ensemble.explainer_ensemble import (
-    ExplainerEnsemble,
-    ClassifierExplanation,
-)
+from eruption_forecast.ensemble.explainer_ensemble import ExplainerEnsemble
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.dataclass.classifier_explanation import ClassifierExplanation
 
 
 class ExplanationModel(BaseModel, CacheModel):
@@ -249,7 +247,12 @@ class ExplanationModel(BaseModel, CacheModel):
         }
         return CacheModel.compute_hash(fingerprint)
 
-    def explain(self, save_per_seed: bool = True) -> Self:
+    def explain(
+        self,
+        save_per_seed: bool = True,
+        check_additivity: bool = False,
+        overwrite_classifier_explanation: bool = False,
+    ) -> Self:
         identity = type(self).build_cache_identity(
             upstream_hash=self._upstream_hash(),
             explain_params={"save_per_seed": save_per_seed},
@@ -263,10 +266,17 @@ class ExplanationModel(BaseModel, CacheModel):
                 return self
 
         self.create_directories()
-        self.ExplainerEnsemble.explain(save_per_seed=save_per_seed)
+        self.ExplainerEnsemble.explain(
+            save_per_seed=save_per_seed,
+            check_additivity=check_additivity,
+            overwrite_classifier_explanation=overwrite_classifier_explanation
+            or self.overwrite,
+        )
 
         self.explanations = self.ExplainerEnsemble.explanations
         self.save_to_cache(identity)
+
+        self.save()
 
         return self
 
@@ -280,6 +290,7 @@ class ExplanationModel(BaseModel, CacheModel):
         if len(self.explanations) == 0:
             raise ValueError("No explanations found. Please run explain() first.")
 
+        # Plot SHAP beeswarm and bar per seed
         if plot_per_seed:
             self.ExplainerEnsemble.plot_seed(
                 max_display=max_display,

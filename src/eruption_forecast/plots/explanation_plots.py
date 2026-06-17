@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING
-
 import shap
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from eruption_forecast.ensemble import ClassifierEnsemble
+from eruption_forecast.utils.ml import build_classifier_ensemble_summary
 from eruption_forecast.plots.styles import (
     OKABE_ITO,
     NATURE_COLORS,
@@ -13,45 +13,10 @@ from eruption_forecast.plots.styles import (
     apply_nature_style,
 )
 from eruption_forecast.utils.pathutils import save_figure
+from eruption_forecast.dataclass.classifier_explanation import ClassifierExplanation
 from eruption_forecast.dataclass.classifier_ensemble_summary import (
     ClassifierEnsembleSummary,
 )
-
-
-#  ``ClassifierExplanation`` is a ``TypedDict`` defined in
-#  ``ensemble.explainer_ensemble``, which already imports
-#  ``render_seed_plot`` from this module. A direct import would cycle, so the
-#  symbol is pulled in for type checking only and used as a string annotation
-#  on ``plot_classifier_waterfall`` — never resolved at runtime.
-if TYPE_CHECKING:
-    from eruption_forecast.ensemble.explainer_ensemble import ClassifierExplanation
-
-
-def plot_shap_waterfall(
-    explanation: shap.Explanation,
-    max_display: int = 20,
-    title: str | None = None,
-    figsize: tuple[float, float] | None = None,
-    dpi: int = 150,
-) -> plt.Figure:
-    fig_size: tuple[float, float] = (
-        figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
-    )
-
-    fig = plt.figure(figsize=fig_size, dpi=dpi)
-    fig.subplots_adjust(left=0.35)
-
-    shap.plots.waterfall(
-        shap_values=(
-            explanation[..., 1] if explanation.values.ndim == 3 else explanation
-        ),
-        max_display=max_display,
-        show=False,
-    )
-
-    fig.suptitle(title or "SHAP Waterfall Plot", y=0.9)
-
-    return fig
 
 
 def plot_shap_beeswarm(
@@ -373,9 +338,27 @@ def plot_aggregate_shap_beeswarm(
     return fig, tidy_df
 
 
+def plot_shap_waterfall(
+    eruption_dates: list[str],
+    labels: pd.Series | pd.DataFrame,
+    classifier_explanation: ClassifierExplanation,
+    classifier_ensemble: ClassifierEnsemble,
+):
+    classifier_name = classifier_explanation.classifier_name
+    seed_ensemble = classifier_ensemble[classifier_name]
+
+    classifier_ensemble_summary = build_classifier_ensemble_summary(
+        seed_ensemble=seed_ensemble,
+        labels=labels,
+        eruption_dates=eruption_dates,
+    )
+
+    return None
+
+
 def plot_classifier_waterfall(
     summary: ClassifierEnsembleSummary,
-    classifier_explanation: "ClassifierExplanation",
+    classifier_explanation: ClassifierExplanation,
     max_display: int = 20,
     figsize: tuple[float, float] | None = None,
     dpi: int = 150,
@@ -384,17 +367,17 @@ def plot_classifier_waterfall(
 
     Looks up the seed identified by
     :attr:`ClassifierEnsembleSummary.highest.random_state` inside
-    ``classifier_explanation["seeds"]`` (by ``random_state``, not list
+    ``classifier_explanation.seeds`` (by ``random_state``, not list
     position), then renders ``shap.plots.waterfall`` for the corresponding
     explanation row.
 
     Args:
         summary (ClassifierEnsembleSummary): Summary returned by
             :func:`eruption_forecast.utils.ml.build_classifier_ensemble_summary`.
-        classifier_explanation (ClassifierExplanation): One of the
-            ``TypedDict`` payloads produced by
-            :class:`ExplainerEnsemble.explain`. Must contain a ``seeds`` list of
-            ``{"random_state": int, "shape_values": shap.Explanation}``.
+        classifier_explanation (ClassifierExplanation): One of the dataclass
+            payloads produced by :class:`ExplainerEnsemble.explain`. Its
+            ``seeds`` attribute is a list of ``SeedExplanation`` records
+            exposing ``random_state`` and ``shap_values``.
         max_display (int, optional): Maximum number of features in the
             waterfall. Defaults to 20.
         figsize (tuple[float, float] | None, optional): Figure size in inches.
@@ -409,7 +392,7 @@ def plot_classifier_waterfall(
         RuntimeError: If ``summary.highest`` is ``None`` — no eruption window
             intersected the prediction grid, so there is no row to render.
         KeyError: If the seed identified by ``summary.highest.random_state`` is
-            absent from ``classifier_explanation["seeds"]``.
+            absent from ``classifier_explanation.seeds``.
     """
     if summary.highest is None:
         raise RuntimeError(
@@ -418,10 +401,10 @@ def plot_classifier_waterfall(
         )
 
     seeds_by_random_state = {
-        int(seed["random_state"]): seed for seed in classifier_explanation["seeds"]
+        int(seed.random_state): seed for seed in classifier_explanation.seeds
     }
     seed = seeds_by_random_state[summary.highest.random_state]
-    explanation: shap.Explanation = seed["shape_values"][summary.highest.index]
+    explanation: shap.Explanation = seed.shap_values[summary.highest.index]
 
     fig_size = figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
 

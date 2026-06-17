@@ -73,6 +73,12 @@ class EruptionWindow:
     lowest: ProbabilityPick
     seeds: list[SeedSummary]
 
+    def __repr__(self):
+        return (
+            f"EruptionWindow(eruption_date={self.eruption_date}, "
+            f"highest={self.highest}, lowest={self.lowest}, seeds={len(self.seeds)})"
+        )
+
 
 @dataclass
 class ClassifierEnsembleSummary:
@@ -99,3 +105,10 @@ class ClassifierEnsembleSummary:
     eruption_windows: list[EruptionWindow] = field(default_factory=list)
     highest: ProbabilityPick | None = None
     lowest: ProbabilityPick | None = None
+
+    def __repr__(self):
+        return (
+            f"ClassifierEnsembleSummary(classifier_name={self.classifier_name}), "
+            f"highest={self.highest}, lowest={self.lowest}), "
+            f"eruption_windows={len(self.eruption_windows)})"
+        )

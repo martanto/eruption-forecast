@@ -1,7 +1,7 @@
 """Per-classifier × per-seed SHAP explanation worker."""
 
 import os
-from typing import Self, Literal, TypedDict
+from typing import Self, Literal
 
 import shap
 import numpy as np
@@ -11,11 +11,16 @@ from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.ml import build_classifier_ensemble_summary
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.formatting import shorten_feature_name
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.plots.explanation_plots import render_seed_plot
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
+from eruption_forecast.dataclass.classifier_explanation import (
+    SeedExplanation,
+    ClassifierExplanation,
+)
 
 
 TREE_CLASSIFIERS: tuple[type, ...] = (
@@ -23,20 +28,6 @@ TREE_CLASSIFIERS: tuple[type, ...] = (
     XGBClassifier,
     GradientBoostingClassifier,
 )
-
-
-class SeedExplanation(TypedDict):
-    """Per-seed SHAP explanation payload."""
-
-    random_state: int
-    shape_values: shap.Explanation
-
-
-class ClassifierExplanation(TypedDict):
-    """Aggregated SHAP explanations for one classifier across all seeds."""
-
-    classifier_name: str
-    seeds: list[SeedExplanation]
 
 
 class ExplainerEnsemble:
@@ -127,10 +118,11 @@ class ExplainerEnsemble:
             ) from e
 
     @staticmethod
-    def explain_seed_ensemble(
+    def explain_classifier(
         seed_ensemble: SeedEnsemble,
         features_df: pd.DataFrame,
         save_per_seed: bool = False,
+        kind: Literal["training", "prediction"] = "prediction",
         check_additivity: bool = False,
         output_dir: str | None = None,
         overwrite: bool = False,
@@ -138,10 +130,10 @@ class ExplainerEnsemble:
     ) -> ClassifierExplanation:
         classifier_name = seed_ensemble.classifier_name
         seeds = seed_ensemble.seeds
-        seed_ensemble_explanations: ClassifierExplanation = {
-            "classifier_name": classifier_name,
-            "seeds": [],
-        }
+
+        classifier_explanation = ClassifierExplanation(
+            classifier_name=classifier_name,
+        )
 
         if verbose:
             logger.info(
@@ -150,7 +142,7 @@ class ExplainerEnsemble:
 
         output_dir = ensure_dir(
             output_dir
-            or os.path.join(os.getcwd(), "output", "explanation", "classifiers")
+            or os.path.join(os.getcwd(), "output", "explanation", kind, "classifiers")
         )
 
         output_shap_dir = os.path.join(output_dir, classifier_name, "shap_values")
@@ -168,13 +160,16 @@ class ExplainerEnsemble:
             if not overwrite and os.path.exists(seed_explanation_filepath):
                 if verbose:
                     logger.info(
-                        f"Seed Explanation {classifier_name}/{seed_idx:05d} exists."
+                        f"SeedExplanation {classifier_name}/{seed_idx:05d} exists."
                     )
                 seed_explanation: shap.Explanation = joblib.load(
                     seed_explanation_filepath
                 )
-                seed_ensemble_explanations["seeds"].append(
-                    {"random_state": int(seed_idx), "shape_values": seed_explanation}
+                classifier_explanation.seeds.append(
+                    SeedExplanation(
+                        random_state=int(seed_idx),
+                        shap_values=seed_explanation,
+                    )
                 )
                 continue
 
@@ -195,17 +190,44 @@ class ExplainerEnsemble:
                     f"{seed_explanation_filepath}"
                 )
 
-            seed_ensemble_explanations["seeds"].append(
-                {"random_state": int(seed_idx), "shape_values": seed_explanation}
+            classifier_explanation.seeds.append(
+                SeedExplanation(
+                    random_state=int(seed_idx),
+                    shap_values=seed_explanation,
+                )
             )
 
-        return seed_ensemble_explanations
+        return classifier_explanation
 
     def explain(
-        self, save_per_seed: bool = False, check_additivity: bool = False
+        self,
+        save_per_seed: bool = True,
+        check_additivity: bool = False,
+        overwrite_classifier_explanation: bool = False,
     ) -> Self:
+        overwrite = overwrite_classifier_explanation or self.overwrite
+
         for seed_ensemble in self.ClassifierEnsemble.ensembles.values():
             classifier_name = seed_ensemble.classifier_name
+
+            save_filepath = os.path.join(
+                self.output_dir,
+                classifier_name,
+                f"ClassifierExplanation_{classifier_name}.pkl",
+            )
+
+            ensure_dir(os.path.dirname(save_filepath))
+
+            if os.path.exists(save_filepath) and not overwrite:
+                classifier_explanation = joblib.load(save_filepath)
+
+                if self.verbose:
+                    logger.info(
+                        f"[{classifier_name}]: Loaded from cache: {save_filepath}"
+                    )
+
+                self.explanations.append(classifier_explanation)
+                continue
 
             if not seed_ensemble.seeds:
                 logger.warning(
@@ -223,19 +245,22 @@ class ExplainerEnsemble:
             if self.verbose:
                 logger.info(f"Explaining {classifier_name}")
 
-            seed_ensemble_explanations: ClassifierExplanation = (
-                self.explain_seed_ensemble(
-                    seed_ensemble=seed_ensemble,
-                    features_df=self.features_df,
-                    save_per_seed=save_per_seed,
-                    check_additivity=check_additivity,
-                    output_dir=self.output_dir,
-                    overwrite=self.overwrite,
-                    verbose=self.verbose,
-                )
+            classifier_explanation: ClassifierExplanation = self.explain_classifier(
+                seed_ensemble=seed_ensemble,
+                features_df=self.features_df,
+                save_per_seed=save_per_seed,
+                check_additivity=check_additivity,
+                output_dir=self.output_dir,
+                overwrite=self.overwrite,
+                verbose=self.verbose,
             )
 
-            self.explanations.append(seed_ensemble_explanations)
+            joblib.dump(classifier_explanation, save_filepath)
+            logger.info(
+                f"[{classifier_name}]: ClassifierExplanation saved to: {save_filepath}"
+            )
+
+            self.explanations.append(classifier_explanation)
 
         logger.info(f"Explained {len(self.explanations)} classifiers")
 
@@ -252,12 +277,12 @@ class ExplainerEnsemble:
 
         jobs: list[tuple] = []
         for explanation in self.explanations:
-            classifier_name = explanation["classifier_name"]
+            classifier_name = explanation.classifier_name
             figures_dir = os.path.join(self.output_dir, classifier_name, "figures")
 
-            for seed in explanation["seeds"]:
-                seed_id = int(seed["random_state"])
-                shape_values = seed["shape_values"]
+            for seed in explanation.seeds:
+                seed_id = int(seed.random_state)
+                shap_values = seed.shap_values
                 title = f"{classifier_name}[{seed_id:05d}]"
 
                 for plot_kind in ("beeswarm", "bar"):
@@ -271,7 +296,7 @@ class ExplainerEnsemble:
                     jobs.append(
                         (
                             plot_kind,
-                            shape_values,
+                            shap_values,
                             save_filepath,
                             title,
                             max_display,
@@ -289,3 +314,19 @@ class ExplainerEnsemble:
         )
 
         return None
+
+    def plot_waterfall(
+        self, labels: pd.Series | pd.DataFrame, eruption_dates: list[str]
+    ):
+        if len(self.explanations) == 0:
+            raise ValueError("Please run explain() first")
+
+        for classifier_explanation in self.explanations:
+            classifier_name = classifier_explanation.classifier_name
+            seed_ensemble = self.ClassifierEnsemble.ensembles[classifier_name]
+
+            classifier_ensemble_summary = build_classifier_ensemble_summary(
+                seed_ensemble=seed_ensemble,
+                labels=labels,
+                eruption_dates=eruption_dates,
+            )
