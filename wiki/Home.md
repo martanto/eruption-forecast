@@ -22,6 +22,7 @@ It is a research tool and must not be used as the sole basis for public safety d
 | 5a | [Training Workflow](Training-Workflow) | `TrainingModel`, classifiers, CV, imbalance, parallelism |
 | 5b | [Prediction Workflow](Prediction-Workflow) | `PredictionModel`, forecast outputs, consensus |
 | 5c | [Evaluation Workflow](Evaluation-Workflow) | `EvaluationModel`, `MetricsEnsemble`, `ClassifierComparator` |
+| 5d | [Explanation Workflow](Explanation-Workflow) | `ExplanationModel`, `ExplainerEnsemble`, per-seed SHAP |
 | 6 | [Visualization](Visualization) | Plot catalog + output paths |
 | 7 | [Configuration](Configuration) | `ForecastConfig`, YAML save/replay, Telegram, logging |
 | 8 | [Output Structure](Output-Structure) | Full directory tree + slug conventions |
@@ -51,10 +52,19 @@ It is a research tool and must not be used as the sole basis for public safety d
               ┌────────┴────────┐
               ▼                 ▼
    ┌───────────────────┐  ┌──────────────────────┐
-   │  PredictionModel  │  │   EvaluationModel    │  per-seed metrics JSON
-   │  forecast grid →  │  │  MetricsEnsemble +   │  aggregate CSV + plots
-   │  probabilities    │  │  ClassifierComparator│
-   └───────────────────┘  └──────────────────────┘
+   │  PredictionModel  │  │   EvaluationModel    │  (n_samples × n_seeds)
+   │  forecast grid →  │  │  MetricsEnsemble +   │  y_proba / y_pred CSVs
+   │  probabilities    │  │  ClassifierComparator│  aggregate plots
+   └─────────┬─────────┘  └──────────┬───────────┘
+             │                       │
+             └───────────┬───────────┘
+                         ▼
+            ┌───────────────────────────┐
+            │     ExplanationModel      │  per-classifier SHAP
+            │  ExplainerEnsemble →      │  TreeExplainer-only
+            │  per-seed bar/beeswarm +  │  (rf, lite-rf, gb, xgb)
+            │  per-eruption waterfall   │
+            └───────────────────────────┘
 ```
 
 The high-level `ForecastModel` class chains every stage with a fluent API:
@@ -75,6 +85,7 @@ from eruption_forecast import ForecastModel
              window_step=10, window_step_unit="minutes",
              plot_threshold=0.7)
     .evaluate(model="prediction")
+    .explain(model="prediction", plot_per_seed=True)
 )
 ```
 

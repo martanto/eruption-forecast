@@ -93,13 +93,18 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 #### `fm.evaluate(model="prediction", plot_per_seed=True)`
 - Reuses the in-memory `PredictionModel` - no re-extraction of features, no re-fit.
 - Falls back to `train()`'s `eruption_dates` when called without an explicit list.
-- Writes per-seed JSON under `evaluation/prediction/classifiers/{clf}/metrics/json/{seed:05d}.json` plus aggregate `metrics_summary_*.csv`.
+- Writes `(n_samples, n_seeds)` `y_proba.csv` / `y_pred.csv` matrices under `evaluation/prediction/classifiers/{Clf}/predictions/` (no per-seed JSON; per-seed metric tables live in memory on `self.metrics`).
 - `plot_per_seed=True` is expensive - flip off for fast iteration.
 
 #### `fm.EvaluationModel.compare()`
-- One `MultiModelEvaluator` per classifier → fed to a `ClassifierComparator`.
+- Reuses the cached `MetricsEnsemble` from `evaluate()` and hands it to `ClassifierComparator`.
 - `comparator.get_ranking()` writes `comparison/metrics/ranking_recall.csv` (defaults to recall ranking - matches the training `scoring`).
 - `comparator.plot_all()` writes ROC overlay, metric bars, seed stability violins, and a comparison grid under `evaluation/prediction/comparison/figures/`.
+
+#### Optional: `fm.explain(model="prediction", plot_per_seed=True)`
+- Not called in `main.py` itself - add it after `evaluate(...)` to produce per-seed SHAP bar + beeswarm plots and per-eruption waterfall plots.
+- Restricted to tree classifiers (RF / `lite-rf` / GB / XGB). Non-tree classifiers in the ensemble are skipped with a warning.
+- Sees the same `eruption_dates` fall-back as `evaluate(...)`. Output lands under `explanation/prediction/` - see [Explanation Workflow](Explanation-Workflow).
 
 ---
 
@@ -162,6 +167,12 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
    │       ▼                                                           │
    │  fm.evaluate(model="prediction", plot_per_seed=True,              │
    │              output_dir=output_dir)                               │
+   │       │                                                           │
+   │       ▼                                                           │
+   │  fm.explain(model="prediction",                                   │
+   │             eruption_dates=eruption_dates,                        │
+   │             save_per_seed=True, plot_per_seed=False,              │
+   │             max_display=20)                                       │
    └───────────────────────────────────────────────────────────────────┘
            │
            ▼
@@ -175,7 +186,8 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 - `eruption_dates` is the **full** list of eight known eruptions on every scenario. The training window simply excludes the eruptions that haven't happened yet, and the prediction window picks them up later.
 - `plot_kwargs["eruption_dates"]` is forwarded into `fm.predict(...)` as `**plot_kwargs`, which routes them to `forecast_plots` so eruption-day markers are drawn on the per-scenario forecast plot.
 - The Telegram hook (`send_telegram_notification`) ships the per-scenario forecast PNG to the configured chat the moment `predict()` returns. The bundled `send_as_document=True` flag forces the file to be uploaded as a document rather than re-encoded as an image - preserves the full DPI plot.
-- `fm.evaluate(...)` runs **after** the notification, so by the time you see the plot in Telegram, the per-seed metrics JSON is already being computed in the background.
+- `fm.evaluate(...)` runs **after** the notification, so by the time you see the plot in Telegram, the per-seed `y_proba` / `y_pred` matrices and aggregate metric plots are already being written in the background.
+- `fm.explain(...)` runs last in each scenario - per-seed SHAP explanations are bundled into `ClassifierExplanation_*.pkl` under `explanation/prediction/classifiers/` and per-eruption waterfall plots land under `explanation/prediction/eruptions/`. See [Explanation Workflow](Explanation-Workflow) for the full output tree.
 
 ### Resulting directory layout
 
@@ -189,6 +201,7 @@ output/
         │   ├── training/
         │   ├── prediction/
         │   ├── evaluation/prediction/
+        │   ├── explanation/prediction/
         │   └── cache/
         ├── scenario-2/
         ...

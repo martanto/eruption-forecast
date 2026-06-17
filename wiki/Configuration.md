@@ -22,7 +22,8 @@ This page covers config persistence, the dataclass layout, Telegram notification
    │   ├── calculate:  ForecastCalculateConfig | None             │
    │   ├── train:      ForecastTrainConfig     | None             │
    │   ├── predict:    ForecastPredictConfig   | None             │
-   │   └── evaluate:   ForecastEvaluateConfig  | None             │
+   │   ├── evaluate:   ForecastEvaluateConfig  | None             │
+   │   └── explain:    ForecastExplainConfig   | None             │
    └────────────────────────┬─────────────────────────────────────┘
                             │
                 ┌───────────┴───────────┐
@@ -131,9 +132,44 @@ evaluate:
   model: prediction
   plot_per_seed: true
   plot_aggregate: true
+
+explain:
+  model: prediction              # "prediction" | "training"
+  eruption_dates: null           # null → reuse the dates captured during train()
+  save_per_seed: true            # persist each per-seed shap.Explanation
+  plot_per_seed: true            # bar + beeswarm per seed
+  figsize: null                  # null → auto-size from max_display
+  max_display: 20
+  group_remaining_features: false
+  dpi: 150
+  check_additivity: false        # forwarded to shap.TreeExplainer
+  overwrite_classifier_explanation: false
+  output_dir: null
+  overwrite: null
+  n_jobs: null
+  verbose: null
 ```
 
 The keys mirror the kwargs accepted by each method 1:1 - see [API Reference](API-Reference) for the per-stage signatures.
+
+### ForecastExplainConfig fields
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `model` | `Literal["training", "prediction"]` | `"prediction"` | Which upstream stage to explain |
+| `eruption_dates` | `list[str] \| None` | `None` | Falls back to `train()` dates at replay |
+| `save_per_seed` | `bool` | `True` | Persist `shap_values/{seed:05d}.pkl` per seed |
+| `plot_per_seed` | `bool` | `True` | Bar + beeswarm per seed under `classifiers/{Clf}/figures/` |
+| `figsize` | `tuple[float, float] \| None` | `None` | Auto-sized when `None` |
+| `max_display` | `int` | `20` | tsfresh labels truncated to this many in plots |
+| `group_remaining_features` | `bool` | `False` | Forwarded to `shap.plots.beeswarm` |
+| `dpi` | `int` | `150` | Figure resolution |
+| `check_additivity` | `bool` | `False` | Forwarded to `shap.TreeExplainer` |
+| `overwrite_classifier_explanation` | `bool` | `False` | Overwrite cached `ClassifierExplanation_*.pkl` |
+| `output_dir` | `str \| None` | `None` | Inherits from `ForecastModel` |
+| `overwrite` | `bool \| None` | `None` | Inherits from `ForecastModel` |
+| `n_jobs` | `int \| None` | `None` | Inherits from `ForecastModel` |
+| `verbose` | `bool \| None` | `None` | Inherits from `ForecastModel` |
 
 ### `None`-as-inherit
 
@@ -248,8 +284,9 @@ enable_logging()              # restore handlers
 ├── forecast.config.yaml                 # fm.save_config()  - full pipeline
 ├── training.config.yaml                 # tm.save_config()  - standalone TrainingModel
 ├── cache/
-│   ├── TrainingModel/{hash}.params.json # CacheModel identity dumps (diff-able)
-│   └── PredictionModel/{hash}.params.json
+│   ├── TrainingModel/{hash}.params.json     # CacheModel identity dumps (diff-able)
+│   ├── PredictionModel/{hash}.params.json
+│   └── ExplanationModel/{hash}.params.json
 └── ...
 ```
 

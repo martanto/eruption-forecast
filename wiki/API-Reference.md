@@ -8,6 +8,7 @@ from eruption_forecast import (
     TrainingModel,
     PredictionModel,
     EvaluationModel,
+    ExplanationModel,
     CalculateTremor,
     LabelBuilder,
     DynamicLabelBuilder,
@@ -23,6 +24,11 @@ from eruption_forecast import (
 from eruption_forecast.ensemble import SeedEnsemble, ClassifierEnsemble
 from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
+from eruption_forecast.ensemble.explainer_ensemble import ExplainerEnsemble
+from eruption_forecast.dataclass import (
+    SeedExplanation,
+    ClassifierExplanation,
+)
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.features.feature_selector import FeatureSelector
 ```
@@ -167,6 +173,29 @@ fm.evaluate(
 ```
 
 `eruption_dates=None` falls back to the dates captured during `train()`. Always auto-calls `save_config()` at the end. Sets `self.EvaluationModel`, `self.evaluation_results`.
+
+### `explain(...)`
+
+```python
+fm.explain(
+    model: Literal["training", "prediction"] = "prediction",
+    eruption_dates: list[str] | None = None,
+    save_per_seed: bool = True,
+    plot_per_seed: bool = True,
+    figsize: tuple[float, float] | None = None,
+    max_display: int = 20,
+    group_remaining_features: bool = False,
+    dpi: int = 150,
+    check_additivity: bool = False,
+    overwrite_classifier_explanation: bool = False,
+    output_dir: str | None = None,
+    overwrite: bool | None = None,
+    n_jobs: int | None = None,
+    verbose: bool | None = None,
+) -> Self
+```
+
+Requires the upstream `TrainingModel` or `PredictionModel` to exist on `self` (run `train()` and, for `model="prediction"`, `predict()` first). `eruption_dates=None` falls back to the dates captured during `train()`. Internally constructs an `ExplanationModel`, runs `explain()` then `plot()`, and sets `self.ExplanationModel`. See [Explanation Workflow](Explanation-Workflow) for the TreeExplainer constraint (RF / `lite-rf` / GB / XGB only — other classifiers are skipped with a warning).
 
 ### Config round-trip
 
@@ -360,7 +389,156 @@ EvaluationModel.from_file(
 
 Classmethod. Loads a `.pkl` produced by `TrainingModel.save()` or `PredictionModel.save()` and dispatches on `kind`.
 
-`plot_per_seed=True` and `plot_shap=True` currently emit a warning and are no-ops (reserved for a follow-up that rebuilds plots from `MetricsEnsemble`'s persisted matrices).
+`plot_shap=True` is reserved on this surface and emits a warning — SHAP rendering is produced by the dedicated [Explanation Workflow](Explanation-Workflow) via `ExplanationModel.explain()`. `plot_per_seed=True` is plumbed through to `MetricsEnsemble.plot_seed()` for the metric plots (ROC, PR, confusion, etc.) — it does **not** render SHAP.
+
+---
+
+## ExplanationModel
+
+`BaseModel + CacheModel` subclass. Per-seed SHAP explanations over a fitted `ClassifierEnsemble` — never re-fits. See [Explanation Workflow](Explanation-Workflow).
+
+### Constructor
+
+```python
+ExplanationModel(
+    model: TrainingModel | PredictionModel,
+    eruption_dates: list[str] | None = None,
+    overwrite: bool = False,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+)
+```
+
+Output is namespaced to `explanation/{model.kind}/`. The constructor sets `self.kind="explanation"`, `self.model_kind` (mirrored from the upstream `TrainingModel.kind` / `PredictionModel.kind`), `self.ClassifierEnsemble`, `self.features_df`, `self.explanation_dir`, `self.classifiers_dir`, and `self.ExplainerEnsemble`.
+
+### Methods
+
+```python
+em.explain(
+    save_per_seed: bool = True,
+    check_additivity: bool = False,
+    overwrite_classifier_explanation: bool = False,
+) -> Self
+
+em.plot(
+    figsize: tuple[float, float] | None = None,
+    max_display: int = 20,
+    group_remaining_features: bool = False,
+    dpi: int = 150,
+    plot_per_seed: bool = True,
+)
+```
+
+`explain()` delegates to `ExplainerEnsemble.explain()` and caches the result via `CacheModel`. On a cache hit the stored `self.explanations` is restored without re-running SHAP. `plot()` renders the per-eruption waterfall (only when `eruption_dates` is available) and, optionally, per-seed bar + beeswarm plots.
+
+```python
+ExplanationModel.from_file(
+    filepath: str,
+    eruption_dates: list[str] | None = None,
+    overwrite: bool = False,
+    output_dir: str | None = None,
+    root_dir: str | None = None,
+    n_jobs: int = 1,
+    verbose: bool = False,
+) -> ExplanationModel
+```
+
+Classmethod. Loads a `.pkl` from `TrainingModel.save()` or `PredictionModel.save()` and constructs an `ExplanationModel` against it. Raises `TypeError` if the pickle holds anything else.
+
+Populated attributes after `explain()`: `em.explanations: list[ClassifierExplanation]`.
+
+---
+
+## ExplainerEnsemble
+
+```python
+ExplainerEnsemble(
+    classifier_ensemble: ClassifierEnsemble,
+    features_df: pd.DataFrame,
+    kind: Literal["training", "prediction"] = "prediction",
+    output_dir: str | None = None,
+    explanation_dir: str | None = None,
+    root_dir: str | None = None,
+    overwrite: bool = False,
+    n_jobs: int = 1,
+    verbose: bool = False,
+)
+```
+
+Per-seed SHAP engine driven by `shap.TreeExplainer`. Non-tree classifiers (`svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`) are skipped at the per-classifier loop with a warning. `explanation_dir` is the sibling-of-`classifiers/` root used for per-eruption waterfall plots; when omitted it falls back to `dirname(output_dir)`.
+
+### Methods
+
+```python
+ee.explain(
+    save_per_seed: bool = True,
+    check_additivity: bool = False,
+    overwrite_classifier_explanation: bool = False,
+) -> Self
+
+ee.plot_seed(
+    max_display: int = 20,
+    group_remaining_features: bool = False,
+    dpi: int = 150,
+)   # per-classifier bar + beeswarm under classifiers/{ClfName}/figures/
+
+ee.plot_waterfall(
+    labels: pd.Series | pd.DataFrame,
+    eruption_dates: list[str],
+    figsize: tuple[float, float] | None = None,
+    max_display: int = 20,
+    dpi: int = 150,
+)   # per-eruption waterfall under {explanation_dir}/eruptions/{date}/
+```
+
+### Static helpers
+
+```python
+ExplainerEnsemble.explain_seed(
+    seed: dict,
+    features_df: pd.DataFrame,
+    save_per_seed: bool = False,
+    check_additivity: bool = False,
+    seed_explanation_filepath: str | None = None,
+) -> shap.Explanation
+
+ExplainerEnsemble.explain_classifier(
+    seed_ensemble: SeedEnsemble,
+    features_df: pd.DataFrame,
+    save_per_seed: bool = False,
+    kind: Literal["training", "prediction"] = "prediction",
+    check_additivity: bool = False,
+    output_dir: str | None = None,
+    overwrite: bool = False,
+    verbose: bool = False,
+) -> ClassifierExplanation
+
+ExplainerEnsemble.normalise_shap_values(
+    explanation: shap.Explanation,
+) -> tuple[np.ndarray, np.ndarray]
+```
+
+Imported from `eruption_forecast.ensemble.explainer_ensemble` (intentionally **not** re-exported from `ensemble/__init__.py` to keep that subpackage cycle-free).
+
+---
+
+## SeedExplanation / ClassifierExplanation
+
+```python
+@dataclass(frozen=True, slots=True)
+class SeedExplanation:
+    random_state: int
+    shap_values: shap.Explanation
+
+@dataclass(slots=True)
+class ClassifierExplanation:
+    classifier_name: str
+    seeds: list[SeedExplanation] = field(default_factory=list)
+```
+
+Both re-exported from `eruption_forecast.dataclass`. `SeedExplanation` is frozen; `ClassifierExplanation` is mutable so `ExplainerEnsemble.explain_classifier()` can append seeds incrementally. Produced by the explanation stage and consumed by every plot helper in `plots/explanation_plots.py`.
 
 ---
 
@@ -631,10 +809,11 @@ MetricsEnsemble.from_file(
 
 | Method | Notes |
 |--------|-------|
-| `me.compute() -> Self` | Per-seed metric loop; writes JSON + `y_proba/y_pred/y_true` CSV matrices |
-| `me.plot_aggregate()` | Aggregate plots per classifier - ROC, PR, confusion, threshold, importance |
-| `me.plot_seed()` | Per-seed plots (currently reserved) |
-| `me.metrics` | `dict[str, pd.DataFrame]` - populated after `compute()` |
+| `me.compute() -> Self` | Per-seed metric loop. Writes only the `(n_samples, n_seeds)` `y_proba.csv` / `y_pred.csv` matrices under `classifiers/{ClfName}/predictions/`. `metrics`, `y_probas`, `y_preds` stay in memory; no per-seed JSON is produced. Idempotent once `y_probas` is populated. |
+| `me.plot_aggregate(include_plots=None, exclude_plots=None) -> list[str]` | Aggregate plots per classifier — ROC, PR, threshold analysis, g-mean curve, MCC curve. Writes `figures/aggregate/{plot_name}.{png,csv}` per classifier. |
+| `me.plot_seed(include_plots=None, exclude_plots=None) -> list[str]` | Per-seed plots — same dispatcher catalogue. Writes `figures/{plot_name}/{seed:05d}.png` per classifier in parallel via `joblib`. |
+| `me.metrics` | `dict[str, pd.DataFrame]` — populated after `compute()` |
+| `me.save(path=None)` / `MetricsEnsemble.load(path)` | joblib round-trip of the full instance to `MetricsEnsemble.pkl`. |
 
 Imported from `eruption_forecast.ensemble.metrics_ensemble` (intentionally **not** in `ensemble/__init__.py` to avoid an import cycle).
 

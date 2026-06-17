@@ -9,7 +9,8 @@ The pipeline auto-renders the most useful plots; you can also invoke each helper
 | `plots/tremor_plots.py` | `plot_tremor` | `CalculateTremor` daily plots |
 | `plots/feature_plots.py` | `plot_significant_features`, `replot_significant_features`, `plot_frequency_band_contribution` | `TrainingModel.fit()` when `plot_features=True` |
 | `plots/forecast_plots.py` | `plot_forecast`, `plot_forecast_from_file` | `PredictionModel.forecast()` |
-| `plots/evaluation_plots.py` | `plot_roc_curve`, `plot_precision_recall_curve`, `plot_confusion_matrix`, `plot_threshold_analysis`, `plot_feature_importance` | `EvaluationModel.evaluate(plot_aggregate=True)` |
+| `plots/evaluation_plots.py` | `plot_roc_curve`, `plot_precision_recall_curve`, `plot_confusion_matrix`, `plot_threshold_analysis`, `plot_g_mean_curve`, `plot_mcc_curve`, aggregate counterparts (`plot_aggregate_*`), `render_one_plot`, `render_one_aggregate_plot` | `EvaluationModel.evaluate(plot_aggregate=…, plot_per_seed=…)` |
+| `plots/explanation_plots.py` | `plot_shap_waterfall`, `plot_shap_beeswarm`, `plot_shap_bar`, `plot_aggregate_shap_bar`, `plot_aggregate_shap_beeswarm`, `plot_classifier_waterfall`, `render_seed_plot` | `ExplanationModel.explain()` + `ExplainerEnsemble.plot_seed/plot_waterfall` |
 | `label/label_plots.py` | `plot_label_distribution` | `LabelBuilder` debugging |
 
 All of these are re-exported from `eruption_forecast.plots`:
@@ -102,20 +103,22 @@ fig.savefig("forecast.png", dpi=200, bbox_inches="tight")
 
 ## Evaluation - `plot_roc_curve` etc.
 
-These are the aggregate plots `EvaluationModel.evaluate(plot_aggregate=True)` renders per classifier:
+These are the aggregate plots `EvaluationModel.evaluate(plot_aggregate=True)` renders per classifier — each call also writes a `{plot_name}.csv` sidecar with the underlying mean / std data so the figure can be re-rendered offline:
 
 | Function | Plot |
 |----------|------|
-| `plot_roc_curve` | Mean ROC + ± std band across seeds |
-| `plot_precision_recall_curve` | Mean PR + ± std band |
-| `plot_confusion_matrix` | Summed confusion matrix |
-| `plot_threshold_analysis` | Precision, recall, F1, balanced accuracy, G-mean vs threshold - marks `ERUPTION_PROBABILITY_THRESHOLD` (`config/constants.py`) and the optimal G-mean threshold |
-| `plot_feature_importance` | Mean feature importance with std error bars |
+| `plot_roc_curve` / `plot_aggregate_roc_curve` | Mean ROC + ± std band across seeds |
+| `plot_precision_recall_curve` / `plot_aggregate_precision_recall_curve` | Mean PR + ± std band |
+| `plot_confusion_matrix` | Summed confusion matrix (per-seed only) |
+| `plot_threshold_analysis` / `plot_aggregate_threshold_analysis` | Precision, recall, F1, balanced accuracy, G-mean, MCC vs threshold — marks `ERUPTION_PROBABILITY_THRESHOLD` (`config/constants.py`) and the optimal G-mean / MCC thresholds |
+| `plot_g_mean_curve` / `plot_aggregate_g_mean_curve` | G-mean vs threshold across seeds |
+| `plot_mcc_curve` / `plot_aggregate_mcc_curve` | MCC vs threshold across seeds |
 
 Auto-rendered at:
 
 ```
-{station_dir}/evaluation/{kind}/classifiers/{classifier}/figures/*.png
+{station_dir}/evaluation/{kind}/classifiers/{Clf}/figures/aggregate/{plot_name}.{png,csv}
+{station_dir}/evaluation/{kind}/classifiers/{Clf}/figures/{plot_name}/{seed:05d}.png   # plot_per_seed=True
 ```
 
 `ClassifierComparator.plot_all()` adds cross-classifier figures under `evaluation/{kind}/comparison/figures/` - see [Evaluation Workflow → Cross-Classifier Comparison](Evaluation-Workflow#cross-classifier-comparison).
@@ -136,11 +139,27 @@ Useful when tuning `window_step` and `day_to_forecast` - flips the imbalance imm
 
 ---
 
-## SHAP Status
+## SHAP — `plot_classifier_waterfall` etc.
 
-The current evaluation flow has SHAP plotting stubbed via `evaluate(plot_shap=True)` - the call is accepted 
-but emits a warning instead of rendering. Per-seed SHAP plots will return once the follow-up rebuilds them from the `(y_proba, y_pred, y_true)` 
-matrices persisted by `MetricsEnsemble`. When that happens, remember to pass `plot_size=None` to `shap.plots.beeswarm` so SHAP does not override the pre-created `figsize`.
+SHAP plots are produced by the dedicated explanation stage (`ExplanationModel.explain()` → `ExplainerEnsemble.plot_seed/plot_waterfall`) and rendered through `plots/explanation_plots.py`. The legacy `EvaluationModel.evaluate(plot_shap=True)` hook is now a reserved no-op — it accepts the kwarg, logs a warning, and dispatches no figures.
+
+| Function | Plot | Output |
+|----------|------|--------|
+| `plot_shap_bar(explanation, ...)` | One bar plot for one seed | caller-supplied `save_filepath` |
+| `plot_shap_beeswarm(explanation, ...)` | One beeswarm for one seed | caller-supplied `save_filepath` |
+| `plot_shap_waterfall(explanation, ...)` | One waterfall for one observation | caller-supplied `save_filepath` |
+| `plot_aggregate_shap_bar(aggregate_df, ...)` | Frequency-weighted aggregate bar across seeds | `(fig, df)` returned |
+| `plot_aggregate_shap_beeswarm(explanation, row_seed, row_obs, ...)` | Stacked-seeds aggregate beeswarm | `(fig, tidy_df)` returned |
+| `plot_classifier_waterfall(classifier_explanation, classifier_ensemble, labels, eruption_dates, ...)` | Per-eruption highest-probability waterfall | `{explanation_dir}/eruptions/{date}/{Clf}_*.png` |
+
+Auto-rendered at:
+
+```
+{station_dir}/explanation/{kind}/classifiers/{Clf}/figures/{bar,beeswarm}/{seed:05d}.png
+{station_dir}/explanation/{kind}/eruptions/{date}/{Clf}_{datetime}_seed=_index=.png
+```
+
+When invoking the SHAP helpers directly, always pass `plot_size=None` to `shap.plots.beeswarm` so SHAP does not override the pre-created `figsize` — the project's `shap_figure` context manager already sets it. See [Explanation Workflow](Explanation-Workflow) for the full surface.
 
 ---
 
