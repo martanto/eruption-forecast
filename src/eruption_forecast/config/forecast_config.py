@@ -331,6 +331,9 @@ class ForecastExplainConfig(BaseConfig):
             Defaults to ``True``.
         plot_per_seed (bool): Render per-seed bar and beeswarm plots.
             Defaults to ``True``.
+        plot_aggregate (bool): Render per-classifier aggregate bar and
+            beeswarm plots over the NaN-padded union feature space.
+            Defaults to ``True``.
         figsize (tuple[float, float] | None): Figure size in inches for
             SHAP plots. ``None`` auto-sizes from ``max_display``. Defaults
             to ``None``.
@@ -362,6 +365,7 @@ class ForecastExplainConfig(BaseConfig):
     eruption_dates: list[str] | None = None
     save_per_seed: bool = True
     plot_per_seed: bool = True
+    plot_aggregate: bool = True
     figsize: tuple[float, float] | None = None
     max_display: int = 20
     group_remaining_features: bool = False

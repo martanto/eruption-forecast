@@ -408,11 +408,13 @@ class ExplanationModel(BaseModel, CacheModel):
         group_remaining_features: bool = False,
         dpi: int = 150,
         plot_per_seed: bool = True,
+        plot_aggregate: bool = True,
     ):
         """Render every SHAP plot the stage produces.
 
         Renders per-eruption waterfall plots (when ``eruption_dates`` is
-        available) and, optionally, per-seed bar and beeswarm plots.
+        available) and, optionally, per-seed bar and beeswarm plots plus
+        per-classifier aggregate bar and beeswarm plots.
 
         Args:
             figsize (tuple[float, float] | None): Figure size in inches
@@ -428,6 +430,11 @@ class ExplanationModel(BaseModel, CacheModel):
             plot_per_seed (bool): Render per-seed bar and beeswarm plots
                 in parallel under ``classifiers/{name}/figures/``. Defaults
                 to ``True``.
+            plot_aggregate (bool): Render per-classifier aggregate bar
+                and beeswarm plots under
+                ``classifiers/{name}/figures/aggregate/``. Stacks every
+                seed into the union feature space (NaN-padded) so a single
+                figure summarises the whole ensemble. Defaults to ``True``.
 
         Raises:
             ValueError: If :meth:`explain` has not yet been called.
@@ -456,4 +463,15 @@ class ExplanationModel(BaseModel, CacheModel):
                 max_display=max_display,
                 group_remaining_features=group_remaining_features,
                 dpi=dpi,
+            )
+
+        # Aggregate plots collapse all seeds into a single per-classifier view
+        # over the NaN-padded union feature space.
+        if plot_aggregate:
+            explainer_ensemble.plot_aggregate(
+                max_display=max_display,
+                top_n=max_display,
+                figsize=figsize,
+                dpi=dpi,
+                group_remaining_features=group_remaining_features,
             )
