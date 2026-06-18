@@ -168,19 +168,19 @@ constraint: n_jobs × n_grids ≤ total_cpu
 
 Configured in `ClassifierModel` (`model/classifier_model.py`). Grid params come from `model/constants.py:DEFAULT_GRID_PARAMS`.
 
-| Key | sklearn class | Folder slug | GPU |
-|-----|---------------|-------------|-----|
-| `rf` | `RandomForestClassifier` (balanced class weights) | `random-forest-classifier` | - |
-| `lite-rf` | `RandomForestClassifier` with a slimmer grid | `lite-random-forest-classifier` | - |
-| `gb` | `GradientBoostingClassifier` | `gradient-boosting-classifier` | - |
-| `xgb` | `XGBClassifier` | `xgb-classifier` | ✓ via `use_gpu=True, gpu_id=0` |
-| `svm` | `SVC` (balanced) | `svc` | - |
-| `lr` | `LogisticRegression` (balanced) | `logistic-regression` | - |
-| `nn` | `MLPClassifier` | `mlp-classifier` | - |
-| `dt` | `DecisionTreeClassifier` (balanced) | `decision-tree-classifier` | - |
-| `knn` | `KNeighborsClassifier` | `k-neighbors-classifier` | - |
-| `nb` | `GaussianNB` | `gaussian-nb` | - |
-| `voting` | `VotingClassifier` over `rf + xgb` | `voting-classifier` | ✓ (delegates to XGB) |
+| Key | sklearn class | Folder slug |
+|-----|---------------|-------------|
+| `rf` | `RandomForestClassifier` (balanced class weights) | `random-forest-classifier` |
+| `lite-rf` | `RandomForestClassifier` with a slimmer grid | `lite-random-forest-classifier` |
+| `gb` | `GradientBoostingClassifier` | `gradient-boosting-classifier` |
+| `xgb` | `XGBClassifier` | `xgb-classifier` |
+| `svm` | `SVC` (balanced) | `svc` |
+| `lr` | `LogisticRegression` (balanced) | `logistic-regression` |
+| `nn` | `MLPClassifier` | `mlp-classifier` |
+| `dt` | `DecisionTreeClassifier` (balanced) | `decision-tree-classifier` |
+| `knn` | `KNeighborsClassifier` | `k-neighbors-classifier` |
+| `nb` | `GaussianNB` | `gaussian-nb` |
+| `voting` | `VotingClassifier` over `rf + xgb` | `voting-classifier` |
 
 Pass `classifiers="rf"` or `classifiers=["rf", "xgb", "gb"]` to `fm.train(...)`. Each classifier produces one `SeedEnsemble`; together they form a `ClassifierEnsemble`.
 
