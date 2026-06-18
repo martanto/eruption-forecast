@@ -128,8 +128,6 @@ class ClassifierModel:
         verbose: bool = False,
         class_weight: str | dict[int, float] | None = None,
         n_jobs: int = 1,
-        use_gpu: bool = False,
-        gpu_id: int = 0,
     ):
         """Initialize the ClassifierModel with a classifier type and cross-validation settings.
 
@@ -152,13 +150,6 @@ class ClassifierModel:
                 scheme passed to classifiers that support it. Defaults to None.
             n_jobs (int, optional): Number of parallel jobs for supported classifiers.
                 Defaults to 1.
-            use_gpu (bool, optional): Enable GPU acceleration for XGBoost via
-                ``device="cuda"``. Defaults to False (CPU only). Enable only when
-                training on a single large batch outside cross-validation loops,
-                as repeated CPU↔GPU transfers during CV can cause instability.
-            gpu_id (int, optional): GPU device index to use when use_gpu is True
-                (e.g. 0 for the first GPU, 1 for the second). Ignored when
-                use_gpu is False. Defaults to 0.
         """
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -171,14 +162,6 @@ class ClassifierModel:
         self.verbose = verbose
         self.class_weight = class_weight
         self.n_jobs = n_jobs
-        self.use_gpu = use_gpu
-        self.gpu_id = gpu_id
-
-        if use_gpu and classifier not in {"xgb", "voting"}:
-            logger.warning(
-                f"use_gpu=True has no effect for classifier '{classifier}'. "
-                "GPU acceleration is only supported for 'xgb' and 'voting'."
-            )
 
         # ------------------------------------------------------------------
         # Set ADDITIONAL properties (derived values)
@@ -418,17 +401,6 @@ class ClassifierModel:
 
         return self._build_model()
 
-    def _xgb_device(self) -> str:
-        """Return the XGBoost device string based on use_gpu and gpu_id.
-
-        Returns "cuda:<gpu_id>" when use_gpu is True so that a specific GPU
-        can be targeted on multi-GPU machines; otherwise returns "cpu".
-
-        Returns:
-            str: "cuda:<gpu_id>" if use_gpu is True, otherwise "cpu".
-        """
-        return f"cuda:{self.gpu_id}" if self.use_gpu else "cpu"
-
     def _build_model(
         self,
     ) -> (
@@ -485,7 +457,6 @@ class ClassifierModel:
             ),
             "gb": lambda: GradientBoostingClassifier(random_state=self.random_state),
             "xgb": lambda: XGBClassifier(
-                device=self._xgb_device(),
                 tree_method="hist",
                 eval_metric="logloss",
                 random_state=self.random_state,
@@ -513,7 +484,6 @@ class ClassifierModel:
                     (
                         "xgb",
                         XGBClassifier(
-                            device=self._xgb_device(),
                             tree_method="hist",
                             eval_metric="logloss",
                             random_state=self.random_state,

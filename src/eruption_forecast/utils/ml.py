@@ -27,7 +27,6 @@ from sklearn.model_selection import GridSearchCV
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.dataframe import to_series
 from eruption_forecast.utils.pathutils import ensure_dir
-from eruption_forecast.config.constants import GPU_CLASSIFIERS
 from eruption_forecast.utils.date_utils import (
     sort_dates,
     to_datetime,
@@ -514,25 +513,18 @@ def get_classifier_models(
         "shuffle", "stratified", "shuffle-stratified", "timeseries"
     ] = "shuffle-stratified",
     cv_splits: int = 5,
-    use_gpu: bool = False,
-    gpu_id: int = 0,
     verbose: bool = False,
 ) -> list[ClassifierModel]:
     """Instantiate one ClassifierModel per classifier key.
 
     Builds a :class:`~eruption_forecast.model.classifier_model.ClassifierModel`
-    for each slug in ``classifiers``, applying a shared CV strategy, split count,
-    and GPU settings. GPU acceleration is enabled only for classifiers listed in
-    ``GPU_CLASSIFIERS``.
+    for each slug in ``classifiers``, applying a shared CV strategy and split count.
 
     Args:
         classifiers (list[str]): List of classifier slug names (e.g. ``["rf", "xgb"]``).
         cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified", "timeseries"],
             optional): Cross-validation strategy. Defaults to ``"shuffle-stratified"``.
         cv_splits (int, optional): Number of CV folds. Defaults to 5.
-        use_gpu (bool, optional): Enable GPU acceleration for supported classifiers.
-            Defaults to False.
-        gpu_id (int, optional): GPU device index when ``use_gpu`` is True. Defaults to 0.
         verbose (bool, optional): Emit progress log messages. Defaults to False.
 
     Returns:
@@ -544,8 +536,6 @@ def get_classifier_models(
             classifier=classifier,  # ty:ignore[invalid-argument-type]
             cv_strategy=cv_strategy,
             n_splits=cv_splits,
-            use_gpu=use_gpu and classifier in GPU_CLASSIFIERS,
-            gpu_id=gpu_id,
             verbose=verbose,
         )
         for classifier in classifiers
