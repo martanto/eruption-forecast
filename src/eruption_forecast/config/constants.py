@@ -33,6 +33,3 @@ MATPLOTLIB_BACKEND: str = "Agg"
 
 CLASS_LABELS: list[str] = ["Not Erupted", "Erupted"]
 """Display labels for the binary classification classes (index 0 = not erupted, 1 = erupted)."""
-
-GPU_CLASSIFIERS: set[str] = {"xgb", "voting"}
-"""Classifier identifiers that support GPU acceleration."""
