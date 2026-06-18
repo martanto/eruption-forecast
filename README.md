@@ -504,14 +504,14 @@ set_log_directory("logs/2026-06-10")            # move file handler
 | `rf` | `RandomForestClassifier` | `class_weight="balanced"` | Default; robust baseline |
 | `lite-rf` | `RandomForestClassifier` | `class_weight="balanced"` | Smaller grid for faster training |
 | `gb` | `GradientBoostingClassifier` | natural | — |
-| `xgb` | `XGBClassifier` | `scale_pos_weight` grid | GPU-capable via `use_gpu=True` on the `ClassifierModel` |
+| `xgb` | `XGBClassifier` | `scale_pos_weight` grid | — |
 | `svm` | `SVC` | `class_weight="balanced"` | — |
 | `lr` | `LogisticRegression` | `class_weight="balanced"` | Fast, interpretable |
 | `nn` | `MLPClassifier` | none | — |
 | `dt` | `DecisionTreeClassifier` | `class_weight="balanced"` | Interpretable baseline |
 | `knn` | `KNeighborsClassifier` | none | — |
 | `nb` | `GaussianNB` | none | Fast baseline |
-| `voting` | `VotingClassifier` (RF + XGBoost soft vote) | combined | GPU-capable |
+| `voting` | `VotingClassifier` (RF + XGBoost soft vote) | combined | — |
 
 `classifiers=` accepts `str` or `list[str]`. One `SeedEnsemble` is built per classifier and bundled into a single `ClassifierEnsemble` for consensus forecasting.
 
@@ -609,9 +609,9 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 - obspy (seismic data processing)
 - tsfresh (time-series feature extraction)
 - scikit-learn, imbalanced-learn
-- xgboost ≥ 3.x (GPU-capable)
+- xgboost ≥ 3.x
 - shap ≥ 0.46
-- joblib, numba
+- joblib
 - matplotlib, seaborn
 - loguru
 - python-dotenv (Telegram credentials)

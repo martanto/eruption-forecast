@@ -14,7 +14,6 @@ For per-stage detail jump to [Pipeline Walkthrough](Pipeline-Walkthrough); for a
 | **Git** | Required for cloning the repository |
 | **Seismic data archive** | An [SDS-formatted](Data-Sources#sds) local directory, **or** access to an FDSN web service (default: `https://service.iris.edu`) |
 | **Eruption dates** | Known absolute eruption timestamps for the target volcano - supervised labelling is keyed off these dates |
-| **GPU** *(optional)* | CUDA-capable device for XGBoost - toggled per-classifier via `ClassifierModel(use_gpu=True, gpu_id=0)` |
 | **Telegram bot** *(optional)* | Push notifications when long-running stages finish - see [Configuration](Configuration#telegram-notifications) |
 
 ---
@@ -51,12 +50,12 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 |---------|------|
 | `obspy` | Seismic-stream IO (`Stream`, `Trace`) |
 | `pandas` (≥ 3.0.0) | Time-series manipulation and CSV IO |
-| `numpy`, `numba` | Numerical kernels + JIT for tremor metrics |
+| `numpy` | Numerical kernels for tremor metrics |
 | `scipy` | Signal processing (filtering, FFT) |
 | `tsfresh` | Automated extraction of 700+ time-series features |
 | `scikit-learn` | Classifiers, CV splitters, GridSearchCV |
 | `imbalanced-learn` | `RandomUnderSampler` for class imbalance |
-| `xgboost` (≥ 3.x) | Gradient boosting with optional GPU |
+| `xgboost` (≥ 3.x) | Gradient boosting |
 | `shap` (≥ 0.46) | Model interpretability (used by evaluation plots) |
 | `joblib` | Parallel workers + ensemble serialisation |
 | `matplotlib`, `seaborn` | Plotting backends |
