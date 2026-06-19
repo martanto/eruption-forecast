@@ -1,6 +1,6 @@
 # %%
 import os
-from typing import Any, TypedDict, NotRequired
+from typing import Any, Literal, TypedDict, NotRequired
 
 from dotenv import load_dotenv
 
@@ -17,6 +17,8 @@ class Scenario(TypedDict):
     train_end_date: str
     prediction_start_date: str
     prediction_end_date: str
+    window_step: int
+    window_step_unit: Literal["minutes", "hours"]
     plot_kwargs: NotRequired[dict[str, Any]]
 
 
@@ -44,6 +46,8 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-03-31",
         "prediction_start_date": "2025-04-01",
         "prediction_end_date": "2025-04-30",
+        "window_step": 10,
+        "window_step_unit": "minutes",
     },
     {
         "name": "Scenario 2",
@@ -52,6 +56,8 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-03-31",
         "prediction_start_date": "2025-05-01",
         "prediction_end_date": "2025-05-31",
+        "window_step": 10,
+        "window_step_unit": "minutes",
     },
     {
         "name": "Scenario 3",
@@ -60,6 +66,8 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-03-31",
         "prediction_start_date": "2025-06-01",
         "prediction_end_date": "2025-06-30",
+        "window_step": 10,
+        "window_step_unit": "minutes",
     },
     {
         "name": "Scenario 5",
@@ -68,6 +76,8 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-04-30",
         "prediction_start_date": "2025-05-01",
         "prediction_end_date": "2025-05-31",
+        "window_step": 10,
+        "window_step_unit": "minutes",
     },
     {
         "name": "Scenario 6",
@@ -76,6 +86,8 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-05-31",
         "prediction_start_date": "2025-06-01",
         "prediction_end_date": "2025-06-30",
+        "window_step": 10,
+        "window_step_unit": "minutes",
     },
     {
         "name": "Scenario 7",
@@ -84,6 +96,8 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-06-30",
         "prediction_start_date": "2025-07-01",
         "prediction_end_date": "2025-07-13",
+        "window_step": 10,
+        "window_step_unit": "minutes",
     },
     {
         "name": "Scenario 8",
@@ -92,17 +106,36 @@ scenarios: list[Scenario] = [
         "train_end_date": "2025-07-26",
         "prediction_start_date": "2025-07-27",
         "prediction_end_date": "2025-08-22",
+        "window_step": 10,
+        "window_step_unit": "minutes",
         "plot_kwargs": {
             "legend_n_cols": 4,
         },
     },
     {
         "name": "Scenario 9",
-        "description": "Training using ALL",
+        "description": "Prediciton using ALL - 6 Hours",
         "train_start_date": "2025-01-01",
         "train_end_date": "2025-08-22",
         "prediction_start_date": "2025-01-01",
         "prediction_end_date": "2025-08-22",
+        "window_step": 6,
+        "window_step_unit": "hours",
+        "plot_kwargs": {
+            "rolling_window": "6h",
+            "x_days_interval": 14,
+            "legend_n_cols": 4,
+        },
+    },
+    {
+        "name": "Scenario 10",
+        "description": "Prediciton using ALL - 10 minutes",
+        "train_start_date": "2025-01-01",
+        "train_end_date": "2025-08-22",
+        "prediction_start_date": "2025-01-01",
+        "prediction_end_date": "2025-08-22",
+        "window_step": 10,
+        "window_step_unit": "minutes",
         "plot_kwargs": {
             "rolling_window": "6h",
             "x_days_interval": 14,
@@ -185,25 +218,25 @@ def main(sds_dir: str, n_jobs: int = 2):
                 "has_duplicate_min",
                 "has_duplicate",
             ],
-            seeds=10,
+            seeds=25,
             resample_method="under",
             plot_features=True,
             output_dir=output_dir,
             n_jobs=4,
             n_grids=4,
-            verbose=True,
+            verbose=False,
         )
 
         fm.predict(
             start_date=scenario["prediction_start_date"],
             end_date=scenario["prediction_end_date"],
-            window_step=10,
-            window_step_unit="minutes",
+            window_step=scenario["window_step"],
+            window_step_unit=scenario["window_step_unit"],
             save_seed_result=True,
             plot_threshold=0.7,
             output_dir=output_dir,
             use_cache=False,
-            verbose=True,
+            verbose=False,
             **plot_kwargs,
         )
 
@@ -211,11 +244,27 @@ def main(sds_dir: str, n_jobs: int = 2):
             send_telegram_notification(
                 message=f"{name}: {description}",
                 files=[fm.PredictionModel.forecast_plot_path],
-                file_caption=f"{name}: {description}",
+                file_caption=f"[LAPTOP] {name}: {description}",
                 send_as_document=True,
             )
 
-        fm.evaluate(model="prediction", plot_per_seed=True, output_dir=output_dir)
+        fm.evaluate(
+            model="prediction",
+            eruption_dates=eruption_dates,
+            plot_per_seed=True,
+            output_dir=output_dir,
+        )
+
+        fm.explain(
+            model="prediction",
+            eruption_dates=eruption_dates,
+            save_per_seed=True,
+            plot_per_seed=False,
+            plot_aggregate=True,
+            max_display=20,
+            dpi=150,
+            output_dir=output_dir,
+        )
 
 
 # %%
