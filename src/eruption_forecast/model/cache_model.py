@@ -1,6 +1,7 @@
 import os
 import json
 import hashlib
+import pickle
 from abc import ABC, abstractmethod
 from typing import Any, Self
 from pathlib import Path
@@ -126,9 +127,14 @@ class CacheModel(ABC):
         path = cls.cache_path_for(output_dir, identity)
         if not os.path.isfile(path):
             return None
-        obj: Self = joblib.load(path)
-        logger.info(f"[{cls.__name__}] Loaded from cache: {path}")
-        return obj
+
+        try:
+            obj: Self = joblib.load(path)
+            logger.info(f"[{cls.__name__}] Loaded from cache: {path}")
+            return obj
+        except (ImportError, AttributeError, EOFError, pickle.UnpicklingError, TypeError) as e:
+            logger.warning(f"[{cls.__name__}] Failed to load from cache: {path}. {e}")
+            return None
 
     @classmethod
     def compute_hash(cls, identity: dict, length: int = 12) -> str:
