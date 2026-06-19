@@ -13,7 +13,6 @@ from eruption_forecast.plots.styles import (
     NATURE_COLORS,
     shap_figure,
     configure_spine,
-    apply_nature_style,
 )
 from eruption_forecast.utils.pathutils import save_figure
 from eruption_forecast.dataclass.classifier_explanation import ClassifierExplanation
@@ -200,25 +199,170 @@ def render_seed_plot(
     return save_filepath
 
 
+def _aggregate_importance(
+    classifier_explanation: ClassifierExplanation,
+) -> pd.DataFrame:
+    """Compute a per-feature aggregate importance table across all seeds.
+
+    For each feature appearing in any seed's ``shap.Explanation``, records
+    the mean ``|SHAP|`` averaged over the seeds that selected the feature
+    (the conditional importance), the count of seeds that selected it, and
+    the corresponding ``selection_frequency``. Seed values are reduced
+    from 3D to 2D by slicing the positive class (mirrors the per-seed
+    beeswarm rendering at :func:`plot_shap_beeswarm`) before the per-seed
+    mean ``|SHAP|`` is taken.
+
+    Args:
+        classifier_explanation (ClassifierExplanation): Per-classifier
+            bundle of per-seed ``SeedExplanation`` payloads.
+
+    Returns:
+        pd.DataFrame: Frequency-weighted importance table sorted by
+            ``mean_abs_shap`` descending. Columns are ``feature``,
+            ``mean_abs_shap``, ``selection_frequency``, and
+            ``n_seeds_selected``. The schema matches the input contract
+            of :func:`plot_aggregate_shap_bar`.
+    """
+    n_total_seeds = len(classifier_explanation.seeds)
+    accumulator: dict[str, list[float]] = {}
+    for seed in classifier_explanation.seeds:
+        explanation = seed.shap_values
+        values = np.asarray(explanation.values)  # noqa: PD011
+        if values.ndim == 3:
+            values = values[..., 1]
+        mean_abs = np.abs(values).mean(axis=0)
+        for name, val in zip(list(explanation.feature_names), mean_abs, strict=True):
+            accumulator.setdefault(name, []).append(float(val))
+
+    rows = [
+        {
+            "feature": feature,
+            "mean_abs_shap": float(np.mean(seed_values)),
+            "selection_frequency": len(seed_values) / n_total_seeds,
+            "n_seeds_selected": len(seed_values),
+        }
+        for feature, seed_values in accumulator.items()
+    ]
+    importance_df = pd.DataFrame(
+        rows,
+        columns=[
+            "feature",
+            "mean_abs_shap",
+            "selection_frequency",
+            "n_seeds_selected",
+        ],
+    )
+    return importance_df.sort_values("mean_abs_shap", ascending=False).reset_index(
+        drop=True
+    )
+
+
+def _aggregate_explanation(
+    classifier_explanation: ClassifierExplanation,
+) -> tuple[shap.Explanation, list[int], list[int]]:
+    """Stack per-seed ``shap.Explanation``s into a union feature space.
+
+    Builds the ordered union of feature names across every seed
+    (preserving first-seen order so re-runs are deterministic), then
+    NaN-pads each seed's ``values`` and ``data`` matrices from its
+    per-seed columns into the union space and concatenates along the
+    sample axis. Cells where a seed did not select a feature carry
+    ``np.nan`` so SHAP's beeswarm internals skip them — preserving the
+    "this seed didn't pick it" signal instead of inflating the swarm
+    with fake zeros. 3D ``values`` are reduced to the positive class
+    before padding (matches the per-seed beeswarm path at
+    :func:`plot_shap_beeswarm`).
+
+    Args:
+        classifier_explanation (ClassifierExplanation): Per-classifier
+            bundle of per-seed ``SeedExplanation`` payloads.
+
+    Returns:
+        tuple[shap.Explanation, list[int], list[int]]: A 3-tuple of:
+
+            - **explanation** (``shap.Explanation``): Stacked explanation
+              of shape ``(n_seeds * n_obs, |union features|)`` with
+              ``feature_names`` set to the union list.
+            - **row_seed** (``list[int]``): ``random_state`` for each
+              row of ``explanation.values``.
+            - **row_obs** (``list[int]``): Window id for each row of
+              ``explanation.values`` (the row index within the
+              per-seed explanation, since per-seed explanations are
+              aligned positionally to ``features_df``).
+    """
+    all_names: list[str] = []
+    seen: set[str] = set()
+    for seed in classifier_explanation.seeds:
+        for name in seed.shap_values.feature_names:
+            if name not in seen:
+                seen.add(name)
+                all_names.append(name)
+    name_to_idx = {name: i for i, name in enumerate(all_names)}
+    n_features = len(all_names)
+
+    values_blocks: list[np.ndarray] = []
+    data_blocks: list[np.ndarray] = []
+    row_seed: list[int] = []
+    row_obs: list[int] = []
+
+    for seed in classifier_explanation.seeds:
+        explanation = seed.shap_values
+        values = np.asarray(explanation.values)  # noqa: PD011
+        if values.ndim == 3:
+            values = values[..., 1]
+        raw_data = getattr(explanation, "data", None)
+        data = (
+            np.asarray(raw_data)
+            if raw_data is not None
+            else np.full_like(values, np.nan)
+        )
+        n_samples = values.shape[0]
+
+        padded_values = np.full((n_samples, n_features), np.nan)
+        padded_data = np.full((n_samples, n_features), np.nan)
+        for j, name in enumerate(explanation.feature_names):
+            col_idx = name_to_idx[name]
+            padded_values[:, col_idx] = values[:, j]
+            padded_data[:, col_idx] = data[:, j]
+
+        values_blocks.append(padded_values)
+        data_blocks.append(padded_data)
+        row_seed.extend([int(seed.random_state)] * n_samples)
+        row_obs.extend(range(n_samples))
+
+    merged_values = np.concatenate(values_blocks, axis=0)
+    merged_data = np.concatenate(data_blocks, axis=0)
+
+    aggregated = shap.Explanation(
+        values=merged_values,
+        data=merged_data,
+        feature_names=all_names,
+    )
+    return aggregated, row_seed, row_obs
+
+
 def plot_aggregate_shap_bar(
-    aggregate_df: pd.DataFrame,
+    classifier_explanation: ClassifierExplanation,
     top_n: int = 20,
     figsize: tuple[float, float] | None = None,
     dpi: int = 150,
     title: str | None = None,
+    save_filepath: str | None = None,
+    verbose: bool = False,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Render a frequency-weighted aggregate SHAP bar plot.
 
-    Expects an ``aggregate_df`` produced by
-    :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble._aggregate_importance`,
-    containing columns ``feature``, ``mean_abs_shap``, ``selection_frequency``,
-    ``n_seeds_selected``. Bars are ranked by ``mean_abs_shap``; the
-    ``selection_frequency`` is overlaid as a right-edge text annotation so
-    callers can spot features that were highly impactful but selected by only
-    a few seeds.
+    Builds the per-feature aggregate importance table via
+    :func:`_aggregate_importance` (columns ``feature``, ``mean_abs_shap``,
+    ``selection_frequency``, ``n_seeds_selected``), then renders the
+    top-``top_n`` rows as a horizontal bar chart. Bars are ranked by
+    ``mean_abs_shap``; the ``selection_frequency`` is overlaid as a
+    right-edge text annotation so callers can spot features that were
+    highly impactful but selected by only a few seeds.
 
     Args:
-        aggregate_df (pd.DataFrame): Aggregate importance DataFrame.
+        classifier_explanation (ClassifierExplanation): Per-classifier
+            bundle of per-seed ``SeedExplanation`` payloads.
         top_n (int, optional): Number of top features to display. Defaults
             to ``20``.
         figsize (tuple[float, float] | None, optional): Figure size in
@@ -227,13 +371,19 @@ def plot_aggregate_shap_bar(
         dpi (int, optional): Figure resolution in dots per inch. Defaults
             to ``150``.
         title (str | None, optional): Plot title. Defaults to ``None``.
+        save_filepath (str | None, optional): Destination path. ``None``
+            skips saving. Defaults to ``None``.
+        verbose (bool, optional): Forwarded to :func:`save_figure`.
+            Defaults to ``False``.
 
     Returns:
-        tuple[plt.Figure, pd.DataFrame]: The figure and the unmodified
-            ``aggregate_df`` (so :func:`render_one_aggregate_plot` can save
-            it as the CSV companion).
+        tuple[plt.Figure, pd.DataFrame]: The figure and the full
+            importance DataFrame (not truncated to ``top_n``) so the
+            caller can persist it as the CSV companion.
     """
-    df = aggregate_df.head(top_n).copy()
+    importance_df = _aggregate_importance(classifier_explanation)
+
+    df = importance_df.head(top_n).copy()
     figheight = max(4.0, top_n * 0.35)
     figsize: tuple[float, float] = figsize if figsize is not None else (8.0, figheight)
 
@@ -241,8 +391,8 @@ def plot_aggregate_shap_bar(
     #  chart — matplotlib draws ``barh`` bottom-up.
     df_plot = df.iloc[::-1].reset_index(drop=True)
 
-    with apply_nature_style():
-        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    with shap_figure(figsize=figsize, dpi=dpi) as fig:
+        ax = fig.add_subplot(111)
 
         bars = ax.barh(
             range(len(df_plot)),
@@ -276,34 +426,35 @@ def plot_aggregate_shap_bar(
         ax.set_ylabel("Feature")
         ax.set_title(title or f"Aggregate Top-{top_n} SHAP Importances")
 
-    return fig, aggregate_df
+        if save_filepath:
+            save_figure(fig, save_filepath, dpi, verbose=verbose)
+
+    return fig, importance_df
 
 
 def plot_aggregate_shap_beeswarm(
-    explanation: shap.Explanation,
-    row_seed: list[int],
-    row_obs: list[int],
+    classifier_explanation: ClassifierExplanation,
     max_display: int = 20,
     figsize: tuple[float, float] | None = None,
     dpi: int = 150,
     title: str | None = None,
     dot_size: float = 32.0,
+    group_remaining_features: bool = False,
+    save_filepath: str | None = None,
+    verbose: bool = False,
 ) -> tuple[plt.Figure, pd.DataFrame]:
     """Render a stacked-seeds aggregate SHAP beeswarm.
 
-    Consumes the union-of-features Explanation produced by
-    :meth:`~eruption_forecast.ensemble.explainer_ensemble.ExplainerEnsemble._aggregate_explanation`.
-    Cells where a seed did not select a feature carry NaN and are skipped by
-    SHAP's beeswarm internals. Returns a tidy long-form sidecar DataFrame so
-    external tools can redraw the swarm without the worker pickle.
+    Builds a NaN-padded union-of-features Explanation via
+    :func:`_aggregate_explanation` and renders it as a single beeswarm.
+    Cells where a seed did not select a feature carry NaN and are skipped
+    by SHAP's beeswarm internals. Returns a tidy long-form sidecar
+    DataFrame so external tools can redraw the swarm without the worker
+    pickle.
 
     Args:
-        explanation (shap.Explanation): Stacked positive-class explanation
-            with shape ``(n_seeds × n_obs, |union features|)``.
-        row_seed (list[int]): Seed ``random_state`` for each row of
-            ``explanation.values``.
-        row_obs (list[int]): Window id for each row of
-            ``explanation.values``.
+        classifier_explanation (ClassifierExplanation): Per-classifier
+            bundle of per-seed ``SeedExplanation`` payloads.
         max_display (int, optional): Maximum features to display. Defaults
             to ``20``.
         figsize (tuple[float, float] | None, optional): Figure size in
@@ -317,6 +468,12 @@ def plot_aggregate_shap_beeswarm(
             forwarded to ``shap.plots.beeswarm(s=...)``. SHAP's default is
             ``16``; bumped here so dots remain visible inside the wider
             figure. Defaults to ``32.0``.
+        group_remaining_features (bool, optional): Forwarded to
+            ``shap.plots.beeswarm``. Defaults to ``False``.
+        save_filepath (str | None, optional): Destination path. ``None``
+            skips saving. Defaults to ``None``.
+        verbose (bool, optional): Forwarded to :func:`save_figure`.
+            Defaults to ``False``.
 
     Returns:
         tuple[plt.Figure, pd.DataFrame]: The figure and a tidy DataFrame
@@ -324,19 +481,20 @@ def plot_aggregate_shap_beeswarm(
             ``shap_value``, ``feature_value`` covering only the non-NaN
             cells.
     """
+    explanation, row_seed, row_obs = _aggregate_explanation(classifier_explanation)
+
     figsize: tuple[float, float] = (
         figsize if figsize is not None else (16.0, max(8.0, max_display * 0.5))
     )
 
-    with apply_nature_style():
-        fig = plt.figure(figsize=figsize, dpi=dpi)
-
+    with shap_figure(figsize=figsize, dpi=dpi) as fig:
         shap.plots.beeswarm(
             explanation,
             max_display=max_display,
             s=dot_size,
             plot_size=None,
             show=False,
+            group_remaining_features=group_remaining_features,
         )
 
         #  SHAP draws into the current axes and then adds a colorbar axes,
@@ -351,7 +509,9 @@ def plot_aggregate_shap_beeswarm(
             y=0.9,
             ha="center",
         )
-        configure_spine(ax)
+
+        if save_filepath:
+            save_figure(fig, save_filepath, dpi, verbose=verbose)
 
     #  Tidy long-form sidecar: one row per non-NaN cell. Lets a downstream
     #  consumer rebuild the swarm or query a specific (seed, obs, feature)
