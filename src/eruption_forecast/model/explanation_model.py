@@ -1,10 +1,8 @@
 import os
 from typing import Self, Literal
 
-import joblib
-
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.model.training_model import TrainingModel
@@ -209,10 +207,7 @@ class ExplanationModel(BaseModel, CacheModel):
             TypeError: If the loaded pickle is not a ``TrainingModel`` or
                 ``PredictionModel``.
         """
-        if not os.path.isfile(filepath):
-            raise FileNotFoundError(f"File not found: {filepath}")
-
-        model = joblib.load(filepath)
+        model = load_pickle(filepath)
 
         if not isinstance(model, (TrainingModel, PredictionModel)):
             raise TypeError(

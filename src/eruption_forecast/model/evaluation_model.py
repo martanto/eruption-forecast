@@ -1,11 +1,10 @@
 import os
 from typing import Self, Literal
 
-import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
@@ -224,10 +223,7 @@ class EvaluationModel(BaseModel):
             ... )
             >>> metrics = em.evaluate()
         """
-        if not os.path.isfile(filepath):
-            raise FileNotFoundError(f"File not found: {filepath}")
-
-        model = joblib.load(filepath)
+        model = load_pickle(filepath)
 
         if not isinstance(model, (TrainingModel, PredictionModel)):
             raise TypeError(
