@@ -461,7 +461,6 @@ def _ax_eruption(
         va="bottom",
         ha="right",
         fontsize=8,
-        fontweight="light",
         color="black",
         zorder=100,
     )
