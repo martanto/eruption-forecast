@@ -71,7 +71,12 @@ class PredictionModel(BaseModel, CacheModel):
         result_dir (str): Per-seed probability output directory.
         labels (pd.Series): Forecast-window index. ``pd.DatetimeIndex`` with
             integer ``id`` values; carries no truth labels. Empty until
-            ``build_label()`` is called.
+            ``build_label()`` is called. May be re-narrowed by
+            ``extract_features()`` to drop ids whose tremor windows failed
+            ``minimum_completion``.
+        labels_csv (str | None): Path to the forecast-grid CSV written by
+            ``build_label()`` (and overwritten by ``extract_features()`` when
+            the grid is narrowed). ``None`` until ``build_label()`` is called.
         forecast_plot_path (str): Path to the saved forecast plot (PDF when
             ``plot_pdf=True``, otherwise PNG). Set by ``forecast()``.
         results (pd.DataFrame): Forecast results indexed by datetime, with
@@ -169,6 +174,7 @@ class PredictionModel(BaseModel, CacheModel):
         # ``construct_windows``.
         self.labels: pd.Series = pd.Series()
         self._labels: pd.DataFrame = pd.DataFrame()
+        self.labels_csv: str | None = None
 
         # Will be set after forecast() called
         self.forecast_plot_path: str | None = None
@@ -456,6 +462,7 @@ class PredictionModel(BaseModel, CacheModel):
 
             self._labels = label_df
             self.labels = label_df["id"]
+            self.labels_csv = label_csv
 
             return self
 
@@ -478,6 +485,7 @@ class PredictionModel(BaseModel, CacheModel):
         # Label with ``is_erupted`` values are 0.
         self._labels = label_df
         self.labels = label_df["id"]
+        self.labels_csv = label_csv
 
         if self.verbose:
             logger.info(f"Label for prediction: {label_csv}")
@@ -500,6 +508,14 @@ class PredictionModel(BaseModel, CacheModel):
         (no relevance filtering). Populates ``self.features_df`` and
         ``self.features_csv``. When features were already extracted on this
         instance, the method early-returns without re-running tsfresh.
+
+        When ``TremorMatrixBuilder`` drops windows that fail
+        ``minimum_completion``, the surviving feature ids become a strict
+        subset of the label grid built by :meth:`build_label`. The method
+        detects the mismatch and narrows ``self._labels`` / ``self.labels``
+        to the surviving ids, rewriting ``self.labels_csv`` on disk so the
+        invariant *"``self._labels`` and ``self.features_df`` share length
+        and id space"* holds for every downstream consumer.
 
         Args:
             select_tremor_columns (list[str] | None, optional): Tremor column
@@ -551,6 +567,18 @@ class PredictionModel(BaseModel, CacheModel):
 
         self.features_csv = features_builder.csv
 
+        # ``TremorMatrixBuilder`` drops windows that fail ``minimum_completion``,
+        # so narrow the label grid to the surviving feature ids here — this
+        # invariant lets every downstream consumer (forecast, evaluation,
+        # explanation) treat ``self._labels`` and ``self.features_df`` as
+        # aligned without a separate re-check.
+        if len(self._labels) != len(self.features_df):
+            self._labels = self._labels[
+                self._labels["id"].isin(self.features_df.index)
+            ]
+            self._labels.to_csv(self.labels_csv, index=True)
+            self.labels = self._labels["id"]
+
         return self
 
     def forecast(
@@ -593,7 +621,7 @@ class PredictionModel(BaseModel, CacheModel):
             ValueError: If ``build_label()`` has not been called first.
             ValueError: If ``extract_features()`` has not been called first.
         """
-        if self.labels.empty or self._labels.empty:
+        if self.labels.empty or self._labels.empty or self.labels_csv is None:
             raise ValueError("Please run build_label() first.")
 
         if self.features_df.empty and self.features_csv is None:
