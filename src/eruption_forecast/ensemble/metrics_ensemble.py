@@ -9,7 +9,11 @@ import pandas as pd
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import build_y_true, compute_seed
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    ensure_dir,
+    load_pickle,
+    resolve_output_dir,
+)
 from eruption_forecast.plots.evaluation_plots import (
     PER_SEED_PLOT_DISPATCHER,
     AGGREGATE_PLOT_DISPATCHER,
@@ -242,10 +246,7 @@ class MetricsEnsemble:
             ... )
             >>> me.plot_aggregate()
         """
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"MetricsEnsemble file not found: {path}")
-
-        obj = joblib.load(path)
+        obj = load_pickle(path)
         if not isinstance(obj, cls):
             raise TypeError(
                 f"Loaded object is not a MetricsEnsemble (got {type(obj).__name__})."

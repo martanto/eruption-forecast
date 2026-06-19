@@ -11,7 +11,11 @@ import pandas as pd
 
 from eruption_forecast.utils import validate_date_ranges
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    ensure_dir,
+    load_pickle,
+    resolve_output_dir,
+)
 from eruption_forecast.utils.date_utils import sort_dates, to_datetime
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.features.features_builder import FeaturesBuilder
@@ -386,9 +390,7 @@ class BaseModel(ABC):
         Example:
             >>> model = TrainingModel.load("output/TrainingModel_2025-01-01_2025-12-31.pkl")
         """
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"{cls.__name__}: file not found: {path}")
-        obj = joblib.load(path)
+        obj = load_pickle(path)
         logger.info(f"[{cls.__name__}] Loaded from: {path}")
         return obj
 

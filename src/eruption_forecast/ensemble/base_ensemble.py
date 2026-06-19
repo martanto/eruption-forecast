@@ -4,7 +4,7 @@ from typing import Self
 import joblib
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 
 
 class BaseEnsemble:
@@ -45,9 +45,6 @@ class BaseEnsemble:
         Raises:
             FileNotFoundError: If ``path`` does not exist.
         """
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"{cls.__name__} file not found: {path}")
-
-        obj = joblib.load(path)
+        obj = load_pickle(path)
         logger.info(f"{cls.__name__}: Loaded from: {path}")
         return obj

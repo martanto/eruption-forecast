@@ -1,7 +1,6 @@
 import os
 import json
 import hashlib
-import pickle
 from abc import ABC, abstractmethod
 from typing import Any, Self
 from pathlib import Path
@@ -12,7 +11,7 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 
 
 class CacheModel(ABC):
@@ -129,10 +128,10 @@ class CacheModel(ABC):
             return None
 
         try:
-            obj: Self = joblib.load(path)
+            obj: Self = load_pickle(path)
             logger.info(f"[{cls.__name__}] Loaded from cache: {path}")
             return obj
-        except (ImportError, AttributeError, EOFError, pickle.UnpicklingError, TypeError) as e:
+        except RuntimeError as e:
             logger.warning(f"[{cls.__name__}] Failed to load from cache: {path}. {e}")
             return None
 
