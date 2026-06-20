@@ -92,6 +92,7 @@ fm.explain(
     eruption_dates=None,                      # falls back to train() dates
     save_per_seed=True,
     plot_per_seed=True,
+    plot_aggregate=True,                      # aggregate bar + beeswarm per classifier
     figsize=None,                             # auto-sized from max_display
     max_display=20,
     group_remaining_features=False,
@@ -126,12 +127,15 @@ em.plot(
     group_remaining_features=False,
     dpi=150,
     plot_per_seed=True,
+    plot_aggregate=True,
 )
 ```
 
 `plot()` always renders per-eruption waterfalls when `eruption_dates`
 is available; per-seed bar + beeswarm rendering is gated on
-`plot_per_seed`.
+`plot_per_seed`; per-classifier aggregate bar + beeswarm rendering
+(stacks every seed into the NaN-padded union feature space) is gated
+on `plot_aggregate`.
 
 ---
 
@@ -141,6 +145,8 @@ is available; per-seed bar + beeswarm rendering is gated on
 |------|----------|-------------|
 | Per-seed beeswarm | `ExplainerEnsemble.plot_seed()` | `classifiers/{ClfName}/figures/beeswarm/{seed:05d}.png` |
 | Per-seed bar | `ExplainerEnsemble.plot_seed()` | `classifiers/{ClfName}/figures/bar/{seed:05d}.png` |
+| Aggregate bar (frequency-weighted mean \|SHAP\| across seeds) | `ExplainerEnsemble.plot_aggregate()` → `plot_aggregate_shap_bar()` | `classifiers/{ClfName}/figures/aggregate/bar.{png,csv}` |
+| Aggregate beeswarm (NaN-padded union feature space) | `ExplainerEnsemble.plot_aggregate()` → `plot_aggregate_shap_beeswarm()` | `classifiers/{ClfName}/figures/aggregate/beeswarm.{png,csv}` |
 | Per-eruption waterfall (highest-probability window per eruption) | `ExplainerEnsemble.plot_waterfall()` → `plot_classifier_waterfall()` | `eruptions/{eruption_date}/{ClfName}_{datetime}_seed=_index=.png` |
 
 Standalone plot helpers in
@@ -151,8 +157,8 @@ Standalone plot helpers in
 | `plot_shap_waterfall(explanation, ...)` | One waterfall for one observation |
 | `plot_shap_beeswarm(explanation, ...)` | One beeswarm for one seed |
 | `plot_shap_bar(explanation, ...)` | One bar plot for one seed |
-| `plot_aggregate_shap_bar(aggregate_df, ...)` | Frequency-weighted aggregate bar across seeds |
-| `plot_aggregate_shap_beeswarm(explanation, row_seed, row_obs, ...)` | Stacked-seeds aggregate beeswarm |
+| `plot_aggregate_shap_bar(classifier_explanation, ...)` | Frequency-weighted aggregate bar across seeds (builds importance table internally) |
+| `plot_aggregate_shap_beeswarm(classifier_explanation, ...)` | Stacked-seeds aggregate beeswarm (builds NaN-padded union explanation internally) |
 | `plot_classifier_waterfall(classifier_explanation, ...)` | Per-eruption highest-probability waterfall (the `plot_waterfall` workhorse) |
 
 All renderers route through
@@ -171,8 +177,13 @@ matplotlib figure after saving.
 │       ├── shap_values/
 │       │   └── {seed:05d}.pkl                             # per-seed shap.Explanation
 │       └── figures/
-│           ├── beeswarm/{seed:05d}.png
-│           └── bar/{seed:05d}.png
+│           ├── beeswarm/{seed:05d}.png                    # plot_per_seed=True
+│           ├── bar/{seed:05d}.png                         # plot_per_seed=True
+│           └── aggregate/                                 # plot_aggregate=True
+│               ├── bar.png
+│               ├── bar.csv                                # frequency-weighted importance table
+│               ├── beeswarm.png
+│               └── beeswarm.csv                           # tidy non-NaN cells for offline redraw
 └── eruptions/                                             # sibling of classifiers/
     └── {YYYY-MM-DD}/
         └── {ClassifierName}_{YYYY-MM-DD_HH-MM-SS}_seed={i}_index={j}.png

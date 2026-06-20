@@ -11,12 +11,19 @@ from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    save_data,
+    ensure_dir,
+    load_pickle,
+    resolve_output_dir,
+)
 from eruption_forecast.utils.formatting import shorten_feature_name
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.plots.explanation_plots import (
     render_seed_plot,
+    plot_aggregate_shap_bar,
     plot_classifier_waterfall,
+    plot_aggregate_shap_beeswarm,
 )
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.dataclass.classifier_explanation import (
@@ -273,7 +280,7 @@ class ExplainerEnsemble:
                     logger.info(
                         f"SeedExplanation {classifier_name}/{seed_idx:05d} exists."
                     )
-                seed_explanation: shap.Explanation = joblib.load(
+                seed_explanation: shap.Explanation = load_pickle(
                     seed_explanation_filepath
                 )
                 classifier_explanation.seeds.append(
@@ -350,7 +357,7 @@ class ExplainerEnsemble:
             ensure_dir(os.path.dirname(save_filepath))
 
             if os.path.exists(save_filepath) and not overwrite:
-                classifier_explanation = joblib.load(save_filepath)
+                classifier_explanation = load_pickle(save_filepath)
 
                 if self.verbose:
                     logger.info(
@@ -514,3 +521,80 @@ class ExplainerEnsemble:
                 dpi=dpi,
                 verbose=self.verbose,
             )
+
+    def plot_aggregate(
+        self,
+        max_display: int = 20,
+        top_n: int = 20,
+        figsize: tuple[float, float] | None = None,
+        dpi: int = 150,
+        group_remaining_features: bool = False,
+    ) -> None:
+        """Render aggregate bar and beeswarm SHAP plots per classifier.
+
+        For every ``ClassifierExplanation`` on :attr:`explanations`,
+        delegates to
+        :func:`~eruption_forecast.plots.explanation_plots.plot_aggregate_shap_bar`
+        and
+        :func:`~eruption_forecast.plots.explanation_plots.plot_aggregate_shap_beeswarm`.
+        Outputs land under
+        ``{output_dir}/{classifier_name}/figures/aggregate/`` as
+        ``bar.{png,csv}`` and ``beeswarm.{png,csv}`` — the ``.csv`` files
+        are the durable sidecar artefacts (importance table for the bar
+        plot, tidy long-form non-NaN cell list for the beeswarm).
+
+        Args:
+            max_display (int): Maximum number of features to display in
+                the beeswarm. Defaults to ``20``.
+            top_n (int): Maximum number of features to display in the bar
+                plot. Defaults to ``20``.
+            figsize (tuple[float, float] | None): Figure size in inches.
+                ``None`` auto-sizes inside each renderer. Defaults to
+                ``None``.
+            dpi (int): Figure resolution in dots per inch. Defaults to
+                ``150``.
+            group_remaining_features (bool): Reserved for parity with the
+                per-seed renderer signature.
+                ``plot_aggregate_shap_beeswarm`` does not forward this
+                kwarg to ``shap.plots.beeswarm`` because the NaN-padded
+                stack uses SHAP's default grouping behaviour. Defaults to
+                ``False``.
+
+        Raises:
+            ValueError: If :meth:`explain` has not yet been called.
+        """
+        if len(self.explanations) == 0:
+            raise ValueError("Please run explain() first")
+
+        del group_remaining_features  # Reserved for signature parity.
+
+        for classifier_explanation in self.explanations:
+            classifier_name = classifier_explanation.classifier_name
+            aggregate_dir = os.path.join(
+                self.output_dir, classifier_name, "figures", "aggregate"
+            )
+            ensure_dir(aggregate_dir)
+
+            bar_path = os.path.join(aggregate_dir, "bar")
+            _, importance_df = plot_aggregate_shap_bar(
+                classifier_explanation=classifier_explanation,
+                top_n=top_n,
+                figsize=figsize,
+                dpi=dpi,
+                title=f"{classifier_name} — Aggregate Top-{top_n} SHAP Importances",
+                save_filepath=bar_path,
+                verbose=self.verbose,
+            )
+            save_data(importance_df, bar_path, filetype="csv")
+
+            beeswarm_path = os.path.join(aggregate_dir, "beeswarm")
+            _, tidy_df = plot_aggregate_shap_beeswarm(
+                classifier_explanation=classifier_explanation,
+                max_display=max_display,
+                figsize=figsize,
+                dpi=dpi,
+                title=f"{classifier_name} — Aggregate SHAP Summary",
+                save_filepath=beeswarm_path,
+                verbose=self.verbose,
+            )
+            save_data(tidy_df, beeswarm_path, filetype="csv")

@@ -11,29 +11,46 @@ authors = [
 description = "Eruption forecast modelling"
 readme = "README.md"
 license = "MIT"
-keywords = ["eruption", "forecast", "volcano", "volcanology", "seismic"]
+license-files = ["LICENSE"]
+keywords = [
+    "eruption",
+    "forecast",
+    "volcano",
+    "volcanology",
+    "seismic",
+    "seismology",
+    "machine learning",
+]
 requires-python = ">=3.11"
 dependencies = [
-    "obspy>=1.5.0",
-    "tsfresh",
-    "loguru",
-    "pandas>=3.0.2",
-    "pip>=26.1.1",
-    "imbalanced-learn>=0.14.1",
-    "scikit-learn>=1.8",
-    "seaborn>=0.13.2",
-    "xgboost>=3.2.0",
-    "lightgbm>=4.6.0",
-    "shap>=0.51.0",
-    "python-dotenv>=1.2.2",
-    "pip-system-certs>=5.3",
-    "pyarrow>=18.0.0",
+    "obspy>=1.5.0,<2",
+    "tsfresh>=0.21,<1",
+    "loguru>=0.7,<1",
+    "pandas>=3.0.2,<4",
+    "imbalanced-learn>=0.14.1,<0.15",
+    "scikit-learn>=1.9,<2",
+    "seaborn>=0.13.2,<1",
+    "xgboost>=3.2.0,<4",
+    "lightgbm>=4.6.0,<5",
+    "shap>=0.51.0,<1",
+    "python-dotenv>=1.2.2,<2",
+    "pip-system-certs>=5.3,<6",
+    "pyarrow>=18.0.0,<25",
 ]
 classifiers = [
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 
 [dependency-groups]
@@ -46,17 +63,21 @@ dev = [
     "pytest",
     "ipywidgets",
     "pandas-stubs~=3.0.3",
+    "pip",
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
 markers = [
     "integration: tests that send real external requests (e.g. Telegram API)",
 ]
 
 [tool.uv]
 cache-dir = "./.cache/uv"
-build-constraint-dependencies = ["setuptools==80.8.0"]
 
 [project.urls]
-Homepage = "https://github.com/martanto/eruption-forecast"
-Issues = "https://github.com/martanto/eruption-forecast/issues"
+Repository    = "https://github.com/martanto/eruption-forecast"
+Documentation = "https://github.com/martanto/eruption-forecast/wiki"
+Changelog     = "https://github.com/martanto/eruption-forecast/releases"
+Issues        = "https://github.com/martanto/eruption-forecast/issues"

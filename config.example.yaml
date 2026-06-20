@@ -98,6 +98,7 @@ explain:
   eruption_dates: null      # null = reuse the dates captured during train()
   save_per_seed: true       # Persist each per-seed shap.Explanation to disk
   plot_per_seed: true       # Render per-seed bar and beeswarm SHAP plots
+  plot_aggregate: true      # Render per-classifier aggregate bar + beeswarm (NaN-padded union)
   figsize: null             # Figure size in inches; null auto-sizes from max_display
   max_display: 20           # Maximum number of features to display in SHAP plots
   group_remaining_features: false   # Forwarded to shap.plots.beeswarm

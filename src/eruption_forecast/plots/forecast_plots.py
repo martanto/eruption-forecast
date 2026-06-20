@@ -20,7 +20,7 @@ def plot_forecast(
     df: pd.DataFrame,
     label_df: pd.DataFrame | pd.Series | None = None,
     title: str | None = None,
-    fig_width: float = 12,
+    fig_width: float = 8,
     fig_height: float = 1.5,
     threshold: float = 0.7,
     rolling_window: str = "6h",
@@ -461,7 +461,6 @@ def _ax_eruption(
         va="bottom",
         ha="right",
         fontsize=8,
-        fontweight="light",
         color="black",
         zorder=100,
     )

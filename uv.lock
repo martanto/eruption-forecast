@@ -16,9 +16,6 @@ resolution-markers = [
     "(python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'darwin') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'win32')",
 ]
 
-[manifest]
-build-constraints = [{ name = "setuptools", specifier = "==80.8.0" }]
-
 [[package]]
 name = "anyio"
 version = "4.14.0"
@@ -502,7 +499,6 @@ dependencies = [
     { name = "loguru" },
     { name = "obspy" },
     { name = "pandas" },
-    { name = "pip" },
     { name = "pip-system-certs" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
@@ -521,6 +517,7 @@ dev = [
     { name = "ipywidgets" },
     { name = "notebook" },
     { name = "pandas-stubs" },
+    { name = "pip" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "ty" },
@@ -529,20 +526,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "imbalanced-learn", specifier = ">=0.14.1" },
-    { name = "lightgbm", specifier = ">=4.6.0" },
-    { name = "loguru" },
-    { name = "obspy", specifier = ">=1.5.0" },
-    { name = "pandas", specifier = ">=3.0.2" },
-    { name = "pip", specifier = ">=26.1.1" },
-    { name = "pip-system-certs", specifier = ">=5.3" },
-    { name = "pyarrow", specifier = ">=18.0.0" },
-    { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "scikit-learn", specifier = ">=1.8" },
-    { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "shap", specifier = ">=0.51.0" },
-    { name = "tsfresh" },
-    { name = "xgboost", specifier = ">=3.2.0" },
+    { name = "imbalanced-learn", specifier = ">=0.14.1,<0.15" },
+    { name = "lightgbm", specifier = ">=4.6.0,<5" },
+    { name = "loguru", specifier = ">=0.7,<1" },
+    { name = "obspy", specifier = ">=1.5.0,<2" },
+    { name = "pandas", specifier = ">=3.0.2,<4" },
+    { name = "pip-system-certs", specifier = ">=5.3,<6" },
+    { name = "pyarrow", specifier = ">=18.0.0,<25" },
+    { name = "python-dotenv", specifier = ">=1.2.2,<2" },
+    { name = "scikit-learn", specifier = ">=1.9,<2" },
+    { name = "seaborn", specifier = ">=0.13.2,<1" },
+    { name = "shap", specifier = ">=0.51.0,<1" },
+    { name = "tsfresh", specifier = ">=0.21,<1" },
+    { name = "xgboost", specifier = ">=3.2.0,<4" },
 ]
 
 [package.metadata.requires-dev]
@@ -551,6 +547,7 @@ dev = [
     { name = "ipywidgets" },
     { name = "notebook" },
     { name = "pandas-stubs", specifier = "~=3.0.3" },
+    { name = "pip" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "ty" },

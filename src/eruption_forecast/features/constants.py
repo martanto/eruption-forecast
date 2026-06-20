@@ -15,11 +15,15 @@ SECONDS_PER_DAY = 86400
 # tsfresh feature exclusions
 DEFAULT_EXCLUDE_FEATURES: set[str] = {
     "agg_linear_trend",
+    "count_above_mean",
+    "count_below_mean",
     "has_duplicate_max",
     "has_duplicate_min",
     "has_duplicate",
     "linear_trend_timewise",
     "length",
+    "median",
+    "minimum",
     "quantile",
     "sum_of_reoccurring_data_points",
     "sum_of_reoccurring_values",

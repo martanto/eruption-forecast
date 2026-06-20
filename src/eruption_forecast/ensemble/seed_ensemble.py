@@ -3,7 +3,6 @@ import json
 from typing import Self
 
 import numpy as np
-import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils._repr_html.estimator import _VisualBlock
@@ -13,7 +12,7 @@ from eruption_forecast.utils.array import (
     save_forecast_seed,
     compute_model_probabilities,
 )
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 
 
@@ -147,7 +146,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                 features_csv, index_col=0
             ).index.tolist()
 
-            model = joblib.load(model_filepath)
+            model = load_pickle(model_filepath)
 
             # Try to extract metadata from the first seed
             if _classifier_name == "Unknown":
@@ -236,26 +235,46 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
                     f"in {trained_model_json}"
                 )
 
-            model = joblib.load(record["model_filepath"])
+            try:
+                model = load_pickle(record["model_filepath"])
+                if _classifier_name == "Unknown":
+                    _classifier_name = type(model).__name__
 
-            if _classifier_name == "Unknown":
-                _classifier_name = type(model).__name__
-
-            seeds.append(
-                {
-                    "random_state": int(record["random_state"]),
-                    "model": model,
-                    "feature_names": list(record["features"]),
-                }
-            )
+                seeds.append(
+                    {
+                        "random_state": int(record["random_state"]),
+                        "model": model,
+                        "feature_names": list(record["features"]),
+                    }
+                )
+            except (FileNotFoundError, RuntimeError) as e:
+                raise RuntimeError(
+                    f"SeedEnsemble: {_classifier_name}: failed to load seed "
+                    f"model {record['model_filepath']} referenced by "
+                    f"{trained_model_json}: {e}. Seed counts must match the "
+                    f"registry exactly — partial ensembles are not allowed. "
+                    f"The trained-model pickle is likely missing, corrupt, or "
+                    f"was saved by an incompatible version of the codebase. "
+                    f"To recover:\n"
+                    f"  1. Re-train the model with `ForecastModel.train(..., overwrite=True)` "
+                    f"or `TrainingModel.fit(overwrite=True)` to regenerate the "
+                    f"seed pickles in-place.\n"
+                    f"  2. Or delete the existing training directory "
+                    f"(`{{output_dir}}/training/`) plus the matching cache "
+                    f"entry under `{{output_dir}}/cache/TrainingModel/` and "
+                    f"re-run training from scratch.\n"
+                    f"  3. Or point `from_json` / `from_any` at a different "
+                    f"registry whose `model_filepath` entries still resolve on "
+                    f"disk."
+                ) from e
 
         ensemble = cls(classifier_name=_classifier_name)
         ensemble.seeds = seeds
 
         if verbose:
             logger.info(
-                f"SeedEnsemble: {_classifier_name} — Loaded {len(seeds)} "
-                f"seeds from JSON registry."
+                f"SeedEnsemble: {_classifier_name}: Loaded {len(seeds)} "
+                f"seeds from JSON: {trained_model_json}."
             )
 
         return ensemble

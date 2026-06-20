@@ -11,7 +11,7 @@ import joblib
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 
 
 class CacheModel(ABC):
@@ -126,9 +126,14 @@ class CacheModel(ABC):
         path = cls.cache_path_for(output_dir, identity)
         if not os.path.isfile(path):
             return None
-        obj: Self = joblib.load(path)
-        logger.info(f"[{cls.__name__}] Loaded from cache: {path}")
-        return obj
+
+        try:
+            obj: Self = load_pickle(path)
+            logger.info(f"[{cls.__name__}] Loaded from cache: {path}")
+            return obj
+        except RuntimeError as e:
+            logger.warning(f"[{cls.__name__}] Failed to load from cache: {path}. {e}")
+            return None
 
     @classmethod
     def compute_hash(cls, identity: dict, length: int = 12) -> str:

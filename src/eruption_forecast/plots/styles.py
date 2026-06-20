@@ -224,8 +224,10 @@ def shap_figure(
     Intentionally bypasses :func:`apply_nature_style` — SHAP's own colour and
     typographic choices already form a coherent visual style; layering Nature
     rcParams on top breaks SHAP's spacing and double-styles the dots. The
-    ``subplots_adjust(left=0.35)`` reserves room for long tsfresh feature
-    labels on the y-axis.
+    figure is created with ``layout=None`` to disable the global constrained
+    layout engine (Nature rcParams sets ``figure.constrained_layout.use=True``)
+    so the manual ``subplots_adjust(left=0.35)`` — which reserves room for long
+    tsfresh feature labels on the y-axis — is honoured without warnings.
 
     Args:
         figsize: Figure width and height in inches.
@@ -235,7 +237,7 @@ def shap_figure(
         plt.Figure: The freshly created figure. The caller owns the figure
             lifecycle — close it after saving, or let ``save_figure`` do so.
     """
-    kwargs: dict = {"figsize": figsize}
+    kwargs: dict = {"figsize": figsize, "layout": "none"}
     if dpi is not None:
         kwargs["dpi"] = dpi
     fig = plt.figure(**kwargs)

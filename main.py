@@ -3,6 +3,18 @@ from eruption_forecast.decorators import timer, notify
 from eruption_forecast.model.forecast_model import ForecastModel
 
 
+eruption_dates = [
+    "2025-03-20",
+    "2025-04-10",
+    "2025-04-22",
+    "2025-05-18",
+    "2025-06-17",
+    "2025-07-07",
+    "2025-08-02",
+    "2025-08-18",
+]
+
+
 @timer("Run Forecasting")
 @notify("Run Forecasting")
 def main(sds_dir: str, n_jobs: int = 2):
@@ -37,16 +49,7 @@ def main(sds_dir: str, n_jobs: int = 2):
         start_date="2025-01-01",
         end_date="2025-07-26",
         classifiers=["lite-rf", "rf", "gb", "xgb"],
-        eruption_dates=[
-            "2025-03-20",
-            "2025-04-10",
-            "2025-04-22",
-            "2025-05-18",
-            "2025-06-17",
-            "2025-07-07",
-            "2025-08-02",
-            "2025-08-18",
-        ],
+        eruption_dates=eruption_dates,
         window_step=6,
         window_step_unit="hours",
         label_builder="standard",
@@ -86,13 +89,22 @@ def main(sds_dir: str, n_jobs: int = 2):
         verbose=True,
     )
 
-    fm.evaluate(model="prediction", plot_per_seed=True)
+    # %%
+    fm.evaluate(
+        model="prediction",
+        plot_per_seed=True,
+        plot_aggregate=True,
+    )
 
     # %%
-    if fm.EvaluationModel:
-        comparator = fm.EvaluationModel.compare()
-        comparator.get_ranking()
-        comparator.plot_all()
+    fm.explain(
+        model="prediction",
+        eruption_dates=eruption_dates,
+        save_per_seed=True,
+        plot_per_seed=False,
+        max_display=20,
+        dpi=150,
+    )
 
 
 # %%

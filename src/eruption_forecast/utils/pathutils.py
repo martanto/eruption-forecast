@@ -7,6 +7,7 @@ saving matplotlib figures and data artifacts.
 
 import os
 import json
+import pickle
 from typing import Any
 
 import joblib
@@ -52,6 +53,43 @@ def load_json(path: str) -> Any:
         raise FileNotFoundError(f"JSON file not found: {path}")
     with open(path) as f:
         return json.load(f)
+
+
+def load_pickle(path: str) -> Any:
+    """Load a joblib pickle and surface the file path on failure.
+
+    Thin wrapper around ``joblib.load`` that fails loudly with the
+    offending file path. If the file is missing, raises
+    ``FileNotFoundError`` naming ``path``. If ``joblib.load`` raises an
+    unpickle-related error (commonly triggered by a package upgrade that
+    moves or removes a class), the original exception is chained via
+    ``raise ... from e`` so the traceback still shows *why* it failed
+    while the new top-level ``RuntimeError`` shows *which* file failed.
+
+    Args:
+        path (str): Path to a ``.pkl`` file produced by ``joblib.dump``.
+
+    Returns:
+        Any: The deserialised object.
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist.
+        RuntimeError: If ``joblib.load`` raises an unpickle-related error.
+    """
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Pickle file not found: {path}")
+    try:
+        return joblib.load(path)
+    except (
+        ImportError,
+        ModuleNotFoundError,
+        AttributeError,
+        EOFError,
+        pickle.UnpicklingError,
+        TypeError,
+        ValueError,
+    ) as e:
+        raise RuntimeError(f"Failed to load pickle: {path}") from e
 
 
 def resolve_output_dir(

@@ -116,6 +116,7 @@ class CalculateTremor:
         methods (list[str] | None): Calculation methods to apply
             (e.g., ``["rsam", "dsar", "entropy"]``). If None, defaults to all
             three methods. Defaults to None.
+        buffer_days (int | None): Add n-days prior start date. Defaults to None.
         output_dir (str | None): Directory for output files.
             If None, defaults to ``root_dir/output``. Relative paths are resolved
             against ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
@@ -168,6 +169,7 @@ class CalculateTremor:
         location: str | None = None,
         channel_type: str = "D",
         methods: list[str] | None = None,
+        buffer_days: int | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
@@ -203,6 +205,7 @@ class CalculateTremor:
             channel_type (str, optional): Set channel type. Defaults to "D".
             methods (list[str] | None, optional): Tremor metrics to compute.
                 Defaults to ["rsam", "dsar", "entropy"].
+            buffer_days (int | None): Add n-days prior start date. Defaults to None.
             output_dir (str | None, optional): Base output directory. Defaults to
                 ``root_dir/output``. Defaults to None.
             root_dir (str | None, optional): Anchor directory for relative path
@@ -242,6 +245,9 @@ class CalculateTremor:
         forecast_dir = os.path.join(station_dir, "forecast")
         tremor_dir = os.path.join(station_dir, "tremor")
         figures_dir = os.path.join(tremor_dir, "figures")
+        start_date_buffered = (
+            start_date if buffer_days is None else to_datetime(start_date) - timedelta()
+        )
 
         # ------------------------------------------------------------------
         # Set DEFAULT properties
@@ -255,6 +261,7 @@ class CalculateTremor:
         self.end_date: datetime = end_date
 
         # TODO: Add kurtosis
+        self.start_date_buffered: datetime = start_date_buffered
         self.methods: list[str] = methods or CALCULATE_METHODS
         self.output_dir: str = output_dir
         self.station_dir: str = station_dir
@@ -286,7 +293,7 @@ class CalculateTremor:
         self.freq_bands: list[tuple[float, float]] = list(DEFAULT_FREQUENCY_BANDS)
         self.figures_dir = figures_dir
         self.dates: pd.DatetimeIndex = pd.date_range(
-            start=self.start_date, end=self.end_date
+            start=self.start_date_buffered, end=self.end_date
         )
         self.n_days: int = len(self.dates)
         self.nslc = nslc
@@ -367,6 +374,7 @@ class CalculateTremor:
             f"location={self.location!r}",
             f"channel_type={self.channel_type!r}",
             f"methods={self.methods!r}",
+            f"buffer_days={self.start_date_buffered}",
             f"output_dir={self.output_dir!r}",
             f"root_dir={self.root_dir!r}"
             if hasattr(self, "root_dir")
@@ -485,7 +493,7 @@ class CalculateTremor:
         """
         # Example: tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31
         return (
-            f"tremor_interpolated_{self._filename}"
+            f"tremor-interpolated_{self._filename}"
             if self.filename_prefix is None
             else f"{self.filename_prefix}_{self._filename}"
         )
@@ -717,6 +725,11 @@ class CalculateTremor:
             >>> print(tremor.df.head())
             >>> print(f"Saved to: {tremor.csv}")
         """
+        if self.verbose and self.start_date_buffered != self.start_date:
+            logger.info(
+                f"Start date {self.start_date:%Y-%m-%d} buffered to {self.start_date_buffered:%Y-%m-%d}"
+            )
+
         if self._source is None:
             raise ValueError(
                 "No source specified. Please run from_sds() or from_fdsn() first."
@@ -759,7 +772,7 @@ class CalculateTremor:
 
         # Save non-interpolated dataframe
         non_interpolated_filename = (
-            f"tremor_non-interpolated_{self.nslc}_{start_date}-{end_date}.csv"
+            f"tremor-non-interpolated_{self.nslc}_{start_date}-{end_date}.csv"
         )
         csv_non_interpolated = os.path.join(self.tremor_dir, non_interpolated_filename)
         df.to_csv(csv_non_interpolated, index=True)
