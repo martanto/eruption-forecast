@@ -337,6 +337,7 @@ fm = ForecastModel(
         model="prediction",
         eruption_dates=["2025-08-02"],   # falls back to train() dates when omitted
         plot_per_seed=True,
+        plot_aggregate=True,             # per-classifier aggregate bar + beeswarm
         max_display=20,
     )
 )
@@ -354,7 +355,7 @@ print(fm.TrainingModel.classifier_ensemble_path)
 2. **Train** — build labels around the 5 eruption dates, extract tsfresh features over a 6-hour window grid, fit 25 seeds × 4 classifiers under stratified-shuffle CV with `"auto"` imbalance handling.
 3. **Predict** — apply the bundled `ClassifierEnsemble` to a fresh 10-minute window grid over the forecast period and emit per-classifier + consensus probabilities.
 4. **Evaluate** — score the forecast against the held-out eruption date by writing `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices per classifier and aggregate metric plots; cross-classifier ranking via `ClassifierComparator`.
-5. **Explain** — produce per-seed SHAP explanations for the tree classifiers in the ensemble, bundled into `ClassifierExplanation_*.pkl` per classifier and rendered as per-seed bar / beeswarm + per-eruption waterfall plots.
+5. **Explain** — produce per-seed SHAP explanations for the tree classifiers in the ensemble, bundled into `ClassifierExplanation_*.pkl` per classifier and rendered as per-seed bar / beeswarm, per-classifier aggregate bar / beeswarm (NaN-padded union feature space), and per-eruption waterfall plots.
 
 See [`main.py`](main.py) for the full working example and [`scenarios.py`](scenarios.py) for the multi-scenario variant.
 
@@ -582,7 +583,9 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │       ├── classifiers/{ClfName}/
 │       │   ├── ClassifierExplanation_{ClfName}.pkl
 │       │   ├── shap_values/{seed:05d}.pkl
-│       │   └── figures/{bar,beeswarm}/{seed:05d}.png
+│       │   └── figures/
+│       │       ├── {bar,beeswarm}/{seed:05d}.png            # plot_per_seed=True
+│       │       └── aggregate/{bar,beeswarm}.{png,csv}       # plot_aggregate=True
 │       └── eruptions/{YYYY-MM-DD}/
 │           └── {ClfName}_{datetime}_seed=_index=.png
 │

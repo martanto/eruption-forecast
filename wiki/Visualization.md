@@ -148,16 +148,19 @@ SHAP plots are produced by the dedicated explanation stage (`ExplanationModel.ex
 | `plot_shap_bar(explanation, ...)` | One bar plot for one seed | caller-supplied `save_filepath` |
 | `plot_shap_beeswarm(explanation, ...)` | One beeswarm for one seed | caller-supplied `save_filepath` |
 | `plot_shap_waterfall(explanation, ...)` | One waterfall for one observation | caller-supplied `save_filepath` |
-| `plot_aggregate_shap_bar(aggregate_df, ...)` | Frequency-weighted aggregate bar across seeds | `(fig, df)` returned |
-| `plot_aggregate_shap_beeswarm(explanation, row_seed, row_obs, ...)` | Stacked-seeds aggregate beeswarm | `(fig, tidy_df)` returned |
+| `plot_aggregate_shap_bar(classifier_explanation, ...)` | Frequency-weighted aggregate bar across seeds | `(fig, df)` returned; `save_filepath` optional |
+| `plot_aggregate_shap_beeswarm(classifier_explanation, ...)` | Stacked-seeds aggregate beeswarm | `(fig, tidy_df)` returned; `save_filepath` optional |
 | `plot_classifier_waterfall(classifier_explanation, classifier_ensemble, labels, eruption_dates, ...)` | Per-eruption highest-probability waterfall | `{explanation_dir}/eruptions/{date}/{Clf}_*.png` |
 
 Auto-rendered at:
 
 ```
-{station_dir}/explanation/{kind}/classifiers/{Clf}/figures/{bar,beeswarm}/{seed:05d}.png
+{station_dir}/explanation/{kind}/classifiers/{Clf}/figures/{bar,beeswarm}/{seed:05d}.png    # plot_per_seed=True
+{station_dir}/explanation/{kind}/classifiers/{Clf}/figures/aggregate/{bar,beeswarm}.{png,csv}  # plot_aggregate=True
 {station_dir}/explanation/{kind}/eruptions/{date}/{Clf}_{datetime}_seed=_index=.png
 ```
+
+The aggregate `bar.png` ranks features by frequency-weighted mean |SHAP| with `selection_frequency` annotated at the right edge; the aggregate `beeswarm.png` stacks every seed into the NaN-padded union feature space so a single figure summarises the whole ensemble. Each `.png` has a `.csv` sidecar (importance table for the bar, tidy long-form non-NaN cell list for the beeswarm) so the figures can be redrawn offline.
 
 When invoking the SHAP helpers directly, always pass `plot_size=None` to `shap.plots.beeswarm` so SHAP does not override the pre-created `figsize` — the project's `shap_figure` context manager already sets it. See [Explanation Workflow](Explanation-Workflow) for the full surface.
 

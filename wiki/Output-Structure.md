@@ -70,7 +70,10 @@ Every pipeline run writes under a single station directory:
 │   │   │   ├── shap_values/{seed:05d}.pkl                    # Per-seed shap.Explanation (save_per_seed=True)
 │   │   │   └── figures/
 │   │   │       ├── bar/{seed:05d}.png                        # plot_per_seed=True
-│   │   │       └── beeswarm/{seed:05d}.png                   # plot_per_seed=True
+│   │   │       ├── beeswarm/{seed:05d}.png                   # plot_per_seed=True
+│   │   │       └── aggregate/                                # plot_aggregate=True
+│   │   │           ├── bar.{png,csv}                         # frequency-weighted importance
+│   │   │           └── beeswarm.{png,csv}                    # NaN-padded union beeswarm
 │   │   └── eruptions/{YYYY-MM-DD}/                           # Per-eruption waterfall sibling
 │   │       └── {ClassifierName}_{datetime}_seed={i}_index={j}.png
 │   └── prediction/                                           # When upstream model.kind == "prediction"
@@ -247,6 +250,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Bundled SHAP per classifier | `explanation/{kind}/classifiers/{Clf}/ClassifierExplanation_{Clf}.pkl` |
 | Per-seed SHAP explanations | `explanation/{kind}/classifiers/{Clf}/shap_values/{seed:05d}.pkl` |
 | Per-seed bar / beeswarm plots | `explanation/{kind}/classifiers/{Clf}/figures/{bar,beeswarm}/{seed:05d}.png` |
+| Aggregate SHAP bar / beeswarm + sidecar CSV | `explanation/{kind}/classifiers/{Clf}/figures/aggregate/{bar,beeswarm}.{png,csv}` |
 | Per-eruption waterfall plots | `explanation/{kind}/eruptions/{YYYY-MM-DD}/{Clf}_*.png` |
 | Cache identity (diff-friendly) | `cache/{Stage}/{hash}.params.json` |
 | Replayable pipeline config | `forecast.config.yaml` |
