@@ -1,5 +1,4 @@
 from eruption_forecast.config.constants import (
-    CLASS_LABELS,
     MATPLOTLIB_BACKEND,
     BANDPASS_FILTER_CORNERS,
     DEFAULT_FREQUENCY_BANDS,
@@ -28,7 +27,6 @@ __all__ = [
     "BANDPASS_FILTER_CORNERS",
     "DEFAULT_FREQUENCY_BANDS",
     "MATPLOTLIB_BACKEND",
-    "CLASS_LABELS",
     "BaseConfig",
     "BaseForecastConfig",
     "ForecastCalculateConfig",

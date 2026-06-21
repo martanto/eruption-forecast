@@ -30,6 +30,3 @@ DEFAULT_FREQUENCY_BANDS: list[tuple[float, float]] = [
 
 MATPLOTLIB_BACKEND: str = "Agg"
 """Non-interactive Matplotlib backend, safe for worker threads."""
-
-CLASS_LABELS: list[str] = ["Not Erupted", "Erupted"]
-"""Display labels for the binary classification classes (index 0 = not erupted, 1 = erupted)."""
