@@ -157,14 +157,14 @@ def plot_tremor(
             ax.plot(
                 df.index,
                 df[column].rolling(window=rolling_window, center=True).median(),
-                c=DIVERGING_BREWER[column_index],
+                color=DIVERGING_BREWER[column_index],
                 alpha=0.8,
                 label=f"2d|median|{label}",
             )
             ax.plot(
                 df.index,
                 df[column].rolling(window=rolling_window, center=True).mean(),
-                c=DIVERGING_BREWER[column_index],
+                color=DIVERGING_BREWER[column_index],
                 alpha=0.5,
                 label=f"2d|mean|{label}",
                 linestyle="--",
@@ -191,10 +191,14 @@ def plot_tremor(
             ylabel = "Entropy"
         else:
             ylabel = "A.U."
+        ax.set_ylabel(ylabel)
 
         ax.xaxis.set_major_locator(date_locator)
         ax.xaxis.set_major_formatter(date_formatter)
         ax.set_xlim(start_date, end_date)
+        for label in ax.get_xticklabels(which="major"):
+            label.set(rotation=30, horizontalalignment="right")
+
         ax.grid(
             True,
             which="major",
@@ -202,7 +206,6 @@ def plot_tremor(
             linewidth=0.5,
             alpha=0.7,
         )
-        ax.set_ylabel(ylabel)
         ax.legend(
             loc=legend_loc,  # ty:ignore[invalid-argument-type]
             frameon=False,
@@ -211,7 +214,7 @@ def plot_tremor(
         )
         ax.set_title(method.upper(), fontsize=10)
 
-        if method.upper() == "RSAM" and rsam_as_log:
+        if method.lower() == "rsam" and rsam_as_log:
             ax.set_yscale("log")
 
     if title:
