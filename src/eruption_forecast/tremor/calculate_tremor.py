@@ -45,7 +45,11 @@ from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.dataframe import remove_anomalies
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    ensure_dir,
+    save_figure,
+    resolve_output_dir,
+)
 from eruption_forecast.config.constants import (
     CALCULATE_METHODS,
     BANDPASS_FILTER_CORNERS,
@@ -818,13 +822,22 @@ class CalculateTremor:
             figure_filename = self.filename.replace(".csv", ".png")
             figure_path = os.path.join(self.tremor_dir, figure_filename)
             if self.overwrite or self.overwrite_plot or not os.path.exists(figure_path):
-                plot_tremor(
+                fig = plot_tremor(
                     df=df,
                     interval=14,
                     interval_unit="days",
                     eruption_dates=eruption_dates,
-                    filepath=figure_path,
+                    filepath=None,
                     title=self.nslc,
+                    verbose=self.verbose,
+                )
+
+                save_figure(
+                    fig=fig,
+                    filepath=figure_path,
+                    dpi=300,
+                    save_as_pdf=True,
+                    pdf_title=f"Tremor Plot | {self.nslc}",
                     verbose=self.verbose,
                 )
 
