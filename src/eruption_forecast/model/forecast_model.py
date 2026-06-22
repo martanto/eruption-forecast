@@ -47,11 +47,42 @@ class ForecastModel:
         n_jobs: int = 1,
         verbose: bool = False,
     ):
-        """Initialize the ForecastModel pipeline orchestrator."""
-        # Capture the user-supplied output_dir / root_dir before
-        # setup_nslc_directories() and os.path.abspath() rewrite them — the
-        # saved config should round-trip to the user's original intent
-        # (often a relative path or ``None``).
+        """Initialize the ForecastModel pipeline orchestrator.
+
+        Args:
+            station (str): Station code. Uppercased on assignment.
+            channel (str): Channel code (e.g. ``"EHZ"``). Uppercased
+                on assignment.
+            network (str): Network code. Uppercased on assignment.
+            location (str): Location code. Defaults to ``""``.
+            day_to_forecast (int): Forecast lead time in days. Threaded
+                into ``TrainingModel`` / ``PredictionModel`` as
+                ``window_size`` and used to back-shift the tremor
+                calculation start date so the first label window has
+                full lead-in coverage. Defaults to ``2``.
+            output_dir (str | None): Root output directory. ``None``
+                resolves via :func:`setup_nslc_directories`. Defaults
+                to ``None``.
+            root_dir (str | None): Project root used when resolving a
+                relative ``output_dir``. ``None`` keeps the resolved
+                ``output_dir`` as-is. Defaults to ``None``.
+            overwrite (bool): Default overwrite flag inherited by every
+                stage method when its own ``overwrite`` kwarg is
+                ``None``. Defaults to ``False``.
+            n_jobs (int): Default parallel-worker count inherited by
+                every stage method when its own ``n_jobs`` kwarg is
+                ``None``. Defaults to ``1``.
+            verbose (bool): Default verbose flag inherited by every
+                stage method when its own ``verbose`` kwarg is
+                ``None``. Defaults to ``False``.
+
+        Example:
+            >>> fm = ForecastModel(
+            ...     station="OJN", channel="EHZ", network="VG",
+            ...     location="00", day_to_forecast=2,
+            ...     root_dir="/path/to/project", n_jobs=4,
+            ... )
+        """
         _config_output_dir = output_dir
         _config_root_dir = root_dir
 
@@ -86,14 +117,7 @@ class ForecastModel:
         self.select_tremor_columns: list[str] | None = None
         self.save_tremor_matrix_per_method: bool = False
         self.exclude_features: list[str] | None = None
-
-        # Eruption dates from train() forwarded to evaluate() as a fallback
-        # when the caller does not pass them explicitly.
         self._eruption_dates: list[str] | None = None
-
-        # Hash of the TrainingModel identity produced by the last train() call.
-        # Threaded into PredictionModel.build_cache_identity so the prediction
-        # cache invalidates whenever the upstream training model changes.
         self._training_cache_hash: str | None = None
 
         # Will be set after predict() run
@@ -107,7 +131,7 @@ class ForecastModel:
         # Will be set after explain() run
         self.ExplanationModel: ExplanationModel | None = None
 
-        # Pipeline configuration — populated incrementally as each stage runs.
+        # Pipeline configuration: populated incrementally as each stage runs.
         # ``save_config()`` serialises whatever stages have executed so far.
         self._config: ForecastConfig = ForecastConfig(
             model=BaseForecastConfig(
@@ -137,14 +161,108 @@ class ForecastModel:
         cleanup_daily_dir: bool = False,
         plot_daily: bool = False,
         save_plot: bool = False,
-        overwrite_plot: bool = False,
         sds_dir: str | None = None,
         client_url: str = "https://service.iris.edu",
         minimum_completion_ratio: float = 0.3,
+        plot_eruption_dates: list[str] | None = None,
+        plot_rsam_as_log: bool = False,
+        plot_rolling_window: str | None = None,
+        plot_filter_dsar_value: float | None = None,
+        plot_overwrite: bool = False,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
         verbose: bool | None = None,
     ) -> Self:
+        """Run tremor calculation for the configured station.
+
+        Reads seismic data from SDS or FDSN and computes RSAM, DSAR,
+        and Shannon entropy across the default frequency bands. The
+        effective start date is shifted backward by ``day_to_forecast``
+        days so the first downstream label window has full lead-in
+        coverage.
+
+        Args:
+            start_date (str | datetime): Start of the calculation
+                window in ``"YYYY-MM-DD"`` format or as a
+                ``datetime``.
+            end_date (str | datetime): End of the calculation window
+                in ``"YYYY-MM-DD"`` format or as a ``datetime``.
+            source (Literal["sds", "fdsn"]): Seismic data source.
+                Defaults to ``"sds"``.
+            methods (str | list[str] | None): Tremor metrics to
+                compute (``"rsam"``, ``"dsar"``, ``"entropy"``).
+                ``None`` computes all three. Defaults to ``None``.
+            remove_outlier_method (Literal["all", "maximum"]): Outlier
+                removal strategy applied per band. Defaults to
+                ``"maximum"``.
+            remove_tremor_anomalies (bool): Drop z-score anomalies
+                from the merged tremor frame. Defaults to ``False``.
+            interpolate (bool): Interpolate gaps in the daily output.
+                Defaults to ``True``.
+            value_multiplier (float | None): Optional scalar applied
+                to every tremor sample. Defaults to ``None``.
+            cleanup_daily_dir (bool): Remove the per-day CSV directory
+                after merging. Defaults to ``False``.
+            plot_daily (bool): Render a per-day diagnostic plot.
+                Defaults to ``False``.
+            save_plot (bool): Persist the daily plot to disk.
+                Defaults to ``False``.
+            plot_overwrite (bool): Overwrite an existing daily plot.
+                Defaults to ``False``.
+            sds_dir (str | None): Root directory of the SDS archive.
+                Required when ``source="sds"``. Defaults to ``None``.
+            client_url (str): FDSN base URL used when
+                ``source="fdsn"``. Defaults to
+                ``"https://service.iris.edu"``.
+            minimum_completion_ratio (float): Minimum per-day
+                completion ratio required for a daily file to be kept.
+                Defaults to ``0.3``.
+            plot_eruption_dates (list[str] | None): Eruption dates
+                (``"YYYY-MM-DD"``) overlaid as vertical markers on the
+                merged tremor summary figure. Forwarded to
+                ``CalculateTremor.run()`` and ultimately to
+                :func:`~eruption_forecast.plots.tremor_plots.plot_tremor`.
+                Only takes effect when ``save_plot=True``. Defaults to
+                ``None``.
+            plot_rsam_as_log (bool): Render the RSAM subplot of the
+                merged tremor summary figure on a log y-axis. Forwarded
+                to ``CalculateTremor.run()`` and only takes effect when
+                ``save_plot=True``. Defaults to ``False``.
+            plot_rolling_window (str | None): Pandas offset alias
+                (e.g. ``"2D"``, ``"12H"``) used as the rolling-window
+                size for the merged tremor summary figure. ``None``
+                plots the raw series. Only takes effect when
+                ``save_plot=True``. Defaults to ``None``.
+            plot_filter_dsar_value (float | None): Upper bound applied
+                to every DSAR series before plotting on the merged
+                tremor summary figure — samples at or above this value
+                are masked with ``NaN`` so a few spikes do not flatten
+                the visible band. RSAM and entropy series are
+                unaffected. Only takes effect when ``save_plot=True``.
+                Defaults to ``None``.
+            overwrite (bool | None): Overwrite cached daily outputs.
+                ``None`` inherits from ``self.overwrite``. Defaults to
+                ``None``.
+            n_jobs (int | None): Parallel workers. ``None`` inherits
+                from ``self.n_jobs``. Defaults to ``None``.
+            verbose (bool | None): Verbose logging. ``None`` inherits
+                from ``self.verbose``. Defaults to ``None``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If ``source="sds"`` is passed without
+                ``sds_dir``, or if ``source`` is not ``"sds"`` or
+                ``"fdsn"``.
+
+        Example:
+            >>> fm.calculate(
+            ...     start_date="2020-01-01", end_date="2020-12-31",
+            ...     source="sds", sds_dir="/path/to/sds",
+            ...     methods=["rsam", "dsar", "entropy"],
+            ... )
+        """
         # Snapshot the user's original kwargs before any normalization so the
         # captured config round-trips cleanly through YAML.
         _cfg_start_date = (
@@ -183,7 +301,7 @@ class ForecastModel:
             cleanup_daily_dir=cleanup_daily_dir,
             plot_daily=plot_daily,
             save_plot=save_plot,
-            overwrite_plot=overwrite_plot,
+            plot_overwrite=plot_overwrite,
             overwrite=overwrite,
             minimum_completion_ratio=minimum_completion_ratio,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
@@ -196,13 +314,18 @@ class ForecastModel:
                     "You chose 'sds' as source, please provide 'sds_dir' parameter. "
                     "Example: calculate(source='sds', sds_dir='converted')"
                 )
-            calculate = calculate.from_sds(sds_dir=sds_dir).run()
+            calculate = calculate.from_sds(sds_dir=sds_dir)
         elif source.upper() == "FDSN":
-            calculate = calculate.from_fdsn(client_url=client_url).run()
+            calculate = calculate.from_fdsn(client_url=client_url)
         else:
             raise ValueError(f"Unknown source {source!r}. Expected 'sds' or 'fdsn'.")
 
-        self.CalculateTremor = calculate
+        self.CalculateTremor = calculate.run(
+            plot_eruption_dates=plot_eruption_dates,
+            plot_rsam_as_log=plot_rsam_as_log,
+            plot_rolling_window=plot_rolling_window,
+            plot_filter_dsar_value=plot_filter_dsar_value,
+        )
 
         if verbose:
             start_date_str = start_date.strftime("%Y-%m-%d")
@@ -225,10 +348,16 @@ class ForecastModel:
             cleanup_daily_dir=cleanup_daily_dir,
             plot_daily=plot_daily,
             save_plot=save_plot,
-            overwrite_plot=overwrite_plot,
             sds_dir=sds_dir,
             client_url=client_url,
             minimum_completion_ratio=minimum_completion_ratio,
+            plot_eruption_dates=(
+                list(plot_eruption_dates) if plot_eruption_dates is not None else None
+            ),
+            plot_rsam_as_log=plot_rsam_as_log,
+            plot_rolling_window=plot_rolling_window,
+            plot_filter_dsar_value=plot_filter_dsar_value,
+            plot_overwrite=plot_overwrite,
             overwrite=_cfg_overwrite,
             n_jobs=_cfg_n_jobs,
             verbose=_cfg_verbose,
@@ -270,10 +399,107 @@ class ForecastModel:
         use_cache: bool = True,
         verbose: bool | None = None,
     ) -> Self:
+        """Build labels, extract features and fit the classifier ensemble.
+
+        Wraps a full ``TrainingModel`` pipeline
+        (``build_label → extract_features → fit``) over the tremor
+        frame produced by :meth:`calculate`. Results are cached by a
+        content-addressable identity, so a re-run with identical
+        kwargs and tremor data is a cache hit.
+
+        Args:
+            start_date (str | datetime): Start of the training window
+                in ``"YYYY-MM-DD"`` format or as a ``datetime``.
+            end_date (str | datetime): End of the training window in
+                ``"YYYY-MM-DD"`` format or as a ``datetime``.
+            eruption_dates (list[str]): Ground-truth eruption dates
+                in ``"YYYY-MM-DD"`` format.
+            window_step (int): Sliding window step size.
+            window_step_unit (Literal["minutes", "hours"]): Unit for
+                ``window_step``.
+            label_builder (Literal["standard", "dynamic"]): Label
+                construction strategy. ``"standard"`` builds a single
+                global sliding window grid; ``"dynamic"`` builds
+                per-eruption windows and deduplicates. Defaults to
+                ``"standard"``.
+            days_before_eruption (int | None): Number of days marked
+                positive ahead of each eruption when
+                ``label_builder="dynamic"``. Defaults to ``None``.
+            classifiers (str | list[str]): Classifier slugs to fit
+                (``"rf"``, ``"gb"``, ``"xgb"``, ``"svm"``, ``"lr"``,
+                ``"nn"``, ``"dt"``, ``"knn"``, ``"nb"``, ``"voting"``,
+                ``"lite-rf"``). Defaults to ``"rf"``.
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified"]):
+                Cross-validation strategy. Defaults to
+                ``"shuffle-stratified"``.
+            cv_splits (int): Number of CV splits. Defaults to ``5``.
+            scoring (str): sklearn scoring metric for ``GridSearchCV``.
+                Defaults to ``"balanced_accuracy"``.
+            top_n_features (int): Number of features retained by
+                ``FeatureSelector``. Defaults to ``20``.
+            include_eruption_date (bool): Include the eruption day in
+                the positive label window. Defaults to ``True``.
+            select_tremor_columns (list[str] | None): Subset of
+                tremor columns used for feature extraction. ``None``
+                uses every available column. Defaults to ``None``.
+            save_tremor_matrix_per_method (bool): Persist per-column
+                tremor matrices under ``per_method/``. Defaults to
+                ``True``.
+            exclude_features (list[str] | None): Feature substrings
+                to drop after tsfresh extraction. Defaults to
+                ``None``.
+            select_features (str | list[str] | None): Feature
+                selection method (``"tsfresh"`` or
+                ``"random_forest"``). Defaults to ``None``.
+            minimum_completion (float): Minimum per-window
+                completion ratio required for a window to be kept.
+                Defaults to ``1.0``.
+            seeds (int): Number of seed models per classifier.
+                Defaults to ``10``.
+            resample_method (Literal["under", "over", "auto"] | None):
+                Imbalance handling. ``"auto"`` picks ``"under"`` when
+                minority share is below ``minority_threshold``.
+                Defaults to ``"auto"``.
+            minority_threshold (float): Minority-class share below
+                which ``"auto"`` triggers undersampling. Defaults to
+                ``0.15``.
+            sampling_strategy (str | float): Forwarded to the
+                imbalanced-learn sampler. Defaults to ``0.75``.
+            plot_features (bool): Render per-seed feature importance
+                plots. Defaults to ``True``.
+            output_dir (str | None): Root output directory for
+                training artefacts. Defaults to the station directory.
+            overwrite (bool | None): Overwrite cached artefacts.
+                ``None`` inherits from ``self.overwrite``. Defaults
+                to ``None``.
+            n_jobs (int | None): Outer seed workers. ``None`` inherits
+                from ``self.n_jobs``. Defaults to ``None``.
+            n_grids (int): Inner ``GridSearchCV`` /
+                ``FeatureSelector`` workers. Defaults to ``1``.
+            use_cache (bool): Short-circuit re-fit when a cache hit
+                exists. Defaults to ``True``.
+            verbose (bool | None): Verbose logging. ``None`` inherits
+                from ``self.verbose``. Defaults to ``None``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If :meth:`calculate` has not produced tremor
+                data yet.
+
+        Example:
+            >>> fm.train(
+            ...     start_date="2020-01-01", end_date="2020-12-31",
+            ...     eruption_dates=["2020-06-15"],
+            ...     window_step=6, window_step_unit="hours",
+            ...     classifiers=["rf", "xgb"], seeds=500,
+            ... )
+        """
         if self.CalculateTremor is None:
             raise ValueError("Tremor data not found. Please run calculate() first.")
 
-        # Snapshot originals for the captured config — must happen before the
+        # Snapshot originals for the captured config, must happen before the
         # n_jobs/verbose/overwrite fallback so ``None`` keeps the "inherit at
         # replay" semantics.
         self._config.train = ForecastTrainConfig(
@@ -439,6 +665,63 @@ class ForecastModel:
         verbose: bool | None = None,
         **plot_kwargs: Any,
     ) -> Self:
+        """Forecast over an unlabelled window grid.
+
+        Builds a fresh sliding window grid over ``[start_date,
+        end_date]``, runs feature extraction with the columns and
+        exclusions captured during :meth:`train`, and dispatches the
+        cached ``ClassifierEnsemble`` to produce per-seed and
+        consensus eruption probabilities.
+
+        Args:
+            start_date (str | datetime): Start of the forecast
+                window in ``"YYYY-MM-DD"`` format or as a
+                ``datetime``.
+            end_date (str | datetime): End of the forecast window in
+                ``"YYYY-MM-DD"`` format or as a ``datetime``.
+            window_step (int): Sliding window step size.
+            window_step_unit (Literal["minutes", "hours"]): Unit for
+                ``window_step``.
+            save_seed_result (bool): Persist per-seed probability
+                CSVs under ``prediction/results/``. Defaults to
+                ``True``.
+            plot_threshold (float): Decision threshold drawn on the
+                forecast plot. Defaults to ``0.5``.
+            plot_title (str | None): Forecast plot title. Defaults to
+                ``None``.
+            plot_pdf (bool): Also render the forecast plot as PDF.
+                Defaults to ``True``.
+            output_dir (str | None): Root output directory for
+                prediction artefacts. Defaults to the station
+                directory.
+            overwrite (bool | None): Overwrite cached artefacts.
+                ``None`` inherits from ``self.overwrite``. Defaults
+                to ``None``.
+            n_jobs (int | None): Parallel workers. ``None`` inherits
+                from ``self.n_jobs``. Defaults to ``None``.
+            use_cache (bool): Short-circuit re-run when a cache hit
+                exists. Defaults to ``True``.
+            verbose (bool | None): Verbose logging. ``None`` inherits
+                from ``self.verbose``. Defaults to ``None``.
+            **plot_kwargs (Any): Extra keyword arguments forwarded to
+                the forecast plotter. Intentionally excluded from the
+                captured config since they may carry non-serialisable
+                matplotlib objects.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If :meth:`train` has not produced a trained
+                ensemble yet.
+
+        Example:
+            >>> fm.predict(
+            ...     start_date="2020-07-01", end_date="2020-07-31",
+            ...     window_step=10, window_step_unit="minutes",
+            ...     plot_threshold=0.5,
+            ... )
+        """
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
 
@@ -550,7 +833,7 @@ class ForecastModel:
 
         Reuses the ``TrainingModel`` or ``PredictionModel`` already produced
         in the current session.  No tsfresh re-run or model re-fit is
-        performed — the window grid and extracted features are taken
+        performed, the window grid and extracted features are taken
         directly from the chosen reuse source.
 
         Args:
@@ -643,8 +926,6 @@ class ForecastModel:
             compare_classifiers=True,
         )
 
-        # Persist for callers who stop at evaluate(); explain() repeats this
-        # write but content is identical.
         self.save_config()
 
         return self
@@ -671,7 +952,7 @@ class ForecastModel:
 
         Reuses the ``TrainingModel`` or ``PredictionModel`` already produced
         in the current session.  No tsfresh re-run or model re-fit is
-        performed — the window grid and extracted features are taken
+        performed, the window grid and extracted features are taken
         directly from the chosen reuse source.
 
         Args:
@@ -755,9 +1036,6 @@ class ForecastModel:
         verbose = verbose if verbose is not None else self.verbose
         overwrite = overwrite if overwrite is not None else self.overwrite
 
-        # Caller-supplied eruption_dates win over the values captured from
-        # train(); prediction-mode ``ExplanationModel`` raises when neither
-        # source provides them.
         eruption_dates = (
             eruption_dates if eruption_dates is not None else self._eruption_dates
         )
@@ -799,8 +1077,6 @@ class ForecastModel:
 
         self.ExplanationModel = explanation_model
 
-        # Persist for callers who stop at explain(); when evaluate() ran
-        # first, this write repeats it with the now-complete config.
         self.save_config()
 
         return self
@@ -821,11 +1097,11 @@ class ForecastModel:
         ``evaluate()`` and ``explain()`` both call ``save_config()`` at the
         end so the config persists from whichever terminal stage the caller
         stops at. When both stages run the write fires twice with identical
-        content — intentional and idempotent.
+        content, intentional and idempotent.
 
         Args:
             path (str | None): Destination file path.  ``None`` resolves to
-                ``{station_dir}/forecast.config.{fmt}`` — a sibling of
+                ``{station_dir}/forecast.config.{fmt}``, a sibling of
                 the per-stage ``cache/`` directories written by
                 :class:`~eruption_forecast.model.cache_model.CacheModel`.
                 Defaults to ``None``.

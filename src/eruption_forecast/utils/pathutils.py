@@ -1,19 +1,14 @@
-"""File path resolution utilities.
-
-This module provides utilities for resolving output directory paths relative
-to a root anchor directory, creating directories, loading JSON files, and
-saving matplotlib figures and data artifacts.
-"""
-
 import os
 import json
 import pickle
 from typing import Any
 
 import joblib
+import matplotlib
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
+from eruption_forecast.utils.formatting import pdf_metadata
 
 
 def ensure_dir(path: str) -> str:
@@ -133,12 +128,60 @@ def resolve_output_dir(
     return os.path.join(anchor, output_dir)
 
 
+def save_figure_as_pdf(
+    fig: plt.Figure,
+    filepath: str,
+    title: str | None = None,
+    *,
+    verbose: bool = True,
+) -> None:
+    """Save a matplotlib figure as a PDF with embedded TrueType fonts.
+
+    Wraps ``fig.savefig`` inside a scoped ``matplotlib.rc_context`` that
+    sets ``pdf.fonttype=42`` so text in the PDF stays selectable and
+    renders consistently across viewers and vector editors. Embeds
+    package metadata via :func:`pdf_metadata` and creates the parent
+    directory if it does not already exist. The figure is NOT closed —
+    callers that render PNG and PDF from the same figure should close
+    it themselves.
+
+    Args:
+        fig (plt.Figure): Figure to save.
+        filepath (str): Destination path, including the ``.pdf`` extension.
+        title (str | None, optional): Title embedded in the PDF metadata.
+            Falls back to the :func:`pdf_metadata` default when ``None``.
+            Defaults to ``None``.
+        verbose (bool, optional): When ``True``, log an info message
+            after saving. Defaults to ``True``.
+
+    Returns:
+        None
+    """
+    ensure_dir(os.path.dirname(filepath))
+
+    # Type 42 embeds TrueType fonts — text stays selectable and
+    # renders consistently in all PDF viewers and vector editors.
+    with matplotlib.rc_context({"pdf.fonttype": 42}):
+        fig.savefig(
+            filepath,
+            bbox_inches="tight",
+            facecolor="white",
+            edgecolor=None,
+            metadata=pdf_metadata(title=title),
+        )
+
+    if verbose:
+        logger.info(f"Saved: {filepath}")
+
+
 def save_figure(
     fig: plt.Figure,
     filepath: str,
     dpi: int,
     *,
     filetype: str = "png",
+    save_as_pdf: bool = False,
+    pdf_title: str | None = None,
     verbose: bool = True,
 ) -> None:
     """Save a matplotlib figure to disk and always close it.
@@ -147,8 +190,12 @@ def save_figure(
     the filename already ends in ``.{filetype}`` it is used as-is; otherwise
     the extension is appended. A directory in the path that contains a dot
     (e.g. ``output/foo.png-debug/figure``) is not mistaken for an extension.
-    The figure is closed unconditionally after saving so it cannot be reused
-    by subsequent plot calls.
+    When ``save_as_pdf`` is ``True``, a PDF sibling with embedded TrueType
+    fonts and PDF metadata is also written via :func:`save_figure_as_pdf`
+    before the figure is closed; the sibling shares the primary file's stem
+    (e.g. ``output/foo.png`` → ``output/foo.pdf``). The figure is closed
+    unconditionally after both saves so it cannot be reused by subsequent
+    plot calls.
 
     Args:
         fig (plt.Figure): Figure to save and close.
@@ -157,6 +204,16 @@ def save_figure(
         dpi (int): Resolution in dots per inch.
         filetype (str): File extension without a leading dot. Defaults to
             ``"png"``.
+        save_as_pdf (bool, optional): When ``True``, also write a PDF
+            sibling with embedded TrueType fonts and PDF metadata via
+            :func:`save_figure_as_pdf`. The sibling reuses the primary
+            file's stem with the ``.pdf`` extension. Intended for adding a
+            vector-editor-friendly companion next to a raster primary
+            output; pass ``filetype="pdf"`` instead when only a PDF is
+            needed. Defaults to ``False``.
+        pdf_title (str | None, optional): Title embedded in the PDF
+            metadata when ``save_as_pdf=True``. Ignored otherwise. Defaults
+            to ``None``.
         verbose (bool): When True, log an info message after saving.
             Defaults to True.
 
@@ -171,11 +228,20 @@ def save_figure(
     ensure_dir(os.path.dirname(full_path))
 
     fig.savefig(
-        full_path, dpi=dpi, bbox_inches="tight", facecolor="white", edgecolor="none"
+        full_path, dpi=dpi, bbox_inches="tight", facecolor="white", edgecolor=None
     )
 
     if verbose:
         logger.info(f"Saved: {full_path}")
+
+    if save_as_pdf:
+        pdf_path = f"{os.path.splitext(full_path)[0]}.pdf"
+        save_figure_as_pdf(
+            fig=fig,
+            filepath=pdf_path,
+            title=pdf_title,
+            verbose=verbose,
+        )
 
     plt.close(fig)
 

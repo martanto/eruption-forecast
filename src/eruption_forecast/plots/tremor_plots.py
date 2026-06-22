@@ -1,4 +1,3 @@
-import os
 from typing import Literal
 from pathlib import Path
 from multiprocessing import Pool
@@ -8,96 +7,131 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
-from eruption_forecast.plots.styles import (
-    OKABE_ITO,
-    configure_spine,
-    apply_nature_style,
-)
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.plots.styles import DIVERGING_BREWER
+from eruption_forecast.utils.pathutils import save_figure
+from eruption_forecast.config.constants import CALCULATE_METHODS
+from eruption_forecast.utils.date_utils import sort_dates, to_datetime
+from eruption_forecast.plots.forecast_plots import ax_eruption
 
 
 def plot_tremor(
     df: pd.DataFrame,
     interval: int = 1,
     interval_unit: Literal["hours", "days"] = "hours",
-    filename: str | None = None,
-    figure_dir: str | None = None,
+    rolling_window: str | None = None,
+    eruption_dates: list[str] | None = None,
     title: str | None = None,
-    overwrite: bool = True,
-    dpi: int = 150,
     selected_columns: list[str] | None = None,
+    metrics: Literal["median", "mean", "all"] = "all",
+    filepath: str | None = None,
+    filter_dsar_value: float | None = None,
+    rsam_as_log: bool = False,
+    legend_loc: str = "upper left",
+    legend_ncol: int = 2,
+    dpi: int = 150,
+    grouped_by_method: bool = True,
     verbose: bool = False,
-) -> None:
-    """Plot tremor data as a multi-panel time series with publication-quality styling.
+) -> plt.Figure:
+    """Plot tremor time-series grouped by calculation method.
 
-    Creates one subplot per column in the DataFrame (or per selected column),
-    with Nature/Science journal formatting, colorblind-safe colors (Okabe-Ito palette),
-    and configurable x-axis tick interval. RSAM columns use blue, DSAR uses orange,
-    and Shannon Entropy uses reddish purple; all other columns cycle through the palette.
+    Renders one subplot per detected method (``rsam``, ``dsar``, ``entropy``)
+    using the columns present in ``df``. By default each series is shown as a
+    rolling median (solid) and rolling mean (dashed); use ``metrics`` to
+    restrict the output to one of the two. Optional eruption markers and a
+    figure title can be overlaid. When ``filepath`` is supplied, the figure is
+    saved via ``save_figure`` (parent directories are created automatically and
+    the extension is appended when missing); otherwise it is returned without
+    being written.
 
     Args:
-        df (pd.DataFrame): Tremor data with a DatetimeIndex and columns like
-            "rsam_f0", "rsam_f1", "dsar_f0-f1", etc.
-        interval (int, optional): Tick interval for the x-axis. Works with
-            interval_unit to set tick spacing. Defaults to 1.
-        interval_unit (Literal["hours", "days"], optional): Unit for the tick
-            interval. Must be either "hours" or "days". Defaults to "hours".
-        filename (str | None, optional): Output filename stem (extension is
-            added automatically as .png). If None, a name is auto-generated from
-            the date range as "tremor_YYYY-MM-DD_YYYY-MM-DD". Defaults to None.
-        figure_dir (str | None, optional): Directory to save the figure. If
-            None, saves to "<cwd>/figures". Directory is created if it doesn't
-            exist. Defaults to None.
-        title (str | None, optional): X-axis label / plot subtitle. If None, the
-            date range is used (e.g., "2025-03-16 to 2025-03-22"). Defaults to None.
-        overwrite (bool, optional): If True, overwrite an existing file with
-            the same name. If False, skip plotting if file exists. Defaults to True.
-        dpi (int, optional): Figure resolution in dots per inch for saved PNG.
-            Defaults to 150.
-        selected_columns (list[str] | None, optional): Subset of column names to
-            plot. If None, all columns are plotted. Defaults to None.
-        verbose (bool, optional): If True, log informational messages when the file is
-            saved or already exists. Defaults to False.
+        df (pd.DataFrame): Tremor DataFrame with a ``DatetimeIndex`` and one
+            column per metric (e.g. ``rsam_f0``, ``dsar_f0-f1``, ``entropy``).
+        interval (int): Tick interval for the x-axis date locator. Defaults to ``1``.
+        interval_unit (Literal["hours", "days"]): Unit applied to ``interval``.
+            ``"hours"`` uses ``HourLocator`` + ``%H:%M`` formatting; ``"days"``
+            uses ``DayLocator`` + ``%Y-%m-%d``. Defaults to ``"hours"``.
+        rolling_window (str | None): Pandas offset alias (e.g. ``"2D"``,
+            ``"12H"``) for the rolling reduction applied to each series before
+            plotting. ``None`` plots the raw series without rolling. Defaults to
+            ``None``.
+        eruption_dates (list[str] | None): Eruption timestamps to overlay as
+            vertical markers (one labelled ``"Eruption"`` legend entry per
+            subplot). Markers outside the DataFrame range are skipped.
+            Defaults to ``None``.
+        title (str | None): Optional figure-level ``suptitle``. Defaults to ``None``.
+        selected_columns (list[str] | None): Subset of columns to plot. When
+            provided, ``df`` is narrowed to these columns before grouping.
+            Defaults to ``None`` (all columns).
+        metrics (Literal["median", "mean", "all"]): Which rolling reduction(s)
+            to draw per series. ``"all"`` (default) draws both the rolling
+            median (solid) and rolling mean (dashed); ``"median"`` draws the
+            solid median only; ``"mean"`` draws the dashed mean only.
+        filepath (str | None): Absolute path where the figure should be saved.
+            Parent directories are created by ``save_figure``; the extension is
+            appended when missing. Callers own the overwrite policy — passing
+            ``filepath`` always (re)writes the file. Defaults to ``None``
+            (figure is returned without being saved).
+        filter_dsar_value (float | None): Upper bound applied to every DSAR
+            series before plotting — samples at or above this value are masked
+            with ``NaN`` (via ``Series.where(series < filter_dsar_value)``) so a
+            handful of spikes do not flatten the visible band. Applied per
+            column when the column name contains ``"dsar"``; RSAM and entropy
+            series are unaffected. Defaults to ``None`` (no clipping).
+        rsam_as_log (bool): If ``True``, plot the RSAM subplot on a log y-axis
+            and annotate the y-label with ``"(log)"``. When ``False``
+            (default), large y-axis magnitudes fall back to matplotlib's
+            scientific offset notation (e.g. ``×10³`` above the axis)
+            instead of printing full integers on every tick. Defaults to
+            ``False``.
+        legend_loc (str): Matplotlib legend location string. Defaults to ``"best"``.
+        legend_ncol (int): Legend column count. Defaults to ``2``.
+        dpi (int): Resolution used when saving. Ignored if ``filepath`` is
+            ``None``. Defaults to ``150``.
+        grouped_by_method (bool): If ``True`` (default), group columns by
+            tremor method and render one subplot per method, stacking every
+            column from the same family (e.g. ``rsam_f0``..``rsam_f4``) on a
+            shared axis. If ``False``, render one subplot per column in the
+            order they appear in ``df`` (or ``selected_columns`` when
+            provided) — useful for inspecting individual bands side by side.
+            Defaults to ``True``.
+        verbose (bool): If ``True``, ``save_figure`` logs the output path.
+            Defaults to ``False``.
 
     Returns:
-        None: Saves figure to disk, does not return matplotlib objects.
+        plt.Figure: The matplotlib figure. Always returned, whether or not
+        ``filepath`` was supplied.
 
-    Examples:
+    Raises:
+        TypeError: If ``df.index`` is not a ``pd.DatetimeIndex``.
+        ValueError: If ``selected_columns`` cannot be applied to ``df``, or if
+            no recognised tremor methods are present in the (possibly narrowed)
+            column set.
+
+    Example:
         >>> import pandas as pd
-        >>> # Plot with 6-hour ticks
-        >>> plot_tremor(df, interval=6, interval_unit="hours",
-        ...            figure_dir="output/figures", overwrite=False)
-        >>> # Plot only RSAM columns with daily ticks
-        >>> plot_tremor(df, interval=1, interval_unit="days",
-        ...            selected_columns=["rsam_f0", "rsam_f1", "rsam_f2"])
+        >>> df = pd.read_csv("tremor.csv", index_col=0, parse_dates=True)
+        >>> fig = plot_tremor(
+        ...     df=df,
+        ...     interval=6,
+        ...     interval_unit="hours",
+        ...     eruption_dates=["2025-03-20"],
+        ...     title="VG.OJN.00.EHZ",
+        ...     filepath="output/tremor.png",
+        ... )
     """
-    start_date: pd.Timestamp = df.index[0]
-    end_date: pd.Timestamp = df.index[-1]
-    n_days = int((end_date - start_date).days)
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError(
+            f"Dataframe doesn't have datetime index. Your index type {type(df.index)}"
+        )
 
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
+    if selected_columns:
+        try:
+            df = df[selected_columns]
+        except Exception as e:
+            raise ValueError(f"Could not select columns [{selected_columns}]. {e}")
 
-    if filename is not None:
-        filename = Path(filename).stem
-
-    default_filename = f"tremor_{start_date_str}_{end_date_str}"
-    default_title = (
-        f"{start_date_str}" if n_days == 0 else f"{start_date_str} to {end_date_str}"
-    )
-    title = title or default_title
-
-    # Save plot to figure directory
-    figure_dir = figure_dir or os.path.join(os.getcwd(), "figures")
-    ensure_dir(figure_dir)
-
-    filename = filename or default_filename
-    filepath = os.path.join(figure_dir, f"{filename}.png")
-
-    if os.path.exists(filepath) and not overwrite:
-        if verbose:
-            logger.info(f"{start_date_str} :: Plot already exists at {filepath}")
-        return None
+    start_date = df.index.min()
+    end_date = df.index.max()
 
     # Define date locator and formatter based on plot type
     date_locator = (
@@ -112,80 +146,186 @@ def plot_tremor(
     )
 
     columns = selected_columns or df.columns.tolist()
-    n_rows = len(columns)
 
-    # Apply Nature/Science styling
-    with apply_nature_style():
-        fig, axs = plt.subplots(
-            nrows=n_rows,
-            ncols=1,
-            figsize=(10, 1.2 * n_rows),
-            sharex=True,
+    grouped_methods: dict[str, list[str]] = {}
+    if grouped_by_method:
+        for method in CALCULATE_METHODS:
+            cols = [c for c in columns if method in c]
+            if cols:
+                grouped_methods[method] = cols
+    else:
+        grouped_methods = {column: [column] for column in columns}
+
+    if not grouped_methods:
+        raise ValueError(f"There are no tremor available for columns {columns}")
+
+    nrows = len(grouped_methods)
+
+    fig, axs = plt.subplots(
+        nrows=nrows,
+        ncols=1,
+        figsize=(12, 2.5 * nrows),
+        layout="constrained",
+        sharex=True,
+        squeeze=False,
+    )
+
+    for index, (method, columns) in enumerate(grouped_methods.items()):
+        if len(columns) == 0:
+            continue
+
+        ax = axs[index, 0]
+        for column_index, column in enumerate(columns):
+            labels = column.split("_")
+            label = labels[0]
+            if len(labels) == 2:
+                label = labels[1]
+
+            label_rolling_window = rolling_window.lower() if rolling_window else "10min"
+
+            if metrics == "all" or metrics == "median":
+                series = (
+                    df[column].rolling(window=rolling_window, center=True).median()
+                    if rolling_window
+                    else df[column]
+                )
+
+                if "dsar" in column.lower() and filter_dsar_value:
+                    series = series.where(series < filter_dsar_value)
+
+                ax.plot(
+                    series.index,
+                    series,
+                    color=DIVERGING_BREWER[column_index],
+                    alpha=0.8,
+                    label=f"{label_rolling_window}|median|{label}",
+                )
+
+            if metrics == "all" or metrics == "mean":
+                series = (
+                    df[column].rolling(window=rolling_window, center=True).mean()
+                    if rolling_window
+                    else df[column]
+                )
+
+                if "dsar" in column.lower() and filter_dsar_value:
+                    series = series.where(series < filter_dsar_value)
+
+                ax.plot(
+                    series.index,
+                    series,
+                    color=DIVERGING_BREWER[column_index],
+                    alpha=0.5 if metrics == "all" else 0.8,
+                    label=f"{label_rolling_window}|mean|{label}",
+                    linestyle="--" if metrics == "all" else "-",
+                )
+
+        if eruption_dates is not None and len(eruption_dates) > 0:
+            _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
+
+            for _index, eruption_date in enumerate(_eruption_dates):
+                label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
+                if df.index[0] <= eruption_date <= df.index[-1]:
+                    ax = ax_eruption(
+                        ax, to_datetime(eruption_date), label=label, fill_between=True
+                    )
+
+        # Add y-axis label with units
+        if "rsam" in method.lower():
+            ylabel = "Amp. "
+            if rsam_as_log:
+                ylabel = f"{ylabel} (log)"
+        elif "dsar" in method.lower():
+            ylabel = "Ratio"
+        elif "entropy" in method.lower():
+            ylabel = "Entropy"
+        else:
+            ylabel = "A.U."
+        ax.set_ylabel(ylabel)
+
+        ax.xaxis.set_major_locator(date_locator)
+        ax.xaxis.set_major_formatter(date_formatter)
+        ax.set_xlim(start_date, end_date)
+        for label in ax.get_xticklabels(which="major"):
+            label.set(rotation=-15, horizontalalignment="left")
+
+        ax.grid(
+            True,
+            which="major",
+            linestyle="--",
+            linewidth=0.5,
+            alpha=0.7,
         )
+        ax.legend(
+            loc=legend_loc,  # ty:ignore[invalid-argument-type]
+            frameon=False,
+            ncol=legend_ncol,
+            fontsize=8,
+        )
+        ax.set_title(method.upper(), fontsize=10)
 
-        # Ensure axs is always iterable
-        if n_rows == 1:
-            axs = [axs]
-
-        for index, column in enumerate(columns):
-            ax = axs[index]
-
-            # Color selection: use Okabe-Ito palette for different column types
-            # RSAM columns in blue tones, DSAR in orange tones
-            if "rsam" in column.lower():
-                color = OKABE_ITO[4]  # Blue
-            elif "dsar" in column.lower():
-                color = OKABE_ITO[0]  # Orange
-            elif "entropy" in column.lower():
-                color = OKABE_ITO[6]  # Reddish purple
-            else:
-                color = OKABE_ITO[index % len(OKABE_ITO)]
-
-            ax.plot(
-                df.index,
-                df[column],
-                color=color,
-                linewidth=1.2,
-                label=column.upper(),
-                alpha=0.85,
+        if "rsam" in method.lower() and rsam_as_log:
+            ax.set_yscale("log")
+        else:
+            ax.ticklabel_format(
+                axis="y",
+                style="sci",
+                scilimits=(-3, 3),
+                useMathText=True,
             )
-            ax.set_xlim(start_date, end_date)
 
-            # Configure axes
-            configure_spine(ax)
-            ax.legend(loc="upper left", frameon=False)
+    if title:
+        fig.suptitle(title)
 
-            # Add y-axis label with units
-            if "rsam" in column.lower():
-                ylabel = "Amp. (counts)"
-            elif "dsar" in column.lower():
-                ylabel = "Ratio"
-            elif "entropy" in column.lower():
-                ylabel = "Entropy"
-            else:
-                ylabel = "A.U."
+    if filepath:
+        save_figure(fig, filepath, dpi=dpi, verbose=verbose)
 
-            ax.set_ylabel(ylabel)
+    return fig
 
-            # Configure x-axis
-            ax.xaxis.set_major_locator(date_locator)
-            ax.xaxis.set_major_formatter(date_formatter)
 
-            # Rotate x-axis labels for better readability
-            for label in ax.get_xticklabels(which="major"):
-                label.set(rotation=30, horizontalalignment="right")
+def plot_tremor_from_file(
+    csv_path: str | Path,
+    **kwargs,
+) -> plt.Figure:
+    """Load a tremor CSV from disk and render it via :func:`plot_tremor`.
 
-            # Add x-axis label only to bottom subplot
-            if index == (n_rows - 1):
-                ax.set_xlabel(f"Time ({title})")
+    Thin convenience wrapper around :func:`plot_tremor` for the common
+    single-file case: read the CSV with a datetime index, then forward the
+    resulting DataFrame plus every other keyword to :func:`plot_tremor`. Use
+    :func:`replot_tremor` instead when batching a whole directory.
 
-        plt.savefig(filepath, dpi=dpi)
-        plt.close()
+    Args:
+        csv_path (str | Path): Path to a tremor CSV produced by
+            ``CalculateTremor`` (datetime index in the first column, tremor
+            columns such as ``rsam_f0``, ``dsar_f0-f1``, ``entropy``).
+        **kwargs: Additional keyword arguments forwarded verbatim to
+            :func:`plot_tremor` (e.g. ``rolling_window``, ``interval``,
+            ``interval_unit``, ``eruption_dates``, ``title``,
+            ``selected_columns``, ``metrics``, ``filepath``,
+            ``filter_dsar_value``, ``rsam_as_log``, ``legend_loc``,
+            ``legend_ncol``, ``dpi``, ``grouped_by_method``, ``verbose``).
+            ``df`` is set internally from ``csv_path``; passing it here would
+            raise ``TypeError``.
 
-    if verbose:
-        logger.info(f"{start_date_str} :: Plot saved to {filepath}")
+    Returns:
+        plt.Figure: The figure returned by :func:`plot_tremor`. Saved to disk
+        only when ``filepath`` is supplied via ``kwargs``.
 
-    return None
+    Raises:
+        FileNotFoundError: If ``csv_path`` does not exist.
+
+    Example:
+        >>> fig = plot_tremor_from_file(
+        ...     "output/VG.OJN.00.EHZ/tremor/daily/2025-03-20.csv",
+        ...     interval=6,
+        ...     interval_unit="hours",
+        ...     eruption_dates=["2025-03-20"],
+        ...     title="VG.OJN.00.EHZ — 2025-03-20",
+        ...     filepath="tremor_2025-03-20.png",
+        ... )
+    """
+    df = pd.read_csv(Path(csv_path), index_col=0, parse_dates=True)
+    return plot_tremor(df=df, **kwargs)
 
 
 def _process_single_tremor_file(
@@ -196,31 +336,36 @@ def _process_single_tremor_file(
 ) -> str:
     """Process a single tremor CSV file and generate a plot.
 
-    Helper function for batch processing in replot_tremor(). Loads a tremor
-    CSV file, generates a plot using plot_tremor(), and returns the processing
-    status. Designed for use with multiprocessing.Pool.starmap().
+    Helper for batch processing in ``replot_tremor()``. Loads a tremor CSV
+    file, derives the output PNG path as
+    ``output_dir / f"{csv_path.stem}.png"``, calls ``plot_tremor()`` with that
+    full path, and returns a status string. Designed for use with
+    ``multiprocessing.Pool.starmap()``.
 
     Args:
-        csv_path (Path): Path to the CSV file containing tremor data. Must have
-            a datetime index and tremor columns (e.g., rsam_f0, dsar_f0-f1).
-        output_dir (Path): Directory where the plot PNG will be saved.
-        overwrite (bool): If True, overwrite existing plots. If False, skip
-            plotting if output file already exists.
-        plot_tremor_kwargs (dict): Additional keyword arguments to pass to
-            plot_tremor(). Can include "interval", "interval_unit",
-            "selected_columns", "dpi", etc.
+        csv_path (Path): Path to the CSV file containing tremor data. Must
+            have a datetime index and tremor columns (e.g. ``rsam_f0``,
+            ``dsar_f0-f1``).
+        output_dir (Path): Directory where the plot PNG will be written. The
+            file is named after ``csv_path.stem``.
+        overwrite (bool): If ``True``, regenerate the plot even when the
+            target PNG already exists. If ``False`` and the PNG exists, the
+            file is left untouched and ``"skipped"`` is returned.
+        plot_tremor_kwargs (dict): Additional keyword arguments forwarded to
+            ``plot_tremor()``. Typical keys: ``interval``, ``interval_unit``,
+            ``selected_columns``, ``title``, ``dpi``, ``verbose``,
+            ``rsam_as_log``, ``legend_loc``. **Do not include ``filepath``** —
+            this helper sets it from ``output_dir`` / ``csv_path.stem`` and a
+            duplicate would raise ``TypeError``.
 
     Returns:
-        str: Processing status - one of "created", "skipped", or "failed".
-
-    Raises:
-        Does not raise exceptions. Errors are logged via logger.error() and
-        "failed" status is returned.
+        str: Processing status — one of ``"created"``, ``"skipped"``, or
+        ``"failed"``.
 
     Notes:
-        - CSV file is expected to have a datetime index and tremor columns
-        - Filename stem is used as the plot filename
-        - Errors are logged but don't raise exceptions for robustness
+        Errors are caught and logged via ``logger.error()``; the function
+        never raises and instead returns ``"failed"`` so a failing CSV does
+        not abort the surrounding batch.
     """
     try:
         # Load CSV with datetime index
@@ -234,12 +379,9 @@ def _process_single_tremor_file(
         if output_path.exists() and not overwrite:
             return "skipped"
 
-        # Generate plot using plot_tremor
         plot_tremor(
             df=df,
-            filename=filename_stem,
-            figure_dir=str(output_dir),
-            overwrite=overwrite,
+            filepath=str(output_path),
             **plot_tremor_kwargs,
         )
 
@@ -279,9 +421,12 @@ def replot_tremor(
         n_jobs (int, optional): Number of parallel jobs for plotting. If 1,
             processes files sequentially. If greater than 1, uses multiprocessing
             to plot multiple files in parallel. Defaults to 1.
-        **kwargs: Additional keyword arguments passed to ``plot_tremor()``.
-            Can include ``interval``, ``interval_unit``, ``selected_columns``,
-            ``title``, ``dpi``, ``verbose``, etc.
+        **kwargs: Additional keyword arguments forwarded to ``plot_tremor()``.
+            Typical keys: ``interval``, ``interval_unit``, ``selected_columns``,
+            ``title``, ``dpi``, ``verbose``, ``rsam_as_log``, ``legend_loc``.
+            **Do not include ``filepath``** — it is set internally per CSV from
+            ``output_dir`` and the CSV stem; passing it here would raise
+            ``TypeError``.
 
     Returns:
         dict[str, int]: Summary statistics with keys:
@@ -371,7 +516,7 @@ def replot_tremor(
     ]
 
     # Process files (sequential or parallel)
-    job_results = None
+    job_results = []
     if n_jobs == 1:
         # Sequential processing
         job_results = [_process_single_tremor_file(*job) for job in jobs]  # type: ignore[arg-type]
@@ -381,7 +526,7 @@ def replot_tremor(
         with Pool(n_jobs) as pool:
             job_results = pool.starmap(_process_single_tremor_file, jobs)
 
-    if job_results is None:
+    if len(job_results) == 0:
         raise ValueError(f"No results from {n_jobs} job(s)")
 
     # Aggregate results

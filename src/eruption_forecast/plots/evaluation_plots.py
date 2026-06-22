@@ -15,7 +15,7 @@ from sklearn.metrics import (
 )
 from sklearn.ensemble import VotingClassifier
 
-from eruption_forecast.config import CLASS_LABELS, ERUPTION_PROBABILITY_THRESHOLD
+from eruption_forecast.config import ERUPTION_PROBABILITY_THRESHOLD
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.ml import (
     compute_threshold_metrics,
@@ -212,7 +212,7 @@ def plot_confusion_matrix(
         >>> fig = plot_confusion_matrix(y_true, y_pred, normalize="true")
     """
     cm = confusion_matrix(y_true, y_pred, normalize=normalize)
-    labels = CLASS_LABELS
+    labels = ["Not Erupted", "Erupted"]
     fmt = ".2f" if normalize else "d"
 
     with nature_figure(figsize=figsize, dpi=dpi) as (fig, ax):

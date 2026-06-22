@@ -62,6 +62,7 @@ SUNRISE_GLOW = ["#233d4d", "#fe7f2d", "#fcca46", "#a1c181", "#619b8a"]
 # https://colorbrewer2.org/?type=diverging&scheme=RdYlBu&n=10
 DIVERGING_BREWER = [
     "#a50026",
+    "#d73027",
     "#009E73",
     "#fdae61",
     "#313695",

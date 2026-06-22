@@ -89,7 +89,7 @@ def main(sds_dir: str, n_jobs: int = 2):
         interpolate=True,            # fill miniSEED gaps linearly
         plot_daily=True,             # save per-day tremor PNG
         save_plot=True,
-        overwrite_plot=True,
+        plot_overwrite=True,
         overwrite=False,             # skip days already on disk
         n_jobs=n_jobs,
     )

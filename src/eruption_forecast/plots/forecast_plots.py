@@ -212,7 +212,7 @@ def plot_forecast(
             for _index, eruption_date in enumerate(_eruption_dates):
                 label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
                 if df.index[0] <= eruption_date <= df.index[-1]:
-                    ax = _ax_eruption(ax, to_datetime(eruption_date), label=label)
+                    ax = ax_eruption(ax, to_datetime(eruption_date), label=label)
 
         ax.axhline(
             y=threshold,
@@ -416,8 +416,12 @@ def _ax_forecast(
     return ax
 
 
-def _ax_eruption(
-    ax: plt.Axes, eruption_date: datetime, label: str | None = None, y_max: float = 1.05
+def ax_eruption(
+    ax: plt.Axes,
+    eruption_date: datetime,
+    label: str | None = None,
+    fill_between: bool = True,
+    fill_between_y_max: float = 1.05,
 ) -> plt.Axes:
     """Annotate a single eruption date on the given axes as a vertical dashed line.
 
@@ -428,7 +432,7 @@ def _ax_eruption(
         eruption_date (datetime): Eruption date to mark.
         label (str | None, optional): Legend label for the line. Pass ``None`` to
             suppress the legend entry for subsequent eruptions. Defaults to ``None``.
-        y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
+        fill_between_y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
 
     Returns:
         plt.Axes: The modified axes object.
@@ -444,13 +448,14 @@ def _ax_eruption(
         label=label,
     )
 
-    ax.fill_between(
-        np.array([start_eruption, end_eruption]),
-        0.0,
-        y_max,
-        color="#a50026",
-        alpha=0.1,
-    )
+    if fill_between:
+        ax.fill_between(
+            np.array([start_eruption, end_eruption]),
+            0.0,
+            fill_between_y_max,
+            color="#a50026",
+            alpha=0.1,
+        )
 
     ax.text(
         x=eruption_date,  # ty:ignore[invalid-argument-type]

@@ -45,7 +45,11 @@ from eruption_forecast.tremor.rsam import RSAM
 from eruption_forecast.sources.fdsn import FDSN
 from eruption_forecast.utils.window import calculate_window_metrics
 from eruption_forecast.utils.dataframe import remove_anomalies
-from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
+from eruption_forecast.utils.pathutils import (
+    ensure_dir,
+    save_figure,
+    resolve_output_dir,
+)
 from eruption_forecast.config.constants import (
     CALCULATE_METHODS,
     BANDPASS_FILTER_CORNERS,
@@ -93,7 +97,7 @@ class CalculateTremor:
         cleanup_daily_dir (bool): Whether to delete daily directory after merging.
         plot_daily (bool): Whether to plot intermediate daily results.
         save_plot (bool): Whether to save final tremor plot to disk.
-        overwrite_plot (bool): Whether to overwrite existing plot files.
+        plot_overwrite (bool): Whether to overwrite existing plot files.
         verbose (bool): If True, enables verbose logging.
         debug (bool): If True, enables debug-level logging.
         df (pd.DataFrame): Calculated tremor DataFrame.
@@ -138,7 +142,7 @@ class CalculateTremor:
         plot_daily (bool): If True, plots intermediate daily results for inspection.
             Defaults to False.
         save_plot (bool): If True, saves the final tremor plot to disk. Defaults to False.
-        overwrite_plot (bool): If True, overwrites existing plot files. Defaults to False.
+        plot_overwrite (bool): If True, overwrites existing plot files. Defaults to False.
         filename_prefix (str | None): Custom prefix for output filenames.
             Defaults to None (auto-generated).
         verbose (bool): If True, enables verbose logging. Defaults to False.
@@ -170,9 +174,6 @@ class CalculateTremor:
         channel_type: str = "D",
         methods: list[str] | None = None,
         buffer_days: int | None = None,
-        output_dir: str | None = None,
-        root_dir: str | None = None,
-        overwrite: bool = False,
         remove_outlier_method: Literal["all", "maximum"] = "maximum",
         remove_tremor_anomalies: bool = False,
         interpolate: bool = False,
@@ -180,9 +181,12 @@ class CalculateTremor:
         cleanup_daily_dir: bool = False,
         plot_daily: bool = False,
         save_plot: bool = False,
-        overwrite_plot: bool = False,
+        plot_overwrite: bool = False,
         filename_prefix: str | None = None,
         minimum_completion_ratio: float = DEFAULT_MINIMUM_COMPLETION_RATIO,
+        overwrite: bool = False,
+        output_dir: str | None = None,
+        root_dir: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
         debug: bool = False,
@@ -225,7 +229,7 @@ class CalculateTremor:
             plot_daily (bool, optional): Generate a plot for each day's tremor data.
                 Defaults to False.
             save_plot (bool, optional): Save daily plots to disk. Defaults to False.
-            overwrite_plot (bool, optional): Overwrite existing daily plot files.
+            plot_overwrite (bool, optional): Overwrite existing daily plot files.
                 Defaults to False.
             filename_prefix (str | None, optional): Custom prefix for the merged CSV
                 filename. Defaults to None (auto-derived from NSLC and date range).
@@ -246,7 +250,9 @@ class CalculateTremor:
         tremor_dir = os.path.join(station_dir, "tremor")
         figures_dir = os.path.join(tremor_dir, "figures")
         start_date_buffered = (
-            start_date if buffer_days is None else to_datetime(start_date) - timedelta()
+            start_date
+            if buffer_days is None
+            else start_date - timedelta(days=buffer_days)
         )
 
         # ------------------------------------------------------------------
@@ -261,6 +267,7 @@ class CalculateTremor:
         self.end_date: datetime = end_date
 
         # TODO: Add kurtosis
+        self.buffer_days: int | None = buffer_days
         self.start_date_buffered: datetime = start_date_buffered
         self.methods: list[str] = methods or CALCULATE_METHODS
         self.output_dir: str = output_dir
@@ -277,7 +284,7 @@ class CalculateTremor:
         self.cleanup_daily_dir = cleanup_daily_dir
         self.plot_daily = plot_daily
         self.save_plot = save_plot
-        self.overwrite_plot = overwrite_plot
+        self.plot_overwrite = plot_overwrite
         self.verbose = verbose
         self.debug = debug
 
@@ -323,6 +330,8 @@ class CalculateTremor:
         # Will be set after run() called
         # ------------------------------------------------------------------
         self.daily_files: list[str] = []
+        self._plot_rsam_as_log: bool = False
+        self._plot_filter_dsar_value: float | None = None
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -374,7 +383,7 @@ class CalculateTremor:
             f"location={self.location!r}",
             f"channel_type={self.channel_type!r}",
             f"methods={self.methods!r}",
-            f"buffer_days={self.start_date_buffered}",
+            f"buffer_days={self.buffer_days!r}",
             f"output_dir={self.output_dir!r}",
             f"root_dir={self.root_dir!r}"
             if hasattr(self, "root_dir")
@@ -387,7 +396,7 @@ class CalculateTremor:
             f"cleanup_daily_dir={self.cleanup_daily_dir}",
             f"plot_daily={self.plot_daily}",
             f"save_plot={self.save_plot}",
-            f"overwrite_plot={self.overwrite_plot}",
+            f"plot_overwrite={self.plot_overwrite}",
             f"filename_prefix={self.filename_prefix!r}",
             f"minimum_completion_ratio={self.minimum_completion_ratio}",
             f"n_jobs={self.n_jobs}",
@@ -420,23 +429,7 @@ class CalculateTremor:
             >>> tremor.change_freq_bands([(0.1, 1.0), (1.0, 5.0), (5.0, 10.0)])
             >>> print(tremor.freq_bands_alias)
         """
-        if not isinstance(freq_bands, list):
-            raise TypeError(
-                "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
-            )
-
         for freqs in freq_bands:
-            if not isinstance(freqs, tuple):
-                raise TypeError(
-                    f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
-                    f"Example (0.1,1.0). Your values are: {freqs}"
-                )
-            if len(freqs) != 2:
-                raise ValueError(
-                    f"Frequencies must have two elements. Example (0.1,1.0). "
-                    f"Your values are: {freqs}"
-                )
-
             freq_min, freq_max = freqs
             if not isinstance(freq_min, (float, int)):
                 raise TypeError(
@@ -706,22 +699,61 @@ class CalculateTremor:
         )
         return self
 
-    def run(self) -> Self:
+    def run(
+        self,
+        plot_eruption_dates: list[str] | None = None,
+        plot_rsam_as_log: bool = False,
+        plot_rolling_window: str | None = None,
+        plot_filter_dsar_value: float | None = None,
+    ) -> Self:
         """Execute tremor calculation workflow.
 
-        Orchestrates the full calculation: loads existing CSV if available and
-        overwrite=False, otherwise processes daily data (in parallel if n_jobs > 1),
-        merges results, and saves the final CSV. Optionally saves a plot.
+        Orchestrates the full calculation: loads the existing merged CSV if
+        available and ``overwrite=False``, otherwise processes daily data
+        (in parallel when ``n_jobs > 1``), merges per-day outputs, and writes
+        both a non-interpolated and an interpolated CSV under ``tremor_dir``.
+
+        When ``save_plot`` is ``True``, a PNG sibling of the interpolated CSV
+        is also written to ``{tremor_dir}/{self.filename}`` with ``.csv``
+        swapped for ``.png``. The existing PNG is preserved unless
+        ``overwrite`` or ``plot_overwrite`` is ``True``.
+
+        Args:
+            plot_eruption_dates (list[str] | None): Eruption timestamps forwarded
+                to ``plot_tremor()`` and overlaid on the summary figure as
+                labelled vertical markers. Has no effect when ``save_plot`` is
+                ``False``. Defaults to ``None``.
+            plot_rsam_as_log (bool): Render the RSAM subplot of the summary
+                figure on a log y-axis. Has no effect when ``save_plot`` is
+                ``False``. Defaults to ``False``.
+            plot_rolling_window (str | None): Pandas offset alias (e.g.
+                ``"2D"``, ``"12H"``) forwarded to ``plot_tremor()`` as the
+                rolling-reduction window for the summary figure. ``None`` plots
+                the raw series without rolling. Has no effect when
+                ``save_plot`` is ``False``. Defaults to ``None``.
+            plot_filter_dsar_value (float | None): Upper bound applied to every
+                DSAR series before plotting — samples at or above this value
+                are masked with ``NaN`` so a few spikes do not flatten the
+                visible band. RSAM and entropy series are unaffected. Persisted
+                on ``self._plot_filter_dsar_value`` so the per-day plotting
+                path (``run_job``) also honours it. Has no effect when
+                ``save_plot`` is ``False`` for the summary figure (the per-day
+                path is gated on ``plot_daily``). Defaults to ``None``.
 
         Returns:
-            Self: The CalculateTremor instance with populated df and csv attributes.
+            Self: The ``CalculateTremor`` instance with populated ``df`` and
+            ``csv`` attributes.
 
         Raises:
-            ValueError: If tremor CSV cannot be loaded when overwrite=False.
+            ValueError: If no data source has been configured (``_source`` is
+                ``None``) or if the existing tremor CSV cannot be loaded when
+                ``overwrite=False``.
 
-        Examples:
-            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-03", station="OJN", channel="EHZ", n_jobs=4)
-            >>> tremor.from_sds("/data/sds").run()
+        Example:
+            >>> tremor = CalculateTremor(
+            ...     start_date="2025-01-01", end_date="2025-01-03",
+            ...     station="OJN", channel="EHZ", n_jobs=4,
+            ... ).from_sds("/data/sds").run(plot_eruption_dates=["2025-01-02"])
             >>> print(tremor.df.head())
             >>> print(f"Saved to: {tremor.csv}")
         """
@@ -746,6 +778,13 @@ class CalculateTremor:
                 raise ValueError(f"Could not load tremor from file: {csv}")
 
         self.create_daily_dir()
+        self._plot_rsam_as_log = plot_rsam_as_log
+        self._plot_filter_dsar_value = plot_filter_dsar_value
+
+        if plot_filter_dsar_value and self.verbose:
+            logger.warning(
+                f"Plotted DSAR value will be filtered by {plot_filter_dsar_value}"
+            )
 
         if self.n_jobs == 1:
             for job in self.jobs:
@@ -766,6 +805,9 @@ class CalculateTremor:
 
         # Merge calculated tremor CSV files from daily dir
         df = self.concat_tremor_data(self.daily_dir, self.tremor_dir)
+
+        if self.buffer_days:
+            df = df[df.index >= self.start_date]
 
         start_date = df.index[0].strftime("%Y-%m-%d")
         end_date = df.index[-1].strftime("%Y-%m-%d")
@@ -792,16 +834,31 @@ class CalculateTremor:
         logger.info(f"Interpolated tremor data saved to {csv}")
 
         if self.save_plot:
-            plot_tremor(
-                df=df,
-                interval=14,
-                interval_unit="days",
-                figure_dir=self.tremor_dir,
-                filename=self.filename,
-                title=self.nslc,
-                overwrite=self.overwrite or self.overwrite_plot,
-                verbose=self.verbose,
-            )
+            figure_filename = self.filename.replace(".csv", ".png")
+            figure_path = os.path.join(self.tremor_dir, figure_filename)
+            if self.overwrite or self.plot_overwrite or not os.path.exists(figure_path):
+                fig = plot_tremor(
+                    df=df,
+                    rolling_window=plot_rolling_window,
+                    interval=30,
+                    interval_unit="days",
+                    eruption_dates=plot_eruption_dates,
+                    filepath=None,
+                    title=self.nslc,
+                    grouped_by_method=False,
+                    filter_dsar_value=plot_filter_dsar_value,
+                    rsam_as_log=plot_rsam_as_log,
+                    verbose=self.verbose,
+                )
+
+                save_figure(
+                    fig=fig,
+                    filepath=figure_path,
+                    dpi=150,
+                    save_as_pdf=True,
+                    pdf_title=f"Tremor Plot | {self.nslc}",
+                    verbose=self.verbose,
+                )
 
         self.df = df
         self.csv = csv
@@ -812,22 +869,32 @@ class CalculateTremor:
     def run_job(self, job_index: int, date: datetime) -> str | None:
         """Execute tremor calculation for a single day.
 
-        Processes one day of seismic data, calculates RSAM and DSAR metrics,
-        saves results to a daily CSV file, and optionally plots the data.
-        Skips processing if the file already exists and overwrite=False.
+        Processes one day of seismic data, computes the configured metrics
+        (RSAM, DSAR, Shannon entropy), writes a daily CSV to ``daily_dir`` and
+        — when ``plot_daily`` is ``True`` — a matching ``{date}.png`` to
+        ``figures_dir``. Both outputs are skipped when they already exist
+        unless ``overwrite`` is ``True``; the same flag is the only gate on
+        the daily plot (there is no separate ``plot_overwrite`` knob in this
+        path).
+
+        Days below ``minimum_completion_ratio`` (after anomaly removal) are
+        skipped and return ``None`` without writing either file.
 
         Args:
-            job_index (int): Job index for logging purposes.
-            date (datetime): Date to process.
+            job_index (int): Job index used in verbose log messages.
+            date (datetime): Calendar day to process.
 
         Returns:
-            str | None: Path to the saved CSV file, or None if the DataFrame is empty
-                (no data available for that day).
+            str | None: Path to the saved daily CSV file, or ``None`` when no
+            usable data was available (empty stream, all-NaN frame, or
+            completeness below ``minimum_completion_ratio``).
 
-        Examples:
+        Example:
             >>> from datetime import datetime
-            >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-01-02", station="OJN", channel="EHZ")
-            >>> tremor.from_sds("/data/sds")
+            >>> tremor = CalculateTremor(
+            ...     start_date="2025-01-01", end_date="2025-01-02",
+            ...     station="OJN", channel="EHZ",
+            ... ).from_sds("/data/sds")
             >>> csv_path = tremor.run_job(0, datetime(2025, 1, 1))
         """
         date_str = date.strftime("%Y-%m-%d")
@@ -873,21 +940,22 @@ class CalculateTremor:
         # Save daily tremor data
         df.to_csv(daily_file, index=True, index_label="datetime")
 
-        # plot tremor data
         if self.plot_daily:
             plot_tremor(
                 df=df,
                 interval=2,
                 interval_unit="hours",
-                filename=f"{date_str}.png",
-                figure_dir=self.figures_dir,
+                filepath=temp_plot,
                 title=date_str,
-                overwrite=self.overwrite,
+                metrics="mean",
+                grouped_by_method=False,
+                rsam_as_log=self._plot_rsam_as_log,
+                filter_dsar_value=self._plot_filter_dsar_value,
                 verbose=self.verbose,
             )
 
         if self.verbose:
-            logger.info(f"{date_str} :: File CSV saved to {daily_file}")
+            logger.info(f"{date_str} :: Commpleted. CSV saved: {daily_file}")
 
         return daily_file
 
@@ -990,9 +1058,6 @@ class CalculateTremor:
 
             if method == "entropy":
                 df = self.calculate_entropy(date_str, df, stream)
-
-        if self.verbose:
-            logger.info(f"{date_str} :: Calculation finished.")
 
         return df
 
@@ -1345,7 +1410,7 @@ class CalculateTremor:
         interpolate: bool = False,
         value_multiplier: float | None = None,
         save_plot: bool = False,
-        overwrite_plot: bool = False,
+        plot_overwrite: bool = False,
         verbose: bool = False,
         debug: bool = False,
     ) -> "CalculateTremor":
@@ -1404,10 +1469,13 @@ class CalculateTremor:
                 the data source. Defaults to False.
             value_multiplier (float | None): Scaling factor for seismic values.
                 Defaults to None.
-            save_plot (bool): If True, saves a tremor plot of the merged CSV.
-                Defaults to False.
-            overwrite_plot (bool): If True, overwrites an existing plot file.
-                Defaults to False.
+            save_plot (bool): If ``True``, write a PNG sibling of the merged
+                interpolated CSV under ``tremor_dir`` (``.csv`` swapped for
+                ``.png``). Defaults to ``False``.
+            plot_overwrite (bool): If ``True``, overwrite the PNG when it
+                already exists. ``overwrite=True`` also forces a rewrite.
+                When both are ``False`` and the file is present, the existing
+                plot is preserved. Defaults to ``False``.
             verbose (bool): Enables verbose logging. Defaults to False.
             debug (bool): Enables debug-level logging. Defaults to False.
 
@@ -1446,7 +1514,7 @@ class CalculateTremor:
         # ------------------------------------------------------------------
         existing_df = pd.read_csv(existing_csv, index_col=0, parse_dates=True)
 
-        gap_start: datetime = existing_df.index[-1].to_pydatetime() + timedelta(
+        gap_start: datetime = existing_df.index.max().to_pydatetime() + timedelta(
             minutes=10
         )
         gap_end: datetime = to_datetime(new_end_date)
@@ -1489,7 +1557,7 @@ class CalculateTremor:
             value_multiplier=value_multiplier,
             n_jobs=n_jobs,
             save_plot=save_plot,
-            overwrite_plot=overwrite_plot,
+            plot_overwrite=plot_overwrite,
             verbose=verbose,
             debug=debug,
         )
@@ -1584,7 +1652,7 @@ class CalculateTremor:
         # 11. Save non-interpolated version
         # ------------------------------------------------------------------
         non_interpolated_filename = (
-            f"tremor_non-interpolated_{instance.nslc}_{start_date}-{end_date}.csv"
+            f"tremor-non-interpolated_{instance.nslc}_{start_date}-{end_date}.csv"
         )
         csv_non_interpolated = os.path.join(
             instance.tremor_dir, non_interpolated_filename
@@ -1609,15 +1677,16 @@ class CalculateTremor:
         # 13. Optionally plot
         # ------------------------------------------------------------------
         if save_plot:
-            plot_tremor(
-                df=merged,
-                interval=14,
-                interval_unit="days",
-                figure_dir=instance.tremor_dir,
-                filename=instance.filename,
-                title=instance.nslc,
-                overwrite=overwrite or overwrite_plot,
-                verbose=verbose,
-            )
+            figure_filename = instance.filename.replace(".csv", ".png")
+            figure_path = os.path.join(instance.tremor_dir, figure_filename)
+            if overwrite or plot_overwrite or not os.path.exists(figure_path):
+                plot_tremor(
+                    df=merged,
+                    interval=14,
+                    interval_unit="days",
+                    filepath=figure_path,
+                    title=instance.nslc,
+                    verbose=verbose,
+                )
 
         return instance

@@ -13,7 +13,10 @@ from eruption_forecast.plots.styles import (
 from eruption_forecast.label.label_plots import plot_label_distribution
 
 # Tremor plotting
-from eruption_forecast.plots.tremor_plots import plot_tremor
+from eruption_forecast.plots.tremor_plots import (
+    plot_tremor,
+    plot_tremor_from_file,
+)
 
 # Feature plotting
 from eruption_forecast.plots.feature_plots import (
@@ -49,6 +52,7 @@ __all__ = [
     "setup_nature_style",
     # Tremor plotting
     "plot_tremor",
+    "plot_tremor_from_file",
     # Feature plotting
     "plot_significant_features",
     "replot_significant_features",

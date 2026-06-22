@@ -8,17 +8,15 @@ import matplotlib
 from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
-from eruption_forecast.utils.pathutils import ensure_dir
+from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
-from eruption_forecast.utils.formatting import pdf_metadata
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 
 class PredictionModel(BaseModel, CacheModel):
@@ -573,9 +571,7 @@ class PredictionModel(BaseModel, CacheModel):
         # explanation) treat ``self._labels`` and ``self.features_df`` as
         # aligned without a separate re-check.
         if len(self._labels) != len(self.features_df):
-            self._labels = self._labels[
-                self._labels["id"].isin(self.features_df.index)
-            ]
+            self._labels = self._labels[self._labels["id"].isin(self.features_df.index)]
             self._labels.to_csv(self.labels_csv, index=True)
             self.labels = self._labels["id"]
 
@@ -702,30 +698,17 @@ class PredictionModel(BaseModel, CacheModel):
         )
 
         figure_dir = os.path.join(self.prediction_dir, "figures")
-        os.makedirs(figure_dir, exist_ok=True)
+        png_path = os.path.join(figure_dir, f"forecast_{self.basename}.png")
 
-        path = os.path.join(figure_dir, f"forecast_{self.basename}.png")
-        fig.savefig(
-            path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor=None
+        save_figure(
+            fig=fig,
+            filepath=png_path,
+            dpi=300,
+            save_as_pdf=plot_pdf,
+            pdf_title=f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}",
+            verbose=self.verbose,
         )
 
-        logger.info(f"Forecast plot saved to: {path}")
-
-        if plot_pdf:
-            path = os.path.join(figure_dir, f"forecast_{self.basename}.pdf")
-
-            # Type 42 embeds TrueType fonts — text stays selectable and
-            # renders consistently in all PDF viewers and vector editors.
-            with matplotlib.rc_context({"pdf.fonttype": 42}):
-                fig.savefig(
-                    path,
-                    bbox_inches="tight",
-                    facecolor="white",
-                    edgecolor=None,
-                    metadata=pdf_metadata(
-                        title=f"Eruption Forecast: {self.start_date_str} to {self.end_date_str}"
-                    ),
-                )
-
-        plt.close(fig)
-        self.forecast_plot_path = path
+        self.forecast_plot_path = (
+            png_path.replace(".png", ".pdf") if plot_pdf else png_path
+        )
