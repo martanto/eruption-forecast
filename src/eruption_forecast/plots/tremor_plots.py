@@ -22,18 +22,21 @@ def plot_tremor(
     eruption_dates: list[str] | None = None,
     title: str | None = None,
     selected_columns: list[str] | None = None,
+    metrics: Literal["median", "mean", "all"] = "all",
     filepath: str | None = None,
     dpi: int = 150,
     rsam_as_log: bool = False,
     legend_loc: str = "best",
     legend_ncol: int = 2,
+    grouped_by_method: bool = True,
     verbose: bool = False,
 ) -> plt.Figure:
     """Plot tremor time-series grouped by calculation method.
 
     Renders one subplot per detected method (``rsam``, ``dsar``, ``entropy``)
-    using the columns present in ``df``. Each series is shown as a rolling
-    median (solid) and rolling mean (dashed). Optional eruption markers and a
+    using the columns present in ``df``. By default each series is shown as a
+    rolling median (solid) and rolling mean (dashed); use ``metrics`` to
+    restrict the output to one of the two. Optional eruption markers and a
     figure title can be overlaid. When ``filepath`` is supplied, the figure is
     saved via ``save_figure`` (parent directories are created automatically and
     the extension is appended when missing); otherwise it is returned without
@@ -56,6 +59,10 @@ def plot_tremor(
         selected_columns (list[str] | None): Subset of columns to plot. When
             provided, ``df`` is narrowed to these columns before grouping.
             Defaults to ``None`` (all columns).
+        metrics (Literal["median", "mean", "all"]): Which rolling reduction(s)
+            to draw per series. ``"all"`` (default) draws both the rolling
+            median (solid) and rolling mean (dashed); ``"median"`` draws the
+            solid median only; ``"mean"`` draws the dashed mean only.
         filepath (str | None): Absolute path where the figure should be saved.
             Parent directories are created by ``save_figure``; the extension is
             appended when missing. Callers own the overwrite policy — passing
@@ -67,6 +74,13 @@ def plot_tremor(
             and annotate the y-label with ``"(log)"``. Defaults to ``False``.
         legend_loc (str): Matplotlib legend location string. Defaults to ``"best"``.
         legend_ncol (int): Legend column count. Defaults to ``2``.
+        grouped_by_method (bool): If ``True`` (default), group columns by
+            tremor method and render one subplot per method, stacking every
+            column from the same family (e.g. ``rsam_f0``..``rsam_f4``) on a
+            shared axis. If ``False``, render one subplot per column in the
+            order they appear in ``df`` (or ``selected_columns`` when
+            provided) — useful for inspecting individual bands side by side.
+            Defaults to ``True``.
         verbose (bool): If ``True``, ``save_figure`` logs the output path.
             Defaults to ``False``.
 
@@ -120,20 +134,19 @@ def plot_tremor(
 
     columns = selected_columns or df.columns.tolist()
 
-    nrows = len(CALCULATE_METHODS)
     grouped_methods: dict[str, list[str]] = {}
-    for method in CALCULATE_METHODS:
-        grouped_methods[method] = []
-        for column in columns:
-            if method in column:
-                grouped_methods[method].append(column)
-            grouped_methods[method].sort()
+    if grouped_by_method:
+        for method in CALCULATE_METHODS:
+            cols = sorted(c for c in columns if method in c)
+            if cols:
+                grouped_methods[method] = cols
+    else:
+        grouped_methods = {column: [column] for column in columns}
 
-        if len(grouped_methods[method]) == 0:
-            grouped_methods.pop(method)
-
-    if nrows == 0:
+    if not grouped_methods:
         raise ValueError(f"There are no tremor available for columns {columns}")
+
+    nrows = len(grouped_methods)
 
     fig, axs = plt.subplots(
         nrows=nrows,
@@ -141,34 +154,38 @@ def plot_tremor(
         figsize=(12, 2.5 * nrows),
         layout="constrained",
         sharex=True,
+        squeeze=False,
     )
 
     for index, (method, columns) in enumerate(grouped_methods.items()):
         if len(columns) == 0:
             continue
 
-        ax = axs[index]
+        ax = axs[index, 0]
         for column_index, column in enumerate(columns):
             labels = column.split("_")
             label = labels[0]
             if len(labels) == 2:
                 label = labels[1]
 
-            ax.plot(
-                df.index,
-                df[column].rolling(window=rolling_window, center=True).median(),
-                color=DIVERGING_BREWER[column_index],
-                alpha=0.8,
-                label=f"2d|median|{label}",
-            )
-            ax.plot(
-                df.index,
-                df[column].rolling(window=rolling_window, center=True).mean(),
-                color=DIVERGING_BREWER[column_index],
-                alpha=0.5,
-                label=f"2d|mean|{label}",
-                linestyle="--",
-            )
+            if metrics == "all" or metrics == "median":
+                ax.plot(
+                    df.index,
+                    df[column].rolling(window=rolling_window, center=True).median(),
+                    color=DIVERGING_BREWER[column_index],
+                    alpha=0.8,
+                    label=f"2d|median|{label}",
+                )
+
+            if metrics == "all" or metrics == "mean":
+                ax.plot(
+                    df.index,
+                    df[column].rolling(window=rolling_window, center=True).mean(),
+                    color=DIVERGING_BREWER[column_index],
+                    alpha=0.5,
+                    label=f"2d|mean|{label}",
+                    linestyle="--",
+                )
 
         if eruption_dates is not None and len(eruption_dates) > 0:
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
@@ -214,7 +231,7 @@ def plot_tremor(
         )
         ax.set_title(method.upper(), fontsize=10)
 
-        if method.lower() == "rsam" and rsam_as_log:
+        if "rsam" in method.lower() and rsam_as_log:
             ax.set_yscale("log")
 
     if title:
@@ -224,6 +241,50 @@ def plot_tremor(
         save_figure(fig, filepath, dpi=dpi, verbose=verbose)
 
     return fig
+
+
+def plot_tremor_from_file(
+    csv_path: str | Path,
+    **kwargs,
+) -> plt.Figure:
+    """Load a tremor CSV from disk and render it via :func:`plot_tremor`.
+
+    Thin convenience wrapper around :func:`plot_tremor` for the common
+    single-file case: read the CSV with a datetime index, then forward the
+    resulting DataFrame plus every other keyword to :func:`plot_tremor`. Use
+    :func:`replot_tremor` instead when batching a whole directory.
+
+    Args:
+        csv_path (str | Path): Path to a tremor CSV produced by
+            ``CalculateTremor`` (datetime index in the first column, tremor
+            columns such as ``rsam_f0``, ``dsar_f0-f1``, ``entropy``).
+        **kwargs: Additional keyword arguments forwarded verbatim to
+            :func:`plot_tremor` (e.g. ``rolling_window``, ``interval``,
+            ``interval_unit``, ``eruption_dates``, ``title``,
+            ``selected_columns``, ``metrics``, ``filepath``, ``dpi``,
+            ``rsam_as_log``, ``legend_loc``, ``legend_ncol``,
+            ``grouped_by_method``, ``verbose``). ``df`` is set internally
+            from ``csv_path``; passing it here would raise ``TypeError``.
+
+    Returns:
+        plt.Figure: The figure returned by :func:`plot_tremor`. Saved to disk
+        only when ``filepath`` is supplied via ``kwargs``.
+
+    Raises:
+        FileNotFoundError: If ``csv_path`` does not exist.
+
+    Example:
+        >>> fig = plot_tremor_from_file(
+        ...     "output/VG.OJN.00.EHZ/tremor/daily/2025-03-20.csv",
+        ...     interval=6,
+        ...     interval_unit="hours",
+        ...     eruption_dates=["2025-03-20"],
+        ...     title="VG.OJN.00.EHZ — 2025-03-20",
+        ...     filepath="tremor_2025-03-20.png",
+        ... )
+    """
+    df = pd.read_csv(Path(csv_path), index_col=0, parse_dates=True)
+    return plot_tremor(df=df, **kwargs)
 
 
 def _process_single_tremor_file(
