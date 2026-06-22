@@ -829,13 +829,15 @@ class CalculateTremor:
                     eruption_dates=eruption_dates,
                     filepath=None,
                     title=self.nslc,
+                    grouped_by_method=False,
+                    rsam_as_log=True,
                     verbose=self.verbose,
                 )
 
                 save_figure(
                     fig=fig,
                     filepath=figure_path,
-                    dpi=300,
+                    dpi=150,
                     save_as_pdf=True,
                     pdf_title=f"Tremor Plot | {self.nslc}",
                     verbose=self.verbose,
