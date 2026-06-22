@@ -130,7 +130,6 @@ class DSAR:
             >>> print(ratio.mean())
         """
         # Calculate mean of absolute values for both streams
-        # Note: We use absolute_value=True inside calculate_window_metrics
         if isinstance(first_stream, Stream):
             trace: Trace = first_stream[0]
             first_stream = calculate_window_metrics(
@@ -156,7 +155,6 @@ class DSAR:
         self.second_dsar = second_stream
 
         # Calculate DSAR ratio
-        # Pandas handles division of Series with same index automatically
         series: pd.Series[float] = first_stream / second_stream
 
         if value_multiplier != 1.0:
