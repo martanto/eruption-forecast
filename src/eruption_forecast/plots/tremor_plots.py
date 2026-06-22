@@ -26,7 +26,7 @@ def plot_tremor(
     filepath: str | None = None,
     filter_dsar_value: float | None = None,
     rsam_as_log: bool = False,
-    legend_loc: str = "best",
+    legend_loc: str = "upper left",
     legend_ncol: int = 2,
     dpi: int = 150,
     grouped_by_method: bool = True,

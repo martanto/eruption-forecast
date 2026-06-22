@@ -84,7 +84,7 @@ calculate:
   interpolate: true
   plot_daily: true
   save_plot: true
-  overwrite_plot: true
+  plot_overwrite: true
   sds_dir: "D:/Data/OJN"
   client_url: "https://service.iris.edu"
   minimum_completion_ratio: 0.3

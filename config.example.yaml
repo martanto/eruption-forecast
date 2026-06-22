@@ -27,10 +27,11 @@ calculate:
   cleanup_daily_dir: false  # Delete per-day CSV files after merging
   plot_daily: false         # Plot each day's tremor data
   save_plot: false          # Save merged tremor plot to disk
-  overwrite_plot: false     # Overwrite existing tremor plots
+  plot_overwrite: false     # Overwrite existing tremor plots
   sds_dir: D:/Data/OJN      # SDS archive root (required when source='sds')
   client_url: https://service.iris.edu  # FDSN client URL (used when source='fdsn')
   minimum_completion_ratio: 0.3   # Minimum daily completion to accept a file
+  plot_eruption_dates: null # Eruption dates overlaid as vertical markers on the summary figure (save_plot=true only); null = no markers
   plot_rsam_as_log: false   # Render the RSAM subplot on a log y-axis (save_plot=true only)
   plot_rolling_window: null # Pandas offset alias for rolling reduction (e.g. '2D', '12H'); null = raw series
   plot_filter_dsar_value: null   # Upper bound applied to DSAR series before plotting (null = no clipping)

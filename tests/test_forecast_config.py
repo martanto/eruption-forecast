@@ -188,10 +188,11 @@ class TestForecastCalculateConfig:
         assert cfg.cleanup_daily_dir is False
         assert cfg.plot_daily is False
         assert cfg.save_plot is False
-        assert cfg.overwrite_plot is False
+        assert cfg.plot_overwrite is False
         assert cfg.sds_dir is None
         assert cfg.client_url == "https://service.iris.edu"
         assert cfg.minimum_completion_ratio == 0.3
+        assert cfg.plot_eruption_dates is None
         assert cfg.overwrite is None
         assert cfg.n_jobs is None
         assert cfg.verbose is None

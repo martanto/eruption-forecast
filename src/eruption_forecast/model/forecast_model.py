@@ -161,14 +161,14 @@ class ForecastModel:
         cleanup_daily_dir: bool = False,
         plot_daily: bool = False,
         save_plot: bool = False,
-        overwrite_plot: bool = False,
         sds_dir: str | None = None,
         client_url: str = "https://service.iris.edu",
         minimum_completion_ratio: float = 0.3,
-        eruption_dates: list[str] | None = None,
+        plot_eruption_dates: list[str] | None = None,
         plot_rsam_as_log: bool = False,
         plot_rolling_window: str | None = None,
         plot_filter_dsar_value: float | None = None,
+        plot_overwrite: bool = False,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -207,7 +207,7 @@ class ForecastModel:
                 Defaults to ``False``.
             save_plot (bool): Persist the daily plot to disk.
                 Defaults to ``False``.
-            overwrite_plot (bool): Overwrite an existing daily plot.
+            plot_overwrite (bool): Overwrite an existing daily plot.
                 Defaults to ``False``.
             sds_dir (str | None): Root directory of the SDS archive.
                 Required when ``source="sds"``. Defaults to ``None``.
@@ -217,9 +217,13 @@ class ForecastModel:
             minimum_completion_ratio (float): Minimum per-day
                 completion ratio required for a daily file to be kept.
                 Defaults to ``0.3``.
-            eruption_dates (list[str] | None): Eruption dates
-                (``"YYYY-MM-DD"``) used to guide anomaly handling.
-                Defaults to ``None``.
+            plot_eruption_dates (list[str] | None): Eruption dates
+                (``"YYYY-MM-DD"``) overlaid as vertical markers on the
+                merged tremor summary figure. Forwarded to
+                ``CalculateTremor.run()`` and ultimately to
+                :func:`~eruption_forecast.plots.tremor_plots.plot_tremor`.
+                Only takes effect when ``save_plot=True``. Defaults to
+                ``None``.
             plot_rsam_as_log (bool): Render the RSAM subplot of the
                 merged tremor summary figure on a log y-axis. Forwarded
                 to ``CalculateTremor.run()`` and only takes effect when
@@ -297,7 +301,7 @@ class ForecastModel:
             cleanup_daily_dir=cleanup_daily_dir,
             plot_daily=plot_daily,
             save_plot=save_plot,
-            overwrite_plot=overwrite_plot,
+            plot_overwrite=plot_overwrite,
             overwrite=overwrite,
             minimum_completion_ratio=minimum_completion_ratio,
             n_jobs=n_jobs if n_jobs is not None else self.n_jobs,
@@ -317,7 +321,7 @@ class ForecastModel:
             raise ValueError(f"Unknown source {source!r}. Expected 'sds' or 'fdsn'.")
 
         self.CalculateTremor = calculate.run(
-            eruption_dates=eruption_dates,
+            plot_eruption_dates=plot_eruption_dates,
             plot_rsam_as_log=plot_rsam_as_log,
             plot_rolling_window=plot_rolling_window,
             plot_filter_dsar_value=plot_filter_dsar_value,
@@ -344,13 +348,16 @@ class ForecastModel:
             cleanup_daily_dir=cleanup_daily_dir,
             plot_daily=plot_daily,
             save_plot=save_plot,
-            overwrite_plot=overwrite_plot,
             sds_dir=sds_dir,
             client_url=client_url,
             minimum_completion_ratio=minimum_completion_ratio,
+            plot_eruption_dates=(
+                list(plot_eruption_dates) if plot_eruption_dates is not None else None
+            ),
             plot_rsam_as_log=plot_rsam_as_log,
             plot_rolling_window=plot_rolling_window,
             plot_filter_dsar_value=plot_filter_dsar_value,
+            plot_overwrite=plot_overwrite,
             overwrite=_cfg_overwrite,
             n_jobs=_cfg_n_jobs,
             verbose=_cfg_verbose,
