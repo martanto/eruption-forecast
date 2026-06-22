@@ -16,18 +16,19 @@ from eruption_forecast.plots.forecast_plots import ax_eruption
 
 def plot_tremor(
     df: pd.DataFrame,
-    rolling_window: str = "2D",
     interval: int = 1,
     interval_unit: Literal["hours", "days"] = "hours",
+    rolling_window: str | None = None,
     eruption_dates: list[str] | None = None,
     title: str | None = None,
     selected_columns: list[str] | None = None,
     metrics: Literal["median", "mean", "all"] = "all",
     filepath: str | None = None,
-    dpi: int = 150,
+    filter_dsar_value: float | None = None,
     rsam_as_log: bool = False,
     legend_loc: str = "best",
     legend_ncol: int = 2,
+    dpi: int = 150,
     grouped_by_method: bool = True,
     verbose: bool = False,
 ) -> plt.Figure:
@@ -45,12 +46,14 @@ def plot_tremor(
     Args:
         df (pd.DataFrame): Tremor DataFrame with a ``DatetimeIndex`` and one
             column per metric (e.g. ``rsam_f0``, ``dsar_f0-f1``, ``entropy``).
-        rolling_window (str): Pandas offset alias for the rolling reduction
-            (median + mean). Defaults to ``"2D"``.
         interval (int): Tick interval for the x-axis date locator. Defaults to ``1``.
         interval_unit (Literal["hours", "days"]): Unit applied to ``interval``.
             ``"hours"`` uses ``HourLocator`` + ``%H:%M`` formatting; ``"days"``
             uses ``DayLocator`` + ``%Y-%m-%d``. Defaults to ``"hours"``.
+        rolling_window (str | None): Pandas offset alias (e.g. ``"2D"``,
+            ``"12H"``) for the rolling reduction applied to each series before
+            plotting. ``None`` plots the raw series without rolling. Defaults to
+            ``None``.
         eruption_dates (list[str] | None): Eruption timestamps to overlay as
             vertical markers (one labelled ``"Eruption"`` legend entry per
             subplot). Markers outside the DataFrame range are skipped.
@@ -68,12 +71,22 @@ def plot_tremor(
             appended when missing. Callers own the overwrite policy — passing
             ``filepath`` always (re)writes the file. Defaults to ``None``
             (figure is returned without being saved).
-        dpi (int): Resolution used when saving. Ignored if ``filepath`` is
-            ``None``. Defaults to ``150``.
+        filter_dsar_value (float | None): Upper bound applied to every DSAR
+            series before plotting — samples at or above this value are masked
+            with ``NaN`` (via ``Series.where(series < filter_dsar_value)``) so a
+            handful of spikes do not flatten the visible band. Applied per
+            column when the column name contains ``"dsar"``; RSAM and entropy
+            series are unaffected. Defaults to ``None`` (no clipping).
         rsam_as_log (bool): If ``True``, plot the RSAM subplot on a log y-axis
-            and annotate the y-label with ``"(log)"``. Defaults to ``False``.
+            and annotate the y-label with ``"(log)"``. When ``False``
+            (default), large y-axis magnitudes fall back to matplotlib's
+            scientific offset notation (e.g. ``×10³`` above the axis)
+            instead of printing full integers on every tick. Defaults to
+            ``False``.
         legend_loc (str): Matplotlib legend location string. Defaults to ``"best"``.
         legend_ncol (int): Legend column count. Defaults to ``2``.
+        dpi (int): Resolution used when saving. Ignored if ``filepath`` is
+            ``None``. Defaults to ``150``.
         grouped_by_method (bool): If ``True`` (default), group columns by
             tremor method and render one subplot per method, stacking every
             column from the same family (e.g. ``rsam_f0``..``rsam_f4``) on a
@@ -137,7 +150,7 @@ def plot_tremor(
     grouped_methods: dict[str, list[str]] = {}
     if grouped_by_method:
         for method in CALCULATE_METHODS:
-            cols = sorted(c for c in columns if method in c)
+            cols = [c for c in columns if method in c]
             if cols:
                 grouped_methods[method] = cols
     else:
@@ -168,23 +181,43 @@ def plot_tremor(
             if len(labels) == 2:
                 label = labels[1]
 
+            label_rolling_window = rolling_window.lower() if rolling_window else "10min"
+
             if metrics == "all" or metrics == "median":
+                series = (
+                    df[column].rolling(window=rolling_window, center=True).median()
+                    if rolling_window
+                    else df[column]
+                )
+
+                if "dsar" in column.lower() and filter_dsar_value:
+                    series = series.where(series < filter_dsar_value)
+
                 ax.plot(
-                    df.index,
-                    df[column].rolling(window=rolling_window, center=True).median(),
+                    series.index,
+                    series,
                     color=DIVERGING_BREWER[column_index],
                     alpha=0.8,
-                    label=f"2d|median|{label}",
+                    label=f"{label_rolling_window}|median|{label}",
                 )
 
             if metrics == "all" or metrics == "mean":
+                series = (
+                    df[column].rolling(window=rolling_window, center=True).mean()
+                    if rolling_window
+                    else df[column]
+                )
+
+                if "dsar" in column.lower() and filter_dsar_value:
+                    series = series.where(series < filter_dsar_value)
+
                 ax.plot(
-                    df.index,
-                    df[column].rolling(window=rolling_window, center=True).mean(),
+                    series.index,
+                    series,
                     color=DIVERGING_BREWER[column_index],
-                    alpha=0.5,
-                    label=f"2d|mean|{label}",
-                    linestyle="--",
+                    alpha=0.5 if metrics == "all" else 0.8,
+                    label=f"{label_rolling_window}|mean|{label}",
+                    linestyle="--" if metrics == "all" else "-",
                 )
 
         if eruption_dates is not None and len(eruption_dates) > 0:
@@ -214,7 +247,7 @@ def plot_tremor(
         ax.xaxis.set_major_formatter(date_formatter)
         ax.set_xlim(start_date, end_date)
         for label in ax.get_xticklabels(which="major"):
-            label.set(rotation=30, horizontalalignment="right")
+            label.set(rotation=-15, horizontalalignment="left")
 
         ax.grid(
             True,
@@ -233,6 +266,13 @@ def plot_tremor(
 
         if "rsam" in method.lower() and rsam_as_log:
             ax.set_yscale("log")
+        else:
+            ax.ticklabel_format(
+                axis="y",
+                style="sci",
+                scilimits=(-3, 3),
+                useMathText=True,
+            )
 
     if title:
         fig.suptitle(title)
@@ -261,10 +301,11 @@ def plot_tremor_from_file(
         **kwargs: Additional keyword arguments forwarded verbatim to
             :func:`plot_tremor` (e.g. ``rolling_window``, ``interval``,
             ``interval_unit``, ``eruption_dates``, ``title``,
-            ``selected_columns``, ``metrics``, ``filepath``, ``dpi``,
-            ``rsam_as_log``, ``legend_loc``, ``legend_ncol``,
-            ``grouped_by_method``, ``verbose``). ``df`` is set internally
-            from ``csv_path``; passing it here would raise ``TypeError``.
+            ``selected_columns``, ``metrics``, ``filepath``,
+            ``filter_dsar_value``, ``rsam_as_log``, ``legend_loc``,
+            ``legend_ncol``, ``dpi``, ``grouped_by_method``, ``verbose``).
+            ``df`` is set internally from ``csv_path``; passing it here would
+            raise ``TypeError``.
 
     Returns:
         plt.Figure: The figure returned by :func:`plot_tremor`. Saved to disk

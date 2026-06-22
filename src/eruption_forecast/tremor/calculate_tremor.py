@@ -330,6 +330,8 @@ class CalculateTremor:
         # Will be set after run() called
         # ------------------------------------------------------------------
         self.daily_files: list[str] = []
+        self._plot_rsam_as_log: bool = False
+        self._plot_filter_dsar_value: float | None = None
 
         # ------------------------------------------------------------------
         # Validate and create directories
@@ -427,23 +429,7 @@ class CalculateTremor:
             >>> tremor.change_freq_bands([(0.1, 1.0), (1.0, 5.0), (5.0, 10.0)])
             >>> print(tremor.freq_bands_alias)
         """
-        if not isinstance(freq_bands, list):
-            raise TypeError(
-                "freq_bands must be a list. Example [(0.1,1.0),(1.0,2.5),(2.0,5.0)]"
-            )
-
         for freqs in freq_bands:
-            if not isinstance(freqs, tuple):
-                raise TypeError(
-                    f"Frequencies must be a tuple. Consist of freq minimum and maximum. "
-                    f"Example (0.1,1.0). Your values are: {freqs}"
-                )
-            if len(freqs) != 2:
-                raise ValueError(
-                    f"Frequencies must have two elements. Example (0.1,1.0). "
-                    f"Your values are: {freqs}"
-                )
-
             freq_min, freq_max = freqs
             if not isinstance(freq_min, (float, int)):
                 raise TypeError(
@@ -713,7 +699,13 @@ class CalculateTremor:
         )
         return self
 
-    def run(self, eruption_dates: list[str] | None = None) -> Self:
+    def run(
+        self,
+        eruption_dates: list[str] | None = None,
+        plot_rsam_as_log: bool = False,
+        plot_rolling_window: str | None = None,
+        plot_filter_dsar_value: float | None = None,
+    ) -> Self:
         """Execute tremor calculation workflow.
 
         Orchestrates the full calculation: loads the existing merged CSV if
@@ -731,6 +723,22 @@ class CalculateTremor:
                 to ``plot_tremor()`` and overlaid on the summary figure as
                 labelled vertical markers. Has no effect when ``save_plot`` is
                 ``False``. Defaults to ``None``.
+            plot_rsam_as_log (bool): Render the RSAM subplot of the summary
+                figure on a log y-axis. Has no effect when ``save_plot`` is
+                ``False``. Defaults to ``False``.
+            plot_rolling_window (str | None): Pandas offset alias (e.g.
+                ``"2D"``, ``"12H"``) forwarded to ``plot_tremor()`` as the
+                rolling-reduction window for the summary figure. ``None`` plots
+                the raw series without rolling. Has no effect when
+                ``save_plot`` is ``False``. Defaults to ``None``.
+            plot_filter_dsar_value (float | None): Upper bound applied to every
+                DSAR series before plotting — samples at or above this value
+                are masked with ``NaN`` so a few spikes do not flatten the
+                visible band. RSAM and entropy series are unaffected. Persisted
+                on ``self._plot_filter_dsar_value`` so the per-day plotting
+                path (``run_job``) also honours it. Has no effect when
+                ``save_plot`` is ``False`` for the summary figure (the per-day
+                path is gated on ``plot_daily``). Defaults to ``None``.
 
         Returns:
             Self: The ``CalculateTremor`` instance with populated ``df`` and
@@ -770,6 +778,13 @@ class CalculateTremor:
                 raise ValueError(f"Could not load tremor from file: {csv}")
 
         self.create_daily_dir()
+        self._plot_rsam_as_log = plot_rsam_as_log
+        self._plot_filter_dsar_value = plot_filter_dsar_value
+
+        if plot_filter_dsar_value and self.verbose:
+            logger.warning(
+                f"Plotted DSAR value will be filtered by {plot_filter_dsar_value}"
+            )
 
         if self.n_jobs == 1:
             for job in self.jobs:
@@ -824,13 +839,15 @@ class CalculateTremor:
             if self.overwrite or self.overwrite_plot or not os.path.exists(figure_path):
                 fig = plot_tremor(
                     df=df,
-                    interval=14,
+                    rolling_window=plot_rolling_window,
+                    interval=30,
                     interval_unit="days",
                     eruption_dates=eruption_dates,
                     filepath=None,
                     title=self.nslc,
                     grouped_by_method=False,
-                    rsam_as_log=True,
+                    filter_dsar_value=plot_filter_dsar_value,
+                    rsam_as_log=plot_rsam_as_log,
                     verbose=self.verbose,
                 )
 
@@ -930,11 +947,15 @@ class CalculateTremor:
                 interval_unit="hours",
                 filepath=temp_plot,
                 title=date_str,
+                metrics="mean",
+                grouped_by_method=False,
+                rsam_as_log=self._plot_rsam_as_log,
+                filter_dsar_value=self._plot_filter_dsar_value,
                 verbose=self.verbose,
             )
 
         if self.verbose:
-            logger.info(f"{date_str} :: File CSV saved to {daily_file}")
+            logger.info(f"{date_str} :: Commpleted. CSV saved: {daily_file}")
 
         return daily_file
 
@@ -1037,9 +1058,6 @@ class CalculateTremor:
 
             if method == "entropy":
                 df = self.calculate_entropy(date_str, df, stream)
-
-        if self.verbose:
-            logger.info(f"{date_str} :: Calculation finished.")
 
         return df
 
@@ -1634,7 +1652,7 @@ class CalculateTremor:
         # 11. Save non-interpolated version
         # ------------------------------------------------------------------
         non_interpolated_filename = (
-            f"tremor_non-interpolated_{instance.nslc}_{start_date}-{end_date}.csv"
+            f"tremor-non-interpolated_{instance.nslc}_{start_date}-{end_date}.csv"
         )
         csv_non_interpolated = os.path.join(
             instance.tremor_dir, non_interpolated_filename

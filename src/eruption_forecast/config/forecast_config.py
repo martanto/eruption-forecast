@@ -87,6 +87,24 @@ class ForecastCalculateConfig(BaseConfig):
             ``source="fdsn"``. Defaults to ``"https://service.iris.edu"``.
         minimum_completion_ratio (float): Minimum fraction of expected samples
             per day for a daily file to be accepted. Defaults to ``0.3``.
+        plot_rsam_as_log (bool): Render the RSAM subplot of the merged tremor
+            summary figure on a log y-axis. Forwarded to ``CalculateTremor.run()``
+            and ultimately to :func:`~eruption_forecast.plots.tremor_plots.plot_tremor`.
+            Only takes effect when ``save_plot=True``. Defaults to ``False``.
+        plot_rolling_window (str | None): Pandas offset alias (e.g. ``"2D"``,
+            ``"12H"``) used as the rolling-window size for the merged tremor
+            summary figure. ``None`` plots the raw series without rolling
+            reduction. Forwarded to ``CalculateTremor.run()`` and ultimately to
+            :func:`~eruption_forecast.plots.tremor_plots.plot_tremor`. Only takes
+            effect when ``save_plot=True``. Defaults to ``None``.
+        plot_filter_dsar_value (float | None): Upper bound applied to every
+            DSAR series before plotting on the merged tremor summary figure —
+            samples greater than or equal to this value are masked out with
+            ``NaN`` so a few spikes do not flatten the visible band. RSAM and
+            entropy series are unaffected. Forwarded to ``CalculateTremor.run()``
+            and ultimately to
+            :func:`~eruption_forecast.plots.tremor_plots.plot_tremor`. Only takes
+            effect when ``save_plot=True``. Defaults to ``None``.
         overwrite (bool | None): Overwrite existing output files. ``None``
             inherits from ``ForecastModel.overwrite``. Defaults to ``None``.
         n_jobs (int | None): Parallel workers for this stage. ``None``
@@ -110,6 +128,9 @@ class ForecastCalculateConfig(BaseConfig):
     sds_dir: str | None = None
     client_url: str = "https://service.iris.edu"
     minimum_completion_ratio: float = 0.3
+    plot_rsam_as_log: bool = False
+    plot_rolling_window: str | None = None
+    plot_filter_dsar_value: float | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None
     verbose: bool | None = None

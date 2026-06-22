@@ -31,6 +31,9 @@ calculate:
   sds_dir: D:/Data/OJN      # SDS archive root (required when source='sds')
   client_url: https://service.iris.edu  # FDSN client URL (used when source='fdsn')
   minimum_completion_ratio: 0.3   # Minimum daily completion to accept a file
+  plot_rsam_as_log: false   # Render the RSAM subplot on a log y-axis (save_plot=true only)
+  plot_rolling_window: null # Pandas offset alias for rolling reduction (e.g. '2D', '12H'); null = raw series
+  plot_filter_dsar_value: null   # Upper bound applied to DSAR series before plotting (null = no clipping)
   overwrite: null           # null = inherit from model.overwrite
   n_jobs: null              # null = inherit from model.n_jobs
   verbose: null             # null = inherit from model.verbose

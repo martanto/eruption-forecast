@@ -166,6 +166,9 @@ class ForecastModel:
         client_url: str = "https://service.iris.edu",
         minimum_completion_ratio: float = 0.3,
         eruption_dates: list[str] | None = None,
+        plot_rsam_as_log: bool = False,
+        plot_rolling_window: str | None = None,
+        plot_filter_dsar_value: float | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -216,6 +219,22 @@ class ForecastModel:
                 Defaults to ``0.3``.
             eruption_dates (list[str] | None): Eruption dates
                 (``"YYYY-MM-DD"``) used to guide anomaly handling.
+                Defaults to ``None``.
+            plot_rsam_as_log (bool): Render the RSAM subplot of the
+                merged tremor summary figure on a log y-axis. Forwarded
+                to ``CalculateTremor.run()`` and only takes effect when
+                ``save_plot=True``. Defaults to ``False``.
+            plot_rolling_window (str | None): Pandas offset alias
+                (e.g. ``"2D"``, ``"12H"``) used as the rolling-window
+                size for the merged tremor summary figure. ``None``
+                plots the raw series. Only takes effect when
+                ``save_plot=True``. Defaults to ``None``.
+            plot_filter_dsar_value (float | None): Upper bound applied
+                to every DSAR series before plotting on the merged
+                tremor summary figure — samples at or above this value
+                are masked with ``NaN`` so a few spikes do not flatten
+                the visible band. RSAM and entropy series are
+                unaffected. Only takes effect when ``save_plot=True``.
                 Defaults to ``None``.
             overwrite (bool | None): Overwrite cached daily outputs.
                 ``None`` inherits from ``self.overwrite``. Defaults to
@@ -297,7 +316,12 @@ class ForecastModel:
         else:
             raise ValueError(f"Unknown source {source!r}. Expected 'sds' or 'fdsn'.")
 
-        self.CalculateTremor = calculate.run(eruption_dates=eruption_dates)
+        self.CalculateTremor = calculate.run(
+            eruption_dates=eruption_dates,
+            plot_rsam_as_log=plot_rsam_as_log,
+            plot_rolling_window=plot_rolling_window,
+            plot_filter_dsar_value=plot_filter_dsar_value,
+        )
 
         if verbose:
             start_date_str = start_date.strftime("%Y-%m-%d")
@@ -324,6 +348,9 @@ class ForecastModel:
             sds_dir=sds_dir,
             client_url=client_url,
             minimum_completion_ratio=minimum_completion_ratio,
+            plot_rsam_as_log=plot_rsam_as_log,
+            plot_rolling_window=plot_rolling_window,
+            plot_filter_dsar_value=plot_filter_dsar_value,
             overwrite=_cfg_overwrite,
             n_jobs=_cfg_n_jobs,
             verbose=_cfg_verbose,
