@@ -458,7 +458,7 @@ class TremorMatrixBuilder:
                 If None, all tremor columns are used. Defaults to None.
             tremor_matrix_filename (str | None, optional): Override the default
                 auto-generated filename. If None, uses the auto-generated filename
-                format: tremor_matrix_unified_<start>_<end>_ws-<size>.csv.
+                format: tremor-matrix_<start>_<end>_ws-<size>.csv.
                 Defaults to None.
             save_tremor_matrix_per_method (bool, optional): If True, saves
                 individual CSVs for each tremor column method in the subdirectory
@@ -494,7 +494,7 @@ class TremorMatrixBuilder:
             >>> print(builder.df.shape)
             (14400, 4)  # 100 windows × 144 samples/window
             >>> print(builder.csv)
-            "output/tremor/matrix/tremor_matrix_unified_2025-01-01_2025-09-28_ws-1.csv"
+            "output/tremor/matrix/tremor-matrix_2025-01-01_2025-09-28_ws-1.csv"
             >>>
             >>> # Method chaining example
             >>> matrix = TremorMatrixBuilder(tremor_df, label_df) \
@@ -504,7 +504,7 @@ class TremorMatrixBuilder:
         verbose = self.verbose
 
         # Build filename
-        # Example filename: tremor_matrix_unified_2025-01-01_2025-09-28_ws-2.csv
+        # Example filename: tremor-matrix_2025-01-01_2025-09-28_ws-2.csv
         tremor_matrix_filename = tremor_matrix_filename or self.tremor_matrix_filename
         tremor_matrix_csv = os.path.join(self.output_dir, tremor_matrix_filename)
 
