@@ -17,6 +17,9 @@ from eruption_forecast.config.forecast_config import (
     ForecastCalculateConfig,
 )
 from eruption_forecast.config.training_config import TrainingConfig
+from eruption_forecast.config.evaluation_config import EvaluationConfig
+from eruption_forecast.config.prediction_config import PredictionConfig
+from eruption_forecast.config.explanation_config import ExplanationConfig
 
 
 __all__ = [
@@ -35,4 +38,7 @@ __all__ = [
     "ForecastEvaluateConfig",
     "ForecastConfig",
     "TrainingConfig",
+    "PredictionConfig",
+    "EvaluationConfig",
+    "ExplanationConfig",
 ]

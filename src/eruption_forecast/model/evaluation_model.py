@@ -9,6 +9,7 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.config.evaluation_config import EvaluationConfig
 from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
@@ -176,6 +177,16 @@ class EvaluationModel(BaseModel):
 
         self.validate()
 
+        # Save model config
+        self._config: EvaluationConfig = EvaluationConfig(
+            eruption_dates=list(eruption_dates) if eruption_dates else [],
+            overwrite=overwrite,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
     @classmethod
     def from_file(
         cls,
@@ -320,7 +331,11 @@ class EvaluationModel(BaseModel):
             "window_step_unit": self.window_step_unit,
             "eruption_dates": list(self.eruption_dates) if self.eruption_dates else [],
             "classifiers": self.ClassifierEnsemble.classifiers,
+            "overwrite": self.overwrite,
             "output_dir": self.output_dir,
+            "root_dir": self.root_dir,
+            "n_jobs": self.n_jobs,
+            "verbose": self.verbose,
         }
         if self.metrics:
             data["metrics"] = {
@@ -341,6 +356,38 @@ class EvaluationModel(BaseModel):
         data = self.to_dict()
         lines = [f"- {k}: {v}" for k, v in data.items()]
         return "\n".join(lines)
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured ``EvaluationModel`` init configuration to disk.
+
+        Writes the parameter snapshot captured during ``__init__`` so a
+        standalone evaluation run can save its constructor surface without
+        going through :class:`~eruption_forecast.model.forecast_model.ForecastModel`.
+
+        Args:
+            path (str | None): Destination file path. ``None`` resolves to
+                ``{evaluation_dir}/evaluation.config.{fmt}`` — already
+                namespaced by mode (``evaluation/training/`` or
+                ``evaluation/prediction/``) so training and prediction reuse
+                configs never collide. Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+
+        Example:
+            >>> path = evaluation.save_config()
+            >>> path  # doctest: +SKIP
+            'output/VG.OJN.00.EHZ/evaluation/prediction/evaluation.config.yaml'
+        """
+        if path is None:
+            path = os.path.join(self.evaluation_dir, f"evaluation.config.{fmt}")
+        return self._config.save(path, fmt)
 
     def build_label(
         self,
@@ -506,6 +553,12 @@ class EvaluationModel(BaseModel):
                 self.comparator.plot_all()
 
         self.metrics = me.metrics
+
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save evaluation config: {exc}")
+
         return me.metrics
 
     def compare(

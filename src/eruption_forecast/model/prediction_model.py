@@ -13,6 +13,7 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
+from eruption_forecast.config.prediction_config import PredictionConfig
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
@@ -136,6 +137,19 @@ class PredictionModel(BaseModel, CacheModel):
             verbose (bool, optional): Emit verbose log messages when ``True``.
                 Defaults to ``False``.
         """
+        self._config: PredictionConfig = self._init_config(
+            model=model,
+            tremor_data=tremor_data,
+            start_date=start_date,
+            end_date=end_date,
+            window_size=window_size,
+            overwrite=overwrite,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
         super().__init__(
             tremor_data=tremor_data,
             start_date=start_date,
@@ -177,6 +191,58 @@ class PredictionModel(BaseModel, CacheModel):
         # Will be set after forecast() called
         self.forecast_plot_path: str | None = None
         self.results: pd.DataFrame = pd.DataFrame()
+
+    @staticmethod
+    def _init_config(
+        *,
+        model: str | ClassifierEnsemble | SeedEnsemble,
+        tremor_data: str | pd.DataFrame,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        window_size: int,
+        overwrite: bool,
+        output_dir: str | None,
+        root_dir: str | None,
+        n_jobs: int,
+        verbose: bool,
+    ) -> PredictionConfig:
+        """Snapshot the ``__init__`` surface into a :class:`PredictionConfig`.
+
+        Normalises non-serializable inputs to string handles so the saved
+        YAML/JSON round-trips the user's original intent: ``model`` and
+        ``tremor_data`` become ``None`` when a live in-memory object was
+        passed, ``start_date`` / ``end_date`` are emitted in ISO-8601 form.
+
+        Args:
+            model (str | ClassifierEnsemble | SeedEnsemble): Trained model
+                source supplied by the caller.
+            tremor_data (str | pd.DataFrame): Tremor source supplied by the caller.
+            start_date (str | datetime): Forecast period start.
+            end_date (str | datetime): Forecast period end.
+            window_size (int): Sliding window size in days.
+            overwrite (bool): Overwrite cached artefacts.
+            output_dir (str | None): Root output directory.
+            root_dir (str | None): Project root.
+            n_jobs (int): Parallel workers.
+            verbose (bool): Emit verbose logs.
+
+        Returns:
+            PredictionConfig: Snapshot ready for ``save_config()``.
+        """
+        return PredictionConfig(
+            model=model if isinstance(model, str) else None,
+            tremor_data=tremor_data if isinstance(tremor_data, str) else None,
+            start_date=start_date
+            if isinstance(start_date, str)
+            else start_date.isoformat(),
+            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
+            window_size=window_size,
+            overwrite=overwrite,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
 
     def set_directories(self) -> tuple[str, str, str]:
         """Build and return the prediction output directory paths.
@@ -267,6 +333,8 @@ class PredictionModel(BaseModel, CacheModel):
             True
         """
         result: dict = {
+            "model": self._config.model,
+            "tremor_data": self._config.tremor_data,
             "start_date": self.start_date_str,
             "end_date": self.end_date_str,
             "window_size": self.window_size,
@@ -353,6 +421,37 @@ class PredictionModel(BaseModel, CacheModel):
             f"Verbose: {self.verbose}. "
             f"Basename: {self.basename}."
         )
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured ``PredictionModel`` init configuration to disk.
+
+        Writes the parameter snapshot captured during ``__init__`` so a
+        standalone prediction run can save its constructor surface without
+        going through :class:`~eruption_forecast.model.forecast_model.ForecastModel`.
+
+        Args:
+            path (str | None): Destination file path. ``None`` resolves to
+                ``{prediction_dir}/prediction.config.{fmt}`` so the config
+                sits next to the artefacts produced by ``forecast()``.
+                Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+
+        Example:
+            >>> path = prediction.save_config()
+            >>> path  # doctest: +SKIP
+            'output/VG.OJN.00.EHZ/prediction/prediction.config.yaml'
+        """
+        if path is None:
+            path = os.path.join(self.prediction_dir, f"prediction.config.{fmt}")
+        return self._config.save(path, fmt)
 
     @classmethod
     def build_cache_identity(  # ty:ignore[invalid-method-override]
@@ -657,6 +756,11 @@ class PredictionModel(BaseModel, CacheModel):
         self.results = df_forecast
 
         self.save()
+
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save prediction config: {exc}")
 
         return df_forecast
 

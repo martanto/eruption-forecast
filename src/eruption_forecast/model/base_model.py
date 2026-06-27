@@ -340,6 +340,30 @@ class BaseModel(ABC):
                 or LLM context.
         """
 
+    @abstractmethod
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured init configuration to disk.
+
+        Concrete subclasses snapshot their constructor surface into a
+        dedicated config dataclass on ``self._config`` during ``__init__``
+        and delegate to that snapshot's ``save(path, fmt)``. The default
+        path lives under the subclass's stage directory so configs from
+        different stages never collide.
+
+        Args:
+            path (str | None): Destination file path. ``None`` resolves to
+                the subclass-specific default. Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+        """
+
     def save(self, path: str | None = None) -> str:
         """Serialise this model instance to a ``.pkl`` file via joblib.
 
