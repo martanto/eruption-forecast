@@ -22,12 +22,13 @@ Every pipeline run writes under a single station directory:
 │   └── {nslc}_{start}_{end}.csv                              # Merged tremor CSV (DateTime index)
 │
 ├── training/                                                 # TrainingModel
+│   ├── training.config.yaml                                  # tm.save_config() — auto-written at end of fit()
 │   ├── features/{cv-slug}/
 │   │   ├── features-matrix_{basename}.csv                    # Full tsfresh feature matrix
 │   │   ├── features-label_{basename}.csv                     # Aligned binary labels
 │   │   ├── seed/{seed:05d}.csv                               # Top-N features per seed
 │   │   ├── seed/figures/{seed:05d}.png                       # Per-seed importance plots (plot_features=True)
-│   │   ├── resampled/{seed:05d}.csv                          # Resampled training set per seed
+│   │   ├── resampled/{seed:05d}.csv                          # Per-seed (id + is_erupted) — features recovered via features_df.loc[ids]
 │   │   ├── top_{N}_features.csv                              # Aggregated top-N across all seeds
 │   │   └── top_{N}_features.png                              # Aggregated importance plot
 │   │
@@ -40,6 +41,7 @@ Every pipeline run writes under a single station directory:
 │           └── SeedEnsemble_{suffix}.pkl                     # Single-classifier SeedEnsemble
 │
 ├── prediction/                                               # PredictionModel
+│   ├── prediction.config.yaml                                # pm.save_config() — auto-written at end of forecast()
 │   ├── features/
 │   │   ├── features-label_{basename}_step-{N}-{unit}.csv     # Forecast window grid
 │   │   └── features-matrix_*.csv                             # tsfresh matrix for the grid
@@ -48,6 +50,7 @@ Every pipeline run writes under a single station directory:
 │
 ├── evaluation/                                               # EvaluationModel
 │   ├── training/                                             # When model.kind == "training"
+│   │   ├── evaluation.config.yaml                            # em.save_config() — auto-written at end of evaluate()
 │   │   ├── classifiers/{ClassifierName}/
 │   │   │   ├── predictions/
 │   │   │   │   ├── y_proba.csv                               # (n_samples, n_seeds) matrix
@@ -60,11 +63,13 @@ Every pipeline run writes under a single station directory:
 │   │   │   └── figures/
 │   │   └── MetricsEnsemble.pkl                               # Optional, via me.save()
 │   └── prediction/                                           # When model.kind == "prediction"
+│       ├── evaluation.config.yaml                            # em.save_config() — auto-written at end of evaluate()
 │       ├── labels/y_true.csv                                 # Built by EvaluationModel.build_label()
 │       └── classifiers/{ClassifierName}/…                    # Same shape as training/
 │
 ├── explanation/                                              # ExplanationModel
 │   ├── training/                                             # When upstream model.kind == "training"
+│   │   ├── explanation.config.yaml                           # xm.save_config() — auto-written at end of explain()
 │   │   ├── classifiers/{ClassifierName}/
 │   │   │   ├── ClassifierExplanation_{ClassifierName}.pkl    # Bundled SHAP payload
 │   │   │   ├── shap_values/{seed:05d}.pkl                    # Per-seed shap.Explanation (save_per_seed=True)
@@ -77,6 +82,7 @@ Every pipeline run writes under a single station directory:
 │   │   └── eruptions/{YYYY-MM-DD}/                           # Per-eruption waterfall sibling
 │   │       └── {ClassifierName}_{datetime}_seed={i}_index={j}.png
 │   └── prediction/                                           # When upstream model.kind == "prediction"
+│       ├── explanation.config.yaml                           # xm.save_config() — auto-written at end of explain()
 │       └── (identical sub-tree)
 │
 ├── cache/                                                    # CacheModel
@@ -88,7 +94,6 @@ Every pipeline run writes under a single station directory:
 │   └── ExplanationModel/{hash}.params.json
 │
 ├── forecast.config.yaml                                      # fm.save_config()
-├── training.config.yaml                                      # tm.save_config()  (standalone)
 ├── forecast-results_{basename}.csv               # PredictionModel.forecast() top-level dump
 ├── TrainingModel_{basename}.pkl                              # Optional, via fm.TrainingModel.save()
 ├── PredictionModel_{basename}.pkl                            # Optional, via fm.PredictionModel.save()
@@ -254,3 +259,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Per-eruption waterfall plots | `explanation/{kind}/eruptions/{YYYY-MM-DD}/{Clf}_*.png` |
 | Cache identity (diff-friendly) | `cache/{Stage}/{hash}.params.json` |
 | Replayable pipeline config | `forecast.config.yaml` |
+| Standalone training config | `training/training.config.yaml` |
+| Standalone prediction config | `prediction/prediction.config.yaml` |
+| Standalone evaluation config | `evaluation/{kind}/evaluation.config.yaml` |
+| Standalone explanation config | `explanation/{kind}/explanation.config.yaml` |

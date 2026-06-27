@@ -112,7 +112,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
 - **Content-Addressable Caching** — `TrainingModel` and `PredictionModel` cache their fitted state under `{output_dir}/cache/` so repeated runs with identical kwargs short-circuit.
-- **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline.
+- **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`.
 - **Telegram Notifications** — `@notify` decorator + `send_telegram_notification()` for start/finish/error messages and file attachments.
 - **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` / `FeatureSelector` workers) parallelism, clamped to `total_cpu - 2` automatically.
 
@@ -121,7 +121,8 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 ```
 src/eruption_forecast/
 ├── __init__.py, logger.py, data_container.py
-├── config/        forecast_config, training_config, constants
+├── config/        forecast_config, training_config, prediction_config,
+│                  evaluation_config, explanation_config, constants
 ├── dataclass/     station_data, classifier_ensemble_summary,
 │                  classifier_explanation
 ├── decorators/    notify, decorator_class
@@ -480,6 +481,20 @@ fm.PredictionModel.save()     # → {output_dir}/PredictionModel_{basename}.pkl
 fm.EvaluationModel.save()     # → {output_dir}/EvaluationModel_{basename}.pkl
 ```
 
+### Per-stage config snapshots
+
+Each stage model also auto-saves its own YAML at the end of its main run
+method — `tm.save_config()`, `pm.save_config()`, `em.save_config()`,
+`xm.save_config()` all default to a stage-namespaced path under the station
+dir:
+
+```
+{station_dir}/training/training.config.yaml         # auto at end of fit()
+{station_dir}/prediction/prediction.config.yaml     # auto at end of forecast()
+{station_dir}/evaluation/{kind}/evaluation.config.yaml  # auto at end of evaluate()
+{station_dir}/explanation/{kind}/explanation.config.yaml # auto at end of explain()
+```
+
 ### Silence logging during batch jobs
 
 ```python
@@ -553,6 +568,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │   └── {nslc}_{start}_{end}.csv             # merged tremor CSV
 │
 ├── training/                                # TrainingModel
+│   ├── training.config.yaml                 # tm.save_config() — auto at end of fit()
 │   ├── features/{cv-slug}/                  # tsfresh matrix, per-seed CSVs, top-N features
 │   └── classifiers/
 │       ├── ClassifierEnsemble_{cv}.{pkl,json}
@@ -562,6 +578,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │           └── SeedEnsemble_{suffix}.pkl
 │
 ├── prediction/                              # PredictionModel
+│   ├── prediction.config.yaml               # pm.save_config() — auto at end of forecast()
 │   ├── features/                            # forecast-grid features
 │   ├── results/{clf-slug}/{seed:05d}.csv    # per-seed probabilities (save_seed_result=True)
 │   └── figures/forecast_{basename}.{png,pdf}
@@ -569,6 +586,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 ├── evaluation/                              # EvaluationModel
 │   ├── training/                            # when model="training"
 │   └── prediction/                          # when model="prediction"
+│       ├── evaluation.config.yaml                  # em.save_config() — auto at end of evaluate()
 │       ├── classifiers/{ClfName}/
 │       │   ├── predictions/{y_proba,y_pred}.csv   # (n_samples × n_seeds)
 │       │   └── figures/
@@ -580,6 +598,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 ├── explanation/                             # ExplanationModel
 │   ├── training/                            # when upstream model.kind=="training"
 │   └── prediction/                          # when upstream model.kind=="prediction"
+│       ├── explanation.config.yaml                 # xm.save_config() — auto at end of explain()
 │       ├── classifiers/{ClfName}/
 │       │   ├── ClassifierExplanation_{ClfName}.pkl
 │       │   ├── shap_values/{seed:05d}.pkl
@@ -674,6 +693,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.3.2
+**Version:** 0.3.3
 **Status:** Active Development
-**Last Updated:** 2026-06-20
+**Last Updated:** 2026-06-27

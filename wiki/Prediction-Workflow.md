@@ -192,3 +192,16 @@ df = pm.results
 ```
 
 The reloaded `pm.results` is the same DataFrame returned by `forecast()` - no re-inference needed for downstream analysis.
+
+### Persist the prediction config
+
+```python
+pm.save_config()   # → {prediction_dir}/prediction.config.yaml
+```
+
+`forecast()` already auto-calls `save_config()` at the end, so a standalone 
+prediction run always leaves a YAML snapshot at 
+`{output_dir}/prediction/prediction.config.yaml`. The captured `model` and 
+`tremor_data` fields preserve the path strings the user supplied (or `null` 
+when a live ensemble / pre-loaded DataFrame was passed). 
+See [Configuration](Configuration#per-stage-configs-standalone).

@@ -7,6 +7,7 @@ from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
+from eruption_forecast.config.explanation_config import ExplanationConfig
 from eruption_forecast.ensemble.explainer_ensemble import ExplainerEnsemble
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.dataclass.classifier_explanation import ClassifierExplanation
@@ -131,6 +132,18 @@ class ExplanationModel(BaseModel, CacheModel):
 
         self.explanations: list[ClassifierExplanation] = []
         self.validate()
+
+        # Save model config
+        self._config: ExplanationConfig = ExplanationConfig(
+            eruption_dates=list(resolved_eruption_dates)
+            if resolved_eruption_dates
+            else [],
+            overwrite=overwrite,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
 
         if verbose:
             logger.info(f"Explaining on {type(model).__name__}")
@@ -276,7 +289,12 @@ class ExplanationModel(BaseModel, CacheModel):
             "end_date": self.end_date_str,
             "window_size": self.window_size,
             "classifiers": list(self.ClassifierEnsemble.classifiers),
+            "eruption_dates": list(self.eruption_dates) if self.eruption_dates else [],
+            "overwrite": self.overwrite,
             "output_dir": self.output_dir,
+            "root_dir": self.root_dir,
+            "n_jobs": self.n_jobs,
+            "verbose": self.verbose,
         }
 
     def to_prompt(self) -> str:
@@ -326,6 +344,38 @@ class ExplanationModel(BaseModel, CacheModel):
             f"Verbose: {self.verbose}. "
             f"Basename: {self.basename}."
         )
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured ``ExplanationModel`` init configuration to disk.
+
+        Writes the parameter snapshot captured during ``__init__`` so a
+        standalone explanation run can save its constructor surface without
+        going through :class:`~eruption_forecast.model.forecast_model.ForecastModel`.
+
+        Args:
+            path (str | None): Destination file path. ``None`` resolves to
+                ``{explanation_dir}/explanation.config.{fmt}`` — already
+                namespaced by upstream stage (``explanation/training/`` or
+                ``explanation/prediction/``) so the two reuse modes never
+                collide. Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+
+        Example:
+            >>> path = explanation.save_config()
+            >>> path  # doctest: +SKIP
+            'output/VG.OJN.00.EHZ/explanation/prediction/explanation.config.yaml'
+        """
+        if path is None:
+            path = os.path.join(self.explanation_dir, f"explanation.config.{fmt}")
+        return self._config.save(path, fmt)
 
     def _upstream_hash(self) -> str:
         """Hash the upstream-model fingerprint so the explanation cache invalidates
@@ -393,6 +443,11 @@ class ExplanationModel(BaseModel, CacheModel):
         self.save_to_cache(identity)
 
         self.save()
+
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save explanation config: {exc}")
 
         return self
 

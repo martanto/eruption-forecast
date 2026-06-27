@@ -19,6 +19,7 @@ from eruption_forecast.utils.ml import (
     grid_search_cv,
     save_model_json,
     get_classifier_models,
+    load_features_resampled,
 )
 from eruption_forecast.utils.dataframe import (
     load_label_csv,
@@ -113,16 +114,23 @@ class TrainingModel(BaseModel, CacheModel):
         n_grids: int = 1,
         verbose: bool = False,
     ) -> None:
-        # Snapshot user-supplied kwargs before ``super().__init__`` coerces
-        # dates to ``datetime`` and stores the tremor source on ``_tremor_data``
-        # — the saved config should round-trip the user's original intent
-        # (CSV path or ``None`` when a pre-loaded DataFrame is passed).
-        _config_tremor_data = tremor_data if isinstance(tremor_data, str) else None
-        _config_start_date = (
-            start_date if isinstance(start_date, str) else start_date.isoformat()
-        )
-        _config_end_date = (
-            end_date if isinstance(end_date, str) else end_date.isoformat()
+        self._config: TrainingConfig = self._init_config(
+            tremor_data=tremor_data,
+            start_date=start_date,
+            end_date=end_date,
+            classifiers=classifiers,
+            eruption_dates=eruption_dates,
+            window_size=window_size,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            top_n_features=top_n_features,
+            include_eruption_date=include_eruption_date,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            n_grids=n_grids,
+            verbose=verbose,
         )
 
         # Set properties
@@ -196,13 +204,62 @@ class TrainingModel(BaseModel, CacheModel):
 
         self.validate()
 
-        # Capture the constructor surface so ``save_config()`` can persist a
-        # standalone training run independently of ``ForecastModel``.
-        self._config: TrainingConfig = TrainingConfig(
-            tremor_data=_config_tremor_data,
-            start_date=_config_start_date,
-            end_date=_config_end_date,
-            classifiers=classifiers,
+    @staticmethod
+    def _init_config(
+        *,
+        tremor_data: str | pd.DataFrame,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        classifiers: str | list[str],
+        eruption_dates: list[str],
+        window_size: int,
+        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"],
+        cv_splits: int,
+        top_n_features: int,
+        include_eruption_date: bool,
+        output_dir: str | None,
+        root_dir: str | None,
+        overwrite: bool,
+        n_jobs: int,
+        n_grids: int,
+        verbose: bool,
+    ) -> TrainingConfig:
+        """Snapshot the ``__init__`` surface into a :class:`TrainingConfig`.
+
+        Normalises non-serializable inputs to string handles so the saved
+        YAML/JSON round-trips the user's original intent: ``tremor_data``
+        becomes ``None`` when a pre-loaded ``pd.DataFrame`` was passed,
+        ``start_date`` / ``end_date`` are emitted in ISO-8601 form.
+
+        Args:
+            tremor_data (str | pd.DataFrame): Tremor source supplied by the caller.
+            start_date (str | datetime): Training period start.
+            end_date (str | datetime): Training period end.
+            classifiers (str | list[str]): Classifier key(s) to train.
+            eruption_dates (list[str]): Known eruption dates.
+            window_size (int): Sliding window size in days.
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified"]):
+                Cross-validation strategy.
+            cv_splits (int): Number of CV folds.
+            top_n_features (int): Top-N features retained after selection.
+            include_eruption_date (bool): Whether to label the eruption day positive.
+            output_dir (str | None): Root output directory.
+            root_dir (str | None): Project root.
+            overwrite (bool): Overwrite cached artefacts.
+            n_jobs (int): Outer parallel workers.
+            n_grids (int): Inner grid-search workers.
+            verbose (bool): Emit verbose logs.
+
+        Returns:
+            TrainingConfig: Snapshot ready for ``save_config()``.
+        """
+        return TrainingConfig(
+            tremor_data=tremor_data if isinstance(tremor_data, str) else None,
+            start_date=start_date
+            if isinstance(start_date, str)
+            else start_date.isoformat(),
+            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
+            classifiers=[classifiers] if isinstance(classifiers, str) else classifiers,
             eruption_dates=list(eruption_dates),
             window_size=window_size,
             cv_strategy=cv_strategy,
@@ -440,11 +497,9 @@ class TrainingModel(BaseModel, CacheModel):
 
         Args:
             path (str | None): Destination file path. ``None`` resolves to
-                ``{output_dir}/config/training.config.{fmt}`` — one level
-                above the ``training/`` directory, alongside the per-stage
-                ``cache/`` directories written by
-                :class:`~eruption_forecast.model.cache_model.CacheModel`.
-                Defaults to ``None``.
+                ``{training_dir}/training.config.{fmt}`` so the config sits
+                next to the artefacts produced by ``fit()``. Defaults to
+                ``None``.
             fmt (Literal["yaml", "json"]): Output format. Defaults to
                 ``"yaml"``.
 
@@ -454,10 +509,10 @@ class TrainingModel(BaseModel, CacheModel):
         Example:
             >>> path = model.save_config()
             >>> path  # doctest: +SKIP
-            'output/VG.OJN.00.EHZ/config/training.config.yaml'
+            'output/VG.OJN.00.EHZ/training/training.config.yaml'
         """
         if path is None:
-            path = os.path.join(self.output_dir, f"training.config.{fmt}")
+            path = os.path.join(self.training_dir, f"training.config.{fmt}")
         return self._config.save(path, fmt)
 
     @classmethod
@@ -1169,6 +1224,11 @@ class TrainingModel(BaseModel, CacheModel):
 
         self.save()
 
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save training config: {exc}")
+
         if compute_learning_curve:
             self.compute_learning_curve(overwrite=self.overwrite)
 
@@ -1300,6 +1360,12 @@ class TrainingModel(BaseModel, CacheModel):
         if ensemble is None:
             raise ValueError("Please run fit() first.")
 
+        if self.features_df.empty:
+            raise ValueError(
+                "compute_learning_curve() requires self.features_df to be populated. "
+                "Run extract_features() or load_features() before fit()."
+            )
+
         scoring = (
             list(scoring) if scoring is not None else ["balanced_accuracy", "roc_auc"]
         )
@@ -1421,9 +1487,11 @@ class TrainingModel(BaseModel, CacheModel):
                 top_n_features,
             )
 
-        _resampled_df = pd.read_csv(features_resampled_path, index_col=0)
-        labels_resampled = _resampled_df["is_erupted"]
-        features_resampled = _resampled_df.drop(columns=["is_erupted"])
+        features_resampled, labels_resampled = load_features_resampled(
+            features=self.features_df,
+            resampled=features_resampled_path,
+            columns=top_n_features,
+        )
 
         if self.verbose:
             logger.info(f"Fitting Seed: {random_state:05d} / {classifier_name}...")
@@ -1463,9 +1531,13 @@ class TrainingModel(BaseModel, CacheModel):
     ) -> str | None:
         """Resample the dataset and select the top-N features for one seed.
 
-        Applies the configured resampler, writes the balanced dataset to
-        ``features_resampled_path``, then delegates to ``_select_features``
-        to run tsfresh feature selection and persist the top-N list.
+        Applies the configured resampler, writes the resampled id list and
+        ``is_erupted`` label per seed to ``features_resampled_path``, then
+        delegates to ``_select_features`` to run tsfresh feature selection
+        and persist the top-N list. The matching feature rows are recovered
+        downstream via ``load_features_resampled`` slicing
+        ``self.features_df`` by the resampled id index, so the feature
+        matrix is never duplicated on disk per seed.
 
         Args:
             random_state (int): Seed used for reproducible resampling and
@@ -1473,7 +1545,9 @@ class TrainingModel(BaseModel, CacheModel):
             features_seed_path (str): Destination CSV path for the top-N
                 selected feature list.
             features_resampled_path (str): Destination CSV path for the
-                resampled feature-and-label DataFrame.
+                per-seed resampled label series (``id`` index + ``is_erupted``
+                column). The matching feature rows are recovered downstream
+                via ``self.features_df.loc[...]``.
             figures_seed_path (str | None): Destination path for the feature
                 importance figure, or None to skip plotting.
             resample_method (Literal["under", "over"] | None): Resampling
@@ -1494,9 +1568,11 @@ class TrainingModel(BaseModel, CacheModel):
             verbose=self.verbose,
         )
 
-        pd.concat([features_resampled, labels_resampled], axis=1).to_csv(
-            features_resampled_path
-        )
+        # Persist only the resampled id index + ``is_erupted`` per seed; the
+        # matching feature rows are reconstructed downstream by slicing
+        # ``self.features_df`` via ``load_features_resampled``. Avoids a
+        # per-seed copy of the full tsfresh matrix on disk.
+        labels_resampled.to_frame(name="is_erupted").to_csv(features_resampled_path)
 
         result = self._select_features(
             features=features_resampled,
@@ -1815,9 +1891,11 @@ class TrainingModel(BaseModel, CacheModel):
         if not top_n_features:
             return None
 
-        resampled_df = pd.read_csv(features_resampled_path, index_col=0)
-        y = resampled_df["is_erupted"]
-        X = resampled_df[top_n_features]
+        X, y = load_features_resampled(
+            features=self.features_df,
+            resampled=features_resampled_path,
+            columns=top_n_features,
+        )
 
         cv_splitter = classifier_model.set_random_state(random_state).get_cv_splitter()
 

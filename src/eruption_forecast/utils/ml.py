@@ -412,21 +412,68 @@ def resample(
             random_state=random_state,
         )
 
-    if method == "over":
-        if verbose:
-            logger.info(
-                f"Applying RandomOverSampler (sampling_strategy={sampling_strategy})."
-            )
-
-        sampler = RandomOverSampler(
-            sampling_strategy=sampling_strategy, random_state=random_state
+    if verbose:
+        logger.info(
+            f"Applying RandomOverSampler (sampling_strategy={sampling_strategy})."
         )
-        features, labels = sampler.fit_resample(features, labels)
-        return features, labels
 
-    raise ValueError(
-        f"Unknown resample method '{method}'. Choose from 'under', 'over', or None."
+    sampler = RandomOverSampler(
+        sampling_strategy=sampling_strategy, random_state=random_state
     )
+    features, labels = sampler.fit_resample(features, labels)
+    return features, labels
+
+
+def load_features_resampled(
+    features: pd.DataFrame | str,
+    resampled: pd.DataFrame | pd.Series | str,
+    columns: list[str] | None = None,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Reconstruct a per-seed resampled ``(X, y)`` pair from a labels-only payload.
+
+    Slices the full feature matrix down to the ids recorded in ``resampled``,
+    so the per-seed resampling decision can be replayed without persisting a
+    copy of the feature matrix per seed. Duplicated ids (produced by
+    over-sampling) are preserved in the returned ``X`` and ``y``.
+
+    Args:
+        features (pd.DataFrame | str): Full id-indexed feature matrix produced
+            by :meth:`TrainingModel.extract_features` or
+            :meth:`TrainingModel.load_features`. Pass a path to a
+            ``features-matrix_*.csv`` to load it on demand.
+        resampled (pd.DataFrame | pd.Series | str): Per-seed resampled label
+            payload. Accepts a path to ``features/{cv}/resampled/{seed}.csv``,
+            a DataFrame carrying an ``is_erupted`` column, or a Series already
+            indexed by id.
+        columns (list[str] | None): Optional column projection — typically
+            the seed's ``top_n_features``. ``None`` returns every feature
+            column. Defaults to ``None``.
+
+    Returns:
+        tuple[pd.DataFrame, pd.Series]: ``(features_resampled,
+            labels_resampled)`` aligned on the resampled id index.
+
+    Examples:
+        >>> X, y = load_features_resampled(
+        ...     features=model.features_df,
+        ...     resampled="training/features/.../resampled/00042.csv",
+        ...     columns=top_n_features,
+        ... )
+    """
+    if isinstance(features, str):
+        features = pd.read_csv(features, index_col=0)
+
+    if isinstance(resampled, str):
+        labels = pd.read_csv(resampled, index_col=0)["is_erupted"]
+    elif isinstance(resampled, pd.DataFrame):
+        labels = resampled["is_erupted"]
+    else:
+        labels = resampled
+
+    idx = labels.index
+    if columns is None:
+        return features.loc[idx], labels
+    return features.loc[idx, columns], labels
 
 
 def get_significant_features(

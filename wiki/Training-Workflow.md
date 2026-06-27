@@ -111,7 +111,7 @@ training/features/{cv-slug}/
 ├── features-matrix_{basename}.csv      # full tsfresh feature matrix
 ├── features-label_{basename}.csv       # aligned labels
 ├── seed/{seed:05d}.csv                 # top-N features per seed
-├── resampled/{seed:05d}.csv            # resampled training set per seed
+├── resampled/{seed:05d}.csv            # per-seed (id + is_erupted) — features recovered via features_df.loc[ids]
 └── figures/                            # per-seed importance plots (if plot_features=True)
 ```
 
@@ -278,7 +278,12 @@ tm.load_features(
 ### Persist the training config
 
 ```python
-tm.save_config()   # → {output_dir}/training.config.yaml
+tm.save_config()   # → {training_dir}/training.config.yaml
 ```
 
-Round-trips through `TrainingConfig.load(path)` for reproducibility - see [Configuration](Configuration#trainingconfig).
+`fit()` already auto-calls `save_config()` at the end, so a standalone training 
+run always leaves a YAML snapshot at `{output_dir}/training/training.config.yaml`. 
+Call `save_config()` manually only when you want a custom path or `fmt="json"`.
+
+Round-trips through `TrainingConfig.load(path)` for reproducibility — see 
+[Configuration](Configuration#per-stage-configs-standalone).
