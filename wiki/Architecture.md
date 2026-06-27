@@ -18,7 +18,10 @@ src/eruption_forecast/
 │   ├── base_config.py         - shared config primitives
 │   ├── constants.py           - ERUPTION_PROBABILITY_THRESHOLD, defaults
 │   ├── forecast_config.py     - ForecastConfig + per-stage sub-configs
-│   └── training_config.py     - TrainingConfig (standalone TrainingModel)
+│   ├── training_config.py     - TrainingConfig    (standalone TrainingModel)
+│   ├── prediction_config.py   - PredictionConfig  (standalone PredictionModel)
+│   ├── evaluation_config.py   - EvaluationConfig  (standalone EvaluationModel)
+│   └── explanation_config.py  - ExplanationConfig (standalone ExplanationModel)
 │
 ├── dataclass/
 │   ├── station_data.py                 - StationData (immutable nslc identity)
@@ -310,7 +313,7 @@ ForecastConfig
 └── explain:   ForecastExplainConfig   | None
 ```
 
-`TrainingConfig` mirrors `TrainingModel.__init__` directly and is the standalone equivalent used when `TrainingModel` runs outside `ForecastModel`.
+`TrainingConfig`, `PredictionConfig`, `EvaluationConfig`, and `ExplanationConfig` each mirror their stage model's `__init__` directly and are the standalone equivalents used when the model runs outside `ForecastModel`. Every stage model auto-calls `save_config()` at the end of its main run method (`fit()` / `forecast()` / `evaluate()` / `explain()`), so a standalone run always leaves a YAML snapshot next to its artefacts. The upstream `model` parameter on `EvaluationConfig` and `ExplanationConfig` is intentionally omitted because it is always a live model instance.
 
 ### 3.9 Decorators (`decorators/`)
 

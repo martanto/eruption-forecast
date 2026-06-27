@@ -186,6 +186,22 @@ print(rf_metrics["recall"].describe())
 ranking = em.compare(metrics="balanced_accuracy").get_ranking(metric="balanced_accuracy")
 ```
 
+### Persist the evaluation config
+
+```python
+em.save_config()   # → {evaluation_dir}/evaluation.config.yaml
+```
+
+`evaluate()` already auto-calls `save_config()` once `self.metrics` is set, so 
+a standalone evaluation always leaves a YAML snapshot at 
+`{output_dir}/evaluation/{training|prediction}/evaluation.config.yaml`. The 
+path is already mode-namespaced, so a training-reuse and a prediction-reuse 
+run sharing the same `output_dir` never collide. The upstream `model` 
+parameter is intentionally omitted from the config (live model instances are 
+not serializable); the captured fields are `eruption_dates`, `overwrite`, 
+`output_dir`, `root_dir`, `n_jobs`, and `verbose`. 
+See [Configuration](Configuration#per-stage-configs-standalone).
+
 ---
 
 ## ASCII Quick Reference

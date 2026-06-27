@@ -224,6 +224,22 @@ fm.PredictionModel.save()      # → {station_dir}/PredictionModel_{basename}.pk
 fm.EvaluationModel.save()      # → {station_dir}/EvaluationModel_{basename}.pkl
 ```
 
+### Per-stage config snapshots
+
+Each stage model also auto-saves its own `*.config.yaml` at the end of its main 
+run method, so a standalone run leaves a YAML snapshot next to its artefacts 
+without any extra wiring:
+
+```
+{station_dir}/training/training.config.yaml         # auto at end of fit()
+{station_dir}/prediction/prediction.config.yaml     # auto at end of forecast()
+{station_dir}/evaluation/{kind}/evaluation.config.yaml  # auto at end of evaluate()
+{station_dir}/explanation/{kind}/explanation.config.yaml # auto at end of explain()
+```
+
+Call `tm.save_config(path=..., fmt="json")` etc. manually for a custom path or 
+JSON output. See [Configuration](Configuration#per-stage-configs-standalone).
+
 ### Standalone evaluation from a saved `.pkl`
 
 ```python

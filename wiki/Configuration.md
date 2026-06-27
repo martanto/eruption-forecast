@@ -179,17 +179,47 @@ applied at runtime when the kwarg is omitted, so a replay behaves identically.
 
 ---
 
-## TrainingConfig (Standalone)
+## Per-stage configs (Standalone)
 
-`TrainingModel.__init__` captures its own kwargs into a `TrainingConfig` dataclass 
-(`config/training_config.py`), independent of `ForecastConfig`. 
-Use this when you run `TrainingModel` outside of `ForecastModel`:
+Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, 
+`ExplanationModel`) captures its own `__init__` surface into a matching dataclass 
+under `config/` and exposes `save_config(path=None, fmt="yaml")`. Each main run 
+method auto-calls `save_config()` once its primary artefacts are written, so a 
+standalone run always leaves a YAML snapshot behind without any extra wiring.
+
+| Model | Config dataclass | Auto-save trigger | Default path |
+|-------|------------------|--------------------|--------------|
+| `TrainingModel` | `config/training_config.py` | end of `fit()` | `{training_dir}/training.config.yaml` |
+| `PredictionModel` | `config/prediction_config.py` | end of `forecast()` | `{prediction_dir}/prediction.config.yaml` |
+| `EvaluationModel` | `config/evaluation_config.py` | end of `evaluate()` | `{evaluation_dir}/evaluation.config.yaml` |
+| `ExplanationModel` | `config/explanation_config.py` | end of `explain()` | `{explanation_dir}/explanation.config.yaml` |
+
+`{evaluation_dir}` and `{explanation_dir}` are already mode-namespaced (`evaluation/training/` 
+vs `evaluation/prediction/`, same for `explanation/`), so training-reuse and 
+prediction-reuse configs never collide.
 
 ```python
-tm.save_config()      # → {output_dir}/training.config.yaml
+tm.save_config()      # → {training_dir}/training.config.yaml
+pm.save_config()      # → {prediction_dir}/prediction.config.yaml
+em.save_config()      # → {evaluation_dir}/evaluation.config.yaml
+xm.save_config()      # → {explanation_dir}/explanation.config.yaml
 ```
 
-The shape mirrors the `TrainingModel.__init__` signature - see [Training Workflow](Training-Workflow#standalone-use).
+Each call wraps the YAML write in a `try/except` and only logs a warning if 
+the dump fails — a read-only output directory can never regress the underlying 
+`fit() / forecast() / evaluate() / explain()` run itself.
+
+**Non-serializable inputs are reduced to string handles**: `tremor_data` is 
+emitted as `null` when a pre-loaded `pd.DataFrame` was passed (and as the CSV 
+path otherwise); the upstream `model` parameter on `EvaluationConfig` / 
+`ExplanationConfig` is **intentionally omitted** since it is always a live 
+`TrainingModel` / `PredictionModel` instance. `PredictionConfig.model` keeps 
+the path when the user passed one and `null` otherwise.
+
+See [Training Workflow](Training-Workflow#standalone-use), 
+[Prediction Workflow](Prediction-Workflow), 
+[Evaluation Workflow](Evaluation-Workflow), and 
+[Explanation Workflow](Explanation-Workflow) for the per-stage signatures.
 
 ---
 
@@ -281,8 +311,11 @@ enable_logging()              # restore handlers
 
 ```
 {station_dir}/
-├── forecast.config.yaml                 # fm.save_config()  - full pipeline
-├── training.config.yaml                 # tm.save_config()  - standalone TrainingModel
+├── forecast.config.yaml                                # fm.save_config()  - full pipeline
+├── training/training.config.yaml                       # tm.save_config()  - standalone TrainingModel
+├── prediction/prediction.config.yaml                   # pm.save_config()  - standalone PredictionModel
+├── evaluation/{training|prediction}/evaluation.config.yaml   # em.save_config()  - standalone EvaluationModel
+├── explanation/{training|prediction}/explanation.config.yaml # xm.save_config()  - standalone ExplanationModel
 ├── cache/
 │   ├── TrainingModel/{hash}.params.json     # CacheModel identity dumps (diff-able)
 │   ├── PredictionModel/{hash}.params.json

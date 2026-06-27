@@ -277,7 +277,7 @@ tm.fit(
 | `TrainingModel.load_from_cache(output_dir, identity)` | Classmethod; returns the instance or `None` |
 | `tm.save(path=None)` | `{output_dir}/TrainingModel_{basename}.pkl` |
 | `TrainingModel.load(path)` | Classmethod |
-| `tm.save_config(path=None)` | Standalone `training.config.yaml` |
+| `tm.save_config(path=None, fmt="yaml")` | `{training_dir}/training.config.{yaml,json}` — auto-called at end of `fit()` |
 
 Populated attributes after `fit()`: `tm.results` (per-classifier trained-model JSON registry paths written by `save_model_json`), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels`.
 
@@ -338,6 +338,12 @@ pm.forecast(
 
 Same surface as `TrainingModel`: `build_cache_identity`, `save_to_cache`, `load_from_cache`, `save`, `load`. The cache identity embeds the upstream `training_hash`.
 
+| Method | Notes |
+|--------|-------|
+| `pm.save_config(path=None, fmt="yaml")` | `{prediction_dir}/prediction.config.{yaml,json}` — auto-called at end of `forecast()` |
+
+`PredictionConfig` captures the user-supplied `model` and `tremor_data` as string handles (`null` when a live in-memory object was passed).
+
 ---
 
 ## EvaluationModel
@@ -390,6 +396,12 @@ EvaluationModel.from_file(
 Classmethod. Loads a `.pkl` produced by `TrainingModel.save()` or `PredictionModel.save()` and dispatches on `kind`.
 
 `plot_shap=True` is reserved on this surface and emits a warning — SHAP rendering is produced by the dedicated [Explanation Workflow](Explanation-Workflow) via `ExplanationModel.explain()`. `plot_per_seed=True` is plumbed through to `MetricsEnsemble.plot_seed()` for the metric plots (ROC, PR, confusion, etc.) — it does **not** render SHAP.
+
+| Method | Notes |
+|--------|-------|
+| `em.save_config(path=None, fmt="yaml")` | `{evaluation_dir}/evaluation.config.{yaml,json}` — auto-called at end of `evaluate()` |
+
+`EvaluationConfig` omits the upstream `model` parameter (live model instances are not serializable). Captured fields: `eruption_dates`, `overwrite`, `output_dir`, `root_dir`, `n_jobs`, `verbose`.
 
 ---
 
@@ -448,6 +460,12 @@ ExplanationModel.from_file(
 Classmethod. Loads a `.pkl` from `TrainingModel.save()` or `PredictionModel.save()` and constructs an `ExplanationModel` against it. Raises `TypeError` if the pickle holds anything else.
 
 Populated attributes after `explain()`: `em.explanations: list[ClassifierExplanation]`.
+
+| Method | Notes |
+|--------|-------|
+| `em.save_config(path=None, fmt="yaml")` | `{explanation_dir}/explanation.config.{yaml,json}` — auto-called at end of `explain()` |
+
+`ExplanationConfig` omits the upstream `model` parameter (live model instances are not serializable). Captured fields: `eruption_dates`, `overwrite`, `output_dir`, `root_dir`, `n_jobs`, `verbose`.
 
 ---
 

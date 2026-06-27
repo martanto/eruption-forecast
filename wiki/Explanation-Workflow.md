@@ -267,6 +267,21 @@ for classifier_explanation in em.explanations:
     )
 ```
 
+### Persist the explanation config
+
+```python
+em.save_config()   # → {explanation_dir}/explanation.config.yaml
+```
+
+`explain()` already auto-calls `save_config()` after the SHAP pass + 
+`self.save()`, so a standalone explanation always leaves a YAML snapshot at 
+`{output_dir}/explanation/{training|prediction}/explanation.config.yaml`. The 
+path is already namespaced by upstream stage. The upstream `model` parameter 
+is intentionally omitted from the config (live model instances are not 
+serializable); the captured fields are `eruption_dates`, `overwrite`, 
+`output_dir`, `root_dir`, `n_jobs`, and `verbose`. 
+See [Configuration](Configuration#per-stage-configs-standalone).
+
 ---
 
 ## ASCII quick reference
