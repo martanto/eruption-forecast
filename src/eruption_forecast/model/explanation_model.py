@@ -4,7 +4,6 @@ from typing import Self, Literal
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
-from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.config.explanation_config import ExplanationConfig
@@ -13,7 +12,7 @@ from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 from eruption_forecast.dataclass.classifier_explanation import ClassifierExplanation
 
 
-class ExplanationModel(BaseModel, CacheModel):
+class ExplanationModel(BaseModel):
     """Per-classifier SHAP explanation stage built on a fitted upstream model.
 
     Reuses ``tremor_data``, ``start_date``, ``end_date``, ``window_size``,
@@ -149,7 +148,7 @@ class ExplanationModel(BaseModel, CacheModel):
             logger.info(f"Explaining on {type(model).__name__}")
 
     @classmethod
-    def build_cache_identity(  # ty:ignore[invalid-method-override]
+    def build_identity(  # ty:ignore[invalid-method-override]
         cls,
         *,
         upstream_hash: str,
@@ -237,6 +236,19 @@ class ExplanationModel(BaseModel, CacheModel):
             n_jobs=n_jobs,
             verbose=verbose,
         )
+
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the explanation cache artefact is written.
+
+        Already mode-namespaced under ``explanation/{training|prediction}/`` by
+        :meth:`set_directories`, so training-reuse and prediction-reuse cache
+        files never collide.
+
+        Returns:
+            str: ``self.explanation_dir``.
+        """
+        return self.explanation_dir
 
     def set_directories(self) -> tuple[str, str]:
         """Build the output directory paths for explanation artefacts.
@@ -390,7 +402,7 @@ class ExplanationModel(BaseModel, CacheModel):
             "end_date": self.end_date_str,
             "window_size": self.window_size,
         }
-        return CacheModel.compute_hash(fingerprint)
+        return type(self).compute_hash(fingerprint)
 
     def explain(
         self,
@@ -401,7 +413,7 @@ class ExplanationModel(BaseModel, CacheModel):
         """Compute per-classifier SHAP explanations for every seed.
 
         Delegates to :meth:`ExplainerEnsemble.explain` and caches the
-        result via :class:`CacheModel`. On a cache hit the stored
+        result via :meth:`BaseModel.save`. On a cache hit the stored
         ``explanations`` list is restored without re-running SHAP.
 
         Args:
@@ -419,13 +431,13 @@ class ExplanationModel(BaseModel, CacheModel):
         Returns:
             Self: The current instance, enabling method chaining.
         """
-        identity = type(self).build_cache_identity(
+        identity = type(self).build_identity(
             upstream_hash=self._upstream_hash(),
             explain_params={"save_per_seed": save_per_seed},
         )
 
         if not self.overwrite:
-            cached = type(self).load_from_cache(self.output_dir, identity)
+            cached = type(self).load(self.stage_dir, identity)
             if cached is not None:
                 self.explanations = cached.explanations
                 self.ExplainerEnsemble.explanations = cached.explanations
@@ -440,9 +452,7 @@ class ExplanationModel(BaseModel, CacheModel):
         )
 
         self.explanations = self.ExplainerEnsemble.explanations
-        self.save_to_cache(identity)
-
-        self.save()
+        self.save(identity)
 
         try:
             self.save_config()

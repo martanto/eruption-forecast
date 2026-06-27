@@ -29,7 +29,6 @@ from eruption_forecast.utils.dataframe import (
 from eruption_forecast.utils.pathutils import ensure_dir, generate_features_filepaths
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
-from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.config.training_config import TrainingConfig
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
@@ -39,7 +38,7 @@ from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
-class TrainingModel(BaseModel, CacheModel):
+class TrainingModel(BaseModel):
     """Train classifier models across multiple random seeds on tremor feature data.
 
     Orchestrates the full training pipeline: label building, tremor matrix
@@ -107,6 +106,7 @@ class TrainingModel(BaseModel, CacheModel):
         cv_splits: int = 5,
         top_n_features: int = 20,
         include_eruption_date: bool = False,
+        nslc: str | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
@@ -125,6 +125,7 @@ class TrainingModel(BaseModel, CacheModel):
             cv_splits=cv_splits,
             top_n_features=top_n_features,
             include_eruption_date=include_eruption_date,
+            nslc=nslc,
             output_dir=output_dir,
             root_dir=root_dir,
             overwrite=overwrite,
@@ -155,8 +156,16 @@ class TrainingModel(BaseModel, CacheModel):
         self.cv_splits = cv_splits
         self.top_n_features = top_n_features
         self.include_eruption_date: bool = include_eruption_date
+        self.nslc: str | None = nslc
         self.overwrite: bool = overwrite
         self.n_grids: int = n_grids
+
+        # Captured from extract_features() / fit() kwargs so fit() can rebuild
+        # the cache identity at save time without the caller passing them
+        # again. ``None`` until the corresponding method has run.
+        self._extract_features_kwargs: dict | None = None
+        self._fit_kwargs: dict | None = None
+        self.training_hash: str | None = None
 
         # Set additional properties
         self.classifier_models: list[ClassifierModel] = get_classifier_models(
@@ -217,6 +226,7 @@ class TrainingModel(BaseModel, CacheModel):
         cv_splits: int,
         top_n_features: int,
         include_eruption_date: bool,
+        nslc: str | None,
         output_dir: str | None,
         root_dir: str | None,
         overwrite: bool,
@@ -266,6 +276,7 @@ class TrainingModel(BaseModel, CacheModel):
             cv_splits=cv_splits,
             top_n_features=top_n_features,
             include_eruption_date=include_eruption_date,
+            nslc=nslc,
             output_dir=output_dir,
             root_dir=root_dir,
             overwrite=overwrite,
@@ -515,11 +526,21 @@ class TrainingModel(BaseModel, CacheModel):
             path = os.path.join(self.training_dir, f"training.config.{fmt}")
         return self._config.save(path, fmt)
 
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the training cache artefact is written.
+
+        Returns:
+            str: ``self.training_dir`` — the ``training/`` subtree under
+                ``output_dir`` that already hosts every training artefact.
+        """
+        return self.training_dir
+
     @classmethod
-    def build_cache_identity(  # ty:ignore[invalid-method-override]
+    def build_identity(  # ty:ignore[invalid-method-override]
         cls,
         *,
-        nslc: str,
+        nslc: str | None,
         tremor_df: pd.DataFrame,
         start_date: str | datetime,
         end_date: str | datetime,
@@ -546,10 +567,11 @@ class TrainingModel(BaseModel, CacheModel):
         artefact.
 
         Args:
-            nslc (str): ``Network.Station.Location.Channel`` identifier.
+            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
+                or ``None`` for standalone runs.
             tremor_df (pd.DataFrame): The tremor DataFrame that will be used
                 for training. Reduced to a small fingerprint via
-                :meth:`CacheModel.tremor_fingerprint`.
+                :meth:`BaseModel.tremor_fingerprint`.
             start_date (str | datetime): Training period start.
             end_date (str | datetime): Training period end.
             classifiers (str | list[str]): Classifier keys.
@@ -797,6 +819,17 @@ class TrainingModel(BaseModel, CacheModel):
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
 
+        # Snapshot the kwargs that materially change the produced features
+        # matrix so ``fit()`` can rebuild the same identity dict that
+        # :class:`ForecastModel` constructs externally for cache lookup.
+        self._extract_features_kwargs = {
+            "select_tremor_columns": select_tremor_columns,
+            "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
+            "exclude_features": exclude_features,
+            "select_features": select_features,
+            "minimum_completion": minimum_completion,
+        }
+
         resolved_select_features = (
             load_select_features(
                 select_features, number_of_features=self.top_n_features
@@ -839,143 +872,6 @@ class TrainingModel(BaseModel, CacheModel):
         self.labels = labels["is_erupted"]
 
         return self
-
-    def load_features(
-        self,
-        features_matrix_csv: str | None = None,
-        label_features_csv: str | None = None,
-        select_features: str | list[str] | None = None,
-    ) -> Self:
-        """Reuse the feature matrix written by a previous training run.
-
-        Skips tsfresh extraction entirely by reading the persisted
-        ``features-matrix_*.csv`` and ``features-label_*.csv`` produced by an
-        earlier :meth:`extract_features` call, then optionally projecting the
-        matrix to a curated column subset. Designed for repeat training where
-        the windowing and tremor data have not changed but the model needs to
-        be refit — e.g. iterating on hyperparameters with the curated feature
-        list from a prior ``top_{N}_features.csv``.
-
-        Drops in as a replacement for the
-        ``build_label() → extract_features()`` prefix before :meth:`fit`;
-        ``self.LabelBuilder`` is left untouched (may be ``None``), and
-        :meth:`fit` derives the resampling minority-share check from
-        ``self.labels`` when ``LabelBuilder`` is absent.
-
-        Args:
-            features_matrix_csv (str | None, optional): Path to the
-                ``features-matrix_*.csv`` written under
-                ``{output_dir}/training/features/{cv}/``. When ``None``, the
-                method globs ``self.features_dir`` for exactly one match.
-                Defaults to ``None``.
-            label_features_csv (str | None, optional): Path to the matching
-                ``features-label_*.csv``. Same auto-resolve behaviour as
-                ``features_matrix_csv``. Defaults to ``None``.
-            select_features (str | list[str] | None, optional): Curated
-                feature list — accepts either the path to a
-                ``top_{N}_features.csv`` / ``significant_features.csv`` or an
-                explicit ``list[str]``. Resolved via
-                :func:`load_select_features` and intersected with the matrix
-                columns; missing names log a warning and are skipped. ``None``
-                loads the full matrix. Defaults to ``None``.
-
-        Returns:
-            Self: The current instance, enabling method chaining.
-
-        Raises:
-            ValueError: If auto-resolve finds zero or more than one matching
-                CSV under ``self.features_dir``.
-            ValueError: If ``select_features`` is provided but its intersection
-                with the matrix columns is empty.
-            FileNotFoundError: If an explicit path argument does not exist.
-
-        Example:
-            >>> # Reuse the artefacts from a prior run with the curated top-N
-            >>> top_n_csv = "output/.../training/features/.../top_20_features.csv"
-            >>> model.load_features(select_features=top_n_csv).fit(seeds=25)
-            >>> # No build_label() / extract_features() needed.
-        """
-        if features_matrix_csv is None:
-            features_matrix_csv = self._resolve_single_csv(
-                pattern="features-matrix_*.csv", label="feature matrix"
-            )
-        elif not os.path.isfile(features_matrix_csv):
-            raise FileNotFoundError(
-                f"features_matrix_csv not found: {features_matrix_csv}"
-            )
-
-        if label_features_csv is None:
-            label_features_csv = self._resolve_single_csv(
-                pattern="features-label_*.csv", label="feature label"
-            )
-        elif not os.path.isfile(label_features_csv):
-            raise FileNotFoundError(
-                f"label_features_csv not found: {label_features_csv}"
-            )
-
-        if self.verbose:
-            logger.info(
-                f"[Training Model]: Loading feature matrix {features_matrix_csv}"
-            )
-
-        self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
-        self.labels = load_label_csv(label_features_csv)
-        self.features_csv = features_matrix_csv
-
-        if select_features is not None:
-            resolved = load_select_features(
-                select_features, number_of_features=self.top_n_features
-            )
-            matrix_columns = set(self.features_df.columns)
-            present = [name for name in resolved if name in matrix_columns]
-            missing = [name for name in resolved if name not in matrix_columns]
-            if missing:
-                logger.warning(
-                    f"load_features: {len(missing)} of {len(resolved)} curated "
-                    f"features absent from matrix; skipping {missing[:5]}"
-                    + ("..." if len(missing) > 5 else "")
-                )
-            if not present:
-                raise ValueError(
-                    "select_features has no overlap with the loaded feature matrix."
-                )
-            self.features_df = self.features_df[present]
-
-        if self.verbose:
-            logger.info(
-                f"[Training Model]: Loaded features_df={self.features_df.shape}, "
-                f"labels={self.labels.shape}"
-            )
-
-        return self
-
-    def _resolve_single_csv(self, pattern: str, label: str) -> str:
-        """Glob ``self.features_dir`` for exactly one CSV matching ``pattern``.
-
-        Args:
-            pattern (str): Glob pattern relative to ``self.features_dir``
-                (e.g. ``"features-matrix_*.csv"``).
-            label (str): Human-readable name used in error messages.
-
-        Returns:
-            str: Absolute path to the single matching CSV.
-
-        Raises:
-            ValueError: If zero or more than one match is found — the caller
-                must then pass an explicit path.
-        """
-        matches = sorted(glob.glob(os.path.join(self.features_dir, pattern)))
-        if len(matches) == 1:
-            return matches[0]
-        if not matches:
-            raise ValueError(
-                f"No {label} CSV matching '{pattern}' under {self.features_dir}; "
-                "pass an explicit path."
-            )
-        raise ValueError(
-            f"Multiple {label} CSVs matching '{pattern}' under {self.features_dir}: "
-            f"{matches}; pass an explicit path."
-        )
 
     def fit(
         self,
@@ -1047,6 +943,17 @@ class TrainingModel(BaseModel, CacheModel):
 
         self.create_directories(plot_features=plot_features)
         self._scoring = scoring
+
+        # Capture the input ``fit`` kwargs (pre-"auto" resolution for
+        # ``resample_method``) so the save-time identity dict produces the
+        # same cache hash whether the user runs through ``ForecastModel`` or
+        # standalone.
+        self._fit_kwargs = {
+            "seeds": seeds,
+            "resample_method": resample_method,
+            "minority_threshold": minority_threshold,
+            "sampling_strategy": sampling_strategy,
+        }
 
         if resample_method == "auto":
             # Prefer ``LabelBuilder`` when present so the share matches the
@@ -1222,7 +1129,31 @@ class TrainingModel(BaseModel, CacheModel):
         else:
             raise ValueError("No seed ensembles found")
 
-        self.save()
+        # Save model
+        identity = type(self).build_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            classifiers=self.classifiers,
+            eruption_dates=self.eruption_dates or [],
+            window_size=self.window_size,
+            cv_strategy=self.cv_strategy,
+            cv_splits=self.cv_splits,
+            scoring=self._scoring,
+            top_n_features=self.top_n_features,
+            include_eruption_date=self.include_eruption_date,
+            build_label_params={
+                "window_step": self.window_step,
+                "window_step_unit": self.window_step_unit,
+                "builder": self.builder,
+                "days_before_eruption": self.days_before_eruption,
+            },
+            extract_features_params=dict(self._extract_features_kwargs or {}),
+            fit_params=dict(self._fit_kwargs or {}),
+        )
+        self.save(identity)
+        self.training_hash = type(self).compute_hash(identity)
 
         try:
             self.save_config()
@@ -1233,6 +1164,143 @@ class TrainingModel(BaseModel, CacheModel):
             self.compute_learning_curve(overwrite=self.overwrite)
 
         return self
+
+    def load_features(
+        self,
+        features_matrix_csv: str | None = None,
+        label_features_csv: str | None = None,
+        select_features: str | list[str] | None = None,
+    ) -> Self:
+        """Reuse the feature matrix written by a previous training run.
+
+        Skips tsfresh extraction entirely by reading the persisted
+        ``features-matrix_*.csv`` and ``features-label_*.csv`` produced by an
+        earlier :meth:`extract_features` call, then optionally projecting the
+        matrix to a curated column subset. Designed for repeat training where
+        the windowing and tremor data have not changed but the model needs to
+        be refit — e.g. iterating on hyperparameters with the curated feature
+        list from a prior ``top_{N}_features.csv``.
+
+        Drops in as a replacement for the
+        ``build_label() → extract_features()`` prefix before :meth:`fit`;
+        ``self.LabelBuilder`` is left untouched (may be ``None``), and
+        :meth:`fit` derives the resampling minority-share check from
+        ``self.labels`` when ``LabelBuilder`` is absent.
+
+        Args:
+            features_matrix_csv (str | None, optional): Path to the
+                ``features-matrix_*.csv`` written under
+                ``{output_dir}/training/features/{cv}/``. When ``None``, the
+                method globs ``self.features_dir`` for exactly one match.
+                Defaults to ``None``.
+            label_features_csv (str | None, optional): Path to the matching
+                ``features-label_*.csv``. Same auto-resolve behaviour as
+                ``features_matrix_csv``. Defaults to ``None``.
+            select_features (str | list[str] | None, optional): Curated
+                feature list — accepts either the path to a
+                ``top_{N}_features.csv`` / ``significant_features.csv`` or an
+                explicit ``list[str]``. Resolved via
+                :func:`load_select_features` and intersected with the matrix
+                columns; missing names log a warning and are skipped. ``None``
+                loads the full matrix. Defaults to ``None``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If auto-resolve finds zero or more than one matching
+                CSV under ``self.features_dir``.
+            ValueError: If ``select_features`` is provided but its intersection
+                with the matrix columns is empty.
+            FileNotFoundError: If an explicit path argument does not exist.
+
+        Example:
+            >>> # Reuse the artefacts from a prior run with the curated top-N
+            >>> top_n_csv = "output/.../training/features/.../top_20_features.csv"
+            >>> model.load_features(select_features=top_n_csv).fit(seeds=25)
+            >>> # No build_label() / extract_features() needed.
+        """
+        if features_matrix_csv is None:
+            features_matrix_csv = self._resolve_single_csv(
+                pattern="features-matrix_*.csv", label="feature matrix"
+            )
+        elif not os.path.isfile(features_matrix_csv):
+            raise FileNotFoundError(
+                f"features_matrix_csv not found: {features_matrix_csv}"
+            )
+
+        if label_features_csv is None:
+            label_features_csv = self._resolve_single_csv(
+                pattern="features-label_*.csv", label="feature label"
+            )
+        elif not os.path.isfile(label_features_csv):
+            raise FileNotFoundError(
+                f"label_features_csv not found: {label_features_csv}"
+            )
+
+        if self.verbose:
+            logger.info(
+                f"[Training Model]: Loading feature matrix {features_matrix_csv}"
+            )
+
+        self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
+        self.labels = load_label_csv(label_features_csv)
+        self.features_csv = features_matrix_csv
+
+        if select_features is not None:
+            resolved = load_select_features(
+                select_features, number_of_features=self.top_n_features
+            )
+            matrix_columns = set(self.features_df.columns)
+            present = [name for name in resolved if name in matrix_columns]
+            missing = [name for name in resolved if name not in matrix_columns]
+            if missing:
+                logger.warning(
+                    f"load_features: {len(missing)} of {len(resolved)} curated "
+                    f"features absent from matrix; skipping {missing[:5]}"
+                    + ("..." if len(missing) > 5 else "")
+                )
+            if not present:
+                raise ValueError(
+                    "select_features has no overlap with the loaded feature matrix."
+                )
+            self.features_df = self.features_df[present]
+
+        if self.verbose:
+            logger.info(
+                f"[Training Model]: Loaded features_df={self.features_df.shape}, "
+                f"labels={self.labels.shape}"
+            )
+
+        return self
+
+    def _resolve_single_csv(self, pattern: str, label: str) -> str:
+        """Glob ``self.features_dir`` for exactly one CSV matching ``pattern``.
+
+        Args:
+            pattern (str): Glob pattern relative to ``self.features_dir``
+                (e.g. ``"features-matrix_*.csv"``).
+            label (str): Human-readable name used in error messages.
+
+        Returns:
+            str: Absolute path to the single matching CSV.
+
+        Raises:
+            ValueError: If zero or more than one match is found — the caller
+                must then pass an explicit path.
+        """
+        matches = sorted(glob.glob(os.path.join(self.features_dir, pattern)))
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise ValueError(
+                f"No {label} CSV matching '{pattern}' under {self.features_dir}; "
+                "pass an explicit path."
+            )
+        raise ValueError(
+            f"Multiple {label} CSVs matching '{pattern}' under {self.features_dir}: "
+            f"{matches}; pass an explicit path."
+        )
 
     @staticmethod
     def build_classifier_ensemble(

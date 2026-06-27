@@ -35,6 +35,14 @@ class PredictionConfig(BaseConfig):
             ISO-8601 format. Defaults to ``""``.
         end_date (str): Forecast period end date. Defaults to ``""``.
         window_size (int): Sliding window size in days. Defaults to ``2``.
+        nslc (str | None): ``Network.Station.Location.Channel`` identifier.
+            Used to scope the content-addressable cache identity to a single
+            station-channel. ``None`` for standalone runs. Defaults to ``None``.
+        training_hash (str | None): Hash of the upstream ``TrainingModel``
+            cache identity. Threaded into the prediction cache identity so a
+            re-trained ensemble automatically invalidates downstream
+            forecasts. ``None`` when the ensemble was loaded from outside the
+            current pipeline run. Defaults to ``None``.
         overwrite (bool): Overwrite existing output files. Defaults to
             ``False``.
         output_dir (str | None): Root output directory. ``None`` resolves to
@@ -52,6 +60,8 @@ class PredictionConfig(BaseConfig):
     start_date: str = ""
     end_date: str = ""
     window_size: int = 2
+    nslc: str | None = None
+    training_hash: str | None = None
     overwrite: bool = False
     output_dir: str | None = None
     root_dir: str | None = None
@@ -82,6 +92,8 @@ class PredictionConfig(BaseConfig):
             "start_date",
             "end_date",
             "window_size",
+            "nslc",
+            "training_hash",
             "overwrite",
             "output_dir",
             "root_dir",
