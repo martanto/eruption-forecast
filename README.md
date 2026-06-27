@@ -693,6 +693,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.3.2
+**Version:** 0.3.3
 **Status:** Active Development
-**Last Updated:** 2026-06-20
+**Last Updated:** 2026-06-27
