@@ -992,18 +992,16 @@ class TrainingModel(BaseModel):
             plot_features=plot_features,
         )
 
-        logger.info(f"Running parallel feature selection across {seeds} seeds..")
+        if self.verbose:
+            logger.info(
+                f"Pending Feature Selection: Found {len(pending_feature_selection_jobs)} job(s)"
+            )
 
         feature_selection_results: list[str | None] = self._run_jobs(
             self._features_selection,
             pending_feature_selection_jobs,
-            job_name="Pending Feature Selection",
+            job_name=f"Running {len(pending_feature_selection_jobs)} Pending Feature Selection",
         )
-
-        if self.verbose:
-            logger.info(
-                f"Pending Feature Selection: Found {len(feature_selection_results)} job(s)"
-            )
 
         new_training_model_jobs: list[tuple] = []
 
@@ -1017,10 +1015,16 @@ class TrainingModel(BaseModel):
                 new_training_model_jobs.append((_random_state, classifier_model.name))
 
         all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs
+
+        if self.verbose:
+            logger.info(
+                f"Pending Training Model: Found {len(all_training_model_jobs)} job(s)"
+            )
+
         training_model_results: list[str | None] = self._run_jobs(
             self._train,
             all_training_model_jobs,
-            job_name="Pending Training",
+            job_name=f"Running {len(all_training_model_jobs)} Training Model",
         )
 
         if self.verbose:
@@ -1682,7 +1686,7 @@ class TrainingModel(BaseModel):
         """
         if self.n_jobs != 1:
             logger.info(
-                f"[{job_name}]: Running on {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
+                f"[{job_name}]:On {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
             )
             return Parallel(n_jobs=self.n_jobs, backend="loky")(
                 delayed(method)(*job) for job in jobs
