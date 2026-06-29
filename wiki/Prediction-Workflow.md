@@ -12,7 +12,7 @@ Driver: `PredictionModel` (`src/eruption_forecast/model/prediction_model.py`). W
 ```
                 ┌──────────────────────────────────────────────┐
                 │             PredictionModel                  │
-                │   inherits BaseModel + CacheModel            │
+                │   inherits BaseModel                         │
                 │   self.ClassifierEnsemble loaded eagerly     │
                 └──────────────┬───────────────────────────────┘
                                │
@@ -121,16 +121,16 @@ prediction/figures/forecast_{basename}.pdf       # when plot_pdf=True (default)
 
 ## Cache
 
-`PredictionModel` mixes in `CacheModel`. The cache identity includes:
+`PredictionModel` inherits the cache layer from `BaseModel`. The cache identity includes:
 
-- NSLC
+- NSLC (constructor param, threaded by `ForecastModel.predict`)
 - tremor DataFrame fingerprint
-- **`training_hash`** - the cache hash of the upstream `TrainingModel`
+- **`training_hash`** (constructor param) - the cache hash of the upstream `TrainingModel`
 - `start_date`, `end_date`, `window_size`
 - `build_label` kwargs (`window_step`, `window_step_unit`)
 - `extract_features` kwargs (`select_tremor_columns`, `save_tremor_matrix_per_method`, `exclude_features`)
 
-Threading `training_hash` means re-training automatically invalidates the prediction cache. Hashes land at `{station_dir}/cache/PredictionModel/{hash}.pkl` + `{hash}.params.json`.
+Threading `training_hash` means re-training automatically invalidates the prediction cache. `forecast()` calls `self.save(self.build_identity())`; the pickle lands at `{station_dir}/prediction/{hash}.PredictionModel.pkl` + `{hash}.PredictionModel.params.json`.
 
 ---
 
@@ -145,7 +145,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 │   ├── results/{clf-slug}/{seed:05d}.csv                   # per-seed probability (save_seed_result=True)
 │   └── figures/forecast_{basename}.{png,pdf}               # forecast plot
 ├── forecast-results_{basename}.csv             # top-level results dump
-└── cache/PredictionModel/{hash}.pkl                        # CacheModel artefact
+└── prediction/{hash}.PredictionModel.pkl       # content-addressable cache pickle (+ .params.json sidecar)
 ```
 
 `fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `scenarios.py` to attach the figure to a Telegram notification.

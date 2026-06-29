@@ -111,7 +111,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
-- **Content-Addressable Caching** — `TrainingModel` and `PredictionModel` cache their fitted state under `{output_dir}/cache/` so repeated runs with identical kwargs short-circuit.
+- **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, and `ExplanationModel` cache their fitted state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`.
 - **Telegram Notifications** — `@notify` decorator + `send_telegram_notification()` for start/finish/error messages and file attachments.
 - **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` / `FeatureSelector` workers) parallelism, clamped to `total_cpu - 2` automatically.
@@ -194,7 +194,7 @@ src/eruption_forecast/
    └──────────────────────┘
 
    ┌──────────────────────────────────────────────────────────────┐
-   │     ExplanationModel    (BaseModel + CacheModel)             │
+   │     ExplanationModel    (BaseModel)                          │
    │     ExplainerEnsemble                                        │
    │       ── per-seed shap.TreeExplainer (RF / lite-rf / GB /XGB)│
    │       ── ClassifierExplanation.pkl per classifier            │
@@ -608,14 +608,15 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │       └── eruptions/{YYYY-MM-DD}/
 │           └── {ClfName}_{datetime}_seed=_index=.png
 │
-├── cache/                                   # CacheModel
-│   ├── TrainingModel/{hash}.pkl + {hash}.params.json
-│   ├── PredictionModel/{hash}.pkl + {hash}.params.json
-│   └── ExplanationModel/{hash}.pkl + {hash}.params.json
+│   # Cache pickles for the three cache-using stages now live next to
+│   # each stage's other outputs — no separate cache/ subtree:
+│   #   training/{hash}.TrainingModel.pkl + .params.json
+│   #   prediction/{hash}.PredictionModel.pkl + .params.json
+│   #   explanation/{kind}/{hash}.ExplanationModel.pkl + .params.json
 │
 ├── forecast.config.yaml                     # fm.save_config()
 ├── forecast-results_{basename}.csv
-└── {Training,Prediction,Evaluation}Model_*.pkl   # optional, via .save()
+└── {Training,Prediction,Evaluation}Model_*.pkl   # optional legacy save — .save() without identity
 ```
 
 > Full tree with slug tables and filename conventions: [wiki/Output-Structure.md](wiki/Output-Structure.md)

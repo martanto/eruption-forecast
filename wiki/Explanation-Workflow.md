@@ -196,8 +196,8 @@ Per-classifier folder names use the *unslugified* sklearn class name
 
 ## Cache semantics
 
-`ExplanationModel` mixes in `CacheModel`. The cache identity is
-content-addressable:
+`ExplanationModel` inherits the cache layer from `BaseModel`. The cache
+identity is content-addressable:
 
 ```
 ExplanationModel cache identity = {
@@ -209,9 +209,12 @@ ExplanationModel cache identity = {
 ```
 
 A change to the upstream `ClassifierEnsemble` or the feature matrix
-invalidates the cache automatically. Cache files land under
-`cache/ExplanationModel/{hash}.pkl + {hash}.params.json`, alongside the
-existing `TrainingModel` and `PredictionModel` caches.
+invalidates the cache automatically. `explain()` calls
+`self.save(identity)`; the pickle lands at
+`{explanation_dir}/{hash}.ExplanationModel.pkl` + matching `.params.json`
+sidecar. Because `explanation_dir` is already mode-namespaced under
+`explanation/{training,prediction}/`, training-reuse and prediction-reuse
+caches never collide.
 
 A cache hit restores `self.explanations` and skips the SHAP pass. The
 per-seed `shap_values/{seed:05d}.pkl` files and per-classifier
@@ -288,7 +291,7 @@ See [Configuration](Configuration#per-stage-configs-standalone).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│             ExplanationModel  (BaseModel + CacheModel)          │
+│             ExplanationModel  (BaseModel)                       │
 │                                                                 │
 │   ┌──────────────────────────────────────────┐                  │
 │   │ ExplainerEnsemble.explain()              │                  │
