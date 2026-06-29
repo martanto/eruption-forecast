@@ -3,7 +3,6 @@ from typing import Any, Self, Literal
 from datetime import datetime
 
 import pandas as pd
-import matplotlib
 
 from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
@@ -14,9 +13,6 @@ from eruption_forecast.utils.date_utils import set_datetime_index
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.config.prediction_config import PredictionConfig
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
-
-
-matplotlib.use("Agg")
 
 
 class PredictionModel(BaseModel):
