@@ -751,16 +751,19 @@ class ForecastModel:
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
 
-        load_features_requested = (
-            features_matrix_csv is not None or label_features_csv is not None
-        )
-        if load_features_requested and (
-            features_matrix_csv is None or label_features_csv is None
-        ):
+        if (features_matrix_csv is None) != (label_features_csv is None):
             raise ValueError(
                 "features_matrix_csv and label_features_csv must be provided together."
             )
-        if load_features_requested:
+
+        feature_shortcut_csvs: tuple[str, str] | None = None
+        if (
+            features_matrix_csv is not None
+            and label_features_csv is not None
+            and os.path.exists(features_matrix_csv)
+            and os.path.exists(label_features_csv)
+        ):
+            feature_shortcut_csvs = (features_matrix_csv, label_features_csv)
             use_cache = False
 
         # ``plot_kwargs`` are intentionally excluded from the captured config
@@ -835,10 +838,11 @@ class ForecastModel:
             verbose=verbose,
         )
 
-        if features_matrix_csv is not None and label_features_csv is not None:
+        if feature_shortcut_csvs is not None:
+            matrix_csv, label_csv = feature_shortcut_csvs
             prediction_model = prediction_model.load_features(
-                features_matrix_csv=features_matrix_csv,
-                label_features_csv=label_features_csv,
+                features_matrix_csv=matrix_csv,
+                label_features_csv=label_csv,
             )
         else:
             prediction_model = prediction_model.build_label(
