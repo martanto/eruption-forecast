@@ -663,6 +663,8 @@ class ForecastModel:
         plot_threshold: float = 0.5,
         plot_title: str | None = None,
         plot_pdf: bool = True,
+        features_matrix_csv: str | None = None,
+        label_features_csv: str | None = None,
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
@@ -696,6 +698,21 @@ class ForecastModel:
                 ``None``.
             plot_pdf (bool): Also render the forecast plot as PDF.
                 Defaults to ``True``.
+            features_matrix_csv (str | None): Path to a pre-built
+                ``features-matrix_*.csv`` produced by an earlier
+                :meth:`PredictionModel.extract_features` run. When
+                supplied together with ``label_features_csv``, replaces
+                the ``build_label → extract_features`` prefix with
+                :meth:`PredictionModel.load_features`, skipping tsfresh
+                entirely. Both paths must be provided together (raises
+                ``ValueError`` otherwise). Also forces ``use_cache`` to
+                ``False`` because ``load_features`` does not populate
+                the extract-features kwargs the prediction cache
+                identity depends on. Defaults to ``None``.
+            label_features_csv (str | None): Companion
+                ``features-label_*.csv`` for ``features_matrix_csv``.
+                Both paths must be provided together. Defaults to
+                ``None``.
             output_dir (str | None): Root output directory for
                 prediction artefacts. Defaults to the station
                 directory.
@@ -705,7 +722,9 @@ class ForecastModel:
             n_jobs (int | None): Parallel workers. ``None`` inherits
                 from ``self.n_jobs``. Defaults to ``None``.
             use_cache (bool): Short-circuit re-run when a cache hit
-                exists. Defaults to ``True``.
+                exists. Ignored (forced to ``False``) when
+                ``features_matrix_csv`` / ``label_features_csv`` are
+                supplied. Defaults to ``True``.
             verbose (bool | None): Verbose logging. ``None`` inherits
                 from ``self.verbose``. Defaults to ``None``.
             **plot_kwargs (Any): Extra keyword arguments forwarded to
@@ -718,7 +737,9 @@ class ForecastModel:
 
         Raises:
             ValueError: If :meth:`train` has not produced a trained
-                ensemble yet.
+                ensemble yet, or if only one of
+                ``features_matrix_csv`` / ``label_features_csv`` is
+                supplied.
 
         Example:
             >>> fm.predict(
@@ -729,6 +750,18 @@ class ForecastModel:
         """
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
+
+        load_features_requested = (
+            features_matrix_csv is not None or label_features_csv is not None
+        )
+        if load_features_requested and (
+            features_matrix_csv is None or label_features_csv is None
+        ):
+            raise ValueError(
+                "features_matrix_csv and label_features_csv must be provided together."
+            )
+        if load_features_requested:
+            use_cache = False
 
         # ``plot_kwargs`` are intentionally excluded from the captured config
         # because they may carry non-serialisable matplotlib objects.
@@ -743,6 +776,8 @@ class ForecastModel:
             plot_threshold=plot_threshold,
             plot_title=plot_title,
             plot_pdf=plot_pdf,
+            features_matrix_csv=features_matrix_csv,
+            label_features_csv=label_features_csv,
             output_dir=output_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
@@ -786,25 +821,30 @@ class ForecastModel:
                 self.results = cached.results
                 return self
 
-        prediction_model = (
-            PredictionModel(
-                model=self.ClassifierEnsemble,
-                tremor_data=self.tremor_df,
-                start_date=start_date,
-                end_date=end_date,
-                window_size=self.day_to_forecast,
-                nslc=self.nslc,
-                training_hash=self._training_cache_hash,
-                output_dir=resolved_output_dir,
-                overwrite=overwrite,
-                n_jobs=n_jobs,
-                verbose=verbose,
+        prediction_model = PredictionModel(
+            model=self.ClassifierEnsemble,
+            tremor_data=self.tremor_df,
+            start_date=start_date,
+            end_date=end_date,
+            window_size=self.day_to_forecast,
+            nslc=self.nslc,
+            training_hash=self._training_cache_hash,
+            output_dir=resolved_output_dir,
+            overwrite=overwrite,
+            n_jobs=n_jobs,
+            verbose=verbose,
+        )
+
+        if features_matrix_csv is not None and label_features_csv is not None:
+            prediction_model = prediction_model.load_features(
+                features_matrix_csv=features_matrix_csv,
+                label_features_csv=label_features_csv,
             )
-            .build_label(
+        else:
+            prediction_model = prediction_model.build_label(
                 window_step=window_step,
                 window_step_unit=window_step_unit,
-            )
-            .extract_features(
+            ).extract_features(
                 select_tremor_columns=self.select_tremor_columns,
                 save_tremor_matrix_per_method=self.save_tremor_matrix_per_method,
                 exclude_features=self.exclude_features,
@@ -812,7 +852,6 @@ class ForecastModel:
                 n_jobs=n_jobs,
                 verbose=verbose,
             )
-        )
 
         self.PredictionModel = prediction_model
         self.results = prediction_model.forecast(
@@ -822,8 +861,6 @@ class ForecastModel:
             plot_pdf=plot_pdf,
             **plot_kwargs,
         )
-
-        # ``forecast()`` already persisted the cache via ``self.save(identity)``.
 
         return self
 

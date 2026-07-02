@@ -273,6 +273,13 @@ class ForecastPredictConfig(BaseConfig):
             ``None``.
         plot_pdf (bool): Whether to save the forecast plot as a PDF alongside
             the PNG. Defaults to ``True``.
+        features_matrix_csv (str | None): Path to a pre-built
+            ``features-matrix_*.csv`` that skips tsfresh re-extraction.
+            Requires ``label_features_csv`` to be supplied together and
+            forces ``use_cache=False`` at replay time. Defaults to ``None``.
+        label_features_csv (str | None): Companion ``features-label_*.csv``
+            for ``features_matrix_csv``. Both paths must be supplied
+            together. Defaults to ``None``.
         output_dir (str | None): Override for the prediction output
             directory. ``None`` uses ``ForecastModel.station_dir``. Defaults
             to ``None``.
@@ -296,6 +303,8 @@ class ForecastPredictConfig(BaseConfig):
     plot_threshold: float = 0.5
     plot_title: str | None = None
     plot_pdf: bool = True
+    features_matrix_csv: str | None = None
+    label_features_csv: str | None = None
     output_dir: str | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None
