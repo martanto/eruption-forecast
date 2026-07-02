@@ -1,11 +1,14 @@
 import os
+import json
+import hashlib
 import multiprocessing
 from abc import ABC, abstractmethod
-from typing import Self, Literal
+from typing import Any, Self, Literal
 from pathlib import Path
 from datetime import datetime
 from functools import cached_property
 
+import numpy as np
 import joblib
 import pandas as pd
 
@@ -27,12 +30,18 @@ class BaseModel(ABC):
     """Abstract base class for eruption forecast model stages.
 
     Concrete subclasses (``TrainingModel``, ``PredictionModel``,
-    ``EvaluationModel``) inherit construction, parameter validation,
-    tremor-data loading, output-directory resolution, and joblib-based
-    persistence from this class. Each subclass implements its own
-    ``set_directories()``, ``create_directories()``, ``validate()``,
-    ``describe()``, ``to_dict()``, ``to_prompt()``, ``build_label()``,
-    and ``extract_features()``.
+    ``EvaluationModel``, ``ExplanationModel``) inherit construction,
+    parameter validation, tremor-data loading, output-directory resolution,
+    content-addressable cache identity hashing, and joblib-based persistence
+    from this class. Each subclass implements its own ``set_directories()``,
+    ``create_directories()``, ``validate()``, ``describe()``, ``to_dict()``,
+    ``to_prompt()``, ``build_label()``, and ``extract_features()``.
+
+    Cache-using subclasses additionally override ``stage_dir`` so cache
+    artefacts land next to their other outputs, and ``build_identity`` to
+    declare the parameters that uniquely identify a cache entry. Identity
+    dicts are canonicalised and SHA-256-hashed so two calls with identical
+    parameters resolve to the same on-disk pickle.
 
     Attributes:
         start_date (datetime): Inclusive start of the modelling period.
@@ -364,30 +373,201 @@ class BaseModel(ABC):
             str: The absolute path the configuration was written to.
         """
 
-    def save(self, path: str | None = None) -> str:
-        """Serialise this model instance to a ``.pkl`` file via joblib.
+    @property
+    def stage_dir(self) -> str:
+        """Directory where cache artefacts are written.
 
-        Persists the entire object — including cached tremor data,
-        extracted features, the loaded ``ClassifierEnsemble``, and window-grid
-        metadata — so that a later run can restore it with :meth:`load` and
-        pass it directly to ``EvaluationModel`` without re-training or
-        re-extracting features.
+        Defaults to ``self.output_dir`` so non-cache stages and the
+        legacy-mode save still work. Cache-using subclasses override to point
+        at their stage-specific directory (e.g. ``self.training_dir``).
 
-        The default path is
-        ``{output_dir}/{ClassName}_{basename}.pkl`` when ``self.basename``
-        is set and non-empty, and ``{output_dir}/{ClassName}.pkl`` otherwise.
+        Returns:
+            str: Absolute path used as the destination for cache writes.
+        """
+        return self.output_dir
+
+    @classmethod
+    def build_identity(cls, **kwargs: Any) -> dict:
+        """Return the canonical identity dict that defines a cache entry.
+
+        Cache-using subclasses override this to enumerate every parameter that
+        materially affects the produced artefact. Runtime knobs that do not
+        change output (``n_jobs``, ``n_grids``, ``verbose``, ``overwrite``,
+        ``output_dir``, ``root_dir``) must be excluded.
+
+        Called from two places with the same kwargs shape: ``ForecastModel``
+        before a stage instance exists (so the cache lookup can short-circuit
+        the expensive ``build_label`` / ``extract_features`` chain on a hit),
+        and from inside each stage's main method (``fit`` / ``forecast`` /
+        ``explain``) once instance state is populated.
 
         Args:
-            path (str | None): Explicit destination path. When ``None`` the
-                default path is used. Defaults to ``None``.
+            **kwargs (Any): Subclass-specific identity inputs. Each subclass
+                documents its accepted keyword arguments.
+
+        Returns:
+            dict: Canonical, JSON-serialisable identity dict ready for hashing.
+
+        Raises:
+            NotImplementedError: When the subclass does not participate in the
+                content-addressable cache layer.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} does not implement build_identity. "
+            "Override this classmethod on cache-using subclasses."
+        )
+
+    @classmethod
+    def cache_path(cls, stage_dir: str, identity: dict) -> str:
+        """Return the absolute ``.pkl`` path for ``identity`` under ``stage_dir``.
+
+        Args:
+            stage_dir (str): Directory where the cache file lives.
+            identity (dict): Identity dict produced by :meth:`build_identity`.
+
+        Returns:
+            str: Path of the form ``{stage_dir}/{hash}.{ClassName}.pkl``.
+        """
+        return os.path.join(
+            stage_dir, f"{cls.compute_hash(identity)}.{cls.__name__}.pkl"
+        )
+
+    @classmethod
+    def compute_hash(cls, identity: dict, length: int = 12) -> str:
+        """Hash the canonical form of ``identity`` to a truncated hex digest.
+
+        Args:
+            identity (dict): Identity dict produced by :meth:`build_identity`.
+            length (int): Number of hex characters to keep from the SHA-256
+                digest. Defaults to ``12`` (~48 bits — ample at this scale).
+
+        Returns:
+            str: Hex-encoded hash prefix.
+        """
+        canon = cls._canonicalize(identity)
+        payload = json.dumps(canon, sort_keys=True, default=str).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()[:length]
+
+    @staticmethod
+    def _canonicalize(value: Any) -> Any:
+        """Recursively normalise ``value`` into a JSON-stable representation.
+
+        Ensures two equivalent inputs produce identical JSON, regardless of the
+        original Python types or dict-key ordering. Handles ``datetime``,
+        ``pd.Timestamp``, ``Path``, NumPy scalars, sets, and tuples in addition
+        to plain containers.
+
+        Args:
+            value (Any): Arbitrary nested structure to normalise.
+
+        Returns:
+            Any: A structure built from ``dict``, ``list``, ``str``, ``int``,
+                ``float``, ``bool``, and ``None`` only.
+        """
+        if value is None or isinstance(value, (str, bool)):
+            return value
+        if isinstance(value, (int, float)):
+            return value
+        if isinstance(value, (datetime, pd.Timestamp)):
+            return value.isoformat()
+        if isinstance(value, Path):
+            return value.as_posix()
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        if isinstance(value, np.ndarray):
+            return [BaseModel._canonicalize(v) for v in value.tolist()]
+        if isinstance(value, dict):
+            return {
+                str(k): BaseModel._canonicalize(value[k])
+                for k in sorted(value, key=str)
+            }
+        if isinstance(value, (set, frozenset)):
+            return sorted(
+                (BaseModel._canonicalize(v) for v in value),
+                key=lambda v: json.dumps(v, sort_keys=True, default=str),
+            )
+        if isinstance(value, (list, tuple)):
+            return [BaseModel._canonicalize(v) for v in value]
+        return str(value)
+
+    @staticmethod
+    def tremor_fingerprint(df: pd.DataFrame) -> dict:
+        """Return a compact, hash-stable fingerprint of a tremor DataFrame.
+
+        Captures the row count, index span, and sorted column names — enough
+        to detect tremor recalculations (different outlier method, value
+        multiplier, frequency bands, etc.) without hashing the full numerical
+        payload.
+
+        Args:
+            df (pd.DataFrame): Tremor DataFrame with a ``DatetimeIndex``.
+
+        Returns:
+            dict: ``{"start", "end", "n_rows", "columns"}`` where ``start`` and
+                ``end`` are ISO strings (or ``None`` for an empty frame) and
+                ``columns`` is sorted.
+        """
+        if df.empty:
+            return {"start": None, "end": None, "n_rows": 0, "columns": []}
+
+        return {
+            "start": pd.Timestamp(df.index.min()).isoformat(),
+            "end": pd.Timestamp(df.index.max()).isoformat(),
+            "n_rows": int(len(df)),
+            "columns": sorted(str(c) for c in df.columns),
+        }
+
+    def save(
+        self, identity: dict | None = None, path: str | None = None
+    ) -> str:
+        """Serialise this model instance to a ``.pkl`` file via joblib.
+
+        Two modes:
+
+        - **Cache mode** (``identity`` is set) — writes
+          ``{stage_dir}/{hash}.{ClassName}.pkl`` plus a
+          ``{hash}.{ClassName}.params.json`` sidecar capturing the
+          canonicalised identity. Stage methods call this mode automatically
+          so a successful run is replayable from disk by hash.
+        - **Legacy mode** (``identity`` is ``None``) — writes
+          ``{output_dir}/{ClassName}_{basename}.pkl`` (or
+          ``{output_dir}/{ClassName}.pkl`` when ``self.basename`` is unset).
+          Kept for standalone manual dumps; ``path`` overrides the default
+          destination.
+
+        Args:
+            identity (dict | None): Identity dict produced by
+                :meth:`build_identity`. When set, enables cache mode.
+                Defaults to ``None``.
+            path (str | None): Explicit destination path. Ignored in cache
+                mode. When ``None`` in legacy mode the default basename path
+                is used. Defaults to ``None``.
 
         Returns:
             str: Absolute path to the written ``.pkl`` file.
 
         Example:
+            >>> # Cache mode — content-addressable artefact
+            >>> path = model.save(TrainingModel.build_identity(...))
+            >>> # Legacy mode — basename pkl for manual use
             >>> path = model.save()
-            >>> restored = TrainingModel.load(path)
         """
+        if identity is not None:
+            cache_path = type(self).cache_path(self.stage_dir, identity)
+            ensure_dir(self.stage_dir)
+            joblib.dump(self, cache_path)
+
+            sidecar = cache_path[: -len(".pkl")] + ".params.json"
+            with open(sidecar, "w", encoding="utf-8") as f:
+                json.dump(
+                    type(self)._canonicalize(identity), f, indent=2, default=str
+                )
+
+            logger.info(f"[{type(self).__name__}] Cached at: {cache_path}")
+            return cache_path
+
         if path is None:
             basename: str | None = getattr(self, "basename", None)
             suffix = f"_{basename}" if basename else ""
@@ -399,24 +579,34 @@ class BaseModel(ABC):
         return path
 
     @classmethod
-    def load(cls, path: str) -> Self:
-        """Restore a model instance previously saved with :meth:`save`.
+    def load(cls, stage_dir: str, identity: dict) -> Self | None:
+        """Return the cached instance for ``identity`` if it exists on disk.
+
+        Resolves the cache path via :meth:`cache_path` and joblib-loads the
+        pickle. Returns ``None`` on a cache miss so callers can fall through
+        to the regular build path. Path-based restores live outside this
+        method — use :func:`eruption_forecast.utils.pathutils.load_pickle`
+        directly when a ``.pkl`` location is known.
 
         Args:
-            path (str): Path to a ``.pkl`` file produced by :meth:`save`.
+            stage_dir (str): Stage directory where the cache file lives.
+            identity (dict): Identity dict produced by :meth:`build_identity`.
 
         Returns:
-            Self: The restored model instance.
-
-        Raises:
-            FileNotFoundError: If ``path`` does not exist on disk.
-
-        Example:
-            >>> model = TrainingModel.load("output/TrainingModel_2025-01-01_2025-12-31.pkl")
+            Self | None: The restored instance on a cache hit, otherwise
+                ``None``.
         """
-        obj = load_pickle(path)
-        logger.info(f"[{cls.__name__}] Loaded from: {path}")
-        return obj
+        path = cls.cache_path(stage_dir, identity)
+        if not os.path.isfile(path):
+            return None
+
+        try:
+            obj: Self = load_pickle(path)
+            logger.info(f"[{cls.__name__}] Loaded from cache: {path}")
+            return obj
+        except RuntimeError as e:
+            logger.warning(f"[{cls.__name__}] Failed to load from cache: {path}. {e}")
+            return None
 
     def build_label(
         self, window_step: int, window_step_unit: Literal["minutes", "hours"]

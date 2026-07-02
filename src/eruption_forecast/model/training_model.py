@@ -29,7 +29,6 @@ from eruption_forecast.utils.dataframe import (
 from eruption_forecast.utils.pathutils import ensure_dir, generate_features_filepaths
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
-from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.config.training_config import TrainingConfig
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
@@ -39,7 +38,7 @@ from eruption_forecast.label.dynamic_label_builder import DynamicLabelBuilder
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
-class TrainingModel(BaseModel, CacheModel):
+class TrainingModel(BaseModel):
     """Train classifier models across multiple random seeds on tremor feature data.
 
     Orchestrates the full training pipeline: label building, tremor matrix
@@ -107,6 +106,7 @@ class TrainingModel(BaseModel, CacheModel):
         cv_splits: int = 5,
         top_n_features: int = 20,
         include_eruption_date: bool = False,
+        nslc: str | None = None,
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
@@ -125,6 +125,7 @@ class TrainingModel(BaseModel, CacheModel):
             cv_splits=cv_splits,
             top_n_features=top_n_features,
             include_eruption_date=include_eruption_date,
+            nslc=nslc,
             output_dir=output_dir,
             root_dir=root_dir,
             overwrite=overwrite,
@@ -155,8 +156,16 @@ class TrainingModel(BaseModel, CacheModel):
         self.cv_splits = cv_splits
         self.top_n_features = top_n_features
         self.include_eruption_date: bool = include_eruption_date
+        self.nslc: str | None = nslc
         self.overwrite: bool = overwrite
         self.n_grids: int = n_grids
+
+        # Captured from extract_features() / fit() kwargs so fit() can rebuild
+        # the cache identity at save time without the caller passing them
+        # again. ``None`` until the corresponding method has run.
+        self._extract_features_kwargs: dict | None = None
+        self._fit_kwargs: dict | None = None
+        self.training_hash: str | None = None
 
         # Set additional properties
         self.classifier_models: list[ClassifierModel] = get_classifier_models(
@@ -217,6 +226,7 @@ class TrainingModel(BaseModel, CacheModel):
         cv_splits: int,
         top_n_features: int,
         include_eruption_date: bool,
+        nslc: str | None,
         output_dir: str | None,
         root_dir: str | None,
         overwrite: bool,
@@ -266,6 +276,7 @@ class TrainingModel(BaseModel, CacheModel):
             cv_splits=cv_splits,
             top_n_features=top_n_features,
             include_eruption_date=include_eruption_date,
+            nslc=nslc,
             output_dir=output_dir,
             root_dir=root_dir,
             overwrite=overwrite,
@@ -515,11 +526,21 @@ class TrainingModel(BaseModel, CacheModel):
             path = os.path.join(self.training_dir, f"training.config.{fmt}")
         return self._config.save(path, fmt)
 
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the training cache artefact is written.
+
+        Returns:
+            str: ``self.training_dir`` — the ``training/`` subtree under
+                ``output_dir`` that already hosts every training artefact.
+        """
+        return self.training_dir
+
     @classmethod
-    def build_cache_identity(  # ty:ignore[invalid-method-override]
+    def build_identity(  # ty:ignore[invalid-method-override]
         cls,
         *,
-        nslc: str,
+        nslc: str | None,
         tremor_df: pd.DataFrame,
         start_date: str | datetime,
         end_date: str | datetime,
@@ -546,10 +567,11 @@ class TrainingModel(BaseModel, CacheModel):
         artefact.
 
         Args:
-            nslc (str): ``Network.Station.Location.Channel`` identifier.
+            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
+                or ``None`` for standalone runs.
             tremor_df (pd.DataFrame): The tremor DataFrame that will be used
                 for training. Reduced to a small fingerprint via
-                :meth:`CacheModel.tremor_fingerprint`.
+                :meth:`BaseModel.tremor_fingerprint`.
             start_date (str | datetime): Training period start.
             end_date (str | datetime): Training period end.
             classifiers (str | list[str]): Classifier keys.
@@ -797,6 +819,17 @@ class TrainingModel(BaseModel, CacheModel):
         if self.LabelBuilder is None:
             raise ValueError("Please run build_label() first.")
 
+        # Snapshot the kwargs that materially change the produced features
+        # matrix so ``fit()`` can rebuild the same identity dict that
+        # :class:`ForecastModel` constructs externally for cache lookup.
+        self._extract_features_kwargs = {
+            "select_tremor_columns": select_tremor_columns,
+            "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
+            "exclude_features": exclude_features,
+            "select_features": select_features,
+            "minimum_completion": minimum_completion,
+        }
+
         resolved_select_features = (
             load_select_features(
                 select_features, number_of_features=self.top_n_features
@@ -837,6 +870,302 @@ class TrainingModel(BaseModel, CacheModel):
 
         # Label with ``pd.RangeIndex`` and column ``is_erupted`` only
         self.labels = labels["is_erupted"]
+
+        return self
+
+    def fit(
+        self,
+        seeds: int = 25,
+        resample_method: Literal["under", "over", "auto"] | None = "auto",
+        minority_threshold: float = 0.15,
+        sampling_strategy: str | float = 0.75,
+        plot_features: bool = False,
+        scoring: str = "balanced_accuracy",
+        compute_learning_curve: bool = False,
+    ) -> Self:
+        """Train classifier models on the full dataset across multiple random seeds.
+
+        For each seed, resamples the extracted features, selects the top-N
+        features, and fits every configured classifier via ``GridSearchCV``.
+        Existing feature and model files are reused unless ``overwrite=True``.
+        Populates ``self.results`` with the trained-model JSON registry path
+        for each classifier (written by
+        :func:`~eruption_forecast.utils.ml.save_model_json`) and
+        ``self.features_selected_df`` with the aggregated top-N feature
+        importance DataFrame.
+
+        Args:
+            seeds (int): Number of random seeds to train over. Defaults to 25.
+            resample_method (Literal["under", "over", "auto"] | None):
+                Resampling strategy applied before feature selection.
+                ``"auto"`` chooses ``"under"`` when the minority class share
+                is below ``minority_threshold``, otherwise skips resampling.
+                Defaults to ``"auto"``.
+            minority_threshold (float): Minority-class share threshold used
+                when ``resample_method="auto"``. Defaults to 0.15.
+            sampling_strategy (str | float): Target class ratio passed to the
+                resampler. Defaults to 0.75.
+            plot_features (bool): Save per-seed feature importance figures.
+                Defaults to False.
+            scoring (str, optional): Scoring GridSearchCV. Defaults to ``"balanced_accuracy"``.
+                See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
+            compute_learning_curve (bool): If ``True``, run
+                :meth:`compute_learning_curve` after the ensemble is built and
+                saved, generating per-seed sklearn learning-curve JSON files
+                under ``training/classifiers/{slug}/{cv}/learning_curves/``.
+                Defaults to ``False``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If neither ``extract_features()`` nor
+                ``load_features()`` has populated ``features_df`` / ``labels``.
+            ValueError: If no seed ensembles are produced (every classifier
+                yielded zero successful seeds).
+
+        Example:
+            >>> model.build_label(window_step=6, window_step_unit="hours")
+            >>> model.extract_features()
+            >>> model.fit(seeds=25, resample_method="auto", plot_features=True)
+            >>> model.results  # {"RandomForestClassifier": "path/to/trained-model__*.json"}
+        """
+        if self.features_df.empty and self.features_csv is None:
+            raise ValueError(
+                "Features (matrix) dataframe (features_df) is empty. "
+                "Please run extract_features() or load_features() first."
+            )
+        if self.labels.empty:
+            raise ValueError(
+                "Labels are empty. Please run extract_features() or "
+                "load_features() first."
+            )
+
+        self.create_directories(plot_features=plot_features)
+        self._scoring = scoring
+
+        # Capture the input ``fit`` kwargs (pre-"auto" resolution for
+        # ``resample_method``) so the save-time identity dict produces the
+        # same cache hash whether the user runs through ``ForecastModel`` or
+        # standalone.
+        self._fit_kwargs = {
+            "seeds": seeds,
+            "resample_method": resample_method,
+            "minority_threshold": minority_threshold,
+            "sampling_strategy": sampling_strategy,
+        }
+
+        if resample_method == "auto":
+            # Prefer ``LabelBuilder`` when present so the share matches the
+            # full labelled window grid; fall back to ``self.labels`` when
+            # the user came in through ``load_features()`` and never built a
+            # label builder.
+            label_series = (
+                self.LabelBuilder.df["is_erupted"]
+                if self.LabelBuilder is not None
+                else self.labels
+            )
+            minority_share = label_series.value_counts(normalize=True).min()
+            if minority_share <= minority_threshold:
+                resample_method = "under"
+                logger.info(
+                    f"resample_method='auto': minority class is {minority_share:.1%} "
+                    f"(<{minority_threshold * 100}%) — using 'under' (RandomUnderSampler)."
+                )
+            else:
+                resample_method = None
+                logger.info(
+                    f"resample_method='auto': minority class is {minority_share:.1%} "
+                    f"(>{minority_threshold * 100}%) — skipping resampling."
+                )
+
+        random_states: list[int] = list(range(seeds))
+        (
+            pending_feature_selection_jobs,
+            pending_training_model_jobs,
+            records_per_classifier,
+            existing_feature_paths,
+        ) = self._collect_pending_train_jobs(
+            random_states=random_states,
+            resample_method=resample_method,
+            sampling_strategy=sampling_strategy,
+            plot_features=plot_features,
+        )
+
+        if self.verbose:
+            logger.info(
+                f"Pending Feature Selection: Found {len(pending_feature_selection_jobs)} job(s)"
+            )
+
+        feature_selection_results: list[str | None] = self._run_jobs(
+            self._features_selection,
+            pending_feature_selection_jobs,
+            job_name=f"Running {len(pending_feature_selection_jobs)} Pending Feature Selection",
+        )
+
+        new_training_model_jobs: list[tuple] = []
+
+        for feature_selection_result, pending_feature_selection_job in zip(
+            feature_selection_results, pending_feature_selection_jobs, strict=True
+        ):
+            if feature_selection_result is None:
+                continue
+            _random_state = pending_feature_selection_job[0]
+            for classifier_model in self.classifier_models:
+                new_training_model_jobs.append((_random_state, classifier_model.name))
+
+        all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs
+
+        if self.verbose:
+            logger.info(
+                f"Pending Training Model: Found {len(all_training_model_jobs)} job(s)"
+            )
+
+        training_model_results: list[str | None] = self._run_jobs(
+            self._train,
+            all_training_model_jobs,
+            job_name=f"Running {len(all_training_model_jobs)} Training Model",
+        )
+
+        if self.verbose:
+            logger.info(f"Pending Training: Found {len(training_model_results)} job(s)")
+
+        for result in training_model_results:
+            if result is None:
+                continue
+
+            (
+                classifier_name,
+                _random_state,
+                features_seed_path,
+                model_seed_path,
+                top_n_features,
+            ) = result
+
+            if classifier_name not in records_per_classifier:
+                records_per_classifier[classifier_name] = []
+
+            if features_seed_path not in self.features_csvs:
+                self.features_csvs.append(features_seed_path)
+
+            records_per_classifier[classifier_name].append(
+                {
+                    "random_state": _random_state,
+                    "features": top_n_features,
+                    "model_filepath": model_seed_path,
+                }
+            )
+
+        for path in existing_feature_paths:
+            if path not in self.features_csvs:
+                self.features_csvs.append(path)
+
+        if self.verbose:
+            logger.info("Training: Concatenating significant features")
+
+        self.features_selected_df = concat_significant_features(
+            features_csvs=self.features_csvs,
+            features_dir=self.features_dir,
+            number_of_features=self.top_n_features,
+        )
+
+        if plot_features and not self.features_selected_df.empty:
+            plot_significant_features(
+                df=self.features_selected_df.reset_index(),
+                filepath=os.path.join(
+                    self.features_dir, f"top_{self.top_n_features}_features"
+                ),
+                top_features=self.top_n_features,
+                overwrite=self.overwrite,
+                legend_loc="lower right",
+                values_column="score",
+            )
+
+        # Save SeedEnsemble
+        seed_ensembles: dict[str, SeedEnsemble] = {}
+        cv_name = self.classifier_models[0].cv_name
+        for classifier_model in self.classifier_models:
+            if self.verbose:
+                logger.info(
+                    f"Training: Saving SeedEnsemble for {classifier_model.name} model ..."
+                )
+
+            classifier_name = classifier_model.name
+            if not records_per_classifier[classifier_name]:
+                continue
+
+            trained_model_json = save_model_json(
+                seeds=seeds,
+                records=records_per_classifier[classifier_name],
+                classifier_dir=self.classifier_dirs[classifier_name],
+                classifier_model=classifier_model,
+                number_of_features=self.top_n_features,
+                prefix_filename="trained-model",
+                verbose=self.verbose,
+            )
+
+            seed_ensemble_path, seed_ensemble = self.build_seed_ensemble(
+                output_dir=self.classifier_dirs[classifier_name],
+                classifier_name=classifier_model.name,
+                registry_path=trained_model_json,
+                verbose=self.verbose,
+            )
+
+            seed_ensembles[classifier_model.name] = seed_ensemble
+            self.seed_ensembles[classifier_model.name] = seed_ensemble_path
+            self.results[classifier_model.name] = trained_model_json
+
+        filename = f"ClassifierEnsemble_{cv_name}"
+        if self.results:
+            results_json_path = os.path.join(self.classifier_dir, f"{filename}.json")
+            with open(results_json_path, "w") as f:
+                json.dump(self.results, f, indent=2)
+            self.results_json = results_json_path
+
+        if seed_ensembles:
+            self.classifier_ensemble_path, self.ClassifierEnsemble = (
+                self.build_classifier_ensemble(
+                    output_dir=self.classifier_dir,
+                    seed_ensembles=seed_ensembles,
+                    filename=filename,
+                )
+            )
+        else:
+            raise ValueError("No seed ensembles found")
+
+        # Save model
+        identity = type(self).build_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            classifiers=self.classifiers,
+            eruption_dates=self.eruption_dates or [],
+            window_size=self.window_size,
+            cv_strategy=self.cv_strategy,
+            cv_splits=self.cv_splits,
+            scoring=self._scoring,
+            top_n_features=self.top_n_features,
+            include_eruption_date=self.include_eruption_date,
+            build_label_params={
+                "window_step": self.window_step,
+                "window_step_unit": self.window_step_unit,
+                "builder": self.builder,
+                "days_before_eruption": self.days_before_eruption,
+            },
+            extract_features_params=dict(self._extract_features_kwargs or {}),
+            fit_params=dict(self._fit_kwargs or {}),
+        )
+        self.save(identity)
+        self.training_hash = type(self).compute_hash(identity)
+
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save training config: {exc}")
+
+        if compute_learning_curve:
+            self.compute_learning_curve(overwrite=self.overwrite)
 
         return self
 
@@ -976,263 +1305,6 @@ class TrainingModel(BaseModel, CacheModel):
             f"Multiple {label} CSVs matching '{pattern}' under {self.features_dir}: "
             f"{matches}; pass an explicit path."
         )
-
-    def fit(
-        self,
-        seeds: int = 25,
-        resample_method: Literal["under", "over", "auto"] | None = "auto",
-        minority_threshold: float = 0.15,
-        sampling_strategy: str | float = 0.75,
-        plot_features: bool = False,
-        scoring: str = "balanced_accuracy",
-        compute_learning_curve: bool = False,
-    ) -> Self:
-        """Train classifier models on the full dataset across multiple random seeds.
-
-        For each seed, resamples the extracted features, selects the top-N
-        features, and fits every configured classifier via ``GridSearchCV``.
-        Existing feature and model files are reused unless ``overwrite=True``.
-        Populates ``self.results`` with the trained-model JSON registry path
-        for each classifier (written by
-        :func:`~eruption_forecast.utils.ml.save_model_json`) and
-        ``self.features_selected_df`` with the aggregated top-N feature
-        importance DataFrame.
-
-        Args:
-            seeds (int): Number of random seeds to train over. Defaults to 25.
-            resample_method (Literal["under", "over", "auto"] | None):
-                Resampling strategy applied before feature selection.
-                ``"auto"`` chooses ``"under"`` when the minority class share
-                is below ``minority_threshold``, otherwise skips resampling.
-                Defaults to ``"auto"``.
-            minority_threshold (float): Minority-class share threshold used
-                when ``resample_method="auto"``. Defaults to 0.15.
-            sampling_strategy (str | float): Target class ratio passed to the
-                resampler. Defaults to 0.75.
-            plot_features (bool): Save per-seed feature importance figures.
-                Defaults to False.
-            scoring (str, optional): Scoring GridSearchCV. Defaults to ``"balanced_accuracy"``.
-                See here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-string-names
-            compute_learning_curve (bool): If ``True``, run
-                :meth:`compute_learning_curve` after the ensemble is built and
-                saved, generating per-seed sklearn learning-curve JSON files
-                under ``training/classifiers/{slug}/{cv}/learning_curves/``.
-                Defaults to ``False``.
-
-        Returns:
-            Self: The current instance, enabling method chaining.
-
-        Raises:
-            ValueError: If neither ``extract_features()`` nor
-                ``load_features()`` has populated ``features_df`` / ``labels``.
-            ValueError: If no seed ensembles are produced (every classifier
-                yielded zero successful seeds).
-
-        Example:
-            >>> model.build_label(window_step=6, window_step_unit="hours")
-            >>> model.extract_features()
-            >>> model.fit(seeds=25, resample_method="auto", plot_features=True)
-            >>> model.results  # {"RandomForestClassifier": "path/to/trained-model__*.json"}
-        """
-        if self.features_df.empty and self.features_csv is None:
-            raise ValueError(
-                "Features (matrix) dataframe (features_df) is empty. "
-                "Please run extract_features() or load_features() first."
-            )
-        if self.labels.empty:
-            raise ValueError(
-                "Labels are empty. Please run extract_features() or "
-                "load_features() first."
-            )
-
-        self.create_directories(plot_features=plot_features)
-        self._scoring = scoring
-
-        if resample_method == "auto":
-            # Prefer ``LabelBuilder`` when present so the share matches the
-            # full labelled window grid; fall back to ``self.labels`` when
-            # the user came in through ``load_features()`` and never built a
-            # label builder.
-            label_series = (
-                self.LabelBuilder.df["is_erupted"]
-                if self.LabelBuilder is not None
-                else self.labels
-            )
-            minority_share = label_series.value_counts(normalize=True).min()
-            if minority_share <= minority_threshold:
-                resample_method = "under"
-                logger.info(
-                    f"resample_method='auto': minority class is {minority_share:.1%} "
-                    f"(<{minority_threshold * 100}%) — using 'under' (RandomUnderSampler)."
-                )
-            else:
-                resample_method = None
-                logger.info(
-                    f"resample_method='auto': minority class is {minority_share:.1%} "
-                    f"(>{minority_threshold * 100}%) — skipping resampling."
-                )
-
-        random_states: list[int] = list(range(seeds))
-        (
-            pending_feature_selection_jobs,
-            pending_training_model_jobs,
-            records_per_classifier,
-            existing_feature_paths,
-        ) = self._collect_pending_train_jobs(
-            random_states=random_states,
-            resample_method=resample_method,
-            sampling_strategy=sampling_strategy,
-            plot_features=plot_features,
-        )
-
-        logger.info(f"Running parallel feature selection across {seeds} seeds..")
-
-        feature_selection_results: list[str | None] = self._run_jobs(
-            self._features_selection,
-            pending_feature_selection_jobs,
-            job_name="Pending Feature Selection",
-        )
-
-        if self.verbose:
-            logger.info(
-                f"Pending Feature Selection: Found {len(feature_selection_results)} job(s)"
-            )
-
-        new_training_model_jobs: list[tuple] = []
-
-        for feature_selection_result, pending_feature_selection_job in zip(
-            feature_selection_results, pending_feature_selection_jobs, strict=True
-        ):
-            if feature_selection_result is None:
-                continue
-            _random_state = pending_feature_selection_job[0]
-            for classifier_model in self.classifier_models:
-                new_training_model_jobs.append((_random_state, classifier_model.name))
-
-        all_training_model_jobs = pending_training_model_jobs + new_training_model_jobs
-        training_model_results: list[str | None] = self._run_jobs(
-            self._train,
-            all_training_model_jobs,
-            job_name="Pending Training",
-        )
-
-        if self.verbose:
-            logger.info(f"Pending Training: Found {len(training_model_results)} job(s)")
-
-        for result in training_model_results:
-            if result is None:
-                continue
-
-            (
-                classifier_name,
-                _random_state,
-                features_seed_path,
-                model_seed_path,
-                top_n_features,
-            ) = result
-
-            if classifier_name not in records_per_classifier:
-                records_per_classifier[classifier_name] = []
-
-            if features_seed_path not in self.features_csvs:
-                self.features_csvs.append(features_seed_path)
-
-            records_per_classifier[classifier_name].append(
-                {
-                    "random_state": _random_state,
-                    "features": top_n_features,
-                    "model_filepath": model_seed_path,
-                }
-            )
-
-        for path in existing_feature_paths:
-            if path not in self.features_csvs:
-                self.features_csvs.append(path)
-
-        if self.verbose:
-            logger.info("Training: Concatenating significant features")
-
-        self.features_selected_df = concat_significant_features(
-            features_csvs=self.features_csvs,
-            features_dir=self.features_dir,
-            number_of_features=self.top_n_features,
-        )
-
-        if plot_features and not self.features_selected_df.empty:
-            plot_significant_features(
-                df=self.features_selected_df.reset_index(),
-                filepath=os.path.join(
-                    self.features_dir, f"top_{self.top_n_features}_features"
-                ),
-                top_features=self.top_n_features,
-                overwrite=self.overwrite,
-                legend_loc="lower right",
-                values_column="score",
-            )
-
-        # Save SeedEnsemble
-        seed_ensembles: dict[str, SeedEnsemble] = {}
-        cv_name = self.classifier_models[0].cv_name
-        for classifier_model in self.classifier_models:
-            if self.verbose:
-                logger.info(
-                    f"Training: Saving SeedEnsemble for {classifier_model.name} model ..."
-                )
-
-            classifier_name = classifier_model.name
-            if not records_per_classifier[classifier_name]:
-                continue
-
-            trained_model_json = save_model_json(
-                seeds=seeds,
-                records=records_per_classifier[classifier_name],
-                classifier_dir=self.classifier_dirs[classifier_name],
-                classifier_model=classifier_model,
-                number_of_features=self.top_n_features,
-                prefix_filename="trained-model",
-                verbose=self.verbose,
-            )
-
-            seed_ensemble_path, seed_ensemble = self.build_seed_ensemble(
-                output_dir=self.classifier_dirs[classifier_name],
-                classifier_name=classifier_model.name,
-                registry_path=trained_model_json,
-                verbose=self.verbose,
-            )
-
-            seed_ensembles[classifier_model.name] = seed_ensemble
-            self.seed_ensembles[classifier_model.name] = seed_ensemble_path
-            self.results[classifier_model.name] = trained_model_json
-
-        filename = f"ClassifierEnsemble_{cv_name}"
-        if self.results:
-            results_json_path = os.path.join(self.classifier_dir, f"{filename}.json")
-            with open(results_json_path, "w") as f:
-                json.dump(self.results, f, indent=2)
-            self.results_json = results_json_path
-
-        if seed_ensembles:
-            self.classifier_ensemble_path, self.ClassifierEnsemble = (
-                self.build_classifier_ensemble(
-                    output_dir=self.classifier_dir,
-                    seed_ensembles=seed_ensembles,
-                    filename=filename,
-                )
-            )
-        else:
-            raise ValueError("No seed ensembles found")
-
-        self.save()
-
-        try:
-            self.save_config()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Failed to save training config: {exc}")
-
-        if compute_learning_curve:
-            self.compute_learning_curve(overwrite=self.overwrite)
-
-        return self
 
     @staticmethod
     def build_classifier_ensemble(
@@ -1494,9 +1566,9 @@ class TrainingModel(BaseModel, CacheModel):
         )
 
         if self.verbose:
-            logger.info(f"Fitting Seed: {random_state:05d} / {classifier_name}...")
+            logger.info(f"Fitting {random_state:05d}/{classifier_name}...")
 
-        _, _, best_model = grid_search_cv(
+        _classifier_model, _grid_search, best_model = grid_search_cv(
             random_state,
             features_resampled,
             labels_resampled,
@@ -1509,7 +1581,7 @@ class TrainingModel(BaseModel, CacheModel):
 
         if self.verbose:
             logger.info(
-                f"Fitted Model {random_state:05d} / {classifier_name} : {model_seed_path}"
+                f"Fitted {random_state:05d}/{classifier_name}: {model_seed_path}"
             )
 
         return (
@@ -1614,7 +1686,7 @@ class TrainingModel(BaseModel, CacheModel):
         """
         if self.n_jobs != 1:
             logger.info(
-                f"[{job_name}]: Running on {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
+                f"[{job_name}]:On {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
             )
             return Parallel(n_jobs=self.n_jobs, backend="loky")(
                 delayed(method)(*job) for job in jobs

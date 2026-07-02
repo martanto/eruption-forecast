@@ -3,7 +3,6 @@ from typing import Any, Self, Literal
 from datetime import datetime
 
 import pandas as pd
-import matplotlib
 
 from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
@@ -11,16 +10,12 @@ from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
-from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.config.prediction_config import PredictionConfig
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
 
 
-matplotlib.use("Agg")
-
-
-class PredictionModel(BaseModel, CacheModel):
+class PredictionModel(BaseModel):
     """Forecast volcanic eruption probabilities from a trained ensemble.
 
     Loads a trained ensemble produced by ``TrainingModel.fit()`` and runs
@@ -104,6 +99,8 @@ class PredictionModel(BaseModel, CacheModel):
         start_date: str | datetime,
         end_date: str | datetime,
         window_size: int = 2,
+        nslc: str | None = None,
+        training_hash: str | None = None,
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -143,6 +140,8 @@ class PredictionModel(BaseModel, CacheModel):
             start_date=start_date,
             end_date=end_date,
             window_size=window_size,
+            nslc=nslc,
+            training_hash=training_hash,
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
@@ -169,10 +168,17 @@ class PredictionModel(BaseModel, CacheModel):
         )
 
         self.kind: Literal["training", "prediction"] = "prediction"
+        self.nslc: str | None = nslc
+        self.training_hash: str | None = training_hash
         self.overwrite = overwrite
         self.basename = (
             f"{self.start_date_str}_{self.end_date_str}_ws-{self.window_size}"
         )
+
+        # Captured from extract_features() kwargs so forecast() can rebuild
+        # the cache identity at save time without the caller passing them
+        # again. ``None`` until extract_features() has run.
+        self._extract_features_kwargs: dict | None = None
 
         (
             self.prediction_dir,
@@ -200,6 +206,8 @@ class PredictionModel(BaseModel, CacheModel):
         start_date: str | datetime,
         end_date: str | datetime,
         window_size: int,
+        nslc: str | None,
+        training_hash: str | None,
         overwrite: bool,
         output_dir: str | None,
         root_dir: str | None,
@@ -237,6 +245,8 @@ class PredictionModel(BaseModel, CacheModel):
             else start_date.isoformat(),
             end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
             window_size=window_size,
+            nslc=nslc,
+            training_hash=training_hash,
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
@@ -453,11 +463,21 @@ class PredictionModel(BaseModel, CacheModel):
             path = os.path.join(self.prediction_dir, f"prediction.config.{fmt}")
         return self._config.save(path, fmt)
 
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the prediction cache artefact is written.
+
+        Returns:
+            str: ``self.prediction_dir`` — the ``prediction/`` subtree under
+                ``output_dir`` that already hosts the forecast outputs.
+        """
+        return self.prediction_dir
+
     @classmethod
-    def build_cache_identity(  # ty:ignore[invalid-method-override]
+    def build_identity(  # ty:ignore[invalid-method-override]
         cls,
         *,
-        nslc: str,
+        nslc: str | None,
         tremor_df: pd.DataFrame,
         training_hash: str | None,
         start_date: str | datetime,
@@ -476,10 +496,11 @@ class PredictionModel(BaseModel, CacheModel):
         unchanged.
 
         Args:
-            nslc (str): ``Network.Station.Location.Channel`` identifier.
+            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
+                or ``None`` for standalone runs.
             tremor_df (pd.DataFrame): The tremor DataFrame used for the
                 forecast. Reduced to a fingerprint via
-                :meth:`CacheModel.tremor_fingerprint`.
+                :meth:`BaseModel.tremor_fingerprint`.
             training_hash (str | None): Hash of the upstream
                 :class:`TrainingModel` identity that produced the loaded
                 ensemble. ``None`` only when the ensemble was loaded from a
@@ -640,6 +661,15 @@ class PredictionModel(BaseModel, CacheModel):
         if self._labels.empty:
             raise ValueError("Please run build_label() first.")
 
+        # Snapshot the kwargs that change the produced features matrix so
+        # ``forecast()`` can rebuild the same cache identity dict that
+        # :class:`ForecastModel` constructs externally for the cache lookup.
+        self._extract_features_kwargs = {
+            "select_tremor_columns": select_tremor_columns,
+            "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
+            "exclude_features": exclude_features,
+        }
+
         if not self.features_df.empty and self.features_csv is not None:
             if self.verbose:
                 logger.info(f"Features already extracted: {self.features_csv}")
@@ -755,7 +785,21 @@ class PredictionModel(BaseModel, CacheModel):
 
         self.results = df_forecast
 
-        self.save()
+        self.save(
+            type(self).build_identity(
+                nslc=self.nslc,
+                tremor_df=self.tremor_df,
+                training_hash=self.training_hash,
+                start_date=self.start_date,
+                end_date=self.end_date,
+                window_size=self.window_size,
+                build_label_params={
+                    "window_step": self.window_step,
+                    "window_step_unit": self.window_step_unit,
+                },
+                extract_features_params=dict(self._extract_features_kwargs or {}),
+            )
+        )
 
         try:
             self.save_config()

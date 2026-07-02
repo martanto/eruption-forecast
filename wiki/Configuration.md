@@ -316,12 +316,13 @@ enable_logging()              # restore handlers
 ├── prediction/prediction.config.yaml                   # pm.save_config()  - standalone PredictionModel
 ├── evaluation/{training|prediction}/evaluation.config.yaml   # em.save_config()  - standalone EvaluationModel
 ├── explanation/{training|prediction}/explanation.config.yaml # xm.save_config()  - standalone ExplanationModel
-├── cache/
-│   ├── TrainingModel/{hash}.params.json     # CacheModel identity dumps (diff-able)
-│   ├── PredictionModel/{hash}.params.json
-│   └── ExplanationModel/{hash}.params.json
+│   # Cache identity dumps (diff-able JSON sidecars) live next to each
+│   # stage's cache pickle — no central cache/ subtree:
+│   #   training/{hash}.TrainingModel.params.json
+│   #   prediction/{hash}.PredictionModel.params.json
+│   #   explanation/{kind}/{hash}.ExplanationModel.params.json
 └── ...
 ```
 
-The `*.params.json` files inside `cache/` capture **exactly** what went into the cache hash. 
+The `*.params.json` files next to each stage's cache pickle capture **exactly** what went into the cache hash. 
 They are handy when debugging a cache miss - `diff` two of them to see which kwarg differed.

@@ -48,8 +48,8 @@ That's the whole pipeline. The four stages - `calculate → train → predict �
 | Stage | What it does | Key output (under `{station_dir}/`) |
 |-------|--------------|-------------------------------------|
 | `calculate()` | Reads SDS/FDSN waveforms, computes RSAM / DSAR / entropy per band | `tremor/{nslc}_{start}_{end}.csv` |
-| `train()` | Builds labels → extracts tsfresh features → fits one `SeedEnsemble` per classifier into a `ClassifierEnsemble` | `training/...` + `cache/TrainingModel/` |
-| `predict()` | Re-extracts features over the forecast grid → runs ensemble inference | `prediction/...` + `cache/PredictionModel/` |
+| `train()` | Builds labels → extracts tsfresh features → fits one `SeedEnsemble` per classifier into a `ClassifierEnsemble` | `training/...` (cache pickle: `training/{hash}.TrainingModel.pkl`) |
+| `predict()` | Re-extracts features over the forecast grid → runs ensemble inference | `prediction/...` (cache pickle: `prediction/{hash}.PredictionModel.pkl`) |
 | `evaluate()` | Re-uses the in-session `TrainingModel` or `PredictionModel` for per-seed metrics + aggregate plots | `evaluation/{training\|prediction}/...` |
 
 All paths root at `{output_dir}/{nslc}/`, where `nslc = "{network}.{station}.{location}.{channel}"` - see [Output Structure](Output-Structure) for the full tree.

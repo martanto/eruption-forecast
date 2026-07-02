@@ -23,7 +23,6 @@ MODULES = [
     "eruption_forecast.ensemble.metrics_ensemble",
     "eruption_forecast.ensemble.explainer_ensemble",
     "eruption_forecast.model.base_model",
-    "eruption_forecast.model.cache_model",
     "eruption_forecast.model.classifier_comparator",
     "eruption_forecast.model.classifier_model",
     "eruption_forecast.model.evaluation_model",

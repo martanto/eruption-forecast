@@ -54,13 +54,12 @@ src/eruption_forecast/
 │
 ├── model/
 │   ├── constants.py
-│   ├── base_model.py            - BaseModel ABC (dates, I/O, save/load)
-│   ├── cache_model.py           - CacheModel mixin (content-addressed cache)
+│   ├── base_model.py            - BaseModel ABC (dates, I/O, dual-mode save/load + cache identity)
 │   ├── forecast_model.py        - ForecastModel orchestrator
-│   ├── training_model.py        - TrainingModel(BaseModel, CacheModel)
-│   ├── prediction_model.py      - PredictionModel(BaseModel, CacheModel)
+│   ├── training_model.py        - TrainingModel(BaseModel)
+│   ├── prediction_model.py      - PredictionModel(BaseModel)
 │   ├── evaluation_model.py      - EvaluationModel(BaseModel)
-│   ├── explanation_model.py     - ExplanationModel(BaseModel, CacheModel)
+│   ├── explanation_model.py     - ExplanationModel(BaseModel)
 │   ├── classifier_model.py      - ClassifierModel (estimator + grid)
 │   └── classifier_comparator.py - ClassifierComparator (cross-classifier rank)
 │
@@ -142,7 +141,7 @@ src/eruption_forecast/
    └──────────────────────┘
 
    ┌────────────────────────────────────────────────────────────────┐
-   │    ExplanationModel  (BaseModel + CacheModel)                  │
+   │    ExplanationModel  (BaseModel)                               │
    │    dispatch on upstream model.kind: training | prediction      │
    │                                                                │
    │    ExplainerEnsemble                                           │
@@ -249,12 +248,11 @@ band does not invalidate the cached results for the others.
 
 The model layer follows a **mixin** pattern:
 
-- **`BaseModel`** - abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, and joblib `save()` / `load()`. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`.
-- **`CacheModel`** - abstract mixin that adds a content-addressable cache layer. Implementers declare `build_cache_identity(**kwargs) -> dict`; the mixin canonicalises the dict, SHA-256-hashes it, and reads/writes `{output_dir}/cache/{ClassName}/{hash}.pkl` (with a `.params.json` sidecar for debugging).
-- **`TrainingModel(BaseModel, CacheModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, writes a per-classifier trained-model JSON registry via `save_model_json`, then bundles every seed into a `SeedEnsemble` (`build_seed_ensemble` → `SeedEnsemble.from_any`) and every classifier into a `ClassifierEnsemble` (`build_classifier_ensemble`).
-- **`PredictionModel(BaseModel, CacheModel)`** - `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash`, so re-training automatically invalidates downstream forecasts.
+- **`BaseModel`** - abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, the content-addressable cache identity helpers (`build_identity`, `compute_hash`, `_canonicalize`, `tremor_fingerprint`, `cache_path`), and the dual-mode joblib `save(identity=None, path=None)` / cache-only `load(stage_dir, identity)`. When `identity` is supplied, `save()` writes to `{stage_dir}/{hash}.{ClassName}.pkl` (plus a `.params.json` sidecar). When `identity` is omitted, the legacy `{output_dir}/{ClassName}_{basename}.pkl` joblib dump is preserved for standalone manual saves. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`, and override `stage_dir` + `build_identity` when they participate in the cache.
+- **`TrainingModel(BaseModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, writes a per-classifier trained-model JSON registry via `save_model_json`, bundles every seed into a `SeedEnsemble` and every classifier into a `ClassifierEnsemble`, then calls `self.save(self.build_identity())` so the cache pickle lands at `{training_dir}/{hash}.TrainingModel.pkl` with a matching sidecar.
+- **`PredictionModel(BaseModel)`** - `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash` (a constructor param threaded by `ForecastModel.predict`), so re-training automatically invalidates downstream forecasts. `forecast()` calls `self.save(self.build_identity())`; cache files live at `{prediction_dir}/{hash}.PredictionModel.pkl`.
 - **`EvaluationModel(BaseModel)`** - no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
-- **`ExplanationModel(BaseModel, CacheModel)`** - per-seed SHAP explanations over a fitted `ClassifierEnsemble`. Reuses the upstream `TrainingModel` or `PredictionModel` and dispatches on `model.kind`. Restricted to tree classifiers (RF / lite-rf / GB / XGB); non-tree classifiers are skipped at the `ExplainerEnsemble` loop with a warning. Output is namespaced under `explanation/{kind}/`.
+- **`ExplanationModel(BaseModel)`** - per-seed SHAP explanations over a fitted `ClassifierEnsemble`. Reuses the upstream `TrainingModel` or `PredictionModel` and dispatches on `model.kind`. Restricted to tree classifiers (RF / lite-rf / GB / XGB); non-tree classifiers are skipped at the `ExplainerEnsemble` loop with a warning. Output is namespaced under `explanation/{kind}/`; cache pickles land at `{explanation_dir}/{hash}.ExplanationModel.pkl` (already mode-namespaced so training-reuse and prediction-reuse caches never collide).
 - **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the four stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
 
 `ClassifierModel` is the per-classifier descriptor (sklearn estimator + hyperparameter grid + slug). 
@@ -342,7 +340,7 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
             ▼                ▼           ▼               ▼                ▼
   ┌───────────────┐ ┌───────────────┐ ┌──────────────┐ ┌───────────────────┐
   │ TrainingModel │ │PredictionModel│ │EvaluationMdl │ │ ExplanationModel  │
-  │ + CacheModel  │ │ + CacheModel  │ │(BaseModel)   │ │ + CacheModel      │
+  │ (BaseModel)   │ │ (BaseModel)   │ │(BaseModel)   │ │ (BaseModel)       │
   │               │ │               │ │              │ │                   │
   │ build_label → │ │ build_label → │ │ dispatch on  │ │ explain →         │
   │ extract_feat →│ │ extract_feat →│ │ model.kind   │ │   ExplainerEns.   │
@@ -379,13 +377,12 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
 
 | Class                  | Scope (per …)              | Mixin / Inheritance          | Cache |
 |------------------------|----------------------------|------------------------------|-------|
-| `BaseModel`            | -                          | ABC                          | ✗ |
-| `CacheModel`           | -                          | ABC mixin                    | self |
+| `BaseModel`            | -                          | ABC (cache identity + dual-mode save/load) | self |
 | `BaseEnsemble`         | -                          | mixin                        | ✗ |
-| `TrainingModel`        | One date span              | `BaseModel + CacheModel`     | ✓ |
-| `PredictionModel`      | One forecast window grid   | `BaseModel + CacheModel`     | ✓ |
+| `TrainingModel`        | One date span              | `BaseModel`                  | ✓ |
+| `PredictionModel`      | One forecast window grid   | `BaseModel`                  | ✓ |
 | `EvaluationModel`      | One trained model          | `BaseModel`                  | ✗ |
-| `ExplanationModel`     | One trained ensemble       | `BaseModel + CacheModel`     | ✓ |
+| `ExplanationModel`     | One trained ensemble       | `BaseModel`                  | ✓ |
 | `SeedEnsemble`         | 1 classifier × N seeds     | `BaseEnsemble`               | ✗ |
 | `ClassifierEnsemble`   | M classifiers × N seeds    | `BaseEnsemble`               | ✗ |
 | `MetricsEnsemble`      | 1 ensemble × 1 dataset     | standalone                   | ✗ |
@@ -471,12 +468,12 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
     │     {Clf}_{datetime}_seed=_index=.png                         │
     └───────────────────────────────────────────────────────────────┘
 
-           ┌─────────────────────────────────────────────────────┐
-           │  cache/                                             │
-           │    TrainingModel/{hash}.pkl + {hash}.params.json    │  ← CacheModel
-           │    PredictionModel/{hash}.pkl + {hash}.params.json  │
-           │    ExplanationModel/{hash}.pkl + {hash}.params.json │
-           └─────────────────────────────────────────────────────┘
+           ┌────────────────────────────────────────────────────────────┐
+           │  Stage-internal caches (no separate cache/ subtree):       │
+           │    training/{hash}.TrainingModel.pkl       + .params.json  │  ← BaseModel.save
+           │    prediction/{hash}.PredictionModel.pkl   + .params.json  │
+           │    explanation/{kind}/{hash}.ExplanationModel.pkl + sidecar│
+           └────────────────────────────────────────────────────────────┘
 ```
 
 A cache hit on `TrainingModel` short-circuits everything in the `training/` box; 

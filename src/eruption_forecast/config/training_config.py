@@ -39,6 +39,9 @@ class TrainingConfig(BaseConfig):
             feature selection. Defaults to ``20``.
         include_eruption_date (bool): If ``True``, the eruption date itself
             is labeled as erupted. Defaults to ``False``.
+        nslc (str | None): ``Network.Station.Location.Channel`` identifier.
+            Used to scope the content-addressable cache identity to a single
+            station-channel. ``None`` for standalone runs. Defaults to ``None``.
         output_dir (str | None): Root output directory. ``None`` resolves to
             ``root_dir/output``. Defaults to ``None``.
         root_dir (str | None): Anchor directory for resolving relative paths.
@@ -66,6 +69,7 @@ class TrainingConfig(BaseConfig):
     cv_splits: int = 5
     top_n_features: int = 20
     include_eruption_date: bool = False
+    nslc: str | None = None
     output_dir: str | None = None
     root_dir: str | None = None
     overwrite: bool = False
@@ -102,6 +106,7 @@ class TrainingConfig(BaseConfig):
             "cv_splits",
             "top_n_features",
             "include_eruption_date",
+            "nslc",
             "output_dir",
             "root_dir",
             "overwrite",

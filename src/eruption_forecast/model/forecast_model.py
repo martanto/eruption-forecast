@@ -7,7 +7,6 @@ import pandas as pd
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import setup_nslc_directories
 from eruption_forecast.utils.date_utils import to_datetime
-from eruption_forecast.model.cache_model import CacheModel
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.config.forecast_config import (
@@ -542,7 +541,7 @@ class ForecastModel:
 
         resolved_output_dir = output_dir or self.station_dir
 
-        identity = TrainingModel.build_cache_identity(
+        identity = TrainingModel.build_identity(
             nslc=self.nslc,
             tremor_df=self.tremor_df,
             start_date=start_date,
@@ -576,8 +575,10 @@ class ForecastModel:
             },
         )
 
+        training_stage_dir = os.path.join(resolved_output_dir, "training")
+
         if use_cache:
-            cached = TrainingModel.load_from_cache(resolved_output_dir, identity)
+            cached = TrainingModel.load(training_stage_dir, identity)
             if cached is not None:
                 if self.verbose:
                     logger.warning("Loading cached training data...")
@@ -588,7 +589,7 @@ class ForecastModel:
                 self.save_tremor_matrix_per_method = save_tremor_matrix_per_method
                 self.exclude_features = exclude_features
                 self._eruption_dates = eruption_dates
-                self._training_cache_hash = CacheModel.compute_hash(identity)
+                self._training_cache_hash = TrainingModel.compute_hash(identity)
                 return self
 
         training_model = (
@@ -603,6 +604,7 @@ class ForecastModel:
                 cv_splits=cv_splits,
                 top_n_features=top_n_features,
                 include_eruption_date=include_eruption_date,
+                nslc=self.nslc,
                 output_dir=resolved_output_dir,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
@@ -643,8 +645,11 @@ class ForecastModel:
 
         self._eruption_dates = eruption_dates
 
-        training_model.save_to_cache(identity)
-        self._training_cache_hash = CacheModel.compute_hash(identity)
+        # ``fit()`` has already persisted the cache via ``self.save(identity)``.
+        # The hash is needed downstream by :meth:`predict` for its own identity.
+        self._training_cache_hash = (
+            training_model.training_hash or TrainingModel.compute_hash(identity)
+        )
 
         return self
 
@@ -751,7 +756,7 @@ class ForecastModel:
 
         resolved_output_dir = output_dir or self.station_dir
 
-        identity = PredictionModel.build_cache_identity(
+        identity = PredictionModel.build_identity(
             nslc=self.nslc,
             tremor_df=self.tremor_df,
             training_hash=self._training_cache_hash,
@@ -769,8 +774,10 @@ class ForecastModel:
             },
         )
 
+        prediction_stage_dir = os.path.join(resolved_output_dir, "prediction")
+
         if use_cache:
-            cached = PredictionModel.load_from_cache(resolved_output_dir, identity)
+            cached = PredictionModel.load(prediction_stage_dir, identity)
             if cached is not None:
                 if self.verbose:
                     logger.warning("Loading cached prediction data...")
@@ -786,6 +793,8 @@ class ForecastModel:
                 start_date=start_date,
                 end_date=end_date,
                 window_size=self.day_to_forecast,
+                nslc=self.nslc,
+                training_hash=self._training_cache_hash,
                 output_dir=resolved_output_dir,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
@@ -814,7 +823,7 @@ class ForecastModel:
             **plot_kwargs,
         )
 
-        prediction_model.save_to_cache(identity)
+        # ``forecast()`` already persisted the cache via ``self.save(identity)``.
 
         return self
 
@@ -1101,10 +1110,9 @@ class ForecastModel:
 
         Args:
             path (str | None): Destination file path.  ``None`` resolves to
-                ``{station_dir}/forecast.config.{fmt}``, a sibling of
-                the per-stage ``cache/`` directories written by
-                :class:`~eruption_forecast.model.cache_model.CacheModel`.
-                Defaults to ``None``.
+                ``{station_dir}/forecast.config.{fmt}``, a sibling of the
+                per-stage cache pickles written next to each stage's outputs
+                by :meth:`BaseModel.save`. Defaults to ``None``.
             fmt (Literal["yaml", "json"]): Output format.  Defaults to
                 ``"yaml"``.
 

@@ -42,7 +42,7 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 │                     │  cv = shuffle-stratified, scoring = recall
 │                     │  resample = under,  n_jobs = 4, n_grids = 4
 └──────────┬──────────┘
-           │  cached → {station_dir}/cache/TrainingModel/{hash}.pkl
+           │  cached → {station_dir}/training/{hash}.TrainingModel.pkl
            │
            ▼
 ┌─────────────────────┐
@@ -52,7 +52,7 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 │                     │    forecast     (4 clf × 25 seeds → consensus)
 │                     │  plot_threshold = 0.7,  save_seed_result = True
 └──────────┬──────────┘
-           │  cached → {station_dir}/cache/PredictionModel/{hash}.pkl
+           │  cached → {station_dir}/prediction/{hash}.PredictionModel.pkl
            │
            ▼
 ┌─────────────────────┐

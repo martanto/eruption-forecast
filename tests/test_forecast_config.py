@@ -8,8 +8,8 @@ Covers the new-API counterpart of ``test_pipeline_config.py``:
 - Unknown keys in ``from_dict()`` are silently ignored
 - ``ForecastModel._config`` populated at ``__init__`` (model section only)
 - ``ForecastModel.save_config()`` default path lives under
-  ``{station_dir}/config/`` (sibling of the per-stage ``cache/`` directories
-  written by :class:`~eruption_forecast.model.cache_model.CacheModel`)
+  ``{station_dir}/config/`` (sibling of the per-stage cache pickles written
+  next to each stage's outputs by :meth:`BaseModel.save`)
 - ``ForecastModel.from_config()`` round-trip
 - ``ForecastModel.run()`` is a no-op when no stage sections are populated
 - ``ForecastPredictConfig`` does not capture the variadic ``**plot_kwargs``
@@ -683,7 +683,7 @@ class TestForecastModelSaveConfig:
             assert os.path.isfile(path)
 
     def test_save_config_default_path_sibling_of_cache(self) -> None:
-        """Default config file sits directly under ``station_dir``, next to the per-stage ``cache/`` directories."""
+        """Default config file sits directly under ``station_dir``, next to the per-stage cache pickles."""
         with tempfile.TemporaryDirectory() as tmp:
             fm = ForecastModel(**_model_kwargs(tmp))
             path = fm.save_config()

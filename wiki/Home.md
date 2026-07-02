@@ -44,8 +44,8 @@ It is a research tool and must not be used as the sole basis for public safety d
                        ▼
             ┌───────────────────────┐
             │     TrainingModel     │  LabelBuilder → FeaturesBuilder → fit
-            │  (BaseModel +         │  multi-seed GridSearchCV
-            │   CacheModel)         │  produces ClassifierEnsemble
+            │  (BaseModel)          │  multi-seed GridSearchCV
+            │                       │  produces ClassifierEnsemble
             └──────────┬────────────┘
                        │  ClassifierEnsemble  (N classifiers × M seeds)
                        │

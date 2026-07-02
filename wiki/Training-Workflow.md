@@ -14,7 +14,7 @@ Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapp
 ```
                 ┌──────────────────────────────────────────────┐
                 │              TrainingModel                   │
-                │   inherits BaseModel + CacheModel            │
+                │   inherits BaseModel                         │
                 └──────────────┬───────────────────────────────┘
                                │
                   ┌────────────┼─────────────┐
@@ -203,14 +203,14 @@ for ad-hoc direct use, but `ForecastModel.train` does not expose it.
 
 ## Cache
 
-`TrainingModel` mixes in `CacheModel`. The cache identity is built from:
+`TrainingModel` inherits the cache layer directly from `BaseModel`. The cache identity is built from:
 
-- station NSLC
+- station NSLC (constructor param)
 - tremor DataFrame fingerprint (shape + min/max + checksum)
 - every train kwarg that affects output (`classifiers`, `eruption_dates`, `cv_strategy`, `cv_splits`, `scoring`, `top_n_features`, `include_eruption_date`)
 - the kwargs passed into `build_label`, `extract_features`, and `fit`
 
-Hash → `{station_dir}/cache/TrainingModel/{hash}.pkl` (+ a sidecar `{hash}.params.json` for diff-able inspection).
+`fit()` calls `self.save(self.build_identity())` after the ensemble is built, so the hash lands at `{station_dir}/training/{hash}.TrainingModel.pkl` (+ a sidecar `{hash}.TrainingModel.params.json` for diff-able inspection). `ForecastModel.train()` consults the same path via `TrainingModel.load(training_dir, identity)` before instantiating the model — a hit short-circuits the entire build.
 
 `fm.train(..., use_cache=True)` (default) short-circuits a re-fit when the identity matches; pass `use_cache=False` to force a fresh run.
 

@@ -143,7 +143,7 @@ plot names come from `evaluation_plots.AGGREGATE_PLOT_DISPATCHER` and
 
 ## Cache Semantics
 
-`EvaluationModel` does **not** mix in `CacheModel` — it has no parameter cache. Re-runs are gated by `MetricsEnsemble.compute()`'s in-memory idempotency fast-path: once `self.y_probas` is populated, repeated `compute()` calls short-circuit immediately. `overwrite` only controls plot regeneration — passing `overwrite=False` keeps existing `figures/.../{plot}.png` files in place. The on-disk `predictions/{y_proba,y_pred}.csv` matrices themselves are the persistent layer; deleting them forces the next `compute()` to refit from scratch.
+`EvaluationModel` does **not** override `build_identity` and so does not participate in the `BaseModel` cache layer — it has no parameter cache. Re-runs are gated by `MetricsEnsemble.compute()`'s in-memory idempotency fast-path: once `self.y_probas` is populated, repeated `compute()` calls short-circuit immediately. `overwrite` only controls plot regeneration — passing `overwrite=False` keeps existing `figures/.../{plot}.png` files in place. The on-disk `predictions/{y_proba,y_pred}.csv` matrices themselves are the persistent layer; deleting them forces the next `compute()` to refit from scratch.
 
 ---
 
@@ -208,7 +208,7 @@ See [Configuration](Configuration#per-stage-configs-standalone).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│             EvaluationModel  (no CacheModel mix-in)             │
+│             EvaluationModel  (no cache participation)           │
 │                                                                 │
 │   ┌──────────────────────────────────────────┐                  │
 │   │ MetricsEnsemble.compute()                │                  │

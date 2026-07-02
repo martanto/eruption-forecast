@@ -132,7 +132,7 @@ fm.train(
 ) -> Self
 ```
 
-Requires `calculate()` to have populated tremor data first. `label_builder="dynamic"` requires `days_before_eruption`. `use_cache=True` short-circuits via `TrainingModel.load_from_cache` when the cache identity matches. Sets `self.TrainingModel`, `self.ClassifierEnsemble`, and `self._training_cache_hash`.
+Requires `calculate()` to have populated tremor data first. `label_builder="dynamic"` requires `days_before_eruption`. `use_cache=True` short-circuits via `TrainingModel.load(training_dir, identity)` when the cache identity matches. Sets `self.TrainingModel`, `self.ClassifierEnsemble`, and `self._training_cache_hash`.
 
 ### `predict(...)`
 
@@ -209,7 +209,7 @@ Requires the upstream `TrainingModel` or `PredictionModel` to exist on `self` (r
 
 ## TrainingModel
 
-`BaseModel + CacheModel` subclass. Use standalone when running outside `ForecastModel`; otherwise `fm.train(...)` constructs it for you.
+`BaseModel` subclass with content-addressable cache participation. Use standalone when running outside `ForecastModel`; otherwise `fm.train(...)` constructs it for you.
 
 ### Constructor
 
@@ -272,11 +272,10 @@ tm.fit(
 
 | Method | Notes |
 |--------|-------|
-| `TrainingModel.build_cache_identity(**kwargs)` | Classmethod; returns canonical identity dict for hashing |
-| `tm.save_to_cache(identity)` | Writes `{output_dir}/cache/TrainingModel/{hash}.pkl` (+ `.params.json`) |
-| `TrainingModel.load_from_cache(output_dir, identity)` | Classmethod; returns the instance or `None` |
-| `tm.save(path=None)` | `{output_dir}/TrainingModel_{basename}.pkl` |
-| `TrainingModel.load(path)` | Classmethod |
+| `TrainingModel.build_identity(**kwargs)` | Classmethod; returns canonical identity dict for hashing. Called both by `ForecastModel.train()` (before the instance exists, for cache lookup) and inside `fit()` (with kwargs pulled from `self`, for the save). |
+| `tm.save(identity)` | Cache mode: writes `{training_dir}/{hash}.TrainingModel.pkl` + `.params.json` sidecar |
+| `tm.save()` | Legacy mode (no identity): `{output_dir}/TrainingModel_{basename}.pkl` joblib dump |
+| `TrainingModel.load(stage_dir, identity)` | Classmethod; returns the instance on cache hit or `None` |
 | `tm.save_config(path=None, fmt="yaml")` | `{training_dir}/training.config.{yaml,json}` — auto-called at end of `fit()` |
 
 Populated attributes after `fit()`: `tm.results` (per-classifier trained-model JSON registry paths written by `save_model_json`), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels`.
@@ -285,7 +284,7 @@ Populated attributes after `fit()`: `tm.results` (per-classifier trained-model J
 
 ## PredictionModel
 
-`BaseModel + CacheModel` subclass.
+`BaseModel` subclass with content-addressable cache participation.
 
 ### Constructor
 
@@ -336,7 +335,7 @@ pm.forecast(
 
 ### Cache + persistence
 
-Same surface as `TrainingModel`: `build_cache_identity`, `save_to_cache`, `load_from_cache`, `save`, `load`. The cache identity embeds the upstream `training_hash`.
+Same surface as `TrainingModel`: `build_identity(**kwargs)`, `save(identity)`, `load(stage_dir, identity)`. The cache identity embeds the upstream `training_hash` (constructor param).
 
 | Method | Notes |
 |--------|-------|
@@ -407,7 +406,7 @@ Classmethod. Loads a `.pkl` produced by `TrainingModel.save()` or `PredictionMod
 
 ## ExplanationModel
 
-`BaseModel + CacheModel` subclass. Per-seed SHAP explanations over a fitted `ClassifierEnsemble` — never re-fits. See [Explanation Workflow](Explanation-Workflow).
+`BaseModel` subclass with content-addressable cache participation. Per-seed SHAP explanations over a fitted `ClassifierEnsemble` — never re-fits. See [Explanation Workflow](Explanation-Workflow).
 
 ### Constructor
 
@@ -443,7 +442,7 @@ em.plot(
 )
 ```
 
-`explain()` delegates to `ExplainerEnsemble.explain()` and caches the result via `CacheModel`. On a cache hit the stored `self.explanations` is restored without re-running SHAP. `plot()` renders the per-eruption waterfall (only when `eruption_dates` is available) and, optionally, per-seed bar + beeswarm plots.
+`explain()` delegates to `ExplainerEnsemble.explain()` and caches the result via `BaseModel.save(identity)`. On a cache hit the stored `self.explanations` is restored without re-running SHAP. `plot()` renders the per-eruption waterfall (only when `eruption_dates` is available) and, optionally, per-seed bar + beeswarm plots.
 
 ```python
 ExplanationModel.from_file(

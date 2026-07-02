@@ -85,13 +85,14 @@ Every pipeline run writes under a single station directory:
 │       ├── explanation.config.yaml                           # xm.save_config() — auto-written at end of explain()
 │       └── (identical sub-tree)
 │
-├── cache/                                                    # CacheModel
-│   ├── TrainingModel/{hash}.pkl                              # Cached fitted TrainingModel
-│   ├── TrainingModel/{hash}.params.json                      # Sidecar identity dump
-│   ├── PredictionModel/{hash}.pkl                            # Cached PredictionModel
-│   ├── PredictionModel/{hash}.params.json
-│   ├── ExplanationModel/{hash}.pkl                           # Cached ExplanationModel
-│   └── ExplanationModel/{hash}.params.json
+│   # Cache pickles for the three cache-using stages live next to each
+│   # stage's other outputs — no separate cache/ subtree:
+│   #   training/{hash}.TrainingModel.pkl                     # Cached fitted TrainingModel
+│   #   training/{hash}.TrainingModel.params.json             # Sidecar identity dump
+│   #   prediction/{hash}.PredictionModel.pkl                 # Cached PredictionModel
+│   #   prediction/{hash}.PredictionModel.params.json
+│   #   explanation/{kind}/{hash}.ExplanationModel.pkl        # Cached ExplanationModel
+│   #   explanation/{kind}/{hash}.ExplanationModel.params.json
 │
 ├── forecast.config.yaml                                      # fm.save_config()
 ├── forecast-results_{basename}.csv               # PredictionModel.forecast() top-level dump
@@ -178,19 +179,20 @@ Per-seed model files inside `classifiers/{clf}/{cv}/models/` are zero-padded:
 
 ## Cache Layout
 
-`CacheModel` writes content-addressed artefacts under `{station_dir}/cache/{ClassName}/`:
+`BaseModel.save(identity)` writes content-addressed artefacts directly into each stage's own directory — no central `cache/` subtree:
 
 ```
-cache/
-├── TrainingModel/
-│   ├── 3b7a98e6...c2.pkl              # joblib-pickled fitted TrainingModel
-│   └── 3b7a98e6...c2.params.json      # canonical identity dict (diff-friendly)
-├── PredictionModel/
-│   ├── 9c12d04f...88.pkl
-│   └── 9c12d04f...88.params.json
-└── ExplanationModel/
-    ├── 4e6f2a31...77.pkl              # joblib-pickled ExplanationModel
-    └── 4e6f2a31...77.params.json
+training/
+├── 3b7a98e6...c2.TrainingModel.pkl                 # joblib-pickled fitted TrainingModel
+└── 3b7a98e6...c2.TrainingModel.params.json         # canonical identity dict (diff-friendly)
+
+prediction/
+├── 9c12d04f...88.PredictionModel.pkl
+└── 9c12d04f...88.PredictionModel.params.json
+
+explanation/{training|prediction}/
+├── 4e6f2a31...77.ExplanationModel.pkl              # joblib-pickled ExplanationModel
+└── 4e6f2a31...77.ExplanationModel.params.json
 ```
 
 The `.params.json` is what was hashed to produce the filename. When `use_cache=True` 
