@@ -658,22 +658,35 @@ class PredictionModel(BaseModel):
         Raises:
             ValueError: If ``build_label()`` has not been called first.
         """
-        if self._labels.empty:
-            raise ValueError("Please run build_label() first.")
-
-        # Snapshot the kwargs that change the produced features matrix so
-        # ``forecast()`` can rebuild the same cache identity dict that
-        # :class:`ForecastModel` constructs externally for the cache lookup.
-        self._extract_features_kwargs = {
+        new_kwargs = {
             "select_tremor_columns": select_tremor_columns,
             "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
             "exclude_features": exclude_features,
         }
 
-        if not self.features_df.empty and self.features_csv is not None:
+        features_already_populated = (
+            not self.features_df.empty and self.features_csv is not None
+        )
+
+        if features_already_populated and not overwrite:
+            if (
+                self._extract_features_kwargs is not None
+                and new_kwargs != self._extract_features_kwargs
+            ):
+                logger.warning(
+                    "extract_features: incoming kwargs differ from the "
+                    "previously-extracted matrix; keeping the existing matrix "
+                    "and its snapshot. Pass overwrite=True to force a rebuild. "
+                    f"incoming={new_kwargs} snapshot={self._extract_features_kwargs}"
+                )
             if self.verbose:
                 logger.info(f"Features already extracted: {self.features_csv}")
             return self
+
+        if self._labels.empty:
+            raise ValueError("Please run build_label() first.")
+
+        self._extract_features_kwargs = new_kwargs
 
         features_builder = self._build_features(
             label_df=self._labels,
@@ -703,6 +716,113 @@ class PredictionModel(BaseModel):
             self._labels = self._labels[self._labels["id"].isin(self.features_df.index)]
             self._labels.to_csv(self.labels_csv, index=True)
             self.labels = self._labels["id"]
+
+        return self
+
+    def load_features(
+        self,
+        features_matrix_csv: str,
+        label_features_csv: str,
+    ) -> Self:
+        """Reuse a feature matrix written by a previous prediction run.
+
+        Skips tsfresh extraction entirely by reading the persisted
+        ``features-matrix_*.csv`` and ``features-label_*.csv`` produced by an
+        earlier :meth:`extract_features` call. Designed for repeat forecasting
+        where the windowing and tremor data have not changed — for example
+        replaying :meth:`forecast` with a different trained ensemble against
+        an existing feature matrix.
+
+        Drops in as a replacement for the
+        ``build_label() → extract_features()`` prefix before :meth:`forecast`;
+        the loaded label CSV populates both ``self._labels`` (full datetime
+        indexed frame with ``id`` + ``is_erupted`` columns) and
+        ``self.labels`` (the ``id`` Series) so downstream consumers see the
+        same shape they would after ``build_label()``.
+
+        Both paths are required — no auto-resolve fallback — so the user
+        always states their intent explicitly and there is no risk of
+        silently picking up a stale ``features-*_*.csv`` left in
+        ``self.features_dir`` from a previous run.
+
+        Args:
+            features_matrix_csv (str): Path to the ``features-matrix_*.csv``
+                written under ``{output_dir}/prediction/features/`` by
+                :meth:`extract_features`.
+            label_features_csv (str): Path to the matching
+                ``features-label_*.csv``.
+
+        Returns:
+            Self: The current instance, enabling method chaining.
+
+        Raises:
+            FileNotFoundError: If either path does not exist.
+            ValueError: If the loaded label CSV's ``datetime`` span does not
+                fully cover the configured ``[start_date, end_date]`` forecast
+                range (compared at day granularity).
+
+        Example:
+            >>> (
+            ...     prediction
+            ...     .load_features(
+            ...         features_matrix_csv="output/.../features-matrix_2025-03-16_2025-03-22_step-10-minutes.csv",
+            ...         label_features_csv="output/.../features-label_2025-03-16_2025-03-22_step-10-minutes.csv",
+            ...     )
+            ...     .forecast()
+            ... )
+            >>> # No build_label() / extract_features() needed.
+        """
+        if not os.path.isfile(features_matrix_csv):
+            raise FileNotFoundError(
+                f"features_matrix_csv not found: {features_matrix_csv}"
+            )
+        if not os.path.isfile(label_features_csv):
+            raise FileNotFoundError(
+                f"label_features_csv not found: {label_features_csv}"
+            )
+
+        if self.verbose:
+            logger.info(
+                f"[Prediction Model]: Loading feature matrix {features_matrix_csv}"
+            )
+
+        # Ensure ``self.start_date`` and ``self.end_date`` is in label date range
+        label_datetimes = pd.read_csv(
+            label_features_csv, usecols=["datetime"], parse_dates=["datetime"]
+        )["datetime"]
+        loaded_start: pd.Timestamp = label_datetimes.min()
+        loaded_end: pd.Timestamp = label_datetimes.max()
+        if (
+            self.start_date.date() < loaded_start.date()
+            or self.end_date.date() > loaded_end.date()
+        ):
+            raise ValueError(
+                f"Loaded feature range [{loaded_start:%Y-%m-%d} → "
+                f"{loaded_end:%Y-%m-%d}] does not fully cover the configured "
+                f"forecast range [{self.start_date_str} → {self.end_date_str}]. "
+                f"Re-run extract_features() or point to a features run that "
+                f"spans the requested range."
+            )
+
+        label_df = pd.read_csv(label_features_csv, index_col=0, parse_dates=True)
+
+        # Backward compat: legacy cached forecast grids predate the
+        # ``is_erupted`` placeholder column. Mirrors ``build_label()``.
+        if "is_erupted" not in label_df.columns:
+            label_df["is_erupted"] = 0
+
+        self._labels = label_df
+        self.labels = label_df["id"]
+        self.labels_csv = label_features_csv
+
+        self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
+        self.features_csv = features_matrix_csv
+
+        if self.verbose:
+            logger.info(
+                f"[Prediction Model]: Loaded features_df={self.features_df.shape}, "
+                f"labels={self.labels.shape}"
+            )
 
         return self
 

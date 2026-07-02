@@ -816,19 +816,39 @@ class TrainingModel(BaseModel):
             ...     select_features="output/.../top_20_features.csv",
             ... )
         """
-        if self.LabelBuilder is None:
-            raise ValueError("Please run build_label() first.")
-
-        # Snapshot the kwargs that materially change the produced features
-        # matrix so ``fit()`` can rebuild the same identity dict that
-        # :class:`ForecastModel` constructs externally for cache lookup.
-        self._extract_features_kwargs = {
+        new_kwargs = {
             "select_tremor_columns": select_tremor_columns,
             "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
             "exclude_features": exclude_features,
             "select_features": select_features,
             "minimum_completion": minimum_completion,
         }
+
+        features_already_populated = (
+            not self.features_df.empty
+            and not self.labels.empty
+            and self.features_csv is not None
+        )
+
+        if features_already_populated and not overwrite:
+            if (
+                self._extract_features_kwargs is not None
+                and new_kwargs != self._extract_features_kwargs
+            ):
+                logger.warning(
+                    "extract_features: incoming kwargs differ from the "
+                    "previously-extracted matrix; keeping the existing matrix "
+                    "and its snapshot. Pass overwrite=True to force a rebuild. "
+                    f"incoming={new_kwargs} snapshot={self._extract_features_kwargs}"
+                )
+            if self.verbose:
+                logger.info(f"Features already extracted: {self.features_csv}")
+            return self
+
+        if self.LabelBuilder is None:
+            raise ValueError("Please run build_label() first.")
+
+        self._extract_features_kwargs = new_kwargs
 
         resolved_select_features = (
             load_select_features(
