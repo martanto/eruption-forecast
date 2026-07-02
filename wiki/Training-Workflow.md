@@ -7,33 +7,187 @@ Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapp
 
 ---
 
+## Workflow
+
+End-to-end view — what flows in, how the cache short-circuits the run, and
+what lands on disk for the downstream stages to pick up.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                                Inputs                                  │
+│                                                                        │
+│   • tremor_data : CSV from CalculateTremor                             │
+│       (rsam_f0..f4, dsar_f0-f1..f3-f4, entropy)                        │
+│   • eruption_dates : list[str]  (YYYY-MM-DD)                           │
+│   • start_date / end_date : training window                            │
+│   • classifiers : str | list[str]  (rf, xgb, gb, lite-rf, ...)         │
+│   • CV / sampling / feature-selection kwargs                           │
+│   • nslc, output_dir, n_jobs, n_grids                                  │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   TrainingModel.build_identity(**kwargs)               │
+│                                                                        │
+│   hash := SHA over tremor fingerprint + label/feature/fit kwargs       │
+│           + classifiers + cv_strategy + cv_splits + scoring            │
+│           + top_n_features + nslc + ...                                │
+│                                                                        │
+│   ┌─ TrainingModel.load(training_dir, identity) ─┐                     │
+│   │  cache hit? ──── yes ──→ restore self ──→ ─┐ │                     │
+│   │       │                                    │ │                     │
+│   │       no                                   │ │                     │
+│   └───────┼────────────────────────────────────┘ │                     │
+│           ▼                                      │                     │
+│   ┌──────────────────────────────────────────┐   │  short-circuit      │
+│   │  build_label  →  extract_features  → fit │   │  (skip tsfresh +    │
+│   │  (see Internal Pipeline section below)   │   │   GridSearchCV)     │
+│   └──────────────────────────────────────────┘   │                     │
+│           │                                      │                     │
+│           ▼                                      │                     │
+│   self.save(identity) + self.save_config()       │                     │
+│           │                                      │                     │
+│           └──────────────┬───────────────────────┘                     │
+│                          ▼                                             │
+│                  return self  (chainable)                              │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                                Outputs                                 │
+│                                                                        │
+│   in-memory:                                                           │
+│     • self.labels                 : LabelData                          │
+│     • self.features_df            : tsfresh feature matrix             │
+│     • self.classifier_ensemble    : ClassifierEnsemble                 │
+│     • self.classifier_ensemble_path                                    │
+│                                                                        │
+│   on-disk under {station_dir}/training/ :                              │
+│     • {hash}.TrainingModel.pkl          (cache pickle)                 │
+│     • {hash}.TrainingModel.params.json  (diff-able sidecar)            │
+│     • training.config.yaml              (auto-snapshot)                │
+│     • features/{cv-slug}/...            (matrix, labels, per-seed)     │
+│     • classifiers/{clf-slug}/{cv-slug}/ (models, registry, ensemble)   │
+│                                                                        │
+│   consumed by: PredictionModel, EvaluationModel, ExplanationModel      │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+`ForecastModel.train(...)` does the cache **lookup** externally so a hit
+skips even constructing the stages. The standalone `TrainingModel(...)`
+call goes through the same path but executes the stages inline.
+
+---
+
 ## Internal Pipeline
 
-`TrainingModel` chains three idempotent stages via method chaining:
+`TrainingModel` chains three idempotent stages via method chaining. Each stage
+mutates `self`, returns `Self`, and produces concrete on-disk artefacts so
+downstream stages can pick up mid-run.
 
 ```
-                ┌──────────────────────────────────────────────┐
-                │              TrainingModel                   │
-                │   inherits BaseModel                         │
-                └──────────────┬───────────────────────────────┘
-                               │
-                  ┌────────────┼─────────────┐
-                  ▼            ▼             ▼
-        ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-        │ build_label │ →│ extract_    │ →│    fit      │
-        │             │  │ features    │  │             │
-        └─────────────┘  └─────────────┘  └─────────────┘
-            LabelBuilder    TremorMatrix     per-seed
-            or              Builder +        feature
-            DynamicLabel    FeaturesBuilder  selection,
-            Builder         + tsfresh        resample,
-                                             GridSearchCV
-                                             → SeedEnsemble
-                                             → ClassifierEnsemble
+┌───────────────────────────────────────────────────────────────────────┐
+│                          TrainingModel(BaseModel)                     │
+│                                                                       │
+│   constructor inputs: tremor_data, start/end_date, eruption_dates,    │
+│                       classifiers, window_size, cv_strategy,          │
+│                       cv_splits, scoring, top_n_features, n_jobs,     │
+│                       n_grids, output_dir, nslc, ...                  │
+│   validate() clamps n_jobs / n_grids to total_cpu - 2 if needed       │
+└──────────────────────────────────┬────────────────────────────────────┘
+                                   ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│ Stage 1 — build_label(window_step, window_step_unit, builder, ...)    │
+│                                                                       │
+│   builder="standard"                  builder="dynamic"               │
+│   ┌──────────────────────┐            ┌──────────────────────────┐    │
+│   │ LabelBuilder         │     OR     │ DynamicLabelBuilder      │    │
+│   │   • one global       │            │   • per-eruption window  │    │
+│   │     window           │            │   • concat + dedupe      │    │
+│   │   • day_to_forecast  │            │     datetimes            │    │
+│   │     days positive    │            │   • mark positives per   │    │
+│   │   • include_eruption │            │     eruption             │    │
+│   │     _date toggle     │            │   • days_before_eruption │    │
+│   └──────────────────────┘            └──────────────────────────┘    │
+│                                                                       │
+│   → self.labels : LabelData (DateTime index, id, is_erupted)          │
+│   → label_{start}_{end}_ws-{w}_step-{s}-{unit}_dtf-{N}.csv            │
+└──────────────────────────────────┬────────────────────────────────────┘
+                                   ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│ Stage 2 — extract_features(select_tremor_columns, exclude_features,   │
+│                            select_features, minimum_completion, ...)  │
+│                                                                       │
+│   a. TremorMatrixBuilder                                              │
+│        slice tremor DataFrame into label-aligned windows              │
+│        validate sample counts vs minimum_completion                   │
+│        → tremor_matrix (id, datetime, tremor cols)                    │
+│        → per_method/{column}.csv  (save_tremor_matrix_per_method)     │
+│                                                                       │
+│   b. FeaturesBuilder (tsfresh)                                        │
+│        one extraction per tremor column (~700 features / column)      │
+│        respects exclude_features / select_features                    │
+│        → features-matrix_{basename}.csv                               │
+│        → features-label_{basename}.csv  (aligned labels)              │
+│                                                                       │
+│   c. FeatureSelector (constructed here, .fit_transform runs per seed) │
+│        method="tsfresh" (FDR) | "random_forest" (permutation)         │
+│        n_jobs = n_grids                                               │
+└──────────────────────────────────┬────────────────────────────────────┘
+                                   ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│ Stage 3 — fit(seeds, resample_method, sampling_strategy,              │
+│               minority_threshold, plot_features, ...)                 │
+│                                                                       │
+│   joblib.Parallel(backend="loky", n_jobs=n_jobs)      ── outer loop ──┐
+│   for seed in 0 .. seeds-1:                                           │
+│                                                                       │
+│     1. resample                                                       │
+│          resample_method="auto" → "under" when                        │
+│             minority share ≤ minority_threshold (0.15)                │
+│          RandomUnderSampler | RandomOverSampler | none                │
+│          target ratio = sampling_strategy (default 0.75)              │
+│          → resampled/{seed:05d}.csv  (id + is_erupted)                │
+│                                                                       │
+│     2. FeatureSelector.fit_transform(X_resampled, y_resampled)        │
+│          tsfresh FDR p-value filter → top_n_features                  │
+│          → seed/{seed:05d}.csv  (selected feature names)              │
+│          → figures/{seed:05d}.png  (when plot_features=True)          │
+│                                                                       │
+│     3. for clf in classifiers:                                        │
+│          GridSearchCV(                          ── inner loop ──┐     │
+│            ClassifierModel(clf).estimator,                      │     │
+│            ClassifierModel(clf).grid,                           │     │
+│            cv=cv_strategy(cv_splits),                           │     │
+│            scoring=scoring,  n_jobs=n_grids,                    │     │
+│          ).fit(X_selected, y_resampled)                         │     │
+│          → models/{seed:05d}.pkl  (best_estimator_)             │     │
+│          → row appended to trained-model__{suffix}.json         │     │
+│                                                                       │
+│   ── after the seed loop, per classifier ─────────────────────────────│
+│                                                                       │
+│   build_seed_ensemble                                                 │
+│     merge_seed_models(registry.json) via SeedEnsemble.from_any        │
+│     → SeedEnsemble_{suffix}.pkl                                       │
+│                                                                       │
+│   build_classifier_ensemble                                           │
+│     merge_all_classifiers(trained_models)                             │
+│     → ClassifierEnsemble_{CV}.pkl                                     │
+│     → ClassifierEnsemble_{CV}.json  (registry of seed-ensemble paths) │
+│     → self.classifier_ensemble                                        │
+│                                                                       │
+│   cache write (always last)                                           │
+│     self.save(self.build_identity())                                  │
+│       → {training_dir}/{hash}.TrainingModel.pkl                       │
+│       → {training_dir}/{hash}.TrainingModel.params.json               │
+│     self.save_config()           (try/except, never regresses run)    │
+│       → {training_dir}/training.config.yaml                           │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
-`ForecastModel.train(...)` calls all three in one go; the standalone `TrainingModel(...)` 
-lets you call them separately for fine-grained debugging.
+`ForecastModel.train(...)` calls all three in one go and consults
+`TrainingModel.load(training_dir, identity)` first — a cache hit short-circuits
+the whole pipeline. The standalone `TrainingModel(...)` lets you call each
+stage separately for fine-grained debugging or partial re-runs (e.g. swap
+`fit()` kwargs without rerunning tsfresh).
 
 ---
 
