@@ -1566,9 +1566,9 @@ class TrainingModel(BaseModel):
         )
 
         if self.verbose:
-            logger.info(f"Fitting Seed: {random_state:05d} / {classifier_name}...")
+            logger.info(f"Fitting {random_state:05d}/{classifier_name}...")
 
-        _, _, best_model = grid_search_cv(
+        _classifier_model, _grid_search, best_model = grid_search_cv(
             random_state,
             features_resampled,
             labels_resampled,
@@ -1581,7 +1581,7 @@ class TrainingModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"Fitted Model {random_state:05d} / {classifier_name} : {model_seed_path}"
+                f"Fitted {random_state:05d}/{classifier_name}: {model_seed_path}"
             )
 
         return (
