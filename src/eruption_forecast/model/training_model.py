@@ -1214,6 +1214,9 @@ class TrainingModel(BaseModel):
         Raises:
             ValueError: If auto-resolve finds zero or more than one matching
                 CSV under ``self.features_dir``.
+            ValueError: If the loaded label CSV's ``datetime`` span does not
+                fully cover the configured ``[start_date, end_date]`` training
+                range (compared at day granularity).
             ValueError: If ``select_features`` is provided but its intersection
                 with the matrix columns is empty.
             FileNotFoundError: If an explicit path argument does not exist.
@@ -1245,6 +1248,24 @@ class TrainingModel(BaseModel):
         if self.verbose:
             logger.info(
                 f"[Training Model]: Loading feature matrix {features_matrix_csv}"
+            )
+
+        # Ensure ``self.start_date`` and ``self.end_date`` is in label date range
+        label_datetimes = pd.read_csv(
+            label_features_csv, usecols=["datetime"], parse_dates=["datetime"]
+        )["datetime"]
+        loaded_start: pd.Timestamp = label_datetimes.min()
+        loaded_end: pd.Timestamp = label_datetimes.max()
+        if (
+            self.start_date.date() < loaded_start.date()
+            or self.end_date.date() > loaded_end.date()
+        ):
+            raise ValueError(
+                f"Loaded feature range [{loaded_start:%Y-%m-%d} → "
+                f"{loaded_end:%Y-%m-%d}] does not fully cover the configured "
+                f"training range [{self.start_date_str} → {self.end_date_str}]. "
+                f"Re-run extract_features() or point to a features run that "
+                f"spans the requested range."
             )
 
         self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
