@@ -125,7 +125,7 @@ downstream stages can pick up mid-run.
 │   b. FeaturesBuilder (tsfresh)                                        │
 │        one extraction per tremor column (~700 features / column)      │
 │        respects exclude_features / select_features                    │
-│        → features-matrix_{basename}.csv                               │
+│        → features-matrix_{basename}.parquet                               │
 │        → features-label_{basename}.csv  (aligned labels)              │
 │                                                                       │
 │   c. FeatureSelector (constructed here, .fit_transform runs per seed) │
@@ -262,7 +262,7 @@ Outputs land under `{station_dir}/training/features/{cv-slug}/`:
 
 ```
 training/features/{cv-slug}/
-├── features-matrix_{basename}.csv      # full tsfresh feature matrix
+├── features-matrix_{basename}.parquet      # full tsfresh feature matrix
 ├── features-label_{basename}.csv       # aligned labels
 ├── seed/{seed:05d}.csv                 # top-N features per seed
 ├── resampled/{seed:05d}.csv            # per-seed (id + is_erupted) — features recovered via features_df.loc[ids]
@@ -420,7 +420,7 @@ print(tm.classifier_ensemble_path) # path to the saved ClassifierEnsemble
 
 ### Reuse a feature matrix from a prior run
 
-`TrainingModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix_*.csv` + `features-label_*.csv`. 
+`TrainingModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix_*.parquet` + `features-label_*.csv`. 
 Pair with `select_features="path/to/top_20_features.csv"` to refit on the curated subset:
 
 ```python
