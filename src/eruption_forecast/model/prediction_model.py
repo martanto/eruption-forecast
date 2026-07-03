@@ -1,6 +1,6 @@
 import os
 from typing import Any, Self, Literal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -796,13 +796,25 @@ class PredictionModel(BaseModel):
             self.start_date.date() < loaded_start.date()
             or self.end_date.date() > loaded_end.date()
         ):
-            raise ValueError(
-                f"Loaded feature range [{loaded_start:%Y-%m-%d} → "
-                f"{loaded_end:%Y-%m-%d}] does not fully cover the configured "
-                f"forecast range [{self.start_date_str} → {self.end_date_str}]. "
-                f"Re-run extract_features() or point to a features run that "
-                f"spans the requested range."
-            )
+            if self.start_date.date() == (
+                loaded_start.date() - timedelta(days=self.window_size)
+            ) and self.end_date.date() == loaded_end.date():
+                logger.info(
+                    f"Adjusting start_date and end_date: {loaded_start:%Y-%m-%d} -> {loaded_end:%Y-%m-%d}"
+                )
+                self.start_date = loaded_start.to_pydatetime()
+                self.end_date = loaded_end.to_pydatetime()
+                self.start_date_str = loaded_start.strftime("%Y-%m-%d")
+                self.end_date_str = loaded_end.strftime("%Y-%m-%d")
+
+            else:
+                raise ValueError(
+                    f"Loaded feature range [{loaded_start:%Y-%m-%d} → "
+                    f"{loaded_end:%Y-%m-%d}] does not fully cover the configured "
+                    f"forecast range [{self.start_date_str} → {self.end_date_str}]. "
+                    f"Re-run extract_features() or point to a features run that "
+                    f"spans the requested range."
+                )
 
         label_df = pd.read_csv(label_features_csv, index_col=0, parse_dates=True)
 
