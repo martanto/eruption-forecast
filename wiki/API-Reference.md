@@ -19,7 +19,8 @@ from eruption_forecast import (
     enable_logging,
     disable_logging,
     notify,
-    send_telegram_notification,
+    timer,
+    TelegramNotification,
 )
 from eruption_forecast.ensemble import SeedEnsemble, ClassifierEnsemble
 from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
@@ -923,20 +924,40 @@ set_log_directory(dir: str)   # move the log file to a new directory (created if
 ## Telegram helpers
 
 ```python
-from eruption_forecast import notify, send_telegram_notification
+from eruption_forecast import notify, timer, TelegramNotification
 
-@notify(label: str)
+@notify(
+    task: str,
+    message: str | None = None,
+    to: Literal["telegram", "email"] = "telegram",
+    on_success: bool = True,
+    on_error: bool = True,
+    timeout: float = 3.0,
+    verbose: bool = False,
+)
 def my_func(): ...
 
-send_telegram_notification(
-    message: str,
-    files: list[str] | None = None,
-    file_caption: str | None = None,
-    send_as_document: bool = False,
+@timer(name: str | None = None, send_to: Literal["telegram"] | None = None)
+def my_func(): ...
+
+tn = TelegramNotification(
+    token: str | None = None,
+    chat_id: str | int | None = None,
+    verbose: bool = False,
 )
+tn.send_message(message: str, timeout: float = 3.0) -> Self
+tn.send_document(file: str, timeout: float = 30.0, **kwargs) -> Self
+tn.send_photo(file: str, timeout: float = 30.0, **kwargs) -> Self
+tn.send_media_group(
+    files: str | list[str],
+    kind: Literal["photo", "document"] = "photo",
+    caption: str | None = None,
+    timeout: float = 30.0,
+    disable_notification: bool = False,
+) -> Self
 ```
 
-Credentials are read from environment (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). Both helpers degrade gracefully when the env vars are absent - they emit a warning and skip the network call instead of raising.
+Credentials are read from constructor arguments or the `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` environment variables (`.env` supported via `python-dotenv`). Every send method returns `self` for fluent chaining, and network failures are logged and swallowed — a dead network never blocks the caller.
 
 ---
 

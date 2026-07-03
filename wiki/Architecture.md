@@ -29,8 +29,11 @@ src/eruption_forecast/
 │   └── classifier_explanation.py       - SeedExplanation, ClassifierExplanation (SHAP payloads)
 │
 ├── decorators/
-│   ├── decorator_class.py     - base decorator scaffolding
-│   └── notify.py              - Telegram notify + send_telegram_notification
+│   ├── notify.py              - @notify decorator (Telegram success/error notifications)
+│   └── timer.py               - @timer decorator (elapsed-time logger, optional Telegram forward)
+│
+├── notification/
+│   └── telegram.py            - TelegramNotification (send_message / send_document / send_photo / send_media_group)
 │
 ├── ensemble/
 │   ├── base_ensemble.py       - BaseEnsemble (joblib save/load mixin)
@@ -87,7 +90,7 @@ src/eruption_forecast/
     ├── validation.py, window.py
 ```
 
-70 `.py` files in total.
+74 `.py` files in total.
 
 ---
 
@@ -313,10 +316,11 @@ ForecastConfig
 
 `TrainingConfig`, `PredictionConfig`, `EvaluationConfig`, and `ExplanationConfig` each mirror their stage model's `__init__` directly and are the standalone equivalents used when the model runs outside `ForecastModel`. Every stage model auto-calls `save_config()` at the end of its main run method (`fit()` / `forecast()` / `evaluate()` / `explain()`), so a standalone run always leaves a YAML snapshot next to its artefacts. The upstream `model` parameter on `EvaluationConfig` and `ExplanationConfig` is intentionally omitted because it is always a live model instance.
 
-### 3.9 Decorators (`decorators/`)
+### 3.9 Decorators (`decorators/`) and Notification (`notification/`)
 
-`notify(label)` wraps a function with start/finish/error Telegram messages. `send_telegram_notification(message, files, file_caption)` 
-is the one-off helper used inside `scenarios.py` to ship each per-scenario plot.
+`notify(task)` wraps a function with success and error Telegram messages (MarkdownV2 body, hostname, elapsed time, exception details). `timer(name, send_to=None)` logs the wrapped function's elapsed wall-clock time via `loguru`; passing `send_to="telegram"` also mirrors the message to Telegram.
+
+Both decorators delegate to `TelegramNotification` (`notification/telegram.py`), a fluent-chain client wrapping the Telegram Bot API. It exposes `send_message(...)`, `send_document(...)`, `send_photo(...)`, and `send_media_group(...)`; every send method returns `self` so calls can be chained (`tn.send_message(...).send_document(...)`). Credentials are resolved from constructor arguments or the `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` environment variables. Every network failure is logged and swallowed, so a dead network never blocks the caller. `scenarios.py` uses this class directly to ship each per-scenario forecast PNG next to a title message.
 
 ### 3.10 Utils (`utils/`)
 

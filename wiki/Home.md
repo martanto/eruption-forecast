@@ -95,7 +95,7 @@ from eruption_forecast import ForecastModel
 
 ```
 eruption-forecast/
-├── src/eruption_forecast/      Package source (64 .py files)
+├── src/eruption_forecast/      Package source (74 .py files)
 ├── wiki/                       This wiki (Markdown sources)
 ├── tests/                      Unit tests
 ├── main.py                     Research Workflow - single train + predict

@@ -159,10 +159,11 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
    │             eruption_dates=plot_kwargs["eruption_dates"])         │
    │       │                                                           │
    │       ▼                                                           │
-   │  send_telegram_notification(                                      │
-   │      message=f"{name}: {description}",                            │
-   │      files=[fm.PredictionModel.forecast_plot_path],               │
-   │      file_caption=f"{name}: {description}")                       │
+   │  tn = TelegramNotification(verbose=False)                        │
+   │  tn.send_message(message=f"{name}: {description}") \              │
+   │    .send_document(                                                │
+   │      file=fm.PredictionModel.forecast_plot_path,                  │
+   │      caption=f"{name}: {description}")                            │
    │       │                                                           │
    │       ▼                                                           │
    │  fm.evaluate(model="prediction", plot_per_seed=True,              │
@@ -185,7 +186,7 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 - The outer `fm.calculate(...)` runs **once** before the loop. Its tremor frame is captured on `fm.tremor_df` and reused on every iteration - `fm.train()` reads from `fm.tremor_df`, not from disk.
 - `eruption_dates` is the **full** list of eight known eruptions on every scenario. The training window simply excludes the eruptions that haven't happened yet, and the prediction window picks them up later.
 - `plot_kwargs["eruption_dates"]` is forwarded into `fm.predict(...)` as `**plot_kwargs`, which routes them to `forecast_plots` so eruption-day markers are drawn on the per-scenario forecast plot.
-- The Telegram hook (`send_telegram_notification`) ships the per-scenario forecast PNG to the configured chat the moment `predict()` returns. The bundled `send_as_document=True` flag forces the file to be uploaded as a document rather than re-encoded as an image - preserves the full DPI plot.
+- The Telegram hook (`TelegramNotification.send_message(...).send_document(...)`) ships the per-scenario forecast PNG to the configured chat the moment `predict()` returns. Using `send_document(...)` (rather than `send_photo(...)`) forces the file to be uploaded as a document — Telegram never re-encodes it, so the full DPI plot is preserved.
 - `fm.evaluate(...)` runs **after** the notification, so by the time you see the plot in Telegram, the per-seed `y_proba` / `y_pred` matrices and aggregate metric plots are already being written in the background.
 - `fm.explain(...)` runs last in each scenario - per-seed SHAP explanations are bundled into `ClassifierExplanation_*.pkl` under `explanation/prediction/classifiers/` and per-eruption waterfall plots land under `explanation/prediction/eruptions/`. See [Explanation Workflow](Explanation-Workflow) for the full output tree.
 
@@ -220,7 +221,7 @@ See [Output Structure](Output-Structure#scenarios-layout) for the full per-scena
 | Tremor computation | once | once (reused) |
 | Training | once | once per scenario |
 | Output isolation | flat | one directory per scenario |
-| Telegram notifications | per-stage via `@notify` decorator | per-scenario forecast plot via `send_telegram_notification(...)` |
+| Telegram notifications | per-stage via `@notify` decorator | per-scenario forecast plot via `TelegramNotification().send_message(...).send_document(...)` |
 | Use case | a single research run on a fixed split | leave-one-out style sweeps, ablation over training windows |
 
 When the goal is to publish a forecast plot, use `main.py`. When the goal is to compare how forecast quality degrades as the training-window shifts, use `scenarios.py`.

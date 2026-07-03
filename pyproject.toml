@@ -36,6 +36,7 @@ dependencies = [
     "python-dotenv>=1.2.2,<2",
     "pip-system-certs>=5.3,<6",
     "pyarrow>=18.0.0,<25",
+    "niquests>=3.20.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
