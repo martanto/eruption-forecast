@@ -827,7 +827,7 @@ class TrainingModel(BaseModel):
         features_already_populated = (
             not self.features_df.empty
             and not self.labels.empty
-            and self.features_csv is not None
+            and self.features_path is not None
         )
 
         if features_already_populated and not overwrite:
@@ -842,7 +842,7 @@ class TrainingModel(BaseModel):
                     f"incoming={new_kwargs} snapshot={self._extract_features_kwargs}"
                 )
             if self.verbose:
-                logger.info(f"Features already extracted: {self.features_csv}")
+                logger.info(f"Features already extracted: {self.features_path}")
             return self
 
         if self.LabelBuilder is None:
@@ -879,7 +879,7 @@ class TrainingModel(BaseModel):
             exclude_features=exclude_features,
         )
 
-        self.features_csv = features_builder.csv
+        self.features_path = features_builder.path
 
         labels: pd.DataFrame = features_builder.label_df
 
@@ -950,7 +950,7 @@ class TrainingModel(BaseModel):
             >>> model.fit(seeds=25, resample_method="auto", plot_features=True)
             >>> model.results  # {"RandomForestClassifier": "path/to/trained-model__*.json"}
         """
-        if self.features_df.empty and self.features_csv is None:
+        if self.features_df.empty and self.features_path is None:
             raise ValueError(
                 "Features (matrix) dataframe (features_df) is empty. "
                 "Please run extract_features() or load_features() first."
@@ -1191,19 +1191,19 @@ class TrainingModel(BaseModel):
 
     def load_features(
         self,
-        features_matrix_csv: str | None = None,
+        features_matrix_path: str | None = None,
         label_features_csv: str | None = None,
         select_features: str | list[str] | None = None,
     ) -> Self:
         """Reuse the feature matrix written by a previous training run.
 
         Skips tsfresh extraction entirely by reading the persisted
-        ``features-matrix_*.csv`` and ``features-label_*.csv`` produced by an
-        earlier :meth:`extract_features` call, then optionally projecting the
-        matrix to a curated column subset. Designed for repeat training where
-        the windowing and tremor data have not changed but the model needs to
-        be refit — e.g. iterating on hyperparameters with the curated feature
-        list from a prior ``top_{N}_features.csv``.
+        ``features-matrix_*.parquet`` and ``features-label_*.csv`` produced by
+        an earlier :meth:`extract_features` call, then optionally projecting
+        the matrix to a curated column subset. Designed for repeat training
+        where the windowing and tremor data have not changed but the model
+        needs to be refit — e.g. iterating on hyperparameters with the curated
+        feature list from a prior ``top_{N}_features.csv``.
 
         Drops in as a replacement for the
         ``build_label() → extract_features()`` prefix before :meth:`fit`;
@@ -1212,14 +1212,14 @@ class TrainingModel(BaseModel):
         ``self.labels`` when ``LabelBuilder`` is absent.
 
         Args:
-            features_matrix_csv (str | None, optional): Path to the
-                ``features-matrix_*.csv`` written under
+            features_matrix_path (str | None, optional): Path to the
+                ``features-matrix_*.parquet`` written under
                 ``{output_dir}/training/features/{cv}/``. When ``None``, the
                 method globs ``self.features_dir`` for exactly one match.
                 Defaults to ``None``.
             label_features_csv (str | None, optional): Path to the matching
                 ``features-label_*.csv``. Same auto-resolve behaviour as
-                ``features_matrix_csv``. Defaults to ``None``.
+                ``features_matrix_path``. Defaults to ``None``.
             select_features (str | list[str] | None, optional): Curated
                 feature list — accepts either the path to a
                 ``top_{N}_features.csv`` / ``significant_features.csv`` or an
@@ -1233,7 +1233,7 @@ class TrainingModel(BaseModel):
 
         Raises:
             ValueError: If auto-resolve finds zero or more than one matching
-                CSV under ``self.features_dir``.
+                artefact under ``self.features_dir``.
             ValueError: If the loaded label CSV's ``datetime`` span does not
                 fully cover the configured ``[start_date, end_date]`` training
                 range (compared at day granularity).
@@ -1247,17 +1247,17 @@ class TrainingModel(BaseModel):
             >>> model.load_features(select_features=top_n_csv).fit(seeds=25)
             >>> # No build_label() / extract_features() needed.
         """
-        if features_matrix_csv is None:
-            features_matrix_csv = self._resolve_single_csv(
-                pattern="features-matrix_*.csv", label="feature matrix"
+        if features_matrix_path is None:
+            features_matrix_path = self._resolve_single_artefact(
+                pattern="features-matrix_*.parquet", label="feature matrix"
             )
-        elif not os.path.isfile(features_matrix_csv):
+        elif not os.path.isfile(features_matrix_path):
             raise FileNotFoundError(
-                f"features_matrix_csv not found: {features_matrix_csv}"
+                f"features_matrix_path not found: {features_matrix_path}"
             )
 
         if label_features_csv is None:
-            label_features_csv = self._resolve_single_csv(
+            label_features_csv = self._resolve_single_artefact(
                 pattern="features-label_*.csv", label="feature label"
             )
         elif not os.path.isfile(label_features_csv):
@@ -1267,7 +1267,7 @@ class TrainingModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"[Training Model]: Loading feature matrix {features_matrix_csv}"
+                f"[Training Model]: Loading feature matrix {features_matrix_path}"
             )
 
         # Ensure ``self.start_date`` and ``self.end_date`` is in label date range
@@ -1288,9 +1288,9 @@ class TrainingModel(BaseModel):
                 f"spans the requested range."
             )
 
-        self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
+        self.features_df = pd.read_parquet(features_matrix_path)
         self.labels = load_label_csv(label_features_csv)
-        self.features_csv = features_matrix_csv
+        self.features_path = features_matrix_path
 
         if select_features is not None:
             resolved = load_select_features(
@@ -1319,16 +1319,17 @@ class TrainingModel(BaseModel):
 
         return self
 
-    def _resolve_single_csv(self, pattern: str, label: str) -> str:
-        """Glob ``self.features_dir`` for exactly one CSV matching ``pattern``.
+    def _resolve_single_artefact(self, pattern: str, label: str) -> str:
+        """Glob ``self.features_dir`` for exactly one file matching ``pattern``.
 
         Args:
             pattern (str): Glob pattern relative to ``self.features_dir``
-                (e.g. ``"features-matrix_*.csv"``).
+                (e.g. ``"features-matrix_*.parquet"``,
+                ``"features-label_*.csv"``).
             label (str): Human-readable name used in error messages.
 
         Returns:
-            str: Absolute path to the single matching CSV.
+            str: Absolute path to the single matching file.
 
         Raises:
             ValueError: If zero or more than one match is found — the caller
@@ -1339,12 +1340,12 @@ class TrainingModel(BaseModel):
             return matches[0]
         if not matches:
             raise ValueError(
-                f"No {label} CSV matching '{pattern}' under {self.features_dir}; "
+                f"No {label} matching '{pattern}' under {self.features_dir}; "
                 "pass an explicit path."
             )
         raise ValueError(
-            f"Multiple {label} CSVs matching '{pattern}' under {self.features_dir}: "
-            f"{matches}; pass an explicit path."
+            f"Multiple {label} files matching '{pattern}' under "
+            f"{self.features_dir}: {matches}; pass an explicit path."
         )
 
     @staticmethod

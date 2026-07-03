@@ -11,7 +11,6 @@ from datetime import datetime
 import pandas as pd
 
 from eruption_forecast.logger import logger
-from eruption_forecast.config.constants import DEFAULT_SAMPLING_FREQUENCY
 from eruption_forecast.utils.date_utils import to_datetime
 
 
@@ -118,7 +117,7 @@ def validate_window_step(
 
 def check_sampling_consistency(
     df: pd.DataFrame,
-    expected_freq: str = DEFAULT_SAMPLING_FREQUENCY,
+    expected_freq: str = "10min",
     tolerance: str = "1min",
     verbose: bool = False,
 ) -> tuple[bool, pd.DataFrame, pd.DataFrame, int | None]:
@@ -130,7 +129,7 @@ def check_sampling_consistency(
 
     Args:
         df (pd.DataFrame): DataFrame with pd.DatetimeIndex.
-        expected_freq (str, optional): Expected sampling frequency (e.g., "10min", "1H").
+        expected_freq (str, optional): Expected sampling frequency (e.g., "10min", "1h").
             Defaults to "10min".
         tolerance (str, optional): Tolerance for considering sampling periods as equal
             (e.g., "1min", "30s"). Defaults to "1min".
@@ -155,7 +154,7 @@ def check_sampling_consistency(
         >>> print(is_consistent)
         True
     """
-    if len(df) <= 2:
+    if len(df) < 2:
         raise ValueError(
             "DataFrame must have at least 2 rows to check sampling consistency"
         )
@@ -181,7 +180,10 @@ def check_sampling_consistency(
     is_consistent = inconsistent_data.empty
 
     if is_consistent:
-        sampling_rate = (df.index[1] - df.index[0]).seconds
+        # ``Timedelta.seconds`` returns only the seconds component of the
+        # decomposition (0-86399); ``total_seconds()`` returns the full
+        # duration so intervals >= 24h are reported correctly.
+        sampling_rate = int((df.index[1] - df.index[0]).total_seconds())
 
     if verbose:
         logger.info(f"Total rows: {len(df)}")

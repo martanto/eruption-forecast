@@ -220,63 +220,64 @@ def load_select_features(
 
 
 def concat_features(
-    csv_list: list[str],
+    paths: list[str],
     filepath: str,
     frames: list[pd.DataFrame] | None = None,
 ) -> tuple[str, pd.DataFrame]:
-    """Concatenate feature CSVs (and optional in-memory frames) into one DataFrame and save.
+    """Concatenate per-column feature Parquets (and optional in-memory frames) and save.
 
-    Reads each path in ``csv_list``, optionally combines them with already-loaded
-    DataFrames in ``frames``, concatenates everything column-wise (``axis=1``),
-    and saves the merged DataFrame to ``filepath``. Used to merge per-column
-    tsfresh feature extractions; ``frames`` lets callers skip a disk round-trip
-    for columns whose DataFrames are already in memory.
+    Reads each path in ``paths`` as Parquet, optionally combines them with
+    already-loaded DataFrames in ``frames``, concatenates everything column-wise
+    (``axis=1``), and saves the merged DataFrame to ``filepath`` as
+    Snappy-compressed Parquet. Used to merge per-column tsfresh feature
+    extractions; ``frames`` lets callers skip a disk round-trip for columns
+    whose DataFrames are already in memory.
 
     Args:
-        csv_list (list[str]): Paths to feature CSV files to read and concatenate.
-        filepath (str): Output filepath for the merged CSV.
+        paths (list[str]): Paths to per-column feature Parquet files to read
+            and concatenate.
+        filepath (str): Output filepath for the merged Parquet (should end in
+            ``.parquet``).
         frames (list[pd.DataFrame] | None, optional): Pre-loaded feature
-            DataFrames to include in the concatenation alongside the CSVs.
-            Defaults to ``None`` (CSV-only behaviour).
+            DataFrames to include in the concatenation alongside the Parquet
+            paths. Defaults to ``None`` (Parquet-only behaviour).
 
     Returns:
         tuple[str, pd.DataFrame]: Tuple containing:
-            - filepath (str): Path where the merged CSV was saved.
+            - filepath (str): Path where the merged Parquet was saved.
             - df (pd.DataFrame): Concatenated DataFrame.
 
     Raises:
-        ValueError: If the combined input count (``len(csv_list) + len(frames)``)
+        ValueError: If the combined input count (``len(paths) + len(frames)``)
             is fewer than 2, or if all inputs concatenate to an empty frame.
 
     Examples:
-        >>> csv_files = ["features_f0.csv", "features_f1.csv"]
-        >>> path, df = concat_features(csv_files, "all_features.csv")
+        >>> parquet_files = ["features_f0.parquet", "features_f1.parquet"]
+        >>> path, df = concat_features(parquet_files, "all_features.parquet")
         >>> print(df.shape)
         >>> # mix in already-loaded frames
         >>> path, df = concat_features(
-        ...     ["features_f0.csv"],
-        ...     "all_features.csv",
+        ...     ["features_f0.parquet"],
+        ...     "all_features.parquet",
         ...     frames=[fresh_df_f1, fresh_df_f2],
         ... )
     """
     frames = frames or []
-    total_inputs = len(csv_list) + len(frames)
+    total_inputs = len(paths) + len(frames)
     if total_inputs <= 1:
         raise ValueError(
-            f"Requires at least 2 inputs (csv_list + frames). Got {total_inputs}."
+            f"Requires at least 2 inputs (paths + frames). Got {total_inputs}."
         )
 
-    pieces: list[pd.DataFrame] = [
-        pd.read_csv(file, index_col=0) for file in csv_list
-    ]
+    pieces: list[pd.DataFrame] = [pd.read_parquet(path) for path in paths]
     pieces.extend(frames)
 
     df = pd.concat(pieces, axis=1)
 
     if df.empty:
-        raise ValueError("There is no data in the csv files.")
+        raise ValueError("There is no data in the input files.")
 
-    df.to_csv(filepath, index=True)
+    df.to_parquet(filepath, engine="pyarrow", compression="snappy", index=True)
 
     return filepath, df
 
@@ -580,7 +581,7 @@ def plot_common_features_correlation(
     """Pearson correlation heatmap across scenarios for the common-feature subset.
 
     For each entry in ``top_features_csv``, globs the sibling
-    ``features-matrix_*.csv`` (written by ``TrainingModel.extract_features``)
+    ``features-matrix_*.parquet`` (written by ``TrainingModel.extract_features``)
     next to the top-N CSV, slices it to the cross-scenario common-feature
     subset returned by :func:`find_common_features`, and stacks the rows
     across all scenarios into a single feature matrix. Pairwise Pearson
@@ -602,7 +603,7 @@ def plot_common_features_correlation(
         plt.Axes: The heatmap axes.
 
     Raises:
-        ValueError: If the sibling ``features-matrix_*.csv`` next to any
+        ValueError: If the sibling ``features-matrix_*.parquet`` next to any
             input path is missing or ambiguous (0 or >1 matches).
         KeyError: If any common feature is absent from a scenario's matrix.
     """
@@ -612,13 +613,13 @@ def plot_common_features_correlation(
     blocks: list[pd.DataFrame] = []
     for path in top_features_csv.values():
         parent = os.path.dirname(path)
-        matches = glob.glob(os.path.join(parent, "features-matrix_*.csv"))
+        matches = glob.glob(os.path.join(parent, "features-matrix_*.parquet"))
         if len(matches) != 1:
             raise ValueError(
-                f"Expected exactly 1 features-matrix_*.csv next to {path}, "
+                f"Expected exactly 1 features-matrix_*.parquet next to {path}, "
                 f"found {len(matches)}."
             )
-        matrix = pd.read_csv(matches[0], index_col=0)
+        matrix = pd.read_parquet(matches[0])
         missing = [f for f in common_features if f not in matrix.columns]
         if missing:
             shown = ", ".join(missing[:3]) + ("..." if len(missing) > 3 else "")
