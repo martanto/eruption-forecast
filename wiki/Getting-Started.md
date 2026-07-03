@@ -91,7 +91,7 @@ All `uv`, `uvx`, and `python` commands are pre-approved in the project hooks - n
 
 ## Telegram Notifications (Optional)
 
-The `notify` decorator and `send_telegram_notification(...)` helper push a Telegram message when long stages finish or fail. Enable them by copying `.env.example` to `.env`:
+The `notify` / `timer` decorators and the `TelegramNotification` client push a Telegram message when long stages finish or fail. Enable them by copying `.env.example` to `.env`:
 
 ```dotenv
 TELEGRAM_BOT_TOKEN=your_bot_token_here

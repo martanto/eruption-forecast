@@ -113,7 +113,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
 - **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, and `ExplanationModel` cache their fitted state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`.
-- **Telegram Notifications** — `@notify` decorator + `send_telegram_notification()` for start/finish/error messages and file attachments.
+- **Telegram Notifications** — `@notify` / `@timer` decorators + fluent `TelegramNotification` client (`send_message` / `send_document` / `send_photo` / `send_media_group`) for success/error messages and file attachments.
 - **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` / `FeatureSelector` workers) parallelism, clamped to `total_cpu - 2` automatically.
 
 ## Package Architecture
@@ -125,7 +125,7 @@ src/eruption_forecast/
 │                  evaluation_config, explanation_config, constants
 ├── dataclass/     station_data, classifier_ensemble_summary,
 │                  classifier_explanation
-├── decorators/    notify, decorator_class
+├── decorators/    notify
 ├── ensemble/      base_ensemble, seed_ensemble, classifier_ensemble,
 │                  metrics_ensemble, explainer_ensemble
 ├── features/      tremor_matrix_builder, features_builder, feature_selector

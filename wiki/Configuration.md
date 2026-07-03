@@ -233,7 +233,7 @@ field is added, renamed, or has its default changed, the example YAML is updated
 
 ## Telegram Notifications
 
-`eruption_forecast.decorators` exposes two complementary primitives.
+`eruption_forecast` exposes three complementary primitives.
 
 ### `notify` decorator
 
@@ -248,23 +248,47 @@ def main():
     fm = ForecastModel(...)
     fm.calculate(...).train(...).predict(...).evaluate(...)
 
-main()    # Telegram chat receives start, finish, and error messages
+main()    # Telegram chat receives success (or error) messages
 ```
 
-### `send_telegram_notification(...)` helper
+Message body is MarkdownV2 and includes hostname, task label, timestamp, elapsed time, and — on error — the exception type and stringified body.
 
-Used by `scenarios.py` to ship the per-scenario forecast plot:
+### `timer` decorator
+
+Logs the wrapped function's elapsed wall-clock time through `loguru`. Passing `send_to="telegram"` also mirrors the message to Telegram:
 
 ```python
-from eruption_forecast import send_telegram_notification
+from eruption_forecast import timer
 
-send_telegram_notification(
-    message=f"{name}: {description}",
-    files=[fm.PredictionModel.forecast_plot_path],
-    file_caption=f"{name}: {description}",
-    send_as_document=True,        # preserves DPI - Telegram does not re-encode
+@timer("Run Forecasting", send_to="telegram")
+def main(): ...
+```
+
+### `TelegramNotification` client
+
+Used by `scenarios.py` to ship the per-scenario forecast plot. Every send method returns `self` so calls can be chained:
+
+```python
+from eruption_forecast import TelegramNotification
+
+tn = TelegramNotification(verbose=False)
+(
+    tn.send_message(message=f"{name}: {description}")
+      .send_document(
+          file=fm.PredictionModel.forecast_plot_path,
+          caption=f"{name}: {description}",
+      )
 )
 ```
+
+Additional endpoints on the same class:
+
+| Method | Purpose |
+|--------|---------|
+| `send_message(message, timeout=3.0)` | MarkdownV2 text via `sendMessage` |
+| `send_document(file, timeout=30.0, **kwargs)` | Single file via `sendDocument` — preserves DPI (no re-encoding) |
+| `send_photo(file, timeout=30.0, **kwargs)` | Single image via `sendPhoto` — non-photo suffixes fall back to `send_document` |
+| `send_media_group(files, kind="photo"\|"document", caption=None, timeout=30.0, disable_notification=False)` | 2–10 items per album; larger inputs are auto-chunked; caption attaches to the first item of the first album only |
 
 ### Credentials (`.env`)
 
@@ -276,7 +300,7 @@ TELEGRAM_CHAT_ID=your_chat_id_here
 - Bot token from [@BotFather](https://t.me/BotFather)
 - Chat ID from [@userinfobot](https://t.me/userinfobot)
 
-Both primitives degrade gracefully when the env vars are absent - they emit a warning and skip the network call instead of raising.
+Credentials can also be passed explicitly to `TelegramNotification(token=..., chat_id=...)`. Every primitive degrades gracefully when the env vars are absent — a warning is logged and the network call is skipped instead of raising.
 
 ---
 
@@ -303,7 +327,7 @@ fm.calculate(...)             # silent - useful during tests
 enable_logging()              # restore handlers
 ```
 
-`enable_logging`, `disable_logging`, `notify`, and `send_telegram_notification` are exported from the package root.
+`enable_logging`, `disable_logging`, `notify`, `timer`, and `TelegramNotification` are exported from the package root.
 
 ---
 
