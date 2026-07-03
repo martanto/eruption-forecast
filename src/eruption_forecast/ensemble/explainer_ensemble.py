@@ -539,9 +539,14 @@ class ExplainerEnsemble:
         :func:`~eruption_forecast.plots.explanation_plots.plot_aggregate_shap_beeswarm`.
         Outputs land under
         ``{output_dir}/{classifier_name}/figures/aggregate/`` as
-        ``bar.{png,csv}`` and ``beeswarm.{png,csv}`` — the ``.csv`` files
-        are the durable sidecar artefacts (importance table for the bar
-        plot, tidy long-form non-NaN cell list for the beeswarm).
+        ``bar.{png,csv}`` and ``beeswarm.{png,parquet}`` — the sidecar
+        data files are the durable artefacts (``bar.csv`` for the
+        importance table, ``beeswarm.parquet`` for the tidy long-form
+        non-NaN cell list). The beeswarm sidecar is written as Snappy-
+        compressed Parquet because the tidy stack grows to millions of
+        rows for realistic ensembles; Parquet preserves the ``int64``
+        ``random_state`` / ``obs_id`` columns and typically writes an
+        order of magnitude smaller than the equivalent CSV.
 
         Args:
             max_display (int): Maximum number of features to display in
@@ -597,4 +602,4 @@ class ExplainerEnsemble:
                 save_filepath=beeswarm_path,
                 verbose=self.verbose,
             )
-            save_data(tidy_df, beeswarm_path, filetype="csv")
+            save_data(tidy_df, beeswarm_path, filetype="parquet")
