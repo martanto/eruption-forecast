@@ -663,7 +663,7 @@ class ForecastModel:
         plot_threshold: float = 0.5,
         plot_title: str | None = None,
         plot_pdf: bool = True,
-        features_matrix_csv: str | None = None,
+        features_matrix_path: str | None = None,
         label_features_csv: str | None = None,
         output_dir: str | None = None,
         overwrite: bool | None = None,
@@ -698,8 +698,8 @@ class ForecastModel:
                 ``None``.
             plot_pdf (bool): Also render the forecast plot as PDF.
                 Defaults to ``True``.
-            features_matrix_csv (str | None): Path to a pre-built
-                ``features-matrix_*.csv`` produced by an earlier
+            features_matrix_path (str | None): Path to a pre-built
+                ``features-matrix_*.parquet`` produced by an earlier
                 :meth:`PredictionModel.extract_features` run. When
                 supplied together with ``label_features_csv``, replaces
                 the ``build_label → extract_features`` prefix with
@@ -710,7 +710,7 @@ class ForecastModel:
                 the extract-features kwargs the prediction cache
                 identity depends on. Defaults to ``None``.
             label_features_csv (str | None): Companion
-                ``features-label_*.csv`` for ``features_matrix_csv``.
+                ``features-label_*.csv`` for ``features_matrix_path``.
                 Both paths must be provided together. Defaults to
                 ``None``.
             output_dir (str | None): Root output directory for
@@ -723,7 +723,7 @@ class ForecastModel:
                 from ``self.n_jobs``. Defaults to ``None``.
             use_cache (bool): Short-circuit re-run when a cache hit
                 exists. Ignored (forced to ``False``) when
-                ``features_matrix_csv`` / ``label_features_csv`` are
+                ``features_matrix_path`` / ``label_features_csv`` are
                 supplied. Defaults to ``True``.
             verbose (bool | None): Verbose logging. ``None`` inherits
                 from ``self.verbose``. Defaults to ``None``.
@@ -738,7 +738,7 @@ class ForecastModel:
         Raises:
             ValueError: If :meth:`train` has not produced a trained
                 ensemble yet, or if only one of
-                ``features_matrix_csv`` / ``label_features_csv`` is
+                ``features_matrix_path`` / ``label_features_csv`` is
                 supplied.
 
         Example:
@@ -751,19 +751,19 @@ class ForecastModel:
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
 
-        if (features_matrix_csv is None) != (label_features_csv is None):
+        if (features_matrix_path is None) != (label_features_csv is None):
             raise ValueError(
-                "features_matrix_csv and label_features_csv must be provided together."
+                "features_matrix_path and label_features_csv must be provided together."
             )
 
-        feature_shortcut_csvs: tuple[str, str] | None = None
+        feature_shortcut_paths: tuple[str, str] | None = None
         if (
-            features_matrix_csv is not None
+            features_matrix_path is not None
             and label_features_csv is not None
-            and os.path.exists(features_matrix_csv)
+            and os.path.exists(features_matrix_path)
             and os.path.exists(label_features_csv)
         ):
-            feature_shortcut_csvs = (features_matrix_csv, label_features_csv)
+            feature_shortcut_paths = (features_matrix_path, label_features_csv)
             use_cache = False
 
         # ``plot_kwargs`` are intentionally excluded from the captured config
@@ -779,7 +779,7 @@ class ForecastModel:
             plot_threshold=plot_threshold,
             plot_title=plot_title,
             plot_pdf=plot_pdf,
-            features_matrix_csv=features_matrix_csv,
+            features_matrix_path=features_matrix_path,
             label_features_csv=label_features_csv,
             output_dir=output_dir,
             overwrite=overwrite,
@@ -838,11 +838,13 @@ class ForecastModel:
             verbose=verbose,
         )
 
-        if feature_shortcut_csvs is not None:
-            matrix_csv, label_csv = feature_shortcut_csvs
+        if feature_shortcut_paths is not None:
+            matrix_path, label_csv = feature_shortcut_paths
             prediction_model = prediction_model.load_features(
-                features_matrix_csv=matrix_csv,
+                features_matrix_path=matrix_path,
                 label_features_csv=label_csv,
+                window_step=window_step,
+                window_step_unit=window_step_unit,
             )
         else:
             prediction_model = prediction_model.build_label(

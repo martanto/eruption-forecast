@@ -141,7 +141,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 ├── prediction/
 │   ├── features/
 │   │   ├── features-label_{basename}_step-{N}-{unit}.csv  # forecast grid
-│   │   └── features-matrix_*.csv                           # tsfresh matrix
+│   │   └── features-matrix_*.parquet                       # tsfresh matrix (Snappy Parquet)
 │   ├── results/{clf-slug}/{seed:05d}.csv                   # per-seed probability (save_seed_result=True)
 │   └── figures/forecast_{basename}.{png,pdf}               # forecast plot
 ├── forecast-results_{basename}.csv             # top-level results dump

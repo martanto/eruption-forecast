@@ -68,7 +68,7 @@ class MetricsEnsemble:
         ... )
         >>> me = MetricsEnsemble.from_file(
         ...     model_filepath="output/VG.OJN.00.EHZ/ClassifierEnsemble.json",
-        ...     features_csv="output/VG.OJN.00.EHZ/features.csv",
+        ...     features_path="output/VG.OJN.00.EHZ/features-matrix.parquet",
         ...     features_label_csv="output/VG.OJN.00.EHZ/labels.csv",
         ...     eruption_dates=["2025-03-20"],
         ...     n_jobs=4,
@@ -145,7 +145,7 @@ class MetricsEnsemble:
     def from_file(
         cls,
         model_filepath: str,
-        features_csv: str,
+        features_path: str,
         features_label_csv: str,
         eruption_dates: list[str] | list[datetime],
         kind: Literal["prediction", "training"] = "prediction",
@@ -165,8 +165,9 @@ class MetricsEnsemble:
                 artefact — ``.json``, ``.pkl``, or a trained-model
                 registry CSV — accepted by
                 :meth:`ClassifierEnsemble.from_any`.
-            features_csv (str): Path to the feature matrix CSV used for
-                scoring. The first column is treated as the index.
+            features_path (str): Path to the merged feature matrix
+                Parquet used for scoring (the ``features-matrix_*.parquet``
+                produced by :class:`FeaturesBuilder`).
             features_label_csv (str): Path to the label CSV consumed by
                 :func:`build_y_true` to derive the binary ground truth.
             eruption_dates (list[str] | list[datetime]): Eruption dates
@@ -188,13 +189,13 @@ class MetricsEnsemble:
             MetricsEnsemble: A fresh instance ready for :meth:`compute`.
 
         Raises:
-            FileNotFoundError: If ``model_filepath``, ``features_csv``,
+            FileNotFoundError: If ``model_filepath``, ``features_path``,
                 or ``features_label_csv`` does not exist.
 
         Example:
             >>> me = MetricsEnsemble.from_file(
             ...     model_filepath="output/VG.OJN.00.EHZ/ClassifierEnsemble.json",
-            ...     features_csv="output/VG.OJN.00.EHZ/features.csv",
+            ...     features_path="output/VG.OJN.00.EHZ/features-matrix.parquet",
             ...     features_label_csv="output/VG.OJN.00.EHZ/labels.csv",
             ...     eruption_dates=["2025-03-20"],
             ... )
@@ -202,7 +203,7 @@ class MetricsEnsemble:
         """
         for label, path in (
             ("Model Filepath", model_filepath),
-            ("Features CSV", features_csv),
+            ("Features Matrix", features_path),
             ("Features Label CSV", features_label_csv),
         ):
             if not os.path.exists(path):
@@ -211,7 +212,7 @@ class MetricsEnsemble:
         classifier_ensemble = ClassifierEnsemble.from_any(
             model_filepath, verbose=verbose
         )
-        features_df = pd.read_csv(features_csv, index_col=0)
+        features_df = pd.read_parquet(features_path)
         y_true = build_y_true(features_label_csv, eruption_dates)
 
         return cls(

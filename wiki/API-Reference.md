@@ -812,7 +812,7 @@ MetricsEnsemble(
 
 MetricsEnsemble.from_file(
     model_filepath: str,
-    features_csv: str,
+    features_path: str,
     features_label_csv: str,
     eruption_dates: list[str] | None = None,
     kind: Literal["prediction", "training"] = "prediction",

@@ -67,7 +67,7 @@ class BaseModel(ABC):
             during feature extraction. Defaults to ``True``.
         features_df (pd.DataFrame): Extracted features. Empty until
             ``extract_features()`` has been called.
-        features_csv (str | None): Path to the features CSV on disk.
+        features_path (str | None): Path to the merged features matrix Parquet on disk.
             ``None`` until ``extract_features()`` has been called.
         window_step (int | None): Step size between consecutive windows.
             Set by ``build_label()``.
@@ -163,7 +163,7 @@ class BaseModel(ABC):
 
         # WIll be set after extract_features() called
         self.features_df: pd.DataFrame = pd.DataFrame()
-        self.features_csv: str | None = None
+        self.features_path: str | None = None
 
         # Will be set after build_label() called
         self.window_step: int | None = None
@@ -732,7 +732,7 @@ class BaseModel(ABC):
         Concrete subclasses that own a feature-extraction pass override this
         hook to build a tremor matrix aligned to their labels (typically via
         ``_build_features()``), run tsfresh extraction, and populate
-        ``features_df`` and ``features_csv`` on the instance. Reuse stages
+        ``features_df`` and ``features_path`` on the instance. Reuse stages
         such as ``ExplanationModel`` inherit this no-op so they can still be
         dropped into chains that call ``extract_features()``.
 

@@ -30,8 +30,13 @@ class FeaturesBuilder:
 
     Accepts a tremor matrix produced by TremorMatrixBuilder (one row per time
     sample, grouped by window 'id') and runs tsfresh feature extraction on each
-    tremor metric column independently. Results are saved as individual CSVs
-    and then concatenated into a single feature matrix ready for ModelTrainer.
+    tremor metric column independently. Per-column results are saved as
+    Snappy-compressed Parquet files under ``extracted/`` and then concatenated
+    into a single merged features matrix (also Parquet) ready for ModelTrainer.
+    Parquet is used for the feature artefacts because a realistic tsfresh run
+    has thousands of numeric columns × hundreds/thousands of window rows, and
+    Parquet compresses that dense-numeric shape substantially while preserving
+    column dtypes. The aligned label file stays CSV (small, human-readable).
 
     Supports two operating modes:
     - **Training mode** (label_df provided): Filters windows to those present
@@ -41,7 +46,7 @@ class FeaturesBuilder:
 
     Attributes:
         tremor_matrix_df (pd.DataFrame): Tremor matrix from TremorMatrixBuilder.build().
-        output_dir (str): Directory for saved CSVs.
+        output_dir (str): Directory for saved features artefacts.
         label_df (pd.DataFrame): Label DataFrame with DatetimeIndex (empty for prediction).
         overwrite (bool): Whether to re-extract when output files exist.
         n_jobs (int): Number of parallel jobs for tsfresh extraction.
@@ -49,14 +54,14 @@ class FeaturesBuilder:
         default_fc_parameters (ComprehensiveFCParameters): tsfresh feature calculation params.
         excludes_features (set[str]): Set of tsfresh feature names to exclude.
         use_relevant_features (bool): Whether relevant features were used (set after extract).
-        all_features_csvs (set[str]): Paths to all extracted feature CSVs.
-        relevant_features_csvs (set[str]): Paths to relevant feature CSVs.
-        csv (str | None): Path to concatenated features CSV (set after extract).
+        all_features_paths (set[str]): Paths to all extracted per-column feature Parquet files.
+        relevant_features_paths (set[str]): Paths to relevant per-column feature Parquet files.
+        path (str | None): Path to concatenated features matrix Parquet (set after extract).
         df (pd.DataFrame): Concatenated features DataFrame (set after extract).
         label_features_csv (str | None): Path to aligned label CSV (training mode only).
         unique_ids (list[int]): Window IDs present in tremor matrix (set after extract).
-        all_features_csv (str | None): Path to all features CSV (set after concat).
-        relevant_features_csv (str | None): Path to relevant features CSV (set after concat).
+        all_features_path (str | None): Path to all-features matrix Parquet (set after concat).
+        relevant_features_path (str | None): Path to relevant-features matrix Parquet (set after concat).
         df_all_features (pd.DataFrame): All extracted features (set after concat).
         df_relevant_features (pd.DataFrame): Relevant features only (set after concat).
 
@@ -64,11 +69,11 @@ class FeaturesBuilder:
         tremor_matrix_df (pd.DataFrame): Tremor matrix produced by
             TremorMatrixBuilder.build(). Must contain 'id' and 'datetime' columns
             plus one or more tremor metric columns (rsam_*, dsar_*).
-        output_dir (str | None, optional): Directory for saved CSVs.
-            If None, defaults to ``root_dir/output/features``. Relative paths
-            are resolved against ``root_dir`` (or ``os.getcwd()`` when
-            ``root_dir`` is None). Absolute paths are used as-is.
-            Defaults to None.
+        output_dir (str | None, optional): Directory for saved features
+            artefacts (Parquet matrices + label CSV). If None, defaults to
+            ``root_dir/output/features``. Relative paths are resolved against
+            ``root_dir`` (or ``os.getcwd()`` when ``root_dir`` is None).
+            Absolute paths are used as-is. Defaults to None.
         label_df (pd.DataFrame | None, optional): Label DataFrame with a
             DatetimeIndex and columns 'id' and 'is_erupted'.
             Pass None (default) for prediction mode.
@@ -136,8 +141,9 @@ class FeaturesBuilder:
         Args:
             tremor_matrix_df (pd.DataFrame): Windowed tremor matrix from TremorMatrixBuilder.
                 Must contain 'id' and 'datetime' columns plus tremor metric columns.
-            output_dir (str | None, optional): Directory for saved feature CSVs.
-                Defaults to ``root_dir/output/features``. Defaults to None.
+            output_dir (str | None, optional): Directory for saved features
+                artefacts (Parquet matrices + label CSV). Defaults to
+                ``root_dir/output/features``. Defaults to None.
             label_df (pd.DataFrame | None, optional): Label DataFrame with DatetimeIndex
                 and columns 'id' and 'is_erupted'. Pass None for prediction mode.
                 Defaults to None.
@@ -190,16 +196,16 @@ class FeaturesBuilder:
 
         # Will be set after extract_features() called
         self.use_relevant_features: bool = False
-        self.all_features_csvs: set[str] = set()
-        self.relevant_features_csvs: set[str] = set()
-        self.csv: str | None = None
+        self.all_features_paths: set[str] = set()
+        self.relevant_features_paths: set[str] = set()
+        self.path: str | None = None
         self.df: pd.DataFrame = pd.DataFrame()
         self.label_features_csv: str | None = None
         self.unique_ids: list[int] = []
 
         # Will be set after concat_features() called
-        self.all_features_csv: str | None = None
-        self.relevant_features_csv: str | None = None
+        self.all_features_path: str | None = None
+        self.relevant_features_path: str | None = None
         self.df_all_features: pd.DataFrame = pd.DataFrame()
         self.df_relevant_features: pd.DataFrame = pd.DataFrame()
 
@@ -431,10 +437,10 @@ class FeaturesBuilder:
 
         # Extract features for each column. ``in_memory_frames`` holds
         # freshly-extracted DataFrames so concat can reuse them without
-        # re-reading the per-column CSV we just wrote; ``paths_to_load`` lists
-        # the per-column CSVs that came from disk cache hits (no DataFrame in
-        # memory) and will be read once at concat time.
-        extracted_csvs: set[str] = set()
+        # re-reading the per-column Parquet we just wrote; ``paths_to_load``
+        # lists the per-column Parquet files that came from disk cache hits
+        # (no DataFrame in memory) and will be read once at concat time.
+        extracted_paths: set[str] = set()
         in_memory_frames: list[pd.DataFrame] = []
         paths_to_load: list[str] = []
         for column_method in tremor_matrix_df.columns.tolist():
@@ -462,7 +468,7 @@ class FeaturesBuilder:
                     "default_fc_parameters": column_fc_parameters,
                 }
 
-            extracted_csv_path, extracted_frame = self._extract_features_for_column(
+            extracted_path, extracted_frame = self._extract_features_for_column(
                 tremor_matrix_df=tremor_matrix_df,
                 column_method=column_method,
                 y=label_df,
@@ -472,23 +478,23 @@ class FeaturesBuilder:
                 extract_features_dir=extract_features_dir,
             )
 
-            if extracted_csv_path:
-                extracted_csvs.add(extracted_csv_path)
+            if extracted_path:
+                extracted_paths.add(extracted_path)
                 if extracted_frame is not None:
                     in_memory_frames.append(extracted_frame)
                 else:
-                    paths_to_load.append(extracted_csv_path)
+                    paths_to_load.append(extracted_path)
 
-        # Update tracked CSVs
+        # Update tracked per-column Parquet paths
         if use_relevant_features:
-            self.relevant_features_csvs.update(extracted_csvs)
+            self.relevant_features_paths.update(extracted_paths)
         else:
-            self.all_features_csvs.update(extracted_csvs)
+            self.all_features_paths.update(extracted_paths)
 
         self.label_df = label_df
         self.use_relevant_features = use_relevant_features
-        self.csv, self.df = self._concat_features(
-            csv_list=paths_to_load,
+        self.path, self.df = self._concat_features(
+            paths=paths_to_load,
             filename=prefix_filename,
             use_relevant_features=use_relevant_features,
             frames=in_memory_frames,
@@ -534,77 +540,78 @@ class FeaturesBuilder:
 
     def _concat_features(
         self,
-        csv_list: list[str],
+        paths: list[str],
         filename: str,
         use_relevant_features: bool = False,
         frames: list[pd.DataFrame] | None = None,
     ) -> tuple[str, pd.DataFrame]:
-        """Concatenate extracted features from CSVs and in-memory frames.
+        """Concatenate extracted features from Parquet paths and in-memory frames.
 
         Merges per-column feature inputs into a single unified features
-        DataFrame and saves it to disk. Inputs can be supplied as on-disk CSV
-        paths (``csv_list``) and/or already-loaded DataFrames (``frames``);
-        the latter avoids the disk round-trip for columns whose data is still
-        in memory from the extraction pass. Also updates the relevant
-        ``self.all_features_csv`` / ``self.relevant_features_csv`` attributes
-        depending on ``use_relevant_features``.
+        DataFrame and saves it as Snappy-compressed Parquet. Inputs can be
+        supplied as on-disk Parquet paths (``paths``) and/or already-loaded
+        DataFrames (``frames``); the latter avoids the disk round-trip for
+        columns whose data is still in memory from the extraction pass. Also
+        updates the relevant ``self.all_features_path`` /
+        ``self.relevant_features_path`` attributes depending on
+        ``use_relevant_features``.
 
         Args:
-            csv_list (list[str]): Paths to per-column extracted feature CSV files.
-            filename (str): Output filename stem (without .csv extension) for
-                the concatenated features file.
+            paths (list[str]): Paths to per-column extracted feature Parquet files.
+            filename (str): Output filename stem (without ``.parquet`` extension)
+                for the concatenated features file.
             use_relevant_features (bool, optional): When True, stores the
-                result in relevant_features_csv / df_relevant_features;
-                otherwise in all_features_csv / df_all_features.
+                result in relevant_features_path / df_relevant_features;
+                otherwise in all_features_path / df_all_features.
                 Defaults to False.
             frames (list[pd.DataFrame] | None, optional): Pre-loaded per-column
-                feature DataFrames to combine with ``csv_list``. Defaults to
+                feature DataFrames to combine with ``paths``. Defaults to
                 ``None``.
 
         Returns:
             tuple[str, pd.DataFrame]: A tuple containing:
-                - filepath (str): Path of the saved concatenated CSV
+                - filepath (str): Path of the saved concatenated Parquet
                 - features_df (pd.DataFrame): Resulting concatenated DataFrame
 
         Raises:
-            FileNotFoundError: If both ``csv_list`` and ``frames`` are empty.
+            FileNotFoundError: If both ``paths`` and ``frames`` are empty.
             ValueError: If the combined inputs total fewer than 2 (raised by
                 the underlying concat_features utility).
 
         Examples:
             >>> builder = FeaturesBuilder(tremor_matrix_df, label_df)
-            >>> csv_files = ["features_rsam_f0.csv", "features_rsam_f1.csv"]
-            >>> filepath, df = builder._concat_features(csv_files, "all_features")
+            >>> parquet_files = ["features_rsam_f0.parquet", "features_rsam_f1.parquet"]
+            >>> filepath, df = builder._concat_features(parquet_files, "all_features")
             >>> print(df.shape)
             (100, 1500)  # 100 windows, 1500 features
             >>> print(filepath)
-            'output/features/all_features.csv'
+            'output/features/all_features.parquet'
         """
-        if len(csv_list) == 0 and not frames:
-            raise FileNotFoundError("Extracted features CSV not found.")
+        if len(paths) == 0 and not frames:
+            raise FileNotFoundError("Extracted features Parquet files not found.")
 
         if self.verbose:
             logger.info("Concatenating extracted features from calculation...")
 
-        filepath = os.path.join(self.output_dir, f"{filename}.csv")
-        features_csv, features_df = concat_features(
-            list(csv_list), filepath, frames=frames
+        filepath = os.path.join(self.output_dir, f"{filename}.parquet")
+        features_path, features_df = concat_features(
+            list(paths), filepath, frames=frames
         )
 
         if self.verbose:
             logger.info(f"Features matrix saved to: {filepath}")
 
         if use_relevant_features:
-            self.relevant_features_csv = features_csv
+            self.relevant_features_path = features_path
             self.df_relevant_features = features_df
         else:
-            self.all_features_csv = features_csv
+            self.all_features_path = features_path
             self.df_all_features = features_df
 
-        self.csv = features_csv
+        self.path = features_path
         self.df = features_df
 
-        return features_csv, features_df
+        return features_path, features_df
 
     def _try_load_cached_features_matrix(
         self,
@@ -616,28 +623,29 @@ class FeaturesBuilder:
         """Reload the merged features matrix from disk when it is still fresh.
 
         Skips the per-column extraction loop and the concat step when a prior
-        run already produced ``{output_dir}/{prefix_filename}.csv`` and every
-        per-column CSV under ``extract_features_dir`` is older than it. On a
-        fresh cache hit, the merged CSV is read once and the same
+        run already produced ``{output_dir}/{prefix_filename}.parquet`` and
+        every per-column Parquet under ``extract_features_dir`` is older than
+        it. On a fresh cache hit, the merged Parquet is read once and the same
         ``self``-attributes that ``extract_features`` would have populated
         post-loop are restored, so the caller can return immediately.
         ``overwrite=True`` always returns ``None`` (cache bypass).
 
         Args:
-            prefix_filename (str): Filename stem (without ``.csv``) used both
-                for the merged file (``{output_dir}/{prefix_filename}.csv``)
-                and the per-column files
-                (``{extract_features_dir}/{prefix_filename}_{column}.csv``).
+            prefix_filename (str): Filename stem (without ``.parquet``) used
+                both for the merged file
+                (``{output_dir}/{prefix_filename}.parquet``) and the per-column
+                files
+                (``{extract_features_dir}/{prefix_filename}_{column}.parquet``).
             extract_features_dir (str): Directory holding the per-column
-                feature CSVs whose mtimes drive the freshness check.
+                feature Parquet files whose mtimes drive the freshness check.
             label_df (pd.DataFrame): Label DataFrame that ``extract_features``
                 already prepared via ``_prepare_training_mode`` /
                 ``_prepare_prediction_mode``. Assigned to ``self.label_df``
                 on cache hit so callers do not re-derive it.
             use_relevant_features (bool): Mode flag forwarded from
                 ``extract_features``; determines which
-                ``{all,relevant}_features_csv(s)`` / ``df_{all,relevant}_features``
-                slots are populated on hit.
+                ``{all,relevant}_features_path(s)`` /
+                ``df_{all,relevant}_features`` slots are populated on hit.
 
         Returns:
             pd.DataFrame | None: The reloaded merged features matrix when the
@@ -645,11 +653,11 @@ class FeaturesBuilder:
                 bypassed via ``overwrite=True``.
 
         Side Effects:
-            On cache hit, sets ``self.csv``, ``self.df``, ``self.label_df``,
+            On cache hit, sets ``self.path``, ``self.df``, ``self.label_df``,
             ``self.use_relevant_features``, and the matching
-            ``self.{all,relevant}_features_csv``,
+            ``self.{all,relevant}_features_path``,
             ``self.df_{all,relevant}_features``, and
-            ``self.{all,relevant}_features_csvs`` slots.
+            ``self.{all,relevant}_features_paths`` slots.
 
         Examples:
             >>> builder = FeaturesBuilder(tremor_matrix_df, label_df)
@@ -665,38 +673,38 @@ class FeaturesBuilder:
         if self.overwrite:
             return None
 
-        merged_csv = os.path.join(self.output_dir, f"{prefix_filename}.csv")
-        if not os.path.exists(merged_csv):
+        merged_path = os.path.join(self.output_dir, f"{prefix_filename}.parquet")
+        if not os.path.exists(merged_path):
             return None
 
         per_column_paths = glob.glob(
-            os.path.join(extract_features_dir, f"{prefix_filename}_*.csv")
+            os.path.join(extract_features_dir, f"{prefix_filename}_*.parquet")
         )
         if not per_column_paths:
             return None
 
-        merged_mtime = os.path.getmtime(merged_csv)
+        merged_mtime = os.path.getmtime(merged_path)
         per_column_max_mtime = max(os.path.getmtime(p) for p in per_column_paths)
         if per_column_max_mtime > merged_mtime:
             return None
 
         if self.verbose:
-            logger.info(f"Loaded cached features matrix from {merged_csv}")
-        features_df = pd.read_csv(merged_csv, index_col=0)
+            logger.info(f"Loaded cached features matrix from {merged_path}")
+        features_df = pd.read_parquet(merged_path)
 
-        self.csv = merged_csv
+        self.path = merged_path
         self.df = features_df
         self.label_df = label_df
         self.use_relevant_features = use_relevant_features
 
         if use_relevant_features:
-            self.relevant_features_csv = merged_csv
+            self.relevant_features_path = merged_path
             self.df_relevant_features = features_df
-            self.relevant_features_csvs.update(per_column_paths)
+            self.relevant_features_paths.update(per_column_paths)
         else:
-            self.all_features_csv = merged_csv
+            self.all_features_path = merged_path
             self.df_all_features = features_df
-            self.all_features_csvs.update(per_column_paths)
+            self.all_features_paths.update(per_column_paths)
 
         return features_df
 
@@ -780,17 +788,17 @@ class FeaturesBuilder:
 
         Returns:
             tuple[str, pd.DataFrame | None]: Tuple containing:
-                - extracted_csv (str): Path to the per-column features CSV.
+                - extracted_path (str): Path to the per-column features Parquet.
                 - extracted_features (pd.DataFrame | None): The freshly
                   extracted DataFrame when extraction was just performed, or
-                  ``None`` when the on-disk CSV was reused as-is (no read
+                  ``None`` when the on-disk Parquet was reused as-is (no read
                   incurred). Callers that need the data should fall back to
-                  reading ``extracted_csv``.
+                  reading ``extracted_path``.
 
         Examples:
             >>> builder = FeaturesBuilder(tremor_matrix_df, label_df)
             >>> params = builder._prepare_extraction_parameters(None)
-            >>> csv_path, df = builder._extract_features_for_column(
+            >>> parquet_path, df = builder._extract_features_for_column(
             ...     tremor_matrix_df=tremor_matrix_df,
             ...     column_method="rsam_f0",
             ...     y=label_df,
@@ -800,19 +808,19 @@ class FeaturesBuilder:
             ...     extract_features_dir="output/features/extracted"
             ... )
         """
-        extracted_csv = os.path.join(
-            extract_features_dir, f"{prefix_filename}_{column_method}.csv"
+        extracted_path = os.path.join(
+            extract_features_dir, f"{prefix_filename}_{column_method}.parquet"
         )
 
         # Skip if already exists and not overwriting. Returning ``None`` signals
         # the caller that the DataFrame is not in memory; it can read from
-        # ``extracted_csv`` only if it actually needs the data.
-        if not self.overwrite and os.path.exists(extracted_csv):
+        # ``extracted_path`` only if it actually needs the data.
+        if not self.overwrite and os.path.exists(extracted_path):
             if self.verbose:
                 logger.info(
-                    f"Extracted features for {column_method} already exist: {extracted_csv}"
+                    f"Extracted features for {column_method} already exist: {extracted_path}"
                 )
-            return extracted_csv, None
+            return extracted_path, None
 
         # Prepare data for extraction
         df = tremor_matrix_df[[ID_COLUMN, DATETIME_COLUMN, column_method]]
@@ -851,14 +859,16 @@ class FeaturesBuilder:
                 **extract_params,
             )
 
-        # Save to CSV
+        # Save to Parquet
         extracted_features.index.name = ID_COLUMN
-        extracted_features.to_csv(extracted_csv, index=True)
+        extracted_features.to_parquet(
+            extracted_path, engine="pyarrow", compression="snappy", index=True
+        )
 
         if self.verbose:
-            logger.info(f"{column_method} :: Features extracted: {extracted_csv}")
+            logger.info(f"{column_method} :: Features extracted: {extracted_path}")
 
-        return extracted_csv, extracted_features
+        return extracted_path, extracted_features
 
     def _prepare_training_mode(
         self, label_df: pd.DataFrame

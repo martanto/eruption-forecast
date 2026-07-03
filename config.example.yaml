@@ -81,8 +81,8 @@ predict:
   plot_threshold: 0.5       # Probability threshold drawn on the forecast plot
   plot_title: null          # Optional plot title override
   plot_pdf: true            # Also save the forecast plot as a PDF
-  features_matrix_csv: null # Skip tsfresh: load a pre-built features matrix CSV (requires label_features_csv too; forces use_cache=false)
-  label_features_csv: null  # Companion label grid CSV for features_matrix_csv
+  features_matrix_path: null # Skip tsfresh: load a pre-built features matrix Parquet (requires label_features_csv too; forces use_cache=false)
+  label_features_csv: null   # Companion label grid CSV for features_matrix_path
   output_dir: null          # null = use station_dir
   overwrite: null           # null = inherit from model.overwrite
   n_jobs: null              # null = inherit from model.n_jobs

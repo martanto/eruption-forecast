@@ -440,7 +440,7 @@ def load_features_resampled(
         features (pd.DataFrame | str): Full id-indexed feature matrix produced
             by :meth:`TrainingModel.extract_features` or
             :meth:`TrainingModel.load_features`. Pass a path to a
-            ``features-matrix_*.csv`` to load it on demand.
+            ``features-matrix_*.parquet`` to load it on demand.
         resampled (pd.DataFrame | pd.Series | str): Per-seed resampled label
             payload. Accepts a path to ``features/{cv}/resampled/{seed}.csv``,
             a DataFrame carrying an ``is_erupted`` column, or a Series already
@@ -461,7 +461,7 @@ def load_features_resampled(
         ... )
     """
     if isinstance(features, str):
-        features = pd.read_csv(features, index_col=0)
+        features = pd.read_parquet(features)
 
     if isinstance(resampled, str):
         labels = pd.read_csv(resampled, index_col=0)["is_erupted"]

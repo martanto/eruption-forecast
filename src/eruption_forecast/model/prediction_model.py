@@ -10,6 +10,7 @@ from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
+from eruption_forecast.utils.validation import check_sampling_consistency
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.config.prediction_config import PredictionConfig
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
@@ -329,7 +330,7 @@ class PredictionModel(BaseModel):
         (``start_date``, ``end_date``, ``window_size``, ``classifiers``,
         ``overwrite``, ``output_dir``, ``root_dir``, ``n_jobs``, ``verbose``,
         and ``basename``). Stage-specific keys (``window_step``,
-        ``window_step_unit``, ``features_csv``, ``forecast_plot_path``) are
+        ``window_step_unit``, ``features_path``, ``forecast_plot_path``) are
         added once the corresponding method has been called.
 
         Returns:
@@ -363,8 +364,8 @@ class PredictionModel(BaseModel):
         if self.window_step_unit is not None:
             result["window_step_unit"] = self.window_step_unit
 
-        if self.features_csv is not None:
-            result["features_csv"] = self.features_csv
+        if self.features_path is not None:
+            result["features_path"] = self.features_path
 
         if self.forecast_plot_path is not None:
             result["forecast_plot_path"] = self.forecast_plot_path
@@ -390,7 +391,7 @@ class PredictionModel(BaseModel):
             Window size: 2 day(s)
             Classifiers: RandomForestClassifier, XGBClassifier
             Window step: 10 minutes
-            Features CSV: features-label_2025-03-16_2025-03-22_step-10-minutes.csv
+            Features: features-matrix_2025-03-16_2025-03-22_step-10-minutes.parquet
             Forecast plot: forecast_2025-03-16_2025-03-22.pdf
             Overwrite: False
             Output dir: output/VG.OJN.00.EHZ
@@ -406,9 +407,9 @@ class PredictionModel(BaseModel):
             if self.window_step is not None and self.window_step_unit is not None
             else "not built"
         )
-        features_csv_str = (
-            os.path.basename(self.features_csv)
-            if self.features_csv is not None
+        features_path_str = (
+            os.path.basename(self.features_path)
+            if self.features_path is not None
             else "not extracted"
         )
         forecast_plot_str = (
@@ -422,7 +423,7 @@ class PredictionModel(BaseModel):
             f"Window size: {self.window_size} day(s). "
             f"Classifiers: {classifier_names}. "
             f"Window step: {window_step_str}. "
-            f"Features CSV: {features_csv_str}. "
+            f"Features: {features_path_str}. "
             f"Forecast plot: {forecast_plot_str}. "
             f"Overwrite: {self.overwrite}. "
             f"Output dir: {self.output_dir}. "
@@ -624,7 +625,7 @@ class PredictionModel(BaseModel):
         Builds the windowed tremor matrix aligned to the labels produced by
         :meth:`build_label`, then runs ``FeaturesBuilder`` in prediction mode
         (no relevance filtering). Populates ``self.features_df`` and
-        ``self.features_csv``. When features were already extracted on this
+        ``self.features_path``. When features were already extracted on this
         instance, the method early-returns without re-running tsfresh.
 
         When ``TremorMatrixBuilder`` drops windows that fail
@@ -665,7 +666,7 @@ class PredictionModel(BaseModel):
         }
 
         features_already_populated = (
-            not self.features_df.empty and self.features_csv is not None
+            not self.features_df.empty and self.features_path is not None
         )
 
         if features_already_populated and not overwrite:
@@ -680,7 +681,7 @@ class PredictionModel(BaseModel):
                     f"incoming={new_kwargs} snapshot={self._extract_features_kwargs}"
                 )
             if self.verbose:
-                logger.info(f"Features already extracted: {self.features_csv}")
+                logger.info(f"Features already extracted: {self.features_path}")
             return self
 
         if self._labels.empty:
@@ -705,7 +706,7 @@ class PredictionModel(BaseModel):
             exclude_features=exclude_features,
         )
 
-        self.features_csv = features_builder.csv
+        self.features_path = features_builder.path
 
         # ``TremorMatrixBuilder`` drops windows that fail ``minimum_completion``,
         # so narrow the label grid to the surviving feature ids here — this
@@ -721,17 +722,19 @@ class PredictionModel(BaseModel):
 
     def load_features(
         self,
-        features_matrix_csv: str,
+        features_matrix_path: str,
         label_features_csv: str,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
     ) -> Self:
         """Reuse a feature matrix written by a previous prediction run.
 
         Skips tsfresh extraction entirely by reading the persisted
-        ``features-matrix_*.csv`` and ``features-label_*.csv`` produced by an
-        earlier :meth:`extract_features` call. Designed for repeat forecasting
-        where the windowing and tremor data have not changed — for example
-        replaying :meth:`forecast` with a different trained ensemble against
-        an existing feature matrix.
+        ``features-matrix_*.parquet`` and ``features-label_*.csv`` produced by
+        an earlier :meth:`extract_features` call. Designed for repeat
+        forecasting where the windowing and tremor data have not changed — for
+        example replaying :meth:`forecast` with a different trained ensemble
+        against an existing feature matrix.
 
         Drops in as a replacement for the
         ``build_label() → extract_features()`` prefix before :meth:`forecast`;
@@ -742,39 +745,49 @@ class PredictionModel(BaseModel):
 
         Both paths are required — no auto-resolve fallback — so the user
         always states their intent explicitly and there is no risk of
-        silently picking up a stale ``features-*_*.csv`` left in
+        silently picking up a stale ``features-*_*`` artefact left in
         ``self.features_dir`` from a previous run.
 
         Args:
-            features_matrix_csv (str): Path to the ``features-matrix_*.csv``
-                written under ``{output_dir}/prediction/features/`` by
+            features_matrix_path (str): Path to the
+                ``features-matrix_*.parquet`` written under
+                ``{output_dir}/prediction/features/`` by
                 :meth:`extract_features`.
             label_features_csv (str): Path to the matching
                 ``features-label_*.csv``.
+            window_step (int): Step size between consecutive windows. Must be
+                strictly greater than ``0``. Should have the same interval with the
+                label_features_csv and features_matrix_path
+            window_step_unit (Literal["minutes", "hours"]): Unit for
+                ``window_step``. Should have the same interval with the
+                label_features_csv and features_matrix_path
 
         Returns:
             Self: The current instance, enabling method chaining.
 
         Raises:
             FileNotFoundError: If either path does not exist.
-            ValueError: If the loaded label CSV's ``datetime`` span does not
-                fully cover the configured ``[start_date, end_date]`` forecast
-                range (compared at day granularity).
+            ValueError: If the loaded label CSV's sampling — checked via
+                :func:`~eruption_forecast.utils.validation.check_sampling_consistency`
+                — does not match the caller-supplied ``window_step`` /
+                ``window_step_unit``, or if its ``datetime`` span does not
+                fully cover the configured ``[start_date, end_date]``
+                forecast range (compared at day granularity).
 
         Example:
             >>> (
             ...     prediction
             ...     .load_features(
-            ...         features_matrix_csv="output/.../features-matrix_2025-03-16_2025-03-22_step-10-minutes.csv",
+            ...         features_matrix_path="output/.../features-matrix_2025-03-16_2025-03-22_step-10-minutes.parquet",
             ...         label_features_csv="output/.../features-label_2025-03-16_2025-03-22_step-10-minutes.csv",
             ...     )
             ...     .forecast()
             ... )
             >>> # No build_label() / extract_features() needed.
         """
-        if not os.path.isfile(features_matrix_csv):
+        if not os.path.isfile(features_matrix_path):
             raise FileNotFoundError(
-                f"features_matrix_csv not found: {features_matrix_csv}"
+                f"features_matrix_path not found: {features_matrix_path}"
             )
         if not os.path.isfile(label_features_csv):
             raise FileNotFoundError(
@@ -783,22 +796,41 @@ class PredictionModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"[Prediction Model]: Loading feature matrix {features_matrix_csv}"
+                f"[Prediction Model]: Loading feature matrix {features_matrix_path}"
             )
 
         # Ensure ``self.start_date`` and ``self.end_date`` is in label date range
         label_datetimes = pd.read_csv(
             label_features_csv, usecols=["datetime"], parse_dates=["datetime"]
         )["datetime"]
+
+        # Validate sampling rate
+        unit_alias = {"minutes": "min", "hours": "h"}[window_step_unit]
+        expected_freq = f"{window_step}{unit_alias}"
+        is_consistent, _, inconsistent_data, _ = check_sampling_consistency(
+            pd.DataFrame(index=pd.DatetimeIndex(label_datetimes)),
+            expected_freq=expected_freq,
+            tolerance="0s",
+        )
+        if not is_consistent:
+            raise ValueError(
+                f"Sampling-rate mismatch in {label_features_csv!r}: caller "
+                f"passed window_step={window_step} {window_step_unit} "
+                f"(={expected_freq}) but {len(inconsistent_data)} row(s) in "
+                "the loaded label CSV disagree with that step."
+            )
+
         loaded_start: pd.Timestamp = label_datetimes.min()
         loaded_end: pd.Timestamp = label_datetimes.max()
         if (
             self.start_date.date() < loaded_start.date()
             or self.end_date.date() > loaded_end.date()
         ):
-            if self.start_date.date() == (
-                loaded_start.date() - timedelta(days=self.window_size)
-            ) and self.end_date.date() == loaded_end.date():
+            if (
+                self.start_date.date()
+                == (loaded_start.date() - timedelta(days=self.window_size))
+                and self.end_date.date() == loaded_end.date()
+            ):
                 logger.info(
                     f"Adjusting start_date and end_date: {loaded_start:%Y-%m-%d} -> {loaded_end:%Y-%m-%d}"
                 )
@@ -827,8 +859,10 @@ class PredictionModel(BaseModel):
         self.labels = label_df["id"]
         self.labels_csv = label_features_csv
 
-        self.features_df = pd.read_csv(features_matrix_csv, index_col=0)
-        self.features_csv = features_matrix_csv
+        self.features_df = pd.read_parquet(features_matrix_path)
+        self.features_path = features_matrix_path
+        self.window_step = window_step
+        self.window_step_unit = window_step_unit
 
         if self.verbose:
             logger.info(
@@ -881,7 +915,7 @@ class PredictionModel(BaseModel):
         if self.labels.empty or self._labels.empty or self.labels_csv is None:
             raise ValueError("Please run build_label() first.")
 
-        if self.features_df.empty and self.features_csv is None:
+        if self.features_df.empty and self.features_path is None:
             raise ValueError(
                 "Features (matrix) dataframe (features_df) is empty. "
                 "Please run extract_features() first."

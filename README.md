@@ -401,7 +401,7 @@ tm = (
 
 ### Reuse curated features (skip full tsfresh re-extraction)
 
-Once a `TrainingModel` run has persisted its `features-matrix_*.csv` and `top_{N}_features.csv`, two shortcuts let later runs reuse that work:
+Once a `TrainingModel` run has persisted its `features-matrix_*.parquet` and `top_{N}_features.csv`, two shortcuts let later runs reuse that work:
 
 ```python
 # Reuse features (fastest — tremor matrix unchanged)
