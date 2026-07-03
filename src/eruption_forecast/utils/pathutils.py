@@ -249,15 +249,21 @@ def save_figure(
 def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     """Persist a data object to disk.
 
-    Dispatches on ``filetype``: ``"csv"`` writes a ``pd.DataFrame`` via
-    ``to_csv``; any other value serialises the object with
-    ``joblib.dump``. The destination directory is created automatically
-    if absent.
+    Dispatches on ``filetype``:
+
+    - ``"csv"`` — writes a ``pd.DataFrame`` via ``to_csv``.
+    - ``"parquet"`` — writes a ``pd.DataFrame`` via ``to_parquet`` using
+      the ``pyarrow`` engine with Snappy compression and ``index=False``.
+      Preserves column dtypes and typically compresses long-form tables
+      several times smaller than CSV.
+    - anything else — serialises the object with ``joblib.dump``.
+
+    The destination directory is created automatically if absent.
 
     Args:
         data (Any): Object to persist. Pass a ``pd.DataFrame`` with
-            ``filetype="csv"``; pass any joblib-serialisable object
-            with ``filetype="pkl"``.
+            ``filetype="csv"`` or ``filetype="parquet"``; pass any
+            joblib-serialisable object with ``filetype="pkl"``.
         path (str): Destination path WITHOUT a file extension.
         filetype (str): File extension without a leading dot, also
             determines the serialisation method. Defaults to ``"csv"``.
@@ -269,6 +275,10 @@ def save_data(data: Any, path: str, *, filetype: str = "csv") -> None:
     ensure_dir(os.path.dirname(full_path))
     if filetype == "csv":
         data.to_csv(full_path)
+    elif filetype == "parquet":
+        data.to_parquet(
+            full_path, engine="pyarrow", compression="snappy", index=False
+        )
     else:
         joblib.dump(data, full_path)
     logger.info(f"Saved: {full_path}")
