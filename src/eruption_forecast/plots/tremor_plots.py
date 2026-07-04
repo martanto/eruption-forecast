@@ -25,9 +25,12 @@ def plot_tremor(
     metrics: Literal["median", "mean", "all"] = "all",
     filepath: str | None = None,
     filter_dsar_value: float | None = None,
+    filter_rsam_value: float | None = None,
+    filter_entropy_value: float | None = None,
     rsam_as_log: bool = False,
     legend_loc: str = "upper left",
     legend_ncol: int = 2,
+    colors: str | list[str] | None = None,
     dpi: int = 150,
     grouped_by_method: bool = True,
     verbose: bool = False,
@@ -77,14 +80,25 @@ def plot_tremor(
             handful of spikes do not flatten the visible band. Applied per
             column when the column name contains ``"dsar"``; RSAM and entropy
             series are unaffected. Defaults to ``None`` (no clipping).
+        filter_rsam_value (float | None): Upper bound applied to every RSAM series
+            before plotting.
+        filter_entropy_value (float | None): Upper bound applied to every entropy series
+            before plotting.
         rsam_as_log (bool): If ``True``, plot the RSAM subplot on a log y-axis
             and annotate the y-label with ``"(log)"``. When ``False``
             (default), large y-axis magnitudes fall back to matplotlib's
             scientific offset notation (e.g. ``×10³`` above the axis)
             instead of printing full integers on every tick. Defaults to
             ``False``.
-        legend_loc (str): Matplotlib legend location string. Defaults to ``"best"``.
+        legend_loc (str): Matplotlib legend location string. Defaults to ``"upper left"``.
         legend_ncol (int): Legend column count. Defaults to ``2``.
+        colors (str | list[str] | None): Line color(s) applied per column
+            within each method subplot. A single string is broadcast to
+            every column; a list is padded with the default color when
+            shorter than the widest method group (so every column has a
+            color even when one method has more series than another).
+            ``None`` falls back to ``DIVERGING_BREWER``. Defaults to
+            ``None``.
         dpi (int): Resolution used when saving. Ignored if ``filepath`` is
             ``None``. Defaults to ``150``.
         grouped_by_method (bool): If ``True`` (default), group columns by
@@ -132,6 +146,7 @@ def plot_tremor(
 
     start_date = df.index.min()
     end_date = df.index.max()
+    default_color = "#212121"
 
     # Define date locator and formatter based on plot type
     date_locator = (
@@ -158,6 +173,12 @@ def plot_tremor(
 
     if not grouped_methods:
         raise ValueError(f"There are no tremor available for columns {columns}")
+
+    if colors is not None:
+        colors = [colors] if isinstance(colors, str) else list(colors)
+        max_columns_per_method = max(len(cols) for cols in grouped_methods.values())
+        if len(colors) < max_columns_per_method:
+            colors.extend([default_color] * (max_columns_per_method - len(colors)))
 
     nrows = len(grouped_methods)
 
@@ -193,10 +214,20 @@ def plot_tremor(
                 if "dsar" in column.lower() and filter_dsar_value:
                     series = series.where(series < filter_dsar_value)
 
+                if "rsam" in column.lower() and filter_rsam_value:
+                    series = series.where(series < filter_rsam_value)
+
+                if "entropy" in column.lower() and filter_entropy_value:
+                    series = series.where(series < filter_entropy_value)
+
                 ax.plot(
                     series.index,
                     series,
-                    color=DIVERGING_BREWER[column_index],
+                    color=(
+                        DIVERGING_BREWER[column_index]
+                        if colors is None
+                        else colors[column_index]
+                    ),
                     alpha=0.8,
                     label=f"{label_rolling_window}|median|{label}",
                 )
@@ -211,10 +242,20 @@ def plot_tremor(
                 if "dsar" in column.lower() and filter_dsar_value:
                     series = series.where(series < filter_dsar_value)
 
+                if "rsam" in column.lower() and filter_rsam_value:
+                    series = series.where(series < filter_rsam_value)
+
+                if "entropy" in column.lower() and filter_entropy_value:
+                    series = series.where(series < filter_entropy_value)
+
                 ax.plot(
                     series.index,
                     series,
-                    color=DIVERGING_BREWER[column_index],
+                    color=(
+                        DIVERGING_BREWER[column_index]
+                        if colors is None
+                        else colors[column_index]
+                    ),
                     alpha=0.5 if metrics == "all" else 0.8,
                     label=f"{label_rolling_window}|mean|{label}",
                     linestyle="--" if metrics == "all" else "-",
