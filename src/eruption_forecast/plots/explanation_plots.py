@@ -414,7 +414,7 @@ def plot_aggregate_shap_bar(
             ax.text(
                 mean_val,
                 i,
-                f"  {mean_val:.3f}  (sel={freq:.0%})",
+                f"  {mean_val:.3f} (sel={freq:.0%})",  # sel=80%, means 80% of seeds selected that feature
                 va="center",
                 ha="left",
                 fontsize=7,
@@ -424,6 +424,7 @@ def plot_aggregate_shap_bar(
         configure_spine(ax)
         ax.set_xlabel("Mean |SHAP| (frequency-weighted)")
         ax.set_ylabel("Feature")
+        ax.tick_params(axis="y", labelsize=7)
         ax.set_title(title or f"Aggregate Top-{top_n} SHAP Importances")
 
         if save_filepath:
