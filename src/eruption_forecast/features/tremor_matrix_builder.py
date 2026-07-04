@@ -411,7 +411,7 @@ class TremorMatrixBuilder:
             else:
                 message = (
                     f"Label id={column_id}/{start_datetime}: skipped (expected {total_window} "
-                    f"samples, got {len(tremor_df_sliced)}) / completeness={completeness}"
+                    f"samples, got {len(tremor_df_sliced)})/completeness={completeness:.2%}"
                 )
                 logger.warning(message)
 

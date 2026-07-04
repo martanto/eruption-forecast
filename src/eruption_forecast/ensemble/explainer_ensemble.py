@@ -586,7 +586,7 @@ class ExplainerEnsemble:
                 top_n=top_n,
                 figsize=figsize,
                 dpi=dpi,
-                title=f"{classifier_name} — Aggregate Top-{top_n} SHAP Importances",
+                title=f"{classifier_name} - Aggregate Top-{top_n} SHAP Importances",
                 save_filepath=bar_path,
                 verbose=self.verbose,
             )
