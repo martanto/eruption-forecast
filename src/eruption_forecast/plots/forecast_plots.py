@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
+from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import DIVERGING_BREWER
 from eruption_forecast.utils.dataframe import get_envelope_values
 from eruption_forecast.utils.date_utils import (
@@ -29,6 +30,10 @@ def plot_forecast(
     y_max: float = 1.05,
     legend_n_cols: int = 6,
     bbox_to_anchor: tuple[float, float] = (0.5, -0.05),
+    training_start_date: str | None = None,
+    training_end_date: str | None = None,
+    prediction_start_date: str | None = None,
+    prediction_end_date: str | None = None,
 ) -> plt.Figure:
     """Plot eruption forecast probability and prediction time-series.
 
@@ -109,13 +114,35 @@ def plot_forecast(
     df_resampled = df.rolling(window=rolling_window).mean()
 
     # Plot figure
-    fig, axs = plt.subplots(
-        nrows=3,
-        ncols=1,
-        figsize=(fig_width, 3 * fig_height),
-        sharex=True,
-        tight_layout=True,
+    show_segment = all(
+        d is not None
+        for d in (
+            training_start_date,
+            training_end_date,
+            prediction_start_date,
+            prediction_end_date,
+        )
     )
+
+    if show_segment:
+        fig, all_axs = plt.subplots(
+            nrows=4,
+            ncols=1,
+            figsize=(fig_width, 3 * fig_height + 0.4),
+            gridspec_kw={"height_ratios": [0.3, 1, 1, 1]},
+            sharex=True,
+            tight_layout=True,
+        )
+        ax_segment, axs = all_axs[0], all_axs[1:]
+    else:
+        fig, axs = plt.subplots(
+            nrows=3,
+            ncols=1,
+            figsize=(fig_width, 3 * fig_height),
+            sharex=True,
+            tight_layout=True,
+        )
+        ax_segment = None
 
     for index in range(3):
         ax = axs[index]
@@ -228,6 +255,21 @@ def plot_forecast(
         ax.tick_params(labelsize=6)
         ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
+    if (
+        ax_segment is not None
+        and training_start_date is not None
+        and training_end_date is not None
+        and prediction_start_date is not None
+        and prediction_end_date is not None
+    ):
+        _ax_segment(
+            ax_segment,
+            training_start_date,
+            training_end_date,
+            prediction_start_date,
+            prediction_end_date,
+        )
+
     # Collect unique handles/labels from all panels into one shared legend
     handles, labels = [], []
     seen = set()
@@ -262,8 +304,15 @@ def plot_forecast_from_file(
     threshold: float = 0.7,
     rolling_window: str = "6h",
     x_days_interval: int = 2,
-    label_file: str | None = None,
     eruption_dates: list[str] | None = None,
+    y_max: float = 1.05,
+    legend_n_cols: int = 6,
+    bbox_to_anchor: tuple[float, float] = (0.5, -0.05),
+    label_file: str | None = None,
+    training_start_date: str | None = None,
+    training_end_date: str | None = None,
+    prediction_start_date: str | None = None,
+    prediction_end_date: str | None = None,
 ) -> plt.Figure:
     """Load consensus and label CSVs from disk and plot the forecast.
 
@@ -286,6 +335,10 @@ def plot_forecast_from_file(
         x_days_interval (int, optional): X-axis days interval. Defaults to ``2``.
         eruption_dates (list[str] | None, optional): Eruption dates to annotate
             as vertical dashed lines on every panel. Defaults to ``None``.
+        y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
+        legend_n_cols (int, optional): Number of column for legend. Defaults to ``5``.
+        bbox_to_anchor (tuple[float, float], optional): Legend position.
+            Defaults to ``(0.5, -0.05)``.
 
     Returns:
         plt.Figure: Matplotlib figure object with three vertically stacked subplots.
@@ -298,15 +351,22 @@ def plot_forecast_from_file(
     )
 
     return plot_forecast(
-        df,
-        label_df,
-        title,
-        fig_width,
-        fig_height,
-        threshold,
-        rolling_window,
-        x_days_interval,
-        eruption_dates,
+        df=df,
+        label_df=label_df,
+        title=title,
+        fig_width=fig_width,
+        fig_height=fig_height,
+        threshold=threshold,
+        rolling_window=rolling_window,
+        x_days_interval=x_days_interval,
+        eruption_dates=eruption_dates,
+        y_max=y_max,
+        legend_n_cols=legend_n_cols,
+        bbox_to_anchor=bbox_to_anchor,
+        training_start_date=training_start_date,
+        training_end_date=training_end_date,
+        prediction_start_date=prediction_start_date,
+        prediction_end_date=prediction_end_date,
     )
 
 
@@ -469,5 +529,95 @@ def ax_eruption(
         color="black",
         zorder=100,
     )
+
+    return ax
+
+
+def _ax_segment(
+    ax: plt.Axes,
+    training_start_date: str | datetime,
+    training_end_date: str | datetime,
+    prediction_start_date: str | datetime,
+    prediction_end_date: str | datetime,
+) -> plt.Axes:
+    training_start = to_datetime(training_start_date).replace(
+        hour=0, minute=0, second=0
+    )
+    training_end = to_datetime(training_end_date).replace(hour=23, minute=59, second=59)
+    prediction_start = to_datetime(prediction_start_date).replace(
+        hour=0, minute=0, second=0
+    )
+    prediction_end = to_datetime(prediction_end_date).replace(
+        hour=23, minute=59, second=59
+    )
+
+    gap_duration = (prediction_start - training_end).days
+
+    if gap_duration < 0:
+        logger.error(
+            f"Gap duration: {gap_duration}. Overlapping training end date "
+            f"({training_end:%Y-%m-%d}) and prediction start date "
+            f"({prediction_start:%Y-%m-%d}). Skip bar chart."
+        )
+        return ax
+
+    training_duration = (training_end - training_start).days + 1
+    prediction_duration = (prediction_end - prediction_start).days + 1
+
+    segments: list[dict[str, Any]] = [
+        {
+            "label": "Training",
+            "width": training_duration,
+            "left": mdates.date2num(training_start),
+            "color": "#009E73",
+            "hatch": None,
+        },
+        {
+            "label": "Gap",
+            "width": gap_duration,
+            "left": mdates.date2num(training_end),
+            "color": "white",
+            "hatch": "////",
+        },
+        {
+            "label": "Prediction",
+            "width": prediction_duration,
+            "left": mdates.date2num(prediction_start),
+            "color": "#d73027",
+            "hatch": None,
+        },
+    ]
+
+    y_pos = -0.2
+    for segment in segments:
+        if segment["label"] == "Gap" and gap_duration == 0:
+            continue
+
+        ax.barh(
+            y=y_pos,
+            label=segment["label"],
+            width=segment["width"],
+            left=segment["left"],
+            color=segment["color"],
+            hatch=segment["hatch"],
+            height=0.2,
+            alpha=0.5,
+        )
+
+    ax.xaxis_date()
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+
+    for spine in ["top", "right", "left", "bottom"]:
+        ax.spines[spine].set_visible(False)
+
+    ax.tick_params(
+        left=False,
+        labelleft=False,
+        bottom=False,
+        labelbottom=False,
+    )
+
+    ax.set_ylim(-0.2, 0.2)
 
     return ax
