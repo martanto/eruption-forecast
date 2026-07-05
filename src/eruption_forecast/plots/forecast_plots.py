@@ -31,7 +31,8 @@ def plot_forecast(
     eruption_dates: list[str] | None = None,
     y_max: float = 1.05,
     legend_n_cols: int = 6,
-    bbox_to_anchor: tuple[float, float] = (0.5, -0.05),
+    legend_fontsize: int = 6,
+    legend_position: tuple[float, float] = (0.5, -0.075),
     training_start_date: str | None = None,
     training_end_date: str | None = None,
     prediction_start_date: str | None = None,
@@ -83,14 +84,21 @@ def plot_forecast(
         rolling_window (str, optional): Pandas-compatible window string passed to
             ``DataFrame.rolling()`` for smoothing before plotting. Defaults to ``"6h"``.
         x_days_interval (int, optional): X-axis days interval. Defaults to ``2``.
+        x_label_fontsize (int, optional): X-axis tick-label font size on the bottom
+            data panel. Defaults to ``7``.
+        x_label_rotation (int, optional): X-axis tick-label rotation in degrees on the
+            bottom data panel. Defaults to ``-15``.
         eruption_dates (list[str] | None, optional): Eruption dates to annotate on
             every data panel as vertical dashed lines. Each entry is passed to
             :func:`to_datetime`. Defaults to ``None``.
         y_max (float, optional): Max y-value for the data panels. Defaults to ``1.05``.
         legend_n_cols (int, optional): Number of columns for the shared bottom legend.
             Defaults to ``6``.
-        bbox_to_anchor (tuple[float, float], optional): Legend position.
-            Defaults to ``(0.5, -0.05)``.
+        legend_fontsize (int, optional): Font size for the shared bottom legend.
+            Defaults to ``6``.
+        legend_position (tuple[float, float], optional): Position of the shared bottom
+            legend, forwarded as ``bbox_to_anchor`` to ``fig.legend()``.
+            Defaults to ``(0.5, -0.075)``.
         training_start_date (str | None, optional): Start of the training window for
             the top segment strip (green bar). The strip is only rendered when all
             four ``training_*`` / ``prediction_*`` dates are non-``None``.
@@ -124,7 +132,6 @@ def plot_forecast(
         if label_df is None or len(label_df) == 0:
             raise ValueError(
                 "df must have a DatetimeIndex; provide label_df (id→datetime mapping) so "
-                "set_datetime_index() can construct and align the forecast index."
                 "set_datetime_index() can construct and align the forecast index."
             )
         df = set_datetime_index(label_df, df)
@@ -264,6 +271,7 @@ def plot_forecast(
                     fontsize=x_label_fontsize,
                 )
 
+            ax.set_xlim(df.index.min(), df.index.max())
             ax.set_ylabel("Cons. Probability", fontsize=8)
 
         if eruption_dates is not None and len(eruption_dates) > 0:
@@ -283,7 +291,6 @@ def plot_forecast(
             label=f"Threshold {threshold}",
         )
 
-        ax.set_xlim(df.index[0], df.index[-1])
         ax.set_ylim(0, y_max)
         ax.tick_params(labelsize=6)
         ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.7)
@@ -318,77 +325,47 @@ def plot_forecast(
         labels,
         loc="lower center",
         ncol=legend_n_cols,
-        fontsize=6,
+        fontsize=legend_fontsize,
         frameon=False,
         fancybox=False,
-        bbox_to_anchor=bbox_to_anchor,
+        bbox_to_anchor=legend_position,
     )
 
-    fig.suptitle(title or "Forecast Results", fontsize=8)
+    start_date_str = df.index.min().strftime("%Y-%m-%d")
+    end_date_str = df.index.max().strftime("%Y-%m-%d")
+    default_title = f"Forecast Results\n{start_date_str}-{end_date_str}"
+
+    fig.suptitle(title or default_title, fontsize=8)
 
     return fig
 
 
 def plot_forecast_from_file(
     consensus_file: str,
-    title: str | None = None,
-    fig_width: float = 8,
-    fig_height: float = 1.5,
-    threshold: float = 0.7,
-    rolling_window: str = "6h",
-    x_days_interval: int = 2,
-    eruption_dates: list[str] | None = None,
-    y_max: float = 1.05,
-    legend_n_cols: int = 6,
-    bbox_to_anchor: tuple[float, float] = (0.5, -0.05),
     label_file: str | None = None,
-    training_start_date: str | None = None,
-    training_end_date: str | None = None,
-    prediction_start_date: str | None = None,
-    prediction_end_date: str | None = None,
+    **kwargs: Any,
 ) -> plt.Figure:
     """Load consensus and (optionally) label CSVs from disk and plot the forecast.
 
     Reads ``consensus_file``, aligns the resulting DataFrame to the label datetime
     index via :func:`set_datetime_index` when ``label_file`` is provided, and
-    delegates to :func:`plot_forecast`. See :func:`plot_forecast` for the full
-    layout description and the optional top segment strip.
+    delegates to :func:`plot_forecast`. All extra keyword arguments are forwarded
+    verbatim to :func:`plot_forecast` — see that function for the full list of
+    styling / layout options and the optional top segment strip.
 
     Args:
         consensus_file (str): Path to the consensus forecast CSV with an ``id``
             index column and per-classifier/consensus output columns.
-        title (str | None, optional): Figure suptitle. Defaults to
-            ``"Forecast Results"`` when ``None``.
-        fig_width (float, optional): Figure width in inches. Defaults to ``8``.
-        fig_height (float, optional): Height of each individual data panel in inches;
-            total figure height is ``3 * fig_height`` (plus a small increment for
-            the top segment strip when it is rendered). Defaults to ``1.5``.
-        threshold (float, optional): Decision threshold for fill-between coloring.
-            Defaults to ``0.7``.
-        rolling_window (str, optional): Pandas-compatible window string for
-            smoothing before plotting. Defaults to ``"6h"``.
-        x_days_interval (int, optional): X-axis days interval. Defaults to ``2``.
-        eruption_dates (list[str] | None, optional): Eruption dates to annotate
-            as vertical dashed lines on every data panel. Defaults to ``None``.
-        y_max (float, optional): Max y-value for the data panels. Defaults to ``1.05``.
-        legend_n_cols (int, optional): Number of columns for the shared bottom legend.
-            Defaults to ``6``.
-        bbox_to_anchor (tuple[float, float], optional): Legend position.
-            Defaults to ``(0.5, -0.05)``.
         label_file (str | None, optional): Path to the label CSV used for datetime
             alignment. When ``None``, an empty label frame is passed through and
             :func:`plot_forecast` will raise unless ``consensus_file`` already
             carries a ``pd.DatetimeIndex``. Defaults to ``None``.
-        training_start_date (str | None, optional): Start of the training window
-            for the top segment strip. The strip is only rendered when all four
-            ``training_*`` / ``prediction_*`` dates are non-``None``.
-            Defaults to ``None``.
-        training_end_date (str | None, optional): End of the training window for
-            the top segment strip. Defaults to ``None``.
-        prediction_start_date (str | None, optional): Start of the prediction window
-            for the top segment strip. Defaults to ``None``.
-        prediction_end_date (str | None, optional): End of the prediction window for
-            the top segment strip. Defaults to ``None``.
+        **kwargs: Forwarded to :func:`plot_forecast` (e.g. ``title``, ``fig_width``,
+            ``fig_height``, ``threshold``, ``rolling_window``, ``x_days_interval``,
+            ``x_label_fontsize``, ``x_label_rotation``, ``eruption_dates``, ``y_max``,
+            ``legend_n_cols``, ``legend_fontsize``, ``legend_position``,
+            ``training_start_date``, ``training_end_date``, ``prediction_start_date``,
+            ``prediction_end_date``).
 
     Returns:
         plt.Figure: Matplotlib figure with three vertically stacked data panels, plus
@@ -402,24 +379,7 @@ def plot_forecast_from_file(
         else pd.DataFrame()
     )
 
-    return plot_forecast(
-        df=df,
-        label_df=label_df,
-        title=title,
-        fig_width=fig_width,
-        fig_height=fig_height,
-        threshold=threshold,
-        rolling_window=rolling_window,
-        x_days_interval=x_days_interval,
-        eruption_dates=eruption_dates,
-        y_max=y_max,
-        legend_n_cols=legend_n_cols,
-        bbox_to_anchor=bbox_to_anchor,
-        training_start_date=training_start_date,
-        training_end_date=training_end_date,
-        prediction_start_date=prediction_start_date,
-        prediction_end_date=prediction_end_date,
-    )
+    return plot_forecast(df=df, label_df=label_df, **kwargs)
 
 
 def _ax_per_classifier(
@@ -640,7 +600,7 @@ def _ax_segment(
         },
     ]
 
-    y_pos = -0.2
+    y_pos = -0.25
     for segment in segments:
         if segment["label"] == "Gap" and gap_duration == 0:
             continue
@@ -656,9 +616,15 @@ def _ax_segment(
             alpha=0.5,
         )
 
-    ax.xaxis_date()
-    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+        if segment["label"] != "Gap":
+            ax.text(
+                segment["left"] + segment["width"] / 2,
+                y_pos + 0.15,
+                segment["label"],
+                ha="center",
+                va="bottom",
+                fontsize=7,
+            )
 
     for spine in ["top", "right", "left", "bottom"]:
         ax.spines[spine].set_visible(False)
