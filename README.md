@@ -694,6 +694,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.3.3
+**Version:** 0.3.4
 **Status:** Active Development
-**Last Updated:** 2026-06-27
+**Last Updated:** 2026-07-05
