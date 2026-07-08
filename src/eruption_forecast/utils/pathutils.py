@@ -23,7 +23,8 @@ def ensure_dir(path: str) -> str:
     Returns:
         str: The same ``path`` that was passed in.
     """
-    os.makedirs(path, exist_ok=True)
+    if path:
+        os.makedirs(path, exist_ok=True)
     return path
 
 
