@@ -7,6 +7,7 @@ import pandas as pd
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import setup_nslc_directories
 from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.config.forecast_config import (
@@ -43,6 +44,7 @@ class ForecastModel:
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ):
@@ -68,6 +70,15 @@ class ForecastModel:
             overwrite (bool): Default overwrite flag inherited by every
                 stage method when its own ``overwrite`` kwarg is
                 ``None``. Defaults to ``False``.
+            prefix_config (str | None): Discriminator slugified into
+                every stage ``save_config()`` filename, inserted before
+                ``.config`` (e.g. ``"scenario 1"`` →
+                ``forecast.scenario-1.config.yaml``). Threaded into
+                ``TrainingModel``, ``PredictionModel``,
+                ``EvaluationModel``, and ``ExplanationModel`` so all
+                five per-stage YAMLs pick up the same discriminator when
+                multiple scenarios share an ``output_dir``. ``None``
+                keeps today's filenames. Defaults to ``None``.
             n_jobs (int): Default parallel-worker count inherited by
                 every stage method when its own ``n_jobs`` kwarg is
                 ``None``. Defaults to ``1``.
@@ -98,6 +109,7 @@ class ForecastModel:
         self.output_dir = output_dir
         self.root_dir = root_dir
         self.overwrite = overwrite
+        self.prefix_config = prefix_config
         self.n_jobs = n_jobs
         self.verbose = verbose
 
@@ -142,6 +154,7 @@ class ForecastModel:
                 output_dir=_config_output_dir,
                 root_dir=_config_root_dir,
                 overwrite=overwrite,
+                prefix_config=prefix_config,
                 n_jobs=n_jobs,
                 verbose=verbose,
             )
@@ -607,6 +620,7 @@ class ForecastModel:
                 nslc=self.nslc,
                 output_dir=resolved_output_dir,
                 overwrite=overwrite,
+                prefix_config=self.prefix_config,
                 n_jobs=n_jobs,
                 n_grids=n_grids,
                 verbose=verbose,
@@ -834,6 +848,7 @@ class ForecastModel:
             training_hash=self._training_cache_hash,
             output_dir=resolved_output_dir,
             overwrite=overwrite,
+            prefix_config=self.prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -967,6 +982,7 @@ class ForecastModel:
             eruption_dates=eruption_dates,
             output_dir=output_dir or self.station_dir,
             overwrite=overwrite,
+            prefix_config=self.prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -1109,6 +1125,7 @@ class ForecastModel:
                 eruption_dates=eruption_dates,
                 output_dir=output_dir or self.station_dir,
                 overwrite=overwrite,
+                prefix_config=self.prefix_config,
                 n_jobs=n_jobs,
                 verbose=verbose,
             )
@@ -1155,7 +1172,11 @@ class ForecastModel:
             path (str | None): Destination file path.  ``None`` resolves to
                 ``{station_dir}/forecast.config.{fmt}``, a sibling of the
                 per-stage cache pickles written next to each stage's outputs
-                by :meth:`BaseModel.save`. Defaults to ``None``.
+                by :meth:`BaseModel.save`. When ``self.prefix_config`` is
+                set, its slugified form is inserted before ``.config`` —
+                e.g. ``forecast.scenario-1.config.yaml`` — so multiple
+                scenarios sharing the same ``station_dir`` do not clobber
+                each other. Defaults to ``None``.
             fmt (Literal["yaml", "json"]): Output format.  Defaults to
                 ``"yaml"``.
 
@@ -1163,7 +1184,12 @@ class ForecastModel:
             str: The absolute path the configuration was written to.
         """
         if path is None:
-            path = os.path.join(self.station_dir, f"forecast.config.{fmt}")
+            suffix = (
+                f".{slug}"
+                if self.prefix_config and (slug := slugify(self.prefix_config))
+                else ""
+            )
+            path = os.path.join(self.station_dir, f"forecast{suffix}.config.{fmt}")
         return self._config.save(path, fmt)
 
     @classmethod

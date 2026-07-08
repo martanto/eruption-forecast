@@ -29,6 +29,10 @@ class EvaluationConfig(BaseConfig):
             ``root_dir/output``. Defaults to ``None``.
         root_dir (str | None): Anchor directory for resolving relative paths.
             ``None`` falls back to ``os.getcwd()``. Defaults to ``None``.
+        prefix_config (str | None): Discriminator slugified into the
+            ``save_config()`` filename, inserted before ``.config`` (e.g.
+            ``"scenario 1"`` → ``evaluation.scenario-1.config.yaml``).
+            ``None`` keeps the default filename. Defaults to ``None``.
         n_jobs (int): Number of parallel workers. Defaults to ``1``.
         verbose (bool): Emit detailed progress logs. Defaults to ``False``.
         version (str): Schema version string.
@@ -39,6 +43,7 @@ class EvaluationConfig(BaseConfig):
     overwrite: bool = False
     output_dir: str | None = None
     root_dir: str | None = None
+    prefix_config: str | None = None
     n_jobs: int = 1
     verbose: bool = False
 
@@ -65,6 +70,7 @@ class EvaluationConfig(BaseConfig):
             "overwrite",
             "output_dir",
             "root_dir",
+            "prefix_config",
             "n_jobs",
             "verbose",
         ):

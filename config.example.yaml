@@ -12,6 +12,7 @@ model:
   output_dir: null          # Override default output directory (null = auto)
   root_dir: null            # Root directory anchor for relative output paths (null = cwd)
   overwrite: false          # Overwrite existing output files
+  prefix_config: null       # Discriminator slugified into every stage save_config() filename before '.config' (e.g. 'scenario 1' -> forecast.scenario-1.config.yaml); null keeps default names
   n_jobs: 1                 # Parallel workers for the outer pipeline
   verbose: false
 

@@ -33,6 +33,13 @@ class BaseForecastConfig(BaseConfig):
             ``None`` falls back to ``os.getcwd()``. Defaults to ``None``.
         overwrite (bool): Whether to overwrite existing output files.
             Defaults to ``False``.
+        prefix_config (str | None): Discriminator slugified into every stage
+            ``save_config()`` filename, inserted before ``.config`` (e.g.
+            ``"scenario 1"`` → ``forecast.scenario-1.config.yaml``). ``None``
+            keeps the default filenames. Threaded from ``ForecastModel`` into
+            each stage constructor so ``training.config``, ``prediction.config``,
+            ``evaluation.config``, and ``explanation.config`` all pick up the
+            same discriminator. Defaults to ``None``.
         n_jobs (int): Number of parallel workers. Defaults to ``1``.
         verbose (bool): Enable verbose logging. Defaults to ``False``.
     """
@@ -45,6 +52,7 @@ class BaseForecastConfig(BaseConfig):
     output_dir: str | None = None
     root_dir: str | None = None
     overwrite: bool = False
+    prefix_config: str | None = None
     n_jobs: int = 1
     verbose: bool = False
 

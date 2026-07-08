@@ -48,6 +48,10 @@ class TrainingConfig(BaseConfig):
             ``None`` falls back to ``os.getcwd()``. Defaults to ``None``.
         overwrite (bool): Re-run and overwrite cached feature and model
             files. Defaults to ``False``.
+        prefix_config (str | None): Discriminator slugified into the
+            ``save_config()`` filename, inserted before ``.config`` (e.g.
+            ``"scenario 1"`` → ``training.scenario-1.config.yaml``). ``None``
+            keeps the default filename. Defaults to ``None``.
         n_jobs (int): Number of parallel outer workers for seed-level
             parallelism. Defaults to ``1``.
         n_grids (int): Parallel workers used inside ``GridSearchCV`` and
@@ -73,6 +77,7 @@ class TrainingConfig(BaseConfig):
     output_dir: str | None = None
     root_dir: str | None = None
     overwrite: bool = False
+    prefix_config: str | None = None
     n_jobs: int = 1
     n_grids: int = 1
     verbose: bool = False
@@ -110,6 +115,7 @@ class TrainingConfig(BaseConfig):
             "output_dir",
             "root_dir",
             "overwrite",
+            "prefix_config",
             "n_jobs",
             "n_grids",
             "verbose",
