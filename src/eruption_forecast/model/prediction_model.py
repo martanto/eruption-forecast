@@ -10,6 +10,7 @@ from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import set_datetime_index
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.utils.validation import check_sampling_consistency
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.config.prediction_config import PredictionConfig
@@ -49,6 +50,10 @@ class PredictionModel(BaseModel):
             relative to ``root_dir`` when omitted. Defaults to ``None``.
         root_dir (str | None, optional): Project root directory used to resolve
             ``output_dir``. Defaults to ``None``.
+        prefix_config (str | None, optional): Discriminator slugified into the
+            ``save_config()`` filename, inserted before ``.config`` (e.g.
+            ``"scenario 1"`` → ``prediction.scenario-1.config.yaml``). ``None``
+            keeps the default filename. Defaults to ``None``.
         n_jobs (int, optional): Number of parallel workers. Defaults to ``1``.
         verbose (bool, optional): Emit verbose log messages when ``True``.
             Defaults to ``False``.
@@ -105,6 +110,7 @@ class PredictionModel(BaseModel):
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ):
@@ -131,6 +137,9 @@ class PredictionModel(BaseModel):
                 to ``None``.
             root_dir (str | None, optional): Project root directory. Defaults
                 to ``None``.
+            prefix_config (str | None, optional): Discriminator slugified into
+                the ``save_config()`` filename, inserted before ``.config``.
+                Defaults to ``None``.
             n_jobs (int, optional): Number of parallel workers. Defaults to ``1``.
             verbose (bool, optional): Emit verbose log messages when ``True``.
                 Defaults to ``False``.
@@ -146,6 +155,7 @@ class PredictionModel(BaseModel):
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -172,6 +182,7 @@ class PredictionModel(BaseModel):
         self.nslc: str | None = nslc
         self.training_hash: str | None = training_hash
         self.overwrite = overwrite
+        self.prefix_config: str | None = prefix_config
         self.basename = (
             f"{self.start_date_str}_{self.end_date_str}_ws-{self.window_size}"
         )
@@ -212,6 +223,7 @@ class PredictionModel(BaseModel):
         overwrite: bool,
         output_dir: str | None,
         root_dir: str | None,
+        prefix_config: str | None,
         n_jobs: int,
         verbose: bool,
     ) -> PredictionConfig:
@@ -232,6 +244,8 @@ class PredictionModel(BaseModel):
             overwrite (bool): Overwrite cached artefacts.
             output_dir (str | None): Root output directory.
             root_dir (str | None): Project root.
+            prefix_config (str | None): Slugified discriminator inserted into
+                the ``save_config()`` filename before ``.config``.
             n_jobs (int): Parallel workers.
             verbose (bool): Emit verbose logs.
 
@@ -251,6 +265,7 @@ class PredictionModel(BaseModel):
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -447,8 +462,12 @@ class PredictionModel(BaseModel):
         Args:
             path (str | None): Destination file path. ``None`` resolves to
                 ``{prediction_dir}/prediction.config.{fmt}`` so the config
-                sits next to the artefacts produced by ``forecast()``.
-                Defaults to ``None``.
+                sits next to the artefacts produced by ``forecast()``. When
+                ``self.prefix_config`` is set, its slugified form is inserted
+                before ``.config`` — e.g.
+                ``prediction.scenario-1.config.yaml`` — so multiple scenarios
+                sharing the same ``prediction_dir`` do not overwrite each
+                other. Defaults to ``None``.
             fmt (Literal["yaml", "json"]): Output format. Defaults to
                 ``"yaml"``.
 
@@ -461,7 +480,14 @@ class PredictionModel(BaseModel):
             'output/VG.OJN.00.EHZ/prediction/prediction.config.yaml'
         """
         if path is None:
-            path = os.path.join(self.prediction_dir, f"prediction.config.{fmt}")
+            suffix = (
+                f".{slug}"
+                if self.prefix_config and (slug := slugify(self.prefix_config))
+                else ""
+            )
+            path = os.path.join(
+                self.prediction_dir, f"prediction{suffix}.config.{fmt}"
+            )
         return self._config.save(path, fmt)
 
     @property

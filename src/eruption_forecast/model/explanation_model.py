@@ -4,6 +4,7 @@ from typing import Self, Literal
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.config.explanation_config import ExplanationConfig
@@ -48,6 +49,7 @@ class ExplanationModel(BaseModel):
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ):
@@ -67,6 +69,11 @@ class ExplanationModel(BaseModel):
                 ``model`` when ``None``. Defaults to ``None``.
             root_dir (str | None): Project root used to anchor relative
                 output paths. Defaults to ``None``.
+            prefix_config (str | None): Discriminator slugified into the
+                ``save_config()`` filename, inserted before ``.config``
+                (e.g. ``"scenario 1"`` →
+                ``explanation.scenario-1.config.yaml``). ``None`` keeps
+                the default filename. Defaults to ``None``.
             n_jobs (int): Parallel workers. Defaults to ``1``.
             verbose (bool): Verbose logging. Defaults to ``False``.
 
@@ -112,6 +119,7 @@ class ExplanationModel(BaseModel):
         self.model_kind: Literal["training", "prediction"] = model.kind
         self.ClassifierEnsemble: ClassifierEnsemble = model.ClassifierEnsemble
         self.features_df = model.features_df
+        self.prefix_config: str | None = prefix_config
         self.basename = (
             f"{type(model).__name__}_{self.start_date_str}_{self.end_date_str}"
         )
@@ -140,6 +148,7 @@ class ExplanationModel(BaseModel):
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -186,6 +195,7 @@ class ExplanationModel(BaseModel):
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> "ExplanationModel":
@@ -208,6 +218,9 @@ class ExplanationModel(BaseModel):
                 ``None``.
             root_dir (str | None): Project root used to anchor relative
                 output paths. Defaults to ``None``.
+            prefix_config (str | None): Discriminator slugified into the
+                ``save_config()`` filename, inserted before ``.config``.
+                Defaults to ``None``.
             n_jobs (int): Parallel workers. Defaults to ``1``.
             verbose (bool): Verbose logging. Defaults to ``False``.
 
@@ -233,6 +246,7 @@ class ExplanationModel(BaseModel):
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -373,7 +387,11 @@ class ExplanationModel(BaseModel):
                 ``{explanation_dir}/explanation.config.{fmt}`` — already
                 namespaced by upstream stage (``explanation/training/`` or
                 ``explanation/prediction/``) so the two reuse modes never
-                collide. Defaults to ``None``.
+                collide. When ``self.prefix_config`` is set, its slugified
+                form is inserted before ``.config`` — e.g.
+                ``explanation.scenario-1.config.yaml`` — so multiple
+                scenarios sharing the same ``explanation_dir`` do not
+                overwrite each other. Defaults to ``None``.
             fmt (Literal["yaml", "json"]): Output format. Defaults to
                 ``"yaml"``.
 
@@ -386,7 +404,14 @@ class ExplanationModel(BaseModel):
             'output/VG.OJN.00.EHZ/explanation/prediction/explanation.config.yaml'
         """
         if path is None:
-            path = os.path.join(self.explanation_dir, f"explanation.config.{fmt}")
+            suffix = (
+                f".{slug}"
+                if self.prefix_config and (slug := slugify(self.prefix_config))
+                else ""
+            )
+            path = os.path.join(
+                self.explanation_dir, f"explanation{suffix}.config.{fmt}"
+            )
         return self._config.save(path, fmt)
 
     def _upstream_hash(self) -> str:

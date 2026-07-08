@@ -6,6 +6,7 @@ import pandas as pd
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
@@ -55,6 +56,10 @@ class EvaluationModel(BaseModel):
             when ``None``. Defaults to ``None``.
         root_dir (str | None): Project root used for path resolution. Defaults
             to ``None``.
+        prefix_config (str | None): Discriminator slugified into the
+            ``save_config()`` filename, inserted before ``.config`` (e.g.
+            ``"scenario 1"`` → ``evaluation.scenario-1.config.yaml``).
+            ``None`` keeps the default filename. Defaults to ``None``.
         n_jobs (int): Number of parallel workers. Defaults to ``1``.
         verbose (bool): Emit detailed progress logs. Defaults to ``False``.
 
@@ -78,6 +83,7 @@ class EvaluationModel(BaseModel):
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> None:
@@ -99,6 +105,9 @@ class EvaluationModel(BaseModel):
             output_dir (str | None): Root output directory. Derived from
                 ``model`` when ``None``. Defaults to ``None``.
             root_dir (str | None): Project root. Defaults to ``None``.
+            prefix_config (str | None): Discriminator slugified into the
+                ``save_config()`` filename, inserted before ``.config``.
+                Defaults to ``None``.
             n_jobs (int): Parallel workers. Defaults to ``1``.
             verbose (bool): Verbose logging. Defaults to ``False``.
 
@@ -146,6 +155,7 @@ class EvaluationModel(BaseModel):
         self.window_step: int = model.window_step
         self.window_step_unit: Literal["minutes", "hours"] = model.window_step_unit
         self.basename: str = f"{self.start_date_str}_{self.end_date_str}"
+        self.prefix_config: str | None = prefix_config
 
         # ``self.y_true`` always holds ground-truth labels (0/1) when populated.
         # Training reuse: ``TrainingModel.labels`` is already truth on
@@ -183,6 +193,7 @@ class EvaluationModel(BaseModel):
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -195,6 +206,7 @@ class EvaluationModel(BaseModel):
         overwrite: bool = False,
         output_dir: str | None = None,
         root_dir: str | None = None,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         verbose: bool = False,
     ) -> "EvaluationModel":
@@ -215,6 +227,9 @@ class EvaluationModel(BaseModel):
             output_dir (str | None): Root output directory. Derived from the
                 loaded model when ``None``. Defaults to ``None``.
             root_dir (str | None): Project root. Defaults to ``None``.
+            prefix_config (str | None): Discriminator slugified into the
+                ``save_config()`` filename, inserted before ``.config``.
+                Defaults to ``None``.
             n_jobs (int): Parallel workers. Defaults to ``1``.
             verbose (bool): Verbose logging. Defaults to ``False``.
 
@@ -248,6 +263,7 @@ class EvaluationModel(BaseModel):
             overwrite=overwrite,
             output_dir=output_dir,
             root_dir=root_dir,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             verbose=verbose,
         )
@@ -373,7 +389,11 @@ class EvaluationModel(BaseModel):
                 ``{evaluation_dir}/evaluation.config.{fmt}`` — already
                 namespaced by mode (``evaluation/training/`` or
                 ``evaluation/prediction/``) so training and prediction reuse
-                configs never collide. Defaults to ``None``.
+                configs never collide. When ``self.prefix_config`` is set,
+                its slugified form is inserted before ``.config`` — e.g.
+                ``evaluation.scenario-1.config.yaml`` — so multiple scenarios
+                sharing the same ``evaluation_dir`` do not overwrite each
+                other. Defaults to ``None``.
             fmt (Literal["yaml", "json"]): Output format. Defaults to
                 ``"yaml"``.
 
@@ -386,7 +406,14 @@ class EvaluationModel(BaseModel):
             'output/VG.OJN.00.EHZ/evaluation/prediction/evaluation.config.yaml'
         """
         if path is None:
-            path = os.path.join(self.evaluation_dir, f"evaluation.config.{fmt}")
+            suffix = (
+                f".{slug}"
+                if self.prefix_config and (slug := slugify(self.prefix_config))
+                else ""
+            )
+            path = os.path.join(
+                self.evaluation_dir, f"evaluation{suffix}.config.{fmt}"
+            )
         return self._config.save(path, fmt)
 
     def build_label(

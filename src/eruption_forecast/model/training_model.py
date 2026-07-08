@@ -29,6 +29,7 @@ from eruption_forecast.utils.dataframe import (
 from eruption_forecast.utils.pathutils import ensure_dir, generate_features_filepaths
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
+from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.label.label_builder import LabelBuilder
 from eruption_forecast.config.training_config import TrainingConfig
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
@@ -71,6 +72,10 @@ class TrainingModel(BaseModel):
             to None.
         overwrite (bool): Re-run and overwrite cached feature and model files.
             Defaults to False.
+        prefix_config (str | None): Discriminator slugified into the
+            ``save_config()`` filename, inserted before ``.config``
+            (e.g. ``"scenario 1"`` → ``training.scenario-1.config.yaml``).
+            ``None`` keeps the default filename. Defaults to ``None``.
         n_jobs (int): Number of parallel outer workers for seed-level
             parallelism. Defaults to 1.
         n_grids (int): Parallel workers used inside ``GridSearchCV`` and
@@ -110,6 +115,7 @@ class TrainingModel(BaseModel):
         output_dir: str | None = None,
         root_dir: str | None = None,
         overwrite: bool = False,
+        prefix_config: str | None = None,
         n_jobs: int = 1,
         n_grids: int = 1,
         verbose: bool = False,
@@ -129,6 +135,7 @@ class TrainingModel(BaseModel):
             output_dir=output_dir,
             root_dir=root_dir,
             overwrite=overwrite,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             n_grids=n_grids,
             verbose=verbose,
@@ -158,6 +165,7 @@ class TrainingModel(BaseModel):
         self.include_eruption_date: bool = include_eruption_date
         self.nslc: str | None = nslc
         self.overwrite: bool = overwrite
+        self.prefix_config: str | None = prefix_config
         self.n_grids: int = n_grids
 
         # Captured from extract_features() / fit() kwargs so fit() can rebuild
@@ -230,6 +238,7 @@ class TrainingModel(BaseModel):
         output_dir: str | None,
         root_dir: str | None,
         overwrite: bool,
+        prefix_config: str | None,
         n_jobs: int,
         n_grids: int,
         verbose: bool,
@@ -256,6 +265,8 @@ class TrainingModel(BaseModel):
             output_dir (str | None): Root output directory.
             root_dir (str | None): Project root.
             overwrite (bool): Overwrite cached artefacts.
+            prefix_config (str | None): Slugified discriminator inserted into
+                the ``save_config()`` filename before ``.config``.
             n_jobs (int): Outer parallel workers.
             n_grids (int): Inner grid-search workers.
             verbose (bool): Emit verbose logs.
@@ -280,6 +291,7 @@ class TrainingModel(BaseModel):
             output_dir=output_dir,
             root_dir=root_dir,
             overwrite=overwrite,
+            prefix_config=prefix_config,
             n_jobs=n_jobs,
             n_grids=n_grids,
             verbose=verbose,
@@ -509,8 +521,12 @@ class TrainingModel(BaseModel):
         Args:
             path (str | None): Destination file path. ``None`` resolves to
                 ``{training_dir}/training.config.{fmt}`` so the config sits
-                next to the artefacts produced by ``fit()``. Defaults to
-                ``None``.
+                next to the artefacts produced by ``fit()``. When
+                ``self.prefix_config`` is set, its slugified form is inserted
+                before ``.config`` — e.g.
+                ``training.scenario-1.config.yaml`` — so multiple scenarios
+                sharing the same ``training_dir`` do not overwrite each other.
+                Defaults to ``None``.
             fmt (Literal["yaml", "json"]): Output format. Defaults to
                 ``"yaml"``.
 
@@ -523,7 +539,12 @@ class TrainingModel(BaseModel):
             'output/VG.OJN.00.EHZ/training/training.config.yaml'
         """
         if path is None:
-            path = os.path.join(self.training_dir, f"training.config.{fmt}")
+            suffix = (
+                f".{slug}"
+                if self.prefix_config and (slug := slugify(self.prefix_config))
+                else ""
+            )
+            path = os.path.join(self.training_dir, f"training{suffix}.config.{fmt}")
         return self._config.save(path, fmt)
 
     @property
