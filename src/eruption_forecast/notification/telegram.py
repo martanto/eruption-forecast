@@ -12,6 +12,7 @@ notifier that never blocks the caller.
 """
 
 import os
+import re
 import json
 import socket
 import contextlib
@@ -26,6 +27,29 @@ from niquests.models import Response
 
 TELEGRAM_API_URL = "https://api.telegram.org"
 PHOTO_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"})
+_MARKDOWN_V2_RESERVED = re.compile(r"([\\_*\[\]()~`>#+\-=|{}.!])")
+
+
+def _escape_markdown_v2(text: str) -> str:
+    """Escape every MarkdownV2 reserved character in ``text``.
+
+    Telegram's MarkdownV2 parser treats ``_ * [ ] ( ) ~ ` > # + - = | { } . !``
+    as entity delimiters, and ``\\`` as the escape character itself; every
+    one of these must appear backslash-prefixed in normal text or the
+    payload is rejected (see
+    https://core.telegram.org/bots/api#markdownv2-style). This helper
+    prefixes each occurrence with ``\\`` in a single left-to-right pass —
+    which is why ``\\`` sits inside the same character class as the other
+    reserved characters, so an incoming ``\\`` becomes ``\\\\`` exactly
+    once instead of being doubled by a two-stage escape.
+
+    Args:
+        text (str): Arbitrary plain-text caption.
+
+    Returns:
+        str: ``text`` with every reserved character backslash-escaped.
+    """
+    return _MARKDOWN_V2_RESERVED.sub(r"\\\1", text)
 
 
 class TelegramNotification:
@@ -145,8 +169,13 @@ class TelegramNotification:
             **kwargs: Additional Telegram parameters (e.g. ``caption``,
                 ``parse_mode``, ``disable_notification``). When ``caption``
                 is provided without ``parse_mode``, MarkdownV2 is applied
-                automatically; when omitted, the filename is used as a
-                plain-text caption.
+                automatically and every MarkdownV2 reserved character
+                (``\\ _ * [ ] ( ) ~ ` > # + - = | { } . !``) is escaped
+                for the caller so the caption round-trips literally.
+                Callers who want live MarkdownV2 formatting must pass
+                ``parse_mode`` explicitly and escape reserved characters
+                themselves. When ``caption`` is omitted, the filename is
+                used as a plain-text caption.
 
         Returns:
             Self: The client instance for fluent chaining.
@@ -212,9 +241,11 @@ class TelegramNotification:
             files (str | list[str]): One or more local file paths.
             kind (Literal["photo", "document"]): Media type applied to
                 every item in the album. Defaults to ``"photo"``.
-            caption (str | None): Optional MarkdownV2 caption attached to
-                the first item of the first album only (Telegram
-                convention). Defaults to ``None``.
+            caption (str | None): Optional caption attached to the first
+                item of the first album only (Telegram convention). Sent
+                under MarkdownV2 with reserved characters auto-escaped,
+                so a plain-text string round-trips literally. Defaults to
+                ``None``.
             timeout (float): HTTP timeout in seconds. Defaults to ``30.0``.
             disable_notification (bool): When ``True``, delivery is
                 silent. Defaults to ``False``.
@@ -267,8 +298,12 @@ class TelegramNotification:
         Shared implementation for :meth:`send_document` and the photo
         path of :meth:`send_photo`. Missing files are logged and skipped
         without raising. If ``caption`` is absent from ``kwargs`` the
-        filename is used as a plain-text caption; if present, MarkdownV2
-        is applied automatically when no ``parse_mode`` is supplied.
+        filename is used as a plain-text caption; if present without a
+        ``parse_mode``, MarkdownV2 is applied and the caption is
+        auto-escaped with :func:`_escape_markdown_v2` so reserved
+        characters (e.g. ``-``, ``.``) round-trip literally. Callers who
+        want live MarkdownV2 formatting must pass ``parse_mode`` and
+        escape reserved characters themselves.
 
         Args:
             url (str): Fully-qualified Telegram endpoint URL.
@@ -291,6 +326,7 @@ class TelegramNotification:
         if "caption" not in data:
             data["caption"] = file_path.name
         elif "parse_mode" not in data:
+            data["caption"] = _escape_markdown_v2(str(data["caption"]))
             data["parse_mode"] = "MarkdownV2"
 
         try:
@@ -328,8 +364,10 @@ class TelegramNotification:
         after filtering, the call is transparently rerouted to
         :meth:`send_photo` or :meth:`send_document`, since Telegram
         rejects single-item media groups. When ``caption`` is supplied
-        it is attached to the first item with MarkdownV2; every other
-        item gets its filename as a plain-text caption.
+        it is auto-escaped with :func:`_escape_markdown_v2` and attached
+        to the first item under MarkdownV2 so reserved characters
+        round-trip literally; every other item gets its filename as a
+        plain-text caption.
 
         Args:
             url (str): ``sendMediaGroup`` endpoint URL.
@@ -372,7 +410,7 @@ class TelegramNotification:
                         "media": f"attach://{attach_name}",
                     }
                     if i == 0 and caption is not None:
-                        item["caption"] = caption
+                        item["caption"] = _escape_markdown_v2(caption)
                         item["parse_mode"] = "MarkdownV2"
                     else:
                         item["caption"] = path.name
