@@ -193,6 +193,33 @@ df = pm.results
 
 The reloaded `pm.results` is the same DataFrame returned by `forecast()` - no re-inference needed for downstream analysis.
 
+### Reuse a feature matrix from a prior run
+
+`PredictionModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix_*.parquet` + `features-label_*.csv`. Use it when the windowing and tremor data have not changed — for example replaying `forecast()` with a different trained ensemble against an existing feature matrix, or forecasting from *just two files* (a `ClassifierEnsemble.pkl` plus a pre-computed features matrix) without ever pointing at raw tremor data:
+
+```python
+from eruption_forecast import PredictionModel
+
+pm = PredictionModel(
+    model="output/VG.OJN.00.EHZ/training/classifiers/ClassifierEnsemble_StratifiedShuffleSplit.pkl",
+    tremor_data="output/VG.OJN.00.EHZ/tremor/VG.OJN.00.EHZ_2025-01-01_2025-12-31.csv",
+    start_date="2025-07-27",
+    end_date="2025-08-22",
+    window_size=2,                 # must match the trained model's window_size
+    output_dir="output/VG.OJN.00.EHZ",
+    n_jobs=4,
+).load_features(
+    features_matrix_path="output/VG.OJN.00.EHZ/prediction/features/features-matrix_2025-07-27_2025-08-22_step-10-minutes.parquet",
+    label_features_csv="output/VG.OJN.00.EHZ/prediction/features/features-label_2025-07-27_2025-08-22_step-10-minutes.csv",
+    window_step=10,
+    window_step_unit="minutes",
+)
+
+df_forecast = pm.forecast(plot_threshold=0.7, plot_pdf=True)
+```
+
+`load_features()` drops in as a replacement for the `build_label() → extract_features()` prefix before `forecast()`. Both paths are required — no auto-resolve fallback — so intent is always explicit and a stale `features-*_*` artefact in `self.features_dir` cannot be picked up silently. The loader validates that the label CSV's sampling matches the caller-supplied `window_step` / `window_step_unit` and that its `datetime` span covers the configured `[start_date, end_date]` forecast range. `ForecastModel.predict(features_matrix_path=..., label_features_csv=...)` threads the same call from the orchestrator.
+
 ### Persist the prediction config
 
 ```python
