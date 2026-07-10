@@ -14,9 +14,14 @@ import functools
 from typing import Literal
 from collections.abc import Callable
 
-from loguru import logger
-
+from eruption_forecast.logger import get_category_logger
 from eruption_forecast.notification.telegram import TelegramNotification
+
+
+# Category-bound logger so Telegram-dispatch failures land in
+# ``logs/telegram_*.log`` instead of the general forecast log.
+# See ``eruption_forecast.logger``.
+logger = get_category_logger("telegram")
 
 
 def _format_elapsed(seconds: float) -> str:
