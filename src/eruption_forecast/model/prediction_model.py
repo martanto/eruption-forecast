@@ -485,9 +485,7 @@ class PredictionModel(BaseModel):
                 if self.prefix_config and (slug := slugify(self.prefix_config))
                 else ""
             )
-            path = os.path.join(
-                self.prediction_dir, f"prediction{suffix}.config.{fmt}"
-            )
+            path = os.path.join(self.prediction_dir, f"prediction{suffix}.config.{fmt}")
         return self._config.save(path, fmt)
 
     @property
@@ -1032,8 +1030,8 @@ class PredictionModel(BaseModel):
         fig = plot_forecast(
             df=df,
             label_df=self._labels,
-            threshold=threshold,
             title=title,
+            threshold=threshold,
             **plot_kwargs,
         )
 

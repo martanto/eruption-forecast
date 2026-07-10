@@ -679,6 +679,7 @@ class ForecastModel:
         plot_pdf: bool = True,
         features_matrix_path: str | None = None,
         label_features_csv: str | None = None,
+        enable_segments_plot: bool = False,
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
@@ -727,6 +728,13 @@ class ForecastModel:
                 ``features-label_*.csv`` for ``features_matrix_path``.
                 Both paths must be provided together. Defaults to
                 ``None``.
+            enable_segments_plot (bool): When ``True``, forward the
+                training and prediction date ranges to
+                :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
+                so it renders the top segment strip above the forecast
+                panels. When ``False``, the four date kwargs are passed
+                as ``None`` and the strip is omitted. Defaults to
+                ``False``.
             output_dir (str | None): Root output directory for
                 prediction artefacts. Defaults to the station
                 directory.
@@ -795,6 +803,7 @@ class ForecastModel:
             plot_pdf=plot_pdf,
             features_matrix_path=features_matrix_path,
             label_features_csv=label_features_csv,
+            enable_segments_plot=enable_segments_plot,
             output_dir=output_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
@@ -880,6 +889,18 @@ class ForecastModel:
             plot_threshold=plot_threshold,
             plot_title=plot_title,
             plot_pdf=plot_pdf,
+            training_start_date=(
+                self.TrainingModel.start_date_str if enable_segments_plot else None
+            ),
+            training_end_date=(
+                self.TrainingModel.end_date_str if enable_segments_plot else None
+            ),
+            prediction_start_date=(
+                prediction_model.start_date_str if enable_segments_plot else None
+            ),
+            prediction_end_date=(
+                prediction_model.end_date_str if enable_segments_plot else None
+            ),
             **plot_kwargs,
         )
 

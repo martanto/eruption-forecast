@@ -288,6 +288,12 @@ class ForecastPredictConfig(BaseConfig):
         label_features_csv (str | None): Companion ``features-label_*.csv``
             for ``features_matrix_path``. Both paths must be supplied
             together. Defaults to ``None``.
+        enable_segments_plot (bool): When ``True``, forward the training and
+            prediction date ranges to
+            :func:`~eruption_forecast.plots.forecast_plots.plot_forecast` so
+            it renders the top segment strip above the forecast panels. When
+            ``False``, the four date kwargs are passed as ``None`` and the
+            strip is omitted. Defaults to ``False``.
         output_dir (str | None): Override for the prediction output
             directory. ``None`` uses ``ForecastModel.station_dir``. Defaults
             to ``None``.
@@ -313,6 +319,7 @@ class ForecastPredictConfig(BaseConfig):
     plot_pdf: bool = True
     features_matrix_path: str | None = None
     label_features_csv: str | None = None
+    enable_segments_plot: bool = False
     output_dir: str | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None
