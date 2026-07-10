@@ -59,8 +59,10 @@ if TYPE_CHECKING:
 _GENERAL_LOG_RETENTION = "30 days"
 _ERROR_LOG_RETENTION = "90 days"
 
-# Tracks whether logging is currently enabled.
-_logging_enabled: bool = True
+# Tracks whether logging is currently enabled. Seeded from ``DISABLE_LOGGING``
+# so a process launched with the env var set can still round-trip through
+# ``enable_logging()`` later.
+_logging_enabled: bool = os.environ.get("DISABLE_LOGGING") != "1"
 
 # Per-category error sinks. Keyed by category name; each entry stores the
 # minimum level and retention for that category's log file. Records emitted
@@ -71,7 +73,9 @@ _ERROR_CATEGORIES: dict[str, dict[str, str]] = {
     "telegram": {"level": "WARNING", "retention": _ERROR_LOG_RETENTION},
 }
 
-DEFAULT_LOG_DIR = ensure_dir(os.path.join(os.getcwd(), "logs"))
+#  Path only — the directory is created lazily by ``_configure_handlers`` so
+#  importing this module with ``DISABLE_LOGGING=1`` has no filesystem effect.
+DEFAULT_LOG_DIR = os.path.join(os.getcwd(), "logs")
 
 _FILE_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
@@ -132,6 +136,7 @@ def _configure_handlers(log_dir: str, console_level: str = "INFO") -> None:
         console_level (str, optional): Log level for the console handler.
             Defaults to "INFO".
     """
+    ensure_dir(log_dir)
     logger.remove()
 
     logger.add(
@@ -263,7 +268,7 @@ def set_log_directory(log_dir: str) -> None:
             Created automatically if it does not exist.
     """
     global DEFAULT_LOG_DIR
-    DEFAULT_LOG_DIR = ensure_dir(os.path.abspath(log_dir))
+    DEFAULT_LOG_DIR = os.path.abspath(log_dir)
     _configure_handlers(DEFAULT_LOG_DIR)
     logger.info(f"Log directory changed to: {DEFAULT_LOG_DIR}")
 
