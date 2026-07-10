@@ -11,7 +11,7 @@ stages on disk, and the utility surface that holds the rest together.
 ```
 src/eruption_forecast/
 ├── __init__.py            - public exports
-├── logger.py              - loguru wrapper (enable/disable/set_level/set_directory)
+├── logger.py              - loguru wrapper (enable/disable/set_level/set_directory) + per-category error files (register_error_category, get_category_logger; telegram category ships pre-registered)
 ├── data_container.py      - BaseDataContainer ABC for TremorData / LabelData
 │
 ├── config/
