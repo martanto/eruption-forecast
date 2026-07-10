@@ -76,9 +76,6 @@ def get_windows_information(
         >>> print(info["total_windows"])
         144
     """
-    if not isinstance(trace, Trace):
-        raise TypeError("Input must be an ObsPy Trace object")
-
     sampling_rate = trace.stats.sampling_rate
     number_of_samples = trace.stats.npts
 
