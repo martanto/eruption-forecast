@@ -314,6 +314,8 @@ The package wraps [`loguru`](https://github.com/Delgan/loguru) behind `eruption_
 | `disable_logging()` | Remove every active loguru handler - no console, no file |
 | `set_log_level(level)` | Change the console handler level (`"DEBUG"` / `"INFO"` / `"WARNING"` / `"ERROR"` / `"CRITICAL"`) |
 | `set_log_directory(dir)` | Move the log file to a new directory - created if missing |
+| `register_error_category(name, level, retention)` | Register a per-category log file `{name}_YYYY-MM-DD.log` |
+| `get_category_logger(category)` | Return `logger.bind(category=category)` so records are routed to the category file |
 
 ```python
 from eruption_forecast import enable_logging, disable_logging
@@ -325,6 +327,27 @@ set_log_level("DEBUG")        # console only - file handlers keep their level
 disable_logging()
 fm.calculate(...)             # silent - useful during tests
 enable_logging()              # restore handlers
+```
+
+### Per-category error log files
+
+`forecast_YYYY-MM-DD.log` (`DEBUG`+, 30-day retention) and `errors_YYYY-MM-DD.log` (`ERROR`+, 90-day retention) receive every uncategorised record. Records emitted via `logger.bind(category=X)` — or the `get_category_logger("X")` helper — are routed to a dedicated file `{X}_YYYY-MM-DD.log` and excluded from the general/error logs *when `X` is registered*. Records for unregistered categories fall through the exclusion filter and land in the general log, so a category must be registered via `register_error_category(...)` before its dedicated sink exists.
+
+All file sinks rotate daily at 00:00, compress rotated files to ZIP, and use `enqueue=True` so writes are safe from `joblib` worker processes. Setting the `DISABLE_LOGGING=1` environment variable before import skips handler registration entirely — child processes inherit this so silenced parents produce silent workers.
+
+The `telegram` category ships pre-registered — every warning raised by `TelegramNotification` (missing credentials, HTTP non-2xx, network exceptions, unsupported photo suffix) lands in `logs/telegram_YYYY-MM-DD.log` instead of `logs/forecast_YYYY-MM-DD.log`. Verbose `INFO` traces are left in the general log by design so normal delivery flow remains visible there.
+
+```python
+from eruption_forecast.logger import get_category_logger, register_error_category
+
+# Optional: register another category before use.
+register_error_category("data_source", level="WARNING", retention="30 days")
+
+# Emit records that get routed to the dedicated file.
+get_category_logger("data_source").warning("FDSN client timed out")
+
+# Re-registering is idempotent - no duplicate sinks are installed.
+register_error_category("telegram", level="ERROR")   # bump the level
 ```
 
 `enable_logging`, `disable_logging`, `notify`, `timer`, and `TelegramNotification` are exported from the package root.

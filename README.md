@@ -509,6 +509,31 @@ set_log_level("WARNING")                        # console-only level
 set_log_directory("logs/2026-06-10")            # move file handler
 ```
 
+### Per-category error log files
+
+Failures inside subsystems can be routed to their own dated log file instead of
+being mixed into `logs/forecast_YYYY-MM-DD.log`. The default installation
+registers a `telegram` category, so every warning emitted by
+`TelegramNotification` (network errors, missing credentials, non-2xx responses)
+lands in `logs/telegram_YYYY-MM-DD.log` and is excluded from the general and
+error logs. Register a category *before* emitting under its name — unregistered
+categories have no dedicated sink and fall back to the general log.
+
+```python
+from eruption_forecast.logger import get_category_logger, register_error_category
+
+# Register a new category on the fly (level and retention are optional).
+register_error_category("data_source", level="WARNING", retention="30 days")
+
+# Emit records that get routed to logs/data_source_YYYY-MM-DD.log.
+get_category_logger("data_source").warning("FDSN client timed out")
+```
+
+All file sinks rotate daily at 00:00 and compress rotated files to ZIP; writes
+use `enqueue=True` so they are safe from `joblib` worker processes. Set
+`DISABLE_LOGGING=1` before import to skip handler registration entirely —
+child processes inherit the env var so silenced parents produce silent workers.
+
 > Telegram + logging full reference: [wiki/Configuration.md](wiki/Configuration.md)
 
 ---

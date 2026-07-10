@@ -25,6 +25,14 @@ from loguru import logger
 from niquests.models import Response
 
 
+# Bound logger so Telegram network / API failures land in
+# ``logs/telegram_*.log`` instead of the general forecast log. Verbose
+# ``logger.info(...)`` traces stay on the plain module logger so they
+# continue to appear in ``forecast_*.log`` — the category file is scoped
+# to failures.
+_tg_logger = logger.bind(category="telegram")
+
+
 TELEGRAM_API_URL = "https://api.telegram.org"
 PHOTO_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"})
 _MARKDOWN_V2_RESERVED = re.compile(r"([\\_*\[\]()~`>#+\-=|{}.!])")
@@ -104,7 +112,7 @@ class TelegramNotification:
                 missing.append("token (TELEGRAM_BOT_TOKEN)")
             if not self.chat_id:
                 missing.append("chat_id (TELEGRAM_CHAT_ID)")
-            logger.warning(
+            _tg_logger.warning(
                 f"Telegram credentials missing: {', '.join(missing)}. "
                 f"Notifications will be skipped."
             )
@@ -152,12 +160,12 @@ class TelegramNotification:
                 if self.verbose:
                     logger.info("Message sent to telegram.")
             else:
-                logger.warning(f"Failed to send message to telegram. {response.text}")
-                logger.warning(f"Message: {message}")
+                _tg_logger.warning(f"Failed to send message to telegram. {response.text}")
+                _tg_logger.warning(f"Message: {message}")
             return self
 
         except Exception as e:
-            logger.warning(f"Telegram notification failed: {e}")
+            _tg_logger.warning(f"Telegram notification failed: {e}")
             return self
 
     def send_document(self, file: str, timeout: float = 30.0, **kwargs) -> Self:
@@ -206,7 +214,7 @@ class TelegramNotification:
             return self
 
         if Path(file).suffix.lower() not in PHOTO_EXTENSIONS:
-            logger.warning(
+            _tg_logger.warning(
                 f"Telegram photo: {Path(file).name} is not a supported photo "
                 f"format {sorted(PHOTO_EXTENSIONS)}; falling back to send_document()."
             )
@@ -265,7 +273,7 @@ class TelegramNotification:
             ]
 
             if non_photo:
-                logger.warning(
+                _tg_logger.warning(
                     f"Telegram media_group: {len(non_photo)} file(s) not supported "
                     f"photo format ({[Path(p).name for p in non_photo]}); "
                     f"falling back to kind='document' for the whole batch."
@@ -317,7 +325,7 @@ class TelegramNotification:
         """
         file_path = Path(file)
         if not file_path.is_file():
-            logger.warning(
+            _tg_logger.warning(
                 f"Telegram {field} notification failed: file not found: {file_path}"
             )
             return
@@ -343,11 +351,11 @@ class TelegramNotification:
                 if self.verbose:
                     logger.info(f"{field.title()} sent to telegram: {file_path.name}")
             else:
-                logger.warning(f"Failed to send {field} to telegram. {response.text}")
-                logger.warning(f"File: {file_path}")
+                _tg_logger.warning(f"Failed to send {field} to telegram. {response.text}")
+                _tg_logger.warning(f"File: {file_path}")
 
         except Exception as e:
-            logger.warning(f"Telegram {field} notification failed: {e}")
+            _tg_logger.warning(f"Telegram {field} notification failed: {e}")
 
     def _send_media_chunk(
         self,
@@ -383,7 +391,7 @@ class TelegramNotification:
         for file in files:
             path = Path(file)
             if not path.is_file():
-                logger.warning(f"Telegram media_group: file not found: {path}")
+                _tg_logger.warning(f"Telegram media_group: file not found: {path}")
                 continue
             paths.append(path)
 
@@ -436,9 +444,9 @@ class TelegramNotification:
                         f"Media group sent to telegram: {len(paths)} {kind}(s)."
                     )
             else:
-                logger.warning(
+                _tg_logger.warning(
                     f"Failed to send media group to telegram. {response.text}"
                 )
 
         except Exception as e:
-            logger.warning(f"Telegram media_group notification failed: {e}")
+            _tg_logger.warning(f"Telegram media_group notification failed: {e}")

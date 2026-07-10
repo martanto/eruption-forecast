@@ -2,7 +2,6 @@
 
 import os
 import json
-import tempfile
 from datetime import datetime
 
 import numpy as np
@@ -235,10 +234,31 @@ class TestCheckSamplingConsistency:
 
     def test_too_few_rows_raises(self):
         from eruption_forecast.utils.validation import check_sampling_consistency
-        idx = pd.date_range("2025-01-01", periods=2, freq="10min")
-        df = pd.DataFrame({"v": [1, 2]}, index=idx)
+        idx = pd.date_range("2025-01-01", periods=1, freq="10min")
+        df = pd.DataFrame({"v": [1]}, index=idx)
         with pytest.raises(ValueError):
             check_sampling_consistency(df)
+
+    def test_two_rows_accepted(self):
+        from eruption_forecast.utils.validation import check_sampling_consistency
+        idx = pd.date_range("2025-01-01", periods=2, freq="10min")
+        df = pd.DataFrame({"v": [1, 2]}, index=idx)
+        is_consistent, _, inconsistent, rate = check_sampling_consistency(df)
+        assert is_consistent
+        assert inconsistent.empty
+        assert rate == 600
+
+    def test_sampling_rate_beyond_one_day(self):
+        # Regression: ``Timedelta.seconds`` used to truncate for >= 24h
+        # intervals, e.g. reporting 3600s for a 25h step.
+        from eruption_forecast.utils.validation import check_sampling_consistency
+        idx = pd.date_range("2025-01-01", periods=5, freq="25h")
+        df = pd.DataFrame({"v": range(5)}, index=idx)
+        is_consistent, _, _, rate = check_sampling_consistency(
+            df, expected_freq="25h", tolerance="0s"
+        )
+        assert is_consistent
+        assert rate == 25 * 3600
 
 
 # ---------------------------------------------------------------------------

@@ -911,13 +911,31 @@ LabelData.from_csv(path: str) -> LabelData
 
 ```python
 from eruption_forecast import enable_logging, disable_logging
-from eruption_forecast.logger import set_log_level, set_log_directory
+from eruption_forecast.logger import (
+    get_category_logger,
+    register_error_category,
+    set_log_directory,
+    set_log_level,
+)
 
 enable_logging()              # restore console + file handlers
 disable_logging()             # remove every loguru handler
 set_log_level(level: str)     # "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
 set_log_directory(dir: str)   # move the log file to a new directory (created if absent)
+
+# Per-category error log files.
+register_error_category(
+    name: str,
+    level: str = "WARNING",
+    retention: str = "90 days",
+) -> None                     # create/update logs/{name}_YYYY-MM-DD.log
+get_category_logger(category: str)   # returns logger.bind(category=category)
 ```
+
+The default installation registers a `"telegram"` category so warnings from
+`TelegramNotification` land in `logs/telegram_YYYY-MM-DD.log` and are excluded
+from `forecast_*.log` / `errors_*.log`. Re-registering an existing category is
+idempotent — no duplicate sinks are created.
 
 ---
 
