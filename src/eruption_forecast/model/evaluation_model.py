@@ -3,6 +3,7 @@ from typing import Self, Literal
 
 import pandas as pd
 
+from eruption_forecast.plots import plot_label_distribution
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
@@ -411,9 +412,7 @@ class EvaluationModel(BaseModel):
                 if self.prefix_config and (slug := slugify(self.prefix_config))
                 else ""
             )
-            path = os.path.join(
-                self.evaluation_dir, f"evaluation{suffix}.config.{fmt}"
-            )
+            path = os.path.join(self.evaluation_dir, f"evaluation{suffix}.config.{fmt}")
         return self._config.save(path, fmt)
 
     def build_label(
@@ -476,6 +475,8 @@ class EvaluationModel(BaseModel):
         y_true.to_csv(y_true_filepath, index=True)
 
         self.y_true = y_true
+
+        plot_label_distribution(y_true.to_frame(), os.path.join(y_true_dir, "y_true_distribution"))
 
         if self.verbose:
             logger.info(f"Label y_true saved to {y_true_filepath}")
