@@ -1246,7 +1246,7 @@ class ForecastModel:
             FileNotFoundError: If ``path`` does not exist.
         """
         config = ForecastConfig.load(path)
-        instance = cls(**config.model.to_dict())
+        instance = cls(**config.model.to_init_kwargs())
         instance._config = config
         return instance
 
@@ -1262,13 +1262,13 @@ class ForecastModel:
             Self: The current instance, enabling method chaining.
         """
         if self._config.calculate is not None:
-            self.calculate(**self._config.calculate.to_dict())
+            self.calculate(**self._config.calculate.to_init_kwargs())
         if self._config.train is not None:
-            self.train(**self._config.train.to_dict())
+            self.train(**self._config.train.to_init_kwargs())
         if self._config.predict is not None:
-            self.predict(**self._config.predict.to_dict())
+            self.predict(**self._config.predict.to_init_kwargs())
         if self._config.evaluate is not None:
-            self.evaluate(**self._config.evaluate.to_dict())
+            self.evaluate(**self._config.evaluate.to_init_kwargs())
         if self._config.explain is not None:
-            self.explain(**self._config.explain.to_dict())
+            self.explain(**self._config.explain.to_init_kwargs())
         return self

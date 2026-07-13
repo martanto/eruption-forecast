@@ -2,7 +2,7 @@ import os
 import json
 from typing import Any, Self, Literal
 from datetime import datetime
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 
 import yaml
 
@@ -23,6 +23,9 @@ class PredictionConfig(BaseConfig):
       instance was passed.
     - ``tremor_data`` is stored as the CSV path when the user supplied one,
       ``None`` when a pre-loaded ``pd.DataFrame`` was passed.
+
+    ``version`` and ``saved_at`` are inherited from :class:`BaseConfig` so
+    every stage config stamps the installed package release identically.
 
     Attributes:
         model (str | None): Path to a trained-model artefact (``.pkl`` /
@@ -55,8 +58,6 @@ class PredictionConfig(BaseConfig):
             keeps the default filename. Defaults to ``None``.
         n_jobs (int): Number of parallel workers. Defaults to ``1``.
         verbose (bool): Emit detailed progress logs. Defaults to ``False``.
-        version (str): Schema version string.
-        saved_at (str): ISO-8601 timestamp set at save time.
     """
 
     model: str | None = None
@@ -72,11 +73,6 @@ class PredictionConfig(BaseConfig):
     prefix_config: str | None = None
     n_jobs: int = 1
     verbose: bool = False
-
-    version: str = "1.0"
-    saved_at: str = field(
-        default_factory=lambda: datetime.now().isoformat(timespec="seconds")
-    )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the prediction configuration to a plain dictionary.
