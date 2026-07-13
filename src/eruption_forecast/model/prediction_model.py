@@ -7,6 +7,7 @@ import pandas as pd
 from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
+from eruption_forecast.utils.dataframe import load_select_features
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime_index
@@ -640,6 +641,7 @@ class PredictionModel(BaseModel):
         select_tremor_columns: list[str] | None = None,
         save_tremor_matrix_per_method: bool = False,
         exclude_features: list[str] | None = None,
+        select_features: str | list[str] | None = None,
         overwrite: bool = False,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -651,6 +653,12 @@ class PredictionModel(BaseModel):
         (no relevance filtering). Populates ``self.features_df`` and
         ``self.features_path``. When features were already extracted on this
         instance, the method early-returns without re-running tsfresh.
+
+        Passing a curated ``select_features`` list narrows tsfresh to the
+        supplied feature names via ``kind_to_fc_parameters``, so extraction
+        computes only those features per tremor column instead of the full
+        ``ComprehensiveFCParameters`` set — the standard fast path for
+        forecasting with a previously-trained ensemble.
 
         When ``TremorMatrixBuilder`` drops windows that fail
         ``minimum_completion``, the surviving feature ids become a strict
@@ -669,6 +677,16 @@ class PredictionModel(BaseModel):
                 to ``False``.
             exclude_features (list[str] | None, optional): tsfresh feature
                 names to drop after extraction. Defaults to ``None``.
+            select_features (str | list[str] | None, optional): Curated
+                feature list used to narrow tsfresh extraction. Accepts either
+                a path to a ``top_{N}_features.csv`` / ``top_features.csv`` /
+                ``significant_features.csv`` (resolved via
+                :func:`load_select_features`) or an explicit ``list[str]`` of
+                fully-qualified tsfresh feature names (e.g.
+                ``"rsam_f2__mean"``). ``None`` runs the full
+                ``ComprehensiveFCParameters`` extraction. Typically populated
+                by :meth:`ForecastModel.predict` with the union of features
+                selected during training. Defaults to ``None``.
             overwrite (bool, optional): Overwrite existing matrix and feature
                 files when ``True``. Defaults to ``False``.
             n_jobs (int | None, optional): Worker count for tsfresh extraction.
@@ -683,10 +701,17 @@ class PredictionModel(BaseModel):
         Raises:
             ValueError: If ``build_label()`` has not been called first.
         """
+        resolved_select_features = (
+            load_select_features(select_features, number_of_features=0)
+            if select_features is not None
+            else None
+        )
+
         new_kwargs = {
             "select_tremor_columns": select_tremor_columns,
             "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
             "exclude_features": exclude_features,
+            "select_features": resolved_select_features,
         }
 
         features_already_populated = (
@@ -720,6 +745,7 @@ class PredictionModel(BaseModel):
             select_tremor_columns=select_tremor_columns,
             save_tremor_matrix_per_method=save_tremor_matrix_per_method,
             save_tremor_matrix_per_id=False,
+            select_features=resolved_select_features,
             overwrite=overwrite,
             n_jobs=n_jobs,
             verbose=verbose,
@@ -820,7 +846,8 @@ class PredictionModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"[Prediction Model]: Loading feature matrix {features_matrix_path}"
+                f"[Prediction Model]: Load features matrix from: {features_matrix_path}"
+                f"[Prediction Model]: Load label features from: {label_features_csv}"
             )
 
         # Ensure ``self.start_date`` and ``self.end_date`` is in label date range

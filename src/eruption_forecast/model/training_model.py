@@ -889,10 +889,10 @@ class TrainingModel(BaseModel):
             save_tremor_matrix_per_method=save_tremor_matrix_per_method,
             save_tremor_matrix_per_id=save_tremor_matrix_per_id,
             minimum_completion=minimum_completion,
+            select_features=resolved_select_features,
             overwrite=overwrite,
             n_jobs=n_jobs,
             verbose=verbose,
-            select_features=resolved_select_features,
         )
 
         self.features_df = features_builder.extract_features(
