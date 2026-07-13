@@ -7,6 +7,7 @@ import pandas as pd
 from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
+from eruption_forecast.utils.dataframe import load_select_features
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime_index
@@ -640,6 +641,7 @@ class PredictionModel(BaseModel):
         select_tremor_columns: list[str] | None = None,
         save_tremor_matrix_per_method: bool = False,
         exclude_features: list[str] | None = None,
+        select_features: str | list[str] | None = None,
         overwrite: bool = False,
         n_jobs: int | None = None,
         verbose: bool | None = None,
@@ -651,6 +653,12 @@ class PredictionModel(BaseModel):
         (no relevance filtering). Populates ``self.features_df`` and
         ``self.features_path``. When features were already extracted on this
         instance, the method early-returns without re-running tsfresh.
+
+        Passing a curated ``select_features`` list narrows tsfresh to the
+        supplied feature names via ``kind_to_fc_parameters``, so extraction
+        computes only those features per tremor column instead of the full
+        ``ComprehensiveFCParameters`` set — the standard fast path for
+        forecasting with a previously-trained ensemble.
 
         When ``TremorMatrixBuilder`` drops windows that fail
         ``minimum_completion``, the surviving feature ids become a strict
@@ -669,6 +677,16 @@ class PredictionModel(BaseModel):
                 to ``False``.
             exclude_features (list[str] | None, optional): tsfresh feature
                 names to drop after extraction. Defaults to ``None``.
+            select_features (str | list[str] | None, optional): Curated
+                feature list used to narrow tsfresh extraction. Accepts either
+                a path to a ``top_{N}_features.csv`` / ``top_features.csv`` /
+                ``significant_features.csv`` (resolved via
+                :func:`load_select_features`) or an explicit ``list[str]`` of
+                fully-qualified tsfresh feature names (e.g.
+                ``"rsam_f2__mean"``). ``None`` runs the full
+                ``ComprehensiveFCParameters`` extraction. Typically populated
+                by :meth:`ForecastModel.predict` with the union of features
+                selected during training. Defaults to ``None``.
             overwrite (bool, optional): Overwrite existing matrix and feature
                 files when ``True``. Defaults to ``False``.
             n_jobs (int | None, optional): Worker count for tsfresh extraction.
@@ -683,10 +701,17 @@ class PredictionModel(BaseModel):
         Raises:
             ValueError: If ``build_label()`` has not been called first.
         """
+        resolved_select_features = (
+            load_select_features(select_features, number_of_features=0)
+            if select_features is not None
+            else None
+        )
+
         new_kwargs = {
             "select_tremor_columns": select_tremor_columns,
             "save_tremor_matrix_per_method": save_tremor_matrix_per_method,
             "exclude_features": exclude_features,
+            "select_features": resolved_select_features,
         }
 
         features_already_populated = (
@@ -720,6 +745,7 @@ class PredictionModel(BaseModel):
             select_tremor_columns=select_tremor_columns,
             save_tremor_matrix_per_method=save_tremor_matrix_per_method,
             save_tremor_matrix_per_id=False,
+            select_features=resolved_select_features,
             overwrite=overwrite,
             n_jobs=n_jobs,
             verbose=verbose,
@@ -772,6 +798,13 @@ class PredictionModel(BaseModel):
         silently picking up a stale ``features-*_*`` artefact left in
         ``self.features_dir`` from a previous run.
 
+        On success, writes a plain-text
+        ``{features_dir}/features-loaded-from.txt`` marker so the otherwise
+        empty ``prediction/features/`` directory records which external
+        paths supplied the matrix and label CSV. The marker is overwritten
+        on every :meth:`load_features` call so it always reflects the most
+        recent load.
+
         Args:
             features_matrix_path (str): Path to the
                 ``features-matrix_*.parquet`` written under
@@ -820,7 +853,8 @@ class PredictionModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"[Prediction Model]: Loading feature matrix {features_matrix_path}"
+                f"[Prediction Model]: Load features matrix from: {features_matrix_path}"
+                f"[Prediction Model]: Load label features from: {label_features_csv}"
             )
 
         # Ensure ``self.start_date`` and ``self.end_date`` is in label date range
@@ -893,6 +927,13 @@ class PredictionModel(BaseModel):
                 f"[Prediction Model]: Loaded features_df={self.features_df.shape}, "
                 f"labels={self.labels.shape}"
             )
+
+        self._write_load_features_note(
+            features_matrix_path=features_matrix_path,
+            label_features_csv=label_features_csv,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+        )
 
         return self
 
@@ -997,6 +1038,53 @@ class PredictionModel(BaseModel):
             logger.warning(f"Failed to save prediction config: {exc}")
 
         return df_forecast
+
+    def _write_load_features_note(
+        self,
+        features_matrix_path: str,
+        label_features_csv: str,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+    ) -> str:
+        """Write a plain-text marker recording where load_features sourced its inputs.
+
+        Materialises ``self.features_dir`` if needed, then writes
+        ``{features_dir}/features-loaded-from.txt`` (overwriting any prior
+        note) so the otherwise empty ``prediction/features/`` directory
+        records which external paths supplied the matrix and label CSV.
+        Called from :meth:`load_features` after the frames have been
+        loaded onto ``self``.
+
+        Args:
+            features_matrix_path (str): Absolute path to the loaded
+                ``features-matrix_*.parquet``.
+            label_features_csv (str): Absolute path to the loaded
+                ``features-label_*.csv``.
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit for
+                ``window_step``.
+
+        Returns:
+            str: Absolute path to the written marker file.
+        """
+        ensure_dir(self.features_dir)
+        note_path = os.path.join(self.features_dir, "features-loaded-from.txt")
+        with open(note_path, "w", encoding="utf-8") as f:
+            f.write(
+                "This prediction/features/ directory holds no features matrix — "
+                "PredictionModel.load_features() sourced them from external paths, "
+                "so no tsfresh extraction ran for this forecast.\n\n"
+                f"Features matrix : {features_matrix_path}\n"
+                f"Label CSV       : {label_features_csv}\n"
+                f"Window step     : {window_step} {window_step_unit}\n"
+                f"Forecast period : {self.start_date_str} to {self.end_date_str}\n"
+                f"Written at      : {datetime.now().isoformat(timespec='seconds')}\n"
+            )
+
+        if self.verbose:
+            logger.info(f"[Prediction Model]: Wrote load-features note: {note_path}")
+
+        return note_path
 
     def _plot_forecast(
         self,

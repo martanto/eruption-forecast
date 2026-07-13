@@ -695,6 +695,12 @@ class ForecastModel:
         cached ``ClassifierEnsemble`` to produce per-seed and
         consensus eruption probabilities.
 
+        Feature extraction is automatically narrowed to the union of
+        features picked by any seed during :meth:`train` — pulled from
+        ``self.TrainingModel.features_selected_df.index`` and forwarded
+        into ``PredictionModel.extract_features`` as ``select_features``
+        so tsfresh only computes the trained-on set.
+
         Args:
             start_date (str | datetime): Start of the forecast
                 window in ``"YYYY-MM-DD"`` format or as a
@@ -773,6 +779,12 @@ class ForecastModel:
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
 
+        select_features: list[str] | None = (
+            self.TrainingModel.features_selected_df.index.tolist()
+            if not self.TrainingModel.features_selected_df.empty
+            else None
+        )
+
         if (features_matrix_path is None) != (label_features_csv is None):
             raise ValueError(
                 "features_matrix_path and label_features_csv must be provided together."
@@ -832,6 +844,7 @@ class ForecastModel:
                 "select_tremor_columns": self.select_tremor_columns,
                 "save_tremor_matrix_per_method": self.save_tremor_matrix_per_method,
                 "exclude_features": self.exclude_features,
+                "select_features": select_features,
             },
         )
 
@@ -878,6 +891,7 @@ class ForecastModel:
                 select_tremor_columns=self.select_tremor_columns,
                 save_tremor_matrix_per_method=self.save_tremor_matrix_per_method,
                 exclude_features=self.exclude_features,
+                select_features=select_features,
                 overwrite=overwrite,
                 n_jobs=n_jobs,
                 verbose=verbose,
