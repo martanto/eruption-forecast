@@ -275,7 +275,7 @@ def parse_label_filename(basename: str) -> dict:
     }
 
 
-def set_datetime_index(
+def to_datetime_index(
     datetime_map: pd.DataFrame | pd.Series,
     df: pd.DataFrame,
     on: str | None = None,
@@ -319,14 +319,14 @@ def set_datetime_index(
         ...     {"datetime": ["2025-01-01", "2025-01-02"]}, index=[1, 2]
         ... )
         >>> df = pd.DataFrame({"feature_1": [0.5, 0.8]}, index=[1, 2])
-        >>> result = set_datetime_index(datetime_map, df)
+        >>> result = to_datetime_index(datetime_map, df)
         >>> print(result.columns.tolist())
         ['feature_1']
         >>> print(type(result.index))
         <class 'pandas.core.indexes.datetimes.DatetimeIndex'>
         >>> # Merge on a column instead of the index
         >>> df_with_id = pd.DataFrame({"id": [1, 2], "feature_1": [0.5, 0.8]})
-        >>> result = set_datetime_index(datetime_map, df_with_id, on="id")
+        >>> result = to_datetime_index(datetime_map, df_with_id, on="id")
         >>> print(result.columns.tolist())
         ['feature_1']
     """

@@ -12,7 +12,7 @@ from eruption_forecast.utils.dataframe import get_envelope_values
 from eruption_forecast.utils.date_utils import (
     sort_dates,
     to_datetime,
-    set_datetime_index,
+    to_datetime_index,
 )
 from eruption_forecast.utils.formatting import get_classifier_label
 
@@ -70,7 +70,7 @@ def plot_forecast(
             automatically from the column prefixes (everything before the first ``_``).
         label_df (pd.DataFrame | pd.Series | None, optional): Label DataFrame or Series
             used to align ``df`` to the label datetime index via
-            :func:`set_datetime_index`. Required when ``df.index`` is not already a
+            :func:`to_datetime_index`. Required when ``df.index`` is not already a
             ``pd.DatetimeIndex``. Defaults to ``None``.
         title (str | None, optional): Figure suptitle. Defaults to ``"Forecast Results"``
             when ``None``.
@@ -132,9 +132,9 @@ def plot_forecast(
         if label_df is None or len(label_df) == 0:
             raise ValueError(
                 "df must have a DatetimeIndex; provide label_df (id→datetime mapping) so "
-                "set_datetime_index() can construct and align the forecast index."
+                "to_datetime_index() can construct and align the forecast index."
             )
-        df = set_datetime_index(label_df, df)
+        df = to_datetime_index(label_df, df)
 
     # Maintain backward compatibility
     # Old dataframe using "_eruption_probability" as suffix column name
@@ -348,7 +348,7 @@ def plot_forecast_from_file(
     """Load consensus and (optionally) label CSVs from disk and plot the forecast.
 
     Reads ``consensus_file``, aligns the resulting DataFrame to the label datetime
-    index via :func:`set_datetime_index` when ``label_file`` is provided, and
+    index via :func:`to_datetime_index` when ``label_file`` is provided, and
     delegates to :func:`plot_forecast`. All extra keyword arguments are forwarded
     verbatim to :func:`plot_forecast` — see that function for the full list of
     styling / layout options and the optional top segment strip.

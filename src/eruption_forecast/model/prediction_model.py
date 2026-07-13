@@ -9,7 +9,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
-from eruption_forecast.utils.date_utils import set_datetime_index
+from eruption_forecast.utils.date_utils import to_datetime_index
 from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.utils.validation import check_sampling_consistency
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
@@ -960,7 +960,7 @@ class PredictionModel(BaseModel):
             self.result_dir, f"forecast-results_{self.basename}.csv"
         )
 
-        df_forecast = set_datetime_index(self._labels, df_forecast)
+        df_forecast = to_datetime_index(self._labels, df_forecast)
 
         df_forecast.to_csv(csv_path)
         logger.info(f"Predictions saved to: {csv_path}")

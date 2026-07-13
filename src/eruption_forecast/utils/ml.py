@@ -30,7 +30,7 @@ from eruption_forecast.utils.pathutils import ensure_dir
 from eruption_forecast.utils.date_utils import (
     sort_dates,
     to_datetime,
-    set_datetime_index,
+    to_datetime_index,
 )
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel
@@ -842,7 +842,7 @@ def build_classifier_ensemble_summary(
         labels (pd.Series | pd.DataFrame): Datetime-indexed label container
             from the upstream :class:`TrainingModel` / :class:`PredictionModel`
             — used to attach a ``datetime`` column to the probability matrix
-            via :func:`set_datetime_index`.
+            via :func:`to_datetime_index`.
         eruption_dates (list[str]): Eruption dates in ``YYYY-MM-DD`` form.
             Dates that do not intersect the prediction grid are skipped.
 
@@ -859,7 +859,7 @@ def build_classifier_ensemble_summary(
             f"probabilities. Run predict_with_uncertainty / forecast first."
         )
 
-    df_probas = set_datetime_index(
+    df_probas = to_datetime_index(
         datetime_map=labels.sort_index(),
         df=seed_ensemble.probabilities,
     ).reset_index()
