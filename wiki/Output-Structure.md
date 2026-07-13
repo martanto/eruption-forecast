@@ -29,7 +29,9 @@ Every pipeline run writes under a single station directory:
 │   │   ├── seed/{seed:05d}.csv                               # Top-N features per seed
 │   │   ├── seed/figures/{seed:05d}.png                       # Per-seed importance plots (plot_features=True)
 │   │   ├── resampled/{seed:05d}.csv                          # Per-seed (id + is_erupted) — features recovered via features_df.loc[ids]
-│   │   ├── top_{N}_features.csv                              # Aggregated top-N across all seeds
+│   │   ├── significant_features.csv                          # Raw per-seed rows concatenated (features + score)
+│   │   ├── top_features.csv                                  # Full ranked list (all features, sorted by score desc, mean_score asc)
+│   │   ├── top_{N}_features.csv                              # Top-N subset of top_features.csv
 │   │   └── top_{N}_features.png                              # Aggregated importance plot
 │   │
 │   └── classifiers/
@@ -241,6 +243,8 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Per-day tremor plots | `tremor/figures/` |
 | The features tsfresh extracted | `training/features/{cv}/features-matrix_*.parquet` |
 | Per-seed feature picks | `training/features/{cv}/seed/{seed:05d}.csv` |
+| Raw per-seed picks concatenated | `training/features/{cv}/significant_features.csv` |
+| Full ranked feature list (all features) | `training/features/{cv}/top_features.csv` |
 | The aggregated top-N features | `training/features/{cv}/top_{N}_features.csv` |
 | Individual trained models | `training/classifiers/{clf}/{cv}/models/{seed:05d}.pkl` |
 | The single-classifier ensemble | `training/classifiers/{clf}/{cv}/SeedEnsemble_*.pkl` |

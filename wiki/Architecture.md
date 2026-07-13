@@ -85,12 +85,10 @@ src/eruption_forecast/
 │   └── tremor_data.py           - TremorData (CSV wrapper)
 │
 └── utils/
-    ├── array.py, dataframe.py, date_utils.py
+    ├── array.py, benchmark.py, dataframe.py, date_utils.py
     ├── formatting.py, ml.py, pathutils.py
     ├── validation.py, window.py
 ```
-
-74 `.py` files in total.
 
 ---
 
@@ -324,7 +322,7 @@ Both decorators delegate to `TelegramNotification` (`notification/telegram.py`),
 
 ### 3.10 Utils (`utils/`)
 
-Eight focused modules that the rest of the codebase pulls from - see the table in [6](#6-utility-modules).
+Nine focused modules that the rest of the codebase pulls from - see the table in [6](#6-utility-modules).
 
 ---
 
@@ -430,7 +428,8 @@ Eight focused modules that the rest of the codebase pulls from - see the table i
     │       │                                                       │
     │       ▼                                                       │
     │    seed/{seed:05d}.csv  ──► resampled/{seed:05d}.csv          │
-    │    top_{N}_features.csv  + .png                               │
+    │    significant_features.csv  ──►  top_features.csv            │
+    │                              ──►  top_{N}_features.csv + .png │
     │                                                               │
     │  classifiers/                                                 │
     │    {clf}/{cv}/models/{seed:05d}.pkl                           │
@@ -491,14 +490,15 @@ Evaluation is **never cached** - the on-disk matrices act as the cache and `Metr
 
 | Module               | Key functions                                                                                                  |
 |----------------------|----------------------------------------------------------------------------------------------------------------|
-| `utils/array.py`     | `detect_maximum_outlier`, `remove_outliers`, `detect_anomalies_zscore`, `aggregate_seed_probabilities`, `predict_proba_from_estimator` |
-| `utils/window.py`    | `construct_windows`, `calculate_window_metrics`                                                                |
-| `utils/date_utils.py`| `to_datetime`, `normalize_dates`, `sort_dates`, `parse_label_filename`, `set_datetime_index`, `label_id_to_datetime` |
-| `utils/ml.py`        | `random_under_sampler`, `get_significant_features`, `load_labels_from_csv`, `save_model_json`, `compute_seed_eruption_probability`, `compute_model_probabilities`, `get_classifier_models`, `compute_g_mean`, `compute_seed`, `build_y_true` |
+| `utils/array.py`     | `detect_maximum_outlier`, `remove_maximum_outlier`, `remove_outliers`, `detect_anomalies_zscore`, `mask_zero_values`, `filter_nans`, `count_valid_values`, `get_completeness`, `confidence_interval`, `compute_model_probabilities`, `save_forecast_seed` |
+| `utils/benchmark.py` | `benchmark_feature_selection` (side-by-side `FeatureSelector` method comparison)                               |
+| `utils/window.py`    | `construct_windows`, `calculate_window_metrics`, `get_windows_information`, `chunk_daily_data`, `shannon_entropy`, `to_safe_array` |
+| `utils/date_utils.py`| `to_datetime`, `normalize_dates`, `sort_dates`, `parse_label_filename`, `to_datetime_index`                    |
+| `utils/ml.py`        | `random_under_sampler`, `resample`, `load_features_resampled`, `temporal_train_test_split`, `get_significant_features`, `get_classifier_models`, `grid_search_cv`, `save_model_json`, `compute_seed`, `build_y_true`, `build_classifier_ensemble_summary`, `compute_threshold_metrics`, `compute_aggregate_threshold_metrics` |
 | `utils/validation.py`| `validate_random_state`, `validate_date_ranges`, `validate_window_step`, `validate_columns`, `check_sampling_consistency` |
-| `utils/pathutils.py` | `resolve_output_dir`, `ensure_dir`, `save_figure`, `save_data`, `load_json`                                    |
-| `utils/dataframe.py` | `load_label_csv`, DataFrame shape and column helpers                                                           |
-| `utils/formatting.py`| `slugify`, human-readable elapsed time and file sizes                                                          |
+| `utils/pathutils.py` | `resolve_output_dir`, `ensure_dir`, `save_figure`, `save_figure_as_pdf`, `save_data`, `load_json`, `load_pickle`, `setup_nslc_directories`, `generate_features_filepaths` |
+| `utils/dataframe.py` | `load_label_csv`, `load_datetime_indexed`, `load_select_features`, `concat_features`, `concat_significant_features`, `find_common_features`, `plot_common_features_heatmap`, `plot_common_features_correlation`, `get_envelope_values`, `remove_anomalies`, `to_series` |
+| `utils/formatting.py`| `slugify`, `slugify_class_name`, `shorten_feature_name`, `get_classifier_label`, `pdf_metadata`                |
 
 `utils/ml.save_model_json` writes the per-classifier trained-model JSON registry (one record per seed, each with the inline top-N feature list and the path to the seed's `.pkl`). `TrainingModel.build_seed_ensemble` reads that registry via `SeedEnsemble.from_any` to package every seed into a `SeedEnsemble`, and the per-classifier `SeedEnsemble`s are then merged into a `ClassifierEnsemble` (`build_classifier_ensemble`). All three steps run at the end of `TrainingModel.fit()`.
 

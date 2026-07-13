@@ -193,10 +193,10 @@ class ForecastTrainConfig(BaseConfig):
             ``None``.
         select_features (str | list[str] | None): Pre-filter tsfresh to a
             curated feature set — either the path to a prior run's
-            ``top_{N}_features.csv`` / ``significant_features.csv`` or an
-            explicit ``list[str]`` of fully-qualified feature names. ``None``
-            keeps the default ``ComprehensiveFCParameters`` behaviour. Defaults
-            to ``None``.
+            ``top_{N}_features.csv`` / ``top_features.csv`` /
+            ``significant_features.csv`` or an explicit ``list[str]`` of
+            fully-qualified feature names. ``None`` keeps the default
+            ``ComprehensiveFCParameters`` behaviour. Defaults to ``None``.
         minimum_completion (float): Minimum fraction of valid samples per
             window required to keep the window. Defaults to ``1.0``.
         seeds (int): Number of independent training seeds. Defaults to ``10``.
