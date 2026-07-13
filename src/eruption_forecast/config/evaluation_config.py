@@ -20,6 +20,9 @@ class EvaluationConfig(BaseConfig):
     :class:`TrainingModel` / :class:`PredictionModel` instance that cannot be
     round-tripped through YAML/JSON.
 
+    ``version`` and ``saved_at`` are inherited from :class:`BaseConfig` so
+    every stage config stamps the installed package release identically.
+
     Attributes:
         eruption_dates (list[str]): Ground-truth eruption dates in
             ``"YYYY-MM-DD"`` format. Defaults to ``[]``.
@@ -35,8 +38,6 @@ class EvaluationConfig(BaseConfig):
             ``None`` keeps the default filename. Defaults to ``None``.
         n_jobs (int): Number of parallel workers. Defaults to ``1``.
         verbose (bool): Emit detailed progress logs. Defaults to ``False``.
-        version (str): Schema version string.
-        saved_at (str): ISO-8601 timestamp set at save time.
     """
 
     eruption_dates: list[str] = field(default_factory=list)
@@ -46,11 +47,6 @@ class EvaluationConfig(BaseConfig):
     prefix_config: str | None = None
     n_jobs: int = 1
     verbose: bool = False
-
-    version: str = "1.0"
-    saved_at: str = field(
-        default_factory=lambda: datetime.now().isoformat(timespec="seconds")
-    )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the evaluation configuration to a plain dictionary.

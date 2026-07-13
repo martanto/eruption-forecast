@@ -7,7 +7,7 @@ from dataclasses import field, dataclass
 import yaml
 
 from eruption_forecast.utils.pathutils import ensure_dir
-from eruption_forecast.config.base_config import BaseConfig
+from eruption_forecast.config.base_config import BaseConfig, _package_version
 
 
 @dataclass
@@ -439,9 +439,10 @@ class ForecastConfig(BaseConfig):
     partial run produces a partial YAML that can still be loaded and
     continued.
 
+    ``version`` and ``saved_at`` are inherited from :class:`BaseConfig` so
+    every stage config stamps the installed package release identically.
+
     Attributes:
-        version (str): Schema version string.
-        saved_at (str): ISO-8601 timestamp set at save time.
         model (BaseForecastConfig): Core model initialization parameters.
         calculate (ForecastCalculateConfig | None): Tremor calculation parameters.
         train (ForecastTrainConfig | None): Training parameters.
@@ -450,10 +451,6 @@ class ForecastConfig(BaseConfig):
         explain (ForecastExplainConfig | None): SHAP explanation parameters.
     """
 
-    version: str = "1.0"
-    saved_at: str = field(
-        default_factory=lambda: datetime.now().isoformat(timespec="seconds")
-    )
     model: BaseForecastConfig = field(default_factory=BaseForecastConfig)
     calculate: ForecastCalculateConfig | None = None
     train: ForecastTrainConfig | None = None
@@ -542,7 +539,7 @@ class ForecastConfig(BaseConfig):
                 data = yaml.safe_load(f)
 
         config = cls(
-            version=data.get("version", "1.0"),
+            version=data.get("version", _package_version()),
             saved_at=data.get("saved_at", ""),
             model=BaseForecastConfig.from_dict(data.get("model", {})),
         )

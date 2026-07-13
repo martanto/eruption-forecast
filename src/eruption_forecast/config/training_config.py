@@ -20,6 +20,9 @@ class TrainingConfig(BaseConfig):
     path, and ``None`` when a pre-loaded ``pd.DataFrame`` was supplied —
     pandas DataFrames are not round-trippable through YAML/JSON.
 
+    ``version`` and ``saved_at`` are inherited from :class:`BaseConfig` so
+    every stage config stamps the installed package release identically.
+
     Attributes:
         tremor_data (str | None): CSV path passed to ``TremorData``. ``None``
             when the caller supplied a pre-loaded DataFrame. Defaults to
@@ -57,8 +60,6 @@ class TrainingConfig(BaseConfig):
         n_grids (int): Parallel workers used inside ``GridSearchCV`` and
             ``FeatureSelector``. Defaults to ``1``.
         verbose (bool): Emit detailed progress logs. Defaults to ``False``.
-        version (str): Schema version string.
-        saved_at (str): ISO-8601 timestamp set at save time.
     """
 
     tremor_data: str | None = None
@@ -81,11 +82,6 @@ class TrainingConfig(BaseConfig):
     n_jobs: int = 1
     n_grids: int = 1
     verbose: bool = False
-
-    version: str = "1.0"
-    saved_at: str = field(
-        default_factory=lambda: datetime.now().isoformat(timespec="seconds")
-    )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the training configuration to a plain dictionary.
