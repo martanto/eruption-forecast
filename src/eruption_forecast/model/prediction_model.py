@@ -798,6 +798,13 @@ class PredictionModel(BaseModel):
         silently picking up a stale ``features-*_*`` artefact left in
         ``self.features_dir`` from a previous run.
 
+        On success, writes a plain-text
+        ``{features_dir}/features-loaded-from.txt`` marker so the otherwise
+        empty ``prediction/features/`` directory records which external
+        paths supplied the matrix and label CSV. The marker is overwritten
+        on every :meth:`load_features` call so it always reflects the most
+        recent load.
+
         Args:
             features_matrix_path (str): Path to the
                 ``features-matrix_*.parquet`` written under
@@ -921,7 +928,61 @@ class PredictionModel(BaseModel):
                 f"labels={self.labels.shape}"
             )
 
+        self._write_load_features_note(
+            features_matrix_path=features_matrix_path,
+            label_features_csv=label_features_csv,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+        )
+
         return self
+
+    def _write_load_features_note(
+        self,
+        features_matrix_path: str,
+        label_features_csv: str,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+    ) -> str:
+        """Write a plain-text marker recording where load_features sourced its inputs.
+
+        Materialises ``self.features_dir`` if needed, then writes
+        ``{features_dir}/features-loaded-from.txt`` (overwriting any prior
+        note) so the otherwise empty ``prediction/features/`` directory
+        records which external paths supplied the matrix and label CSV.
+        Called from :meth:`load_features` after the frames have been
+        loaded onto ``self``.
+
+        Args:
+            features_matrix_path (str): Absolute path to the loaded
+                ``features-matrix_*.parquet``.
+            label_features_csv (str): Absolute path to the loaded
+                ``features-label_*.csv``.
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit for
+                ``window_step``.
+
+        Returns:
+            str: Absolute path to the written marker file.
+        """
+        ensure_dir(self.features_dir)
+        note_path = os.path.join(self.features_dir, "features-loaded-from.txt")
+        with open(note_path, "w", encoding="utf-8") as f:
+            f.write(
+                "This prediction/features/ directory holds no features matrix — "
+                "PredictionModel.load_features() sourced them from external paths, "
+                "so no tsfresh extraction ran for this forecast.\n\n"
+                f"Features matrix : {features_matrix_path}\n"
+                f"Label CSV       : {label_features_csv}\n"
+                f"Window step     : {window_step} {window_step_unit}\n"
+                f"Forecast period : {self.start_date_str} to {self.end_date_str}\n"
+                f"Written at      : {datetime.now().isoformat(timespec='seconds')}\n"
+            )
+
+        if self.verbose:
+            logger.info(f"[Prediction Model]: Wrote load-features note: {note_path}")
+
+        return note_path
 
     def forecast(
         self,
