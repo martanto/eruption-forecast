@@ -290,7 +290,7 @@ def to_datetime_index(
     If ``df`` already has a ``DatetimeIndex``, it is returned unchanged.
 
     Args:
-        datetime_map (pd.DataFrame | pd.Series): Source of the ``id → datetime``
+        datetime_map (pd.DataFrame | pd.Series): Label with ``id → datetime``
             mapping. Accepted forms:
             - DataFrame with an integer ``id`` index and a ``"datetime"`` column.
             - Series named ``"datetime"`` with an integer ``id`` index.

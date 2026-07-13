@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import detect_anomalies_zscore
+from eruption_forecast.utils.date_utils import to_datetime_index
 from eruption_forecast.utils.formatting import shorten_feature_name
 
 
@@ -164,6 +165,65 @@ def load_label_csv(label_features_csv: str) -> pd.Series:
     if "datetime" in df.columns:
         df = df.drop("datetime", axis=1)
     return df["is_erupted"]
+
+
+def load_datetime_indexed(label_csv: str, features_path: str) -> pd.DataFrame:
+    """Load a label CSV and an ``id``-indexed data file, then re-index by datetime.
+
+    Thin file-path wrapper around :func:`to_datetime_index`. Loads the label
+    CSV (DatetimeIndex + ``id`` column) and the features/probability file
+    (``id``-indexed), then delegates the merge and ``DatetimeIndex``
+    replacement to :func:`to_datetime_index`. The features file format is
+    dispatched by extension: ``.parquet`` via ``pd.read_parquet`` and ``.csv``
+    via ``pd.read_csv`` with the first column as index.
+
+    Args:
+        label_csv (str): Path to the aligned label CSV produced by
+            ``FeaturesBuilder`` (e.g. ``features-label_{start}_{end}.csv``).
+            Must contain a datetime index and an ``id`` column.
+        features_path (str): Path to the ``id``-indexed features matrix or
+            probability matrix. Supported suffixes: ``.parquet``, ``.csv``.
+
+    Returns:
+        pd.DataFrame: Copy of the features/probability frame with a
+        ``DatetimeIndex`` derived from ``label_csv``. The ``id`` and
+        ``datetime`` columns are absent from the result.
+
+    Raises:
+        ValueError: If ``features_path`` has a suffix other than ``.parquet``
+            or ``.csv``.
+        ValueError: Propagated from :func:`to_datetime_index` when the loaded
+            frames cannot be aligned (length mismatch, missing ``id`` column,
+            missing ``datetime`` column).
+
+    Examples:
+        >>> # Parquet features matrix
+        >>> df = load_datetime_indexed(
+        ...     label_csv="output/.../features-label_2020-01-01_2020-12-31.csv",
+        ...     features_path="output/.../features-matrix_2020-01-01_2020-12-31.parquet",
+        ... )
+        >>> isinstance(df.index, pd.DatetimeIndex)
+        True
+        >>> # CSV probability matrix
+        >>> df = load_datetime_indexed(
+        ...     label_csv="output/.../prediction/labels/label-features_2020-07.csv",
+        ...     features_path="output/.../predictions/y_proba.csv",
+        ... )
+    """
+    labels = pd.read_csv(label_csv, index_col=0, parse_dates=True)
+
+    suffix = os.path.splitext(features_path)[1].lower()
+    if suffix == ".parquet":
+        features = pd.read_parquet(features_path)
+    elif suffix == ".csv":
+        features = pd.read_csv(features_path, index_col=0)
+    else:
+        raise ValueError(
+            f"Unsupported features_path suffix '{suffix}'. "
+            f"Expected '.parquet' or '.csv'. Got: {features_path}"
+        )
+
+    return to_datetime_index(labels, features)
 
 
 def load_select_features(
@@ -381,26 +441,32 @@ def concat_significant_features(
     """Concatenate per-seed significant-feature CSVs and save a ranked summary.
 
     Reads all CSVs in ``features_csvs``, concatenates them row-wise, and
-    writes the combined data to ``{features_dir}/{filename}.csv``. When
-    ``number_of_features`` is provided, also aggregates by feature name,
+    writes the raw combined data to ``{features_dir}/significant_features.csv``.
+    When ``number_of_features`` is provided, also aggregates by feature name,
     counts occurrences across seeds (``score``), computes mean score
     (``mean_score``), sorts descending by frequency and ascending by mean
-    p-value, and saves the top-N result as
-    ``{features_dir}/top_{number_of_features}_features.csv``.
+    p-value, and writes two additional CSVs:
+
+    - ``{features_dir}/top_features.csv`` — the full ranked list (all
+      features, sorted).
+    - ``{features_dir}/top_{number_of_features}_features.csv`` — the top-N
+      subset of the same ranking, used downstream by
+      :func:`load_select_features`.
 
     Args:
         features_csvs (list[str]): Paths to per-seed significant-feature CSV
             files, each expected to contain a ``features`` column and a
             ``score`` column.
         features_dir (str): Directory where output CSVs are written.
-        number_of_features (int | None, optional): If set, produce an
-            additional ranked CSV limited to the top N features by occurrence
-            count. If ``None`` or ``<= 0``, only the combined CSV is written.
-            Defaults to ``None``.
+        number_of_features (int | None, optional): If set, produce the
+            ``top_features.csv`` full ranking plus a
+            ``top_{number_of_features}_features.csv`` capped to the top-N
+            features by occurrence count. If ``None`` or ``<= 0``, only the
+            raw ``significant_features.csv`` is written. Defaults to ``None``.
 
     Returns:
         pd.DataFrame: The combined DataFrame (all seeds concatenated), or the
-            ranked top-N DataFrame when ``number_of_features`` is specified.
+            full ranked DataFrame when ``number_of_features`` is specified.
 
     Raises:
         ValueError: If ``combined_features_df`` is empty after concatenation.
@@ -424,8 +490,6 @@ def concat_significant_features(
     )
 
     if number_of_features is not None and number_of_features > 0:
-        filename = f"top_{number_of_features}_features"
-
         combined_features_df = (
             combined_features_df.groupby(by="features")
             .agg(score=("score", "count"), mean_score=("score", "mean"))
@@ -436,7 +500,13 @@ def concat_significant_features(
         )
         combined_features_df.index.name = "features"
         combined_features_df.to_csv(
-            os.path.join(features_dir, f"{filename}.csv"),
+            os.path.join(features_dir, "top_features.csv"),
+            index=True,
+        )
+
+        top_n_features_df = combined_features_df.head(number_of_features)
+        top_n_features_df.to_csv(
+            os.path.join(features_dir, f"top_{number_of_features}_features.csv"),
             index=True,
         )
 
