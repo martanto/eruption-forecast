@@ -1,5 +1,5 @@
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -566,12 +566,16 @@ def _ax_segment(
     gap_duration = (prediction_start - training_end).days
 
     if gap_duration < 0:
-        logger.error(
-            f"Gap duration: {gap_duration}. Overlapping training end date "
-            f"({training_end:%Y-%m-%d}) and prediction start date "
-            f"({prediction_start:%Y-%m-%d}). Skip bar chart."
+        original_prediction_start = prediction_start
+        prediction_start = (training_end + timedelta(days=1)).replace(
+            hour=0, minute=0, second=0
         )
-        return ax
+        logger.warning(
+            f"Overlapping training end date ({training_end:%Y-%m-%d}) and "
+            f"prediction start date ({original_prediction_start:%Y-%m-%d}). "
+            f"Adjusted prediction start to {prediction_start:%Y-%m-%d}."
+        )
+        gap_duration = (prediction_start - training_end).days
 
     training_duration = (training_end - training_start).days + 1
     prediction_duration = (prediction_end - prediction_start).days + 1
