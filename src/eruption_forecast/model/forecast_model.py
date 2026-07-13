@@ -779,15 +779,23 @@ class ForecastModel:
         if self.TrainingModel is None or self.ClassifierEnsemble is None:
             raise ValueError("Training model not found. Please run train() first.")
 
-        select_features: list[str] | None = (
-            self.TrainingModel.features_selected_df.index.tolist()
-            if not self.TrainingModel.features_selected_df.empty
-            else None
-        )
-
         if (features_matrix_path is None) != (label_features_csv is None):
             raise ValueError(
                 "features_matrix_path and label_features_csv must be provided together."
+            )
+
+        # ``load_features()`` bypasses tsfresh entirely, so narrowing via
+        # ``select_features`` has no effect on extraction. Force it to ``None``
+        # on the shortcut path so it does not leak into the prediction cache
+        # identity or config snapshot.
+        select_features: list[str] | None
+        if features_matrix_path is not None and label_features_csv is not None:
+            select_features = None
+        else:
+            select_features = (
+                self.TrainingModel.features_selected_df.index.tolist()
+                if not self.TrainingModel.features_selected_df.empty
+                else None
             )
 
         feature_shortcut_paths: tuple[str, str] | None = None
@@ -883,6 +891,7 @@ class ForecastModel:
                 window_step=window_step,
                 window_step_unit=window_step_unit,
             )
+
         else:
             prediction_model = prediction_model.build_label(
                 window_step=window_step,
