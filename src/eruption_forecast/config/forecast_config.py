@@ -281,12 +281,21 @@ class ForecastPredictConfig(BaseConfig):
             ``None``.
         plot_pdf (bool): Whether to save the forecast plot as a PDF alongside
             the PNG. Defaults to ``True``.
+        use_features_from (Literal["all", "files", "training"]): Feature
+            scoping mode. ``"all"`` extracts every tsfresh feature.
+            ``"files"`` loads a pre-built ``features_matrix_path`` +
+            ``label_features_csv`` pair (both required, both must exist)
+            and forces ``use_cache=False``. ``"training"`` narrows tsfresh
+            to the union of features selected during ``train()``. Defaults
+            to ``"all"``.
         features_matrix_path (str | None): Path to a pre-built
             ``features-matrix_*.parquet`` that skips tsfresh re-extraction.
-            Requires ``label_features_csv`` to be supplied together and
-            forces ``use_cache=False`` at replay time. Defaults to ``None``.
+            Only honoured when ``use_features_from="files"``. Requires
+            ``label_features_csv`` to be supplied together and forces
+            ``use_cache=False`` at replay time. Defaults to ``None``.
         label_features_csv (str | None): Companion ``features-label_*.csv``
-            for ``features_matrix_path``. Both paths must be supplied
+            for ``features_matrix_path``. Only honoured when
+            ``use_features_from="files"``. Both paths must be supplied
             together. Defaults to ``None``.
         enable_segments_plot (bool): When ``True``, forward the training and
             prediction date ranges to
@@ -317,6 +326,7 @@ class ForecastPredictConfig(BaseConfig):
     plot_threshold: float = 0.5
     plot_title: str | None = None
     plot_pdf: bool = True
+    use_features_from: Literal["all", "files", "training"] = "all"
     features_matrix_path: str | None = None
     label_features_csv: str | None = None
     enable_segments_plot: bool = False

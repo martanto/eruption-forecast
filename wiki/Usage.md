@@ -240,6 +240,35 @@ without any extra wiring:
 Call `tm.save_config(path=..., fmt="json")` etc. manually for a custom path or 
 JSON output. See [Configuration](Configuration#per-stage-configs-standalone).
 
+### Reuse features already selected during `train()`
+
+By default `fm.predict(...)` extracts every tsfresh feature over the forecast grid, but `use_features_from` narrows the extraction to the features the training run kept:
+
+```python
+fm.predict(
+    start_date="2025-07-27", end_date="2025-08-22",
+    window_step=10, window_step_unit="minutes",
+    use_features_from="training",   # tsfresh only computes features
+                                    # any seed picked during train()
+)
+```
+
+- `"all"` (default) — extracts every tsfresh feature (`select_features=None`).
+- `"training"` — reuses `fm.TrainingModel.features_selected_df.index` as the tsfresh whitelist, so the forecast-window matrix stays consistent with the ensemble's training-time schema.
+- `"files"` — skips tsfresh entirely and loads a pre-built matrix from disk; both file paths are required (raises otherwise) and `use_cache` is forced to `False`:
+
+```python
+fm.predict(
+    start_date="2025-07-27", end_date="2025-08-22",
+    window_step=10, window_step_unit="minutes",
+    use_features_from="files",
+    features_matrix_path="output/VG.OJN.00.EHZ/prediction/features/features-matrix_2025-07-27_2025-08-22_step-10-minutes.parquet",
+    label_features_csv="output/VG.OJN.00.EHZ/prediction/features/features-label_2025-07-27_2025-08-22_step-10-minutes.csv",
+)
+```
+
+See [Prediction Workflow → Feature Scoping](Prediction-Workflow#feature-scoping-via-use_features_from) for the mode table and validation rules.
+
 ### Standalone evaluation from a saved `.pkl`
 
 ```python

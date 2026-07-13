@@ -677,6 +677,7 @@ class ForecastModel:
         plot_threshold: float = 0.5,
         plot_title: str | None = None,
         plot_pdf: bool = True,
+        use_features_from: Literal["all", "files", "training"] = "all",
         features_matrix_path: str | None = None,
         label_features_csv: str | None = None,
         enable_segments_plot: bool = False,
@@ -695,8 +696,12 @@ class ForecastModel:
         cached ``ClassifierEnsemble`` to produce per-seed and
         consensus eruption probabilities.
 
-        Feature extraction is automatically narrowed to the union of
-        features picked by any seed during :meth:`train` — pulled from
+        Feature scoping is controlled by ``use_features_from``:
+        ``"all"`` (default) extracts every tsfresh feature, ``"files"``
+        skips tsfresh entirely and loads a pre-built
+        ``features_matrix_path`` + ``label_features_csv`` pair, and
+        ``"training"`` narrows tsfresh to the union of features picked
+        by any seed during :meth:`train` — pulled from
         ``self.TrainingModel.features_selected_df.index`` and forwarded
         into ``PredictionModel.extract_features`` as ``select_features``
         so tsfresh only computes the trained-on set.
@@ -719,21 +724,32 @@ class ForecastModel:
                 ``None``.
             plot_pdf (bool): Also render the forecast plot as PDF.
                 Defaults to ``True``.
+            use_features_from (Literal["all", "files", "training"]):
+                Feature scoping mode. ``"all"`` extracts every tsfresh
+                feature (``select_features=None``). ``"files"`` skips
+                tsfresh entirely and loads the pair
+                ``features_matrix_path`` + ``label_features_csv`` via
+                :meth:`PredictionModel.load_features`; both paths must
+                be supplied and must exist (raises otherwise) and
+                ``use_cache`` is forced to ``False``. ``"training"``
+                narrows tsfresh to the union of features selected
+                during :meth:`train`. Defaults to ``"all"``.
             features_matrix_path (str | None): Path to a pre-built
                 ``features-matrix_*.parquet`` produced by an earlier
-                :meth:`PredictionModel.extract_features` run. When
-                supplied together with ``label_features_csv``, replaces
-                the ``build_label → extract_features`` prefix with
-                :meth:`PredictionModel.load_features`, skipping tsfresh
-                entirely. Both paths must be provided together (raises
-                ``ValueError`` otherwise). Also forces ``use_cache`` to
-                ``False`` because ``load_features`` does not populate
-                the extract-features kwargs the prediction cache
-                identity depends on. Defaults to ``None``.
+                :meth:`PredictionModel.extract_features` run. Only
+                honoured when ``use_features_from="files"``; then it
+                replaces the ``build_label → extract_features`` prefix
+                with :meth:`PredictionModel.load_features`, skipping
+                tsfresh entirely. Both paths must be provided together
+                (raises ``ValueError`` otherwise). Also forces
+                ``use_cache`` to ``False`` because ``load_features``
+                does not populate the extract-features kwargs the
+                prediction cache identity depends on. Defaults to
+                ``None``.
             label_features_csv (str | None): Companion
                 ``features-label_*.csv`` for ``features_matrix_path``.
-                Both paths must be provided together. Defaults to
-                ``None``.
+                Only honoured when ``use_features_from="files"``; both
+                paths must be provided together. Defaults to ``None``.
             enable_segments_plot (bool): When ``True``, forward the
                 training and prediction date ranges to
                 :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
@@ -765,9 +781,13 @@ class ForecastModel:
 
         Raises:
             ValueError: If :meth:`train` has not produced a trained
-                ensemble yet, or if only one of
-                ``features_matrix_path`` / ``label_features_csv`` is
-                supplied.
+                ensemble yet, if only one of ``features_matrix_path`` /
+                ``label_features_csv`` is supplied, or if
+                ``use_features_from="files"`` is passed without both
+                paths.
+            FileNotFoundError: If ``use_features_from="files"`` is
+                passed with a ``features_matrix_path`` or
+                ``label_features_csv`` that does not exist on disk.
 
         Example:
             >>> fm.predict(
@@ -784,29 +804,34 @@ class ForecastModel:
                 "features_matrix_path and label_features_csv must be provided together."
             )
 
-        # ``load_features()`` bypasses tsfresh entirely, so narrowing via
-        # ``select_features`` has no effect on extraction. Force it to ``None``
-        # on the shortcut path so it does not leak into the prediction cache
-        # identity or config snapshot.
         select_features: list[str] | None
-        if features_matrix_path is not None and label_features_csv is not None:
+        feature_shortcut_paths: tuple[str, str] | None = None
+
+        if use_features_from == "files":
+            if features_matrix_path is None or label_features_csv is None:
+                raise ValueError(
+                    "use_features_from='files' requires both features_matrix_path "
+                    "and label_features_csv to be provided."
+                )
+            if not os.path.exists(features_matrix_path):
+                raise FileNotFoundError(
+                    f"features_matrix_path does not exist: {features_matrix_path}"
+                )
+            if not os.path.exists(label_features_csv):
+                raise FileNotFoundError(
+                    f"label_features_csv does not exist: {label_features_csv}"
+                )
             select_features = None
-        else:
+            feature_shortcut_paths = (features_matrix_path, label_features_csv)
+            use_cache = False
+        elif use_features_from == "training":
             select_features = (
                 self.TrainingModel.features_selected_df.index.tolist()
                 if not self.TrainingModel.features_selected_df.empty
                 else None
             )
-
-        feature_shortcut_paths: tuple[str, str] | None = None
-        if (
-            features_matrix_path is not None
-            and label_features_csv is not None
-            and os.path.exists(features_matrix_path)
-            and os.path.exists(label_features_csv)
-        ):
-            feature_shortcut_paths = (features_matrix_path, label_features_csv)
-            use_cache = False
+        else:
+            select_features = None
 
         # ``plot_kwargs`` are intentionally excluded from the captured config
         # because they may carry non-serialisable matplotlib objects.
@@ -821,6 +846,7 @@ class ForecastModel:
             plot_threshold=plot_threshold,
             plot_title=plot_title,
             plot_pdf=plot_pdf,
+            use_features_from=use_features_from,
             features_matrix_path=features_matrix_path,
             label_features_csv=label_features_csv,
             enable_segments_plot=enable_segments_plot,
