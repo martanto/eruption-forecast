@@ -147,6 +147,10 @@ fm.predict(
     plot_threshold: float = 0.5,
     plot_title: str | None = None,
     plot_pdf: bool = True,
+    use_features_from: Literal["all", "files", "training"] = "all",
+    features_matrix_path: str | None = None,
+    label_features_csv: str | None = None,
+    enable_segments_plot: bool = False,
     output_dir: str | None = None,
     overwrite: bool | None = None,
     n_jobs: int | None = None,
@@ -157,6 +161,16 @@ fm.predict(
 ```
 
 Requires `train()` first. `**plot_kwargs` is forwarded to `plot_forecast` (see [Visualization](Visualization#forecast--plot_forecast) for keys) and is **not** captured in `ForecastConfig` because matplotlib objects do not round-trip through YAML. Sets `self.PredictionModel`, `self.results`.
+
+`use_features_from` switches feature scoping between three modes — see [Prediction Workflow → Feature Scoping](Prediction-Workflow#feature-scoping-via-use_features_from) for the full mode table:
+
+| Mode | Behaviour | Path kwargs |
+|------|-----------|-------------|
+| `"all"` (default) | Extract every tsfresh feature (`select_features=None`) | Ignored |
+| `"files"` | Skip tsfresh and load `features_matrix_path` + `label_features_csv` via `PredictionModel.load_features(...)`. Both paths are required and must exist (raises `ValueError` / `FileNotFoundError` otherwise). `use_cache` is forced to `False` because `load_features()` bypasses the extract-features kwargs the cache identity depends on. | Both required |
+| `"training"` | Narrow tsfresh to the union of features any seed picked during `train()` — pulled from `self.TrainingModel.features_selected_df.index`; falls back to `None` when the frame is empty. | Ignored |
+
+`enable_segments_plot=True` forwards the training and prediction date ranges to `plot_forecast` so it renders the top Training → Gap → Prediction segment strip above the forecast panels. When the prediction start is on or before the training end, the strip helper snaps the prediction start forward to `training_end + 1 day` and logs a warning; when `False` (default) the strip is omitted.
 
 ### `evaluate(...)`
 

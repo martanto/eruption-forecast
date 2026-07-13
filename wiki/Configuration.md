@@ -126,6 +126,10 @@ predict:
   save_seed_result: true
   plot_threshold: 0.7
   plot_pdf: true
+  use_features_from: all      # "all" | "files" | "training" — see Prediction-Workflow
+  features_matrix_path: null  # only honoured when use_features_from="files"
+  label_features_csv: null    # only honoured when use_features_from="files"
+  enable_segments_plot: false
   use_cache: false
 
 evaluate:

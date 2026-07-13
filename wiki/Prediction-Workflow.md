@@ -74,6 +74,87 @@ are mirrored from the training call so that the prediction feature columns line 
 trained model's input schema. `ForecastModel.predict(...)` forwards 
 `self.select_tremor_columns`, `self.save_tremor_matrix_per_method`, and `self.exclude_features` from the upstream `train()` call automatically.
 
+`PredictionModel.extract_features(...)` also accepts a `select_features` kwarg (a curated `list[str]` or a path to a `top_{N}_features.csv` / `top_features.csv` / `significant_features.csv`). When supplied, it is resolved via `load_select_features(..., number_of_features=0)` and forwarded as the tsfresh `kind_to_fc_parameters` — only the named features are computed per tremor column instead of the full `ComprehensiveFCParameters` set. `ForecastModel.predict(use_features_from=...)` picks the value for you; see the next section.
+
+---
+
+## Feature Scoping via `use_features_from`
+
+`ForecastModel.predict(...)` exposes a single knob, `use_features_from: Literal["all", "files", "training"] = "all"`, that switches between three ways of scoping features for the forecast window.
+
+| Mode | What `predict()` runs | When to reach for it |
+|------|-----------------------|----------------------|
+| `"all"` (default) | `build_label → extract_features(select_features=None)` — every tsfresh feature is computed per tremor column | Cold start; no prior features on disk; want to keep the forecast independent of which features the training run happened to pick |
+| `"files"` | `load_features(features_matrix_path, label_features_csv)` — tsfresh is skipped entirely and a pre-built matrix is loaded | Replaying a forecast from a shared feature matrix; want to swap classifiers against a fixed feature snapshot; forecasting from *just two files* + a `ClassifierEnsemble.pkl` without pointing at raw tremor data |
+| `"training"` | `build_label → extract_features(select_features=<union of training-time features>)` — tsfresh is narrowed to the features any seed picked during `train()` | Realistic operational default: the narrower matrix is smaller and faster while still covering every feature the ensemble was actually trained on |
+
+Under the hood, `predict()` derives `select_features` and dispatches accordingly:
+
+```python
+if use_features_from == "files":
+    #  Both paths must be supplied and must exist on disk.
+    #  use_cache is forced to False because load_features()
+    #  bypasses the extract-features kwargs that populate the
+    #  prediction cache identity.
+    select_features = None
+    prediction_model.load_features(features_matrix_path, label_features_csv, ...)
+
+elif use_features_from == "training":
+    #  Auto-narrow tsfresh to the union of features any seed picked
+    #  during train(). Falls back to None (extract everything) when
+    #  the trained ensemble has no features_selected_df — e.g. a
+    #  legacy cache with no feature-selection record.
+    select_features = (
+        self.TrainingModel.features_selected_df.index.tolist()
+        if not self.TrainingModel.features_selected_df.empty
+        else None
+    )
+    prediction_model.build_label(...).extract_features(select_features=select_features, ...)
+
+else:  # "all"
+    select_features = None
+    prediction_model.build_label(...).extract_features(select_features=None, ...)
+```
+
+### Validation and failure modes
+
+`use_features_from="files"` is a hard-fail on misconfiguration — no silent fall-back to `"all"`.
+
+| Condition | Raises |
+|-----------|--------|
+| `features_matrix_path` or `label_features_csv` is `None` | `ValueError("use_features_from='files' requires both features_matrix_path and label_features_csv to be provided.")` |
+| Either supplied path does not exist on disk | `FileNotFoundError(f"features_matrix_path does not exist: {...}")` (or `label_features_csv`) |
+| Only one of the two paths is supplied (independent of mode) | `ValueError("features_matrix_path and label_features_csv must be provided together.")` |
+
+Under `use_features_from="files"`, `use_cache` is forced to `False` because `load_features()` does not populate the extract-features kwargs the prediction cache identity depends on — the cache lookup would be meaningless.
+
+### Cache identity implications
+
+- `"all"` and `"training"` both flow through `extract_features(...)` and therefore fold `select_features` into the `PredictionModel.build_identity(...)` extract-features kwargs. Switching between the two invalidates the prediction cache pickle, which is intentional — the two produce measurably different feature matrices.
+- `"files"` disables the cache outright, so its results are always freshly computed against the supplied matrix.
+
+### Config round-trip
+
+`use_features_from` is captured on `ForecastPredictConfig`, so a `fm.save_config() → ForecastModel.from_config(...) → fm.run()` cycle preserves the mode. `features_matrix_path` and `label_features_csv` round-trip as absolute path strings; leave them `null` in the YAML unless the mode is `"files"`.
+
+### Choosing between the modes
+
+```python
+# Cold start — no prior features on disk.
+fm.predict(..., use_features_from="all")
+
+# Preferred once a training run exists — narrower matrix, same feature set.
+fm.predict(..., use_features_from="training")
+
+# Replay a forecast against a pre-built matrix.
+fm.predict(
+    ...,
+    use_features_from="files",
+    features_matrix_path="output/.../prediction/features/features-matrix_....parquet",
+    label_features_csv="output/.../prediction/features/features-label_....csv",
+)
+```
+
 ---
 
 ## Forecast (`forecast`)
@@ -218,7 +299,7 @@ pm = PredictionModel(
 df_forecast = pm.forecast(plot_threshold=0.7, plot_pdf=True)
 ```
 
-`load_features()` drops in as a replacement for the `build_label() → extract_features()` prefix before `forecast()`. Both paths are required — no auto-resolve fallback — so intent is always explicit and a stale `features-*_*` artefact in `self.features_dir` cannot be picked up silently. The loader validates that the label CSV's sampling matches the caller-supplied `window_step` / `window_step_unit` and that its `datetime` span covers the configured `[start_date, end_date]` forecast range. `ForecastModel.predict(features_matrix_path=..., label_features_csv=...)` threads the same call from the orchestrator.
+`load_features()` drops in as a replacement for the `build_label() → extract_features()` prefix before `forecast()`. Both paths are required — no auto-resolve fallback — so intent is always explicit and a stale `features-*_*` artefact in `self.features_dir` cannot be picked up silently. The loader validates that the label CSV's sampling matches the caller-supplied `window_step` / `window_step_unit` and that its `datetime` span covers the configured `[start_date, end_date]` forecast range. `ForecastModel.predict(use_features_from="files", features_matrix_path=..., label_features_csv=...)` threads the same call from the orchestrator — see [Feature Scoping via `use_features_from`](#feature-scoping-via-use_features_from) above for the gate; the mode kwarg is required (without it the two paths are silently ignored under the `"all"` default).
 
 ### Persist the prediction config
 
