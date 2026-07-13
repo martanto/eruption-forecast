@@ -800,13 +800,14 @@ class TrainingModel(BaseModel):
                 drop before saving. Defaults to None.
             select_features (str | list[str] | None): Pre-filter tsfresh to a
                 curated set of fully-qualified feature names — accepts either
-                the path to a ``top_{N}_features.csv`` /
-                ``significant_features.csv`` written by a prior training run,
-                or an explicit ``list[str]`` of feature names. When supplied,
-                tsfresh computes only those features per tremor column instead
-                of the full ``ComprehensiveFCParameters`` set; downstream
-                per-seed feature selection in :meth:`fit` is unchanged.
-                Defaults to ``None``.
+                the path to a ``top_{N}_features.csv`` (top-N subset) /
+                ``top_features.csv`` (full ranked list) /
+                ``significant_features.csv`` (raw per-seed rows) written by a
+                prior training run, or an explicit ``list[str]`` of feature
+                names. When supplied, tsfresh computes only those features per
+                tremor column instead of the full ``ComprehensiveFCParameters``
+                set; downstream per-seed feature selection in :meth:`fit` is
+                unchanged. Defaults to ``None``.
             save_tremor_matrix_per_id (bool): Write one CSV per window ID.
                 Defaults to False.
             minimum_completion (float, optional): Minimum data-completeness
@@ -1243,11 +1244,12 @@ class TrainingModel(BaseModel):
                 ``features_matrix_path``. Defaults to ``None``.
             select_features (str | list[str] | None, optional): Curated
                 feature list — accepts either the path to a
-                ``top_{N}_features.csv`` / ``significant_features.csv`` or an
-                explicit ``list[str]``. Resolved via
-                :func:`load_select_features` and intersected with the matrix
-                columns; missing names log a warning and are skipped. ``None``
-                loads the full matrix. Defaults to ``None``.
+                ``top_{N}_features.csv`` / ``top_features.csv`` /
+                ``significant_features.csv`` or an explicit ``list[str]``.
+                Resolved via :func:`load_select_features` and intersected
+                with the matrix columns; missing names log a warning and are
+                skipped. ``None`` loads the full matrix. Defaults to
+                ``None``.
 
         Returns:
             Self: The current instance, enabling method chaining.

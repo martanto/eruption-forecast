@@ -232,9 +232,10 @@ def load_select_features(
     """Resolve a ``select_features`` value into a list of tsfresh feature names.
 
     Accepts either a CSV path written by :func:`concat_significant_features`
-    (``top_{N}_features.csv`` or ``significant_features.csv``), in which case
-    the ``features`` index column is read, or an explicit list of tsfresh
-    feature names. Empty lists and blank entries raise.
+    (``top_{N}_features.csv``, ``top_features.csv``, or
+    ``significant_features.csv``), in which case the ``features`` index
+    column is read, or an explicit list of tsfresh feature names. Empty
+    lists and blank entries raise.
 
     Args:
         value (str | list[str]): A CSV path or a list of fully-qualified
