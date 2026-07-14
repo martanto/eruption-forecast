@@ -79,12 +79,12 @@ f1_at_optimal   recall_at_optimal   precision_at_optimal
 em.evaluate(
     plot_aggregate=True,         # ROC, PR, threshold, g-mean, MCC per classifier
     plot_per_seed=False,         # same dispatcher, one plot file per seed
-    plot_shap=False,             # reserved no-op; SHAP moved to ExplanationModel
     compare_classifiers=True,    # also run ClassifierComparator at the end
+    use_cache=True,              # skip the load path when False
 ) -> dict[str, pd.DataFrame]
 ```
 
-`fm.evaluate(...)` forwards `plot_per_seed` and `plot_aggregate` from its own kwargs. `plot_shap=True` is reserved and emits a warning — SHAP plots are produced by the dedicated [Explanation Workflow](Explanation-Workflow) via `ExplanationModel.explain()`.
+`fm.evaluate(...)` forwards `plot_per_seed`, `plot_aggregate`, and `use_cache` from its own kwargs. SHAP plots are produced by the dedicated [Explanation Workflow](Explanation-Workflow) via `ExplanationModel.explain()`. `use_cache=False` skips the internal `EvaluationModel.load(...)` short-circuit even when a cached pickle exists on disk — independent of `overwrite`, which additionally controls plot regeneration.
 
 ---
 
@@ -143,7 +143,7 @@ plot names come from `evaluation_plots.AGGREGATE_PLOT_DISPATCHER` and
 
 ## Cache Semantics
 
-`EvaluationModel` does **not** override `build_identity` and so does not participate in the `BaseModel` cache layer — it has no parameter cache. Re-runs are gated by `MetricsEnsemble.compute()`'s in-memory idempotency fast-path: once `self.y_probas` is populated, repeated `compute()` calls short-circuit immediately. `overwrite` only controls plot regeneration — passing `overwrite=False` keeps existing `figures/.../{plot}.png` files in place. The on-disk `predictions/{y_proba,y_pred}.csv` matrices themselves are the persistent layer; deleting them forces the next `compute()` to refit from scratch.
+`EvaluationModel` participates in the `BaseModel` content-addressable cache layer. Cache identity is built from an upstream-model fingerprint (model kind, classifier list, features shape and column set, `eruption_dates`, evaluation window) plus the `evaluate()` knobs (`plot_aggregate`, `plot_per_seed`, `compare_classifiers`). On a cache hit `self.metrics`, `self.MetricsEnsemble`, and `self.comparator` are restored from `{evaluation_dir}/{hash}.EvaluationModel.pkl` without re-running the per-classifier `predict_proba` pass. `use_cache=True` (default) gates both the load and the write; pass `use_cache=False` to skip the load path even when a cached pickle exists — independent of `overwrite`, which additionally controls plot regeneration. When the cache misses and computes fresh, in-process re-runs are further gated by `MetricsEnsemble.compute()`'s in-memory idempotency fast-path (once `self.y_probas` is populated, repeated `compute()` calls short-circuit).
 
 ---
 
@@ -208,7 +208,7 @@ See [Configuration](Configuration#per-stage-configs-standalone).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│             EvaluationModel  (no cache participation)           │
+│             EvaluationModel  (BaseModel cache layer)            │
 │                                                                 │
 │   ┌──────────────────────────────────────────┐                  │
 │   │ MetricsEnsemble.compute()                │                  │

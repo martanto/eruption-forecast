@@ -136,6 +136,7 @@ evaluate:
   model: prediction
   plot_per_seed: true
   plot_aggregate: true
+  use_cache: true                # skip re-eval when a matching pickle exists
 
 explain:
   model: prediction              # "prediction" | "training"
@@ -148,6 +149,7 @@ explain:
   dpi: 150
   check_additivity: false        # forwarded to shap.TreeExplainer
   overwrite_classifier_explanation: false
+  use_cache: true                # skip re-run when a matching pickle exists
   output_dir: null
   overwrite: null
   n_jobs: null
