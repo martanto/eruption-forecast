@@ -183,11 +183,12 @@ fm.evaluate(
     output_dir: str | None = None,
     overwrite: bool | None = None,
     n_jobs: int | None = None,
+    use_cache: bool = True,
     verbose: bool | None = None,
 ) -> Self
 ```
 
-`eruption_dates=None` falls back to the dates captured during `train()`. Always auto-calls `save_config()` at the end. Sets `self.EvaluationModel`, `self.evaluation_results`.
+`eruption_dates=None` falls back to the dates captured during `train()`. `use_cache=True` (default) consults `{evaluation_dir}/{hash}.EvaluationModel.pkl` before running the per-classifier `predict_proba` pass; pass `use_cache=False` to force a fresh evaluation even when a cached pickle exists on disk. `use_cache` is threaded down to `EvaluationModel.evaluate(..., use_cache=...)` so it gates both the internal load and the write. Independent of `overwrite`, which additionally controls plot regeneration. Always auto-calls `save_config()` at the end. Sets `self.EvaluationModel`, `self.evaluation_results`.
 
 ### `explain(...)`
 
@@ -206,11 +207,12 @@ fm.explain(
     output_dir: str | None = None,
     overwrite: bool | None = None,
     n_jobs: int | None = None,
+    use_cache: bool = True,
     verbose: bool | None = None,
 ) -> Self
 ```
 
-Requires the upstream `TrainingModel` or `PredictionModel` to exist on `self` (run `train()` and, for `model="prediction"`, `predict()` first). `eruption_dates=None` falls back to the dates captured during `train()`. Internally constructs an `ExplanationModel`, runs `explain()` then `plot()`, and sets `self.ExplanationModel`. See [Explanation Workflow](Explanation-Workflow) for the TreeExplainer constraint (RF / `lite-rf` / GB / XGB only — other classifiers are skipped with a warning).
+Requires the upstream `TrainingModel` or `PredictionModel` to exist on `self` (run `train()` and, for `model="prediction"`, `predict()` first). `eruption_dates=None` falls back to the dates captured during `train()`. `use_cache=True` (default) consults `{explanation_dir}/{hash}.ExplanationModel.pkl` before re-running SHAP; pass `use_cache=False` to force a fresh explanation even when a cached pickle exists on disk. `use_cache` is threaded down to `ExplanationModel.explain(..., use_cache=...)` so it gates both the internal load and the write. Independent of `overwrite`, which additionally controls per-classifier artefact regeneration. Internally constructs an `ExplanationModel`, runs `explain()` then `plot()`, and sets `self.ExplanationModel`. See [Explanation Workflow](Explanation-Workflow) for the TreeExplainer constraint (RF / `lite-rf` / GB / XGB only — other classifiers are skipped with a warning).
 
 ### Config round-trip
 

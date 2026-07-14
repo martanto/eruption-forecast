@@ -113,6 +113,7 @@ class PredictionModel(BaseModel):
         root_dir: str | None = None,
         prefix_config: str | None = None,
         n_jobs: int = 1,
+        save_model: bool = False,
         verbose: bool = False,
     ):
         """Initialise the prediction model.
@@ -158,6 +159,7 @@ class PredictionModel(BaseModel):
             root_dir=root_dir,
             prefix_config=prefix_config,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
@@ -170,6 +172,7 @@ class PredictionModel(BaseModel):
             output_dir=output_dir,
             root_dir=root_dir,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
@@ -211,65 +214,72 @@ class PredictionModel(BaseModel):
         self.forecast_plot_path: str | None = None
         self.results: pd.DataFrame = pd.DataFrame()
 
-    @staticmethod
-    def _init_config(
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the prediction cache artefact is written.
+
+        Returns:
+            str: ``self.prediction_dir`` — the ``prediction/`` subtree under
+                ``output_dir`` that already hosts the forecast outputs.
+        """
+        return self.prediction_dir
+
+    @classmethod
+    def build_identity(  # ty:ignore[invalid-method-override]
+        cls,
         *,
-        model: str | ClassifierEnsemble | SeedEnsemble,
-        tremor_data: str | pd.DataFrame,
+        nslc: str | None,
+        tremor_df: pd.DataFrame,
+        training_hash: str | None,
         start_date: str | datetime,
         end_date: str | datetime,
         window_size: int,
-        nslc: str | None,
-        training_hash: str | None,
-        overwrite: bool,
-        output_dir: str | None,
-        root_dir: str | None,
-        prefix_config: str | None,
-        n_jobs: int,
-        verbose: bool,
-    ) -> PredictionConfig:
-        """Snapshot the ``__init__`` surface into a :class:`PredictionConfig`.
+        build_label_params: dict,
+        extract_features_params: dict,
+    ) -> dict:
+        """Return the canonical identity dict that defines this prediction cache entry.
 
-        Normalises non-serializable inputs to string handles so the saved
-        YAML/JSON round-trips the user's original intent: ``model`` and
-        ``tremor_data`` become ``None`` when a live in-memory object was
-        passed, ``start_date`` / ``end_date`` are emitted in ISO-8601 form.
+        Bundles the station-channel id, the tremor data fingerprint, the
+        upstream training-model hash, and all prediction-specific params into
+        a canonical dict. Including ``training_hash`` ensures the prediction
+        cache invalidates automatically whenever the trained ensemble it
+        depends on changes — even when the prediction inputs themselves are
+        unchanged.
 
         Args:
-            model (str | ClassifierEnsemble | SeedEnsemble): Trained model
-                source supplied by the caller.
-            tremor_data (str | pd.DataFrame): Tremor source supplied by the caller.
+            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
+                or ``None`` for standalone runs.
+            tremor_df (pd.DataFrame): The tremor DataFrame used for the
+                forecast. Reduced to a fingerprint via
+                :meth:`BaseModel.tremor_fingerprint`.
+            training_hash (str | None): Hash of the upstream
+                :class:`TrainingModel` identity that produced the loaded
+                ensemble. ``None`` only when the ensemble was loaded from a
+                source outside the current pipeline run.
             start_date (str | datetime): Forecast period start.
             end_date (str | datetime): Forecast period end.
             window_size (int): Sliding window size in days.
-            overwrite (bool): Overwrite cached artefacts.
-            output_dir (str | None): Root output directory.
-            root_dir (str | None): Project root.
-            prefix_config (str | None): Slugified discriminator inserted into
-                the ``save_config()`` filename before ``.config``.
-            n_jobs (int): Parallel workers.
-            verbose (bool): Emit verbose logs.
+            build_label_params (dict): Kwargs passed to ``build_label()``.
+            extract_features_params (dict): Kwargs passed to
+                ``extract_features()`` excluding ``overwrite``, ``n_jobs``,
+                ``verbose``.
 
         Returns:
-            PredictionConfig: Snapshot ready for ``save_config()``.
+            dict: Canonical identity dict ready for hashing.
         """
-        return PredictionConfig(
-            model=model if isinstance(model, str) else None,
-            tremor_data=tremor_data if isinstance(tremor_data, str) else None,
-            start_date=start_date
-            if isinstance(start_date, str)
-            else start_date.isoformat(),
-            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
-            window_size=window_size,
-            nslc=nslc,
-            training_hash=training_hash,
-            overwrite=overwrite,
-            output_dir=output_dir,
-            root_dir=root_dir,
-            prefix_config=prefix_config,
-            n_jobs=n_jobs,
-            verbose=verbose,
-        )
+        return {
+            "class": cls.__name__,
+            "nslc": nslc,
+            "training_hash": training_hash,
+            "tremor": cls.tremor_fingerprint(tremor_df),
+            "constructor": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "window_size": window_size,
+            },
+            "build_label": build_label_params,
+            "extract_features": extract_features_params,
+        }
 
     def set_directories(self) -> tuple[str, str, str]:
         """Build and return the prediction output directory paths.
@@ -489,73 +499,6 @@ class PredictionModel(BaseModel):
             path = os.path.join(self.prediction_dir, f"prediction{suffix}.config.{fmt}")
         return self._config.save(path, fmt)
 
-    @property
-    def stage_dir(self) -> str:
-        """Stage directory where the prediction cache artefact is written.
-
-        Returns:
-            str: ``self.prediction_dir`` — the ``prediction/`` subtree under
-                ``output_dir`` that already hosts the forecast outputs.
-        """
-        return self.prediction_dir
-
-    @classmethod
-    def build_identity(  # ty:ignore[invalid-method-override]
-        cls,
-        *,
-        nslc: str | None,
-        tremor_df: pd.DataFrame,
-        training_hash: str | None,
-        start_date: str | datetime,
-        end_date: str | datetime,
-        window_size: int,
-        build_label_params: dict,
-        extract_features_params: dict,
-    ) -> dict:
-        """Return the canonical identity dict that defines this prediction cache entry.
-
-        Bundles the station-channel id, the tremor data fingerprint, the
-        upstream training-model hash, and all prediction-specific params into
-        a canonical dict. Including ``training_hash`` ensures the prediction
-        cache invalidates automatically whenever the trained ensemble it
-        depends on changes — even when the prediction inputs themselves are
-        unchanged.
-
-        Args:
-            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
-                or ``None`` for standalone runs.
-            tremor_df (pd.DataFrame): The tremor DataFrame used for the
-                forecast. Reduced to a fingerprint via
-                :meth:`BaseModel.tremor_fingerprint`.
-            training_hash (str | None): Hash of the upstream
-                :class:`TrainingModel` identity that produced the loaded
-                ensemble. ``None`` only when the ensemble was loaded from a
-                source outside the current pipeline run.
-            start_date (str | datetime): Forecast period start.
-            end_date (str | datetime): Forecast period end.
-            window_size (int): Sliding window size in days.
-            build_label_params (dict): Kwargs passed to ``build_label()``.
-            extract_features_params (dict): Kwargs passed to
-                ``extract_features()`` excluding ``overwrite``, ``n_jobs``,
-                ``verbose``.
-
-        Returns:
-            dict: Canonical identity dict ready for hashing.
-        """
-        return {
-            "class": cls.__name__,
-            "nslc": nslc,
-            "training_hash": training_hash,
-            "tremor": cls.tremor_fingerprint(tremor_df),
-            "constructor": {
-                "start_date": start_date,
-                "end_date": end_date,
-                "window_size": window_size,
-            },
-            "build_label": build_label_params,
-            "extract_features": extract_features_params,
-        }
-
     def build_label(
         self, window_step: int, window_step_unit: Literal["minutes", "hours"]
     ) -> Self:
@@ -770,6 +713,110 @@ class PredictionModel(BaseModel):
 
         return self
 
+    def forecast(
+        self,
+        save_seed_result: bool = True,
+        plot_threshold: float = 0.5,
+        plot_title: str | None = None,
+        plot_pdf: bool = True,
+        **plot_kwargs,
+    ) -> pd.DataFrame:
+        """Run forecast inference and render the forecast plot.
+
+        Calls :meth:`ClassifierEnsemble.predict_with_uncertainty` over the
+        extracted features, assembles per-classifier and consensus
+        probabilities into a single DataFrame indexed by forecast datetime,
+        writes the result CSV under ``self.output_dir``, and renders the
+        forecast plot via :meth:`_plot_forecast`.
+
+        Args:
+            save_seed_result (bool, optional): Persist per-seed probability
+                CSVs under ``result_dir/{classifier_name}/`` when ``True``.
+                Defaults to ``True``.
+            plot_threshold (float, optional): Decision threshold drawn as a
+                horizontal reference line on the forecast plot. Defaults to
+                ``0.5``.
+            plot_title (str | None, optional): Title to render on the forecast
+                plot. Defaults to ``None``.
+            plot_pdf (bool, optional): Save a PDF copy of the forecast plot
+                with embedded TrueType fonts in addition to the PNG. Defaults
+                to ``True``.
+            **plot_kwargs: Extra keyword arguments forwarded to
+                :func:`plot_forecast`.
+
+        Returns:
+            pd.DataFrame: Forecast results indexed by datetime with one column
+                per ``{classifier}_{probability|uncertainty|prediction|confidence}``
+                plus the four ``consensus_*`` columns.
+
+        Raises:
+            ValueError: If ``build_label()`` has not been called first.
+            ValueError: If ``extract_features()`` has not been called first.
+        """
+        if self.labels.empty or self._labels.empty or self.labels_csv is None:
+            raise ValueError("Please run build_label() first.")
+
+        if self.features_df.empty and self.features_path is None:
+            raise ValueError(
+                "Features (matrix) dataframe (features_df) is empty. "
+                "Please run extract_features() first."
+            )
+
+        self.create_directories()
+
+        results = self.ClassifierEnsemble.predict_with_uncertainty(
+            X=self.features_df,
+            save=save_seed_result,
+            output_dir=self.result_dir,
+            overwrite=self.overwrite,
+            verbose=self.verbose,
+        )
+
+        df_forecast = pd.DataFrame(results, index=self.features_df.index)
+        csv_path = os.path.join(
+            self.result_dir, f"forecast-results_{self.basename}.csv"
+        )
+
+        df_forecast = to_datetime_index(self._labels, df_forecast)
+
+        df_forecast.to_csv(csv_path)
+        logger.info(f"Predictions saved to: {csv_path}")
+
+        self._plot_forecast(
+            df_forecast,
+            plot_threshold,
+            title=plot_title,
+            plot_pdf=plot_pdf,
+            **plot_kwargs,
+        )
+
+        self.results = df_forecast
+
+        identity = type(self).build_identity(
+            nslc=self.nslc,
+            tremor_df=self.tremor_df,
+            training_hash=self.training_hash,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            window_size=self.window_size,
+            build_label_params={
+                "window_step": self.window_step,
+                "window_step_unit": self.window_step_unit,
+            },
+            extract_features_params=dict(self._extract_features_kwargs or {}),
+        )
+        self.id = type(self).compute_hash(identity)
+
+        if self.save_model:
+            self.save(identity)
+
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save prediction config: {exc}")
+
+        return df_forecast
+
     def load_features(
         self,
         features_matrix_path: str,
@@ -937,107 +984,67 @@ class PredictionModel(BaseModel):
 
         return self
 
-    def forecast(
-        self,
-        save_seed_result: bool = True,
-        plot_threshold: float = 0.5,
-        plot_title: str | None = None,
-        plot_pdf: bool = True,
-        **plot_kwargs,
-    ) -> pd.DataFrame:
-        """Run forecast inference and render the forecast plot.
+    @staticmethod
+    def _init_config(
+        *,
+        model: str | ClassifierEnsemble | SeedEnsemble,
+        tremor_data: str | pd.DataFrame,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        window_size: int,
+        nslc: str | None,
+        training_hash: str | None,
+        overwrite: bool,
+        output_dir: str | None,
+        root_dir: str | None,
+        prefix_config: str | None,
+        n_jobs: int,
+        save_model: bool,
+        verbose: bool,
+    ) -> PredictionConfig:
+        """Snapshot the ``__init__`` surface into a :class:`PredictionConfig`.
 
-        Calls :meth:`ClassifierEnsemble.predict_with_uncertainty` over the
-        extracted features, assembles per-classifier and consensus
-        probabilities into a single DataFrame indexed by forecast datetime,
-        writes the result CSV under ``self.output_dir``, and renders the
-        forecast plot via :meth:`_plot_forecast`.
+        Normalises non-serializable inputs to string handles so the saved
+        YAML/JSON round-trips the user's original intent: ``model`` and
+        ``tremor_data`` become ``None`` when a live in-memory object was
+        passed, ``start_date`` / ``end_date`` are emitted in ISO-8601 form.
 
         Args:
-            save_seed_result (bool, optional): Persist per-seed probability
-                CSVs under ``result_dir/{classifier_name}/`` when ``True``.
-                Defaults to ``True``.
-            plot_threshold (float, optional): Decision threshold drawn as a
-                horizontal reference line on the forecast plot. Defaults to
-                ``0.5``.
-            plot_title (str | None, optional): Title to render on the forecast
-                plot. Defaults to ``None``.
-            plot_pdf (bool, optional): Save a PDF copy of the forecast plot
-                with embedded TrueType fonts in addition to the PNG. Defaults
-                to ``True``.
-            **plot_kwargs: Extra keyword arguments forwarded to
-                :func:`plot_forecast`.
+            model (str | ClassifierEnsemble | SeedEnsemble): Trained model
+                source supplied by the caller.
+            tremor_data (str | pd.DataFrame): Tremor source supplied by the caller.
+            start_date (str | datetime): Forecast period start.
+            end_date (str | datetime): Forecast period end.
+            window_size (int): Sliding window size in days.
+            overwrite (bool): Overwrite cached artefacts.
+            output_dir (str | None): Root output directory.
+            root_dir (str | None): Project root.
+            prefix_config (str | None): Slugified discriminator inserted into
+                the ``save_config()`` filename before ``.config``.
+            n_jobs (int): Parallel workers.
+            verbose (bool): Emit verbose logs.
 
         Returns:
-            pd.DataFrame: Forecast results indexed by datetime with one column
-                per ``{classifier}_{probability|uncertainty|prediction|confidence}``
-                plus the four ``consensus_*`` columns.
-
-        Raises:
-            ValueError: If ``build_label()`` has not been called first.
-            ValueError: If ``extract_features()`` has not been called first.
+            PredictionConfig: Snapshot ready for ``save_config()``.
         """
-        if self.labels.empty or self._labels.empty or self.labels_csv is None:
-            raise ValueError("Please run build_label() first.")
-
-        if self.features_df.empty and self.features_path is None:
-            raise ValueError(
-                "Features (matrix) dataframe (features_df) is empty. "
-                "Please run extract_features() first."
-            )
-
-        self.create_directories()
-
-        results = self.ClassifierEnsemble.predict_with_uncertainty(
-            X=self.features_df,
-            save=save_seed_result,
-            output_dir=self.result_dir,
-            overwrite=self.overwrite,
-            verbose=self.verbose,
+        return PredictionConfig(
+            model=model if isinstance(model, str) else None,
+            tremor_data=tremor_data if isinstance(tremor_data, str) else None,
+            start_date=start_date
+            if isinstance(start_date, str)
+            else start_date.isoformat(),
+            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
+            window_size=window_size,
+            nslc=nslc,
+            training_hash=training_hash,
+            overwrite=overwrite,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            prefix_config=prefix_config,
+            n_jobs=n_jobs,
+            save_model=save_model,
+            verbose=verbose,
         )
-
-        df_forecast = pd.DataFrame(results, index=self.features_df.index)
-        csv_path = os.path.join(
-            self.result_dir, f"forecast-results_{self.basename}.csv"
-        )
-
-        df_forecast = to_datetime_index(self._labels, df_forecast)
-
-        df_forecast.to_csv(csv_path)
-        logger.info(f"Predictions saved to: {csv_path}")
-
-        self._plot_forecast(
-            df_forecast,
-            plot_threshold,
-            title=plot_title,
-            plot_pdf=plot_pdf,
-            **plot_kwargs,
-        )
-
-        self.results = df_forecast
-
-        self.save(
-            type(self).build_identity(
-                nslc=self.nslc,
-                tremor_df=self.tremor_df,
-                training_hash=self.training_hash,
-                start_date=self.start_date,
-                end_date=self.end_date,
-                window_size=self.window_size,
-                build_label_params={
-                    "window_step": self.window_step,
-                    "window_step_unit": self.window_step_unit,
-                },
-                extract_features_params=dict(self._extract_features_kwargs or {}),
-            )
-        )
-
-        try:
-            self.save_config()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Failed to save prediction config: {exc}")
-
-        return df_forecast
 
     def _write_load_features_note(
         self,

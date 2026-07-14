@@ -102,11 +102,12 @@ fm.explain(
     output_dir=None,
     overwrite=None,
     n_jobs=None,
+    use_cache=True,                           # skip load path when False
     verbose=None,
 ) -> Self
 ```
 
-Internally calls `ExplanationModel.explain(...)` then `.plot(...)`.
+Internally calls `ExplanationModel.explain(...)` then `.plot(...)`. `use_cache` is threaded down so `use_cache=False` skips the top-level `ExplanationModel.load(...)` short-circuit — see [Cache semantics](#cache-semantics).
 
 ### Standalone `ExplanationModel.explain()` signature
 
@@ -222,6 +223,14 @@ per-seed `shap_values/{seed:05d}.pkl` files and per-classifier
 cache pickle — they survive cache deletion and allow `explain()` to
 short-circuit at the per-classifier level even if the top-level cache
 pickle is missing.
+
+`ExplanationModel.explain()` accepts a `use_cache: bool = True` argument
+that gates the top-level cache. When ``use_cache=False`` (or when
+``self.overwrite`` is true) the load path is skipped and SHAP is
+recomputed from scratch — the write is likewise skipped when the caller
+also disables `save_model`. `ForecastModel.explain(..., use_cache=...)`
+threads this argument straight through, so passing `use_cache=False`
+from the wrapper truly disables the cache end-to-end.
 
 ---
 

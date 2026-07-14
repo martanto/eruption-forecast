@@ -358,6 +358,10 @@ class ForecastEvaluateConfig(BaseConfig):
             inherits from ``ForecastModel.overwrite``. Defaults to ``None``.
         n_jobs (int | None): Parallel workers. ``None`` inherits from
             ``ForecastModel.n_jobs``. Defaults to ``None``.
+        use_cache (bool): Consult the content-addressable evaluation cache
+            before running. ``False`` skips the load path even when a cached
+            pickle exists on disk and also disables cache writes. Defaults
+            to ``True``.
         verbose (bool | None): Enable verbose logging. ``None`` inherits from
             ``ForecastModel.verbose``. Defaults to ``None``.
     """
@@ -369,6 +373,7 @@ class ForecastEvaluateConfig(BaseConfig):
     output_dir: str | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None
+    use_cache: bool = True
     verbose: bool | None = None
 
 
@@ -419,6 +424,10 @@ class ForecastExplainConfig(BaseConfig):
             ``None``.
         n_jobs (int | None): Parallel workers. ``None`` inherits from
             ``ForecastModel.n_jobs``. Defaults to ``None``.
+        use_cache (bool): Consult the content-addressable explanation cache
+            before running. ``False`` skips the load path even when a cached
+            pickle exists on disk and also disables cache writes. Defaults
+            to ``True``.
         verbose (bool | None): Enable verbose logging. ``None`` inherits
             from ``ForecastModel.verbose``. Defaults to ``None``.
     """
@@ -437,6 +446,7 @@ class ForecastExplainConfig(BaseConfig):
     output_dir: str | None = None
     overwrite: bool | None = None
     n_jobs: int | None = None
+    use_cache: bool = True
     verbose: bool | None = None
 
 

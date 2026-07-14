@@ -200,8 +200,11 @@ explanation/{training|prediction}/
 The `.params.json` is what was hashed to produce the filename. When `use_cache=True` 
 and the next run computes the same identity, the `.pkl` is loaded instead of recomputed.
 
-`fm.train(..., use_cache=True)` (default) and `fm.predict(..., use_cache=True)` 
-(default) use the cache; flip to `False` to force a clean run.
+`fm.train(..., use_cache=True)`, `fm.predict(..., use_cache=True)`, `fm.evaluate(..., use_cache=True)`,
+and `fm.explain(..., use_cache=True)` (all defaults) use the cache; flip any of them to
+`False` to force a clean run of that stage. `use_cache` gates both the load and the write —
+it is independent of `overwrite`, which additionally controls plot / per-classifier artefact
+regeneration.
 
 ---
 

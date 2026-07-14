@@ -358,6 +358,7 @@ class TestForecastEvaluateConfig:
         assert cfg.eruption_dates is None
         assert cfg.plot_per_seed is False
         assert cfg.plot_aggregate is True
+        assert cfg.use_cache is True
 
     def test_to_dict_from_dict_round_trip(self) -> None:
         """All fields survive a round-trip."""
@@ -403,6 +404,7 @@ class TestForecastExplainConfig:
         assert cfg.output_dir is None
         assert cfg.overwrite is None
         assert cfg.n_jobs is None
+        assert cfg.use_cache is True
         assert cfg.verbose is None
 
     def test_to_dict_from_dict_round_trip(self) -> None:

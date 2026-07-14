@@ -46,6 +46,7 @@ class EvaluationConfig(BaseConfig):
     root_dir: str | None = None
     prefix_config: str | None = None
     n_jobs: int = 1
+    save_model: bool = False
     verbose: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,6 +69,7 @@ class EvaluationConfig(BaseConfig):
             "root_dir",
             "prefix_config",
             "n_jobs",
+            "save_model",
             "verbose",
         ):
             data[f] = getattr(self, f)
