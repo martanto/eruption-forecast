@@ -81,6 +81,7 @@ class TrainingConfig(BaseConfig):
     prefix_config: str | None = None
     n_jobs: int = 1
     n_grids: int = 1
+    save_model: bool = False
     verbose: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -114,6 +115,7 @@ class TrainingConfig(BaseConfig):
             "prefix_config",
             "n_jobs",
             "n_grids",
+            "save_model",
             "verbose",
         ):
             data[f] = getattr(self, f)

@@ -51,6 +51,7 @@ class ExplanationModel(BaseModel):
         root_dir: str | None = None,
         prefix_config: str | None = None,
         n_jobs: int = 1,
+        save_model: bool = False,
         verbose: bool = False,
     ):
         """Initialize ExplanationModel in training-reuse or prediction-reuse mode.
@@ -111,6 +112,7 @@ class ExplanationModel(BaseModel):
             output_dir=output_dir,
             root_dir=root_dir,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
@@ -150,42 +152,12 @@ class ExplanationModel(BaseModel):
             root_dir=root_dir,
             prefix_config=prefix_config,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
         if verbose:
             logger.info(f"Explaining on {type(model).__name__}")
-
-    @classmethod
-    def build_identity(  # ty:ignore[invalid-method-override]
-        cls,
-        *,
-        upstream_hash: str,
-        explain_params: dict,
-    ) -> dict:
-        """Return the canonical identity dict for this explanation run.
-
-        The ``upstream_hash`` ties the cache to the exact upstream model:
-        when the trained ``ClassifierEnsemble``, the feature matrix, or the
-        modelling window change, the existing explanation cache is
-        invalidated automatically. Station identity is implicit in the
-        per-station ``output_dir`` so it is not part of the identity.
-
-        Args:
-            upstream_hash (str): Hash of the upstream model fingerprint
-                (model kind, classifier names, features shape and columns,
-                date range). Produced by :meth:`_upstream_hash`.
-            explain_params (dict): Stage-level knobs that change the
-                produced artefact — currently ``save_per_seed``.
-
-        Returns:
-            dict: Canonical identity dict ready for hashing.
-        """
-        return {
-            "class": cls.__name__,
-            "upstream_hash": upstream_hash,
-            "explain_params": explain_params,
-        }
 
     @classmethod
     def from_file(
@@ -263,6 +235,37 @@ class ExplanationModel(BaseModel):
             str: ``self.explanation_dir``.
         """
         return self.explanation_dir
+
+    @classmethod
+    def build_identity(  # ty:ignore[invalid-method-override]
+        cls,
+        *,
+        upstream_hash: str,
+        explain_params: dict,
+    ) -> dict:
+        """Return the canonical identity dict for this explanation run.
+
+        The ``upstream_hash`` ties the cache to the exact upstream model:
+        when the trained ``ClassifierEnsemble``, the feature matrix, or the
+        modelling window change, the existing explanation cache is
+        invalidated automatically. Station identity is implicit in the
+        per-station ``output_dir`` so it is not part of the identity.
+
+        Args:
+            upstream_hash (str): Hash of the upstream model fingerprint
+                (model kind, classifier names, features shape and columns,
+                date range). Produced by :meth:`_upstream_hash`.
+            explain_params (dict): Stage-level knobs that change the
+                produced artefact — currently ``save_per_seed``.
+
+        Returns:
+            dict: Canonical identity dict ready for hashing.
+        """
+        return {
+            "class": cls.__name__,
+            "upstream_hash": upstream_hash,
+            "explain_params": explain_params,
+        }
 
     def set_directories(self) -> tuple[str, str]:
         """Build the output directory paths for explanation artefacts.
@@ -414,26 +417,12 @@ class ExplanationModel(BaseModel):
             )
         return self._config.save(path, fmt)
 
-    def _upstream_hash(self) -> str:
-        """Hash the upstream-model fingerprint so the explanation cache invalidates
-        whenever the trained ensemble, the feature matrix, or the modelling
-        window changes."""
-        fingerprint = {
-            "model_kind": self.model_kind,
-            "classifiers": list(self.ClassifierEnsemble.classifiers),
-            "features_shape": list(self.features_df.shape),
-            "features_columns": sorted(map(str, self.features_df.columns)),
-            "start_date": self.start_date_str,
-            "end_date": self.end_date_str,
-            "window_size": self.window_size,
-        }
-        return type(self).compute_hash(fingerprint)
-
     def explain(
         self,
         save_per_seed: bool = True,
         check_additivity: bool = False,
         overwrite_classifier_explanation: bool = False,
+        use_cache: bool = True,
     ) -> Self:
         """Compute per-classifier SHAP explanations for every seed.
 
@@ -452,6 +441,13 @@ class ExplanationModel(BaseModel):
                 per-classifier ``ClassifierExplanation.pkl`` artefact.
                 Falls back to ``self.overwrite`` when ``False``. Defaults
                 to ``False``.
+            use_cache (bool): Short-circuit re-run when a content-addressable
+                cache hit exists at
+                ``{stage_dir}/{hash}.ExplanationModel.pkl``. When ``False``
+                the load path is skipped even if a pickle exists on disk.
+                Independent of ``self.overwrite``, which additionally
+                controls per-classifier artefact regeneration. Defaults to
+                ``True``.
 
         Returns:
             Self: The current instance, enabling method chaining.
@@ -460,12 +456,17 @@ class ExplanationModel(BaseModel):
             upstream_hash=self._upstream_hash(),
             explain_params={"save_per_seed": save_per_seed},
         )
+        self.id = type(self).compute_hash(identity)
 
-        if not self.overwrite:
+        if use_cache and not self.overwrite:
             cached = type(self).load(self.stage_dir, identity)
             if cached is not None:
                 self.explanations = cached.explanations
                 self.ExplainerEnsemble.explanations = cached.explanations
+                # Restored ``cached.id`` from post-change pickles carries the
+                # same hash; older pickles predate ``self.id``, so fall back
+                # to the freshly-computed hash to keep the attribute filled.
+                self.id = cached.id or self.id
                 return self
 
         self.create_directories()
@@ -477,7 +478,9 @@ class ExplanationModel(BaseModel):
         )
 
         self.explanations = self.ExplainerEnsemble.explanations
-        self.save(identity)
+
+        if self.save_model:
+            self.save(identity)
 
         try:
             self.save_config()
@@ -560,3 +563,18 @@ class ExplanationModel(BaseModel):
                 dpi=dpi,
                 group_remaining_features=group_remaining_features,
             )
+
+    def _upstream_hash(self) -> str:
+        """Hash the upstream-model fingerprint so the explanation cache invalidates
+        whenever the trained ensemble, the feature matrix, or the modelling
+        window changes."""
+        fingerprint = {
+            "model_kind": self.model_kind,
+            "classifiers": list(self.ClassifierEnsemble.classifiers),
+            "features_shape": list(self.features_df.shape),
+            "features_columns": sorted(map(str, self.features_df.columns)),
+            "start_date": self.start_date_str,
+            "end_date": self.end_date_str,
+            "window_size": self.window_size,
+        }
+        return type(self).compute_hash(fingerprint)

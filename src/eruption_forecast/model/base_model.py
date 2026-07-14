@@ -76,6 +76,10 @@ class BaseModel(ABC):
         ClassifierEnsemble (ClassifierEnsemble | None): Loaded classifier
             ensemble. ``None`` until populated, typically by
             ``EvaluationModel``.
+        id (str | None): Content-addressable identity hash of this
+            instance. ``None`` until the concrete stage's main method
+            (``fit()`` / ``forecast()`` / ``evaluate()`` / ``explain()``)
+            populates it.
     """
 
     def __init__(
@@ -89,6 +93,7 @@ class BaseModel(ABC):
         output_dir: str | None = None,
         root_dir: str | None = None,
         n_jobs: int = 1,
+        save_model: bool = False,
         verbose: bool = False,
     ):
         """Initialise the base model.
@@ -152,6 +157,7 @@ class BaseModel(ABC):
         self.output_dir = output_dir
         self.root_dir = root_dir
         self.n_jobs = n_jobs
+        self.save_model = save_model
         self.verbose = verbose
 
         # Set additional properties
@@ -172,6 +178,11 @@ class BaseModel(ABC):
 
         # Use for evaluation model
         self.ClassifierEnsemble: ClassifierEnsemble | None = None
+
+        # Content-addressable identity hash of this instance. Populated by the
+        # concrete stage's main method (fit/forecast/evaluate/explain) once
+        # identity inputs are known.
+        self.id: str | None = None
 
         self._validate()
 
@@ -519,9 +530,7 @@ class BaseModel(ABC):
             "columns": sorted(str(c) for c in df.columns),
         }
 
-    def save(
-        self, identity: dict | None = None, path: str | None = None
-    ) -> str:
+    def save(self, identity: dict | None = None, path: str | None = None) -> str:
         """Serialise this model instance to a ``.pkl`` file via joblib.
 
         Two modes:
@@ -561,9 +570,7 @@ class BaseModel(ABC):
 
             sidecar = cache_path[: -len(".pkl")] + ".params.json"
             with open(sidecar, "w", encoding="utf-8") as f:
-                json.dump(
-                    type(self)._canonicalize(identity), f, indent=2, default=str
-                )
+                json.dump(type(self)._canonicalize(identity), f, indent=2, default=str)
 
             logger.info(f"[{type(self).__name__}] Cached at: {cache_path}")
             return cache_path

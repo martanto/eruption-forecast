@@ -118,6 +118,7 @@ class TrainingModel(BaseModel):
         prefix_config: str | None = None,
         n_jobs: int = 1,
         n_grids: int = 1,
+        save_model: bool = False,
         verbose: bool = False,
     ) -> None:
         self._config: TrainingConfig = self._init_config(
@@ -138,6 +139,7 @@ class TrainingModel(BaseModel):
             prefix_config=prefix_config,
             n_jobs=n_jobs,
             n_grids=n_grids,
+            save_model=save_model,
             verbose=verbose,
         )
 
@@ -151,6 +153,7 @@ class TrainingModel(BaseModel):
             output_dir=output_dir,
             root_dir=root_dir,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
@@ -173,7 +176,6 @@ class TrainingModel(BaseModel):
         # again. ``None`` until the corresponding method has run.
         self._extract_features_kwargs: dict | None = None
         self._fit_kwargs: dict | None = None
-        self.training_hash: str | None = None
 
         # Set additional properties
         self.classifier_models: list[ClassifierModel] = get_classifier_models(
@@ -221,81 +223,112 @@ class TrainingModel(BaseModel):
 
         self.validate()
 
-    @staticmethod
-    def _init_config(
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the training cache artefact is written.
+
+        Returns:
+            str: ``self.training_dir`` — the ``training/`` subtree under
+                ``output_dir`` that already hosts every training artefact.
+        """
+        return self.training_dir
+
+    @classmethod
+    def build_identity(  # ty:ignore[invalid-method-override]
+        cls,
         *,
-        tremor_data: str | pd.DataFrame,
+        nslc: str | None,
+        tremor_df: pd.DataFrame,
         start_date: str | datetime,
         end_date: str | datetime,
         classifiers: str | list[str],
         eruption_dates: list[str],
         window_size: int,
-        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"],
+        cv_strategy: str,
         cv_splits: int,
+        scoring: str,
         top_n_features: int,
         include_eruption_date: bool,
-        nslc: str | None,
-        output_dir: str | None,
-        root_dir: str | None,
-        overwrite: bool,
-        prefix_config: str | None,
-        n_jobs: int,
-        n_grids: int,
-        verbose: bool,
-    ) -> TrainingConfig:
-        """Snapshot the ``__init__`` surface into a :class:`TrainingConfig`.
+        build_label_params: dict,
+        extract_features_params: dict,
+        fit_params: dict,
+    ) -> dict:
+        """Return the canonical identity dict that defines this training cache entry.
 
-        Normalises non-serializable inputs to string handles so the saved
-        YAML/JSON round-trips the user's original intent: ``tremor_data``
-        becomes ``None`` when a pre-loaded ``pd.DataFrame`` was passed,
-        ``start_date`` / ``end_date`` are emitted in ISO-8601 form.
+        Builds the parameter bundle that uniquely identifies a trained
+        ``TrainingModel``: the station-channel id, the tremor data
+        fingerprint, all constructor params that affect the output, plus the
+        params passed to ``build_label()``, ``extract_features()``, and
+        ``fit()``. Runtime knobs (``n_jobs``, ``n_grids``, ``verbose``,
+        ``overwrite``) are excluded because they do not change the produced
+        artefact.
 
         Args:
-            tremor_data (str | pd.DataFrame): Tremor source supplied by the caller.
+            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
+                or ``None`` for standalone runs.
+            tremor_df (pd.DataFrame): The tremor DataFrame that will be used
+                for training. Reduced to a small fingerprint via
+                :meth:`BaseModel.tremor_fingerprint`.
             start_date (str | datetime): Training period start.
             end_date (str | datetime): Training period end.
-            classifiers (str | list[str]): Classifier key(s) to train.
-            eruption_dates (list[str]): Known eruption dates.
+            classifiers (str | list[str]): Classifier keys.
+            eruption_dates (list[str]): Eruption dates used for labelling.
             window_size (int): Sliding window size in days.
-            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified"]):
-                Cross-validation strategy.
+            cv_strategy (str): Cross-validation strategy name.
             cv_splits (int): Number of CV folds.
-            top_n_features (int): Top-N features retained after selection.
-            include_eruption_date (bool): Whether to label the eruption day positive.
-            output_dir (str | None): Root output directory.
-            root_dir (str | None): Project root.
-            overwrite (bool): Overwrite cached artefacts.
-            prefix_config (str | None): Slugified discriminator inserted into
-                the ``save_config()`` filename before ``.config``.
-            n_jobs (int): Outer parallel workers.
-            n_grids (int): Inner grid-search workers.
-            verbose (bool): Emit verbose logs.
+            scoring (str): GridSearchCV scoring name.
+            top_n_features (int): Top-N features retained.
+            include_eruption_date (bool): Whether the eruption day itself is
+                labelled positive.
+            build_label_params (dict): Kwargs passed to ``build_label()``
+                excluding ``verbose``.
+            extract_features_params (dict): Kwargs passed to
+                ``extract_features()`` excluding ``overwrite``, ``n_jobs``,
+                ``verbose``.
+            fit_params (dict): Kwargs passed to ``fit()`` excluding
+                ``plot_features``.
 
         Returns:
-            TrainingConfig: Snapshot ready for ``save_config()``.
+            dict: Canonical identity dict ready for hashing.
         """
-        return TrainingConfig(
-            tremor_data=tremor_data if isinstance(tremor_data, str) else None,
-            start_date=start_date
-            if isinstance(start_date, str)
-            else start_date.isoformat(),
-            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
-            classifiers=[classifiers] if isinstance(classifiers, str) else classifiers,
-            eruption_dates=list(eruption_dates),
-            window_size=window_size,
-            cv_strategy=cv_strategy,
-            cv_splits=cv_splits,
-            top_n_features=top_n_features,
-            include_eruption_date=include_eruption_date,
-            nslc=nslc,
-            output_dir=output_dir,
-            root_dir=root_dir,
-            overwrite=overwrite,
-            prefix_config=prefix_config,
-            n_jobs=n_jobs,
-            n_grids=n_grids,
-            verbose=verbose,
+        classifiers_list = (
+            [classifiers] if isinstance(classifiers, str) else list(classifiers)
         )
+
+        # Normalize ``select_features`` (CSV path or raw list) into a sorted
+        # list so two callers that point at the same curated feature set
+        # produce the same cache hash, regardless of how they spelled the
+        # input. Done here so callers do not have to resolve the value
+        # themselves before building the identity.
+        extract_features_params = dict(extract_features_params)
+        raw_select_features = extract_features_params.get("select_features")
+        if raw_select_features is not None:
+            extract_features_params["select_features"] = sorted(
+                load_select_features(
+                    raw_select_features, number_of_features=top_n_features
+                )
+            )
+
+        return {
+            "class": cls.__name__,
+            "nslc": nslc,
+            "tremor": cls.tremor_fingerprint(tremor_df),
+            "constructor": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "classifiers": sorted(classifiers_list),
+                "eruption_dates": sorted(eruption_dates),
+                "window_size": window_size,
+                "cv_strategy": cv_strategy,
+                "cv_splits": cv_splits,
+                "scoring": scoring,
+                "top_n_features": top_n_features,
+                "include_eruption_date": include_eruption_date,
+            },
+            "build_label": build_label_params,
+            "extract_features": extract_features_params,
+            "fit": fit_params,
+        }
 
     def set_directories(
         self,
@@ -546,113 +579,6 @@ class TrainingModel(BaseModel):
             )
             path = os.path.join(self.training_dir, f"training{suffix}.config.{fmt}")
         return self._config.save(path, fmt)
-
-    @property
-    def stage_dir(self) -> str:
-        """Stage directory where the training cache artefact is written.
-
-        Returns:
-            str: ``self.training_dir`` — the ``training/`` subtree under
-                ``output_dir`` that already hosts every training artefact.
-        """
-        return self.training_dir
-
-    @classmethod
-    def build_identity(  # ty:ignore[invalid-method-override]
-        cls,
-        *,
-        nslc: str | None,
-        tremor_df: pd.DataFrame,
-        start_date: str | datetime,
-        end_date: str | datetime,
-        classifiers: str | list[str],
-        eruption_dates: list[str],
-        window_size: int,
-        cv_strategy: str,
-        cv_splits: int,
-        scoring: str,
-        top_n_features: int,
-        include_eruption_date: bool,
-        build_label_params: dict,
-        extract_features_params: dict,
-        fit_params: dict,
-    ) -> dict:
-        """Return the canonical identity dict that defines this training cache entry.
-
-        Builds the parameter bundle that uniquely identifies a trained
-        ``TrainingModel``: the station-channel id, the tremor data
-        fingerprint, all constructor params that affect the output, plus the
-        params passed to ``build_label()``, ``extract_features()``, and
-        ``fit()``. Runtime knobs (``n_jobs``, ``n_grids``, ``verbose``,
-        ``overwrite``) are excluded because they do not change the produced
-        artefact.
-
-        Args:
-            nslc (str | None): ``Network.Station.Location.Channel`` identifier,
-                or ``None`` for standalone runs.
-            tremor_df (pd.DataFrame): The tremor DataFrame that will be used
-                for training. Reduced to a small fingerprint via
-                :meth:`BaseModel.tremor_fingerprint`.
-            start_date (str | datetime): Training period start.
-            end_date (str | datetime): Training period end.
-            classifiers (str | list[str]): Classifier keys.
-            eruption_dates (list[str]): Eruption dates used for labelling.
-            window_size (int): Sliding window size in days.
-            cv_strategy (str): Cross-validation strategy name.
-            cv_splits (int): Number of CV folds.
-            scoring (str): GridSearchCV scoring name.
-            top_n_features (int): Top-N features retained.
-            include_eruption_date (bool): Whether the eruption day itself is
-                labelled positive.
-            build_label_params (dict): Kwargs passed to ``build_label()``
-                excluding ``verbose``.
-            extract_features_params (dict): Kwargs passed to
-                ``extract_features()`` excluding ``overwrite``, ``n_jobs``,
-                ``verbose``.
-            fit_params (dict): Kwargs passed to ``fit()`` excluding
-                ``plot_features``.
-
-        Returns:
-            dict: Canonical identity dict ready for hashing.
-        """
-        classifiers_list = (
-            [classifiers] if isinstance(classifiers, str) else list(classifiers)
-        )
-
-        # Normalize ``select_features`` (CSV path or raw list) into a sorted
-        # list so two callers that point at the same curated feature set
-        # produce the same cache hash, regardless of how they spelled the
-        # input. Done here so callers do not have to resolve the value
-        # themselves before building the identity.
-        extract_features_params = dict(extract_features_params)
-        raw_select_features = extract_features_params.get("select_features")
-        if raw_select_features is not None:
-            extract_features_params["select_features"] = sorted(
-                load_select_features(
-                    raw_select_features, number_of_features=top_n_features
-                )
-            )
-
-        return {
-            "class": cls.__name__,
-            "nslc": nslc,
-            "tremor": cls.tremor_fingerprint(tremor_df),
-            "constructor": {
-                "start_date": start_date,
-                "end_date": end_date,
-                "classifiers": sorted(classifiers_list),
-                "eruption_dates": sorted(eruption_dates),
-                "window_size": window_size,
-                "cv_strategy": cv_strategy,
-                "cv_splits": cv_splits,
-                "scoring": scoring,
-                "top_n_features": top_n_features,
-                "include_eruption_date": include_eruption_date,
-            },
-            "build_label": build_label_params,
-            "extract_features": extract_features_params,
-            "fit": fit_params,
-        }
 
     def build_label(
         self,
@@ -1175,7 +1101,6 @@ class TrainingModel(BaseModel):
         else:
             raise ValueError("No seed ensembles found")
 
-        # Save model
         identity = type(self).build_identity(
             nslc=self.nslc,
             tremor_df=self.tremor_df,
@@ -1198,8 +1123,10 @@ class TrainingModel(BaseModel):
             extract_features_params=dict(self._extract_features_kwargs or {}),
             fit_params=dict(self._fit_kwargs or {}),
         )
-        self.save(identity)
-        self.training_hash = type(self).compute_hash(identity)
+        self.id = type(self).compute_hash(identity)
+
+        if self.save_model:
+            self.save(identity)
 
         try:
             self.save_config()
@@ -1342,116 +1269,6 @@ class TrainingModel(BaseModel):
 
         return self
 
-    def _resolve_single_artefact(self, pattern: str, label: str) -> str:
-        """Glob ``self.features_dir`` for exactly one file matching ``pattern``.
-
-        Args:
-            pattern (str): Glob pattern relative to ``self.features_dir``
-                (e.g. ``"features-matrix_*.parquet"``,
-                ``"features-label_*.csv"``).
-            label (str): Human-readable name used in error messages.
-
-        Returns:
-            str: Absolute path to the single matching file.
-
-        Raises:
-            ValueError: If zero or more than one match is found — the caller
-                must then pass an explicit path.
-        """
-        matches = sorted(glob.glob(os.path.join(self.features_dir, pattern)))
-        if len(matches) == 1:
-            return matches[0]
-        if not matches:
-            raise ValueError(
-                f"No {label} matching '{pattern}' under {self.features_dir}; "
-                "pass an explicit path."
-            )
-        raise ValueError(
-            f"Multiple {label} files matching '{pattern}' under "
-            f"{self.features_dir}: {matches}; pass an explicit path."
-        )
-
-    @staticmethod
-    def build_classifier_ensemble(
-        output_dir: str,
-        seed_ensembles: dict[str, SeedEnsemble],
-        filename: str = "ClassifierEnsemble",
-        verbose: bool = False,
-    ) -> tuple[str, ClassifierEnsemble]:
-        """Build and save a ClassifierEnsemble from in-memory SeedEnsemble objects.
-
-        Assembles all per-classifier ``SeedEnsemble`` objects into a single
-        ``ClassifierEnsemble`` via :meth:`ClassifierEnsemble.from_seed_ensembles`
-        and persists it to ``{output_dir}/ClassifierEnsemble.pkl``.`.
-
-        Returns:
-            str: Absolute path to the saved ``ClassifierEnsemble.pkl`` file.
-
-        Example:
-            >>> path = TrainingModel.build_classifier_ensemble(
-            ...     output_dir="training/classifiers",
-            ...     seed_ensembles={"RandomForestClassifier": rf_ensemble, "XGBClassifier": xgb_ensemble},
-            ... )
-        """
-        classifier_ensemble_path = os.path.join(output_dir, f"{filename}.pkl")
-        classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
-            seed_ensembles, verbose
-        )
-        classifier_ensemble.save(classifier_ensemble_path)
-        return classifier_ensemble_path, classifier_ensemble
-
-    @staticmethod
-    def build_seed_ensemble(
-        output_dir: str,
-        classifier_name: str,
-        registry_path: str,
-        verbose: bool = False,
-    ) -> tuple[str, SeedEnsemble]:
-        """Build and save a SeedEnsemble from a trained-model registry.
-
-        Loads all per-seed model paths from ``registry_path`` via
-        :meth:`SeedEnsemble.from_any` (dispatches on extension — ``.json`` for
-        the new inline-features registry, ``.csv`` for the legacy registry),
-        saves the ensemble to
-        ``{output_dir}/SeedEnsemble_{classifier_name}.pkl``, and returns both
-        the path and the in-memory object so the caller can pass it directly
-        to :meth:`build_classifier_ensemble` without a disk reload.
-
-        Args:
-            output_dir (str): Directory where ``SeedEnsemble_{classifier_name}.pkl``
-                is written.
-            classifier_name (str): Human-readable classifier name used as the
-                filename suffix (e.g. ``"RandomForestClassifier"``).
-            registry_path (str): Path to the trained-model registry produced by
-                :func:`~eruption_forecast.utils.ml.save_model_json` (``.json``)
-                or the legacy CSV writer (``.csv``).
-            verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
-
-        Returns:
-            tuple[str, SeedEnsemble]: A two-element tuple ``(filepath, seed_ensemble)``
-            where ``filepath`` is the absolute path to the saved ``.pkl`` file and
-            ``seed_ensemble`` is the constructed :class:`SeedEnsemble` instance.
-
-        Example:
-            >>> path, ensemble = TrainingModel.build_seed_ensemble(
-            ...     output_dir="training/classifiers",
-            ...     classifier_name="RandomForestClassifier",
-            ...     registry_path="training/classifiers/trained-model__rf.json",
-            ... )
-        """
-        # Strip the extension and split on the ``__`` separator to recover the
-        # ``{Classifier}_{CV}_seeds-{N}_features-{K}`` suffix used by the
-        # ensemble filename.
-        suffix = os.path.splitext(os.path.basename(registry_path))[0].split("__")[-1]
-
-        ensure_dir(output_dir)
-        filepath = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
-        seed_ensemble = SeedEnsemble.from_any(
-            registry_path, classifier_name=classifier_name, verbose=verbose
-        )
-        seed_ensemble.save(filepath)
-        return filepath, seed_ensemble
-
     def compute_learning_curve(
         self,
         scoring: list[str] | None = None,
@@ -1559,6 +1376,194 @@ class TrainingModel(BaseModel):
             logger.info(f"Learning Curve: wrote {written}/{len(results)} JSON(s)")
 
         return self
+
+    @staticmethod
+    def _init_config(
+        *,
+        tremor_data: str | pd.DataFrame,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        classifiers: str | list[str],
+        eruption_dates: list[str],
+        window_size: int,
+        cv_strategy: Literal["shuffle", "stratified", "shuffle-stratified"],
+        cv_splits: int,
+        top_n_features: int,
+        include_eruption_date: bool,
+        nslc: str | None,
+        output_dir: str | None,
+        root_dir: str | None,
+        overwrite: bool,
+        prefix_config: str | None,
+        n_jobs: int,
+        n_grids: int,
+        save_model: bool,
+        verbose: bool,
+    ) -> TrainingConfig:
+        """Snapshot the ``__init__`` surface into a :class:`TrainingConfig`.
+
+        Normalises non-serializable inputs to string handles so the saved
+        YAML/JSON round-trips the user's original intent: ``tremor_data``
+        becomes ``None`` when a pre-loaded ``pd.DataFrame`` was passed,
+        ``start_date`` / ``end_date`` are emitted in ISO-8601 form.
+
+        Args:
+            tremor_data (str | pd.DataFrame): Tremor source supplied by the caller.
+            start_date (str | datetime): Training period start.
+            end_date (str | datetime): Training period end.
+            classifiers (str | list[str]): Classifier key(s) to train.
+            eruption_dates (list[str]): Known eruption dates.
+            window_size (int): Sliding window size in days.
+            cv_strategy (Literal["shuffle", "stratified", "shuffle-stratified"]):
+                Cross-validation strategy.
+            cv_splits (int): Number of CV folds.
+            top_n_features (int): Top-N features retained after selection.
+            include_eruption_date (bool): Whether to label the eruption day positive.
+            output_dir (str | None): Root output directory.
+            root_dir (str | None): Project root.
+            overwrite (bool): Overwrite cached artefacts.
+            prefix_config (str | None): Slugified discriminator inserted into
+                the ``save_config()`` filename before ``.config``.
+            n_jobs (int): Outer parallel workers.
+            n_grids (int): Inner grid-search workers.
+            verbose (bool): Emit verbose logs.
+
+        Returns:
+            TrainingConfig: Snapshot ready for ``save_config()``.
+        """
+        return TrainingConfig(
+            tremor_data=tremor_data if isinstance(tremor_data, str) else None,
+            start_date=start_date
+            if isinstance(start_date, str)
+            else start_date.isoformat(),
+            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
+            classifiers=[classifiers] if isinstance(classifiers, str) else classifiers,
+            eruption_dates=list(eruption_dates),
+            window_size=window_size,
+            cv_strategy=cv_strategy,
+            cv_splits=cv_splits,
+            top_n_features=top_n_features,
+            include_eruption_date=include_eruption_date,
+            nslc=nslc,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            overwrite=overwrite,
+            prefix_config=prefix_config,
+            n_jobs=n_jobs,
+            n_grids=n_grids,
+            save_model=save_model,
+            verbose=verbose,
+        )
+
+    @staticmethod
+    def build_classifier_ensemble(
+        output_dir: str,
+        seed_ensembles: dict[str, SeedEnsemble],
+        filename: str = "ClassifierEnsemble",
+        verbose: bool = False,
+    ) -> tuple[str, ClassifierEnsemble]:
+        """Build and save a ClassifierEnsemble from in-memory SeedEnsemble objects.
+
+        Assembles all per-classifier ``SeedEnsemble`` objects into a single
+        ``ClassifierEnsemble`` via :meth:`ClassifierEnsemble.from_seed_ensembles`
+        and persists it to ``{output_dir}/ClassifierEnsemble.pkl``.`.
+
+        Returns:
+            str: Absolute path to the saved ``ClassifierEnsemble.pkl`` file.
+
+        Example:
+            >>> path = TrainingModel.build_classifier_ensemble(
+            ...     output_dir="training/classifiers",
+            ...     seed_ensembles={"RandomForestClassifier": rf_ensemble, "XGBClassifier": xgb_ensemble},
+            ... )
+        """
+        classifier_ensemble_path = os.path.join(output_dir, f"{filename}.pkl")
+        classifier_ensemble = ClassifierEnsemble.from_seed_ensembles(
+            seed_ensembles, verbose
+        )
+        classifier_ensemble.save(classifier_ensemble_path)
+        return classifier_ensemble_path, classifier_ensemble
+
+    @staticmethod
+    def build_seed_ensemble(
+        output_dir: str,
+        classifier_name: str,
+        registry_path: str,
+        verbose: bool = False,
+    ) -> tuple[str, SeedEnsemble]:
+        """Build and save a SeedEnsemble from a trained-model registry.
+
+        Loads all per-seed model paths from ``registry_path`` via
+        :meth:`SeedEnsemble.from_any` (dispatches on extension — ``.json`` for
+        the new inline-features registry, ``.csv`` for the legacy registry),
+        saves the ensemble to
+        ``{output_dir}/SeedEnsemble_{classifier_name}.pkl``, and returns both
+        the path and the in-memory object so the caller can pass it directly
+        to :meth:`build_classifier_ensemble` without a disk reload.
+
+        Args:
+            output_dir (str): Directory where ``SeedEnsemble_{classifier_name}.pkl``
+                is written.
+            classifier_name (str): Human-readable classifier name used as the
+                filename suffix (e.g. ``"RandomForestClassifier"``).
+            registry_path (str): Path to the trained-model registry produced by
+                :func:`~eruption_forecast.utils.ml.save_model_json` (``.json``)
+                or the legacy CSV writer (``.csv``).
+            verbose (bool): Whether to emit load progress logs. Defaults to ``False``.
+
+        Returns:
+            tuple[str, SeedEnsemble]: A two-element tuple ``(filepath, seed_ensemble)``
+            where ``filepath`` is the absolute path to the saved ``.pkl`` file and
+            ``seed_ensemble`` is the constructed :class:`SeedEnsemble` instance.
+
+        Example:
+            >>> path, ensemble = TrainingModel.build_seed_ensemble(
+            ...     output_dir="training/classifiers",
+            ...     classifier_name="RandomForestClassifier",
+            ...     registry_path="training/classifiers/trained-model__rf.json",
+            ... )
+        """
+        # Strip the extension and split on the ``__`` separator to recover the
+        # ``{Classifier}_{CV}_seeds-{N}_features-{K}`` suffix used by the
+        # ensemble filename.
+        suffix = os.path.splitext(os.path.basename(registry_path))[0].split("__")[-1]
+
+        ensure_dir(output_dir)
+        filepath = os.path.join(output_dir, f"SeedEnsemble_{suffix}.pkl")
+        seed_ensemble = SeedEnsemble.from_any(
+            registry_path, classifier_name=classifier_name, verbose=verbose
+        )
+        seed_ensemble.save(filepath)
+        return filepath, seed_ensemble
+
+    def _resolve_single_artefact(self, pattern: str, label: str) -> str:
+        """Glob ``self.features_dir`` for exactly one file matching ``pattern``.
+
+        Args:
+            pattern (str): Glob pattern relative to ``self.features_dir``
+                (e.g. ``"features-matrix_*.parquet"``,
+                ``"features-label_*.csv"``).
+            label (str): Human-readable name used in error messages.
+
+        Returns:
+            str: Absolute path to the single matching file.
+
+        Raises:
+            ValueError: If zero or more than one match is found — the caller
+                must then pass an explicit path.
+        """
+        matches = sorted(glob.glob(os.path.join(self.features_dir, pattern)))
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise ValueError(
+                f"No {label} matching '{pattern}' under {self.features_dir}; "
+                "pass an explicit path."
+            )
+        raise ValueError(
+            f"Multiple {label} files matching '{pattern}' under "
+            f"{self.features_dir}: {matches}; pass an explicit path."
+        )
 
     def _train(
         self,

@@ -44,6 +44,18 @@ class EvaluationModel(BaseModel):
     training-window and prediction-window results can coexist in the same
     ``output_dir`` without metric-file collisions.
 
+    Participates in the content-addressable cache layer inherited from
+    :class:`BaseModel`. On :meth:`evaluate` the identity is derived from an
+    upstream-model fingerprint (classifier list, feature matrix shape and
+    column set, evaluation window, and ``eruption_dates``) plus the
+    plotting/comparison knobs that materially change the persisted
+    artefacts. On a cache hit (``overwrite=False``) ``self.metrics``,
+    ``self.MetricsEnsemble``, and ``self.comparator`` are restored from
+    ``{evaluation_dir}/{hash}.EvaluationModel.pkl`` without re-running the
+    per-classifier ``predict_proba`` pass. When ``save_model=True`` the
+    pickle plus its ``.params.json`` sidecar are written to the same
+    directory.
+
     Args:
         model (TrainingModel | PredictionModel): Live trained model source. Use
             :meth:`from_file` to load from a ``.pkl`` path.
@@ -86,6 +98,7 @@ class EvaluationModel(BaseModel):
         root_dir: str | None = None,
         prefix_config: str | None = None,
         n_jobs: int = 1,
+        save_model: bool = False,
         verbose: bool = False,
     ) -> None:
         """Initialize EvaluationModel in training-reuse or prediction-reuse mode.
@@ -146,11 +159,13 @@ class EvaluationModel(BaseModel):
             output_dir=output_dir if output_dir is not None else model.output_dir,
             root_dir=root_dir,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
+        self.kind: Literal["evaluation"] = "evaluation"
         self.model: TrainingModel | PredictionModel = model
-        self.model_kind = model_kind
+        self.model_kind: Literal["training", "prediction"] = model_kind
         self.ClassifierEnsemble: ClassifierEnsemble = model.ClassifierEnsemble
         self.features_df = model.features_df
         self.window_step: int = model.window_step
@@ -196,6 +211,7 @@ class EvaluationModel(BaseModel):
             root_dir=root_dir,
             prefix_config=prefix_config,
             n_jobs=n_jobs,
+            save_model=save_model,
             verbose=verbose,
         )
 
@@ -269,6 +285,53 @@ class EvaluationModel(BaseModel):
             verbose=verbose,
         )
 
+    @property
+    def stage_dir(self) -> str:
+        """Stage directory where the evaluation cache artefact is written.
+
+        Already mode-namespaced under ``evaluation/{training|prediction}/``
+        by :meth:`set_directories`, so training-reuse and prediction-reuse
+        cache files never collide.
+
+        Returns:
+            str: ``self.evaluation_dir``.
+        """
+        return self.evaluation_dir
+
+    @classmethod
+    def build_identity(  # ty:ignore[invalid-method-override]
+        cls,
+        *,
+        upstream_hash: str,
+        evaluate_params: dict,
+    ) -> dict:
+        """Return the canonical identity dict for this evaluation run.
+
+        The ``upstream_hash`` ties the cache to the exact upstream model:
+        when the trained ``ClassifierEnsemble``, the feature matrix, the
+        evaluation window, or ``eruption_dates`` change, the existing
+        evaluation cache is invalidated automatically. Station identity is
+        implicit in the per-station ``output_dir`` so it is not part of the
+        identity.
+
+        Args:
+            upstream_hash (str): Hash of the upstream-model fingerprint
+                (model kind, classifier names, features shape and columns,
+                eruption dates, date range, and window step). Produced by
+                :meth:`_upstream_hash`.
+            evaluate_params (dict): Stage-level knobs that change the
+                produced artefacts — currently ``plot_aggregate``,
+                ``plot_per_seed``, and ``compare_classifiers``.
+
+        Returns:
+            dict: Canonical identity dict ready for hashing.
+        """
+        return {
+            "class": cls.__name__,
+            "upstream_hash": upstream_hash,
+            "evaluate_params": evaluate_params,
+        }
+
     def set_directories(self) -> tuple[str, str]:
         """Build the output directory paths for evaluation artefacts.
 
@@ -340,7 +403,8 @@ class EvaluationModel(BaseModel):
             dict: Mapping of field names to their current values.
         """
         data: dict = {
-            "mode": self.model_kind,
+            "kind": self.kind,
+            "model_kind": self.model_kind,
             "start_date": self.start_date_str,
             "end_date": self.end_date_str,
             "window_size": self.window_size,
@@ -476,7 +540,9 @@ class EvaluationModel(BaseModel):
 
         self.y_true = y_true
 
-        plot_label_distribution(y_true.to_frame(), os.path.join(y_true_dir, "y_true_distribution"))
+        plot_label_distribution(
+            y_true.to_frame(), os.path.join(y_true_dir, "y_true_distribution")
+        )
 
         if self.verbose:
             logger.info(f"Label y_true saved to {y_true_filepath}")
@@ -487,8 +553,8 @@ class EvaluationModel(BaseModel):
         self,
         plot_aggregate: bool = True,
         plot_per_seed: bool = False,
-        plot_shap: bool = False,
         compare_classifiers: bool = True,
+        use_cache: bool = True,
     ) -> dict[str, pd.DataFrame]:
         """Evaluate every seed model against the true labels and aggregate.
 
@@ -510,10 +576,12 @@ class EvaluationModel(BaseModel):
                 Defaults to ``False``.
             plot_aggregate (bool): Render aggregate plots per classifier via
                 :meth:`MetricsEnsemble.plot_aggregate`. Defaults to ``True``.
-            plot_shap (bool): Reserved for a follow-up. Setting ``True``
-                currently emits a warning and has no effect. Defaults to
-                ``False``.
             compare_classifiers (bool): Compare classifiers. Defaults to ``True``.
+            use_cache (bool): Short-circuit re-run when a content-addressable
+                cache hit exists at ``{stage_dir}/{hash}.EvaluationModel.pkl``.
+                When ``False`` the load path is skipped even if a pickle
+                exists on disk. Independent of ``self.overwrite``, which
+                additionally controls plot regeneration. Defaults to ``True``.
 
         Returns:
             dict[str, pd.DataFrame]: Mapping of classifier name to a DataFrame
@@ -553,15 +621,24 @@ class EvaluationModel(BaseModel):
                 "before being passed to EvaluationModel."
             )
 
-        # TODO: Plot SHAP
-        if plot_shap:
-            logger.warning(
-                "plot_shap are not yet supported by the "
-                "MetricsEnsemble-backed evaluate(). The per-seed prediction "
-                "matrices are now persisted under "
-                "{classifiers_dir}/{classifier}/predictions/ — a follow-up "
-                "change will rebuild per-seed plots from those files."
-            )
+        identity = type(self).build_identity(
+            upstream_hash=self._upstream_hash(),
+            evaluate_params={
+                "plot_aggregate": plot_aggregate,
+                "plot_per_seed": plot_per_seed,
+                "compare_classifiers": compare_classifiers,
+            },
+        )
+        self.id = type(self).compute_hash(identity)
+
+        if use_cache and not self.overwrite:
+            cached = type(self).load(self.stage_dir, identity)
+            if cached is not None:
+                self.metrics = cached.metrics
+                self.MetricsEnsemble = cached.MetricsEnsemble
+                self.comparator = cached.comparator
+                self.id = cached.id or self.id
+                return cached.metrics
 
         me: MetricsEnsemble = self._metrics_ensemble()
 
@@ -581,6 +658,9 @@ class EvaluationModel(BaseModel):
                 self.comparator.plot_all()
 
         self.metrics = me.metrics
+
+        if self.save_model:
+            self.save(identity)
 
         try:
             self.save_config()
@@ -650,3 +730,25 @@ class EvaluationModel(BaseModel):
             self.MetricsEnsemble = me
 
         return self.MetricsEnsemble
+
+    def _upstream_hash(self) -> str:
+        """Hash the upstream-model fingerprint so the evaluation cache
+        invalidates whenever the trained ensemble, the feature matrix, the
+        evaluation window, or the ground-truth set changes.
+
+        Returns:
+            str: Truncated hex digest of the fingerprint dict.
+        """
+        fingerprint = {
+            "model_kind": self.model_kind,
+            "classifiers": list(self.ClassifierEnsemble.classifiers),
+            "features_shape": list(self.features_df.shape),
+            "features_columns": sorted(map(str, self.features_df.columns)),
+            "eruption_dates": list(self.eruption_dates) if self.eruption_dates else [],
+            "start_date": self.start_date_str,
+            "end_date": self.end_date_str,
+            "window_size": self.window_size,
+            "window_step": self.window_step,
+            "window_step_unit": self.window_step_unit,
+        }
+        return type(self).compute_hash(fingerprint)

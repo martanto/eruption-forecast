@@ -623,6 +623,7 @@ class ForecastModel:
                 prefix_config=self.prefix_config,
                 n_jobs=n_jobs,
                 n_grids=n_grids,
+                save_model=use_cache,
                 verbose=verbose,
             )
             .build_label(
@@ -661,8 +662,8 @@ class ForecastModel:
 
         # ``fit()`` has already persisted the cache via ``self.save(identity)``.
         # The hash is needed downstream by :meth:`predict` for its own identity.
-        self._training_cache_hash = (
-            training_model.training_hash or TrainingModel.compute_hash(identity)
+        self._training_cache_hash = training_model.id or TrainingModel.compute_hash(
+            identity
         )
 
         return self
@@ -906,6 +907,7 @@ class ForecastModel:
             overwrite=overwrite,
             prefix_config=self.prefix_config,
             n_jobs=n_jobs,
+            save_model=use_cache,
             verbose=verbose,
         )
 
@@ -964,6 +966,7 @@ class ForecastModel:
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
+        use_cache: bool = True,
         verbose: bool | None = None,
     ) -> Self:
         """Evaluate a previously trained ensemble against ground-truth labels.
@@ -1023,6 +1026,7 @@ class ForecastModel:
             output_dir=output_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
+            use_cache=use_cache,
             verbose=verbose,
         )
 
@@ -1054,6 +1058,7 @@ class ForecastModel:
             overwrite=overwrite,
             prefix_config=self.prefix_config,
             n_jobs=n_jobs,
+            save_model=use_cache,
             verbose=verbose,
         )
 
@@ -1062,6 +1067,7 @@ class ForecastModel:
             plot_per_seed=plot_per_seed,
             plot_aggregate=plot_aggregate,
             compare_classifiers=True,
+            use_cache=use_cache,
         )
 
         self.save_config()
@@ -1084,6 +1090,7 @@ class ForecastModel:
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
+        use_cache: bool = True,
         verbose: bool | None = None,
     ) -> Self:
         """Explain a previously trained ensemble via SHAP TreeExplainer.
@@ -1167,6 +1174,7 @@ class ForecastModel:
             output_dir=output_dir,
             overwrite=overwrite,
             n_jobs=n_jobs,
+            use_cache=use_cache,
             verbose=verbose,
         )
 
@@ -1197,12 +1205,14 @@ class ForecastModel:
                 overwrite=overwrite,
                 prefix_config=self.prefix_config,
                 n_jobs=n_jobs,
+                save_model=use_cache,
                 verbose=verbose,
             )
             .explain(
                 save_per_seed=save_per_seed,
                 check_additivity=check_additivity,
                 overwrite_classifier_explanation=overwrite_classifier_explanation,
+                use_cache=use_cache,
             )
             .plot(
                 figsize=figsize,
