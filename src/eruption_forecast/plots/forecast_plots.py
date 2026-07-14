@@ -308,6 +308,8 @@ def plot_forecast(
             training_end_date,
             prediction_start_date,
             prediction_end_date,
+            forecast_start=df.index.min(),
+            forecast_end=df.index.max(),
         )
 
     # Collect unique handles/labels from all panels into one shared legend
@@ -551,6 +553,8 @@ def _ax_segment(
     training_end_date: str | datetime,
     prediction_start_date: str | datetime,
     prediction_end_date: str | datetime,
+    forecast_start: datetime | None = None,
+    forecast_end: datetime | None = None,
 ) -> plt.Axes:
     training_start = to_datetime(training_start_date).replace(
         hour=0, minute=0, second=0
@@ -563,46 +567,66 @@ def _ax_segment(
         hour=23, minute=59, second=59
     )
 
-    gap_duration = (prediction_start - training_end).days
+    segments: list[dict[str, Any]]
+    gap_duration = 0
 
-    if gap_duration < 0:
-        original_prediction_start = prediction_start
-        prediction_start = (training_end + timedelta(days=1)).replace(
-            hour=0, minute=0, second=0
-        )
-        logger.warning(
-            f"Overlapping training end date ({training_end:%Y-%m-%d}) and "
-            f"prediction start date ({original_prediction_start:%Y-%m-%d}). "
-            f"Adjusted prediction start to {prediction_start:%Y-%m-%d}."
-        )
+    # Handle if training dates outside forecast date range
+    training_outside_forecast = (
+        forecast_start is not None and training_end < forecast_start
+    ) or (forecast_end is not None and training_start > forecast_end)
+
+    if training_outside_forecast:
+        prediction_duration = (prediction_end - prediction_start).days + 1
+        segments = [
+            {
+                "label": "Prediction",
+                "width": prediction_duration,
+                "left": mdates.date2num(prediction_start),
+                "color": "#d73027",
+                "hatch": None,
+            },
+        ]
+    else:
         gap_duration = (prediction_start - training_end).days
 
-    training_duration = (training_end - training_start).days + 1
-    prediction_duration = (prediction_end - prediction_start).days + 1
+        if gap_duration < 0:
+            original_prediction_start = prediction_start
+            prediction_start = (training_end + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0
+            )
+            logger.warning(
+                f"Overlapping training end date ({training_end:%Y-%m-%d}) and "
+                f"prediction start date ({original_prediction_start:%Y-%m-%d}). "
+                f"Adjusted prediction start to {prediction_start:%Y-%m-%d}."
+            )
+            gap_duration = (prediction_start - training_end).days
 
-    segments: list[dict[str, Any]] = [
-        {
-            "label": "Training",
-            "width": training_duration,
-            "left": mdates.date2num(training_start),
-            "color": "#009E73",
-            "hatch": None,
-        },
-        {
-            "label": "Gap",
-            "width": gap_duration,
-            "left": mdates.date2num(training_end),
-            "color": "white",
-            "hatch": "////",
-        },
-        {
-            "label": "Prediction",
-            "width": prediction_duration,
-            "left": mdates.date2num(prediction_start),
-            "color": "#d73027",
-            "hatch": None,
-        },
-    ]
+        training_duration = (training_end - training_start).days + 1
+        prediction_duration = (prediction_end - prediction_start).days + 1
+
+        segments = [
+            {
+                "label": "Training",
+                "width": training_duration,
+                "left": mdates.date2num(training_start),
+                "color": "#009E73",
+                "hatch": None,
+            },
+            {
+                "label": "Gap",
+                "width": gap_duration,
+                "left": mdates.date2num(training_end),
+                "color": "white",
+                "hatch": "////",
+            },
+            {
+                "label": "Prediction",
+                "width": prediction_duration,
+                "left": mdates.date2num(prediction_start),
+                "color": "#d73027",
+                "hatch": None,
+            },
+        ]
 
     y_pos = -0.25
     for segment in segments:
