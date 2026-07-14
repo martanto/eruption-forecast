@@ -95,6 +95,7 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 - Falls back to `train()`'s `eruption_dates` when called without an explicit list.
 - Writes `(n_samples, n_seeds)` `y_proba.csv` / `y_pred.csv` matrices under `evaluation/prediction/classifiers/{Clf}/predictions/` (no per-seed JSON; per-seed metric tables live in memory on `self.metrics`).
 - `plot_per_seed=True` is expensive - flip off for fast iteration.
+- `use_cache=True` (default) consults `{evaluation_dir}/{hash}.EvaluationModel.pkl` before the per-classifier `predict_proba` pass; pass `use_cache=False` to force a fresh evaluation.
 
 #### `fm.EvaluationModel.compare()`
 - Reuses the cached `MetricsEnsemble` from `evaluate()` and hands it to `ClassifierComparator`.
@@ -105,6 +106,7 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 - Not called in `main.py` itself - add it after `evaluate(...)` to produce per-seed SHAP bar + beeswarm plots and per-eruption waterfall plots.
 - Restricted to tree classifiers (RF / `lite-rf` / GB / XGB). Non-tree classifiers in the ensemble are skipped with a warning.
 - Sees the same `eruption_dates` fall-back as `evaluate(...)`. Output lands under `explanation/prediction/` - see [Explanation Workflow](Explanation-Workflow).
+- `use_cache=True` (default) consults `{explanation_dir}/{hash}.ExplanationModel.pkl` before re-running SHAP; pass `use_cache=False` to force a fresh explanation.
 
 ---
 
