@@ -1,53 +1,5 @@
 from typing import Any
 
-from sklearn.metrics import f1_score, make_scorer, recall_score
-
-
-def safe_recall(y_true, y_pred, **kwargs) -> float:
-    """Compute recall score with zero-division handling.
-
-    Wraps ``sklearn.metrics.recall_score`` and passes ``zero_division=0`` so
-    that folds or seeds with no positive predictions return 0.0 instead of
-    raising a ``ZeroDivisionError``.
-
-    Args:
-        y_true (array-like): Ground-truth target values.
-        y_pred (array-like): Estimated targets as returned by a classifier.
-        **kwargs: Additional keyword arguments forwarded to
-            ``sklearn.metrics.recall_score``.
-
-    Returns:
-        float: Recall score in [0, 1], or 0.0 when no positive predictions exist.
-    """
-    return recall_score(y_true, y_pred, zero_division=0, **kwargs)
-
-
-def safe_f1_weighted(y_true, y_pred, **kwargs) -> float:
-    """Compute weighted F1 score with zero-division handling.
-
-    Wraps ``sklearn.metrics.f1_score`` with ``average="weighted"`` and
-    ``zero_division=0`` so that folds or seeds with no positive predictions
-    return 0.0 instead of raising a ``ZeroDivisionError``.
-
-    Args:
-        y_true (array-like): Ground-truth target values.
-        y_pred (array-like): Estimated targets as returned by a classifier.
-        **kwargs: Additional keyword arguments forwarded to
-            ``sklearn.metrics.f1_score``.
-
-    Returns:
-        float: Weighted F1 score in [0, 1], or 0.0 when no positive predictions exist.
-    """
-    return f1_score(y_true, y_pred, average="weighted", zero_division=0, **kwargs)
-
-
-# Module-level callables are picklable by loky workers (unlike lambdas or
-# make_scorer objects built inside __init__).
-LEARNING_CURVE_SCORER_MAP: dict[str, str | Any] = {
-    "balanced_accuracy": "balanced_accuracy",
-    "recall": make_scorer(safe_recall),
-    "f1_weighted": make_scorer(safe_f1_weighted),
-}
 
 METRIC_KEYS = [
     "accuracy",
