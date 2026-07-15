@@ -23,6 +23,11 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     Attributes:
         ensembles (dict[str, SeedEnsemble]): Mapping from classifier name to
             its ``SeedEnsemble``.
+        features (list[str]): Sorted union of :attr:`SeedEnsemble.features`
+            across every registered classifier — the set of features used by
+            at least one seed in any registered ``SeedEnsemble``. Empty list
+            until populated via one of the factories (:meth:`from_any`,
+            :meth:`from_seed_ensembles`, :meth:`from_dict`, :meth:`from_json`).
     """
 
     def __init__(self) -> None:
@@ -33,6 +38,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         :meth:`from_dict`, or :meth:`from_json`.
         """
         self.ensembles: dict[str, SeedEnsemble] = {}
+        self.features: list[str] = []
 
     def __getitem__(self, name: str) -> SeedEnsemble:
         """Return the SeedEnsemble for the given classifier name.
@@ -193,6 +199,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
             raise ValueError("ensembles must not be empty.")
         obj = cls()
         obj.ensembles = dict(ensembles)
+        obj.features = obj._compute_features_union()
 
         if verbose:
             logger.info(
@@ -492,3 +499,18 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         params: dict = {"n_classifiers": len(self.ensembles)}
         params.update(self.ensembles)
         return params
+
+    def _compute_features_union(self) -> list[str]:
+        """Return the sorted union of features across every registered ``SeedEnsemble``.
+
+        Collects each registered ``SeedEnsemble``'s :attr:`SeedEnsemble.features`
+        list and returns a stable, alphabetically sorted list of the
+        deduplicated names — the set of features used by at least one seed
+        in any registered classifier.
+
+        Returns:
+            list[str]: Sorted union of per-classifier
+                :attr:`SeedEnsemble.features`. Empty when ``self.ensembles``
+                is empty.
+        """
+        return sorted({name for se in self.ensembles.values() for name in se.features})

@@ -269,8 +269,12 @@ The model layer follows a **mixin** pattern:
 SeedEnsemble       ClassifierEnsemble
 1 classifier ×     N classifiers ×
 N fitted seeds     1 SeedEnsemble each
-+ feature lists    + factories (from_any, from_json,
-                     from_dict, from_seed_ensembles)
++ per-seed         + features (sorted union
+  feature lists      across all SeedEnsembles)
++ features         + factories (from_any, from_json,
+  (sorted union      from_dict, from_seed_ensembles)
+  across all
+  seeds)
 
            MetricsEnsemble  (standalone - not a BaseEnsemble subclass)
            wraps ClassifierEnsemble + features + y_true

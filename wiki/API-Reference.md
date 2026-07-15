@@ -731,7 +731,10 @@ Used internally by `TrainingModel.fit()` per-seed (hardcoded `method="tsfresh"`)
 ```python
 class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
     classifier_name: str
-    seeds: list[dict]
+    seeds: list[dict]      # per-seed records: {random_state, model, feature_names}
+    features: list[str]    # sorted union of per-seed feature_names (set of features
+                           # used by at least one seed in this ensemble); populated
+                           # by every factory, empty on the bare constructor
 ```
 
 ### Construction
@@ -773,6 +776,15 @@ se.predict_with_uncertainty(
 # returns (mean_proba, std_proba, confidence, prediction)
 ```
 
+### Inspection
+
+```python
+se.features             # list[str]: sorted union of per-seed feature_names
+se.seeds                # list[dict]: per-seed records
+se[i]                   # seed record at index i (dict)
+len(se)                 # number of seeds
+```
+
 `save(path)` / `load(path)` inherited from `BaseEnsemble`.
 
 ---
@@ -780,7 +792,12 @@ se.predict_with_uncertainty(
 ## ClassifierEnsemble
 
 ```python
-class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin)
+class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
+    ensembles: dict[str, SeedEnsemble]   # classifier name → its SeedEnsemble
+    features: list[str]                  # sorted union of SeedEnsemble.features
+                                         # across every registered classifier;
+                                         # populated by every factory, empty on
+                                         # the bare constructor
 ```
 
 ### Construction (classmethods)
@@ -804,6 +821,8 @@ ce.predict_with_uncertainty(X: pd.DataFrame, threshold: float = 0.5)
 
 ```python
 ce.classifiers          # list[str]: classifier class names in registration order
+ce.features             # list[str]: sorted union of SeedEnsemble.features across
+                        #            every registered classifier
 ce[name]                # SeedEnsemble for the named classifier
 len(ce)                 # number of classifiers
 ```

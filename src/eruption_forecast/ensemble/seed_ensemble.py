@@ -28,6 +28,10 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         seeds (list[dict]): List of seed records.  Each record is a dict with
             keys ``random_state`` (int), ``model`` (fitted estimator), and
             ``feature_names`` (list[str]).
+        features (list[str]): Sorted union of top-N feature names across all
+            seeds — the set of features used by at least one seed in the
+            ensemble. Empty list until seeds are populated via one of the
+            factories (:meth:`from_any`, :meth:`from_json`, :meth:`from_registry`).
         probabilities (pd.DataFrame | None): Per-seed eruption probability
             matrix cached by :meth:`save_matrices`. Shape
             ``(n_samples, n_seeds)`` with columns ``seed_{random_state:05d}``.
@@ -55,6 +59,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         """
         self.classifier_name = classifier_name
         self.seeds: list[dict] = []
+        self.features: list[str] = []
         self.probabilities: pd.DataFrame | None = None
         self.predictions: pd.DataFrame | None = None
 
@@ -161,6 +166,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         ensemble = cls(classifier_name=_classifier_name)
         ensemble.seeds = seeds
+        ensemble.features = ensemble._compute_features_union()
 
         if verbose:
             logger.info(
@@ -269,6 +275,7 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         ensemble = cls(classifier_name=_classifier_name)
         ensemble.seeds = seeds
+        ensemble.features = ensemble._compute_features_union()
 
         if verbose:
             logger.info(
@@ -587,3 +594,16 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
         if self.seeds:
             params["model_representative"] = self.seeds[0]["model"]
         return params
+
+    def _compute_features_union(self) -> list[str]:
+        """Return the sorted union of feature names across every seed.
+
+        Collects each seed's ``feature_names`` list and returns a stable,
+        alphabetically sorted list of the deduplicated names — the set of
+        features used by at least one seed in the ensemble.
+
+        Returns:
+            list[str]: Sorted union of per-seed ``feature_names``. Empty when
+                ``self.seeds`` is empty.
+        """
+        return sorted({name for seed in self.seeds for name in seed["feature_names"]})
