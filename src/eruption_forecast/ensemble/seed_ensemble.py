@@ -5,7 +5,6 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils._repr_html.estimator import _VisualBlock
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import (
@@ -555,38 +554,36 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return probabilities_path, predictions_path
 
-    def _sk_visual_block_(self) -> _VisualBlock:
-        """Return a sklearn ``_VisualBlock`` describing the bundled seed models.
+    def get_params(self, deep: bool = True) -> dict:
+        """Return the ensemble's display parameters.
 
-        Picked up by :func:`sklearn.utils.estimator_html_repr` (and therefore by
-        ``BaseEstimator._repr_html_``) so that Jupyter renders the ensemble as
-        a single nested estimator. All seeds share the same classifier type
-        (only ``random_state`` differs), so a single representative model is
-        sufficient and avoids the unreadable explosion of 100–500 boxes that a
-        one-per-seed layout would produce.
+        Overrides :meth:`sklearn.base.BaseEstimator.get_params` so that
+        Jupyter's rich HTML representation renders a single ``SeedEnsemble``
+        box whose Parameters section lists the wrapper-level metadata
+        (``classifier_name``, ``n_seeds``) and, when at least one seed has
+        been loaded, the representative fitted estimator (``model_representative``)
+        — which sklearn renders as its own collapsible nested Parameters box.
+
+        This intentionally reports synthetic params that are not accepted by
+        :meth:`__init__`. It is safe here because :class:`SeedEnsemble` is a
+        fitted container that is never passed through
+        :func:`sklearn.base.clone` (which would try to re-instantiate the
+        class with these kwargs).
+
+        Args:
+            deep (bool, optional): Accepted for sklearn API compatibility;
+                the return value is identical regardless. Defaults to
+                ``True``.
 
         Returns:
-            _VisualBlock: A ``"single"`` block whose nested estimator is the
-                first seed's fitted model. When the ensemble is empty, the
-                block wraps ``self`` instead so the rich display still renders.
+            dict: ``{"classifier_name", "n_seeds"}`` for an empty ensemble,
+                or ``{"classifier_name", "n_seeds", "model_representative"}`` once at least
+                one seed has been added.
         """
-        if not self.seeds:
-            return _VisualBlock(
-                "single",
-                self,
-                names=self.classifier_name,
-                name_details="n_seeds=0",
-            )
-
-        representative = self.seeds[0]["model"]
-        first_random_state = self.seeds[0]["random_state"]
-        last_random_state = self.seeds[-1]["random_state"]
-        return _VisualBlock(
-            "single",
-            representative,
-            names=f"{self.classifier_name}",
-            name_details=(
-                f"n_seeds={len(self.seeds)}, "
-                f"random_states=[{first_random_state}...{last_random_state}]"
-            ),
-        )
+        params: dict = {
+            "classifier_name": self.classifier_name,
+            "n_seeds": len(self.seeds),
+        }
+        if self.seeds:
+            params["model_representative"] = self.seeds[0]["model"]
+        return params
