@@ -107,7 +107,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Label Building** — Standard sliding-window (`LabelBuilder`) or per-eruption (`DynamicLabelBuilder`) generation from known eruption dates.
 - **Feature Extraction** — tsfresh feature engineering on windowed tremor matrices, with FDR-controlled selection (tsfresh statistical filter; RandomForest permutation importance available as an alternative).
 - **Multi-seed Training** — 11 classifier families (`rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`, `lite-rf`), three CV strategies, automatic imbalance handling, and per-seed `GridSearchCV`.
-- **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface.
+- **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface. Each exposes a `.features` attribute — a sorted union of the features actually used by at least one seed (per-classifier on `SeedEnsemble`, across every registered classifier on `ClassifierEnsemble`) — populated eagerly by every factory.
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
@@ -721,4 +721,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 **Version:** 0.3.4
 **Status:** Active Development
-**Last Updated:** 2026-07-05
+**Last Updated:** 2026-07-15
