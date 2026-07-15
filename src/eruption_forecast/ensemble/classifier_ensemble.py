@@ -5,7 +5,6 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils._repr_html.estimator import _VisualBlock
 
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.array import compute_model_probabilities
@@ -463,37 +462,33 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return results
 
-    def _sk_visual_block_(self) -> _VisualBlock:
-        """Return a sklearn ``_VisualBlock`` describing the bundled classifiers.
+    def get_params(self, deep: bool = True) -> dict:
+        """Return the ensemble's display parameters.
 
-        Picked up by :func:`sklearn.utils.estimator_html_repr` (and therefore by
-        ``BaseEstimator._repr_html_``) so that Jupyter renders the ensemble as
-        one labelled box per registered ``SeedEnsemble`` — mirroring how
-        :class:`~sklearn.ensemble.VotingClassifier` exposes its child
-        estimators.
+        Overrides :meth:`sklearn.base.BaseEstimator.get_params` so that
+        Jupyter's rich HTML representation renders a single
+        ``ClassifierEnsemble`` box whose Parameters section lists
+        ``n_classifiers`` followed by one entry per registered classifier —
+        each of which sklearn renders as a collapsible nested Parameters
+        box for the underlying :class:`SeedEnsemble` (see
+        :meth:`SeedEnsemble.get_params`).
 
-        When no classifiers are registered, returns a ``"single"`` block on
-        ``self`` so the rich display still renders gracefully.
+        This intentionally reports synthetic params that are not accepted by
+        :meth:`__init__`. It is safe here because :class:`ClassifierEnsemble`
+        is a fitted container that is never passed through
+        :func:`sklearn.base.clone` (which would try to re-instantiate the
+        class with these kwargs).
+
+        Args:
+            deep (bool, optional): Accepted for sklearn API compatibility;
+                the return value is identical regardless. Defaults to
+                ``True``.
 
         Returns:
-            _VisualBlock: A ``"parallel"`` block whose child estimators are the
-                registered ``SeedEnsemble`` instances, or a ``"single"`` block
-                on ``self`` when the ensemble is empty.
+            dict: ``{"n_classifiers": 0}`` for an empty ensemble, otherwise
+                ``{"n_classifiers": N, <classifier_name>: <SeedEnsemble>, ...}``
+                with one entry per registered classifier in insertion order.
         """
-        if not self.ensembles:
-            return _VisualBlock(
-                "single",
-                self,
-                names="ClassifierEnsemble",
-                name_details="n_classifiers=0",
-            )
-
-        names = list(self.ensembles.keys())
-        estimators = list(self.ensembles.values())
-        name_details = [repr(seed_ensemble) for seed_ensemble in estimators]
-        return _VisualBlock(
-            "parallel",
-            estimators,
-            names=names,
-            name_details=name_details,
-        )
+        params: dict = {"n_classifiers": len(self.ensembles)}
+        params.update(self.ensembles)
+        return params

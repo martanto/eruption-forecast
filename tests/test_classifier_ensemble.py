@@ -275,27 +275,23 @@ def test_len(clf_ensemble: ClassifierEnsemble) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_sk_visual_block_kind_and_children(
+def test_classifier_ensemble_get_params_populated(
     clf_ensemble: ClassifierEnsemble,
     two_ensembles: dict[str, SeedEnsemble],
 ) -> None:
-    """_sk_visual_block_ returns a parallel block of the registered SeedEnsembles."""
-    block = clf_ensemble._sk_visual_block_()
-    assert block.kind == "parallel"
-    assert list(block.names) == ["rf", "xgb"]
-    assert list(block.estimators) == [two_ensembles["rf"], two_ensembles["xgb"]]
-    for detail in block.name_details:
-        assert "SeedEnsemble" in detail
-        assert "n_seeds=5" in detail
+    """ClassifierEnsemble.get_params exposes n_classifiers and each SeedEnsemble by name."""
+    params = clf_ensemble.get_params()
+    assert params == {
+        "n_classifiers": 2,
+        "rf": two_ensembles["rf"],
+        "xgb": two_ensembles["xgb"],
+    }
 
 
-def test_sk_visual_block_empty_ensemble_is_single() -> None:
-    """An empty ClassifierEnsemble still renders without crashing."""
+def test_classifier_ensemble_get_params_empty() -> None:
+    """An empty ClassifierEnsemble reports n_classifiers=0 and no children."""
     empty = ClassifierEnsemble()
-    block = empty._sk_visual_block_()
-    assert block.kind == "single"
-    assert block.estimators is empty
-    assert block.name_details == "n_classifiers=0"
+    assert empty.get_params() == {"n_classifiers": 0}
 
 
 def test_repr_html_contains_classifier_names(clf_ensemble: ClassifierEnsemble) -> None:
@@ -303,26 +299,38 @@ def test_repr_html_contains_classifier_names(clf_ensemble: ClassifierEnsemble) -
     html = clf_ensemble._repr_html_()
     assert isinstance(html, str)
     assert html
+    assert "ClassifierEnsemble" in html
     assert "rf" in html
     assert "xgb" in html
 
 
-def test_seed_ensemble_sk_visual_block_uses_representative(
+def test_seed_ensemble_get_params_populated(
     two_ensembles: dict[str, SeedEnsemble],
 ) -> None:
-    """SeedEnsemble._sk_visual_block_ exposes the first seed model as a single block."""
+    """SeedEnsemble.get_params exposes classifier_name, n_seeds, and model_representative."""
     seed_ensemble = two_ensembles["rf"]
-    block = seed_ensemble._sk_visual_block_()
-    assert block.kind == "single"
-    assert block.estimators is seed_ensemble.seeds[0]["model"]
-    assert "n_seeds=5" in block.name_details
-    assert "representative seed" in block.names
+    params = seed_ensemble.get_params()
+    assert params == {
+        "classifier_name": seed_ensemble.classifier_name,
+        "n_seeds": len(seed_ensemble.seeds),
+        "model_representative": seed_ensemble.seeds[0]["model"],
+    }
 
 
-def test_seed_ensemble_sk_visual_block_empty() -> None:
-    """An empty SeedEnsemble renders as a single block on itself."""
+def test_seed_ensemble_get_params_empty_omits_model_representative() -> None:
+    """An empty SeedEnsemble omits the model_representative key."""
     empty = SeedEnsemble(classifier_name="LogisticRegression")
-    block = empty._sk_visual_block_()
-    assert block.kind == "single"
-    assert block.estimators is empty
-    assert block.name_details == "n_seeds=0"
+    params = empty.get_params()
+    assert params == {"classifier_name": "LogisticRegression", "n_seeds": 0}
+
+
+def test_seed_ensemble_repr_html_contains_metadata(
+    two_ensembles: dict[str, SeedEnsemble],
+) -> None:
+    """_repr_html_ mentions SeedEnsemble, the classifier_name, and n_seeds."""
+    seed_ensemble = two_ensembles["rf"]
+    html = seed_ensemble._repr_html_()
+    assert isinstance(html, str) and html
+    assert "SeedEnsemble" in html
+    assert seed_ensemble.classifier_name in html
+    assert f"n_seeds={len(seed_ensemble.seeds)}" in html or ">5<" in html
