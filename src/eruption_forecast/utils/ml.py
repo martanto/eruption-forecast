@@ -427,7 +427,7 @@ def resample(
 def load_features_resampled(
     features: pd.DataFrame | str,
     resampled: pd.DataFrame | pd.Series | str,
-    columns: list[str] | None = None,
+    columns: list[str] | str | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Reconstruct a per-seed resampled ``(X, y)`` pair from a labels-only payload.
 
@@ -445,9 +445,13 @@ def load_features_resampled(
             payload. Accepts a path to ``features/{cv}/resampled/{seed}.csv``,
             a DataFrame carrying an ``is_erupted`` column, or a Series already
             indexed by id.
-        columns (list[str] | None): Optional column projection — typically
-            the seed's ``top_n_features``. ``None`` returns every feature
-            column. Defaults to ``None``.
+        columns (list[str] | str | None): Optional column projection —
+            typically the seed's ``top_n_features``. ``None`` returns every
+            feature column. Accepts either an inline ``list[str]`` or a path
+            to the per-seed top-N feature CSV under
+            ``features/{cv}/seed/{seed:05d}.csv``; the CSV is read with
+            ``index_col=0`` and its index becomes the column list. Defaults
+            to ``None``.
 
     Returns:
         tuple[pd.DataFrame, pd.Series]: ``(features_resampled,
@@ -459,6 +463,11 @@ def load_features_resampled(
         ...     resampled="training/features/.../resampled/00042.csv",
         ...     columns=top_n_features,
         ... )
+        >>> X, y = load_features_resampled(
+        ...     features="training/features/.../features-matrix_2025-01-03_2025-03-31.parquet",
+        ...     resampled="training/features/.../resampled/00042.csv",
+        ...     columns="training/features/.../seed/00042.csv",
+        ... )
     """
     if isinstance(features, str):
         features = pd.read_parquet(features)
@@ -469,6 +478,9 @@ def load_features_resampled(
         labels = resampled["is_erupted"]
     else:
         labels = resampled
+
+    if isinstance(columns, str):
+        columns = pd.read_csv(columns, index_col=0).index.tolist()
 
     idx = labels.index
     if columns is None:
