@@ -293,6 +293,7 @@ fm = ForecastModel(
     location="00",
     day_to_forecast=2,           # look-ahead window in days
     root_dir="/path/to/project",
+    prefix_config=None,          # slugified discriminator inserted into every stage's *.config filename — set (e.g. "scenario 1") to share one station_dir across scenarios without clobbering
     n_jobs=4,
     verbose=True,
 )
@@ -328,6 +329,8 @@ fm = ForecastModel(
         window_step=10, window_step_unit="minutes",
         plot_threshold=0.7,
         plot_pdf=True,
+        use_features_from="all",       # "all" (default — every tsfresh feature) | "training" (narrow to features any seed picked during train()) | "files" (skip tsfresh; requires features_matrix_path + label_features_csv)
+        enable_segments_plot=False,    # True overlays a training/prediction window strip above the forecast panels
     )
     .evaluate(
         model="prediction",
