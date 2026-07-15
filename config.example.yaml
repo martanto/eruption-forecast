@@ -82,8 +82,9 @@ predict:
   plot_threshold: 0.5       # Probability threshold drawn on the forecast plot
   plot_title: null          # Optional plot title override
   plot_pdf: true            # Also save the forecast plot as a PDF
-  features_matrix_path: null # Skip tsfresh: load a pre-built features matrix Parquet (requires label_features_csv too; forces use_cache=false)
-  label_features_csv: null   # Companion label grid CSV for features_matrix_path
+  use_features_from: all    # 'all' | 'files' | 'training'. 'files' requires the two paths below (both must exist) and forces use_cache=false. 'training' reuses features selected during train().
+  features_matrix_path: null # Skip tsfresh: load a pre-built features matrix Parquet (only honoured when use_features_from='files'; requires label_features_csv too)
+  label_features_csv: null   # Companion label grid CSV for features_matrix_path (only honoured when use_features_from='files')
   enable_segments_plot: false # Render the top training/prediction segment strip on the forecast plot
   output_dir: null          # null = use station_dir
   overwrite: null           # null = inherit from model.overwrite
@@ -99,6 +100,7 @@ evaluate:
   output_dir: null          # null = use station_dir
   overwrite: null           # null = inherit from model.overwrite
   n_jobs: null              # null = inherit from model.n_jobs
+  use_cache: true           # Consult the content-addressable evaluation cache
   verbose: null             # null = inherit from model.verbose
 
 explain:
@@ -116,4 +118,5 @@ explain:
   output_dir: null          # null = use station_dir
   overwrite: null           # null = inherit from model.overwrite
   n_jobs: null              # null = inherit from model.n_jobs
+  use_cache: true           # Consult the content-addressable explanation cache
   verbose: null             # null = inherit from model.verbose
