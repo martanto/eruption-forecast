@@ -2,17 +2,17 @@
 
 This page is the annotated tour of the two bundled entry-point scripts:
 
-- **[Research Workflow](#research-workflow-mainpy)** - `main.py` - one-shot calculate → train → predict → evaluate on a fixed date split.
+- **[Research Workflow](#research-workflow-mainpy)** - `main.py` - one-shot calculate → train → predict → evaluate → explain on a fixed date split.
 - **[Scenarios Workflow](#scenarios-workflow-scenariospy)** - `scenarios.py` - same pipeline executed once per scenario in a nine-scenario sweep.
 
-Both scripts share the same `ForecastModel` instance and the same `calculate()` output; they differ in how the `train → predict → evaluate` legs are sequenced.
+Both scripts share the same `ForecastModel` instance and the same `calculate()` output; they differ in how the `train → predict → evaluate → explain` legs are sequenced.
 
 ---
 
 ## Research Workflow (`main.py`)
 
 `main.py` runs a single, linear pipeline: it computes tremor over the whole year, 
-trains on the first seven months, forecasts the next four weeks, and evaluates against the held-out eruptions.
+trains on the first seven months, forecasts the next four weeks, evaluates against the held-out eruptions, and finishes with per-seed SHAP explanations over the tree classifiers.
 
 ### Stage flow
 
@@ -61,12 +61,22 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 │    "prediction")    │    aggregate per-classifier metrics
 │                     │    plot_per_seed = True
 └──────────┬──────────┘
+           │  cached → {station_dir}/evaluation/prediction/{hash}.EvaluationModel.pkl
            │
            ▼
 ┌─────────────────────┐
 │  fm.EvaluationModel │  ClassifierComparator
 │      .compare()     │    ranking CSV + comparison plots
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  fm.explain(        │  ExplanationModel(model="prediction")
+│    model=           │    ExplainerEnsemble.explain()  (tree classifiers only)
+│    "prediction")    │    per-seed bar/beeswarm + per-eruption waterfalls
+│                     │  save_per_seed = True, plot_per_seed = False
 └─────────────────────┘
+           │  cached → {station_dir}/explanation/prediction/{hash}.ExplanationModel.pkl
 ```
 
 ### Per-stage notes
@@ -102,11 +112,13 @@ trains on the first seven months, forecasts the next four weeks, and evaluates a
 - `comparator.get_ranking()` writes `comparison/metrics/ranking_recall.csv` (defaults to recall ranking - matches the training `scoring`).
 - `comparator.plot_all()` writes ROC overlay, metric bars, seed stability violins, and a comparison grid under `evaluation/prediction/comparison/figures/`.
 
-#### Optional: `fm.explain(model="prediction", plot_per_seed=True)`
-- Not called in `main.py` itself - add it after `evaluate(...)` to produce per-seed SHAP bar + beeswarm plots and per-eruption waterfall plots.
+#### `fm.explain(model="prediction", save_per_seed=True, plot_per_seed=False, max_display=20, dpi=150)`
+- Called at the end of `main.py` after `evaluate(...)`; produces per-seed SHAP bar + beeswarm plots and per-eruption waterfall plots.
 - Restricted to tree classifiers (RF / `lite-rf` / GB / XGB). Non-tree classifiers in the ensemble are skipped with a warning.
-- Sees the same `eruption_dates` fall-back as `evaluate(...)`. Output lands under `explanation/prediction/` - see [Explanation Workflow](Explanation-Workflow).
+- `eruption_dates` is passed explicitly in `main.py` (the same eight-eruption list used by `train(...)`); when omitted it falls back to `train()`'s dates just like `evaluate(...)`.
+- `save_per_seed=True` writes per-seed `shap.Explanation` pickles alongside the bundled `ClassifierExplanation_*.pkl`; `plot_per_seed=False` skips per-seed PNG rendering (aggregate bar + beeswarm still run).
 - `use_cache=True` (default) consults `{explanation_dir}/{hash}.ExplanationModel.pkl` before re-running SHAP; pass `use_cache=False` to force a fresh explanation.
+- Output lands under `explanation/prediction/` - see [Explanation Workflow](Explanation-Workflow) for the full tree.
 
 ---
 

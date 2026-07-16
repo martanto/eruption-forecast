@@ -36,10 +36,11 @@ fm = ForecastModel(
         plot_threshold=0.7,
     )
     .evaluate(model="prediction")
+    .explain(model="prediction")
 )
 ```
 
-That's the whole pipeline. The four stages - `calculate → train → predict → evaluate` - each return `self`, so they chain.
+That's the whole pipeline. The five stages - `calculate → train → predict → evaluate → explain` - each return `self`, so they chain.
 
 ---
 
@@ -51,6 +52,7 @@ That's the whole pipeline. The four stages - `calculate → train → predict �
 | `train()` | Builds labels → extracts tsfresh features → fits one `SeedEnsemble` per classifier into a `ClassifierEnsemble` | `training/...` (cache pickle: `training/{hash}.TrainingModel.pkl`) |
 | `predict()` | Re-extracts features over the forecast grid → runs ensemble inference | `prediction/...` (cache pickle: `prediction/{hash}.PredictionModel.pkl`) |
 | `evaluate()` | Re-uses the in-session `TrainingModel` or `PredictionModel` for per-seed metrics + aggregate plots | `evaluation/{training\|prediction}/...` |
+| `explain()` | Runs per-seed SHAP over the fitted `ClassifierEnsemble` (tree classifiers only) - bar / beeswarm / per-eruption waterfalls | `explanation/{training\|prediction}/...` (cache pickle: `explanation/{kind}/{hash}.ExplanationModel.pkl`) |
 
 All paths root at `{output_dir}/{nslc}/`, where `nslc = "{network}.{station}.{location}.{channel}"` - see [Output Structure](Output-Structure) for the full tree.
 
@@ -135,11 +137,24 @@ def main(sds_dir: str, n_jobs: int = 2):
     # 4. Evaluate the forecast against ground truth
     fm.evaluate(model="prediction", plot_per_seed=True)
 
-    # 5. Cross-classifier ranking
+    # 5. Cross-classifier ranking (follow-up on the evaluation stage)
     if fm.EvaluationModel:
         comparator = fm.EvaluationModel.compare()
         comparator.get_ranking()
         comparator.plot_all()
+
+    # 6. Per-seed SHAP explanations (tree classifiers only)
+    fm.explain(
+        model="prediction",                # reuse PredictionModel; "training" is also valid
+        eruption_dates=[
+            "2025-03-20", "2025-04-10", "2025-04-22", "2025-05-18",
+            "2025-06-17", "2025-07-07", "2025-08-02", "2025-08-18",
+        ],
+        save_per_seed=True,                # write per-seed shap.Explanation pickles
+        plot_per_seed=False,               # skip per-seed bar/beeswarm PNGs (aggregate only)
+        max_display=20,
+        dpi=150,
+    )
 
 
 if __name__ == "__main__":
