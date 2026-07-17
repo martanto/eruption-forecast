@@ -441,3 +441,53 @@ Call `save_config()` manually only when you want a custom path or `fmt="json"`.
 
 Round-trips through `TrainingConfig.load(path)` for reproducibility — see 
 [Configuration](Configuration#per-stage-configs-standalone).
+
+---
+
+## Post-Hoc `top_n_features` Sweep (Experimental)
+
+> **⚠️ Experimental — not production-ready.** Lives on the
+> `ft/feature-count-sweep` branch. Public surface, defaults, and on-disk
+> layout may change without deprecation. Treat the recommended `N*` as a
+> hypothesis to verify with a fresh `TrainingModel.fit(top_n_features=N*)`
+> before adopting it.
+
+`sweep_feature_count(...)` reuses the per-seed FDR rankings, resampled
+ids, and tuned hyperparameters already written by `fit()` and re-scores
+each seed at several candidate `N` values against a held-out prediction
+window (default) or via within-training CV. Nothing new is trained by
+`TrainingModel` — the sweep runs one bare `clone(best_model).fit()` per
+`(seed, N)` behind the scenes.
+
+Minimal usage — assumes `ForecastModel.predict(...)` has already
+persisted a `{hash}.PredictionModel.pkl` under the scenario's
+`prediction/` directory:
+
+```python
+import glob, os
+
+from eruption_forecast import EvaluationModel
+from eruption_forecast.features import sweep_feature_count
+
+SCENARIO_DIR = "output/VG.OJN.00.EHZ/scenarios/scenario-1"
+ERUPTION_DATES = ["2025-04-10", "2025-04-22"]
+
+# EvaluationModel in prediction-reuse mode; build_label() populates y_true.
+prediction_pkl = glob.glob(os.path.join(SCENARIO_DIR, "prediction", "*.PredictionModel.pkl"))[0]
+em = EvaluationModel.from_file(prediction_pkl, eruption_dates=ERUPTION_DATES)
+em.build_label(window_step=em.window_step, window_step_unit=em.window_step_unit)
+
+results = sweep_feature_count(
+    source=os.path.join(SCENARIO_DIR, "training"),
+    mode="forecast",
+    evaluation_source=em,
+    n_candidates=list(range(1, 26)),
+    scoring="roc_auc",
+    save=True,
+)
+for name, sweep in results.items():
+    print(f"{name}: N* = {sweep.n_features_}")
+```
+
+Full documentation, CV-mode variant, and `FeatureCountSweep.load(...)`
+reload flow: [Feature Count Sweep](Feature-Count-Sweep).

@@ -32,6 +32,8 @@ from eruption_forecast.dataclass import (
 )
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.features.feature_selector import FeatureSelector
+# ⚠ Experimental — see the Feature Count Sweep wiki page:
+from eruption_forecast.features import FeatureCountSweep, sweep_feature_count
 ```
 
 ---
@@ -723,6 +725,118 @@ FeatureSelector(
 ```
 
 Used internally by `TrainingModel.fit()` per-seed (hardcoded `method="tsfresh"`); surfaced publicly for ad-hoc selection experiments. Pick `method="tsfresh"` for FDR-controlled p-value filtering (fast, model-agnostic) or `method="random_forest"` for permutation importance from a RandomForest probe. Populated after `fit(X, y)`: `selected_features_`, `p_values_`, `importance_scores_`, `n_features_tsfresh`, `n_features_rf`, `n_features`, `feature_names_`.
+
+---
+
+## FeatureCountSweep (Experimental)
+
+> **⚠ Experimental — not production-ready.** Signature, defaults, and
+> on-disk layout may change without deprecation. See
+> [Feature Count Sweep](Feature-Count-Sweep) for the full contract,
+> examples, and caveats.
+
+Post-hoc `top_n_features` recommender. Consumes per-seed FDR rankings,
+resampled ids, and tuned `best_model.pkl` files already written by
+`TrainingModel.fit()`, then re-scores each seed at multiple candidate
+`N` values.
+
+### Constructor
+
+```python
+FeatureCountSweep(
+    estimator: BaseEstimator | None = None,
+    *,
+    strategy: Literal["shared", "per-seed"] = "per-seed",
+    n_candidates: list[int] | None = None,
+    cv: BaseCrossValidator | int = 5,
+    scoring: str = "average_precision",
+    parsimony: bool = True,
+    parsimony_tolerance: float | None = None,
+    resample_method: Literal["under", "over", "auto"] | None = None,
+    minority_threshold: float = 0.15,
+    estimator_mode: Literal["default", "tuned"] = "default",
+    mode: Literal["cv", "forecast"] = "forecast",
+    n_jobs: int = 1,
+    random_state: int = 42,
+    verbose: bool = False,
+)
+```
+
+| Param | Notes |
+|-------|-------|
+| `mode` | `"forecast"` (default) — score against a held-out prediction window; `"cv"` — RFECV-analog CV inside the trainer's resampled subset |
+| `estimator_mode` | `"default"` (recommended) drops the tuned hyperparameters via `estimator.__class__()`; `"tuned"` keeps them and biases the curve toward the trained `N` |
+| `parsimony_tolerance` | `None` → adaptive 1-SE rule; float in `(0, 1)` → fractional tolerance `peak × (1 − t)` |
+| `n_jobs` | Applied over CV folds when `mode="cv"`; unused in `mode="forecast"` (one fit per `(seed, N)`) |
+
+### `.fit(...)`
+
+```python
+sweep.fit(
+    X: pd.DataFrame,
+    y: pd.Series,
+    *,
+    per_seed_inputs: dict[int, dict[str, Any]] | None = None,
+    shared_ranking: pd.Series | pd.Index | list[str] | None = None,
+    per_seed_rankings: dict[int, ...] | None = None,
+    X_test: pd.DataFrame | None = None,
+    y_test: pd.Series | None = None,
+) -> Self
+```
+
+`per_seed_inputs` / `shared_ranking` / `per_seed_rankings` are mutually
+exclusive input modes. `X_test` / `y_test` are required in
+`mode="forecast"`; missing per-seed features in `X_test` raise `KeyError`
+(never silently intersected).
+
+Populated attributes: `cv_scores_` (aggregated N × [mean, std,
+n_seeds]), `cv_scores_raw_` (full N × seed matrix), `n_features_`
+(recommended `N*`), `seed_argmax_` (per-seed argmax `N`), `support_`
+(per-seed top-`N*` feature lists).
+
+### `sweep_feature_count(...)`
+
+```python
+sweep_feature_count(
+    source: str | os.PathLike | TrainingModel,
+    *,
+    mode: Literal["cv", "forecast"] = "forecast",
+    evaluation_source: EvaluationModel | None = None,
+    classifier_name: str | None = None,
+    n_candidates: list[int] | None = None,
+    cv: BaseCrossValidator | int = 5,
+    scoring: str = "average_precision",
+    parsimony: bool = True,
+    parsimony_tolerance: float | None = None,
+    resample_method: Literal["under", "over", "auto"] | None = None,
+    minority_threshold: float = 0.15,
+    estimator_mode: Literal["default", "tuned"] = "default",
+    n_jobs: int = 1,
+    random_state: int = 42,
+    output_dir: str | None = None,
+    save: bool = True,
+    verbose: bool = False,
+) -> FeatureCountSweep | dict[str, FeatureCountSweep]
+```
+
+Convenience wrapper that harvests per-seed inputs from an existing
+`training/` directory (or live `TrainingModel`). In `mode="forecast"`,
+`evaluation_source` must be an `EvaluationModel` in prediction-reuse
+mode with a populated `y_true` (call `em.build_label(...)` or
+`em.evaluate()` first). Returns a single sweep when `classifier_name`
+is given, otherwise a dict keyed by discovered classifier names.
+
+### Persistence
+
+| Method | Notes |
+|--------|-------|
+| `sweep.save(path)` | joblib-dump the full instance |
+| `FeatureCountSweep.load(path)` | Classmethod; restore a saved sweep |
+
+`sweep_feature_count(save=True)` also writes `cv_scores.csv`,
+`cv_scores_raw.csv`, `seed_argmax_hist.csv`, `support.json`, and
+`curve.png` alongside the pickle under
+`{training_dir}/features/{cv-slug}/sweep/{mode}/{classifier}/`.
 
 ---
 
