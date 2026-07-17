@@ -4,6 +4,7 @@ from typing import Any, Literal, cast
 from pathlib import Path
 from multiprocessing import Pool
 
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -799,6 +800,120 @@ def plot_feature_correlations(
                         fontsize=4,
                         color=text_color,
                     )
+
+        plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+
+
+def plot_feature_count_curve(
+    cv_scores: pd.DataFrame,
+    seed_argmax: pd.Series,
+    n_features_star: int,
+    filepath: str,
+    *,
+    figsize: tuple[float, float] = (10, 4),
+    dpi: int = 150,
+    title: str | None = None,
+    overwrite: bool = True,
+) -> None:
+    """Plot the feature-count sweep summary.
+
+    Renders two side-by-side panels:
+
+    - **Left**: mean CV score vs. ``N`` with a ±1 std shaded band, an
+      annotated marker at the recommended ``N*``.
+    - **Right**: histogram of per-seed argmax ``N`` — the diagnostic that
+      reveals whether the shared-``N`` assumption holds.
+
+    Args:
+        cv_scores (pd.DataFrame): Aggregated summary indexed by ``N`` with
+            columns ``mean``, ``std``, ``n_seeds`` (produced by
+            :meth:`FeatureCountSweep.fit`).
+        seed_argmax (pd.Series): Per-seed argmax ``N`` values.
+        n_features_star (int): Recommended ``N*`` to annotate.
+        filepath (str): Destination for the saved figure.
+        figsize (tuple[float, float]): Figure size in inches. Defaults to
+            (10, 4).
+        dpi (int): Figure resolution. Defaults to 150.
+        title (str | None): Overall figure title. Defaults to ``None``.
+        overwrite (bool): Skip saving when the file exists and this is
+            ``False``. Defaults to ``True``.
+    """
+    if not overwrite and os.path.isfile(filepath):
+        logger.info(f"Feature-count curve {filepath} already exists.")
+        return
+
+    n_values = cv_scores.index.to_numpy()
+    mean = cv_scores["mean"].to_numpy()
+    std = cv_scores["std"].to_numpy()
+
+    with apply_nature_style():
+        fig, (ax_curve, ax_hist) = plt.subplots(
+            nrows=1, ncols=2, figsize=figsize, dpi=dpi, constrained_layout=True
+        )
+
+        # -- Left: mean ± std curve ------------------------------------
+        ax_curve.plot(
+            n_values,
+            mean,
+            marker="o",
+            color=NATURE_COLORS["blue"],
+            label="mean CV score",
+        )
+        ax_curve.fill_between(
+            n_values,
+            mean - std,
+            mean + std,
+            color=NATURE_COLORS["blue"],
+            alpha=0.2,
+            label="± 1 std across seeds",
+        )
+        if n_features_star in cv_scores.index:
+            star_mean = float(cv_scores["mean"].to_numpy()[
+                int(np.where(cv_scores.index.to_numpy() == n_features_star)[0][0])
+            ])
+            ax_curve.axvline(
+                n_features_star,
+                color=NATURE_COLORS["red"],
+                linestyle="--",
+                linewidth=1.2,
+                alpha=0.8,
+            )
+            ax_curve.scatter(
+                [n_features_star],
+                [star_mean],
+                color=NATURE_COLORS["red"],
+                zorder=5,
+                label=f"N* = {n_features_star}",
+            )
+        ax_curve.set_xlabel("Number of features (N)")
+        ax_curve.set_ylabel("CV score (mean across seeds)")
+        ax_curve.set_title("Sweep — score vs. N")
+        ax_curve.legend(frameon=False, loc="lower right", fontsize=8)
+        configure_spine(ax_curve)
+
+        # -- Right: per-seed argmax histogram --------------------------
+        counts = seed_argmax.value_counts().reindex(n_values, fill_value=0)
+        bar_colors = [
+            NATURE_COLORS["red"] if int(n) == n_features_star else NATURE_COLORS["gray"]
+            for n in counts.index
+        ]
+        ax_hist.bar(
+            counts.index.astype(str),
+            counts.values,
+            color=bar_colors,
+            alpha=0.85,
+        )
+        ax_hist.set_xlabel("Argmax N (per seed)")
+        ax_hist.set_ylabel("Seed count")
+        ax_hist.set_title("Diagnostic — per-seed argmax")
+        for label in ax_hist.get_xticklabels():
+            label.set_rotation(45)
+            label.set_horizontalalignment("right")
+        configure_spine(ax_hist)
+
+        if title:
+            fig.suptitle(title, fontsize=11)
 
         plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
         plt.close(fig)
