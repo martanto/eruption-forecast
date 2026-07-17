@@ -414,18 +414,34 @@ class TrainingModel(BaseModel):
     def validate(self) -> Self:
         """Validate and reconcile model parameters against system and data constraints.
 
-        Clamps ``n_grids`` so that the product ``n_jobs × n_grids`` never
-        exceeds the available CPU count. When the caller leaves both
-        ``n_jobs`` and ``n_grids`` at their default of ``1``, ``n_grids`` is
-        boosted to ``total_cpu - 2`` so the grid search can use the available
-        cores. Creates the root training directory as a side effect. Date
-        range clamping against the tremor data bounds is deferred to
-        ``_sync_dates_to_tremor()``, which is called lazily from
-        ``build_label()`` to avoid loading the tremor CSV during construction.
+        Enforces mutually-exclusive outer/inner parallelism: when
+        ``n_jobs > 1`` the outer seed loop already fans out via
+        ``joblib.Parallel(backend="loky")``, so ``n_grids`` is forced to
+        ``1`` to prevent nested loky parallelism inside ``GridSearchCV`` and
+        ``FeatureSelector`` (nested loky either collapses to sequential with
+        warnings or oversubscribes CPU). Clamps ``n_grids`` so the product
+        ``n_jobs × n_grids`` never exceeds the available CPU count. When the
+        caller leaves both ``n_jobs`` and ``n_grids`` at their default of
+        ``1``, ``n_grids`` is boosted to ``total_cpu - 2`` so the grid search
+        can use the available cores. Keeps the already-constructed
+        ``FeatureSelector.n_jobs`` in sync with the final ``n_grids`` so
+        every inner-parallel site reads the same value. Creates the root
+        training directory as a side effect. Date range clamping against the
+        tremor data bounds is deferred to ``_sync_dates_to_tremor()``, which
+        is called lazily from ``build_label()`` to avoid loading the tremor
+        CSV during construction.
 
         Returns:
             Self: The current instance, enabling method chaining.
         """
+        # Prevent nested joblib parallelism.
+        if self.n_jobs > 1 and self.n_grids > 1:
+            logger.info(
+                f"n_jobs={self.n_jobs} > 1: forcing n_grids from {self.n_grids} to 1 "
+                f"to avoid nested joblib parallelism."
+            )
+            self.n_grids = 1
+
         # Ensure total grid not over than total CPU
         total_grid = self.n_jobs * self.n_grids
         if total_grid > self.total_cpu:
@@ -434,6 +450,11 @@ class TrainingModel(BaseModel):
         # Optimize n_grids search to utitlize all available CPU
         if self.n_jobs == 1 and self.n_grids == 1:
             self.n_grids = max(1, self.total_cpu - 2)
+
+        # Sync the FeatureSelector's inner worker count with the final
+        # n_grids so both inner-parallel sites (GridSearchCV in _train and
+        # tsfresh / RF probe inside FeatureSelector) agree.
+        self.FeatureSelector.n_jobs = self.n_grids
 
         ensure_dir(self.training_dir)
 
@@ -1644,6 +1665,7 @@ class TrainingModel(BaseModel):
             labels_resampled,
             top_n_features,
             classifier_model=classifier_model,
+            n_grids=self.n_grids,
             scoring=self._scoring,
         )
 
