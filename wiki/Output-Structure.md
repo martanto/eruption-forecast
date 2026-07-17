@@ -32,7 +32,14 @@ Every pipeline run writes under a single station directory:
 │   │   ├── significant_features.csv                          # Raw per-seed rows concatenated (features + score)
 │   │   ├── top_features.csv                                  # Full ranked list (all features, sorted by score desc, mean_score asc)
 │   │   ├── top_{N}_features.csv                              # Top-N subset of top_features.csv
-│   │   └── top_{N}_features.png                              # Aggregated importance plot
+│   │   ├── top_{N}_features.png                              # Aggregated importance plot
+│   │   └── sweep/{mode}/{classifier-name}/                   # ⚠ Experimental — FeatureCountSweep outputs (sweep_feature_count)
+│   │       ├── cv_scores.csv                                 # Aggregated summary (N, mean, std, n_seeds)
+│   │       ├── cv_scores_raw.csv                             # Full (N × seed) score matrix
+│   │       ├── seed_argmax_hist.csv                          # Per-seed argmax N
+│   │       ├── support.json                                  # {"n_features": N*, "seeds": {seed: [features…]}}
+│   │       ├── curve.png                                     # mean±std curve + argmax histogram
+│   │       └── FeatureCountSweep.pkl                         # Full sweep instance (FeatureCountSweep.load(path))
 │   │
 │   └── classifiers/
 │       ├── ClassifierEnsemble_{cv-slug}.pkl                  # Bundled ClassifierEnsemble (all classifiers)
@@ -249,6 +256,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Raw per-seed picks concatenated | `training/features/{cv}/significant_features.csv` |
 | Full ranked feature list (all features) | `training/features/{cv}/top_features.csv` |
 | The aggregated top-N features | `training/features/{cv}/top_{N}_features.csv` |
+| ⚠ Experimental — post-hoc sweep results | `training/features/{cv}/sweep/{mode}/{classifier-name}/` |
 | Individual trained models | `training/classifiers/{clf}/{cv}/models/{seed:05d}.pkl` |
 | The single-classifier ensemble | `training/classifiers/{clf}/{cv}/SeedEnsemble_*.pkl` |
 | The all-classifiers ensemble | `training/classifiers/ClassifierEnsemble_{cv}.pkl` |

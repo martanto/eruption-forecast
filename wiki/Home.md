@@ -28,6 +28,7 @@ It is a research tool and must not be used as the sole basis for public safety d
 | 8 | [Output Structure](Output-Structure) | Full directory tree + slug conventions |
 | 9 | [Architecture](Architecture) | Package layout, class relationships, data flow |
 | 10 | [API Reference](API-Reference) | Constructor + method parameter tables |
+| ⚠️ | [Feature Count Sweep](Feature-Count-Sweep) | **Experimental** — post-hoc `top_n_features` recommender (`ft/feature-count-sweep`) |
 
 ---
 

@@ -1619,7 +1619,7 @@ class TrainingModel(BaseModel):
         # Return cached result without re-training if the model already exists.
         if not self.overwrite and os.path.isfile(model_seed_path):
             logger.info(
-                f"Seed {random_state:05d} / {classifier_name}: model exists, skipping."
+                f"{classifier_name}[{random_state:05d}]: Model exists, skipping."
             )
             return (
                 classifier_name,
@@ -1636,7 +1636,7 @@ class TrainingModel(BaseModel):
         )
 
         if self.verbose:
-            logger.info(f"Fitting {random_state:05d}/{classifier_name}...")
+            logger.info(f"Fitting {classifier_name}[{random_state:05d}]...")
 
         _classifier_model, _grid_search, best_model = grid_search_cv(
             random_state,
@@ -1651,7 +1651,7 @@ class TrainingModel(BaseModel):
 
         if self.verbose:
             logger.info(
-                f"Fitted {random_state:05d}/{classifier_name}: {model_seed_path}"
+                f"Fitted {classifier_name}[{random_state:05d}]: {model_seed_path}"
             )
 
         return (
@@ -1756,7 +1756,7 @@ class TrainingModel(BaseModel):
         """
         if self.n_jobs != 1:
             logger.info(
-                f"[{job_name}]:On {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
+                f"[{job_name}]: On {self.n_jobs} job(s) with {self.n_grids} grid(s) search..."
             )
             return Parallel(n_jobs=self.n_jobs, backend="loky")(
                 delayed(method)(*job) for job in jobs

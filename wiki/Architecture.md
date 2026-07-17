@@ -46,7 +46,8 @@ src/eruption_forecast/
 │   ├── constants.py
 │   ├── tremor_matrix_builder.py - TremorMatrixBuilder (windowed alignment)
 │   ├── features_builder.py      - FeaturesBuilder (tsfresh extraction)
-│   └── feature_selector.py      - FeatureSelector (tsfresh FDR or RF importance)
+│   ├── feature_selector.py      - FeatureSelector (tsfresh FDR or RF importance)
+│   └── feature_count_sweep.py   - ⚠ Experimental. FeatureCountSweep + sweep_feature_count (post-hoc top_n_features recommender)
 │
 ├── label/
 │   ├── constants.py
