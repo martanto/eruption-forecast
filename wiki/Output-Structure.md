@@ -30,8 +30,8 @@ Every pipeline run writes under a single station directory:
 │   │   ├── seed/figures/{seed:05d}.png                       # Per-seed importance plots (plot_features=True)
 │   │   ├── resampled/{seed:05d}.csv                          # Per-seed (id + is_erupted) — features recovered via features_df.loc[ids]
 │   │   ├── significant_features.csv                          # Raw per-seed rows concatenated (features + score)
-│   │   ├── top_features.csv                                  # Full ranked list (all features, sorted by score desc, mean_score asc)
-│   │   ├── top_{N}_features.csv                              # Top-N subset of top_features.csv
+│   │   ├── top_features.csv                                  # Full ranked list (features, score, mean_score, alias=ft_N, description)
+│   │   ├── top_{N}_features.csv                              # Top-N subset of top_features.csv (same columns)
 │   │   ├── top_{N}_features.png                              # Aggregated importance plot
 │   │   └── sweep/{mode}/{classifier-name}/                   # ⚠ Experimental — FeatureCountSweep outputs (sweep_feature_count)
 │   │       ├── cv_scores.csv                                 # Aggregated summary (N, mean, std, n_seeds)
@@ -254,8 +254,10 @@ tremor - only the train/predict/evaluate legs are repeated.
 | The features tsfresh extracted | `training/features/{cv}/features-matrix_*.parquet` |
 | Per-seed feature picks | `training/features/{cv}/seed/{seed:05d}.csv` |
 | Raw per-seed picks concatenated | `training/features/{cv}/significant_features.csv` |
-| Full ranked feature list (all features) | `training/features/{cv}/top_features.csv` |
-| The aggregated top-N features | `training/features/{cv}/top_{N}_features.csv` |
+| Full ranked feature list (all features, with `alias` + `description`) | `training/features/{cv}/top_features.csv` |
+| The aggregated top-N features (with `alias` + `description`) | `training/features/{cv}/top_{N}_features.csv` |
+| Alias ↔ canonical mapping for a ranked CSV or DataFrame | `load_feature_aliases(source)` — see the [Feature Alias Utilities](API-Reference#feature-alias-utilities) API section |
+| Backfill `alias` + `description` onto a legacy ranked CSV | `update_top_features_csv(csv_path)` — same section, `overwrite=True` to refresh |
 | ⚠ Experimental — post-hoc sweep results | `training/features/{cv}/sweep/{mode}/{classifier-name}/` |
 | Individual trained models | `training/classifiers/{clf}/{cv}/models/{seed:05d}.pkl` |
 | The single-classifier ensemble | `training/classifiers/{clf}/{cv}/SeedEnsemble_*.pkl` |
