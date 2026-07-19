@@ -362,6 +362,33 @@ def load_feature_aliases(
     return dict(zip(canonicals, aliases, strict=True))
 
 
+def _migrate_score_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename the legacy ``score`` column to ``frequency`` in aggregated CSVs.
+
+    The aggregated frame produced by :func:`concat_significant_features`
+    and :func:`find_common_features` used to write a ``score`` column
+    that actually counted how many seeds selected the feature. It has
+    been renamed to ``frequency`` so it no longer collides with the
+    per-seed ``score`` (p-value / permutation importance) produced by
+    :class:`~eruption_forecast.features.feature_selector.FeatureSelector`.
+    Legacy CSVs on disk still carry ``score``; this helper normalises a
+    freshly-read frame so downstream readers can always look up
+    ``frequency``.
+
+    Args:
+        df (pd.DataFrame): Frame just loaded from a ranked/aggregated
+            CSV.
+
+    Returns:
+        pd.DataFrame: A frame with ``score`` renamed to ``frequency``
+        when applicable, or the original frame unchanged when the column
+        layout is already current.
+    """
+    if "score" in df.columns and "frequency" not in df.columns:
+        return df.rename(columns={"score": "frequency"})
+    return df
+
+
 def update_top_features_csv(
     csv_path: str,
     output_path: str | None = None,
@@ -380,9 +407,16 @@ def update_top_features_csv(
     trusted as-is — the CSV is assumed to already be sorted by rank —
     so aliases are assigned top-to-bottom without re-sorting.
 
-    Idempotent by default: when both columns are already present the CSV
-    is left untouched and the loaded frame is returned unchanged. Pass
-    ``overwrite=True`` to drop and regenerate them (useful after
+    Also migrates the legacy ``score`` column to ``frequency`` when the
+    loaded CSV predates that rename. When only the column rename is
+    outstanding (``alias`` / ``description`` already present, but
+    ``score`` still on disk), the file is rewritten so the header lands
+    in the new shape without dropping the existing annotations.
+
+    Idempotent by default: when ``frequency``, ``alias``, and
+    ``description`` are all already present the CSV is left untouched
+    and the loaded frame is returned unchanged. Pass ``overwrite=True``
+    to drop and regenerate ``alias`` / ``description`` (useful after
     changing ``freq_bands`` or updating the humanizer's calculator
     table).
 
@@ -402,14 +436,15 @@ def update_top_features_csv(
         overwrite (bool, optional): When ``True``, drop any existing
             ``alias`` / ``description`` columns before regenerating them,
             so a stale annotation can be refreshed. When ``False``
-            (default) and both columns are already present, the CSV is
-            not rewritten and the loaded frame is returned as-is.
-            Defaults to ``False``.
+            (default) and both columns are already present (and no
+            ``score``-to-``frequency`` migration is outstanding), the
+            CSV is not rewritten and the loaded frame is returned
+            as-is. Defaults to ``False``.
 
     Returns:
         pd.DataFrame: The annotated (or unchanged, when idempotent)
         frame, indexed by canonical tsfresh feature name with columns
-        ``score``, ``mean_score``, ``alias``, ``description``.
+        ``frequency``, ``mean_score``, ``alias``, ``description``.
 
     Raises:
         FileNotFoundError: If ``csv_path`` does not exist.
@@ -432,20 +467,26 @@ def update_top_features_csv(
         raise FileNotFoundError(f"top_features CSV not found: {csv_path}")
 
     df = pd.read_csv(csv_path, index_col=0)
+    needs_migration = "score" in df.columns and "frequency" not in df.columns
+    df = _migrate_score_column(df)
 
     has_alias = "alias" in df.columns
     has_description = "description" in df.columns
 
-    if has_alias and has_description and not overwrite:
+    if has_alias and has_description and not overwrite and not needs_migration:
         return df
 
     if overwrite:
         df = df.drop(columns=["alias", "description"], errors="ignore")
+        has_alias = False
+        has_description = False
 
-    df["alias"] = [f"ft_{i}" for i in range(1, len(df) + 1)]
-    df["description"] = [
-        humanize_feature_name(name, freq_bands=freq_bands) for name in df.index
-    ]
+    if not has_alias:
+        df["alias"] = [f"ft_{i}" for i in range(1, len(df) + 1)]
+    if not has_description:
+        df["description"] = [
+            humanize_feature_name(name, freq_bands=freq_bands) for name in df.index
+        ]
 
     destination = output_path or csv_path
     df.to_csv(destination, index=True)
@@ -615,13 +656,14 @@ def concat_significant_features(
     """Concatenate per-seed significant-feature CSVs and save a ranked summary.
 
     Reads all CSVs in ``features_csvs``, concatenates them row-wise, and
-    writes the raw combined data to ``{features_dir}/significant_features.csv``.
-    When ``number_of_features`` is provided, also aggregates by feature name,
-    counts occurrences across seeds (``score``), computes mean score
-    (``mean_score``), sorts descending by frequency and ascending by mean
-    p-value, decorates the ranked frame with an ``alias`` column
-    (``ft_1``, ``ft_2``, …) that tracks rank position and a plain-English
-    ``description`` column produced by
+    writes the raw combined data to ``{features_dir}/significant_features.csv``
+    (which keeps the per-seed ``score`` — p-value or permutation importance
+    — as-is). When ``number_of_features`` is provided, also aggregates by
+    feature name, counts occurrences across seeds (``frequency``), computes
+    the mean per-seed score (``mean_score``), sorts descending by
+    ``frequency`` and ascending by ``mean_score``, decorates the ranked
+    frame with an ``alias`` column (``ft_1``, ``ft_2``, …) that tracks
+    rank position and a plain-English ``description`` column produced by
     :func:`~eruption_forecast.utils.formatting.humanize_feature_name`, and
     writes two additional CSVs:
 
@@ -634,7 +676,8 @@ def concat_significant_features(
     Args:
         features_csvs (list[str]): Paths to per-seed significant-feature CSV
             files, each expected to contain a ``features`` column and a
-            ``score`` column.
+            ``score`` column (p-value from ``tsfresh`` or permutation
+            importance from ``random_forest``).
         features_dir (str): Directory where output CSVs are written.
         number_of_features (int | None, optional): If set, produce the
             ``top_features.csv`` full ranking plus a
@@ -678,9 +721,9 @@ def concat_significant_features(
     if number_of_features is not None and number_of_features > 0:
         combined_features_df = (
             combined_features_df.groupby(by="features")
-            .agg(score=("score", "count"), mean_score=("score", "mean"))
+            .agg(frequency=("score", "count"), mean_score=("score", "mean"))
             .sort_values(
-                by=["score", "mean_score"],
+                by=["frequency", "mean_score"],
                 ascending=[False, True],
             )
         )
@@ -715,22 +758,27 @@ def find_common_features(
 
     Loads each CSV produced by the scenario training stage and intersects
     their feature indices, so the result contains only features that every
-    scenario agreed on. The ``score`` and ``mean_score`` columns are summed
-    across the input CSVs so the output keeps the same shape as a source
-    ``top_N_features.csv`` and can be sorted the same way (descending by
-    ``score``, ascending by ``mean_score``). The merged frame is then
-    decorated with an ``alias`` column (``ft_1``, ``ft_2``, …) that tracks
-    the cross-scenario rank position and a plain-English ``description``
-    column produced by
+    scenario agreed on. The ``frequency`` and ``mean_score`` columns are
+    summed across the input CSVs so the output keeps the same shape as a
+    source ``top_N_features.csv`` and can be sorted the same way
+    (descending by ``frequency``, ascending by ``mean_score``). The merged
+    frame is then decorated with an ``alias`` column (``ft_1``, ``ft_2``,
+    …) that tracks the cross-scenario rank position and a plain-English
+    ``description`` column produced by
     :func:`~eruption_forecast.utils.formatting.humanize_feature_name`.
     Aliases assigned here are independent of each scenario's own aliases —
     they follow the merged ranking so downstream plots have a single label
     per feature.
 
+    Legacy inputs written before the ``score`` → ``frequency`` rename are
+    normalised on read via :func:`_migrate_score_column`, so a mix of old
+    and new CSVs can be merged without a prior migration pass.
+
     Args:
         top_features_csv (list[str]): Paths to ``top_{N}_features.csv`` files
             (one per scenario). Each file must have a ``features`` index
-            column and ``score`` / ``mean_score`` columns.
+            column and ``frequency`` / ``mean_score`` columns (legacy files
+            with a ``score`` column are auto-migrated on read).
         output_dir (str | None, optional): Directory where the resulting
             ``common_top_features.csv`` is written. When ``None``, falls back
             to the current working directory (``os.getcwd()``). Defaults to
@@ -746,8 +794,8 @@ def find_common_features(
 
     Returns:
         pd.DataFrame: DataFrame indexed by the common feature names with
-        ``score`` and ``mean_score`` columns summed across the input CSVs.
-        Also written to ``{output_dir}/common_top_features.csv``.
+        ``frequency`` and ``mean_score`` columns summed across the input
+        CSVs. Also written to ``{output_dir}/common_top_features.csv``.
 
     Raises:
         ValueError: If ``top_features_csv`` is empty or the intersection is
@@ -771,17 +819,20 @@ def find_common_features(
     frames: list[pd.DataFrame] = []
     for path in top_features_csv:
         load_select_features(path, number_of_features=0)
-        frames.append(pd.read_csv(path, index_col=0))
+        frames.append(_migrate_score_column(pd.read_csv(path, index_col=0)))
 
     common = sorted(set.intersection(*(set(df.index) for df in frames)))
     if not common:
         raise ValueError("No features are common to all CSVs.")
 
     aligned = [
-        df.loc[df.index.intersection(common), ["score", "mean_score"]] for df in frames
+        df.loc[df.index.intersection(common), ["frequency", "mean_score"]]
+        for df in frames
     ]
     combined = pd.concat(aligned).groupby(level=0).sum()
-    combined = combined.sort_values(by=["score", "mean_score"], ascending=[False, True])
+    combined = combined.sort_values(
+        by=["frequency", "mean_score"], ascending=[False, True]
+    )
     combined["alias"] = [f"ft_{i}" for i in range(1, len(combined) + 1)]
     combined["description"] = [
         humanize_feature_name(name, freq_bands=freq_bands) for name in combined.index
@@ -832,8 +883,8 @@ def plot_common_features_heatmap(
 
     matrix = pd.DataFrame(index=common_features, columns=labels, dtype=float)
     for label, path in top_features_csv.items():
-        per_scenario = pd.read_csv(path, index_col=0)
-        matrix[label] = per_scenario["score"].reindex(common_features)
+        per_scenario = _migrate_score_column(pd.read_csv(path, index_col=0))
+        matrix[label] = per_scenario["frequency"].reindex(common_features)
 
     if label_style == "alias":
         matrix.index = common_df["alias"].reindex(common_features).tolist()
