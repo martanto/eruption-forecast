@@ -98,6 +98,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - [Output Structure](wiki/Output-Structure.md) — Full directory tree
 - [Architecture](wiki/Architecture.md) — Package layout and class relationships
 - [API Reference](wiki/API-Reference.md) — Every public class with parameter tables
+- [Feature Count Sweep](wiki/Feature-Count-Sweep.md) — ⚠ Experimental — post-hoc `top_n_features` diagnostic (`FeatureCountSweep`, `sweep_feature_count`)
 
 ---
 
@@ -111,6 +112,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
+- **Feature Alias Utilities** — the aggregated `top_features.csv` / `top_{N}_features.csv` / `common_top_features.csv` now carry `frequency` (per-seed selection count; renamed from `score`), a rank-based `alias` (`ft_1`, `ft_2`, …), and a plain-English `description` for every row. Helpers: `humanize_feature_name(name, freq_bands=None)`, `load_feature_aliases(source)`, `update_top_features_csv(csv_path)` for legacy backfill; the cross-scenario heatmaps accept `label_style="alias"`.
 - **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, and `ExplanationModel` cache their fitted state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`.
 - **Telegram Notifications** — `@notify` / `@timer` decorators + fluent `TelegramNotification` client (`send_message` / `send_document` / `send_photo` / `send_media_group`) for success/error messages and file attachments.
@@ -722,6 +724,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.3.4
+**Version:** 0.4.0
 **Status:** Active Development
-**Last Updated:** 2026-07-15
+**Last Updated:** 2026-07-19
