@@ -1144,17 +1144,23 @@ Adds `alias` and `description` columns to a legacy `top_features.csv`,
 `top_{N}_features.csv`, or `common_top_features.csv` that predates the
 alias rollout (or was hand-prepared). Row order is trusted as-is —
 aliases follow the existing rank, no re-sorting — so a CSV that's
-already sorted by `score` desc / `mean_score` asc lines up with the
+already sorted by `frequency` desc / `mean_score` asc lines up with the
 same `ft_N` values `concat_significant_features` would produce today.
+
+Also handles the `score` → `frequency` column rename: when the loaded
+CSV still carries the legacy `score` column (which was actually a
+per-seed count, not a score), it's renamed on disk to `frequency` so
+downstream readers pick up the current schema without further action.
 
 - `output_path=None` (default) rewrites the file in place; pass a
   different path to keep the original for comparison.
 - `freq_bands` forwards to `humanize_feature_name` so descriptions can
   reflect custom bands used for that scenario.
-- `overwrite=False` (default) is idempotent — when both columns are
-  already present, the CSV is not touched. Pass `overwrite=True` to
-  drop and regenerate them, useful after changing `freq_bands` or
-  after the calculator humanization table is extended.
+- `overwrite=False` (default) is idempotent — when `frequency`,
+  `alias`, and `description` are all already present, the CSV is not
+  touched. Pass `overwrite=True` to drop and regenerate the alias /
+  description columns, useful after changing `freq_bands` or after
+  the calculator humanization table is extended.
 
 Raises `FileNotFoundError` if `csv_path` does not exist.
 
