@@ -2,13 +2,45 @@ import os
 import json
 import pickle
 from typing import Any
+from importlib.metadata import metadata
 
 import joblib
 import matplotlib
 import matplotlib.pyplot as plt
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.formatting import pdf_metadata
+
+
+def pdf_metadata(title: str | None = None) -> dict[str, str]:
+    """Build PDF metadata dict from package metadata and environment.
+
+    Reads package version and homepage URL from ``importlib.metadata``.
+    The ``Author`` field is resolved from the environment in priority order:
+    ``GIT_AUTHOR_NAME`` → ``USERNAME`` (Windows) → ``USER`` (Unix) →
+    ``"eruption-forecast"`` as a last-resort fallback.
+
+    Returns:
+        dict[str, str]: Metadata dict suitable for passing to
+        ``matplotlib``'s ``savefig(metadata=...)``.  Keys: ``Title``,
+        ``Author``, ``Subject``, ``Keywords``, ``Creator``.
+    """
+    package_metadata = metadata("eruption-forecast")
+    version: str = package_metadata["Version"]
+
+    _pdf_metadata = {
+        "Title": title or "Eruption probability forecast",
+        "Author": (
+            os.environ.get("GIT_AUTHOR_NAME")
+            or os.environ.get("USERNAME")
+            or os.environ.get("USER")
+            or "eruption-forecast"
+        ),
+        "Subject": "Eruption probability forecast",
+        "Keywords": "eruption, forecast, seismic, tremor",
+        "Creator": f"eruption-forecast v{version}",
+    }
+
+    return _pdf_metadata
 
 
 def ensure_dir(path: str) -> str:
