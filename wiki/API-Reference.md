@@ -1056,6 +1056,168 @@ LabelData.from_csv(path: str) -> LabelData
 
 ---
 
+## Feature alias utilities
+
+Aggregation across seeds ranks every significant tsfresh feature, and each
+row of the ranked CSV is tagged with a short display alias (`ft_1`, `ft_2`,
+…) plus a plain-English description. The alias is deterministic — it
+follows the rank position — so regenerating the CSV with the same inputs
+produces identical aliases. The utilities below let callers write, read,
+and translate that mapping.
+
+### Writers — `alias` + `description` columns
+
+```python
+from eruption_forecast.utils.dataframe import (
+    concat_significant_features,
+    find_common_features,
+)
+
+concat_significant_features(
+    features_csvs: list[str],
+    features_dir: str,
+    number_of_features: int | None = None,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+) -> pd.DataFrame
+
+find_common_features(
+    top_features_csv: list[str],
+    output_dir: str | None = None,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+) -> pd.DataFrame
+```
+
+Both functions decorate the ranked frame with `alias` (`ft_1..ft_N` by
+rank) and `description` (plain-English via
+`humanize_feature_name`). `concat_significant_features` writes
+`top_features.csv` and `top_{N}_features.csv` under `features_dir` when
+`number_of_features > 0`; `find_common_features` writes
+`common_top_features.csv` under `output_dir` (or `os.getcwd()`).
+
+`freq_bands` is optional. When omitted, the humanizer uses the default
+edges from `DEFAULT_FREQUENCY_BANDS` (`config/constants.py`), which
+matches `CalculateTremor`'s defaults. Pass a matching dict — same shape
+as `{"f0": (low, high), ...}` — when the tremor was calculated with
+`CalculateTremor.change_freq_bands(...)` so descriptions in the CSVs
+reflect the actual Hz values.
+
+### Reader — `load_feature_aliases`
+
+```python
+from eruption_forecast.utils.dataframe import load_feature_aliases
+
+load_feature_aliases(
+    source: str | pd.DataFrame,
+    reverse: bool = True,
+) -> dict[str, str]
+```
+
+- `source` accepts either a CSV path (`top_features.csv`,
+  `top_{N}_features.csv`, `common_top_features.csv`) OR the DataFrame
+  those functions return directly — the DataFrame path skips the disk
+  round-trip when the frame is still in memory (natural right after
+  `concat_significant_features(...)` in the same session).
+- `reverse=True` (default) → `{alias: canonical_name}` so callers can
+  translate a plot label back to the tsfresh name
+  (`aliases["ft_5"] -> 'dsar_f3-f4__fft_coefficient__attr_"abs"__coeff_91'`).
+- `reverse=False` → `{canonical_name: alias}`, useful for
+  `features_df.rename(columns=mapping)`.
+
+Raises `FileNotFoundError` for missing paths and `ValueError` when the
+frame lacks the `alias` column (typical mistake: pointing at
+`significant_features.csv`, the raw per-seed dump that carries no rank).
+
+### Backfill — `update_top_features_csv`
+
+```python
+from eruption_forecast.utils.dataframe import update_top_features_csv
+
+update_top_features_csv(
+    csv_path: str,
+    output_path: str | None = None,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+    overwrite: bool = False,
+) -> pd.DataFrame
+```
+
+Adds `alias` and `description` columns to a legacy `top_features.csv`,
+`top_{N}_features.csv`, or `common_top_features.csv` that predates the
+alias rollout (or was hand-prepared). Row order is trusted as-is —
+aliases follow the existing rank, no re-sorting — so a CSV that's
+already sorted by `frequency` desc / `mean_score` asc lines up with the
+same `ft_N` values `concat_significant_features` would produce today.
+
+Also handles the `score` → `frequency` column rename: when the loaded
+CSV still carries the legacy `score` column (which was actually a
+per-seed count, not a score), it's renamed on disk to `frequency` so
+downstream readers pick up the current schema without further action.
+
+- `output_path=None` (default) rewrites the file in place; pass a
+  different path to keep the original for comparison.
+- `freq_bands` forwards to `humanize_feature_name` so descriptions can
+  reflect custom bands used for that scenario.
+- `overwrite=False` (default) is idempotent — when `frequency`,
+  `alias`, and `description` are all already present, the CSV is not
+  touched. Pass `overwrite=True` to drop and regenerate the alias /
+  description columns, useful after changing `freq_bands` or after
+  the calculator humanization table is extended.
+
+Raises `FileNotFoundError` if `csv_path` does not exist.
+
+### Label formatters — `shorten_feature_name` / `humanize_feature_name`
+
+```python
+from eruption_forecast.utils.formatting import (
+    shorten_feature_name,
+    humanize_feature_name,
+)
+
+shorten_feature_name(name: str) -> str
+humanize_feature_name(
+    name: str,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+) -> str
+```
+
+- `shorten_feature_name` renders a compact axis-tick label
+  (`dsar_f3-f4 | fft_coef(abs, 91)`), used by `ExplainerEnsemble` at
+  ingest and by the two cross-scenario heatmaps in `label_style="short"`
+  mode.
+- `humanize_feature_name` renders a plain-English phrase (`Fourier
+  coefficient (attr=abs, coeff=91) of DSAR ratio 4.5/8 Hz`), used to
+  populate the `description` column of the ranked CSVs. The
+  `freq_bands` kwarg has the same meaning as on
+  `concat_significant_features` / `find_common_features` above.
+
+Both return the input unchanged when it does not match the
+`column__calculator[__key_value]*` shape.
+
+### Heatmap label style
+
+```python
+plot_common_features_heatmap(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "viridis",
+    label_style: Literal["short", "alias"] = "short",
+) -> plt.Axes
+
+plot_common_features_correlation(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "RdBu_r",
+    label_style: Literal["short", "alias"] = "short",
+) -> plt.Axes
+```
+
+Both cross-scenario heatmaps accept `label_style`. `"short"` (default)
+preserves the existing `shorten_feature_name` labels; `"alias"` uses the
+`ft_1..ft_N` aliases from the merged ranking returned by
+`find_common_features` — useful when the shortened names still crowd the
+axis.
+
+---
+
 ## Logger helpers
 
 ```python

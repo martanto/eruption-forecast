@@ -208,7 +208,7 @@ def _process_single_file(
 
     Notes:
         - Auto-detects features column (tries "features" or uses index)
-        - Auto-detects values column with priority: "score" -> "p_values" -> "importance" -> first numeric column
+        - Auto-detects values column with priority: "frequency" -> "score" -> "p_values" -> "importance" -> first numeric column
         - Output filename matches input CSV filename with .png extension
         - Errors are logged but don't raise exceptions for robustness
     """
@@ -244,7 +244,7 @@ def _process_single_file(
                 raise ValueError(msg)
 
             # Priority order for backward compatibility
-            preferred_order = ["score", "p_values", "importance"]
+            preferred_order = ["frequency", "score", "p_values", "importance"]
             for col_name in preferred_order:
                 if col_name in numeric_cols:
                     values_column = col_name
@@ -351,8 +351,9 @@ def replot_significant_features(
     Notes:
         - CSV files are expected to have either a 'features' column or feature
           names in the index.
-        - The function attempts to auto-detect the values column (uses first
-          numeric column, expected to be "score").
+        - The function attempts to auto-detect the values column (prefers
+          ``frequency`` for aggregated CSVs, then falls back to ``score``,
+          ``p_values``, ``importance``, or the first numeric column).
         - Errors are logged but don't stop processing of remaining files.
         - Output filenames match input CSV filenames with .png extension.
         - Default output directory is ``<parent>/figures/significant`` where

@@ -1067,7 +1067,7 @@ class TrainingModel(BaseModel):
                 top_features=self.top_n_features,
                 overwrite=self.overwrite,
                 legend_loc="lower right",
-                values_column="score",
+                values_column="frequency",
             )
 
         # Save SeedEnsemble
