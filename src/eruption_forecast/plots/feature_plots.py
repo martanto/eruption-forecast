@@ -7,6 +7,7 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from matplotlib.patches import Patch
 
 from eruption_forecast.logger import logger
@@ -891,6 +892,7 @@ def plot_feature_count_curve(
         ax_curve.set_ylabel("CV score (mean across seeds)")
         ax_curve.set_title("Sweep — score vs. N")
         ax_curve.legend(frameon=False, loc="lower right", fontsize=8)
+        ax_curve.xaxis.set_major_locator(MaxNLocator(integer=True))
         configure_spine(ax_curve)
 
         # -- Right: per-seed argmax histogram --------------------------
@@ -911,6 +913,7 @@ def plot_feature_count_curve(
         for label in ax_hist.get_xticklabels():
             label.set_rotation(45)
             label.set_horizontalalignment("right")
+        ax_hist.yaxis.set_major_locator(MaxNLocator(integer=True))
         configure_spine(ax_hist)
 
         if title:
