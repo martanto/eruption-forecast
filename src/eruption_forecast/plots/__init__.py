@@ -22,6 +22,8 @@ from eruption_forecast.plots.tremor_plots import (
 from eruption_forecast.plots.feature_plots import (
     plot_significant_features,
     replot_significant_features,
+    plot_common_features_heatmap,
+    plot_common_features_correlation,
     plot_frequency_band_contribution,
 )
 
@@ -57,6 +59,8 @@ __all__ = [
     "plot_significant_features",
     "replot_significant_features",
     "plot_frequency_band_contribution",
+    "plot_common_features_heatmap",
+    "plot_common_features_correlation",
     # Evaluation plotting
     "plot_confusion_matrix",
     "plot_roc_curve",

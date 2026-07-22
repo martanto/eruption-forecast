@@ -1,11 +1,13 @@
 import os
 import re
+import glob
 from typing import Any, Literal, cast
 from pathlib import Path
 from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.patches import Patch
@@ -17,6 +19,11 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
+from eruption_forecast.utils.dataframe import (
+    find_common_features,
+    _migrate_score_column,
+)
+from eruption_forecast.utils.formatting import shorten_feature_name
 
 
 def plot_significant_features(
@@ -921,3 +928,177 @@ def plot_feature_count_curve(
 
         plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
         plt.close(fig)
+
+
+def plot_common_features_heatmap(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "viridis",
+    label_style: Literal["short", "alias"] = "short",
+) -> plt.Axes:
+    """Heatmap of per-scenario ``score`` for the common-feature subset.
+
+    Computes the cross-scenario intersection via :func:`find_common_features`,
+    re-reads each input CSV to recover its per-scenario ``score`` column, and
+    renders a heatmap with common features on the rows and scenarios on the
+    columns. Rows are ordered by the ranking produced by
+    :func:`find_common_features` (most universally strong on top).
+
+    Args:
+        top_features_csv (dict[str, str]): Mapping of column label → path to
+            a ``top_{N}_features.csv`` file (one entry per scenario). The
+            dict keys are used directly as the heatmap's x-axis labels, so
+            insertion order controls left-to-right column order.
+        output_path (str | None, optional): Where to save the PNG. When
+            ``None``, writes to ``{cwd}/common_top_features_heatmap.png``.
+            Defaults to ``None``.
+        cmap (str, optional): Matplotlib/seaborn colormap name. Defaults to
+            ``"viridis"``.
+        label_style (Literal["short", "alias"], optional): Row-label style.
+            ``"short"`` (default) renders compact tsfresh names via
+            :func:`~eruption_forecast.utils.formatting.shorten_feature_name`;
+            ``"alias"`` uses the ``ft_1``, ``ft_2``, … aliases from the
+            merged ranking returned by :func:`find_common_features`, which
+            is useful when the shortened names crowd the axis.
+
+    Returns:
+        plt.Axes: The heatmap axes, so the caller can further annotate it.
+    """
+    common_df = find_common_features(list(top_features_csv.values()))
+    common_features = list(common_df.index)
+    labels = list(top_features_csv.keys())
+
+    matrix = pd.DataFrame(index=common_features, columns=labels, dtype=float)
+    for label, path in top_features_csv.items():
+        per_scenario = _migrate_score_column(pd.read_csv(path, index_col=0))
+        matrix[label] = per_scenario["frequency"].reindex(common_features)
+
+    if label_style == "alias":
+        matrix.index = common_df["alias"].reindex(common_features).tolist()
+    else:
+        matrix.index = [shorten_feature_name(name) for name in matrix.index]
+
+    fig, ax = plt.subplots(
+        figsize=(
+            max(6.0, 1.6 * len(labels) + 3),
+            max(4.0, 0.6 * len(common_features) + 2),
+        )
+    )
+
+    sns.heatmap(
+        matrix,
+        annot=True,
+        fmt=".0f",
+        cmap=cmap,
+        cbar_kws={"label": "frequency", "shrink": 0.8, "pad": 0.02},
+        linewidths=0.5,
+        square=True,
+        ax=ax,
+    )
+
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_title(f"{len(common_features)} features × {len(labels)} scenarios")
+    fig.tight_layout()
+
+    out = output_path or os.path.join(os.getcwd(), "common_top_features_heatmap.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    return ax
+
+
+def plot_common_features_correlation(
+    top_features_csv: dict[str, str],
+    output_path: str | None = None,
+    cmap: str = "RdBu_r",
+    label_style: Literal["short", "alias"] = "short",
+) -> plt.Axes:
+    """Pearson correlation heatmap across scenarios for the common-feature subset.
+
+    For each entry in ``top_features_csv``, globs the sibling
+    ``features-matrix_*.parquet`` (written by ``TrainingModel.extract_features``)
+    next to the top-N CSV, slices it to the cross-scenario common-feature
+    subset returned by :func:`find_common_features`, and stacks the rows
+    across all scenarios into a single feature matrix. Pairwise Pearson
+    correlations are then rendered as a square heatmap with a diverging
+    colormap centred on 0.
+
+    Args:
+        top_features_csv (dict[str, str]): Mapping of column label → path to
+            a ``top_{N}_features.csv`` file (one entry per scenario). The
+            label is informational; correlations are computed on the stacked
+            features matrices found next to each path.
+        output_path (str | None, optional): Where to save the PNG. When
+            ``None``, writes to ``{cwd}/common_features_correlation.png``.
+            Defaults to ``None``.
+        cmap (str, optional): Diverging colormap name. Defaults to
+            ``"RdBu_r"``.
+        label_style (Literal["short", "alias"], optional): Axis-label style.
+            ``"short"`` (default) renders compact tsfresh names via
+            :func:`~eruption_forecast.utils.formatting.shorten_feature_name`;
+            ``"alias"`` uses the ``ft_1``, ``ft_2``, … aliases from the
+            merged ranking returned by :func:`find_common_features`, which
+            is useful when the shortened names crowd the axis.
+
+    Returns:
+        plt.Axes: The heatmap axes.
+
+    Raises:
+        ValueError: If the sibling ``features-matrix_*.parquet`` next to any
+            input path is missing or ambiguous (0 or >1 matches).
+        KeyError: If any common feature is absent from a scenario's matrix.
+    """
+    common_df = find_common_features(list(top_features_csv.values()))
+    common_features = list(common_df.index)
+
+    blocks: list[pd.DataFrame] = []
+    for path in top_features_csv.values():
+        parent = os.path.dirname(path)
+        matches = glob.glob(os.path.join(parent, "features-matrix_*.parquet"))
+        if len(matches) != 1:
+            raise ValueError(
+                f"Expected exactly 1 features-matrix_*.parquet next to {path}, "
+                f"found {len(matches)}."
+            )
+        matrix = pd.read_parquet(matches[0])
+        missing = [f for f in common_features if f not in matrix.columns]
+        if missing:
+            shown = ", ".join(missing[:3]) + ("..." if len(missing) > 3 else "")
+            raise KeyError(
+                f"{len(missing)} common feature(s) missing from {matches[0]}: {shown}"
+            )
+        blocks.append(matrix[common_features])
+
+    stacked = pd.concat(blocks, axis=0, ignore_index=True)
+    corr = stacked.corr()
+    if label_style == "alias":
+        display_labels = common_df["alias"].reindex(corr.index).tolist()
+    else:
+        display_labels = [shorten_feature_name(n) for n in corr.index]
+    corr.index = display_labels
+    corr.columns = display_labels
+
+    n_features = len(common_features)
+    side = max(6.0, 0.6 * n_features + 3)
+    fig, ax = plt.subplots(figsize=(side, side))
+    sns.heatmap(
+        corr,
+        annot=True,
+        fmt=".2f",
+        cmap=cmap,
+        vmin=-1,
+        vmax=1,
+        center=0,
+        cbar_kws={"shrink": 0.8, "pad": 0.02},
+        linewidths=0.5,
+        square=True,
+        ax=ax,
+    )
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_title(
+        f"Correlation across {len(top_features_csv)} scenarios "
+        f"({n_features} common features)"
+    )
+    fig.tight_layout()
+
+    out = output_path or os.path.join(os.getcwd(), "common_features_correlation.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    return ax
