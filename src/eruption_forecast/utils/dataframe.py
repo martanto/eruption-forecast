@@ -363,29 +363,40 @@ def load_feature_aliases(
 
 
 def _migrate_score_column(df: pd.DataFrame) -> pd.DataFrame:
-    """Rename the legacy ``score`` column to ``frequency`` in aggregated CSVs.
+    """Normalise legacy column names on aggregated feature CSVs.
 
-    The aggregated frame produced by :func:`concat_significant_features`
-    and :func:`find_common_features` used to write a ``score`` column
-    that actually counted how many seeds selected the feature. It has
-    been renamed to ``frequency`` so it no longer collides with the
-    per-seed ``score`` (p-value / permutation importance) produced by
-    :class:`~eruption_forecast.features.feature_selector.FeatureSelector`.
-    Legacy CSVs on disk still carry ``score``; this helper normalises a
-    freshly-read frame so downstream readers can always look up
-    ``frequency``.
+    Handles the two renames introduced after the initial rollout of the
+    aggregated frame produced by :func:`concat_significant_features` and
+    :func:`find_common_features`:
+
+    - ``score`` → ``frequency`` — the original ``score`` column actually
+      counted how many seeds selected the feature and was renamed so it
+      no longer collides with the per-seed ``score`` (p-value or
+      permutation importance) produced by
+      :class:`~eruption_forecast.features.feature_selector.FeatureSelector`.
+    - ``mean_score`` → ``score_mean`` — renamed so ranked-feature CSVs
+      follow the same "name-first, statistic-last" convention as the
+      classifier-comparison tables (``f1_score_mean``, ``f1_score_std``).
+
+    Also backfills ``score_std`` with NaN when missing, so downstream
+    readers can select the column unconditionally on freshly-loaded
+    legacy frames.
 
     Args:
         df (pd.DataFrame): Frame just loaded from a ranked/aggregated
             CSV.
 
     Returns:
-        pd.DataFrame: A frame with ``score`` renamed to ``frequency``
-        when applicable, or the original frame unchanged when the column
-        layout is already current.
+        pd.DataFrame: A frame with ``score`` renamed to ``frequency`` and
+        ``mean_score`` renamed to ``score_mean`` when applicable, and
+        with a NaN-filled ``score_std`` column added when missing.
     """
     if "score" in df.columns and "frequency" not in df.columns:
-        return df.rename(columns={"score": "frequency"})
+        df = df.rename(columns={"score": "frequency"})
+    if "mean_score" in df.columns and "score_mean" not in df.columns:
+        df = df.rename(columns={"mean_score": "score_mean"})
+    if "score_std" not in df.columns:
+        df = df.assign(score_std=float("nan"))
     return df
 
 
@@ -444,7 +455,8 @@ def update_top_features_csv(
     Returns:
         pd.DataFrame: The annotated (or unchanged, when idempotent)
         frame, indexed by canonical tsfresh feature name with columns
-        ``frequency``, ``mean_score``, ``alias``, ``description``.
+        ``frequency``, ``score_mean``, ``score_std``, ``alias``,
+        ``description``.
 
     Raises:
         FileNotFoundError: If ``csv_path`` does not exist.
@@ -467,7 +479,11 @@ def update_top_features_csv(
         raise FileNotFoundError(f"top_features CSV not found: {csv_path}")
 
     df = pd.read_csv(csv_path, index_col=0)
-    needs_migration = "score" in df.columns and "frequency" not in df.columns
+    needs_migration = (
+        ("score" in df.columns and "frequency" not in df.columns)
+        or ("mean_score" in df.columns and "score_mean" not in df.columns)
+        or "score_std" not in df.columns
+    )
     df = _migrate_score_column(df)
 
     has_alias = "alias" in df.columns
@@ -660,8 +676,9 @@ def concat_significant_features(
     (which keeps the per-seed ``score`` — p-value or permutation importance
     — as-is). When ``number_of_features`` is provided, also aggregates by
     feature name, counts occurrences across seeds (``frequency``), computes
-    the mean per-seed score (``mean_score``), sorts descending by
-    ``frequency`` and ascending by ``mean_score``, decorates the ranked
+    the mean and standard deviation of the per-seed score (``score_mean``,
+    ``score_std``), sorts descending by ``frequency`` and ascending by
+    ``score_mean``, decorates the ranked
     frame with an ``alias`` column (``ft_1``, ``ft_2``, …) that tracks
     rank position and a plain-English ``description`` column produced by
     :func:`~eruption_forecast.utils.formatting.humanize_feature_name`, and
@@ -721,9 +738,13 @@ def concat_significant_features(
     if number_of_features is not None and number_of_features > 0:
         combined_features_df = (
             combined_features_df.groupby(by="features")
-            .agg(frequency=("score", "count"), mean_score=("score", "mean"))
+            .agg(
+                frequency=("score", "count"),
+                score_mean=("score", "mean"),
+                score_std=("score", "std"),
+            )
             .sort_values(
-                by=["frequency", "mean_score"],
+                by=["frequency", "score_mean"],
                 ascending=[False, True],
             )
         )
@@ -758,10 +779,10 @@ def find_common_features(
 
     Loads each CSV produced by the scenario training stage and intersects
     their feature indices, so the result contains only features that every
-    scenario agreed on. The ``frequency`` and ``mean_score`` columns are
-    summed across the input CSVs so the output keeps the same shape as a
-    source ``top_N_features.csv`` and can be sorted the same way
-    (descending by ``frequency``, ascending by ``mean_score``). The merged
+    scenario agreed on. The ``frequency``, ``score_mean``, and ``score_std``
+    columns are summed across the input CSVs so the output keeps the same
+    shape as a source ``top_N_features.csv`` and can be sorted the same way
+    (descending by ``frequency``, ascending by ``score_mean``). The merged
     frame is then decorated with an ``alias`` column (``ft_1``, ``ft_2``,
     …) that tracks the cross-scenario rank position and a plain-English
     ``description`` column produced by
@@ -770,15 +791,18 @@ def find_common_features(
     they follow the merged ranking so downstream plots have a single label
     per feature.
 
-    Legacy inputs written before the ``score`` → ``frequency`` rename are
-    normalised on read via :func:`_migrate_score_column`, so a mix of old
-    and new CSVs can be merged without a prior migration pass.
+    Legacy inputs written before the ``score`` → ``frequency`` or
+    ``mean_score`` → ``score_mean`` renames are normalised on read via
+    :func:`_migrate_score_column`, which also backfills a missing
+    ``score_std`` column with NaN, so a mix of old and new CSVs can be
+    merged without a prior migration pass.
 
     Args:
         top_features_csv (list[str]): Paths to ``top_{N}_features.csv`` files
             (one per scenario). Each file must have a ``features`` index
-            column and ``frequency`` / ``mean_score`` columns (legacy files
-            with a ``score`` column are auto-migrated on read).
+            column and ``frequency`` / ``score_mean`` columns (legacy files
+            with a ``score`` or ``mean_score`` column are auto-migrated on
+            read; a missing ``score_std`` column is backfilled with NaN).
         output_dir (str | None, optional): Directory where the resulting
             ``common_top_features.csv`` is written. When ``None``, falls back
             to the current working directory (``os.getcwd()``). Defaults to
@@ -794,8 +818,9 @@ def find_common_features(
 
     Returns:
         pd.DataFrame: DataFrame indexed by the common feature names with
-        ``frequency`` and ``mean_score`` columns summed across the input
-        CSVs. Also written to ``{output_dir}/common_top_features.csv``.
+        ``frequency``, ``score_mean``, and ``score_std`` columns summed
+        across the input CSVs, plus ``alias`` and ``description`` columns.
+        Also written to ``{output_dir}/common_top_features.csv``.
 
     Raises:
         ValueError: If ``top_features_csv`` is empty or the intersection is
@@ -826,12 +851,12 @@ def find_common_features(
         raise ValueError("No features are common to all CSVs.")
 
     aligned = [
-        df.loc[df.index.intersection(common), ["frequency", "mean_score"]]
+        df.loc[df.index.intersection(common), ["frequency", "score_mean", "score_std"]]
         for df in frames
     ]
     combined = pd.concat(aligned).groupby(level=0).sum()
     combined = combined.sort_values(
-        by=["frequency", "mean_score"], ascending=[False, True]
+        by=["frequency", "score_mean"], ascending=[False, True]
     )
     combined["alias"] = [f"ft_{i}" for i in range(1, len(combined) + 1)]
     combined["description"] = [

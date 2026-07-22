@@ -1144,13 +1144,17 @@ Adds `alias` and `description` columns to a legacy `top_features.csv`,
 `top_{N}_features.csv`, or `common_top_features.csv` that predates the
 alias rollout (or was hand-prepared). Row order is trusted as-is —
 aliases follow the existing rank, no re-sorting — so a CSV that's
-already sorted by `frequency` desc / `mean_score` asc lines up with the
+already sorted by `frequency` desc / `score_mean` asc lines up with the
 same `ft_N` values `concat_significant_features` would produce today.
 
-Also handles the `score` → `frequency` column rename: when the loaded
-CSV still carries the legacy `score` column (which was actually a
-per-seed count, not a score), it's renamed on disk to `frequency` so
-downstream readers pick up the current schema without further action.
+Also handles two column renames: `score` → `frequency` (the original
+`score` column was actually a per-seed count) and `mean_score` →
+`score_mean` (name-first, statistic-last convention, matching the
+classifier-comparison tables). A missing `score_std` column is
+backfilled with NaN on read so downstream selectors don't KeyError on
+legacy CSVs. When any of these normalisations is outstanding the file
+is rewritten on disk so downstream readers pick up the current schema
+without further action.
 
 - `output_path=None` (default) rewrites the file in place; pass a
   different path to keep the original for comparison.

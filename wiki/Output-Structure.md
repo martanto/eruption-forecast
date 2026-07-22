@@ -30,7 +30,7 @@ Every pipeline run writes under a single station directory:
 │   │   ├── seed/figures/{seed:05d}.png                       # Per-seed importance plots (plot_features=True)
 │   │   ├── resampled/{seed:05d}.csv                          # Per-seed (id + is_erupted) — features recovered via features_df.loc[ids]
 │   │   ├── significant_features.csv                          # Raw per-seed rows concatenated (features + score = p-value / importance)
-│   │   ├── top_features.csv                                  # Full ranked list (features, frequency, mean_score, alias=ft_N, description)
+│   │   ├── top_features.csv                                  # Full ranked list (features, frequency, score_mean, score_std, alias=ft_N, description)
 │   │   ├── top_{N}_features.csv                              # Top-N subset of top_features.csv (same columns)
 │   │   ├── top_{N}_features.png                              # Aggregated importance plot
 │   │   └── sweep/{mode}/{classifier-name}/                   # ⚠ Experimental — FeatureCountSweep outputs (sweep_feature_count)
