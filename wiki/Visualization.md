@@ -7,7 +7,7 @@ The pipeline auto-renders the most useful plots; you can also invoke each helper
 |--------|----------------|---------|
 | `plots/styles.py` | `apply_nature_style`, `setup_nature_style`, `configure_spine`, `get_color`, `get_figure_size`, `NATURE_COLORS`, `OKABE_ITO` | Internal styling for every figure |
 | `plots/tremor_plots.py` | `plot_tremor` | `CalculateTremor` daily plots |
-| `plots/feature_plots.py` | `plot_significant_features`, `replot_significant_features`, `plot_frequency_band_contribution` | `TrainingModel.fit()` when `plot_features=True` |
+| `plots/feature_plots.py` | `plot_significant_features`, `replot_significant_features`, `plot_frequency_band_contribution`, `plot_common_features_heatmap`, `plot_common_features_correlation` | `TrainingModel.fit()` when `plot_features=True`; cross-scenario analysis |
 | `plots/forecast_plots.py` | `plot_forecast`, `plot_forecast_from_file` | `PredictionModel.forecast()` |
 | `plots/evaluation_plots.py` | `plot_roc_curve`, `plot_precision_recall_curve`, `plot_confusion_matrix`, `plot_threshold_analysis`, `plot_g_mean_curve`, `plot_mcc_curve`, aggregate counterparts (`plot_aggregate_*`), `render_one_plot`, `render_one_aggregate_plot` | `EvaluationModel.evaluate(plot_aggregate=…, plot_per_seed=…)` |
 | `plots/explanation_plots.py` | `plot_shap_waterfall`, `plot_shap_beeswarm`, `plot_shap_bar`, `plot_aggregate_shap_bar`, `plot_aggregate_shap_beeswarm`, `plot_classifier_waterfall`, `render_seed_plot` | `ExplanationModel.explain()` + `ExplainerEnsemble.plot_seed/plot_waterfall` |

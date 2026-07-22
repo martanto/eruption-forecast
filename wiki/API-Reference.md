@@ -1199,6 +1199,11 @@ Both return the input unchanged when it does not match the
 ### Heatmap label style
 
 ```python
+from eruption_forecast.plots.feature_plots import (
+    plot_common_features_heatmap,
+    plot_common_features_correlation,
+)
+
 plot_common_features_heatmap(
     top_features_csv: dict[str, str],
     output_path: str | None = None,
