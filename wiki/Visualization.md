@@ -1,6 +1,6 @@
 # Visualization
 
-All plots are produced by the modules under `src/eruption_forecast/plots/` plus `src/eruption_forecast/label/label_plots.py`. 
+All plots are produced by the modules under `src/eruption_forecast/plots/`.
 The pipeline auto-renders the most useful plots; you can also invoke each helper directly for ad-hoc figures.
 
 | Module | Re-exported as | Used by |
@@ -11,7 +11,7 @@ The pipeline auto-renders the most useful plots; you can also invoke each helper
 | `plots/forecast_plots.py` | `plot_forecast`, `plot_forecast_from_file` | `PredictionModel.forecast()` |
 | `plots/evaluation_plots.py` | `plot_roc_curve`, `plot_precision_recall_curve`, `plot_confusion_matrix`, `plot_threshold_analysis`, `plot_g_mean_curve`, `plot_mcc_curve`, aggregate counterparts (`plot_aggregate_*`), `render_one_plot`, `render_one_aggregate_plot` | `EvaluationModel.evaluate(plot_aggregate=…, plot_per_seed=…)` |
 | `plots/explanation_plots.py` | `plot_shap_waterfall`, `plot_shap_beeswarm`, `plot_shap_bar`, `plot_aggregate_shap_bar`, `plot_aggregate_shap_beeswarm`, `plot_classifier_waterfall`, `render_seed_plot` | `ExplanationModel.explain()` + `ExplainerEnsemble.plot_seed/plot_waterfall` |
-| `label/label_plots.py` | `plot_label_distribution` | `LabelBuilder` debugging |
+| `plots/label_plots.py` | `plot_label_distribution`, `plot_label_distribution_from_file`, `plot_label_distribution_comparison`, `plot_label_distribution_comparison_from_files` | `LabelBuilder.plot_distribution()`; cross-scenario label class comparisons |
 
 All of these are re-exported from `eruption_forecast.plots`:
 

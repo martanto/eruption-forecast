@@ -131,12 +131,12 @@ src/eruption_forecast/
 ├── ensemble/      base_ensemble, seed_ensemble, classifier_ensemble,
 │                  metrics_ensemble, explainer_ensemble
 ├── features/      tremor_matrix_builder, features_builder, feature_selector
-├── label/         label_builder, dynamic_label_builder, label_data, label_plots
+├── label/         label_builder, dynamic_label_builder, label_data
 ├── model/         base_model, cache_model, forecast_model,
 │                  training_model, prediction_model, evaluation_model,
 │                  explanation_model, classifier_model, classifier_comparator
 ├── plots/         styles, tremor_plots, feature_plots, forecast_plots,
-│                  evaluation_plots, explanation_plots
+│                  evaluation_plots, explanation_plots, label_plots
 ├── sources/       base, sds, fdsn
 ├── tremor/        calculate_tremor, rsam, dsar, shannon_entropy, tremor_data
 └── utils/         array, dataframe, date_utils, formatting, ml,
