@@ -53,8 +53,7 @@ src/eruption_forecast/
 │   ├── constants.py
 │   ├── label_builder.py         - LabelBuilder (sliding window)
 │   ├── dynamic_label_builder.py - DynamicLabelBuilder (per-eruption build)
-│   ├── label_data.py            - LabelData (CSV wrapper)
-│   └── label_plots.py           - plot_label_distribution
+│   └── label_data.py            - LabelData (CSV wrapper)
 │
 ├── model/
 │   ├── constants.py
@@ -73,7 +72,8 @@ src/eruption_forecast/
 │   ├── feature_plots.py         - feature-importance plots
 │   ├── forecast_plots.py        - plot_forecast, plot_forecast_from_file
 │   ├── evaluation_plots.py      - ROC, PR, confusion, threshold, importance
-│   └── explanation_plots.py     - SHAP waterfall / beeswarm / bar / aggregate
+│   ├── explanation_plots.py     - SHAP waterfall / beeswarm / bar / aggregate
+│   └── label_plots.py           - plot_label_distribution + scenario comparison
 │
 ├── sources/
 │   ├── base.py                  - SeismicDataSource ABC

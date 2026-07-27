@@ -210,6 +210,9 @@ def plot_label_distribution_comparison(
     color_non_erupted: str = "#1f77b4",
     color_erupted: str = "#d62728",
     figure_size: tuple[float, float] = (7.0, 3.5),
+    x_label_rotation: float = 0.0,
+    bar_width: float = 0.38,
+    group_gap: float = 0.24,
     dpi: int = 300,
     verbose: bool = True,
 ) -> str:
@@ -241,8 +244,19 @@ def plot_label_distribution_comparison(
         figure_size (tuple): Figure dimensions as ``(width, height)`` in inches.
             Defaults to ``(7.0, 3.5)``. Pass a wider width for large ``entries``
             counts to keep annotations legible.
-        dpi (int): Dots per inch for the saved figure. Defaults to ``300``.
-        verbose (bool): Whether to log the saved filepath. Defaults to ``True``.
+        x_label_rotation (float): Rotation in degrees applied to X-axis tick
+            labels. Useful when scenario names are long enough to overlap.
+            Non-zero values also switch horizontal alignment so the tick
+            anchor sits under its bar (``"right"`` for positive rotation,
+            ``"left"`` for negative). Defaults to ``0.0``.
+        bar_width (float): Width of each bar in data units. Since two bars
+            share every scenario slot, the pair spans ``2 * bar_width``.
+            Defaults to ``0.38``.
+        group_gap (float): Fixed horizontal gap (in data units) between
+            adjacent scenario groups. Scenario centers are spaced
+            ``2 * bar_width + group_gap`` apart, so this stays visually
+            constant even as ``bar_width`` shrinks. Defaults to ``0.24``
+            (matches the previous look at ``bar_width=0.38``).
 
     Returns:
         str: Absolute path of the saved figure file
@@ -269,32 +283,34 @@ def plot_label_distribution_comparison(
         erupted_counts.append(erupted)
         totals.append(non_erupted + erupted)
 
-    x = np.arange(len(names))
-    width = 0.38
+    x = np.arange(len(names)) * (2 * bar_width + group_gap)
     max_value = max(non_erupted_counts + erupted_counts) or 1
 
     fig, ax = plt.subplots(figsize=figure_size)
 
     bars_non = ax.bar(
-        x - width / 2,
+        x - bar_width / 2,
         non_erupted_counts,
-        width,
+        bar_width,
         color=color_non_erupted,
         edgecolor="white",
         linewidth=0.8,
         label="Non-erupted (0)",
     )
     bars_erupted = ax.bar(
-        x + width / 2,
+        x + bar_width / 2,
         erupted_counts,
-        width,
+        bar_width,
         color=color_erupted,
         edgecolor="white",
         linewidth=0.8,
         label="Erupted (1)",
     )
 
-    for bars, values in ((bars_non, non_erupted_counts), (bars_erupted, erupted_counts)):
+    for bars, values in (
+        (bars_non, non_erupted_counts),
+        (bars_erupted, erupted_counts),
+    ):
         for bar, value, total in zip(bars, values, totals, strict=True):
             pct = value / total * 100 if total > 0 else 0.0
             ax.text(
@@ -307,10 +323,13 @@ def plot_label_distribution_comparison(
             )
 
     ax.set_xticks(x, names)
+    if x_label_rotation:
+        ha = "right" if x_label_rotation > 0 else "left"
+        plt.setp(ax.get_xticklabels(), rotation=x_label_rotation, ha=ha)
     ax.set_ylabel("Count", fontsize=8)
     ax.set_title(
         title if title is not None else "Label Distribution by Scenario",
-        fontsize=9,
+        fontsize=8,
     )
     ax.tick_params(axis="both", labelsize=7)
     ax.set_ylim(0, max_value * 1.18)
@@ -340,6 +359,9 @@ def plot_label_distribution_comparison_from_files(
     color_non_erupted: str = "#1f77b4",
     color_erupted: str = "#d62728",
     figure_size: tuple[float, float] = (7.0, 3.5),
+    x_label_rotation: float = 0.0,
+    bar_width: float = 0.38,
+    group_gap: float = 0.24,
     dpi: int = 300,
     verbose: bool = True,
 ) -> str:
@@ -368,6 +390,14 @@ def plot_label_distribution_comparison_from_files(
             ``"#d62728"``.
         figure_size (tuple): Figure dimensions as ``(width, height)`` in inches.
             Defaults to ``(7.0, 3.5)``.
+        x_label_rotation (float): Rotation in degrees applied to X-axis tick
+            labels. Forwarded to :func:`plot_label_distribution_comparison`.
+            Defaults to ``0.0``.
+        bar_width (float): Width of each bar in data units. Forwarded to
+            :func:`plot_label_distribution_comparison`. Defaults to ``0.38``.
+        group_gap (float): Fixed horizontal gap between adjacent scenario
+            groups. Forwarded to :func:`plot_label_distribution_comparison`.
+            Defaults to ``0.24``.
         dpi (int): Dots per inch for the saved figure. Defaults to ``300``.
         verbose (bool): Whether to log the saved filepath. Defaults to ``True``.
 
@@ -399,6 +429,9 @@ def plot_label_distribution_comparison_from_files(
         color_non_erupted=color_non_erupted,
         color_erupted=color_erupted,
         figure_size=figure_size,
+        x_label_rotation=x_label_rotation,
+        bar_width=bar_width,
+        group_gap=group_gap,
         dpi=dpi,
         verbose=verbose,
     )

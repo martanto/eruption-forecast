@@ -19,7 +19,7 @@ from eruption_forecast.utils.date_utils import (
     normalize_dates,
 )
 from eruption_forecast.utils.formatting import slugify
-from eruption_forecast.label.label_plots import plot_label_distribution
+from eruption_forecast.plots.label_plots import plot_label_distribution
 
 
 class LabelBuilder:
@@ -1115,7 +1115,7 @@ class LabelBuilder:
         using the same base filename with a ``_distribution`` suffix.
 
         The method delegates to ``plot_label_distribution()`` from
-        ``eruption_forecast.label.label_plots`` and follows the project's
+        ``eruption_forecast.plots.label_plots`` and follows the project's
         Nature/Science journal styling conventions.
 
         Args:

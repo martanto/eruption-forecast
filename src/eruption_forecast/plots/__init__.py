@@ -9,8 +9,8 @@ from eruption_forecast.plots.styles import (
     setup_nature_style,
 )
 
-# Label plotting — imported last to avoid triggering model/utils circular chains
-from eruption_forecast.label.label_plots import plot_label_distribution
+# Label plotting
+from eruption_forecast.plots.label_plots import plot_label_distribution
 
 # Tremor plotting
 from eruption_forecast.plots.tremor_plots import (
