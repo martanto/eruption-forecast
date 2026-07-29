@@ -19,6 +19,7 @@ output/
 .ruff_cache/
 .cache/
 .claude/
+.agents/
 *.log
 *.csv
 *.png
