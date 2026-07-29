@@ -11,12 +11,14 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
-/logs
-/output
-.uv_cache
-.mypy_cache
-.ruff_cache
+.venv/
+logs/
+output/
+.uv_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.claude/
 *.log
 *.csv
 *.png
@@ -24,8 +26,6 @@ wheels/
 
 # Test outputs (cleaned up automatically)
 tests/output/
-/.cache/
-/.claude/
 
 # Live pipeline config (user-specific; use config.example.yaml as template)
 /config.yaml
