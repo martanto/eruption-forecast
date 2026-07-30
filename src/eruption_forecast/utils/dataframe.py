@@ -859,3 +859,184 @@ def find_common_features(
     out_path = os.path.join(output_dir or os.getcwd(), "common_top_features.csv")
     combined.to_csv(out_path, index=True)
     return combined
+
+
+def merge_features_matrix(
+    training_features_matrix: str | pd.DataFrame,
+    prediction_features_matrix: str | pd.DataFrame,
+    training_label_csv: str,
+    prediction_label_csv: str,
+    select_features: str | list[str],
+    number_of_features: int | None = None,
+    output_path: str | None = None,
+) -> pd.DataFrame:
+    """Merge training and prediction feature matrices into a single datetime-sorted frame.
+
+    Loads each matrix (from Parquet/CSV path or a passed-in DataFrame),
+    attaches a ``DatetimeIndex`` from its sibling ``features-label_*.csv``
+    when needed, filters both frames to the feature list resolved from
+    ``select_features``, concatenates them, sorts by datetime, and
+    deduplicates by keeping the training row on any overlapping datetime.
+
+    Training rows are placed first in the concatenation so
+    ``drop_duplicates(keep="first")`` preserves the training version of any
+    row that also appears in the prediction range — training features come
+    from the resampled/selected set actually used to fit the model.
+
+    Column filtering re-uses :func:`load_select_features`, so
+    ``select_features`` can be a ``top_features.csv`` /
+    ``top_{N}_features.csv`` path produced by
+    :func:`concat_significant_features`, or an explicit list of tsfresh
+    feature names. Missing columns are intersected away with an ``info`` log
+    (the training matrix on disk is often already a strict subset).
+
+    Args:
+        training_features_matrix (str | pd.DataFrame): Path to the training
+            features matrix (``.parquet`` or ``.csv``) or a pre-loaded
+            ``pd.DataFrame``. When a DataFrame with a ``DatetimeIndex`` is
+            passed, ``training_label_csv`` is ignored.
+        prediction_features_matrix (str | pd.DataFrame): Same shape as
+            ``training_features_matrix`` for the prediction stage.
+        training_label_csv (str): Path to the sibling
+            ``features-label_*.csv`` for the training matrix (used to attach
+            datetimes to an ``id``-indexed matrix). Ignored when the matrix
+            argument is a DataFrame with a ``DatetimeIndex``.
+        prediction_label_csv (str): Path to the sibling
+            ``features-label_*.csv`` for the prediction matrix.
+        select_features (str | list[str]): Feature-name resolver forwarded
+            to :func:`load_select_features`. Accepts a ranked CSV path or an
+            explicit list of tsfresh feature names.
+        number_of_features (int | None, optional): Cap the resolved list to
+            the top ``number_of_features`` entries. ``None`` (default) keeps
+            every entry from the resolved list. Any positive integer caps
+            to that many top-ranked features.
+        output_path (str | None, optional): When set, also writes the merged
+            frame to disk as Snappy-compressed Parquet via ``pyarrow``.
+            Defaults to ``None`` (return-only).
+
+    Returns:
+        pd.DataFrame: DatetimeIndex-ed frame containing the filtered feature
+        columns from both stages, sorted ascending by datetime with duplicate
+        datetimes resolved in favour of the training row.
+
+    Raises:
+        ValueError: If the intersection between the resolved feature list
+            and both matrices' columns is empty.
+        ValueError: If a matrix path has a suffix other than ``.parquet`` or
+            ``.csv``.
+        FileNotFoundError: If ``select_features`` is a path that does not
+            exist (propagated from :func:`load_select_features`).
+
+    Examples:
+        >>> from eruption_forecast.utils.dataframe import merge_features_matrix
+        >>> df = merge_features_matrix(
+        ...     training_features_matrix="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
+        ...     prediction_features_matrix="output/.../prediction/features/features-matrix_2025-01-01-2025-08-22.parquet",
+        ...     training_label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
+        ...     prediction_label_csv="output/.../prediction/features/features-label_2025-01-01_2025-08-22_ws-2_step-10-minutes.csv",
+        ...     select_features="output/.../training/features/stratified-shuffle-split/top_features.csv",
+        ...     number_of_features=20,
+        ... )
+        >>> isinstance(df.index, pd.DatetimeIndex)
+        True
+        >>> df.index.is_monotonic_increasing
+        True
+    """
+    selected = load_select_features(
+        select_features, number_of_features=number_of_features or 0
+    )
+
+    training_df = _prepare_features_frame(
+        training_features_matrix, training_label_csv, stage="training"
+    )
+    prediction_df = _prepare_features_frame(
+        prediction_features_matrix, prediction_label_csv, stage="prediction"
+    )
+
+    training_cols = [name for name in selected if name in training_df.columns]
+    prediction_cols = [name for name in selected if name in prediction_df.columns]
+    missing_training = set(selected) - set(training_cols)
+    missing_prediction = set(selected) - set(prediction_cols)
+    if missing_training:
+        logger.info(
+            f"merge_features_matrix: {len(missing_training)} selected feature(s) "
+            f"missing from training matrix (kept {len(training_cols)}/{len(selected)})."
+        )
+    if missing_prediction:
+        logger.info(
+            f"merge_features_matrix: {len(missing_prediction)} selected feature(s) "
+            f"missing from prediction matrix (kept {len(prediction_cols)}/{len(selected)})."
+        )
+    if not training_cols and not prediction_cols:
+        raise ValueError(
+            "None of the selected features are present in either matrix. "
+            f"Requested {len(selected)} feature(s); both matrices had zero matches."
+        )
+
+    training_df = training_df[training_cols]
+    prediction_df = prediction_df[prediction_cols]
+
+    merged = pd.concat([training_df, prediction_df], axis=0).sort_index()
+    duplicates = int(merged.index.duplicated(keep="first").sum())
+    if duplicates:
+        merged = merged[~merged.index.duplicated(keep="first")]
+        logger.info(
+            f"merge_features_matrix: dropped {duplicates} duplicate datetime row(s) "
+            "(kept the training row on overlap)."
+        )
+
+    if output_path is not None:
+        merged.to_parquet(
+            output_path, engine="pyarrow", compression="snappy", index=True
+        )
+
+    return merged
+
+
+def _prepare_features_frame(
+    matrix: str | pd.DataFrame,
+    label_csv: str,
+    stage: str,
+) -> pd.DataFrame:
+    """Load or accept a features matrix and attach a ``DatetimeIndex``.
+
+    File-path inputs are dispatched by suffix (``.parquet`` /  ``.csv``) then
+    joined against ``label_csv`` via :func:`to_datetime_index`. Passed-in
+    DataFrames that already carry a ``DatetimeIndex`` are returned as-is
+    (``label_csv`` unused). ``id``-indexed DataFrames are joined against
+    ``label_csv`` the same way file paths are.
+
+    Args:
+        matrix (str | pd.DataFrame): Features matrix input.
+        label_csv (str): Sibling ``features-label_*.csv`` path.
+        stage (str): ``"training"`` or ``"prediction"`` — surfaced in the
+            unsupported-suffix error message so the caller knows which arg
+            was malformed.
+
+    Returns:
+        pd.DataFrame: DatetimeIndex-ed features frame with ``id`` and
+        ``datetime`` columns absent.
+
+    Raises:
+        ValueError: If ``matrix`` is a path with a suffix other than
+            ``.parquet`` or ``.csv``.
+    """
+    if isinstance(matrix, pd.DataFrame):
+        features = matrix
+    else:
+        suffix = os.path.splitext(matrix)[1].lower()
+        if suffix == ".parquet":
+            features = pd.read_parquet(matrix)
+        elif suffix == ".csv":
+            features = pd.read_csv(matrix, index_col=0)
+        else:
+            raise ValueError(
+                f"Unsupported {stage} features matrix suffix '{suffix}'. "
+                f"Expected '.parquet' or '.csv'. Got: {matrix}"
+            )
+
+    if isinstance(features.index, pd.DatetimeIndex):
+        return features
+
+    labels = pd.read_csv(label_csv, index_col=0, parse_dates=True)
+    return to_datetime_index(labels, features)
