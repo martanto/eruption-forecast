@@ -909,18 +909,24 @@ def merge_features_matrix(
     number_of_features: int | None = None,
     output_path: str | None = None,
 ) -> pd.DataFrame:
-    """Merge training and prediction feature matrices into a single datetime-sorted frame.
+    """Merge training and prediction feature matrices while preserving each stage's sampling cadence.
 
     Loads each matrix (from Parquet/CSV path or a passed-in DataFrame),
     attaches a ``DatetimeIndex`` from its sibling ``features-label_*.csv``
     when needed, filters both frames to the feature list resolved from
-    ``select_features``, concatenates them, sorts by datetime, and
-    deduplicates by keeping the training row on any overlapping datetime.
+    ``select_features``, and stitches them together into a single
+    datetime-sorted frame.
 
-    Training rows are placed first in the concatenation so
-    ``drop_duplicates(keep="first")`` preserves the training version of any
-    row that also appears in the prediction range — training features come
-    from the resampled/selected set actually used to fit the model.
+    The two matrices are typically sampled at different cadences —
+    training at the coarse label window step (e.g. ``6 hours``) and
+    prediction at the fine forecast cadence (e.g. ``10 minutes``). To
+    keep the training cadence intact across the training range, the
+    prediction frame is truncated to rows **strictly after**
+    ``training_end`` (the maximum datetime in the training index) before
+    the concatenation. The returned frame therefore holds every training
+    row up to ``training_end`` at the training cadence, followed by
+    every prediction row after ``training_end`` at the prediction
+    cadence — no interleaving inside the training range.
 
     Column filtering re-uses :func:`load_select_features`, so
     ``select_features`` can be a ``top_features.csv`` /
@@ -955,10 +961,13 @@ def merge_features_matrix(
 
     Returns:
         pd.DataFrame: DatetimeIndex-ed frame containing the filtered feature
-        columns from both stages, sorted ascending by datetime with duplicate
-        datetimes resolved in favour of the training row.
+        columns from both stages, sorted ascending by datetime. Prediction
+        rows at or before ``training_end`` are dropped so the training
+        cadence is preserved through the training range.
 
     Raises:
+        ValueError: If the training features matrix has no rows —
+            ``training_end`` can't be resolved from an empty index.
         ValueError: If the intersection between the resolved feature list
             and both matrices' columns is empty.
         ValueError: If a matrix path has a suffix other than ``.parquet`` or
@@ -991,6 +1000,23 @@ def merge_features_matrix(
     prediction_df = _prepare_features_frame(
         prediction_features_matrix, prediction_label_csv, stage="prediction"
     )
+
+    if len(training_df) == 0:
+        raise ValueError(
+            "Training features matrix has no rows; cannot resolve "
+            "`training_end` to anchor the prediction cadence."
+        )
+
+    training_end = training_df.index.max()
+    total_prediction_rows = len(prediction_df)
+    prediction_df = prediction_df.loc[prediction_df.index > training_end]
+    dropped_prediction_rows = total_prediction_rows - len(prediction_df)
+    if dropped_prediction_rows:
+        logger.info(
+            f"merge_features_matrix: truncated prediction to > {training_end} "
+            f"(dropped {dropped_prediction_rows} row(s), "
+            f"kept {len(prediction_df)})."
+        )
 
     training_cols = [name for name in selected if name in training_df.columns]
     prediction_cols = [name for name in selected if name in prediction_df.columns]
