@@ -223,6 +223,45 @@ def load_datetime_indexed(label_csv: str, features_path: str) -> pd.DataFrame:
     return to_datetime_index(labels, features)
 
 
+def load_features_matrix(label_csv: str, features_path: str) -> pd.DataFrame:
+    """Load a features matrix and return it with a ``DatetimeIndex``.
+
+    Domain-named alias for :func:`load_datetime_indexed`. Forwards both
+    arguments unchanged so the parquet / csv dispatch and datetime
+    attachment from a sibling ``features-label_*.csv`` happen exactly
+    once. Prefer this name at call sites that specifically load a
+    features matrix; use :func:`load_datetime_indexed` when the payload
+    is a probability matrix or any other ``id``-indexed frame.
+
+    Args:
+        label_csv (str): Path to the sibling ``features-label_*.csv``
+            (``DatetimeIndex`` + ``id`` column) used to attach datetimes
+            to the ``id``-indexed features matrix.
+        features_path (str): Path to the ``id``-indexed features matrix.
+            Supported suffixes: ``.parquet``, ``.csv``.
+
+    Returns:
+        pd.DataFrame: Features frame with a ``DatetimeIndex`` derived from
+        ``label_csv``. The ``id`` and ``datetime`` columns are absent from
+        the result.
+
+    Raises:
+        ValueError: Propagated from :func:`load_datetime_indexed` on an
+            unsupported path suffix or from
+            :func:`~eruption_forecast.utils.date_utils.to_datetime_index`
+            when the frames cannot be aligned.
+
+    Examples:
+        >>> df = load_features_matrix(
+        ...     label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
+        ...     features_path="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
+        ... )
+        >>> isinstance(df.index, pd.DatetimeIndex)
+        True
+    """
+    return load_datetime_indexed(label_csv=label_csv, features_path=features_path)
+
+
 def load_select_features(
     value: str | list[str], number_of_features: int = 20
 ) -> list[str]:
