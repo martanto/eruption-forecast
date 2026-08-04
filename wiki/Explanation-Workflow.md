@@ -80,9 +80,16 @@ For each SeedEnsemble in ClassifierEnsemble:
         persist seed pickle → shap_values/{seed:05d}.pkl   # save_per_seed=True
     bundle into ClassifierExplanation
     persist → ClassifierExplanation_{classifier_name}.pkl
+
+# em.plot() phase (per-eruption waterfalls only):
+For each ClassifierExplanation:
+    build_classifier_ensemble_summary(seed_ensemble, labels, eruption_dates)
+    For each EruptionWindow in the summary:
+        plot_shap_waterfall(seed[highest.random_state].shap_values[highest.index], ...)
 ```
 
 Result on the instance: `em.explanations: list[ClassifierExplanation]`.
+See [Per-eruption waterfall selection](#per-eruption-waterfall-selection) for how the argmax pick is chosen.
 
 ### `ForecastModel.explain()` signature
 
@@ -148,7 +155,7 @@ on `plot_aggregate`.
 | Per-seed bar | `ExplainerEnsemble.plot_seed()` | `classifiers/{ClfName}/figures/bar/{seed:05d}.png` |
 | Aggregate bar (frequency-weighted mean \|SHAP\| across seeds) | `ExplainerEnsemble.plot_aggregate()` → `plot_aggregate_shap_bar()` | `classifiers/{ClfName}/figures/aggregate/bar.{png,csv}` |
 | Aggregate beeswarm (NaN-padded union feature space) | `ExplainerEnsemble.plot_aggregate()` → `plot_aggregate_shap_beeswarm()` | `classifiers/{ClfName}/figures/aggregate/beeswarm.{png,csv}` |
-| Per-eruption waterfall (highest-probability window per eruption) | `ExplainerEnsemble.plot_waterfall()` → `plot_classifier_waterfall()` | `eruptions/{eruption_date}/{ClfName}_{datetime}_seed=_index=.png` |
+| Per-eruption waterfall (single highest-probability seed × window per eruption day — see [Per-eruption waterfall selection](#per-eruption-waterfall-selection)) | `ExplainerEnsemble.plot_waterfall()` → `plot_classifier_waterfall()` | `eruptions/{eruption_date}/{ClfName}_{datetime}_seed=_index=.png` |
 
 Standalone plot helpers in
 `src/eruption_forecast/plots/explanation_plots.py`:
@@ -165,6 +172,100 @@ Standalone plot helpers in
 All renderers route through
 `plots/styles.py::shap_figure` and `save_figure`, which closes the
 matplotlib figure after saving.
+
+---
+
+## Per-eruption waterfall selection
+
+Why one waterfall per eruption day per classifier — even though the SHAP
+stage produces N × M explanations under the hood.
+
+- A `ClassifierEnsemble` holds **N** `SeedEnsemble` seeds per tree
+  classifier. Each seed independently produces a per-window probability
+  and hard prediction over **M** prediction windows.
+- `ExplainerEnsemble.explain()` runs `shap.TreeExplainer` **once per
+  seed**, so every one of those (seed × window) cells also carries its
+  own SHAP explanation.
+- Rendering all N × M waterfalls per eruption day would swamp the
+  output tree, so the pipeline collapses the grid to **one waterfall
+  per eruption day per classifier** — the single (seed, window) with
+  the highest positive-class probability inside that day.
+- That collapse is done by `build_classifier_ensemble_summary`
+  (`src/eruption_forecast/utils/ml.py`) and consumed by
+  `plot_classifier_waterfall`
+  (`src/eruption_forecast/plots/explanation_plots.py`).
+
+**Diagram A — the (seed × window) matrix scoped to one eruption day.**
+Every cell carries both a probability `p` and a per-observation SHAP
+explanation; the waterfall picks the `argmax(p)` cell across the whole
+grid.
+
+```
+For classifier C, eruption day D:
+
+            window_0    window_1    ...    window_M
+seed_0      (p₀,₀,      (p₀,₁,             (p₀,M,
+             SHAP₀,₀)    SHAP₀,₁)           SHAP₀,M)
+seed_1      (p₁,₀,      (p₁,₁,             (p₁,M,
+             SHAP₁,₀)    SHAP₁,₁)           SHAP₁,M)
+  ⋮            ⋮           ⋮                    ⋮
+seed_N      (pₙ,₀,      (pₙ,₁,             (pₙ,M,
+             SHAPₙ,₀)    SHAPₙ,₁)           SHAPₙ,M)
+
+rollup ─► pick argmax(p) over all cells  →  one waterfall per (C, D)
+```
+
+**Diagram B — the dataclass hierarchy that carries the rollup.** After
+`build_classifier_ensemble_summary` runs, the argmax cell above lives
+at `EruptionWindow.highest`.
+
+```
+ClassifierEnsembleSummary  (per classifier)
+ ├─ highest / lowest        ProbabilityPick  (across all seeds × windows)
+ └─ eruption_windows[]      one EruptionWindow per eruption date
+      ├─ highest / lowest   ProbabilityPick  (across seeds, within this day window)
+      └─ seeds[]            one SeedSummary per seed
+           ├─ highest       ProbabilityPick  (top prob row for this seed, this day)
+           └─ lowest        ProbabilityPick  (bottom prob row for this seed, this day)
+```
+
+Diagram A is the *what* — why one waterfall per eruption day even
+though there are N × M SHAP explanations. Diagram B is the *how* — the
+`ClassifierEnsembleSummary` schema
+(`src/eruption_forecast/dataclass/classifier_ensemble_summary.py`) that
+carries the argmax once the day-window scan finishes.
+
+**How the pick reaches the waterfall.** For each `EruptionWindow`,
+`plot_classifier_waterfall`:
+
+1. Reads `EruptionWindow.highest.random_state` — the seed id of the
+   argmax cell.
+2. Reads `EruptionWindow.highest.index` — the row position of the
+   argmax cell in the per-seed probability matrix.
+3. Slices `classifier_explanation.seeds[random_state].shap_values[index]`
+   to pull the matching single-row `shap.Explanation`.
+4. Renders it via `plot_shap_waterfall` under
+   `eruptions/{eruption_date}/{ClfName}_{datetime}_seed={i}_index={j}.png`.
+
+Step 3 relies on an alignment invariant: per-seed SHAP explanations are
+built against the same `features_df` positional order the ensemble
+scored, so `index` in the probability matrix and `index` in the SHAP
+`Explanation` refer to the same observation.
+
+**Preserved but unused.** `EruptionWindow.seeds[]` still carries a
+`SeedSummary` per seed (with each seed's own highest and lowest picks
+inside the day window) — the current waterfall path never reads it, but
+it stays on the dataclass so future consumers (per-seed waterfall
+grids, seed-agreement diagnostics, etc.) can iterate without rerunning
+the scan.
+
+**Precondition.** `build_classifier_ensemble_summary` requires
+`SeedEnsemble.probabilities` to be populated — i.e. a prediction has
+already run. Both operating modes satisfy this: prediction-reuse pulls
+straight from `PredictionModel.forecast()`; training-reuse relies on
+`TrainingModel.fit()` scoring the training samples during the ensemble
+build. Calling the builder against an unpopulated ensemble raises
+`RuntimeError`.
 
 ---
 
