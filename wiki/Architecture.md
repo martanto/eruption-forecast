@@ -25,7 +25,7 @@ src/eruption_forecast/
 │
 ├── dataclass/
 │   ├── station_data.py                 - StationData (immutable nslc identity)
-│   ├── classifier_ensemble_summary.py  - ClassifierEnsembleSummary, EruptionWindow, ProbabilityPick
+│   ├── classifier_ensemble_summary.py  - ClassifierEnsembleSummary, EruptionWindow, SeedSummary, ProbabilityPick
 │   └── classifier_explanation.py       - SeedExplanation, ClassifierExplanation (SHAP payloads)
 │
 ├── decorators/

@@ -27,8 +27,13 @@ from eruption_forecast.ensemble.base_ensemble import BaseEnsemble
 from eruption_forecast.ensemble.metrics_ensemble import MetricsEnsemble
 from eruption_forecast.ensemble.explainer_ensemble import ExplainerEnsemble
 from eruption_forecast.dataclass import (
+    StationData,
     SeedExplanation,
     ClassifierExplanation,
+    ProbabilityPick,
+    SeedSummary,
+    EruptionWindow,
+    ClassifierEnsembleSummary,
 )
 from eruption_forecast.model.classifier_comparator import ClassifierComparator
 from eruption_forecast.features.feature_selector import FeatureSelector
@@ -575,6 +580,74 @@ class ClassifierExplanation:
 ```
 
 Both re-exported from `eruption_forecast.dataclass`. `SeedExplanation` is frozen; `ClassifierExplanation` is mutable so `ExplainerEnsemble.explain_classifier()` can append seeds incrementally. Produced by the explanation stage and consumed by every plot helper in `plots/explanation_plots.py`.
+
+---
+
+## ClassifierEnsembleSummary family
+
+Per-classifier rollup of a `SeedEnsemble`'s probability matrix. Built by `eruption_forecast.utils.ml.build_classifier_ensemble_summary` and consumed by the SHAP waterfall renderer in `eruption_forecast.plots.explanation_plots.plot_classifier_waterfall`. All four types re-exported from `eruption_forecast.dataclass`.
+
+```python
+@dataclass(frozen=True)
+class ProbabilityPick:
+    random_state: int         # seed identifier the pick came from
+    index: int                # row position in the per-seed probability matrix;
+                              # aligns with the SHAP explanation row for the same seed
+    datetime: pd.Timestamp    # timestamp of the sample
+    value: float              # probability value at the picked row
+
+@dataclass(frozen=True)
+class SeedSummary:
+    random_state: int         # seed identifier shared by both picks
+    highest: ProbabilityPick  # top-probability pick in the window
+    lowest: ProbabilityPick   # bottom-probability pick in the window
+
+@dataclass(frozen=True)
+class EruptionWindow:
+    eruption_date: str        # eruption date in YYYY-MM-DD form
+    highest: ProbabilityPick  # highest-probability pick across all seeds in this window
+    lowest: ProbabilityPick   # lowest-probability pick across all seeds in this window
+    seeds: list[SeedSummary]  # one SeedSummary per seed
+
+@dataclass
+class ClassifierEnsembleSummary:
+    classifier_name: str
+    eruption_windows: list[EruptionWindow] = field(default_factory=list)
+    highest: ProbabilityPick | None = None   # None when no eruption window intersected the prediction grid
+    lowest: ProbabilityPick | None = None    # None when no eruption window intersected the prediction grid
+```
+
+`ClassifierEnsembleSummary` is per-classifier (one instance per `SeedEnsemble`) — no cross-classifier collapse. The builder guarantees `EruptionWindow.highest` / `.lowest` are set (empty windows are skipped) but `ClassifierEnsembleSummary.highest` / `.lowest` may still be `None` when no eruption window intersected the prediction grid at all.
+
+---
+
+## StationData
+
+Immutable container for the five codes that uniquely identify a seismic channel within a network archive (NSLC scheme). All codes are uppercased in `__post_init__`; `nslc` and `nslct` identifiers are derived automatically.
+
+```python
+@dataclass
+class StationData:
+    station: str              # e.g. "OJN"  — must be non-empty
+    channel: str              # e.g. "EHZ"  — must be non-empty
+    network: str              # e.g. "VG"   — must be non-empty
+    location: str = ""        # e.g. "00"   — None coerced to ""
+    channel_type: str = "D"   # SDS data-type suffix
+
+    # Derived (init=False, repr=False):
+    nslc: str                 # "{network}.{station}.{location}.{channel}"
+    nslct: str                # "{nslc}.{channel_type}"
+```
+
+```python
+>>> sd = StationData(station="OJN", channel="EHZ", network="VG", location="00")
+>>> sd.nslc
+'VG.OJN.00.EHZ'
+>>> sd.nslct
+'VG.OJN.00.EHZ.D'
+```
+
+Raises `ValueError` if `station` / `channel` / `network` is empty or non-`str`, or if `location` is neither a `str` nor `None`.
 
 ---
 
