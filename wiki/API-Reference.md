@@ -1141,7 +1141,7 @@ and translate that mapping.
 ### Writers — `alias` + `description` columns
 
 ```python
-from eruption_forecast.utils.dataframe import (
+from eruption_forecast.utils.feature_utils import (
     concat_significant_features,
     find_common_features,
 )
@@ -1177,7 +1177,7 @@ reflect the actual Hz values.
 ### Reader — `load_feature_aliases`
 
 ```python
-from eruption_forecast.utils.dataframe import load_feature_aliases
+from eruption_forecast.utils.feature_utils import load_feature_aliases
 
 load_feature_aliases(
     source: str | pd.DataFrame,
@@ -1203,7 +1203,7 @@ frame lacks the `alias` column (typical mistake: pointing at
 ### Backfill — `update_top_features_csv`
 
 ```python
-from eruption_forecast.utils.dataframe import update_top_features_csv
+from eruption_forecast.utils.feature_utils import update_top_features_csv
 
 update_top_features_csv(
     csv_path: str,
@@ -1348,7 +1348,7 @@ frames cannot be aligned (length mismatch, missing `id` column, missing
 ## Merging training + prediction feature matrices
 
 ```python
-from eruption_forecast.utils.dataframe import merge_features_matrix
+from eruption_forecast.utils.feature_utils import merge_features_matrix
 
 merge_features_matrix(
     training_features_matrix: str | pd.DataFrame,

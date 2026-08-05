@@ -154,7 +154,7 @@ class BaseModel(ABC):
         self.window_size = window_size
         self.eruption_dates = sort_dates(eruption_dates) if eruption_dates else None
         self.overwrite = overwrite
-        self.output_dir = output_dir
+        self.output_dir: str = output_dir
         self.root_dir = root_dir
         self.n_jobs = n_jobs
         self.save_model = save_model

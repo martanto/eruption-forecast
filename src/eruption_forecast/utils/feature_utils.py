@@ -1,0 +1,772 @@
+"""Feature-CSV and feature-matrix helpers.
+
+Utilities that operate on the ranked significant-feature CSVs
+(``top_features.csv``, ``top_{N}_features.csv``, ``common_top_features.csv``)
+and on the per-window tsfresh feature matrices. Split out of
+:mod:`eruption_forecast.utils.dataframe` so the DataFrame module can stay
+focused on generic label / probability helpers while this file owns the
+feature-specific workflows (rank aggregation, alias/description backfill,
+matrix concatenation, and training/prediction matrix merging).
+"""
+
+import os
+
+import pandas as pd
+
+from eruption_forecast.logger import logger
+from eruption_forecast.utils.date_utils import to_datetime_index
+from eruption_forecast.utils.formatting import humanize_feature_name
+
+
+def load_select_features(
+    value: str | list[str], number_of_features: int = 20
+) -> list[str]:
+    """Resolve a ``select_features`` value into a list of tsfresh feature names.
+
+    Accepts either a CSV path written by :func:`concat_significant_features`
+    (``top_{N}_features.csv``, ``top_features.csv``, or
+    ``significant_features.csv``), in which case the ``features`` index
+    column is read, or an explicit list of tsfresh feature names. Empty
+    lists and blank entries raise.
+
+    Args:
+        value (str | list[str]): A CSV path or a list of fully-qualified
+            tsfresh feature names (e.g. ``"rsam_f2__mean"``,
+            ``"rsam_f1__autocorrelation__lag_1"``).
+        number_of_features (int, optional): Cap the returned list to the top
+            ``number_of_features`` entries. The CSV produced by
+            :func:`concat_significant_features` is already sorted descending
+            by frequency, so truncation preserves the highest-ranked names;
+            an in-memory list is assumed to be in priority order. Pass ``0``
+            or a negative value to disable truncation. Defaults to ``20``.
+
+    Returns:
+        list[str]: Cleaned list of feature names, capped to the top
+            ``number_of_features`` entries.
+
+    Raises:
+        FileNotFoundError: If ``value`` is a path that does not exist.
+        ValueError: If ``value`` resolves to an empty list, contains blank
+            entries, or is of an unsupported type.
+
+    Examples:
+        >>> load_select_features("output/.../top_20_features.csv")
+        ['rsam_f2__mean', 'rsam_f1__autocorrelation__lag_1', ...]
+        >>> load_select_features(["rsam_f2__mean", "entropy__variance"])
+        ['rsam_f2__mean', 'entropy__variance']
+        >>> load_select_features("output/.../top_50_features.csv", number_of_features=10)
+        # returns at most 10 names from the top of the ranked CSV
+    """
+    if isinstance(value, str):
+        if not os.path.isfile(value):
+            raise FileNotFoundError(f"select_features CSV not found: {value}")
+        names = pd.read_csv(value, index_col=0).index.astype(str).tolist()
+    else:
+        names = [str(name) for name in value]
+
+    cleaned = [name.strip() for name in names if name and name.strip()]
+    if not cleaned:
+        raise ValueError("select_features resolved to an empty list.")
+    if number_of_features > 0:
+        cleaned = cleaned[:number_of_features]
+    return cleaned
+
+
+def load_feature_aliases(
+    source: str | pd.DataFrame,
+    reverse: bool = True,
+) -> dict[str, str]:
+    """Load the alias ↔ canonical feature name mapping from a ranked frame.
+
+    Accepts either a CSV path written by :func:`concat_significant_features`
+    or :func:`find_common_features`, or the DataFrame those functions
+    return directly — both are indexed by canonical tsfresh feature name
+    with an ``alias`` column populated by
+    :func:`~eruption_forecast.utils.formatting.humanize_feature_name`'s
+    caller. Returns a plain dict so downstream code can look up the
+    canonical name for a display alias (or vice versa) without a CSV
+    round-trip when the frame is already in memory.
+
+    Args:
+        source (str | pd.DataFrame): Either a path to a
+            ``top_features.csv``, ``top_{N}_features.csv``, or
+            ``common_top_features.csv``, OR the DataFrame returned by
+            :func:`concat_significant_features` /
+            :func:`find_common_features` when
+            ``number_of_features > 0``. Must be indexed by the canonical
+            feature name and contain an ``alias`` column.
+        reverse (bool, optional): When ``True`` (default), returns
+            ``{alias: canonical_name}`` so callers can look up
+            ``mapping["ft_5"]``. When ``False``, returns
+            ``{canonical_name: alias}`` for the opposite direction (useful
+            for renaming DataFrame columns with ``df.rename(columns=...)``).
+
+    Returns:
+        dict[str, str]: The requested mapping.
+
+    Raises:
+        FileNotFoundError: If ``source`` is a path that does not exist.
+        ValueError: If the frame does not have an ``alias`` column —
+            likely because it predates the alias rollout or is
+            ``significant_features.csv`` (the raw per-seed dump, which is
+            not ranked and therefore carries no alias).
+
+    Examples:
+        >>> # Path form:
+        >>> aliases = load_feature_aliases(
+        ...     "output/VG.OJN.00.EHZ/training/features/"
+        ...     "stratified-shuffle-split/top_20_features.csv"
+        ... )
+        >>> aliases["ft_1"]
+        'rsam_f2__mean'
+        >>> # DataFrame form — no round-trip through disk:
+        >>> ranked = concat_significant_features(csvs, features_dir, number_of_features=20)
+        >>> aliases = load_feature_aliases(ranked)
+        >>> aliases["ft_5"]
+        'dsar_f3-f4__fft_coefficient__attr_"abs"__coeff_91'
+        >>> # Reverse direction for column renaming:
+        >>> canonical_to_alias = load_feature_aliases(ranked, reverse=False)
+        >>> features_df.rename(columns=canonical_to_alias).head()
+    """
+    if isinstance(source, pd.DataFrame):
+        df = source
+        origin = "DataFrame"
+    else:
+        if not os.path.isfile(source):
+            raise FileNotFoundError(f"Aliases CSV not found: {source}")
+        df = pd.read_csv(source, index_col=0)
+        origin = source
+
+    if "alias" not in df.columns:
+        raise ValueError(
+            f"Missing 'alias' column in {origin}. Expected a ranked frame "
+            "produced by concat_significant_features or find_common_features."
+        )
+
+    aliases = df["alias"].astype(str)
+    canonicals = df.index.astype(str)
+    if reverse:
+        return dict(zip(aliases, canonicals, strict=True))
+    return dict(zip(canonicals, aliases, strict=True))
+
+
+def migrate_score_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalise legacy column names on aggregated feature CSVs.
+
+    Handles the two renames introduced after the initial rollout of the
+    aggregated frame produced by :func:`concat_significant_features` and
+    :func:`find_common_features`:
+
+    - ``score`` → ``frequency`` — the original ``score`` column actually
+      counted how many seeds selected the feature and was renamed so it
+      no longer collides with the per-seed ``score`` (p-value or
+      permutation importance) produced by
+      :class:`~eruption_forecast.features.feature_selector.FeatureSelector`.
+    - ``mean_score`` → ``score_mean`` — renamed so ranked-feature CSVs
+      follow the same "name-first, statistic-last" convention as the
+      classifier-comparison tables (``f1_score_mean``, ``f1_score_std``).
+
+    Also backfills ``score_std`` with NaN when missing, so downstream
+    readers can select the column unconditionally on freshly-loaded
+    legacy frames.
+
+    Args:
+        df (pd.DataFrame): Frame just loaded from a ranked/aggregated
+            CSV.
+
+    Returns:
+        pd.DataFrame: A frame with ``score`` renamed to ``frequency`` and
+        ``mean_score`` renamed to ``score_mean`` when applicable, and
+        with a NaN-filled ``score_std`` column added when missing.
+    """
+    if "score" in df.columns and "frequency" not in df.columns:
+        df = df.rename(columns={"score": "frequency"})
+    if "mean_score" in df.columns and "score_mean" not in df.columns:
+        df = df.rename(columns={"mean_score": "score_mean"})
+    if "score_std" not in df.columns:
+        df = df.assign(score_std=float("nan"))
+    return df
+
+
+def update_top_features_csv(
+    csv_path: str,
+    output_path: str | None = None,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+    overwrite: bool = False,
+) -> pd.DataFrame:
+    """Backfill ``alias`` + ``description`` columns onto a legacy ranked CSV.
+
+    Reads a ``top_features.csv``, ``top_{N}_features.csv``, or
+    ``common_top_features.csv`` written before the alias rollout (or
+    hand-prepared), assigns rank-based aliases (``ft_1``, ``ft_2``, …)
+    that follow the CSV's existing row order, populates a plain-English
+    ``description`` column via
+    :func:`~eruption_forecast.utils.formatting.humanize_feature_name`,
+    and writes the annotated frame back to disk. The row order is
+    trusted as-is — the CSV is assumed to already be sorted by rank —
+    so aliases are assigned top-to-bottom without re-sorting.
+
+    Also migrates the legacy ``score`` column to ``frequency`` when the
+    loaded CSV predates that rename. When only the column rename is
+    outstanding (``alias`` / ``description`` already present, but
+    ``score`` still on disk), the file is rewritten so the header lands
+    in the new shape without dropping the existing annotations.
+
+    Idempotent by default: when ``frequency``, ``alias``, and
+    ``description`` are all already present the CSV is left untouched
+    and the loaded frame is returned unchanged. Pass ``overwrite=True``
+    to drop and regenerate ``alias`` / ``description`` (useful after
+    changing ``freq_bands`` or updating the humanizer's calculator
+    table).
+
+    Args:
+        csv_path (str): Path to the ranked CSV to annotate.
+        output_path (str | None, optional): Where to write the
+            annotated CSV. When ``None`` (default), the file is
+            overwritten in place. Pass a different path to keep the
+            original for comparison.
+        freq_bands (dict[str, tuple[float, float]] | None, optional):
+            Frequency-band edges forwarded to
+            :func:`~eruption_forecast.utils.formatting.humanize_feature_name`
+            when populating the ``description`` column. Pass an explicit
+            mapping (e.g. ``{"f0": (0.05, 0.5), ...}``) when the tremor
+            was calculated with non-default bands. Defaults to ``None``
+            (built-in defaults).
+        overwrite (bool, optional): When ``True``, drop any existing
+            ``alias`` / ``description`` columns before regenerating them,
+            so a stale annotation can be refreshed. When ``False``
+            (default) and both columns are already present (and no
+            ``score``-to-``frequency`` migration is outstanding), the
+            CSV is not rewritten and the loaded frame is returned
+            as-is. Defaults to ``False``.
+
+    Returns:
+        pd.DataFrame: The annotated (or unchanged, when idempotent)
+        frame, indexed by canonical tsfresh feature name with columns
+        ``frequency``, ``score_mean``, ``score_std``, ``alias``,
+        ``description``.
+
+    Raises:
+        FileNotFoundError: If ``csv_path`` does not exist.
+
+    Examples:
+        >>> # In-place backfill for a legacy CSV:
+        >>> update_top_features_csv(
+        ...     "output/VG.OJN.00.EHZ/training/features/"
+        ...     "stratified-shuffle-split/top_20_features.csv"
+        ... )
+        >>> # Re-annotate with custom bands, write to a sibling file:
+        >>> update_top_features_csv(
+        ...     "output/.../top_20_features.csv",
+        ...     output_path="output/.../top_20_features.custom.csv",
+        ...     freq_bands={"f0": (0.05, 0.5), "f1": (0.5, 3.0)},
+        ...     overwrite=True,
+        ... )
+    """
+    if not os.path.isfile(csv_path):
+        raise FileNotFoundError(f"top_features CSV not found: {csv_path}")
+
+    df = pd.read_csv(csv_path, index_col=0)
+    needs_migration = (
+        ("score" in df.columns and "frequency" not in df.columns)
+        or ("mean_score" in df.columns and "score_mean" not in df.columns)
+        or "score_std" not in df.columns
+    )
+    df = migrate_score_column(df)
+
+    has_alias = "alias" in df.columns
+    has_description = "description" in df.columns
+
+    if has_alias and has_description and not overwrite and not needs_migration:
+        return df
+
+    if overwrite:
+        df = df.drop(columns=["alias", "description"], errors="ignore")
+        has_alias = False
+        has_description = False
+
+    if not has_alias:
+        df["alias"] = [f"ft_{i}" for i in range(1, len(df) + 1)]
+    if not has_description:
+        df["description"] = [
+            humanize_feature_name(name, freq_bands=freq_bands) for name in df.index
+        ]
+
+    destination = output_path or csv_path
+    df.to_csv(destination, index=True)
+    return df
+
+
+def concat_features(
+    paths: list[str],
+    filepath: str,
+    frames: list[pd.DataFrame] | None = None,
+) -> tuple[str, pd.DataFrame]:
+    """Concatenate per-column feature Parquets (and optional in-memory frames) and save.
+
+    Reads each path in ``paths`` as Parquet, optionally combines them with
+    already-loaded DataFrames in ``frames``, concatenates everything column-wise
+    (``axis=1``), and saves the merged DataFrame to ``filepath`` as
+    Snappy-compressed Parquet. Used to merge per-column tsfresh feature
+    extractions; ``frames`` lets callers skip a disk round-trip for columns
+    whose DataFrames are already in memory.
+
+    Args:
+        paths (list[str]): Paths to per-column feature Parquet files to read
+            and concatenate.
+        filepath (str): Output filepath for the merged Parquet (should end in
+            ``.parquet``).
+        frames (list[pd.DataFrame] | None, optional): Pre-loaded feature
+            DataFrames to include in the concatenation alongside the Parquet
+            paths. Defaults to ``None`` (Parquet-only behaviour).
+
+    Returns:
+        tuple[str, pd.DataFrame]: Tuple containing:
+            - filepath (str): Path where the merged Parquet was saved.
+            - df (pd.DataFrame): Concatenated DataFrame.
+
+    Raises:
+        ValueError: If the combined input count (``len(paths) + len(frames)``)
+            is fewer than 2, or if all inputs concatenate to an empty frame.
+
+    Examples:
+        >>> parquet_files = ["features_f0.parquet", "features_f1.parquet"]
+        >>> path, df = concat_features(parquet_files, "all_features.parquet")
+        >>> print(df.shape)
+        >>> # mix in already-loaded frames
+        >>> path, df = concat_features(
+        ...     ["features_f0.parquet"],
+        ...     "all_features.parquet",
+        ...     frames=[fresh_df_f1, fresh_df_f2],
+        ... )
+    """
+    frames = frames or []
+    total_inputs = len(paths) + len(frames)
+    if total_inputs <= 1:
+        raise ValueError(
+            f"Requires at least 2 inputs (paths + frames). Got {total_inputs}."
+        )
+
+    pieces: list[pd.DataFrame] = [pd.read_parquet(path) for path in paths]
+    pieces.extend(frames)
+
+    df = pd.concat(pieces, axis=1)
+
+    if df.empty:
+        raise ValueError("There is no data in the input files.")
+
+    df.to_parquet(filepath, engine="pyarrow", compression="snappy", index=True)
+
+    return filepath, df
+
+
+def concat_significant_features(
+    features_csvs: list[str],
+    features_dir: str,
+    number_of_features: int | None = None,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+) -> pd.DataFrame:
+    """Concatenate per-seed significant-feature CSVs and save a ranked summary.
+
+    Reads all CSVs in ``features_csvs``, concatenates them row-wise, and
+    writes the raw combined data to ``{features_dir}/significant_features.csv``
+    (which keeps the per-seed ``score`` — p-value or permutation importance
+    — as-is). When ``number_of_features`` is provided, also aggregates by
+    feature name, counts occurrences across seeds (``frequency``), computes
+    the mean and standard deviation of the per-seed score (``score_mean``,
+    ``score_std``), sorts descending by ``frequency`` and ascending by
+    ``score_mean``, decorates the ranked
+    frame with an ``alias`` column (``ft_1``, ``ft_2``, …) that tracks
+    rank position and a plain-English ``description`` column produced by
+    :func:`~eruption_forecast.utils.formatting.humanize_feature_name`, and
+    writes two additional CSVs:
+
+    - ``{features_dir}/top_features.csv`` — the full ranked list (all
+      features, sorted).
+    - ``{features_dir}/top_{number_of_features}_features.csv`` — the top-N
+      subset of the same ranking, used downstream by
+      :func:`load_select_features`.
+
+    Args:
+        features_csvs (list[str]): Paths to per-seed significant-feature CSV
+            files, each expected to contain a ``features`` column and a
+            ``score`` column (p-value from ``tsfresh`` or permutation
+            importance from ``random_forest``).
+        features_dir (str): Directory where output CSVs are written.
+        number_of_features (int | None, optional): If set, produce the
+            ``top_features.csv`` full ranking plus a
+            ``top_{number_of_features}_features.csv`` capped to the top-N
+            features by occurrence count. If ``None`` or ``<= 0``, only the
+            raw ``significant_features.csv`` is written. Defaults to ``None``.
+        freq_bands (dict[str, tuple[float, float]] | None, optional):
+            Frequency-band edges forwarded to
+            :func:`~eruption_forecast.utils.formatting.humanize_feature_name`
+            when populating the ``description`` column. Pass an explicit
+            mapping (e.g. ``{"f0": (0.05, 0.5), ...}``) when the tremor was
+            calculated with non-default bands so descriptions in
+            ``top_features.csv`` reflect the actual Hz values. Defaults to
+            ``None`` (built-in defaults).
+
+    Returns:
+        pd.DataFrame: The combined DataFrame (all seeds concatenated), or the
+            full ranked DataFrame when ``number_of_features`` is specified.
+
+    Raises:
+        ValueError: If ``combined_features_df`` is empty after concatenation.
+
+    Examples:
+        >>> csvs = ["seed_0_features.csv", "seed_1_features.csv"]
+        >>> df = concat_significant_features(csvs, "output/features", number_of_features=20)
+        >>> df.index.name
+        'features'
+    """
+    combined_features_df = pd.concat(
+        [pd.read_csv(file) for file in features_csvs],
+        ignore_index=True,
+    )
+
+    if combined_features_df.empty:
+        raise ValueError("No data found inside csv files.")
+
+    combined_features_df.to_csv(
+        os.path.join(features_dir, "significant_features.csv"), index=False
+    )
+
+    if number_of_features is not None and number_of_features > 0:
+        combined_features_df = (
+            combined_features_df.groupby(by="features")
+            .agg(
+                frequency=("score", "count"),
+                score_mean=("score", "mean"),
+                score_std=("score", "std"),
+            )
+            .sort_values(
+                by=["frequency", "score_mean"],
+                ascending=[False, True],
+            )
+        )
+        combined_features_df.index.name = "features"
+        combined_features_df["alias"] = [
+            f"ft_{i}" for i in range(1, len(combined_features_df) + 1)
+        ]
+        combined_features_df["description"] = [
+            humanize_feature_name(name, freq_bands=freq_bands)
+            for name in combined_features_df.index
+        ]
+        combined_features_df.to_csv(
+            os.path.join(features_dir, "top_features.csv"),
+            index=True,
+        )
+
+        top_n_features_df = combined_features_df.head(number_of_features)
+        top_n_features_df.to_csv(
+            os.path.join(features_dir, f"top_{number_of_features}_features.csv"),
+            index=True,
+        )
+
+    return combined_features_df
+
+
+def find_common_features(
+    top_features_csv: list[str],
+    output_dir: str | None = None,
+    freq_bands: dict[str, tuple[float, float]] | None = None,
+) -> pd.DataFrame:
+    """Return features that appear in every ``top_N_features.csv``.
+
+    Loads each CSV produced by the scenario training stage and intersects
+    their feature indices, so the result contains only features that every
+    scenario agreed on. The ``frequency``, ``score_mean``, and ``score_std``
+    columns are summed across the input CSVs so the output keeps the same
+    shape as a source ``top_N_features.csv`` and can be sorted the same way
+    (descending by ``frequency``, ascending by ``score_mean``). The merged
+    frame is then decorated with an ``alias`` column (``ft_1``, ``ft_2``,
+    …) that tracks the cross-scenario rank position and a plain-English
+    ``description`` column produced by
+    :func:`~eruption_forecast.utils.formatting.humanize_feature_name`.
+    Aliases assigned here are independent of each scenario's own aliases —
+    they follow the merged ranking so downstream plots have a single label
+    per feature.
+
+    Legacy inputs written before the ``score`` → ``frequency`` or
+    ``mean_score`` → ``score_mean`` renames are normalised on read via
+    :func:`migrate_score_column`, which also backfills a missing
+    ``score_std`` column with NaN, so a mix of old and new CSVs can be
+    merged without a prior migration pass.
+
+    Args:
+        top_features_csv (list[str]): Paths to ``top_{N}_features.csv`` files
+            (one per scenario). Each file must have a ``features`` index
+            column and ``frequency`` / ``score_mean`` columns (legacy files
+            with a ``score`` or ``mean_score`` column are auto-migrated on
+            read; a missing ``score_std`` column is backfilled with NaN).
+        output_dir (str | None, optional): Directory where the resulting
+            ``common_top_features.csv`` is written. When ``None``, falls back
+            to the current working directory (``os.getcwd()``). Defaults to
+            ``None``.
+        freq_bands (dict[str, tuple[float, float]] | None, optional):
+            Frequency-band edges forwarded to
+            :func:`~eruption_forecast.utils.formatting.humanize_feature_name`
+            when populating the ``description`` column. Pass an explicit
+            mapping (e.g. ``{"f0": (0.05, 0.5), ...}``) when the input
+            scenarios ran with non-default bands so descriptions in
+            ``common_top_features.csv`` reflect the actual Hz values.
+            Defaults to ``None`` (built-in defaults).
+
+    Returns:
+        pd.DataFrame: DataFrame indexed by the common feature names with
+        ``frequency``, ``score_mean``, and ``score_std`` columns summed
+        across the input CSVs, plus ``alias`` and ``description`` columns.
+        Also written to ``{output_dir}/common_top_features.csv``.
+
+    Raises:
+        ValueError: If ``top_features_csv`` is empty or the intersection is
+            empty.
+        FileNotFoundError: If any of the paths does not exist (raised by
+            :func:`load_select_features`).
+
+    Examples:
+        >>> csvs = [
+        ...     "output/.../scenarios/scenario-1/training/features/stratified-shuffle-split/top_20_features.csv",
+        ...     "output/.../scenarios/scenario-2/training/features/stratified-shuffle-split/top_20_features.csv",
+        ... ]
+        >>> df = find_common_features(csvs)
+        >>> df.index.tolist()[:3]
+        ['rsam_f2__mean', 'entropy__variance', 'dsar_f3-f4__median']
+        >>> df = find_common_features(csvs, output_dir="output/.../scenarios")
+    """
+    if not top_features_csv:
+        raise ValueError("top_features_csv is empty.")
+
+    frames: list[pd.DataFrame] = []
+    for path in top_features_csv:
+        load_select_features(path, number_of_features=0)
+        frames.append(migrate_score_column(pd.read_csv(path, index_col=0)))
+
+    common = sorted(set.intersection(*(set(df.index) for df in frames)))
+    if not common:
+        raise ValueError("No features are common to all CSVs.")
+
+    aligned = [
+        df.loc[df.index.intersection(common), ["frequency", "score_mean", "score_std"]]
+        for df in frames
+    ]
+    combined = pd.concat(aligned).groupby(level=0).sum()
+    combined = combined.sort_values(
+        by=["frequency", "score_mean"], ascending=[False, True]
+    )
+    combined["alias"] = [f"ft_{i}" for i in range(1, len(combined) + 1)]
+    combined["description"] = [
+        humanize_feature_name(name, freq_bands=freq_bands) for name in combined.index
+    ]
+
+    out_path = os.path.join(output_dir or os.getcwd(), "common_top_features.csv")
+    combined.to_csv(out_path, index=True)
+    return combined
+
+
+def _prepare_features_frame(
+    matrix: str | pd.DataFrame,
+    label_csv: str,
+    stage: str,
+) -> pd.DataFrame:
+    """Load or accept a features matrix and attach a ``DatetimeIndex``.
+
+    File-path inputs are dispatched by suffix (``.parquet`` /  ``.csv``) then
+    joined against ``label_csv`` via :func:`to_datetime_index`. Passed-in
+    DataFrames that already carry a ``DatetimeIndex`` are returned as-is
+    (``label_csv`` unused). ``id``-indexed DataFrames are joined against
+    ``label_csv`` the same way file paths are.
+
+    Args:
+        matrix (str | pd.DataFrame): Features matrix input.
+        label_csv (str): Sibling ``features-label_*.csv`` path.
+        stage (str): ``"training"`` or ``"prediction"`` — surfaced in the
+            unsupported-suffix error message so the caller knows which arg
+            was malformed.
+
+    Returns:
+        pd.DataFrame: DatetimeIndex-ed features frame with ``id`` and
+        ``datetime`` columns absent.
+
+    Raises:
+        ValueError: If ``matrix`` is a path with a suffix other than
+            ``.parquet`` or ``.csv``.
+    """
+    if isinstance(matrix, pd.DataFrame):
+        features = matrix
+    else:
+        suffix = os.path.splitext(matrix)[1].lower()
+        if suffix == ".parquet":
+            features = pd.read_parquet(matrix)
+        elif suffix == ".csv":
+            features = pd.read_csv(matrix, index_col=0)
+        else:
+            raise ValueError(
+                f"Unsupported {stage} features matrix suffix '{suffix}'. "
+                f"Expected '.parquet' or '.csv'. Got: {matrix}"
+            )
+
+    if isinstance(features.index, pd.DatetimeIndex):
+        return features
+
+    labels = pd.read_csv(label_csv, index_col=0, parse_dates=True)
+    return to_datetime_index(labels, features)
+
+
+def merge_features_matrix(
+    training_features_matrix: str | pd.DataFrame,
+    prediction_features_matrix: str | pd.DataFrame,
+    training_label_csv: str,
+    prediction_label_csv: str,
+    select_features: str | list[str],
+    number_of_features: int | None = None,
+    output_path: str | None = None,
+) -> pd.DataFrame:
+    """Merge training and prediction feature matrices while preserving each stage's sampling cadence.
+
+    Loads each matrix (from Parquet/CSV path or a passed-in DataFrame),
+    attaches a ``DatetimeIndex`` from its sibling ``features-label_*.csv``
+    when needed, filters both frames to the feature list resolved from
+    ``select_features``, and stitches them together into a single
+    datetime-sorted frame.
+
+    The two matrices are typically sampled at different cadences —
+    training at the coarse label window step (e.g. ``6 hours``) and
+    prediction at the fine forecast cadence (e.g. ``10 minutes``). To
+    keep the training cadence intact across the training range, the
+    prediction frame is truncated to rows **strictly after**
+    ``training_end`` (the maximum datetime in the training index) before
+    the concatenation. The returned frame therefore holds every training
+    row up to ``training_end`` at the training cadence, followed by
+    every prediction row after ``training_end`` at the prediction
+    cadence — no interleaving inside the training range.
+
+    Column filtering re-uses :func:`load_select_features`, so
+    ``select_features`` can be a ``top_features.csv`` /
+    ``top_{N}_features.csv`` path produced by
+    :func:`concat_significant_features`, or an explicit list of tsfresh
+    feature names. Missing columns are intersected away with an ``info`` log
+    (the training matrix on disk is often already a strict subset).
+
+    Args:
+        training_features_matrix (str | pd.DataFrame): Path to the training
+            features matrix (``.parquet`` or ``.csv``) or a pre-loaded
+            ``pd.DataFrame``. When a DataFrame with a ``DatetimeIndex`` is
+            passed, ``training_label_csv`` is ignored.
+        prediction_features_matrix (str | pd.DataFrame): Same shape as
+            ``training_features_matrix`` for the prediction stage.
+        training_label_csv (str): Path to the sibling
+            ``features-label_*.csv`` for the training matrix (used to attach
+            datetimes to an ``id``-indexed matrix). Ignored when the matrix
+            argument is a DataFrame with a ``DatetimeIndex``.
+        prediction_label_csv (str): Path to the sibling
+            ``features-label_*.csv`` for the prediction matrix.
+        select_features (str | list[str]): Feature-name resolver forwarded
+            to :func:`load_select_features`. Accepts a ranked CSV path or an
+            explicit list of tsfresh feature names.
+        number_of_features (int | None, optional): Cap the resolved list to
+            the top ``number_of_features`` entries. ``None`` (default) keeps
+            every entry from the resolved list. Any positive integer caps
+            to that many top-ranked features.
+        output_path (str | None, optional): When set, also writes the merged
+            frame to disk as Snappy-compressed Parquet via ``pyarrow``.
+            Defaults to ``None`` (return-only).
+
+    Returns:
+        pd.DataFrame: DatetimeIndex-ed frame containing the filtered feature
+        columns from both stages, sorted ascending by datetime. Prediction
+        rows at or before ``training_end`` are dropped so the training
+        cadence is preserved through the training range.
+
+    Raises:
+        ValueError: If the training features matrix has no rows —
+            ``training_end`` can't be resolved from an empty index.
+        ValueError: If the intersection between the resolved feature list
+            and both matrices' columns is empty.
+        ValueError: If a matrix path has a suffix other than ``.parquet`` or
+            ``.csv``.
+        FileNotFoundError: If ``select_features`` is a path that does not
+            exist (propagated from :func:`load_select_features`).
+
+    Examples:
+        >>> from eruption_forecast.utils.feature_utils import merge_features_matrix
+        >>> df = merge_features_matrix(
+        ...     training_features_matrix="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
+        ...     prediction_features_matrix="output/.../prediction/features/features-matrix_2025-01-01-2025-08-22.parquet",
+        ...     training_label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
+        ...     prediction_label_csv="output/.../prediction/features/features-label_2025-01-01_2025-08-22_ws-2_step-10-minutes.csv",
+        ...     select_features="output/.../training/features/stratified-shuffle-split/top_features.csv",
+        ...     number_of_features=20,
+        ... )
+        >>> isinstance(df.index, pd.DatetimeIndex)
+        True
+        >>> df.index.is_monotonic_increasing
+        True
+    """
+    selected = load_select_features(
+        select_features, number_of_features=number_of_features or 0
+    )
+
+    training_df = _prepare_features_frame(
+        training_features_matrix, training_label_csv, stage="training"
+    )
+    prediction_df = _prepare_features_frame(
+        prediction_features_matrix, prediction_label_csv, stage="prediction"
+    )
+
+    if len(training_df) == 0:
+        raise ValueError(
+            "Training features matrix has no rows; cannot resolve "
+            "`training_end` to anchor the prediction cadence."
+        )
+
+    training_end = training_df.index.max()
+    total_prediction_rows = len(prediction_df)
+    prediction_df = prediction_df.loc[prediction_df.index > training_end]
+    dropped_prediction_rows = total_prediction_rows - len(prediction_df)
+    if dropped_prediction_rows:
+        logger.info(
+            f"merge_features_matrix: truncated prediction to > {training_end} "
+            f"(dropped {dropped_prediction_rows} row(s), "
+            f"kept {len(prediction_df)})."
+        )
+
+    training_cols = [name for name in selected if name in training_df.columns]
+    prediction_cols = [name for name in selected if name in prediction_df.columns]
+    missing_training = set(selected) - set(training_cols)
+    missing_prediction = set(selected) - set(prediction_cols)
+    if missing_training:
+        logger.info(
+            f"merge_features_matrix: {len(missing_training)} selected feature(s) "
+            f"missing from training matrix (kept {len(training_cols)}/{len(selected)})."
+        )
+    if missing_prediction:
+        logger.info(
+            f"merge_features_matrix: {len(missing_prediction)} selected feature(s) "
+            f"missing from prediction matrix (kept {len(prediction_cols)}/{len(selected)})."
+        )
+    if not training_cols and not prediction_cols:
+        raise ValueError(
+            "None of the selected features are present in either matrix. "
+            f"Requested {len(selected)} feature(s); both matrices had zero matches."
+        )
+
+    training_df = training_df[training_cols]
+    prediction_df = prediction_df[prediction_cols]
+
+    merged = pd.concat([training_df, prediction_df], axis=0).sort_index()
+    duplicates = int(merged.index.duplicated(keep="first").sum())
+    if duplicates:
+        merged = merged[~merged.index.duplicated(keep="first")]
+        logger.info(
+            f"merge_features_matrix: dropped {duplicates} duplicate datetime row(s) "
+            "(kept the training row on overlap)."
+        )
+
+    if output_path is not None:
+        merged.to_parquet(
+            output_path, engine="pyarrow", compression="snappy", index=True
+        )
+
+    return merged
