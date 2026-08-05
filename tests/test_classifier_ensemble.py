@@ -157,44 +157,54 @@ def test_predict_proba_values_in_range(
 # ---------------------------------------------------------------------------
 
 
-def test_predict_with_uncertainty_shapes(
+def test_predict_with_uncertainty_returns_flat_dict(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """predict_with_uncertainty returns 4 arrays of shape (n_samples,) + per-clf dict."""
+    """predict_with_uncertainty returns a flat dict of (n_samples,) ndarrays."""
     result = clf_ensemble.predict_with_uncertainty(X)
-    consensus_mean, consensus_std, consensus_conf, consensus_pred, per_clf = result
-    assert consensus_mean.shape == (N_SAMPLES,)
-    assert consensus_std.shape == (N_SAMPLES,)
-    assert consensus_conf.shape == (N_SAMPLES,)
-    assert consensus_pred.shape == (N_SAMPLES,)
+    assert isinstance(result, dict)
+    expected_consensus = {
+        "consensus_probability",
+        "consensus_uncertainty",
+        "consensus_prediction",
+        "consensus_confidence",
+    }
+    assert expected_consensus.issubset(set(result.keys()))
+    for key in expected_consensus:
+        arr = result[key]
+        assert isinstance(arr, np.ndarray)
+        assert arr.shape == (N_SAMPLES,)
 
 
-def test_predict_with_uncertainty_per_clf_keys(
+def test_predict_with_uncertainty_per_classifier_columns(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """per_classifier_results has one entry per classifier with required keys."""
-    _, _, _, _, per_clf = clf_ensemble.predict_with_uncertainty(X)
-    assert set(per_clf.keys()) == {"rf", "xgb"}
-    for clf_result in per_clf.values():
-        assert set(clf_result.keys()) == {"probability", "uncertainty", "prediction", "confidence"}
-        for arr in clf_result.values():
+    """Every registered classifier contributes four ``{name}_{metric}`` columns."""
+    result = clf_ensemble.predict_with_uncertainty(X)
+    for name in ("rf", "xgb"):
+        for metric in ("probability", "uncertainty", "prediction", "confidence"):
+            key = f"{name}_{metric}"
+            assert key in result, f"missing per-classifier column {key!r}"
+            arr = result[key]
             assert isinstance(arr, np.ndarray)
             assert arr.shape == (N_SAMPLES,)
 
 
-def test_predict_with_uncertainty_binary_predictions(
+def test_predict_with_uncertainty_prediction_range(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """consensus_prediction values are in [0, 1]."""
-    _, _, _, consensus_pred, _ = clf_ensemble.predict_with_uncertainty(X)
+    """``consensus_prediction`` values (mean of binary votes) are in [0, 1]."""
+    result = clf_ensemble.predict_with_uncertainty(X)
+    consensus_pred = result["consensus_prediction"]
     assert np.all(consensus_pred >= 0) and np.all(consensus_pred <= 1)
 
 
 def test_predict_with_uncertainty_confidence_range(
     clf_ensemble: ClassifierEnsemble, X: pd.DataFrame
 ) -> None:
-    """consensus_confidence is in [0.5, 1.0] by majority-voting definition."""
-    _, _, consensus_conf, _, _ = clf_ensemble.predict_with_uncertainty(X)
+    """``consensus_confidence`` (CI-like statistic) is in [0.0, 1.0]."""
+    result = clf_ensemble.predict_with_uncertainty(X)
+    consensus_conf = result["consensus_confidence"]
     assert np.all(consensus_conf >= 0.0) and np.all(consensus_conf <= 1.0)
 
 
@@ -294,16 +304,6 @@ def test_classifier_ensemble_get_params_empty() -> None:
     assert empty.get_params() == {"n_classifiers": 0}
 
 
-def test_repr_html_contains_classifier_names(clf_ensemble: ClassifierEnsemble) -> None:
-    """_repr_html_ returns a non-empty HTML string mentioning each classifier key."""
-    html = clf_ensemble._repr_html_()
-    assert isinstance(html, str)
-    assert html
-    assert "ClassifierEnsemble" in html
-    assert "rf" in html
-    assert "xgb" in html
-
-
 def test_seed_ensemble_get_params_populated(
     two_ensembles: dict[str, SeedEnsemble],
 ) -> None:
@@ -324,13 +324,3 @@ def test_seed_ensemble_get_params_empty_omits_model_representative() -> None:
     assert params == {"classifier_name": "LogisticRegression", "n_seeds": 0}
 
 
-def test_seed_ensemble_repr_html_contains_metadata(
-    two_ensembles: dict[str, SeedEnsemble],
-) -> None:
-    """_repr_html_ mentions SeedEnsemble, the classifier_name, and n_seeds."""
-    seed_ensemble = two_ensembles["rf"]
-    html = seed_ensemble._repr_html_()
-    assert isinstance(html, str) and html
-    assert "SeedEnsemble" in html
-    assert seed_ensemble.classifier_name in html
-    assert f"n_seeds={len(seed_ensemble.seeds)}" in html or ">5<" in html

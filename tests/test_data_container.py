@@ -1,14 +1,12 @@
 """Tests for BaseDataContainer, TremorData, and LabelData CSV-backed containers."""
 
-import os
-import tempfile
 
 import pandas as pd
 import pytest
 
 from eruption_forecast.data_container import BaseDataContainer
-from eruption_forecast.tremor.tremor_data import TremorData
 from eruption_forecast.label.label_data import LabelData
+from eruption_forecast.tremor.tremor_data import TremorData
 
 
 class TestBaseDataContainer:
@@ -85,24 +83,25 @@ class TestTremorData:
         td = TremorData(df=self._make_tremor_df())
         assert "rsam_f0" in td.columns
 
-    def test_csv_default_empty(self):
-        td = TremorData()
-        assert td.csv == ""
+    def test_csv_default_none(self):
+        """``BaseDataContainer.__init__`` initialises ``csv`` to ``None``."""
+        td = TremorData(df=self._make_tremor_df())
+        assert td.csv is None
 
     def test_has_csv_attribute(self):
-        td = TremorData()
+        td = TremorData(df=self._make_tremor_df())
         assert hasattr(td, "csv")
 
     def test_from_csv(self, tmp_path):
+        """``TremorData.from_csv`` is a classmethod returning a ``TremorData``."""
         df = self._make_tremor_df()
         csv_path = str(tmp_path / "tremor.csv")
         df.index.name = "datetime"
         df.to_csv(csv_path)
 
-        td = TremorData()
-        loaded = td.from_csv(csv_path)
-        assert isinstance(loaded, pd.DataFrame)
-        assert "rsam_f0" in loaded.columns
+        loaded = TremorData.from_csv(csv_path)
+        assert isinstance(loaded, TremorData)
+        assert "rsam_f0" in loaded.df.columns
 
 
 class TestLabelData:
