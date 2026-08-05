@@ -1,166 +1,138 @@
-"""Manual integration tests for the notify decorator.
+"""Unit tests for the ``notify`` decorator.
 
-Run with:
-    uv run pytest tests/test_notify_decorator.py -v -s
-
-These tests send real Telegram messages. They require TELEGRAM_BOT_TOKEN and
-TELEGRAM_CHAT_ID to be set in the .env file or environment. Each test is marked
-with @pytest.mark.integration so they can be skipped in CI with:
-    uv run pytest -m "not integration"
+The current ``notify(task, message=None, to="telegram", on_success=True,
+on_error=True, timeout=3.0, verbose=False)`` decorator dispatches through
+``eruption_forecast.decorators.notify._dispatch`` which in turn calls
+:class:`TelegramNotification`. Every test patches ``_dispatch`` so no HTTP
+call is ever made — the assertions verify the wrapping contract
+(return-value passthrough, exception re-raise) and that dispatch is gated
+by ``on_success`` / ``on_error``.
 """
 
-# Standard library imports
-import time
-from unittest.mock import patch
+import importlib
 
-# Third party imports
 import pytest
 
-# Project imports
-from eruption_forecast.decorators import notify
+from eruption_forecast.decorators.notify import notify
 
 
-pytestmark = pytest.mark.integration
+# ``eruption_forecast.decorators.__init__`` re-exports the ``notify`` function
+# under the same attribute name as the submodule, so ``import
+# eruption_forecast.decorators.notify`` returns the function. Reach the actual
+# module through ``sys.modules`` (populated by ``importlib.import_module``).
+notify_module = importlib.import_module("eruption_forecast.decorators.notify")
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-def _make_decorator(**kwargs):
-    """Return a notify decorator configured from .env credentials.
-
-    Passes any extra kwargs straight through to notify() so individual tests
-    can customise on_success, on_error, name, etc.
-
-    Args:
-        **kwargs: Additional keyword arguments forwarded to notify().
+@pytest.fixture()
+def dispatched(monkeypatch) -> list[tuple]:
+    """Capture every ``_dispatch`` call the decorator issues.
 
     Returns:
-        Callable: The configured notify decorator.
+        list[tuple]: one entry per dispatched notification, shaped
+        ``(to, message, timeout, verbose)``.
     """
-    # Passing no bot_token/chat_id forces the decorator to read from .env
-    return notify(**kwargs)
+    calls: list[tuple] = []
+
+    def _fake_dispatch(to, message, timeout, verbose):
+        calls.append((to, message, timeout, verbose))
+
+    monkeypatch.setattr(notify_module, "_dispatch", _fake_dispatch)
+    return calls
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+def test_success_dispatches_notification(dispatched: list[tuple]) -> None:
+    """``on_success=True`` (default) sends a success notification and returns the value."""
 
-
-def test_success_notification():
-    """Send a success Telegram message for a fast-returning function.
-
-    Decorates a trivial function, calls it, and asserts it returns the expected
-    value,� confirming the decorator does not swallow the return value.
-    """
-
-    @_make_decorator(name="test_success_notification")
-    def quick_task():
-        """Return a constant to verify the decorator passes return values through.
-
-        Returns:
-            int: Always 42.
-        """
+    @notify(task="quick task")
+    def quick_task() -> int:
         return 42
 
     result = quick_task()
+
     assert result == 42
+    assert len(dispatched) == 1
+    to, message, _, _ = dispatched[0]
+    assert to == "telegram"
+    assert "quick task" in message
 
 
-def test_error_notification():
-    """Send an error Telegram message when the decorated function raises.
+def test_error_dispatches_and_reraises(dispatched: list[tuple]) -> None:
+    """``on_error=True`` (default) sends the error and re-raises the original exception."""
 
-    Asserts that the original exception is re-raised after the notification,
-    preserving the caller's error-handling contract.
-    """
+    @notify(task="failing task")
+    def failing_task() -> None:
+        raise ValueError("boom")
 
-    @_make_decorator(name="test_error_notification")
-    def failing_task():
-        """Raise a ValueError to trigger the error notification path.
-
-        Raises:
-            ValueError: Always raised to exercise the on_error branch.
-        """
-        raise ValueError("Intentional test error � please ignore.")
-
-    with pytest.raises(ValueError, match="Intentional test error"):
+    with pytest.raises(ValueError, match="boom"):
         failing_task()
 
-
-def test_elapsed_time_included():
-    """Send a success message that includes elapsed time.
-
-    Sleeps briefly so the elapsed field reads > 0 seconds, making it
-    visually verifiable in the Telegram message.
-    """
-
-    @_make_decorator(name="test_elapsed_time", include_elapsed=True)
-    def slow_task():
-        """Sleep for a short duration to produce a non-zero elapsed time.
-
-        Returns:
-            str: A simple status string.
-        """
-        time.sleep(2)
-        return "done"
-
-    result = slow_task()
-    assert result == "done"
+    assert len(dispatched) == 1
+    _, message, _, _ = dispatched[0]
+    assert "failing task" in message
 
 
-def test_on_success_false_no_message():
-    """Confirm that on_success=False suppresses the success notification.
+def test_on_success_false_suppresses_success(dispatched: list[tuple]) -> None:
+    """``on_success=False`` skips dispatch on a successful call."""
 
-    The function runs normally and returns its value; no Telegram message
-    should be dispatched on success.
-    """
-
-    @_make_decorator(name="test_on_success_false", on_success=False)
-    def silent_task():
-        """Return a value without triggering a success notification.
-
-        Returns:
-            bool: Always True.
-        """
+    @notify(task="silent", on_success=False)
+    def silent_task() -> bool:
         return True
 
     assert silent_task() is True
+    assert dispatched == []
 
 
-def test_on_error_false_no_message():
-    """Confirm that on_error=False suppresses the error notification.
+def test_on_error_false_suppresses_error_but_reraises(dispatched: list[tuple]) -> None:
+    """``on_error=False`` skips dispatch on failure but still re-raises."""
 
-    The exception must still propagate to the caller even when notification
-    is disabled.
-    """
+    @notify(task="silent failure", on_error=False)
+    def silent_failing_task() -> None:
+        raise RuntimeError("nope")
 
-    @_make_decorator(name="test_on_error_false", on_error=False)
-    def silent_failing_task():
-        """Raise without sending an error notification.
-
-        Raises:
-            RuntimeError: Always raised to verify suppression path.
-        """
-        raise RuntimeError("Silent error � no Telegram message expected.")
-
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="nope"):
         silent_failing_task()
 
+    assert dispatched == []
 
-def test_missing_credentials_disables_notifications(monkeypatch):
-    """Verify that missing credentials disables notifications without raising.
 
-    Clears the env vars so the .env fallback is also unavailable, then
-    passes empty strings to confirm the decorator still wraps the function.
+def test_custom_message_forwarded(dispatched: list[tuple]) -> None:
+    """A ``message`` kwarg is embedded in the dispatched notification text.
 
-    Args:
-        monkeypatch: pytest fixture for safely patching environment variables.
+    MarkdownV2 reserved characters (``-``, ``.`` etc.) are backslash-escaped
+    before the body is dispatched, so we use a plain-alphanumeric substring
+    that survives escaping unchanged.
     """
-    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
-    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
-    # Prevent load_dotenv() inside notify() from re-populating the env from .env
-    with patch("eruption_forecast.decorators.notify.load_dotenv"):
-        decorator = notify(bot_token="", chat_id="")
-        assert callable(decorator)
+
+    @notify(task="custom", message="bodyOfTheMessage")
+    def custom_task() -> None:
+        return None
+
+    custom_task()
+
+    assert len(dispatched) == 1
+    _, message, _, _ = dispatched[0]
+    assert "bodyOfTheMessage" in message
+
+
+def test_timeout_and_verbose_forwarded(dispatched: list[tuple]) -> None:
+    """The ``timeout`` and ``verbose`` kwargs reach ``_dispatch`` unchanged."""
+
+    @notify(task="typed", timeout=1.5, verbose=True)
+    def typed_task() -> str:
+        return "done"
+
+    assert typed_task() == "done"
+    assert len(dispatched) == 1
+    _, _, timeout, verbose = dispatched[0]
+    assert timeout == 1.5
+    assert verbose is True
+
+
+def test_wraps_preserves_metadata() -> None:
+    """The decorator preserves the wrapped function's ``__name__`` via ``functools.wraps``."""
+
+    @notify(task="named")
+    def original_name() -> None:
+        return None
+
+    assert original_name.__name__ == "original_name"
