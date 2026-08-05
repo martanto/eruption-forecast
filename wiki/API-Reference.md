@@ -1227,6 +1227,120 @@ axis.
 
 ---
 
+## Feature matrix loaders
+
+Two thin readers rebuild an ``id``-indexed tsfresh features (or
+probability) frame into a `DatetimeIndex`-ed frame by joining against
+the sibling `features-label_*.csv` written by
+`FeaturesBuilder`.
+
+```python
+from eruption_forecast.utils.dataframe import (
+    load_datetime_indexed,
+    load_features_matrix,
+)
+
+load_datetime_indexed(
+    label_csv: str,
+    features_path: str,
+) -> pd.DataFrame
+
+load_features_matrix(
+    label_csv: str,
+    features_path: str,
+) -> pd.DataFrame
+```
+
+- `label_csv` — path to the aligned label CSV (`features-label_*.csv`)
+  with a `DatetimeIndex` and an `id` column.
+- `features_path` — path to the ``id``-indexed matrix. Dispatched by
+  suffix: `.parquet` via `pd.read_parquet`, `.csv` via
+  `pd.read_csv(..., index_col=0)`. Any other suffix raises `ValueError`.
+- Returned frame: the input matrix's columns with a `DatetimeIndex`
+  derived from `label_csv`; the `id` / `datetime` columns are absent.
+
+`load_features_matrix` is the domain-named alias for
+`load_datetime_indexed`. Reach for `load_features_matrix` at call sites
+that specifically load a features matrix so intent is obvious; use
+`load_datetime_indexed` when the payload is a probability matrix or any
+other ``id``-indexed frame (e.g. `predictions/y_proba.csv`).
+
+Both propagate `ValueError` from
+`eruption_forecast.utils.date_utils.to_datetime_index` when the two
+frames cannot be aligned (length mismatch, missing `id` column, missing
+`datetime` column).
+
+---
+
+## Merging training + prediction feature matrices
+
+```python
+from eruption_forecast.utils.dataframe import merge_features_matrix
+
+merge_features_matrix(
+    training_features_matrix: str | pd.DataFrame,
+    prediction_features_matrix: str | pd.DataFrame,
+    training_label_csv: str,
+    prediction_label_csv: str,
+    select_features: str | list[str],
+    number_of_features: int | None = None,
+    output_path: str | None = None,
+) -> pd.DataFrame
+```
+
+Stitches a training-window features matrix and a prediction-window
+features matrix into a single datetime-sorted frame, preserving each
+stage's sampling cadence. Typical use is post-hoc analysis or plotting
+that needs one continuous features frame across the training and
+forecast ranges without collapsing the training cadence.
+
+- Each matrix argument accepts a Parquet / CSV path OR a pre-loaded
+  `pd.DataFrame`. When a DataFrame already has a `DatetimeIndex`, the
+  matching `*_label_csv` is ignored; ``id``-indexed DataFrames are
+  joined against the sibling label CSV the same way file paths are.
+- The two matrices are usually sampled at different cadences —
+  training at the coarse label window step (e.g. `6 hours`) and
+  prediction at the fine forecast cadence (e.g. `10 minutes`). To
+  keep the training cadence intact across the training range, the
+  prediction frame is truncated to rows **strictly after**
+  `training_end` (the maximum datetime in the training index) before
+  the concatenation. No interleaving happens inside the training
+  range.
+- `select_features` is resolved via `load_select_features`, so any
+  `top_features.csv` / `top_{N}_features.csv` path produced by
+  `concat_significant_features` — or an explicit list of tsfresh
+  feature names — is accepted. `number_of_features` is forwarded to
+  the resolver and caps the resolved list to the top-N ranked
+  entries; `None` (default) keeps every entry.
+- Columns present in `select_features` but missing from either matrix
+  are intersected away with an `info` log (the training matrix on disk
+  is often already a strict subset).
+- Duplicate datetime rows across the two frames are dropped
+  (`keep="first"`) so the training row wins on overlap. The counts of
+  dropped rows are logged at `info` level.
+- `output_path` is optional. When set, the merged frame is also
+  written to disk as Snappy-compressed Parquet via `pyarrow`.
+
+Raises `ValueError` when the training matrix has no rows (so
+`training_end` is undefined), when the resolved feature list has zero
+matches in both matrices, or when a matrix path uses an unsupported
+suffix. Propagates `FileNotFoundError` from `load_select_features` when
+`select_features` is a path that does not exist.
+
+```python
+merged = merge_features_matrix(
+    training_features_matrix="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
+    prediction_features_matrix="output/.../prediction/features/features-matrix_2025-01-01-2025-08-22.parquet",
+    training_label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
+    prediction_label_csv="output/.../prediction/features/features-label_2025-01-01_2025-08-22_ws-2_step-10-minutes.csv",
+    select_features="output/.../training/features/stratified-shuffle-split/top_features.csv",
+    number_of_features=20,
+    output_path="output/.../analysis/features-matrix_merged.parquet",
+)
+```
+
+---
+
 ## Logger helpers
 
 ```python
