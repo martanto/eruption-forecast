@@ -44,6 +44,7 @@ MODULES = [
     "eruption_forecast.utils.array",
     "eruption_forecast.utils.dataframe",
     "eruption_forecast.utils.date_utils",
+    "eruption_forecast.utils.feature_utils",
     "eruption_forecast.utils.formatting",
     "eruption_forecast.utils.ml",
     "eruption_forecast.utils.pathutils",

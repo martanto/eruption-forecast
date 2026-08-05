@@ -7,12 +7,12 @@ import pandas as pd
 from eruption_forecast.plots import plot_forecast
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
-from eruption_forecast.utils.dataframe import load_select_features
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime_index
 from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.utils.validation import check_sampling_consistency
+from eruption_forecast.utils.feature_utils import load_select_features
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.config.prediction_config import PredictionConfig
 from eruption_forecast.ensemble.classifier_ensemble import ClassifierEnsemble
@@ -187,7 +187,7 @@ class PredictionModel(BaseModel):
         self.training_hash: str | None = training_hash
         self.overwrite = overwrite
         self.prefix_config: str | None = prefix_config
-        self.basename = (
+        self.basename: str = (
             f"{self.start_date_str}_{self.end_date_str}_ws-{self.window_size}"
         )
 
@@ -453,7 +453,7 @@ class PredictionModel(BaseModel):
             f"Forecast plot: {forecast_plot_str}. "
             f"Overwrite: {self.overwrite}. "
             f"Output dir: {self.output_dir}. "
-            f"Root dir: {self.root_dir}. "
+            f"Root dir: {self.root_dir or 'None'}. "
             f"n_jobs: {self.n_jobs}. "
             f"Verbose: {self.verbose}. "
             f"Basename: {self.basename}."
@@ -657,11 +657,11 @@ class PredictionModel(BaseModel):
             "select_features": resolved_select_features,
         }
 
-        features_already_populated = (
-            not self.features_df.empty and self.features_path is not None
-        )
-
-        if features_already_populated and not overwrite:
+        if (
+            not self.features_df.empty
+            and self.features_path is not None
+            and not overwrite
+        ):
             if (
                 self._extract_features_kwargs is not None
                 and new_kwargs != self._extract_features_kwargs

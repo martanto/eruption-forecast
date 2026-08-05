@@ -19,11 +19,11 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
-from eruption_forecast.utils.dataframe import (
-    find_common_features,
-    _migrate_score_column,
-)
 from eruption_forecast.utils.formatting import shorten_feature_name
+from eruption_forecast.utils.feature_utils import (
+    find_common_features,
+    migrate_score_column,
+)
 
 
 def plot_significant_features(
@@ -970,7 +970,7 @@ def plot_common_features_heatmap(
 
     matrix = pd.DataFrame(index=common_features, columns=labels, dtype=float)
     for label, path in top_features_csv.items():
-        per_scenario = _migrate_score_column(pd.read_csv(path, index_col=0))
+        per_scenario = migrate_score_column(pd.read_csv(path, index_col=0))
         matrix[label] = per_scenario["frequency"].reindex(common_features)
 
     if label_style == "alias":

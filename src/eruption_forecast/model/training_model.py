@@ -21,16 +21,16 @@ from eruption_forecast.utils.ml import (
     get_classifier_models,
     load_features_resampled,
 )
-from eruption_forecast.utils.dataframe import (
-    load_label_csv,
-    load_select_features,
-    concat_significant_features,
-)
+from eruption_forecast.utils.dataframe import load_label_csv
 from eruption_forecast.utils.pathutils import ensure_dir, generate_features_filepaths
 from eruption_forecast.model.base_model import BaseModel
 from eruption_forecast.utils.date_utils import to_datetime
 from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.label.label_builder import LabelBuilder
+from eruption_forecast.utils.feature_utils import (
+    load_select_features,
+    concat_significant_features,
+)
 from eruption_forecast.config.training_config import TrainingConfig
 from eruption_forecast.ensemble.seed_ensemble import SeedEnsemble
 from eruption_forecast.model.classifier_model import ClassifierModel

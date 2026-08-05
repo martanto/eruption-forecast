@@ -14,7 +14,6 @@ from tsfresh.feature_extraction.settings import (
 from tsfresh.utilities.dataframe_functions import impute
 
 from eruption_forecast.logger import logger
-from eruption_forecast.utils.dataframe import concat_features
 from eruption_forecast.utils.pathutils import ensure_dir, resolve_output_dir
 from eruption_forecast.utils.validation import validate_columns
 from eruption_forecast.features.constants import (
@@ -23,6 +22,7 @@ from eruption_forecast.features.constants import (
     DATETIME_COLUMN,
     DEFAULT_EXCLUDE_FEATURES,
 )
+from eruption_forecast.utils.feature_utils import concat_features
 
 
 class FeaturesBuilder:
