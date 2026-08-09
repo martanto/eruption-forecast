@@ -57,12 +57,14 @@ class BaseModel(ABC):
         root_dir (str | None): Optional project root used to resolve
             ``output_dir``.
         n_jobs (int): Number of parallel workers, clamped to
-            ``total_cpu - 2`` when the caller passes a value at or above
-            ``total_cpu``.
+            ``total_cpu`` when the caller passes a value at or above it.
         verbose (bool): Emit verbose log messages.
         n_days (int): Inclusive number of days in the modelling period
             (``(end_date - start_date).days + 1``).
-        total_cpu (int): Number of logical CPUs on the current machine.
+        total_cpu (int): Usable CPU count for parallel workers,
+            ``max(1, multiprocessing.cpu_count() - 2)``. The two-core
+            reservation leaves headroom for the OS and other processes;
+            the ``1`` floor keeps single- and dual-core machines usable.
         use_relevant_features (bool): Enable tsfresh relevance filtering
             during feature extraction. Defaults to ``True``.
         features_df (pd.DataFrame): Extracted features. Empty until
@@ -122,8 +124,9 @@ class BaseModel(ABC):
             root_dir (str | None, optional): Project root directory used to
                 resolve ``output_dir``. Defaults to ``None``.
             n_jobs (int, optional): Number of parallel workers. Clamped to
-                ``cpu_count - 2`` when the caller passes a value at or above
-                ``cpu_count``. Defaults to ``1``.
+                ``total_cpu`` (which is ``cpu_count() - 2`` with a floor of
+                ``1``) when the caller passes a value at or above it.
+                Defaults to ``1``.
             verbose (bool, optional): Emit verbose log messages when ``True``.
                 Defaults to ``False``.
 
@@ -165,7 +168,12 @@ class BaseModel(ABC):
         self.end_date_str = self.end_date.strftime("%Y-%m-%d")
         self.use_relevant_features: bool = True
         self.n_days = (self.end_date - self.start_date).days + 1
-        self.total_cpu = multiprocessing.cpu_count()
+        # Reserve two cores for the OS so the outer joblib.Parallel loop
+        # and every downstream clamp inherit the headroom automatically.
+        # The `max(1, ...)` floor keeps single- and dual-core boxes usable
+        # (CI runners, small VMs) where the raw subtraction would return
+        # 0 or negative and break every downstream `//` and clamp.
+        self.total_cpu = max(1, multiprocessing.cpu_count() - 2)
 
         # WIll be set after extract_features() called
         self.features_df: pd.DataFrame = pd.DataFrame()
@@ -190,8 +198,10 @@ class BaseModel(ABC):
         """Validate base model parameters and clamp ``n_jobs`` to a safe range.
 
         Delegates date-range validation to ``validate_date_ranges`` and
-        clamps ``n_jobs`` to ``total_cpu - 2`` when the caller passes a value
-        at or above the logical CPU count, leaving at least two cores free
+        clamps ``n_jobs`` to ``self.total_cpu`` when the caller passes a
+        value at or above it. ``total_cpu`` is already headroomed to
+        ``multiprocessing.cpu_count() - 2`` (with a floor of ``1``) by the
+        constructor, so the clamp inherits the two-core reservation left
         for the OS and other processes.
 
         Returns:
@@ -204,11 +214,12 @@ class BaseModel(ABC):
         validate_date_ranges(self.start_date, self.end_date)
 
         if self.n_jobs >= self.total_cpu:
-            n_jobs = self.total_cpu - 2
+            n_jobs = self.total_cpu
             if self.verbose:
                 logger.warning(
-                    f"Value of n_jobs ({self.n_jobs}) is more than {self.total_cpu} CPU. "
-                    f"Update n_jobs to {n_jobs} CPU."
+                    f"Value of n_jobs ({self.n_jobs}) exceeds usable "
+                    f"total_cpu ({self.total_cpu}). Update n_jobs to "
+                    f"{n_jobs} CPU."
                 )
             self.n_jobs = n_jobs
 
