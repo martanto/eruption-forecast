@@ -74,7 +74,7 @@ ForecastModel(
 | `output_dir` | `str \| None` | `None` | Defaults to `{cwd}/output` (or `{root_dir}/output` when `root_dir` set) |
 | `root_dir` | `str \| None` | `None` | Anchor for relative `output_dir` |
 | `overwrite` | `bool` | `False` | Default for stage methods |
-| `n_jobs` | `int` | `1` | Default for stage methods; clamped to `cpu_count - 2` |
+| `n_jobs` | `int` | `1` | Default for stage methods; clamped to `total_cpu` (which is `cpu_count() - 2` with a floor of 1) when caller exceeds it |
 | `verbose` | `bool` | `False` | Default for stage methods |
 
 ### `calculate(...)`

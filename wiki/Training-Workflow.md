@@ -91,7 +91,7 @@ downstream stages can pick up mid-run.
 │                       classifiers, window_size, cv_strategy,          │
 │                       cv_splits, scoring, top_n_features, n_jobs,     │
 │                       n_grids, output_dir, nslc, ...                  │
-│   validate() clamps n_jobs / n_grids to total_cpu - 2 if needed       │
+│   validate() clamps n_grids so n_jobs × n_grids ≤ total_cpu           │
 └──────────────────────────────────┬────────────────────────────────────┘
                                    ▼
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -303,14 +303,31 @@ After the loop:
 
 ```
 n_jobs (outer)   = # of seed workers running in parallel
-n_grids (inner)  = # of GridSearchCV / FeatureSelector workers per seed
+n_grids (inner)  = # of GridSearchCV workers per seed
 
 constraint: n_jobs × n_grids ≤ total_cpu
-            BaseModel.validate() clamps n_grids when violated.
-            When both default to 1, n_grids is bumped to total_cpu - 2.
+            TrainingModel.validate() clamps n_grids when violated.
+            When both default to 1, n_grids is bumped to total_cpu so
+            the grid search uses every available core.
 ```
 
-`joblib.Parallel(backend="loky")` runs the outer loop; sklearn's own `GridSearchCV(n_jobs=...)` runs the inner loop.
+`total_cpu` is `max(1, multiprocessing.cpu_count() - 2)`, computed once in `BaseModel.__init__` — the 2-core reservation is baked into the source, so every downstream clamp inherits it and the OS keeps headroom regardless of what callers pick for `n_jobs` and `n_grids`.
+
+`joblib.Parallel(backend="loky")` runs the outer loop; sklearn's own `GridSearchCV(n_jobs=...)` runs the inner loop. Nested inner parallelism (`n_jobs > 1` **and** `n_grids > 1`) is safe: joblib detects the nest and falls back to threading. tsfresh's `FeatureSelector`, which uses a raw `multiprocessing.Pool` with no nested-parallelism fallback of its own, is pinned separately — `FeatureSelector.n_jobs = 1` whenever `n_jobs > 1`; otherwise it mirrors `n_grids` so standalone (outer-sequential) runs still parallelise the p-value pass.
+
+#### Behaviour matrix
+
+Assuming an 8-core box (`total_cpu = 6` after the 2-core OS reservation):
+
+| Caller | Post-validate `n_jobs` | Post-validate `n_grids` | `FeatureSelector.n_jobs` | Notes |
+|---|---|---|---|---|
+| `n_jobs=1, n_grids=1` (defaults) | 1 | 6 (idle-boost) | 6 | Outer sequential — tsfresh still parallelises inside each seed. |
+| `n_jobs=1, n_grids=3` | 1 | 3 | 3 | Outer sequential — tsfresh keeps user's `n_grids`. |
+| `n_jobs=2, n_grids=2` | 2 | 2 | **1** | Nested `GridSearchCV` parallelism allowed; tsfresh pinned. |
+| `n_jobs=4, n_grids=2` (product 8 > 6) | 4 | 1 (product cap) | 1 | Product cap fires; tsfresh still pinned. |
+| `n_jobs=4, n_grids=1` | 4 | 1 | 1 | Outer parallel — tsfresh pin is explicit. |
+
+For a different core count, substitute `total_cpu = max(1, cpu_count() - 2)` and re-derive.
 
 ### Scoring
 
