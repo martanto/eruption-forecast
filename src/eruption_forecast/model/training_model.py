@@ -414,47 +414,48 @@ class TrainingModel(BaseModel):
     def validate(self) -> Self:
         """Validate and reconcile model parameters against system and data constraints.
 
-        Enforces mutually-exclusive outer/inner parallelism: when
-        ``n_jobs > 1`` the outer seed loop already fans out via
-        ``joblib.Parallel(backend="loky")``, so ``n_grids`` is forced to
-        ``1`` to prevent nested loky parallelism inside ``GridSearchCV`` and
-        ``FeatureSelector`` (nested loky either collapses to sequential with
-        warnings or oversubscribes CPU). Clamps ``n_grids`` so the product
-        ``n_jobs × n_grids`` never exceeds the available CPU count. When the
-        caller leaves both ``n_jobs`` and ``n_grids`` at their default of
-        ``1``, ``n_grids`` is boosted to ``total_cpu - 2`` so the grid search
-        can use the available cores. Keeps the already-constructed
-        ``FeatureSelector.n_jobs`` in sync with the final ``n_grids`` so
-        every inner-parallel site reads the same value. Creates the root
-        training directory as a side effect. Date range clamping against the
-        tremor data bounds is deferred to ``_sync_dates_to_tremor()``, which
-        is called lazily from ``build_label()`` to avoid loading the tremor
-        CSV during construction.
+        Clamps ``n_grids`` so the product ``n_jobs × n_grids`` never exceeds
+        ``self.total_cpu`` (already OS-headroomed to ``cpu_count() - 2`` with a
+        floor of ``1`` by ``BaseModel``). When the caller leaves both ``n_jobs``
+        and ``n_grids`` at their default of ``1``, ``n_grids`` is boosted to
+        ``total_cpu`` so the grid search uses every available core. Nested
+        inner ``GridSearchCV`` parallelism is permitted when both ``n_jobs``
+        and ``n_grids`` exceed ``1``: joblib detects the nest and falls back
+        to a threading backend, so no true nested loky process explosion is
+        possible. ``FeatureSelector.n_jobs`` is derived from the outer-loop
+        state — pinned to ``1`` whenever ``n_jobs > 1`` because tsfresh's
+        ``multiprocessing.Pool`` has no nested-parallelism fallback of its
+        own, otherwise mirrored from ``n_grids`` so standalone runs still
+        parallelise the p-value pass. Creates the root training directory as
+        a side effect. Date range clamping against the tremor data bounds is
+        deferred to ``_sync_dates_to_tremor()``, which is called lazily from
+        ``build_label()`` to avoid loading the tremor CSV during construction.
 
         Returns:
             Self: The current instance, enabling method chaining.
         """
-        # Prevent nested joblib parallelism.
-        if self.n_jobs > 1 and self.n_grids > 1:
-            logger.info(
-                f"n_jobs={self.n_jobs} > 1: forcing n_grids from {self.n_grids} to 1 "
-                f"to avoid nested joblib parallelism."
-            )
-            self.n_grids = 1
-
-        # Ensure total grid not over than total CPU
+        # Ensure total grid not over than total CPU.
         total_grid = self.n_jobs * self.n_grids
         if total_grid > self.total_cpu:
             self.n_grids = np.clip(self.total_cpu // self.n_jobs, 1, self.total_cpu)
 
-        # Optimize n_grids search to utitlize all available CPU
+        # Optimise n_grids search to utilise all available CPU. `total_cpu`
+        # already carries the 2-core OS reservation from `BaseModel`, so no
+        # additional subtraction is applied here.
         if self.n_jobs == 1 and self.n_grids == 1:
-            self.n_grids = max(1, self.total_cpu - 2)
+            self.n_grids = max(1, self.total_cpu)
 
-        # Sync the FeatureSelector's inner worker count with the final
-        # n_grids so both inner-parallel sites (GridSearchCV in _train and
-        # tsfresh / RF probe inside FeatureSelector) agree.
-        self.FeatureSelector.n_jobs = self.n_grids
+        # Pin tsfresh's inner parallelism whenever the outer joblib.Parallel
+        # loop is active. tsfresh's ``FeatureSelector`` uses a raw
+        # ``multiprocessing.Pool`` with no nested-parallelism fallback, so
+        # allowing >1 here would spawn child processes per outer loky
+        # worker and oversubscribe the CPU. ``GridSearchCV``'s inner
+        # ``n_grids`` is unaffected — joblib detects the nest and falls
+        # back to threading, keeping it safe.
+        if self.n_jobs > 1:
+            self.FeatureSelector.n_jobs = 1
+        else:
+            self.FeatureSelector.n_jobs = self.n_grids
 
         ensure_dir(self.training_dir)
 
