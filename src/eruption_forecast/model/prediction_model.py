@@ -702,12 +702,14 @@ class PredictionModel(BaseModel):
         self.features_path = features_builder.path
 
         # ``TremorMatrixBuilder`` drops windows that fail ``minimum_completion``,
-        # so narrow the label grid to the surviving feature ids here — this
-        # invariant lets every downstream consumer (forecast, evaluation,
+        # so narrow the label grid to the surviving feature windows here —
+        # this invariant lets every downstream consumer (forecast, evaluation,
         # explanation) treat ``self._labels`` and ``self.features_df`` as
-        # aligned without a separate re-check.
+        # aligned without a separate re-check. Post the features-matrix
+        # DatetimeIndex migration, both frames share a ``DatetimeIndex``, so
+        # the narrow is a straight index-on-index intersection.
         if len(self._labels) != len(self.features_df):
-            self._labels = self._labels[self._labels["id"].isin(self.features_df.index)]
+            self._labels = self._labels[self._labels.index.isin(self.features_df.index)]
             self._labels.to_csv(self.labels_csv, index=True)
             self.labels = self._labels["id"]
 

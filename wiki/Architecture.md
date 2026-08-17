@@ -408,7 +408,7 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
 | Tremor             | `CalculateTremor`          | `SeismicDataSource.get(date)`  | `tremor/daily/*.csv`, merged `{nslc}_{start}_{end}.csv`                                      |
 | Label              | `LabelBuilder`             | Tremor index, eruption dates   | `training/features/{cv}/features-label_*.csv`                                                |
 | Tremor matrix      | `TremorMatrixBuilder`      | Tremor CSV + labels            | `training/tremor/tremor_matrix_*.csv` (+ `per_method/`)                                      |
-| Features           | `FeaturesBuilder`          | Tremor matrix                  | `training/features/{cv}/features-matrix_*.parquet`                                           |
+| Features           | `FeaturesBuilder`          | Tremor matrix                  | `training/features/{cv}/features-matrix-dt_*.parquet`                                           |
 | Feature selection  | `FeatureSelector`          | Features + labels              | `training/features/{cv}/seed/{seed:05d}.csv` + `top_N_features.csv`                          |
 | Training fit       | `TrainingModel`            | Selected features + labels     | `training/classifiers/{clf}/{cv}/models/*.pkl` + `SeedEnsemble_*.pkl` + `ClassifierEnsemble_*.{pkl,json}` |
 | Prediction grid    | `PredictionModel`          | Tremor CSV + window grid       | `prediction/features/features-{matrix,label}_*.csv`                                          |
@@ -429,7 +429,7 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
     ┌───────────────────────────────────────────────────────────────┐
     │ training/                                                     │
     │  features/{cv}/                                               │
-    │    features-matrix_*.parquet ──► features-label_*.csv         │
+    │    features-matrix-dt_*.parquet ──► features-label_*.csv         │
     │       │                                                       │
     │       ▼                                                       │
     │    seed/{seed:05d}.csv  ──► resampled/{seed:05d}.csv          │
@@ -445,7 +445,7 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
               ▼
     ┌───────────────────────────────────────────────────────────────┐
     │ prediction/                                                   │
-    │   features/features-matrix_*.parquet + features-label_*.csv   │
+    │   features/features-matrix-dt_*.parquet + features-label_*.csv   │
     │   results/{clf}/{seed:05d}.csv                                │
     │   figures/forecast_*.{png,pdf}                                │
     │ forecast-results_*.csv  (top-level dump)          │

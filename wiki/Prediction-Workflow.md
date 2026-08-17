@@ -150,7 +150,7 @@ fm.predict(..., use_features_from="training")
 fm.predict(
     ...,
     use_features_from="files",
-    features_matrix_path="output/.../prediction/features/features-matrix_....parquet",
+    features_matrix_path="output/.../prediction/features/features-matrix-dt_....parquet",
     label_features_csv="output/.../prediction/features/features-label_....csv",
 )
 ```
@@ -222,7 +222,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 ├── prediction/
 │   ├── features/
 │   │   ├── features-label_{basename}_step-{N}-{unit}.csv  # forecast grid
-│   │   └── features-matrix_*.parquet                       # tsfresh matrix (Snappy Parquet)
+│   │   └── features-matrix-dt_*.parquet                       # tsfresh matrix (Snappy Parquet)
 │   ├── results/{clf-slug}/{seed:05d}.csv                   # per-seed probability (save_seed_result=True)
 │   └── figures/forecast_{basename}.{png,pdf}               # forecast plot
 ├── forecast-results_{basename}.csv             # top-level results dump
@@ -276,7 +276,7 @@ The reloaded `pm.results` is the same DataFrame returned by `forecast()` - no re
 
 ### Reuse a feature matrix from a prior run
 
-`PredictionModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix_*.parquet` + `features-label_*.csv`. Use it when the windowing and tremor data have not changed — for example replaying `forecast()` with a different trained ensemble against an existing feature matrix, or forecasting from *just two files* (a `ClassifierEnsemble.pkl` plus a pre-computed features matrix) without ever pointing at raw tremor data:
+`PredictionModel.load_features(...)` skips tsfresh entirely and loads a previously written `features-matrix-dt_*.parquet` + `features-label_*.csv`. Use it when the windowing and tremor data have not changed — for example replaying `forecast()` with a different trained ensemble against an existing feature matrix, or forecasting from *just two files* (a `ClassifierEnsemble.pkl` plus a pre-computed features matrix) without ever pointing at raw tremor data:
 
 ```python
 from eruption_forecast import PredictionModel
@@ -290,7 +290,7 @@ pm = PredictionModel(
     output_dir="output/VG.OJN.00.EHZ",
     n_jobs=4,
 ).load_features(
-    features_matrix_path="output/VG.OJN.00.EHZ/prediction/features/features-matrix_2025-07-27_2025-08-22_step-10-minutes.parquet",
+    features_matrix_path="output/VG.OJN.00.EHZ/prediction/features/features-matrix-dt_2025-07-27_2025-08-22_step-10-minutes.parquet",
     label_features_csv="output/VG.OJN.00.EHZ/prediction/features/features-label_2025-07-27_2025-08-22_step-10-minutes.csv",
     window_step=10,
     window_step_unit="minutes",

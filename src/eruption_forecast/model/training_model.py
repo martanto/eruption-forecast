@@ -853,12 +853,19 @@ class TrainingModel(BaseModel):
 
         labels: pd.DataFrame = features_builder.label_df
 
+        # Preserve the DatetimeIndex so labels align with the
+        # DatetimeIndex-first features matrix on the shared temporal axis.
+        # The ``id`` column stays on the on-disk features-label CSV (registry)
+        # but is redundant on the in-memory Series; drop the ``datetime``
+        # column too when it appears (only present if the DatetimeIndex was
+        # already reset into a column upstream).
         if "id" in labels.columns:
-            labels = labels.set_index("id")
+            labels = labels.drop(columns=["id"])
         if "datetime" in labels.columns:
-            labels = labels.drop("datetime", axis=1)
+            labels = labels.drop(columns=["datetime"])
 
-        # Label with ``pd.RangeIndex`` and column ``is_erupted`` only
+        # Series indexed by the label ``DatetimeIndex`` — aligns with
+        # ``self.features_df`` on the shared temporal axis.
         self.labels = labels["is_erupted"]
 
         return self
@@ -1221,7 +1228,7 @@ class TrainingModel(BaseModel):
         """
         if features_matrix_path is None:
             features_matrix_path = self._resolve_single_artefact(
-                pattern="features-matrix_*.parquet", label="feature matrix"
+                pattern="features-matrix-dt_*.parquet", label="feature matrix"
             )
         elif not os.path.isfile(features_matrix_path):
             raise FileNotFoundError(

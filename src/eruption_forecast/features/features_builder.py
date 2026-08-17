@@ -373,6 +373,20 @@ class FeaturesBuilder:
         # Get labels based on unique IDs from tremor matrix
         self.unique_ids: list[int] = tremor_matrix_df[ID_COLUMN].unique().tolist()
 
+        # Map every window ``id`` to its canonical datetime so per-column
+        # tsfresh output can be re-indexed with a ``DatetimeIndex`` before it
+        # is written to disk. This makes every features artefact (per-column
+        # parquets + merged matrix) share one datetime axis and removes the
+        # sibling ``features-label_*.csv`` from the critical path for
+        # downstream consumers.
+        #
+        # Preferred source: ``self.label_df``'s ``DatetimeIndex`` — the
+        # authoritative window-start timestamp per id (matches every existing
+        # ``features-label_*.csv`` and the ``DatetimeIndex`` on ``TrainingModel``
+        # / ``PredictionModel``'s in-memory labels). Fallback (bare FeaturesBuilder
+        # constructed with ``label_df=None``): the first tremor sample per id.
+        id_to_datetime = self._build_id_to_datetime(tremor_matrix_df)
+
         # Dispatch to the appropriate mode helper.
         # Prediction mode forces use_relevant_features=False (requires labels).
         if isinstance(self.label_df, pd.DataFrame) and self.label_df.empty:
@@ -415,7 +429,11 @@ class FeaturesBuilder:
         extract_features_dir = os.path.join(self.output_dir, "extracted")
         ensure_dir(extract_features_dir)
 
-        _prefix_filename = f"features-matrix_{dates_str}"
+        # ``features-matrix-dt`` (dt = DatetimeIndex) — bumped from the legacy
+        # ``features-matrix`` stem so old integer-``id``-indexed cache parquets
+        # from prior runs are ignored rather than reloaded into the new
+        # ``DatetimeIndex``-first pipeline.
+        _prefix_filename = f"features-matrix-dt_{dates_str}"
         prefix_filename = (
             _prefix_filename
             if prefix_filename is None
@@ -476,6 +494,7 @@ class FeaturesBuilder:
                 use_relevant_features=use_relevant_features,
                 prefix_filename=prefix_filename,
                 extract_features_dir=extract_features_dir,
+                id_to_datetime=id_to_datetime,
             )
 
             if extracted_path:
@@ -765,12 +784,17 @@ class FeaturesBuilder:
         use_relevant_features: bool,
         prefix_filename: str,
         extract_features_dir: str,
+        id_to_datetime: pd.Series,
     ) -> tuple[str, pd.DataFrame | None]:
         """Extract features for a single tremor column using tsfresh.
 
         Performs tsfresh feature extraction for one tremor column, either using
         all features (extract_features) or only statistically relevant features
-        (extract_relevant_features) based on correlation with labels.
+        (extract_relevant_features) based on correlation with labels. The
+        tsfresh output is indexed by the integer window ``id``; before the
+        per-column Parquet is written, that index is replaced with a
+        ``DatetimeIndex`` derived from ``id_to_datetime`` so every features
+        artefact carries its temporal axis directly.
 
         Args:
             tremor_matrix_df (pd.DataFrame): Features DataFrame with 'id',
@@ -785,6 +809,11 @@ class FeaturesBuilder:
                 relevant features (requires non-empty y).
             prefix_filename (str): Prefix for output filename.
             extract_features_dir (str): Directory to save extracted features.
+            id_to_datetime (pd.Series): Series mapping window ``id`` (index)
+                to the window's representative ``datetime`` (value). Built
+                once at the top of :meth:`extract_features` from
+                ``tremor_matrix_df`` and shared across every column. Used to
+                stamp a ``DatetimeIndex`` on the tsfresh output before write.
 
         Returns:
             tuple[str, pd.DataFrame | None]: Tuple containing:
@@ -805,7 +834,8 @@ class FeaturesBuilder:
             ...     extract_params=params,
             ...     use_relevant_features=False,
             ...     prefix_filename="all_features",
-            ...     extract_features_dir="output/features/extracted"
+            ...     extract_features_dir="output/features/extracted",
+            ...     id_to_datetime=id_to_datetime,
             ... )
         """
         extracted_path = os.path.join(
@@ -859,8 +889,13 @@ class FeaturesBuilder:
                 **extract_params,
             )
 
-        # Save to Parquet
-        extracted_features.index.name = ID_COLUMN
+        # Replace the tsfresh integer ``id`` index with the window's
+        # representative datetime so every features artefact carries its
+        # temporal axis directly — no more sibling ``features-label_*.csv``
+        # required to attach datetimes downstream.
+        extracted_features = self._attach_datetime_index(
+            extracted_features, id_to_datetime, column_method
+        )
         extracted_features.to_parquet(
             extracted_path, engine="pyarrow", compression="snappy", index=True
         )
@@ -869,6 +904,95 @@ class FeaturesBuilder:
             logger.info(f"{column_method} :: Features extracted: {extracted_path}")
 
         return extracted_path, extracted_features
+
+    def _build_id_to_datetime(self, tremor_matrix_df: pd.DataFrame) -> pd.Series:
+        """Resolve the canonical ``id → datetime`` map for the current run.
+
+        Prefers ``self.label_df``'s ``DatetimeIndex`` when available (the
+        authoritative window-start timestamp per id, matching every existing
+        ``features-label_*.csv`` and the ``DatetimeIndex`` on
+        ``TrainingModel`` / ``PredictionModel``'s in-memory labels). Falls
+        back to the first tremor sample per id when the builder was
+        constructed without a label frame — the bare-``FeaturesBuilder``
+        path that predates the training / prediction pipelines.
+
+        Args:
+            tremor_matrix_df (pd.DataFrame): Windowed tremor matrix; used as
+                the fallback datetime source when ``self.label_df`` is empty.
+
+        Returns:
+            pd.Series: ``id`` index → representative ``datetime`` value.
+
+        Raises:
+            ValueError: If the label DF's index is not a ``DatetimeIndex``.
+        """
+        label_df = self.label_df
+        if isinstance(label_df, pd.DataFrame) and not label_df.empty:
+            if not isinstance(label_df.index, pd.DatetimeIndex):
+                raise ValueError(
+                    "label_df must have a pd.DatetimeIndex for the "
+                    "DatetimeIndex-first features matrix. Got: "
+                    f"{type(label_df.index).__name__}"
+                )
+            id_to_datetime = (
+                label_df[[ID_COLUMN]]
+                .assign(**{DATETIME_COLUMN: label_df.index})
+                .drop_duplicates(ID_COLUMN, keep="first")
+                .set_index(ID_COLUMN)[DATETIME_COLUMN]
+            )
+        else:
+            id_to_datetime = (
+                tremor_matrix_df[[ID_COLUMN, DATETIME_COLUMN]]
+                .drop_duplicates(ID_COLUMN, keep="first")
+                .set_index(ID_COLUMN)[DATETIME_COLUMN]
+            )
+        return pd.to_datetime(id_to_datetime)
+
+    @staticmethod
+    def _attach_datetime_index(
+        df: pd.DataFrame,
+        id_to_datetime: pd.Series,
+        column_method: str,
+    ) -> pd.DataFrame:
+        """Replace an integer-``id`` index with a ``DatetimeIndex``.
+
+        Looks up each row's datetime in ``id_to_datetime`` and sets a
+        ``DatetimeIndex`` named ``"datetime"`` on the frame. Missing ids
+        raise loudly so a stale ``id_to_datetime`` cannot silently drop
+        rows from the merged features matrix downstream.
+
+        Args:
+            df (pd.DataFrame): tsfresh output indexed by integer window
+                ``id``.
+            id_to_datetime (pd.Series): Series mapping window ``id``
+                (index) → representative ``datetime`` (value).
+            column_method (str): Tremor column name, surfaced in the
+                error message when ids are missing so the caller can
+                pinpoint the offending column.
+
+        Returns:
+            pd.DataFrame: ``df`` with its index replaced by a
+                ``DatetimeIndex`` named ``"datetime"``. The original
+                integer-``id`` index is discarded.
+
+        Raises:
+            KeyError: If any id in ``df.index`` is absent from
+                ``id_to_datetime``.
+        """
+        missing = df.index.difference(id_to_datetime.index)
+        if len(missing) > 0:
+            raise KeyError(
+                f"{column_method}: {len(missing)} tsfresh id(s) missing from "
+                f"id_to_datetime map (first few: {list(missing[:5])}). "
+                "This indicates a stale tremor_matrix_df vs the tsfresh "
+                "grouping — rebuild the tremor matrix and retry."
+            )
+        datetimes = pd.DatetimeIndex(
+            id_to_datetime.loc[df.index].to_numpy(), name=DATETIME_COLUMN
+        )
+        df = df.copy()
+        df.index = datetimes
+        return df
 
     def _prepare_training_mode(
         self, label_df: pd.DataFrame

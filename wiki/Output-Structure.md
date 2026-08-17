@@ -24,7 +24,7 @@ Every pipeline run writes under a single station directory:
 ├── training/                                                 # TrainingModel
 │   ├── training.config.yaml                                  # tm.save_config() — auto-written at end of fit()
 │   ├── features/{cv-slug}/
-│   │   ├── features-matrix_{basename}.parquet                # Full tsfresh feature matrix (Snappy Parquet)
+│   │   ├── features-matrix-dt_{basename}.parquet                # Full tsfresh feature matrix (Snappy Parquet)
 │   │   ├── features-label_{basename}.csv                     # Aligned binary labels
 │   │   ├── seed/{seed:05d}.csv                               # Top-N features per seed
 │   │   ├── seed/figures/{seed:05d}.png                       # Per-seed importance plots (plot_features=True)
@@ -53,7 +53,7 @@ Every pipeline run writes under a single station directory:
 │   ├── prediction.config.yaml                                # pm.save_config() — auto-written at end of forecast()
 │   ├── features/
 │   │   ├── features-label_{basename}_step-{N}-{unit}.csv     # Forecast window grid
-│   │   └── features-matrix_*.parquet                         # tsfresh matrix for the grid (Snappy Parquet)
+│   │   └── features-matrix-dt_*.parquet                         # tsfresh matrix for the grid (Snappy Parquet)
 │   ├── results/{clf-slug}/{seed:05d}.csv                     # Per-seed probability (save_seed_result=True)
 │   └── figures/forecast_{basename}.{png,pdf}                 # Forecast plot
 │
@@ -251,7 +251,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 |------------------------|-----------|
 | The merged tremor CSV | `tremor/{nslc}_{start}_{end}.csv` |
 | Per-day tremor plots | `tremor/figures/` |
-| The features tsfresh extracted | `training/features/{cv}/features-matrix_*.parquet` |
+| The features tsfresh extracted | `training/features/{cv}/features-matrix-dt_*.parquet` |
 | Per-seed feature picks | `training/features/{cv}/seed/{seed:05d}.csv` |
 | Raw per-seed picks concatenated | `training/features/{cv}/significant_features.csv` |
 | Full ranked feature list (all features, with `alias` + `description`) | `training/features/{cv}/top_features.csv` |

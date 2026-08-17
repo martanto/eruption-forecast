@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -132,29 +133,48 @@ def to_series(
 
 
 def load_label_csv(label_features_csv: str) -> pd.Series:
-    """Load a label CSV and return a Series indexed by window ID.
+    """Load a label CSV and return the ``is_erupted`` Series with its native axis.
 
-    Reads the aligned label CSV produced by ``FeaturesBuilder``, sets the
-    ``id`` column as the index, drops the ``datetime`` column if present,
-    and returns the ``is_erupted`` column as a Series.
+    Reads the aligned label CSV produced by ``FeaturesBuilder``. Post the
+    features-matrix DatetimeIndex migration, callers align labels with
+    features via a shared ``DatetimeIndex`` — so this helper now preserves
+    the CSV's datetime axis when present and only falls back to the legacy
+    ``id``-indexed shape when the CSV has no parseable datetime column
+    (e.g. an older artefact hand-authored before the migration).
 
     Args:
         label_features_csv (str): Path to the label CSV file. Must contain
-            an ``id`` column and an ``is_erupted`` column.
+            an ``is_erupted`` column. The datetime column (typically the
+            first column, unnamed on read via ``index_col=0``) is parsed
+            as the ``DatetimeIndex`` when present.
 
     Returns:
-        pd.Series: Binary eruption labels indexed by window ID.
+        pd.Series: Binary eruption labels. Indexed by ``pd.DatetimeIndex``
+        when the CSV carries a parseable datetime column; otherwise
+        indexed by window ``id`` for backwards compatibility.
 
     Raises:
         FileNotFoundError: If the file does not exist.
 
     Examples:
-        >>> labels = load_label_csv("output/features/label_features.csv")
+        >>> labels = load_label_csv("output/features/features-label_...csv")
+        >>> isinstance(labels.index, pd.DatetimeIndex)
+        True
         >>> print(labels.value_counts())
         0    450
         1     50
         Name: is_erupted, dtype: int64
     """
+    df = pd.read_csv(label_features_csv, index_col=0, parse_dates=True)
+
+    # New shape: DatetimeIndex + ``id`` column + ``is_erupted`` column.
+    # Preserve the DatetimeIndex so callers can align with the
+    # DatetimeIndex-first features matrix on the shared temporal axis.
+    if isinstance(df.index, pd.DatetimeIndex):
+        return df["is_erupted"]
+
+    # Legacy fallback: no parseable datetime column at index_col=0. Reload
+    # unindexed and reproduce the historical ``id``-indexed behaviour.
     df = pd.read_csv(label_features_csv)
     if "id" in df.columns:
         df = df.set_index("id")
@@ -164,49 +184,53 @@ def load_label_csv(label_features_csv: str) -> pd.Series:
 
 
 def load_datetime_indexed(label_csv: str, features_path: str) -> pd.DataFrame:
-    """Load a label CSV and an ``id``-indexed data file, then re-index by datetime.
+    """Load a features / probability frame and ensure a ``DatetimeIndex``.
 
-    Thin file-path wrapper around :func:`to_datetime_index`. Loads the label
-    CSV (DatetimeIndex + ``id`` column) and the features/probability file
-    (``id``-indexed), then delegates the merge and ``DatetimeIndex``
-    replacement to :func:`to_datetime_index`. The features file format is
-    dispatched by extension: ``.parquet`` via ``pd.read_parquet`` and ``.csv``
-    via ``pd.read_csv`` with the first column as index.
+    .. deprecated::
+        The features-matrix DatetimeIndex migration made the sibling
+        ``features-label_*.csv`` join redundant — features and probability
+        parquets produced by :class:`FeaturesBuilder` / :class:`SeedEnsemble`
+        now carry a ``DatetimeIndex`` directly. This helper stays for one
+        release as a compatibility shim: on-disk artefacts that already
+        carry a ``DatetimeIndex`` are returned as-is (``label_csv``
+        unused); legacy integer-``id``-indexed artefacts still fall back
+        to the CSV-join path via
+        :func:`~eruption_forecast.utils.date_utils.to_datetime_index`.
 
     Args:
-        label_csv (str): Path to the aligned label CSV produced by
-            ``FeaturesBuilder`` (e.g. ``features-label_{start}_{end}.csv``).
-            Must contain a datetime index and an ``id`` column.
-        features_path (str): Path to the ``id``-indexed features matrix or
-            probability matrix. Supported suffixes: ``.parquet``, ``.csv``.
+        label_csv (str): Path to the sibling ``features-label_*.csv``
+            (used only when ``features_path`` is still integer-``id``-indexed).
+        features_path (str): Path to the features / probability frame.
+            Supported suffixes: ``.parquet``, ``.csv``.
 
     Returns:
-        pd.DataFrame: Copy of the features/probability frame with a
-        ``DatetimeIndex`` derived from ``label_csv``. The ``id`` and
-        ``datetime`` columns are absent from the result.
+        pd.DataFrame: Frame with a ``DatetimeIndex``. For DatetimeIndex-first
+        parquets this is the loaded frame itself; for legacy integer-``id``-
+        indexed frames it is the merge output.
 
     Raises:
         ValueError: If ``features_path`` has a suffix other than ``.parquet``
             or ``.csv``.
-        ValueError: Propagated from :func:`to_datetime_index` when the loaded
-            frames cannot be aligned (length mismatch, missing ``id`` column,
-            missing ``datetime`` column).
+        ValueError: Propagated from :func:`to_datetime_index` when a legacy
+            frame cannot be aligned.
 
     Examples:
-        >>> # Parquet features matrix
+        >>> # New-format parquet — ``label_csv`` unused:
         >>> df = load_datetime_indexed(
-        ...     label_csv="output/.../features-label_2020-01-01_2020-12-31.csv",
-        ...     features_path="output/.../features-matrix_2020-01-01_2020-12-31.parquet",
+        ...     label_csv="unused-post-migration.csv",
+        ...     features_path="output/.../features-matrix-dt_2025-01-03_2025-03-31.parquet",
         ... )
         >>> isinstance(df.index, pd.DatetimeIndex)
         True
-        >>> # CSV probability matrix
-        >>> df = load_datetime_indexed(
-        ...     label_csv="output/.../prediction/labels/label-features_2020-07.csv",
-        ...     features_path="output/.../predictions/y_proba.csv",
-        ... )
     """
-    labels = pd.read_csv(label_csv, index_col=0, parse_dates=True)
+    warnings.warn(
+        "load_datetime_indexed is deprecated: FeaturesBuilder and SeedEnsemble "
+        "now write DatetimeIndex-first parquets directly, so the CSV-join is "
+        "no longer required. Read the parquet with pd.read_parquet(...) instead. "
+        "This shim will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     suffix = os.path.splitext(features_path)[1].lower()
     if suffix == ".parquet":
@@ -219,46 +243,56 @@ def load_datetime_indexed(label_csv: str, features_path: str) -> pd.DataFrame:
             f"Expected '.parquet' or '.csv'. Got: {features_path}"
         )
 
+    # DatetimeIndex-first artefact — the ``label_csv`` join is redundant.
+    if isinstance(features.index, pd.DatetimeIndex):
+        return features
+
+    labels = pd.read_csv(label_csv, index_col=0, parse_dates=True)
     return to_datetime_index(labels, features)
 
 
 def load_features_matrix(label_csv: str, features_path: str) -> pd.DataFrame:
-    """Load a features matrix and return it with a ``DatetimeIndex``.
+    """Load a features matrix and ensure a ``DatetimeIndex``.
 
-    Domain-named alias for :func:`load_datetime_indexed`. Forwards both
-    arguments unchanged so the parquet / csv dispatch and datetime
-    attachment from a sibling ``features-label_*.csv`` happen exactly
-    once. Prefer this name at call sites that specifically load a
-    features matrix; use :func:`load_datetime_indexed` when the payload
-    is a probability matrix or any other ``id``-indexed frame.
+    .. deprecated::
+        Domain-named alias for :func:`load_datetime_indexed`. Same
+        semantics — see that function's deprecation notice. Prefer
+        ``pd.read_parquet(features_path)`` for DatetimeIndex-first
+        parquets produced by :class:`FeaturesBuilder` after the
+        features-matrix DatetimeIndex migration.
 
     Args:
         label_csv (str): Path to the sibling ``features-label_*.csv``
-            (``DatetimeIndex`` + ``id`` column) used to attach datetimes
-            to the ``id``-indexed features matrix.
-        features_path (str): Path to the ``id``-indexed features matrix.
-            Supported suffixes: ``.parquet``, ``.csv``.
+            (used only when the features matrix is still integer-``id``-indexed).
+        features_path (str): Path to the features matrix. Supported
+            suffixes: ``.parquet``, ``.csv``.
 
     Returns:
-        pd.DataFrame: Features frame with a ``DatetimeIndex`` derived from
-        ``label_csv``. The ``id`` and ``datetime`` columns are absent from
-        the result.
+        pd.DataFrame: Features frame with a ``DatetimeIndex``.
 
     Raises:
-        ValueError: Propagated from :func:`load_datetime_indexed` on an
-            unsupported path suffix or from
-            :func:`~eruption_forecast.utils.date_utils.to_datetime_index`
-            when the frames cannot be aligned.
+        ValueError: Propagated from :func:`load_datetime_indexed`.
 
     Examples:
         >>> df = load_features_matrix(
-        ...     label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
-        ...     features_path="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
+        ...     label_csv="unused-post-migration.csv",
+        ...     features_path="output/.../training/features/stratified-shuffle-split/features-matrix-dt_2025-01-03_2025-03-31.parquet",
         ... )
         >>> isinstance(df.index, pd.DatetimeIndex)
         True
     """
-    return load_datetime_indexed(label_csv=label_csv, features_path=features_path)
+    warnings.warn(
+        "load_features_matrix is deprecated: FeaturesBuilder now writes "
+        "DatetimeIndex-first parquets directly. Read the parquet with "
+        "pd.read_parquet(...) instead. This shim will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    # Delegate to the shim to keep the fallback behaviour in one place — but
+    # suppress the inner warning so callers only see one message per call.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        return load_datetime_indexed(label_csv=label_csv, features_path=features_path)
 
 
 def get_envelope_values(df: pd.DataFrame) -> pd.DataFrame:

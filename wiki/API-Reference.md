@@ -1302,10 +1302,13 @@ axis.
 
 ## Feature matrix loaders
 
-Two thin readers rebuild an ``id``-indexed tsfresh features (or
-probability) frame into a `DatetimeIndex`-ed frame by joining against
-the sibling `features-label_*.csv` written by
-`FeaturesBuilder`.
+> **Deprecated (one release).** Post the features-matrix DatetimeIndex
+> migration, `FeaturesBuilder` and `SeedEnsemble` write DatetimeIndex-first
+> parquets directly — the CSV-join is no longer required. Call
+> `pd.read_parquet(features_path)` and use the frame's own axis. Both
+> helpers still work: they emit a `DeprecationWarning`, short-circuit
+> DatetimeIndex-first parquets, and fall back to the CSV-join for legacy
+> integer-`id`-indexed artefacts. They will be removed in a future release.
 
 ```python
 from eruption_forecast.utils.dataframe import (
@@ -1324,24 +1327,19 @@ load_features_matrix(
 ) -> pd.DataFrame
 ```
 
-- `label_csv` — path to the aligned label CSV (`features-label_*.csv`)
-  with a `DatetimeIndex` and an `id` column.
-- `features_path` — path to the ``id``-indexed matrix. Dispatched by
-  suffix: `.parquet` via `pd.read_parquet`, `.csv` via
+- `label_csv` — path to the sibling `features-label_*.csv` (used only
+  when `features_path` is still integer-`id`-indexed; ignored for the
+  post-migration `features-matrix-dt_*.parquet`).
+- `features_path` — path to the matrix. Dispatched by suffix:
+  `.parquet` via `pd.read_parquet`, `.csv` via
   `pd.read_csv(..., index_col=0)`. Any other suffix raises `ValueError`.
-- Returned frame: the input matrix's columns with a `DatetimeIndex`
-  derived from `label_csv`; the `id` / `datetime` columns are absent.
+- Returned frame: DatetimeIndex-first parquets are returned unchanged;
+  legacy id-indexed inputs get a `DatetimeIndex` merged in from
+  `label_csv`.
 
 `load_features_matrix` is the domain-named alias for
-`load_datetime_indexed`. Reach for `load_features_matrix` at call sites
-that specifically load a features matrix so intent is obvious; use
-`load_datetime_indexed` when the payload is a probability matrix or any
-other ``id``-indexed frame (e.g. `predictions/y_proba.csv`).
-
-Both propagate `ValueError` from
-`eruption_forecast.utils.date_utils.to_datetime_index` when the two
-frames cannot be aligned (length mismatch, missing `id` column, missing
-`datetime` column).
+`load_datetime_indexed`. Prefer `pd.read_parquet(features_path)` for
+new callers.
 
 ---
 
@@ -1402,13 +1400,13 @@ suffix. Propagates `FileNotFoundError` from `load_select_features` when
 
 ```python
 merged = merge_features_matrix(
-    training_features_matrix="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
-    prediction_features_matrix="output/.../prediction/features/features-matrix_2025-01-01-2025-08-22.parquet",
+    training_features_matrix="output/.../training/features/stratified-shuffle-split/features-matrix-dt_2025-01-03_2025-03-31.parquet",
+    prediction_features_matrix="output/.../prediction/features/features-matrix-dt_2025-01-01-2025-08-22.parquet",
     training_label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
     prediction_label_csv="output/.../prediction/features/features-label_2025-01-01_2025-08-22_ws-2_step-10-minutes.csv",
     select_features="output/.../training/features/stratified-shuffle-split/top_features.csv",
     number_of_features=20,
-    output_path="output/.../analysis/features-matrix_merged.parquet",
+    output_path="output/.../analysis/features-matrix-dt_merged.parquet",
 )
 ```
 

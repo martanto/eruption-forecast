@@ -1042,8 +1042,8 @@ def plot_common_features_correlation(
         plt.Axes: The heatmap axes.
 
     Raises:
-        ValueError: If the sibling ``features-matrix_*.parquet`` next to any
-            input path is missing or ambiguous (0 or >1 matches).
+        ValueError: If the sibling ``features-matrix-dt_*.parquet`` next to
+            any input path is missing or ambiguous (0 or >1 matches).
         KeyError: If any common feature is absent from a scenario's matrix.
     """
     common_df = find_common_features(list(top_features_csv.values()))
@@ -1052,10 +1052,13 @@ def plot_common_features_correlation(
     blocks: list[pd.DataFrame] = []
     for path in top_features_csv.values():
         parent = os.path.dirname(path)
-        matches = glob.glob(os.path.join(parent, "features-matrix_*.parquet"))
+        # Post the features-matrix DatetimeIndex migration, the stem changed
+        # from ``features-matrix_`` to ``features-matrix-dt_`` so old
+        # integer-``id``-indexed caches are ignored automatically.
+        matches = glob.glob(os.path.join(parent, "features-matrix-dt_*.parquet"))
         if len(matches) != 1:
             raise ValueError(
-                f"Expected exactly 1 features-matrix_*.parquet next to {path}, "
+                f"Expected exactly 1 features-matrix-dt_*.parquet next to {path}, "
                 f"found {len(matches)}."
             )
         matrix = pd.read_parquet(matches[0])

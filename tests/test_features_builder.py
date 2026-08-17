@@ -133,4 +133,54 @@ class TestFeaturesBuilderExtract:
             tremor_cols = [c for c in result.columns if "__" in c]
             assert all("rsam_f0" in c or "rsam_f1" in c for c in tremor_cols)
 
+    def test_extract_returns_datetime_index(self) -> None:
+        """Post-migration, extract_features() returns a DatetimeIndex-first frame."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fb = FeaturesBuilder(
+                tremor_matrix_df=_make_tremor_matrix(n_windows=4),
+                output_dir=tmp,
+                label_df=_make_label_df(n_windows=4),
+            )
+            result = fb.extract_features(select_tremor_columns=["rsam_f0", "rsam_f1"])
+            assert isinstance(result.index, pd.DatetimeIndex)
+            assert result.index.name == DATETIME_COLUMN
+            # Index values match the label DF's canonical datetimes.
+            expected = _make_label_df(n_windows=4).index
+            assert list(result.index) == list(expected)
+
+    def test_persisted_parquet_carries_datetime_index(self) -> None:
+        """The merged features parquet on disk keeps the DatetimeIndex."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fb = FeaturesBuilder(
+                tremor_matrix_df=_make_tremor_matrix(n_windows=4),
+                output_dir=tmp,
+                label_df=_make_label_df(n_windows=4),
+            )
+            fb.extract_features(select_tremor_columns=["rsam_f0", "rsam_f1"])
+            assert fb.path is not None
+            # Filename bumped to ``features-matrix-dt_*`` so old caches are ignored.
+            assert "features-matrix-dt_" in os.path.basename(fb.path)
+            reloaded = pd.read_parquet(fb.path)
+            assert isinstance(reloaded.index, pd.DatetimeIndex)
+            assert reloaded.index.name == DATETIME_COLUMN
+
+    def test_prediction_mode_uses_tremor_datetimes(self) -> None:
+        """Without label_df, the DatetimeIndex falls back to the tremor matrix."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tremor_matrix = _make_tremor_matrix(n_windows=3)
+            fb = FeaturesBuilder(
+                tremor_matrix_df=tremor_matrix,
+                output_dir=tmp,
+                label_df=None,
+            )
+            result = fb.extract_features(select_tremor_columns=["rsam_f0", "rsam_f1"])
+            assert isinstance(result.index, pd.DatetimeIndex)
+            # Prediction fallback: each id maps to its first tremor sample.
+            expected = (
+                tremor_matrix[[ID_COLUMN, DATETIME_COLUMN]]
+                .drop_duplicates(ID_COLUMN, keep="first")
+                .set_index(ID_COLUMN)[DATETIME_COLUMN]
+            )
+            assert list(result.index) == list(pd.to_datetime(expected))
+
 

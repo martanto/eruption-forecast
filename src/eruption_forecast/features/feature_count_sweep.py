@@ -870,11 +870,17 @@ def _discover_cv_dir(training_dir: str) -> tuple[str, str]:
 
 
 def _load_features_matrix(features_dir: str) -> pd.DataFrame:
-    """Glob and read the single ``features-matrix_*.parquet`` under ``features_dir``."""
-    matches = sorted(glob.glob(os.path.join(features_dir, "features-matrix_*.parquet")))
+    """Glob and read the single ``features-matrix-dt_*.parquet`` under ``features_dir``.
+
+    Post the features-matrix DatetimeIndex migration, the stem changed from
+    ``features-matrix_`` to ``features-matrix-dt_``; the old stem is
+    intentionally ignored so a stale integer-``id``-indexed cache from an
+    earlier run cannot be mistaken for a fresh datetime-indexed one.
+    """
+    matches = sorted(glob.glob(os.path.join(features_dir, "features-matrix-dt_*.parquet")))
     if len(matches) != 1:
         raise RuntimeError(
-            f"Expected exactly one features-matrix parquet under {features_dir}; "
+            f"Expected exactly one features-matrix-dt parquet under {features_dir}; "
             f"found {matches}."
         )
     return pd.read_parquet(matches[0])

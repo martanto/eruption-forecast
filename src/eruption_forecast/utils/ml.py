@@ -1,5 +1,6 @@
 import os
 import json
+import warnings
 from typing import Any, Literal
 from datetime import datetime
 
@@ -43,74 +44,126 @@ from eruption_forecast.dataclass.classifier_ensemble_summary import (
 
 
 def build_y_true(
-    features_label_csv: str,
+    source: str | pd.DataFrame | pd.DatetimeIndex,
     eruption_dates: list[str] | list[datetime],
     datetime_column: str = "datetime",
 ) -> pd.Series:
-    """Build a pandas Series containing ground truth binary labels (y_true).
+    """Build a binary ground-truth Series (``y_true``) from a datetime axis.
 
-    Reads a features-label CSV indexed by datetime, marks every row falling on
-    one of ``eruption_dates`` as ``1`` in the ``is_erupted`` column, and returns
-    the column re-indexed by the window ``id``. Rows outside eruption days are
-    coerced to ``0`` so the returned series never contains ``NaN``.
+    Two intake shapes are supported:
+
+    - **DatetimeIndex-first (preferred)** — pass a DataFrame with a
+      ``DatetimeIndex`` (e.g. a features matrix written by
+      :class:`FeaturesBuilder` post-migration), or a bare ``DatetimeIndex``.
+      Every timestamp is initialised to ``0`` and rows falling on an
+      eruption day are flipped to ``1``. When a DataFrame is supplied, the
+      returned Series is indexed by the same ``DatetimeIndex`` — no more
+      ``id`` reindex round-trip.
+    - **Legacy features-label CSV (deprecated)** — pass a CSV path that
+      carries a ``datetime`` index column plus ``id`` and ``is_erupted``
+      columns. This path emits a :class:`DeprecationWarning` and returns
+      the historical ``id``-indexed Series so pre-migration callers keep
+      working during one release cycle.
 
     Args:
-        features_label_csv (str): Path to the features-label CSV. Usually saved
-            under ``output_dir/{prediction,training}/features/features-label*.csv``.
-            The CSV must contain ``id`` and ``is_erupted`` columns plus the
-            datetime column named by ``datetime``.
-        eruption_dates (list[str] | list[datetime]): Eruption dates. Strings are
-            parsed via :func:`sort_dates`.
-        datetime_column (str, optional): Name of the column to use as the
-            datetime index. Forwarded to ``pd.read_csv(index_col=...)``.
-            Defaults to ``"datetime"``.
+        source (str | pd.DataFrame | pd.DatetimeIndex): Datetime axis
+            container. ``str`` triggers the deprecated CSV path;
+            DataFrame / DatetimeIndex triggers the datetime-first path.
+        eruption_dates (list[str] | list[datetime]): Eruption dates.
+            Strings are parsed via :func:`sort_dates`.
+        datetime_column (str, optional): Name of the datetime column used
+            by the legacy CSV path only. Ignored for DataFrame /
+            DatetimeIndex inputs. Defaults to ``"datetime"``.
 
     Returns:
-        pd.Series: Ground truth binary labels indexed by window ``id``, with
-            name ``"is_erupted"``.
+        pd.Series: Ground truth binary labels named ``"is_erupted"``.
+            Indexed by ``pd.DatetimeIndex`` for the datetime-first path;
+            indexed by window ``id`` for the deprecated CSV path.
 
     Raises:
-        FileNotFoundError: If ``features_label_csv`` does not exist.
-        KeyError: If the CSV is missing the ``id`` or ``is_erupted`` column,
-            or if ``datetime_column`` is not present in the CSV.
-        TypeError: If the resolved index cannot be parsed as a
-            ``pd.DatetimeIndex``.
+        FileNotFoundError: If a CSV ``source`` does not exist.
+        TypeError: If ``source`` is a DataFrame without a
+            ``pd.DatetimeIndex``, or the CSV's index cannot be parsed as
+            one.
+        KeyError: If the CSV is missing the ``id`` or ``is_erupted``
+            column.
 
     Examples:
+        >>> # New: pass the DatetimeIndex-first features matrix directly.
+        >>> features_df = pd.read_parquet(features_path)
+        >>> y_true = build_y_true(features_df, eruption_dates=["2025-03-20"])
+        >>> isinstance(y_true.index, pd.DatetimeIndex)
+        True
+        >>> # Or just its index:
+        >>> y_true = build_y_true(features_df.index, eruption_dates=["2025-03-20"])
+        >>> # Legacy (deprecated):
         >>> y_true = build_y_true(
-        ...     "output/VG.OJN.00.EHZ/prediction/features/features-label.csv",
+        ...     "output/.../prediction/features/features-label.csv",
         ...     eruption_dates=["2025-03-20"],
         ... )
-        >>> y_true.value_counts()
     """
-    df = pd.read_csv(features_label_csv, index_col=datetime_column, parse_dates=True)
-
-    if not isinstance(df.index, pd.DatetimeIndex):
-        raise TypeError(
-            f"features_label_csv index must be a pd.DatetimeIndex, "
-            f"got '{type(df.index).__name__}'. "
-            f"Check that column '{datetime_column}' in '{features_label_csv}' "
-            f"contains parseable datetimes."
-        )
-
-    missing = {"id", "is_erupted"} - set(df.columns)
-    if missing:
-        raise KeyError(
-            f"features_label_csv is missing required column(s): {sorted(missing)}. "
-            f"Found columns: {list(df.columns)}."
-        )
-
-    df["is_erupted"] = df["is_erupted"].fillna(0).astype(int)
-
     sorted_eruption_dates = sort_dates(eruption_dates, as_datetime=True)
+
+    # DatetimeIndex-first path — no CSV round-trip.
+    if isinstance(source, pd.DatetimeIndex):
+        datetime_index = source
+        result_index = source
+    elif isinstance(source, pd.DataFrame):
+        if not isinstance(source.index, pd.DatetimeIndex):
+            raise TypeError(
+                f"source DataFrame must have a pd.DatetimeIndex, "
+                f"got '{type(source.index).__name__}'. Pass either a "
+                f"DatetimeIndex-first features matrix, its .index, or a "
+                f"legacy features-label CSV path."
+            )
+        datetime_index = source.index
+        result_index = source.index
+    else:
+        warnings.warn(
+            "build_y_true(features_label_csv=...) is deprecated: pass the "
+            "DatetimeIndex-first features matrix (or its .index) directly. "
+            "The CSV-based path will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        df = pd.read_csv(source, index_col=datetime_column, parse_dates=True)
+
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError(
+                f"features_label_csv index must be a pd.DatetimeIndex, "
+                f"got '{type(df.index).__name__}'. "
+                f"Check that column '{datetime_column}' in '{source}' "
+                f"contains parseable datetimes."
+            )
+
+        missing = {"id", "is_erupted"} - set(df.columns)
+        if missing:
+            raise KeyError(
+                f"features_label_csv is missing required column(s): {sorted(missing)}. "
+                f"Found columns: {list(df.columns)}."
+            )
+
+        df["is_erupted"] = df["is_erupted"].fillna(0).astype(int)
+        for eruption_date in sorted_eruption_dates:
+            start_date = eruption_date.replace(hour=0, minute=0, second=0)
+            end_date = eruption_date.replace(hour=23, minute=59, second=59)
+            df.loc[start_date:end_date, "is_erupted"] = 1
+
+        y_true = df.set_index("id")["is_erupted"]
+        y_true.name = "is_erupted"
+        return y_true
+
+    y_true = pd.Series(0, index=result_index, name="is_erupted", dtype=int)
+    # Compare via a Series view so ty (and pandas) both see a well-typed
+    # element-wise comparison against ``pd.Timestamp``. Falling back to raw
+    # ``DatetimeIndex >= datetime`` also works at runtime, but the type
+    # checker cannot see pandas' operator overloads.
+    datetime_series = datetime_index.to_series()
     for eruption_date in sorted_eruption_dates:
-        start_date = eruption_date.replace(hour=0, minute=0, second=0)
-        end_date = eruption_date.replace(hour=23, minute=59, second=59)
-        df.loc[start_date:end_date, "is_erupted"] = 1
-
-    y_true = df.set_index("id")["is_erupted"]
-    y_true.name = "is_erupted"
-
+        start_ts = pd.Timestamp(eruption_date.replace(hour=0, minute=0, second=0))
+        end_ts = pd.Timestamp(eruption_date.replace(hour=23, minute=59, second=59))
+        mask = (datetime_series >= start_ts) & (datetime_series <= end_ts)
+        y_true.loc[mask.to_numpy()] = 1
     return y_true
 
 
@@ -473,7 +526,12 @@ def load_features_resampled(
         features = pd.read_parquet(features)
 
     if isinstance(resampled, str):
-        labels = pd.read_csv(resampled, index_col=0)["is_erupted"]
+        # ``parse_dates=True`` matches the DatetimeIndex-first resampled CSVs
+        # written by ``TrainingModel._features_selection`` post the
+        # features-matrix DatetimeIndex migration. Pre-migration integer-``id``
+        # CSVs remain valid — pandas leaves the index unaltered when the
+        # column cannot be parsed as datetimes.
+        labels = pd.read_csv(resampled, index_col=0, parse_dates=True)["is_erupted"]
     elif isinstance(resampled, pd.DataFrame):
         labels = resampled["is_erupted"]
     else:

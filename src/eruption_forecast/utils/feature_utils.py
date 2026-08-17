@@ -350,6 +350,22 @@ def concat_features(
     pieces: list[pd.DataFrame] = [pd.read_parquet(path) for path in paths]
     pieces.extend(frames)
 
+    # Every per-column input is expected to carry a ``DatetimeIndex`` post
+    # the features-matrix DatetimeIndex migration; a mixed batch would
+    # produce silent NaN alignment under ``pd.concat(axis=1)``, so surface
+    # the mismatch loudly instead of shipping a corrupt merged parquet.
+    non_datetime_indices = [
+        i for i, piece in enumerate(pieces) if not isinstance(piece.index, pd.DatetimeIndex)
+    ]
+    if non_datetime_indices:
+        logger.warning(
+            f"concat_features: {len(non_datetime_indices)} of {len(pieces)} "
+            "input frame(s) do not have a DatetimeIndex "
+            f"(positions: {non_datetime_indices[:5]}"
+            + ("..." if len(non_datetime_indices) > 5 else "")
+            + "). This will produce NaN alignment across columns."
+        )
+
     df = pd.concat(pieces, axis=1)
 
     if df.empty:

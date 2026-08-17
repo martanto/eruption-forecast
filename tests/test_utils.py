@@ -344,6 +344,107 @@ class TestRemoveAnomalies:
         assert df["v"].iloc[100] == original_val  # original unchanged
 
 
+class TestLoadLabelCsvDatetimeIndex:
+    """Post-migration ``load_label_csv`` preserves the CSV's DatetimeIndex."""
+
+    def test_preserves_datetime_index(self, tmp_path):
+        from eruption_forecast.utils.dataframe import load_label_csv
+        idx = pd.date_range("2025-01-01", periods=4, freq="12h")
+        df = pd.DataFrame(
+            {"id": [0, 1, 2, 3], "is_erupted": [0, 0, 1, 0]}, index=idx
+        )
+        df.index.name = "datetime"
+        csv_path = tmp_path / "features-label_2025-01-01_2025-01-02.csv"
+        df.to_csv(csv_path, index=True)
+
+        labels = load_label_csv(str(csv_path))
+
+        assert isinstance(labels.index, pd.DatetimeIndex)
+        assert labels.name == "is_erupted"
+        assert list(labels.values) == [0, 0, 1, 0]
+
+
+class TestLoadFeaturesMatrixDeprecation:
+    """The CSV-pairing shims emit DeprecationWarning and short-circuit new parquets."""
+
+    def test_load_features_matrix_deprecation_warning(self, tmp_path):
+        from eruption_forecast.utils.dataframe import load_features_matrix
+        # Fresh DatetimeIndex-first parquet — label_csv path is unused.
+        idx = pd.date_range("2025-01-01", periods=4, freq="12h", name="datetime")
+        parquet_path = tmp_path / "features-matrix-dt_2025-01-01_2025-01-02.parquet"
+        pd.DataFrame({"a": range(4)}, index=idx).to_parquet(parquet_path)
+
+        with pytest.warns(DeprecationWarning):
+            result = load_features_matrix(
+                label_csv="unused-post-migration.csv",
+                features_path=str(parquet_path),
+            )
+        assert isinstance(result.index, pd.DatetimeIndex)
+        assert list(result.columns) == ["a"]
+
+    def test_load_datetime_indexed_deprecation_warning(self, tmp_path):
+        from eruption_forecast.utils.dataframe import load_datetime_indexed
+        idx = pd.date_range("2025-01-01", periods=3, freq="12h", name="datetime")
+        parquet_path = tmp_path / "features-matrix-dt_2025-01-01_2025-01-02.parquet"
+        pd.DataFrame({"a": range(3)}, index=idx).to_parquet(parquet_path)
+
+        with pytest.warns(DeprecationWarning):
+            result = load_datetime_indexed(
+                label_csv="unused-post-migration.csv",
+                features_path=str(parquet_path),
+            )
+        assert isinstance(result.index, pd.DatetimeIndex)
+
+
+class TestBuildYTrueOverloads:
+    """``build_y_true`` accepts DatetimeIndex, DataFrame, or (deprecated) CSV path."""
+
+    def _label_dates(self):
+        return pd.date_range("2025-03-19", "2025-03-21", freq="12h", name="datetime")
+
+    def test_datetime_index_source(self):
+        from eruption_forecast.utils.ml import build_y_true
+        idx = self._label_dates()
+        y_true = build_y_true(idx, eruption_dates=["2025-03-20"])
+        assert isinstance(y_true.index, pd.DatetimeIndex)
+        assert y_true.name == "is_erupted"
+        # Only the 2025-03-20 rows are positive.
+        assert y_true.loc["2025-03-20 00:00":"2025-03-20 23:59"].tolist() == [1, 1]
+        assert y_true.loc["2025-03-19 00:00":"2025-03-19 23:59"].tolist() == [0, 0]
+
+    def test_dataframe_source(self):
+        from eruption_forecast.utils.ml import build_y_true
+        idx = self._label_dates()
+        features_df = pd.DataFrame({"a": range(len(idx))}, index=idx)
+        y_true = build_y_true(features_df, eruption_dates=["2025-03-20"])
+        assert isinstance(y_true.index, pd.DatetimeIndex)
+        assert (y_true == pd.Series([0, 0, 1, 1, 0], index=idx, name="is_erupted")).all()
+
+    def test_dataframe_without_datetime_index_raises(self):
+        from eruption_forecast.utils.ml import build_y_true
+        with pytest.raises(TypeError, match="DatetimeIndex"):
+            build_y_true(
+                pd.DataFrame({"a": [0, 1, 2]}, index=[10, 11, 12]),
+                eruption_dates=["2025-03-20"],
+            )
+
+    def test_csv_path_deprecation_warning(self, tmp_path):
+        from eruption_forecast.utils.ml import build_y_true
+        idx = self._label_dates()
+        df = pd.DataFrame(
+            {"id": range(len(idx)), "is_erupted": [0] * len(idx)}, index=idx
+        )
+        df.index.name = "datetime"
+        csv_path = tmp_path / "features-label_2025-03-19_2025-03-21.csv"
+        df.to_csv(csv_path, index=True)
+
+        with pytest.warns(DeprecationWarning):
+            y_true = build_y_true(str(csv_path), eruption_dates=["2025-03-20"])
+        # Legacy path returns an ``id``-indexed Series.
+        assert y_true.name == "is_erupted"
+        assert not isinstance(y_true.index, pd.DatetimeIndex)
+
+
 # ---------------------------------------------------------------------------
 # array.py
 # ---------------------------------------------------------------------------

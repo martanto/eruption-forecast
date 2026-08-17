@@ -530,7 +530,13 @@ class EvaluationModel(BaseModel):
 
         id_series = self.model.labels
         merged = id_series.to_frame().join(y_true_df["is_erupted"], how="left")
-        y_true = merged.set_index("id")["is_erupted"].fillna(0).astype(int)
+        # Post the features-matrix DatetimeIndex migration, ``self.model.labels``
+        # is DatetimeIndex-indexed and aligns positionally with
+        # ``self.model.features_df``. Keep the DatetimeIndex on ``y_true`` so
+        # the downstream ``MetricsEnsemble.compute()`` positional alignment
+        # (see ``metrics_ensemble.py::compute``) matches without a re-indexing
+        # round-trip through the integer ``id``.
+        y_true = merged["is_erupted"].fillna(0).astype(int)
         y_true.name = "is_erupted"
 
         y_true_dir = os.path.join(self.evaluation_dir, "labels")

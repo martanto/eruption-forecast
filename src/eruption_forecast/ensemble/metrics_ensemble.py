@@ -146,8 +146,8 @@ class MetricsEnsemble:
         cls,
         model_filepath: str,
         features_path: str,
-        features_label_csv: str,
         eruption_dates: list[str] | list[datetime],
+        features_label_csv: str | None = None,
         kind: Literal["prediction", "training"] = "prediction",
         output_dir: str | None = None,
         root_dir: str | None = None,
@@ -156,9 +156,12 @@ class MetricsEnsemble:
     ) -> "MetricsEnsemble":
         """Construct a ``MetricsEnsemble`` from on-disk artefacts.
 
-        Loads a serialised ``ClassifierEnsemble`` together with the
-        feature matrix and the label CSV needed to derive ``y_true``,
-        then forwards everything to the standard constructor.
+        Loads a serialised ``ClassifierEnsemble`` and the DatetimeIndex-first
+        features matrix Parquet, derives the binary ground truth via
+        :func:`build_y_true`, and forwards everything to the standard
+        constructor. Post the features-matrix DatetimeIndex migration, the
+        sibling ``features-label_*.csv`` is no longer required — ``y_true``
+        can be built from the features frame's ``DatetimeIndex`` alone.
 
         Args:
             model_filepath (str): Path to a ``ClassifierEnsemble``
@@ -166,13 +169,20 @@ class MetricsEnsemble:
                 registry CSV — accepted by
                 :meth:`ClassifierEnsemble.from_any`.
             features_path (str): Path to the merged feature matrix
-                Parquet used for scoring (the ``features-matrix_*.parquet``
-                produced by :class:`FeaturesBuilder`).
-            features_label_csv (str): Path to the label CSV consumed by
-                :func:`build_y_true` to derive the binary ground truth.
+                Parquet used for scoring (the
+                ``features-matrix-dt_*.parquet`` produced by
+                :class:`FeaturesBuilder`). Legacy integer-``id``-indexed
+                parquets are still accepted when ``features_label_csv`` is
+                supplied.
             eruption_dates (list[str] | list[datetime]): Eruption dates
                 forwarded to :func:`build_y_true` to mark positive
                 samples.
+            features_label_csv (str | None, optional): Legacy label CSV
+                path. Only required when ``features_path`` still uses the
+                pre-migration integer-``id`` index. Emits a
+                :class:`DeprecationWarning` when supplied — pass ``None``
+                (the default) with a DatetimeIndex-first parquet.
+                Defaults to ``None``.
             kind (Literal["prediction", "training"], optional): Reuse
                 mode. Defaults to ``"prediction"``.
             output_dir (str | None, optional): Explicit evaluation
@@ -190,22 +200,33 @@ class MetricsEnsemble:
 
         Raises:
             FileNotFoundError: If ``model_filepath``, ``features_path``,
-                or ``features_label_csv`` does not exist.
+                or (when supplied) ``features_label_csv`` does not exist.
+            ValueError: If ``features_label_csv`` is ``None`` and the
+                loaded features frame is not DatetimeIndex-first.
 
         Example:
+            >>> # New (DatetimeIndex-first parquet — no sibling CSV needed):
             >>> me = MetricsEnsemble.from_file(
-            ...     model_filepath="output/VG.OJN.00.EHZ/ClassifierEnsemble.json",
-            ...     features_path="output/VG.OJN.00.EHZ/features-matrix.parquet",
-            ...     features_label_csv="output/VG.OJN.00.EHZ/labels.csv",
+            ...     model_filepath="output/.../ClassifierEnsemble.json",
+            ...     features_path="output/.../features-matrix-dt_2025-03-16_2025-03-22.parquet",
             ...     eruption_dates=["2025-03-20"],
             ... )
             >>> me.compute()
+            >>> # Legacy (integer-``id``-indexed parquet + sibling CSV):
+            >>> me = MetricsEnsemble.from_file(
+            ...     model_filepath="output/.../ClassifierEnsemble.json",
+            ...     features_path="output/.../features-matrix_2025-03-16_2025-03-22.parquet",
+            ...     eruption_dates=["2025-03-20"],
+            ...     features_label_csv="output/.../features-label_2025-03-16_2025-03-22.csv",
+            ... )
         """
-        for label, path in (
+        required_paths: list[tuple[str, str]] = [
             ("Model Filepath", model_filepath),
             ("Features Matrix", features_path),
-            ("Features Label CSV", features_label_csv),
-        ):
+        ]
+        if features_label_csv is not None:
+            required_paths.append(("Features Label CSV", features_label_csv))
+        for label, path in required_paths:
             if not os.path.exists(path):
                 raise FileNotFoundError(f"{label} file not found: {path}")
 
@@ -213,7 +234,24 @@ class MetricsEnsemble:
             model_filepath, verbose=verbose
         )
         features_df = pd.read_parquet(features_path)
-        y_true = build_y_true(features_label_csv, eruption_dates)
+
+        # DatetimeIndex-first path (default): derive ``y_true`` from the
+        # features frame's own axis, no sibling CSV round-trip.
+        if features_label_csv is None:
+            if not isinstance(features_df.index, pd.DatetimeIndex):
+                raise ValueError(
+                    "features_path parquet is not DatetimeIndex-indexed and "
+                    "no features_label_csv was supplied. Either re-run "
+                    "FeaturesBuilder to produce a features-matrix-dt_*.parquet, "
+                    "or pass the legacy features-label_*.csv as "
+                    "features_label_csv."
+                )
+            y_true = build_y_true(features_df, eruption_dates)
+        else:
+            # Legacy path — emit deprecation warning and delegate to the
+            # CSV-based builder for backwards compatibility with
+            # pre-migration parquets.
+            y_true = build_y_true(features_label_csv, eruption_dates)
 
         return cls(
             classifier_ensemble=classifier_ensemble,

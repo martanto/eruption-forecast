@@ -277,7 +277,7 @@ fm.predict(
     start_date="2025-07-27", end_date="2025-08-22",
     window_step=10, window_step_unit="minutes",
     use_features_from="files",
-    features_matrix_path="output/VG.OJN.00.EHZ/prediction/features/features-matrix_2025-07-27_2025-08-22_step-10-minutes.parquet",
+    features_matrix_path="output/VG.OJN.00.EHZ/prediction/features/features-matrix-dt_2025-07-27_2025-08-22_step-10-minutes.parquet",
     label_features_csv="output/VG.OJN.00.EHZ/prediction/features/features-label_2025-07-27_2025-08-22_step-10-minutes.csv",
 )
 ```
