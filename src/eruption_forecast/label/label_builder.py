@@ -20,6 +20,7 @@ from eruption_forecast.utils.date_utils import (
 )
 from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.plots.label_plots import plot_label_distribution
+from eruption_forecast.config.label_config import LabelConfig
 
 
 class LabelBuilder:
@@ -159,6 +160,22 @@ class LabelBuilder:
             ...     verbose=True
             ... )
         """
+        # Save label configs
+        self._config: LabelConfig = self._init_config(
+            start_date=start_date,
+            end_date=end_date,
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            day_to_forecast=day_to_forecast,
+            eruption_dates=eruption_dates,
+            volcano_id=volcano_id,
+            include_eruption_date=include_eruption_date,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            verbose=verbose,
+            debug=debug,
+        )
+
         # ------------------------------------------------------------------
         # Set DEFAULT parameter
         # ------------------------------------------------------------------
@@ -943,6 +960,100 @@ class LabelBuilder:
 
         return label_data.df
 
+    @staticmethod
+    def _init_config(
+        *,
+        start_date: str | datetime,
+        end_date: str | datetime,
+        window_step: int,
+        window_step_unit: Literal["minutes", "hours"],
+        day_to_forecast: int,
+        eruption_dates: list[str] | list[datetime],
+        volcano_id: str | None,
+        include_eruption_date: bool,
+        output_dir: str | None,
+        root_dir: str | None,
+        verbose: bool,
+        debug: bool,
+    ) -> LabelConfig:
+        """Snapshot the ``__init__`` surface into a :class:`LabelConfig`.
+
+        Normalises non-serialisable inputs to string handles so the saved
+        YAML/JSON round-trips the user's original intent: ``start_date`` and
+        ``end_date`` are emitted in ISO-8601 form when the caller passed a
+        ``datetime``, and any ``datetime`` entries in ``eruption_dates`` are
+        rendered as ``"YYYY-MM-DD"`` strings.
+
+        Args:
+            start_date (str | datetime): Label period start.
+            end_date (str | datetime): Label period end.
+            window_step (int): Step size between consecutive windows.
+            window_step_unit (Literal["minutes", "hours"]): Unit of
+                ``window_step``.
+            day_to_forecast (int): Days before eruption to start positive
+                labelling.
+            eruption_dates (list[str] | list[datetime]): Known eruption dates.
+            volcano_id (str | None): Volcano identifier used in filenames.
+            include_eruption_date (bool): Whether the eruption day counts as
+                one of the forecast days.
+            output_dir (str | None): Root output directory.
+            root_dir (str | None): Project root.
+            verbose (bool): Emit informational logs.
+            debug (bool): Emit debug-level logs.
+
+        Returns:
+            LabelConfig: Snapshot ready for ``save_config()``.
+        """
+        return LabelConfig(
+            start_date=start_date
+            if isinstance(start_date, str)
+            else start_date.isoformat(),
+            end_date=end_date if isinstance(end_date, str) else end_date.isoformat(),
+            window_step=window_step,
+            window_step_unit=window_step_unit,
+            day_to_forecast=day_to_forecast,
+            eruption_dates=[
+                d if isinstance(d, str) else d.strftime("%Y-%m-%d")
+                for d in eruption_dates
+            ],
+            volcano_id=volcano_id,
+            include_eruption_date=include_eruption_date,
+            output_dir=output_dir,
+            root_dir=root_dir,
+            verbose=verbose,
+            debug=debug,
+        )
+
+    def save_config(
+        self,
+        path: str | None = None,
+        fmt: Literal["yaml", "json"] = "yaml",
+    ) -> str:
+        """Persist the captured ``LabelBuilder`` init configuration to disk.
+
+        Writes the parameter snapshot captured during ``__init__`` so a
+        standalone label build can save its constructor surface next to the
+        label CSV.
+
+        Args:
+            path (str | None): Destination file path. ``None`` resolves to
+                ``{label_dir}/label.config.{fmt}`` so the config sits next to
+                the CSV produced by ``build()``. Defaults to ``None``.
+            fmt (Literal["yaml", "json"]): Output format. Defaults to
+                ``"yaml"``.
+
+        Returns:
+            str: The absolute path the configuration was written to.
+
+        Example:
+            >>> path = builder.save_config()
+            >>> path  # doctest: +SKIP
+            'output/labels/label.config.yaml'
+        """
+        if path is None:
+            path = os.path.join(self.label_dir, f"label.config.{fmt}")
+        return self._config.save(path, fmt)
+
     def build(
         self,
         overwrite: bool = True,
@@ -1040,6 +1151,11 @@ class LabelBuilder:
 
         if save_label and (not file_exists or overwrite):
             self.save(plot_distribution=plot_distribution)
+
+        try:
+            self.save_config()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save label config: {exc}")
 
         return self
 

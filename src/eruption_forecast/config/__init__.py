@@ -8,6 +8,7 @@ from eruption_forecast.config.constants import (
     DEFAULT_MINIMUM_COMPLETION_RATIO,
 )
 from eruption_forecast.config.base_config import BaseConfig
+from eruption_forecast.config.label_config import LabelConfig
 from eruption_forecast.config.forecast_config import (
     ForecastConfig,
     BaseForecastConfig,
@@ -37,6 +38,7 @@ __all__ = [
     "ForecastPredictConfig",
     "ForecastEvaluateConfig",
     "ForecastConfig",
+    "LabelConfig",
     "TrainingConfig",
     "PredictionConfig",
     "EvaluationConfig",
