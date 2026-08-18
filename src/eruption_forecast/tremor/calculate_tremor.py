@@ -1,31 +1,3 @@
-"""Orchestrator for calculating tremor metrics from raw seismic data.
-
-This module provides the ``CalculateTremor`` class, which coordinates the full
-tremor calculation workflow: reading seismic streams day-by-day from an SDS
-archive or FDSN web service, computing RSAM, DSAR, and Shannon entropy across
-configurable frequency bands, and saving the results as time-series CSV files.
-
-Key class:
-    - ``CalculateTremor``: Reads seismic data via ``from_sds()`` or ``from_fdsn()``,
-      runs parallel daily calculations via multiprocessing (``n_jobs``), merges
-      per-day CSV outputs into a single file, and optionally plots and saves daily
-      tremor figures.
-
-Typical usage::
-
-    calculate = (
-        CalculateTremor(
-            station="OJN",
-            channel="EHZ",
-            start_date="2025-01-01",
-            end_date="2025-01-03",
-            n_jobs=4,
-        )
-        .from_sds(sds_dir="/path/to/sds")
-        .run()
-    )
-"""
-
 import os
 import glob
 import shutil
