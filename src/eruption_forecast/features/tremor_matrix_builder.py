@@ -187,6 +187,83 @@ class TremorMatrixBuilder:
         self.validate()
         self.create_directories()
 
+    @classmethod
+    def from_file(
+        cls,
+        tremor_file: str,
+        label_file: str,
+        output_dir: str | None = None,
+        window_size: int = 1,
+        root_dir: str | None = None,
+        minimum_completion: float = 1.0,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ) -> Self:
+        """Construct a ``TremorMatrixBuilder`` from tremor and label CSV files.
+
+        Thin file-path wrapper around the constructor. Reads both CSVs with
+        the first column parsed as the ``DatetimeIndex`` and forwards every
+        remaining argument to :meth:`__init__`.
+
+        Args:
+            tremor_file (str): Path to a tremor CSV. The first column must be a
+                parseable datetime and become the ``DatetimeIndex``; remaining
+                columns hold tremor metrics (``rsam_*``, ``dsar_*``).
+                Example: ``output/tremor/tremor_VG.OJN.00.EHZ_2025-01-01-2025-09-28.csv``.
+            label_file (str): Path to a label CSV. The first column must be a
+                parseable datetime and become the ``DatetimeIndex``; must
+                contain an ``id`` column and optionally ``is_erupted``.
+                Example: ``output/labels/label_2025-01-01_2025-07-24_ws-2_step-6-hours_dtf-2_ie-0.csv``.
+            output_dir (str | None, optional): Output directory for saved
+                matrix CSVs. Defaults to ``root_dir/output/tremor/matrix``.
+                Defaults to ``None``.
+            window_size (int, optional): Window size in days. Defaults to 1.
+            root_dir (str | None, optional): Anchor directory for resolving
+                relative ``output_dir`` values. Defaults to ``None`` (uses
+                ``os.getcwd()``).
+            minimum_completion (float, optional): Minimum data-completeness
+                ratio in the range 0.0–1.0. Windows whose sample count falls
+                below this fraction of the expected count are skipped.
+                Defaults to 1.0.
+            overwrite (bool, optional): Overwrite existing output files.
+                Defaults to ``False``.
+            verbose (bool, optional): Enable verbose logging. Defaults to
+                ``False``.
+
+        Returns:
+            Self: A fully constructed ``TremorMatrixBuilder`` ready for
+                :meth:`build`.
+
+        Raises:
+            FileNotFoundError: If ``tremor_file`` or ``label_file`` does not
+                exist on disk.
+            TypeError: Propagated from :meth:`__init__` when the loaded index
+                is not a ``pd.DatetimeIndex``.
+            ValueError: Propagated from :meth:`validate` when the required
+                ``id`` column is missing from the label frame.
+
+        Examples:
+            >>> builder = TremorMatrixBuilder.from_file(
+            ...     tremor_file="output/tremor/tremor_VG.OJN.00.EHZ_2025-01-01-2025-09-28.csv",
+            ...     label_file="output/labels/label_2025-01-01_2025-07-24_ws-2_step-6-hours_dtf-2_ie-0.csv",
+            ...     output_dir="output/features",
+            ...     window_size=1,
+            ... ).build(select_tremor_columns=["rsam_f0", "rsam_f1"])
+        """
+        tremor_df = pd.read_csv(tremor_file, index_col=0, parse_dates=True)
+        label_df = pd.read_csv(label_file, index_col=0, parse_dates=True)
+
+        return cls(
+            tremor_df=tremor_df,
+            label_df=label_df,
+            output_dir=output_dir,
+            window_size=window_size,
+            root_dir=root_dir,
+            minimum_completion=minimum_completion,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
+
     def validate(self) -> None:
         """Validate label and tremor DataFrame columns and date ranges.
 
