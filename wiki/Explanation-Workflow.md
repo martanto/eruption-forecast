@@ -267,6 +267,16 @@ straight from `PredictionModel.forecast()`; training-reuse relies on
 build. Calling the builder against an unpopulated ensemble raises
 `RuntimeError`.
 
+**Recovering the matrices without re-predicting.** After a bare pickle
+reload (`SeedEnsemble.from_any(...)` on a training-time
+`SeedEnsemble_*.pkl`), `self.probabilities` / `self.predictions` come
+back as `None` because those attributes are only populated at prediction
+time. If the matching per-classifier `{classifier_name}_seed_probabilities.parquet`
+and `_seed_predictions.parquet` files from a prior forecast are still on
+disk, rehydrate them in one shot with
+`se.load_matrices(probabilities_path, predictions_path)` — the summary
+builder then runs without a fresh `predict_with_uncertainty` call.
+
 ---
 
 ## Outputs
