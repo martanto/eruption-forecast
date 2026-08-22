@@ -561,6 +561,61 @@ class SeedEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 
         return probabilities_path, predictions_path
 
+    def load_matrices(
+        self,
+        probabilities_path: str,
+        predictions_path: str,
+        verbose: bool = False,
+    ) -> Self:
+        """Rehydrate the per-seed probability and prediction matrices from Parquet.
+
+        Mirror of :meth:`save_matrices`. Reads the two
+        ``(n_samples, n_seeds)`` Parquet files that ``save_matrices`` wrote
+        and populates :attr:`probabilities` and :attr:`predictions` on
+        ``self``. Handy after re-loading a persisted ``SeedEnsemble`` (via
+        :meth:`from_any` or a joblib pickle), where those attributes always
+        come back as ``None`` because they are only populated on-demand
+        during a prediction call.
+
+        The two files are read independently — no cross-check on shape,
+        columns, or index is performed. Pass matching outputs from the same
+        ``save_matrices`` call to keep the two matrices aligned.
+
+        Args:
+            probabilities_path (str): Path to the seed probabilities Parquet
+                file (typically
+                ``{output_dir}/{classifier_name}_seed_probabilities.parquet``).
+            predictions_path (str): Path to the seed predictions Parquet file
+                (typically
+                ``{output_dir}/{classifier_name}_seed_predictions.parquet``).
+            verbose (bool, optional): If ``True``, log the loaded paths.
+                Defaults to ``False``.
+
+        Returns:
+            Self: ``self`` for fluent chaining.
+
+        Raises:
+            FileNotFoundError: If either path does not resolve to a file.
+        """
+        for label, path in (
+            ("probabilities", probabilities_path),
+            ("predictions", predictions_path),
+        ):
+            if not os.path.isfile(path):
+                raise FileNotFoundError(
+                    f"Seed {label} matrix not found: {path}. "
+                    f"Example filename: `GradientBoostingClassifier_seed_predictions.parquet`"
+                )
+
+        self.probabilities = pd.read_parquet(probabilities_path)
+        self.predictions = pd.read_parquet(predictions_path)
+
+        if verbose:
+            logger.info(f"Loaded seed probabilities matrix: {probabilities_path}")
+            logger.info(f"Loaded seed predictions matrix: {predictions_path}")
+
+        return self
+
     def get_params(self, deep: bool = True) -> dict:
         """Return the ensemble's display parameters.
 
