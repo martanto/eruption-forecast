@@ -972,6 +972,33 @@ se[i]                   # seed record at index i (dict)
 len(se)                 # number of seeds
 ```
 
+### Per-seed matrix cache
+
+```python
+se.probabilities        # pd.DataFrame | None: (n_samples, n_seeds), columns
+                        #   seed_{random_state:05d}. None until a prediction runs.
+se.predictions          # pd.DataFrame | None: same shape, int8 dtype.
+
+# Populated automatically by predict_with_uncertainty(X), which delegates to
+# save_matrices — writes both DataFrames to Parquet AND caches them on self.
+se.save_matrices(
+    output_dir: str,
+    probabilities: np.ndarray,
+    predictions: np.ndarray,
+    index: pd.Index | None = None,
+    verbose: bool = False,
+) -> tuple[str, str]  # returns (probabilities_path, predictions_path)
+
+# Rehydrate the two attributes after a bare pickle / from_any load without
+# re-running prediction — pass the matching Parquet files written by
+# save_matrices (typically {output_dir}/{classifier_name}_seed_*.parquet).
+se.load_matrices(
+    probabilities_path: str,
+    predictions_path: str,
+    verbose: bool = False,
+) -> Self
+```
+
 `save(path)` / `load(path)` inherited from `BaseEnsemble`.
 
 ---
