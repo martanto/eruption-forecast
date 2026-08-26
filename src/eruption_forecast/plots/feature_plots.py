@@ -935,6 +935,8 @@ def plot_common_features_heatmap(
     output_path: str | None = None,
     cmap: str = "viridis",
     label_style: Literal["short", "alias"] = "short",
+    show_colorbar: bool = True,
+    max_features: int | None = None,
 ) -> plt.Axes:
     """Heatmap of per-scenario ``score`` for the common-feature subset.
 
@@ -960,6 +962,17 @@ def plot_common_features_heatmap(
             ``"alias"`` uses the ``ft_1``, ``ft_2``, … aliases from the
             merged ranking returned by :func:`find_common_features`, which
             is useful when the shortened names crowd the axis.
+        show_colorbar (bool, optional): When ``True`` (default), draw the
+            seaborn colorbar next to the heatmap. Pass ``False`` to hide it —
+            useful when the per-cell numeric annotations already convey the
+            magnitude and the extra strip only steals horizontal space.
+            Defaults to ``True``.
+        max_features (int | None, optional): When set, keep only the top-N
+            rows ranked by the per-row sum of the built matrix (i.e. total
+            frequency across all scenarios), sorted descending. When
+            ``None`` (default) or when the cross-scenario intersection
+            already has fewer than ``max_features`` rows, every common
+            feature is plotted. Defaults to ``None``.
 
     Returns:
         plt.Axes: The heatmap axes, so the caller can further annotate it.
@@ -973,31 +986,48 @@ def plot_common_features_heatmap(
         per_scenario = migrate_score_column(pd.read_csv(path, index_col=0))
         matrix[label] = per_scenario["frequency"].reindex(common_features)
 
+    # Optionally trim to the top-N rows by total frequency across scenarios.
+    # Done before the label-style branch so alias lookups stay aligned with
+    # the surviving rows (both matrix.index and common_df share the raw
+    # tsfresh names at this point).
+    if max_features is not None and len(matrix) > max_features:
+        order = (
+            matrix.sum(axis=1).sort_values(ascending=False).head(max_features).index
+        )
+        matrix = matrix.reindex(order)
+
     if label_style == "alias":
-        matrix.index = common_df["alias"].reindex(common_features).tolist()
+        matrix.index = common_df["alias"].reindex(matrix.index).tolist()
     else:
         matrix.index = [shorten_feature_name(name) for name in matrix.index]
 
     fig, ax = plt.subplots(
         figsize=(
             max(6.0, 1.6 * len(labels) + 3),
-            max(4.0, 0.6 * len(common_features) + 2),
+            max(4.0, 0.6 * len(matrix) + 2),
         )
     )
 
-    sns.heatmap(
-        matrix,
-        annot=True,
-        fmt=".0f",
-        cmap=cmap,
-        cbar_kws={"label": "frequency", "shrink": 0.8, "pad": 0.02},
-        linewidths=0.5,
-        square=True,
-        ax=ax,
-    )
+    heatmap_kwargs: dict[str, Any] = {
+        "annot": True,
+        "fmt": ".0f",
+        "cmap": cmap,
+        "linewidths": 0.5,
+        "square": True,
+        "ax": ax,
+        "cbar": show_colorbar,
+    }
+    if show_colorbar:
+        heatmap_kwargs["cbar_kws"] = {
+            "label": "frequency",
+            "shrink": 0.8,
+            "pad": 0.02,
+        }
+
+    sns.heatmap(matrix, **heatmap_kwargs)
 
     ax.tick_params(axis="x", rotation=90)
-    ax.set_title(f"{len(common_features)} features × {len(labels)} scenarios")
+    ax.set_title(f"{len(matrix)} features × {len(labels)} scenarios")
     fig.tight_layout()
 
     out = output_path or os.path.join(os.getcwd(), "common_top_features_heatmap.png")
