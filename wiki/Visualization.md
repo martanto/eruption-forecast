@@ -87,6 +87,7 @@ Key kwargs forwarded via `**plot_kwargs` from `fm.predict(...)`:
 | `x_days_interval=2` | Major x-tick spacing in days |
 | `legend_n_cols=6`, `bbox_to_anchor=(0.5, -0.05)` | Legend positioning |
 | `title="..."` | Figure suptitle |
+| `start_date="YYYY-MM-DD"`, `end_date="YYYY-MM-DD"` | Optional window slice applied to `df` before envelope extraction and rolling smoothing. `None` on either bound keeps `df.index.min()` / `df.index.max()`. An empty resulting slice logs a warning and falls back to the full range. Also narrows the top segment strip's `forecast_start` / `forecast_end`. From `PredictionModel.forecast()` / `fm.predict()`, pass as `plot_start_date` / `plot_end_date` to avoid colliding with the forecast-period `start_date` / `end_date` on those callers. |
 
 To re-render a forecast plot from the persisted CSV:
 

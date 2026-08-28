@@ -351,9 +351,13 @@ pm.forecast(
     plot_threshold: float = 0.5,
     plot_title: str | None = None,
     plot_pdf: bool = True,
+    plot_start_date: str | None = None,
+    plot_end_date: str | None = None,
     **plot_kwargs,
 ) -> pd.DataFrame
 ```
+
+`plot_start_date` / `plot_end_date` narrow the forecast plot's x-axis without touching the inference window; both default to `None` (full range). Internally forwarded to `plot_forecast(start_date=..., end_date=...)`; the `plot_` prefix disambiguates from the constructor's forecast-period `start_date` / `end_date`. From `fm.predict(...)`, pass the same two names as extra kwargs — `**plot_kwargs` routes them through.
 
 `forecast()` returns the results DataFrame indexed by datetime with one column per `{classifier}_{eruption_probability|uncertainty|confidence|prediction}` plus the four `consensus_*` columns. Also sets `pm.results` and `pm.forecast_plot_path`.
 
