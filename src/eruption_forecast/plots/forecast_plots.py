@@ -37,6 +37,8 @@ def plot_forecast(
     training_end_date: str | None = None,
     prediction_start_date: str | None = None,
     prediction_end_date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> plt.Figure:
     """Plot eruption forecast probability and prediction time-series.
 
@@ -55,6 +57,11 @@ def plot_forecast(
     fourth thin strip is added at the top showing training window → gap →
     prediction window as a Gantt-style horizontal bar. The strip shares the
     x-axis with the three data panels.
+
+    The plotted window can be narrowed via ``start_date`` / ``end_date`` — the
+    slice is applied to ``df`` before envelope extraction, rolling smoothing,
+    and every downstream panel; the segment strip's ``forecast_start`` /
+    ``forecast_end`` follow the slice automatically.
 
     All data panels use ``_ax_forecast`` fill-between coloring to highlight
     regions above the threshold (red), in the tolerance band (yellow), and
@@ -109,6 +116,13 @@ def plot_forecast(
             for the top segment strip (red bar). Defaults to ``None``.
         prediction_end_date (str | None, optional): End of the prediction window for
             the top segment strip. Defaults to ``None``.
+        start_date (str | None, optional): Inclusive lower bound for a window slice
+            applied to ``df`` before envelope extraction and rolling smoothing.
+            Passed through :func:`to_datetime`. When ``None``, uses ``df.index.min()``.
+            When the resulting slice is empty, a warning is logged and the full range
+            is plotted. Defaults to ``None``.
+        end_date (str | None, optional): Inclusive upper bound for the window slice,
+            mirror of ``start_date``. Defaults to ``None``.
 
     Returns:
         plt.Figure: Matplotlib figure with three vertically stacked data panels, plus
@@ -143,6 +157,21 @@ def plot_forecast(
             df = df.rename(
                 columns={column: column.replace("eruption_probability", "probability")}
             )
+
+    # Narrow the plotted window; a downstream slice would also shrink the
+    # segment strip's forecast bounds since they read df.index.min()/max().
+    if start_date is not None or end_date is not None:
+        slice_start = to_datetime(start_date) if start_date is not None else None
+        slice_end = to_datetime(end_date) if end_date is not None else None
+        sliced = df.loc[slice_start:slice_end]
+        if sliced.empty:
+            logger.warning(
+                f"start_date={start_date} / end_date={end_date} produced an empty "
+                f"slice of df (index range {df.index.min()}..{df.index.max()}); "
+                f"falling back to the full range."
+            )
+        else:
+            df = sliced
 
     df = get_envelope_values(df)
 
