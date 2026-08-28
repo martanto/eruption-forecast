@@ -719,6 +719,8 @@ class PredictionModel(BaseModel):
         plot_threshold: float = 0.5,
         plot_title: str | None = None,
         plot_pdf: bool = True,
+        plot_start_date: str | None = None,
+        plot_end_date: str | None = None,
         **plot_kwargs,
     ) -> pd.DataFrame:
         """Run forecast inference and render the forecast plot.
@@ -787,6 +789,8 @@ class PredictionModel(BaseModel):
             plot_threshold,
             title=plot_title,
             plot_pdf=plot_pdf,
+            plot_start_date=plot_start_date,
+            plot_end_date=plot_end_date,
             **plot_kwargs,
         )
 
@@ -1099,6 +1103,8 @@ class PredictionModel(BaseModel):
         threshold: float,
         title: str | None = None,
         plot_pdf: bool = False,
+        plot_start_date: str | None = None,
+        plot_end_date: str | None = None,
         **plot_kwargs: Any,
     ) -> None:
         """Render the forecast plot to PNG and optionally PDF.
@@ -1127,11 +1133,19 @@ class PredictionModel(BaseModel):
             label_df=self._labels,
             title=title,
             threshold=threshold,
+            start_date=plot_start_date,
+            end_date=plot_end_date,
             **plot_kwargs,
         )
 
+        basename = (
+            f"{plot_start_date}_{plot_end_date}"
+            if (plot_start_date and plot_end_date)
+            else self.basename
+        )
+
         figure_dir = os.path.join(self.prediction_dir, "figures")
-        png_path = os.path.join(figure_dir, f"forecast_{self.basename}.png")
+        png_path = os.path.join(figure_dir, f"forecast_{basename}.png")
 
         save_figure(
             fig=fig,
