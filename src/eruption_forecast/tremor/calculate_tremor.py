@@ -705,6 +705,7 @@ class CalculateTremor:
         plot_rsam_as_log: bool = False,
         plot_rolling_window: str | None = None,
         plot_filter_dsar_value: float | None = None,
+        plot_interval: int = 2,
     ) -> Self:
         """Execute tremor calculation workflow.
 
@@ -739,6 +740,12 @@ class CalculateTremor:
                 path (``run_job``) also honours it. Has no effect when
                 ``save_plot`` is ``False`` for the summary figure (the per-day
                 path is gated on ``plot_daily``). Defaults to ``None``.
+            plot_interval (int): Tick interval (in days) for the summary
+                figure's x-axis date locator, forwarded to ``plot_tremor()``
+                as ``interval`` with ``interval_unit="days"``. Larger values
+                thin out the tick labels on long runs; smaller values give
+                denser ticks on short windows. Has no effect when
+                ``save_plot`` is ``False``. Defaults to ``2``.
 
         Returns:
             Self: The ``CalculateTremor`` instance with populated ``df`` and
@@ -840,7 +847,7 @@ class CalculateTremor:
                 fig = plot_tremor(
                     df=df,
                     rolling_window=plot_rolling_window,
-                    interval=30,
+                    interval=plot_interval,
                     interval_unit="days",
                     eruption_dates=plot_eruption_dates,
                     filepath=None,
