@@ -10,7 +10,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.plots.styles import DIVERGING_BREWER
 from eruption_forecast.utils.pathutils import save_figure
 from eruption_forecast.config.constants import CALCULATE_METHODS
-from eruption_forecast.utils.date_utils import sort_dates, to_datetime
+from eruption_forecast.utils.date_utils import sort_dates
 from eruption_forecast.plots.forecast_plots import ax_eruption
 
 
@@ -55,17 +55,22 @@ def plot_tremor(
             uses ``DayLocator`` + ``%Y-%m-%d``. Defaults to ``"hours"``.
         rolling_window (str | None): Pandas offset alias (e.g. ``"2D"``,
             ``"12H"``) for the rolling reduction applied to each series before
-            plotting. ``None`` plots the raw series without rolling. Defaults to
-            ``None``.
+            plotting. ``None`` plots the raw series without rolling and the
+            legend entries use the ``"raw|median|…"`` / ``"raw|mean|…"``
+            prefix instead of the window string. Defaults to ``None``.
         eruption_dates (list[str] | None): Eruption timestamps to overlay as
-            vertical markers (one labelled ``"Eruption"`` legend entry per
-            subplot). Markers are drawn once per subplot via ``ax_eruption``
-            with ``fill_between=True`` and ``fill_between_y_max`` pinned to the
-            axes' auto-scaled upper ``ylim`` after every column on the method
-            has been plotted, so the shaded band always covers the loudest
-            visible series (important on the RSAM subplot, where the default
-            ``1.05`` band would be invisible). Markers outside the DataFrame
-            range are skipped. Defaults to ``None``.
+            vertical markers, one per in-range date on every subplot. Markers
+            are drawn via ``ax_eruption`` with ``fill_between=True`` and
+            ``fill_between_y_min`` / ``fill_between_y_max`` pinned to
+            ``ax.get_ylim()`` captured *after* every column on the method has
+            been plotted, so the shaded band always covers the loudest visible
+            series (important on the RSAM subplot, where the default ``1.05``
+            band would be clipped by the data range). The ``"Eruption"`` legend
+            label is bound to the first in-range marker per subplot; subsequent
+            in-range markers are drawn with ``label=None`` so the legend
+            carries exactly one entry, and dates outside ``df.index`` are
+            skipped entirely (they contribute no legend entry). Defaults to
+            ``None``.
         title (str | None): Optional figure-level ``suptitle``. Defaults to ``None``.
         selected_columns (list[str] | None): Subset of columns to plot. When
             provided, ``df`` is narrowed to these columns before grouping.
@@ -80,15 +85,20 @@ def plot_tremor(
             ``filepath`` always (re)writes the file. Defaults to ``None``
             (figure is returned without being saved).
         filter_dsar_value (float | None): Upper bound applied to every DSAR
-            series before plotting — samples at or above this value are masked
-            with ``NaN`` (via ``Series.where(series < filter_dsar_value)``) so a
-            handful of spikes do not flatten the visible band. Applied per
-            column when the column name contains ``"dsar"``; RSAM and entropy
-            series are unaffected. Defaults to ``None`` (no clipping).
-        filter_rsam_value (float | None): Upper bound applied to every RSAM series
-            before plotting.
-        filter_entropy_value (float | None): Upper bound applied to every entropy series
-            before plotting.
+            series after the rolling reduction but before ``ax.plot`` — samples
+            at or above this value are masked with ``NaN`` (via
+            ``Series.where(series < filter_dsar_value)``) so a handful of
+            residual spikes on the smoothed line do not flatten the visible
+            band. Applied per column when the column name contains ``"dsar"``;
+            RSAM and entropy series are unaffected. The knob is only skipped
+            when set to ``None`` (the ``is not None`` check preserves a
+            legitimate ``0.0`` bound). Defaults to ``None`` (no clipping).
+        filter_rsam_value (float | None): Upper bound applied to every RSAM
+            series after the rolling reduction. Same ``is not None`` semantics
+            as ``filter_dsar_value``. Defaults to ``None``.
+        filter_entropy_value (float | None): Upper bound applied to every
+            entropy series after the rolling reduction. Same ``is not None``
+            semantics as ``filter_dsar_value``. Defaults to ``None``.
         rsam_as_log (bool): If ``True``, plot the RSAM subplot on a log y-axis
             and annotate the y-label with ``"(log)"``. When ``False``
             (default), large y-axis magnitudes fall back to matplotlib's
@@ -146,14 +156,30 @@ def plot_tremor(
     if selected_columns:
         try:
             df = df[selected_columns]
-        except Exception as e:
+        except KeyError as e:
             raise ValueError(f"Could not select columns [{selected_columns}]. {e}")
 
     start_date = df.index.min()
     end_date = df.index.max()
     default_color = "#212121"
 
-    # Define date locator and formatter based on plot type
+    def _apply_upper_filters(_series: pd.Series, _column: str) -> pd.Series:
+        """Mask samples at or above the per-method upper bound.
+
+        Kept as a closure so the three ``filter_*_value`` knobs are read from
+        the enclosing ``plot_tremor`` call without threading them through
+        every invocation. ``None`` disables the corresponding filter — a bare
+        truthy test would also skip a legitimate ``0.0`` bound.
+        """
+        col = _column.lower()
+        if "dsar" in col and filter_dsar_value is not None:
+            _series = _series.where(_series < filter_dsar_value)
+        if "rsam" in col and filter_rsam_value is not None:
+            _series = _series.where(_series < filter_rsam_value)
+        if "entropy" in col and filter_entropy_value is not None:
+            _series = _series.where(_series < filter_entropy_value)
+        return _series
+
     date_locator = (
         mdates.HourLocator(interval=interval)
         if interval_unit == "hours"
@@ -196,18 +222,18 @@ def plot_tremor(
         squeeze=False,
     )
 
-    for index, (method, columns) in enumerate(grouped_methods.items()):
-        if len(columns) == 0:
+    for index, (method, method_columns) in enumerate(grouped_methods.items()):
+        if len(method_columns) == 0:
             continue
 
         ax = axs[index, 0]
-        for column_index, column in enumerate(columns):
+        for column_index, column in enumerate(method_columns):
             labels = column.split("_")
             label = labels[0]
             if len(labels) == 2:
                 label = labels[1]
 
-            label_rolling_window = rolling_window.lower() if rolling_window else "10min"
+            label_rolling_window = rolling_window.lower() if rolling_window else "raw"
 
             if metrics == "all" or metrics == "median":
                 series = (
@@ -215,15 +241,7 @@ def plot_tremor(
                     if rolling_window
                     else df[column]
                 )
-
-                if "dsar" in column.lower() and filter_dsar_value:
-                    series = series.where(series < filter_dsar_value)
-
-                if "rsam" in column.lower() and filter_rsam_value:
-                    series = series.where(series < filter_rsam_value)
-
-                if "entropy" in column.lower() and filter_entropy_value:
-                    series = series.where(series < filter_entropy_value)
+                series = _apply_upper_filters(series, column)
 
                 ax.plot(
                     series.index,
@@ -243,15 +261,7 @@ def plot_tremor(
                     if rolling_window
                     else df[column]
                 )
-
-                if "dsar" in column.lower() and filter_dsar_value:
-                    series = series.where(series < filter_dsar_value)
-
-                if "rsam" in column.lower() and filter_rsam_value:
-                    series = series.where(series < filter_rsam_value)
-
-                if "entropy" in column.lower() and filter_entropy_value:
-                    series = series.where(series < filter_entropy_value)
+                series = _apply_upper_filters(series, column)
 
                 ax.plot(
                     series.index,
@@ -268,18 +278,20 @@ def plot_tremor(
 
         if eruption_dates is not None and len(eruption_dates) > 0:
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
-            y_max = ax.get_ylim()[1]
+            y_min, y_max = ax.get_ylim()
 
-            for _index, eruption_date in enumerate(_eruption_dates):
-                label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
+            labelled = False
+            for eruption_date in _eruption_dates:
                 if df.index[0] <= eruption_date <= df.index[-1]:
                     ax_eruption(
                         ax,
-                        to_datetime(eruption_date),
-                        label=label,
+                        eruption_date,
+                        label=None if labelled else "Eruption",
                         fill_between=True,
+                        fill_between_y_min=y_min,
                         fill_between_y_max=y_max,
                     )
+                    labelled = True
 
         # Add y-axis label with units
         if "rsam" in method.lower():
@@ -308,7 +320,7 @@ def plot_tremor(
             alpha=0.7,
         )
         ax.legend(
-            loc=legend_loc,  # ty:ignore[invalid-argument-type]
+            loc=legend_loc,
             frameon=False,
             ncol=legend_ncol,
             fontsize=8,
