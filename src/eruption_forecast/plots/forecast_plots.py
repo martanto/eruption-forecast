@@ -152,11 +152,13 @@ def plot_forecast(
 
     # Maintain backward compatibility
     # Old dataframe using "_eruption_probability" as suffix column name
-    for column in df.columns:
-        if column.endswith("eruption_probability"):
-            df = df.rename(
-                columns={column: column.replace("eruption_probability", "probability")}
-            )
+    df = df.rename(
+        columns={
+            column: column.replace("eruption_probability", "probability")
+            for column in df.columns
+            if column.endswith("eruption_probability")
+        }
+    )
 
     # Narrow the plotted window; a downstream slice would also shrink the
     # segment strip's forecast bounds since they read df.index.min()/max().
@@ -306,10 +308,15 @@ def plot_forecast(
         if eruption_dates is not None and len(eruption_dates) > 0:
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
 
-            for _index, eruption_date in enumerate(_eruption_dates):
-                label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
+            labelled = False
+            for eruption_date in _eruption_dates:
                 if df.index[0] <= eruption_date <= df.index[-1]:
-                    ax = ax_eruption(ax, to_datetime(eruption_date), label=label)
+                    ax = ax_eruption(
+                        ax,
+                        eruption_date,
+                        label=None if labelled else "Eruption",
+                    )
+                    labelled = True
 
         ax.axhline(
             y=threshold,
@@ -524,18 +531,44 @@ def ax_eruption(
     eruption_date: datetime,
     label: str | None = None,
     fill_between: bool = True,
+    fill_between_y_min: float = 0,
     fill_between_y_max: float = 1.05,
 ) -> plt.Axes:
-    """Annotate a single eruption date on the given axes as a vertical dashed line.
+    """Annotate a single eruption date on the given axes.
 
-    Draws a red dashed vertical line and a rotated date label at the eruption date.
+    Draws a red dashed vertical line at ``eruption_date`` and, when
+    ``fill_between`` is ``True``, shades a translucent red band
+    (``#a50026`` at ``alpha=0.1``) spanning that day (``00:00:00`` →
+    ``23:59:00``) between ``fill_between_y_min`` and
+    ``fill_between_y_max``. A rotated ``YYYY-MM-DD`` label is written at
+    ``y=0.02`` on the axes' fractional y-axis so the annotation stays
+    anchored to the bottom of the plot regardless of the data range.
 
     Args:
         ax (plt.Axes): Matplotlib axes to annotate.
-        eruption_date (datetime): Eruption date to mark.
-        label (str | None, optional): Legend label for the line. Pass ``None`` to
-            suppress the legend entry for subsequent eruptions. Defaults to ``None``.
-        fill_between_y_max (float, optional): Max y-value for the label. Defaults to ``1.05``.
+        eruption_date (datetime): Eruption timestamp to mark. The shaded
+            band's start / end are derived from this timestamp's date via
+            ``.replace(hour=0, minute=0)`` / ``.replace(hour=23, minute=59)``,
+            so any time-of-day component is ignored for the fill but preserved
+            for the vertical line and the date label.
+        label (str | None, optional): Legend label for the vertical line.
+            Pass ``None`` to suppress the legend entry — callers that draw
+            multiple markers in a loop typically bind the label to the first
+            in-range marker only, so the whole batch shares a single
+            ``"Eruption"`` entry. Defaults to ``None``.
+        fill_between (bool, optional): When ``True``, shade the eruption-day
+            band. When ``False``, only the vertical line and the rotated date
+            label are drawn (``fill_between_y_min`` / ``fill_between_y_max``
+            are then ignored). Defaults to ``True``.
+        fill_between_y_min (float, optional): Lower y-value for the shaded
+            band, in data coordinates. Ignored when ``fill_between=False``.
+            Defaults to ``0``.
+        fill_between_y_max (float, optional): Upper y-value for the shaded
+            band, in data coordinates. Ignored when ``fill_between=False``.
+            The default ``1.05`` fits probability panels (``ylim`` ≈
+            ``[0, 1.05]``); for tremor or feature panels with a different
+            y-range, pass the auto-scaled ``ax.get_ylim()[1]`` so the band
+            stays visible above the loudest series. Defaults to ``1.05``.
 
     Returns:
         plt.Axes: The modified axes object.
@@ -554,7 +587,7 @@ def ax_eruption(
     if fill_between:
         ax.fill_between(
             np.array([start_eruption, end_eruption]),
-            0.0,
+            fill_between_y_min,
             fill_between_y_max,
             color="#a50026",
             alpha=0.1,
