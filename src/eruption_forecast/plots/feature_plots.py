@@ -19,11 +19,15 @@ from eruption_forecast.plots.styles import (
     configure_spine,
     apply_nature_style,
 )
-from eruption_forecast.utils.formatting import shorten_feature_name
+from eruption_forecast.utils.dataframe import load_features_matrix
+from eruption_forecast.utils.date_utils import sort_dates, to_datetime
+from eruption_forecast.utils.formatting import slugify, shorten_feature_name
 from eruption_forecast.utils.feature_utils import (
     find_common_features,
+    load_select_features,
     migrate_score_column,
 )
+from eruption_forecast.plots.forecast_plots import ax_eruption
 
 
 def plot_significant_features(
@@ -878,9 +882,11 @@ def plot_feature_count_curve(
             label="± 1 std across seeds",
         )
         if n_features_star in cv_scores.index:
-            star_mean = float(cv_scores["mean"].to_numpy()[
-                int(np.where(cv_scores.index.to_numpy() == n_features_star)[0][0])
-            ])
+            star_mean = float(
+                cv_scores["mean"].to_numpy()[
+                    int(np.where(cv_scores.index.to_numpy() == n_features_star)[0][0])
+                ]
+            )
             ax_curve.axvline(
                 n_features_star,
                 color=NATURE_COLORS["red"],
@@ -991,9 +997,7 @@ def plot_common_features_heatmap(
     # the surviving rows (both matrix.index and common_df share the raw
     # tsfresh names at this point).
     if max_features is not None and len(matrix) > max_features:
-        order = (
-            matrix.sum(axis=1).sort_values(ascending=False).head(max_features).index
-        )
+        order = matrix.sum(axis=1).sort_values(ascending=False).head(max_features).index
         matrix = matrix.reindex(order)
 
     if label_style == "alias":
@@ -1132,3 +1136,165 @@ def plot_common_features_correlation(
     out = output_path or os.path.join(os.getcwd(), "common_features_correlation.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     return ax
+
+
+def plot_features_matrix(
+    features_path: str,
+    label_csv: str,
+    figures_dir: str | Path,
+    eruption_dates: list[str] | None = None,
+    figsize: tuple[float, float] = (8, 2),
+    select_features: str | list[str] | None = None,
+    number_of_features: int | None = None,
+    dpi: int = 150,
+    overwrite: bool = False,
+) -> None:
+    """Plot each column of a features matrix as a time-series with rolling medians.
+
+    Loads a features matrix from ``features_path`` (attaching datetimes via
+    ``label_csv``), optionally subsets it to a top-N feature list, and writes
+    one PNG per surviving column under ``figures_dir``: a raw 10-minute
+    scatter overlaid with 12h and 48h centered rolling medians. When
+    ``eruption_dates`` is supplied, every eruption inside the matrix's
+    datetime range is annotated with a vertical marker via
+    :func:`eruption_forecast.plots.forecast_plots.ax_eruption`.
+
+    Args:
+        features_path (str): Path to the ``id``-indexed features matrix
+            parquet/csv. Forwarded to
+            :func:`~eruption_forecast.utils.dataframe.load_features_matrix`.
+        label_csv (str): Path to the sibling ``features-label_*.csv`` used
+            to attach a ``DatetimeIndex`` to ``features_path``.
+        figures_dir (str | Path): Output directory for PNGs. Created if
+            missing.
+        eruption_dates (list[str] | None, optional): Eruption dates
+            (``YYYY-MM-DD``). Only eruptions inside the matrix's datetime
+            range are drawn. Defaults to ``None``.
+        figsize (tuple[float, float], optional): Figure size in inches.
+            Defaults to ``(8, 2)``.
+        select_features (str | list[str] | None, optional): Optional top-N
+            CSV path (``top_{N}_features.csv``) or an explicit list of
+            tsfresh names. When set, subsets the loaded features matrix to
+            those columns before plotting. Defaults to ``None`` (plot every
+            column).
+        number_of_features (int | None, optional): When ``select_features``
+            is a CSV path, cap to the top-``number_of_features`` ranked
+            entries. ``None`` or ``0`` disables truncation. Ignored when
+            ``select_features`` is a list. Defaults to ``None``.
+        dpi (int, optional): Figure resolution. Defaults to ``150``.
+        overwrite (bool, optional): If ``False``, skip columns whose PNG
+            already exists on disk. Defaults to ``False``.
+
+    Returns:
+        None: PNGs are saved to disk; nothing is returned.
+
+    Raises:
+        TypeError: If the loaded features matrix does not have a
+            ``DatetimeIndex`` (required by ``rolling("12h")`` / ``"48h"``).
+        FileNotFoundError: If ``select_features`` is a path that does not
+            exist.
+    """
+    features_matrix = load_features_matrix(label_csv, features_path)
+
+    if not isinstance(features_matrix.index, pd.DatetimeIndex):
+        msg = (
+            "features_matrix must have a DatetimeIndex for "
+            "rolling(window='12h') / '48h'."
+        )
+        raise TypeError(msg)
+
+    if select_features:
+        if isinstance(select_features, str) and not os.path.exists(select_features):
+            msg = f"select_features CSV not found: {select_features}"
+            raise FileNotFoundError(msg)
+
+        selected = load_select_features(
+            select_features, number_of_features=number_of_features or 0
+        )
+        available = [column for column in selected if column in features_matrix.columns]
+        missing = len(selected) - len(available)
+        if missing:
+            logger.warning(
+                f"plot_features_matrix: {missing} selected feature(s) not "
+                "found in the loaded features matrix and will be skipped."
+            )
+        if not available:
+            logger.warning(
+                "plot_features_matrix: no selected features overlap the "
+                "loaded matrix; nothing to plot."
+            )
+            return None
+        features_matrix = features_matrix[available]
+
+    figures_dir = Path(figures_dir)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    sorted_eruptions = (
+        sort_dates(eruption_dates, as_datetime=True) if eruption_dates else []
+    )
+    idx_min = features_matrix.index.min()
+    idx_max = features_matrix.index.max()
+
+    with apply_nature_style():
+        for index, column in enumerate(features_matrix.columns):
+            slug = slugify(column)
+            filepath = figures_dir / f"{index}_{slug}.png"
+
+            if filepath.exists() and not overwrite:
+                continue
+
+            fig, ax = plt.subplots(
+                nrows=1,
+                ncols=1,
+                figsize=figsize,
+                tight_layout=True,
+            )
+
+            ax.scatter(
+                features_matrix.index,
+                features_matrix[column],
+                label="10min",
+                color=NATURE_COLORS["gray"],
+                s=0.1,
+                alpha=0.3,
+            )
+
+            ax.plot(
+                features_matrix.index,
+                features_matrix[column].rolling(window="12h", center=True).median(),
+                alpha=0.8,
+                color=NATURE_COLORS["blue"],
+                linestyle="-",
+                linewidth=1,
+                label="Median 12h",
+            )
+            ax.plot(
+                features_matrix.index,
+                features_matrix[column].rolling(window="48h", center=True).median(),
+                alpha=0.8,
+                color=NATURE_COLORS["red"],
+                linestyle="-",
+                linewidth=1,
+                label="Median 48h",
+            )
+
+            label_used = False
+            for eruption_date in sorted_eruptions:
+                if not (idx_min <= eruption_date <= idx_max):
+                    continue
+                ax = ax_eruption(
+                    ax,
+                    to_datetime(eruption_date),
+                    label=None if label_used else "Eruption",
+                    fill_between=False,
+                )
+                label_used = True
+
+            configure_spine(ax)
+            ax.set_title(column, fontsize=10)
+            ax.legend(loc="upper left", fontsize=6, frameon=False, ncol=3)
+
+            fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
+            plt.close(fig)
+
+    return None
