@@ -59,8 +59,13 @@ def plot_tremor(
             ``None``.
         eruption_dates (list[str] | None): Eruption timestamps to overlay as
             vertical markers (one labelled ``"Eruption"`` legend entry per
-            subplot). Markers outside the DataFrame range are skipped.
-            Defaults to ``None``.
+            subplot). Markers are drawn once per subplot via ``ax_eruption``
+            with ``fill_between=True`` and ``fill_between_y_max`` pinned to the
+            axes' auto-scaled upper ``ylim`` after every column on the method
+            has been plotted, so the shaded band always covers the loudest
+            visible series (important on the RSAM subplot, where the default
+            ``1.05`` band would be invisible). Markers outside the DataFrame
+            range are skipped. Defaults to ``None``.
         title (str | None): Optional figure-level ``suptitle``. Defaults to ``None``.
         selected_columns (list[str] | None): Subset of columns to plot. When
             provided, ``df`` is narrowed to these columns before grouping.
@@ -263,12 +268,17 @@ def plot_tremor(
 
         if eruption_dates is not None and len(eruption_dates) > 0:
             _eruption_dates = sort_dates(eruption_dates, as_datetime=True)
+            y_max = ax.get_ylim()[1]
 
             for _index, eruption_date in enumerate(_eruption_dates):
                 label = "Eruption" if _index == (len(_eruption_dates) - 1) else None
                 if df.index[0] <= eruption_date <= df.index[-1]:
-                    ax = ax_eruption(
-                        ax, to_datetime(eruption_date), label=label, fill_between=True
+                    ax_eruption(
+                        ax,
+                        to_datetime(eruption_date),
+                        label=label,
+                        fill_between=True,
+                        fill_between_y_max=y_max,
                     )
 
         # Add y-axis label with units
