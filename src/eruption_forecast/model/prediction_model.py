@@ -743,6 +743,19 @@ class PredictionModel(BaseModel):
             plot_pdf (bool, optional): Save a PDF copy of the forecast plot
                 with embedded TrueType fonts in addition to the PNG. Defaults
                 to ``True``.
+            plot_start_date (str | None, optional): Left bound of the
+                rendered forecast plot in ``"YYYY-MM-DD"`` format. Forwarded
+                to :func:`plot_forecast` as ``start_date`` to crop the
+                x-axis. When both ``plot_start_date`` and ``plot_end_date``
+                are supplied they also override the plot filename stem to
+                ``forecast_{plot_start_date}_{plot_end_date}`` in place of
+                the default ``self.basename``; the underlying forecast CSV
+                keeps its ``self.basename`` naming. Defaults to ``None``.
+            plot_end_date (str | None, optional): Right bound of the
+                rendered forecast plot in ``"YYYY-MM-DD"`` format. Forwarded
+                to :func:`plot_forecast` as ``end_date``. Pairs with
+                ``plot_start_date`` for the filename override described
+                above. Defaults to ``None``.
             **plot_kwargs: Extra keyword arguments forwarded to
                 :func:`plot_forecast`.
 
