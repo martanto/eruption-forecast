@@ -682,6 +682,8 @@ class ForecastModel:
         features_matrix_path: str | None = None,
         label_features_csv: str | None = None,
         enable_segments_plot: bool = False,
+        plot_start_date: str | None = None,
+        plot_end_date: str | None = None,
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
@@ -758,6 +760,20 @@ class ForecastModel:
                 panels. When ``False``, the four date kwargs are passed
                 as ``None`` and the strip is omitted. Defaults to
                 ``False``.
+            plot_start_date (str | None): Left bound of the rendered
+                forecast plot in ``"YYYY-MM-DD"`` format. Forwarded to
+                :meth:`PredictionModel.forecast` and ultimately to
+                :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
+                as ``start_date`` to crop the x-axis. When both
+                ``plot_start_date`` and ``plot_end_date`` are supplied
+                they also override the plot filename stem to
+                ``forecast_{plot_start_date}_{plot_end_date}``. Defaults
+                to ``None``.
+            plot_end_date (str | None): Right bound of the rendered
+                forecast plot in ``"YYYY-MM-DD"`` format. Forwarded to
+                :meth:`PredictionModel.forecast`. Pairs with
+                ``plot_start_date`` for the filename override described
+                above. Defaults to ``None``.
             output_dir (str | None): Root output directory for
                 prediction artefacts. Defaults to the station
                 directory.
@@ -940,6 +956,8 @@ class ForecastModel:
             plot_threshold=plot_threshold,
             plot_title=plot_title,
             plot_pdf=plot_pdf,
+            plot_start_date=plot_start_date,
+            plot_end_date=plot_end_date,
             training_start_date=(
                 self.TrainingModel.start_date_str if enable_segments_plot else None
             ),
