@@ -887,9 +887,13 @@ class PredictionModel(BaseModel):
             ValueError: If the loaded label CSV's sampling — checked via
                 :func:`~eruption_forecast.utils.validation.check_sampling_consistency`
                 — does not match the caller-supplied ``window_step`` /
-                ``window_step_unit``, or if its ``datetime`` span does not
-                fully cover the configured ``[start_date, end_date]``
-                forecast range (compared at day granularity).
+                ``window_step_unit``, or if the frame obtained by slicing
+                the loaded label CSV to ``[start_date, end_date]`` does not
+                fully cover that configured forecast range (compared at day
+                granularity). When the sliced frame is empty but the caller
+                passed ``start_date == loaded_start - window_size days``,
+                ``self.start_date`` / ``self.end_date`` are silently
+                advanced to the loaded range instead of raising.
 
         Example:
             >>> (
@@ -938,46 +942,64 @@ class PredictionModel(BaseModel):
                 "the loaded label CSV disagree with that step."
             )
 
-        loaded_start: pd.Timestamp = label_datetimes.min()
-        loaded_end: pd.Timestamp = label_datetimes.max()
-        if (
-            self.start_date.date() < loaded_start.date()
-            or self.end_date.date() > loaded_end.date()
-        ):
-            if (
-                self.start_date.date()
-                == (loaded_start.date() - timedelta(days=self.window_size))
-                and self.end_date.date() == loaded_end.date()
-            ):
-                logger.info(
-                    f"Adjusting start_date and end_date: {loaded_start:%Y-%m-%d} -> {loaded_end:%Y-%m-%d}"
-                )
-                self.start_date = loaded_start.to_pydatetime()
-                self.end_date = loaded_end.to_pydatetime()
-                self.start_date_str = loaded_start.strftime("%Y-%m-%d")
-                self.end_date_str = loaded_end.strftime("%Y-%m-%d")
-
-            else:
-                raise ValueError(
-                    f"Loaded feature range [{loaded_start:%Y-%m-%d} → "
-                    f"{loaded_end:%Y-%m-%d}] does not fully cover the configured "
-                    f"forecast range [{self.start_date_str} → {self.end_date_str}]. "
-                    f"Re-run extract_features() or point to a features run that "
-                    f"spans the requested range."
-                )
-
         label_df = pd.read_csv(label_features_csv, index_col=0, parse_dates=True)
 
-        # Backward compat: legacy cached forecast grids predate the
-        # ``is_erupted`` placeholder column. Mirrors ``build_label()``.
         if "is_erupted" not in label_df.columns:
             label_df["is_erupted"] = 0
 
-        self._labels = label_df
-        self.labels = label_df["id"]
+        features_df = pd.read_parquet(features_matrix_path)
+
+        loaded_start: pd.Timestamp = label_df.index.min()
+        loaded_end: pd.Timestamp = label_df.index.max()
+
+        sliced_labels = label_df.loc[self.start_date : self.end_date]
+
+        # Back-off case: the sliding-window extractor cannot emit a feature
+        # row until it has ``window_size`` days of lookback, so a caller
+        # who passed the raw tremor start sees an empty slice. Realign
+        # ``start_date`` / ``end_date`` to the loaded range and re-slice.
+        if sliced_labels.empty and (
+            self.start_date.date()
+            == (loaded_start.date() - timedelta(days=self.window_size))
+            and self.end_date.date() == loaded_end.date()
+        ):
+            logger.info(
+                f"Adjusting start_date and end_date: {loaded_start:%Y-%m-%d} -> {loaded_end:%Y-%m-%d}"
+            )
+            self.start_date = loaded_start.to_pydatetime()
+            self.end_date = loaded_end.to_pydatetime()
+            self.start_date_str = loaded_start.strftime("%Y-%m-%d")
+            self.end_date_str = loaded_end.strftime("%Y-%m-%d")
+            sliced_labels = label_df.loc[self.start_date : self.end_date]
+
+        if (
+            sliced_labels.empty
+            or sliced_labels.index.min().date() > self.start_date.date()
+            or sliced_labels.index.max().date() < self.end_date.date()
+        ):
+            sliced_range = (
+                f"[{sliced_labels.index.min():%Y-%m-%d} → "
+                f"{sliced_labels.index.max():%Y-%m-%d}]"
+                if not sliced_labels.empty
+                else "[empty]"
+            )
+            raise ValueError(
+                f"Sliced feature range {sliced_range} does not fully cover "
+                f"the configured forecast range "
+                f"[{self.start_date_str} → {self.end_date_str}] "
+                f"(loaded range: [{loaded_start:%Y-%m-%d} → "
+                f"{loaded_end:%Y-%m-%d}]). Re-run extract_features() or "
+                f"point to a features run that spans the requested range."
+            )
+
+        sliced_features = features_df.loc[features_df.index.isin(sliced_labels["id"])]
+        sliced_labels = sliced_labels[sliced_labels["id"].isin(sliced_features.index)]
+
+        self._labels = sliced_labels
+        self.labels = sliced_labels["id"]
         self.labels_csv = label_features_csv
 
-        self.features_df = pd.read_parquet(features_matrix_path)
+        self.features_df = sliced_features
         self.features_path = features_matrix_path
         self.window_step = window_step
         self.window_step_unit = window_step_unit
