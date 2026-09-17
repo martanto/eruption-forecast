@@ -272,7 +272,7 @@ def main(): ...
 
 ### `TelegramNotification` client
 
-Used by `scenarios.py` to ship the per-scenario forecast plot. Every send method returns `self` so calls can be chained:
+Used by `ForecastModelScenario.run()` (driven by `forecast-scenario.py`) to ship the per-scenario forecast plot. Every send method returns `self` so calls can be chained:
 
 ```python
 from eruption_forecast import TelegramNotification

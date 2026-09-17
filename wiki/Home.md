@@ -18,7 +18,7 @@ It is a research tool and must not be used as the sole basis for public safety d
 | 1 | [Getting Started](Getting-Started) | Prerequisites, installation, dev commands |
 | 2 | [Data Sources](Data-Sources) | SDS archive layout, FDSN web service, local caching |
 | 3 | [Usage](Usage) | Quick Start + annotated end-to-end example |
-| 4 | [Pipeline Walkthrough](Pipeline-Walkthrough) | Research Workflow (`main.py`) + Scenarios Workflow (`scenarios.py`) |
+| 4 | [Pipeline Walkthrough](Pipeline-Walkthrough) | Research Workflow (`main.py`) + Scenarios Workflow (`forecast-scenario.py`) |
 | 5a | [Training Workflow](Training-Workflow) | `TrainingModel`, classifiers, CV, imbalance, parallelism |
 | 5b | [Prediction Workflow](Prediction-Workflow) | `PredictionModel`, forecast outputs, consensus |
 | 5c | [Evaluation Workflow](Evaluation-Workflow) | `EvaluationModel`, `MetricsEnsemble`, `ClassifierComparator` |
@@ -100,9 +100,8 @@ eruption-forecast/
 ├── wiki/                       This wiki (Markdown sources)
 ├── tests/                      Unit tests
 ├── main.py                     Research Workflow - single train + predict
-├── scenarios.py                Scenarios Workflow - loop over date-split scenarios
+├── forecast-scenario.py        Scenarios Workflow - packaged multi-scenario orchestrator (ForecastModelScenario)
 ├── config.example.yaml         Annotated ForecastConfig template
-├── CLAUDE.md                   Project rules and architecture cheatsheet
 └── WIKI.md                     Local wiki-rewrite progress tracker
 ```
 
@@ -112,5 +111,5 @@ eruption-forecast/
 
 - [README](https://github.com/martanto/eruption-forecast/blob/master/README.md)
 - [`main.py` - Research Workflow](https://github.com/martanto/eruption-forecast/blob/master/main.py)
-- [`scenarios.py` - Scenarios Workflow](https://github.com/martanto/eruption-forecast/blob/master/scenarios.py)
+- [`forecast-scenario.py` - Scenarios Workflow](https://github.com/martanto/eruption-forecast/blob/master/forecast-scenario.py)
 - [`config.example.yaml` - config template](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml)

@@ -231,7 +231,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 └── prediction/{hash}.PredictionModel.pkl       # content-addressable cache pickle (+ .params.json sidecar)
 ```
 
-`fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `scenarios.py` to attach the figure to a Telegram notification.
+`fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `ForecastModelScenario.run()` to attach the figure to a Telegram notification.
 
 ---
 

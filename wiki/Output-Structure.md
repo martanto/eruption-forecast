@@ -217,7 +217,7 @@ regeneration.
 
 ## Scenarios Layout
 
-`scenarios.py` passes a per-scenario `output_dir` into each stage, so artefacts land at:
+`ForecastModelScenario.run()` (driven by `forecast-scenario.py`) passes a per-scenario `output_dir` into each stage, so artefacts land at:
 
 ```
 output/
