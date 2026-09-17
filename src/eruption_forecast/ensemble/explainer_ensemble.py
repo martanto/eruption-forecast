@@ -78,7 +78,10 @@ class ExplainerEnsemble:
                 ``None``.
             overwrite (bool): Overwrite cached SHAP outputs. Defaults to
                 ``False``.
-            n_jobs (int): Parallel workers for per-seed plotting.
+            n_jobs (int): Parallel workers for the per-seed SHAP compute
+                loop in :meth:`explain_classifier` and for the per-seed
+                plot dispatch in :meth:`plot_seed`. Both paths dispatch
+                via ``joblib.Parallel(backend="loky")`` when ``> 1``.
                 Defaults to ``1``.
             verbose (bool): Verbose logging. Defaults to ``False``.
         """
@@ -204,8 +207,8 @@ class ExplainerEnsemble:
                 f"Explaining Seed {seed['random_state']}: {selected_features_df.shape}. {e}"
             ) from e
 
-    @staticmethod
     def explain_classifier(
+        self,
         seed_ensemble: SeedEnsemble,
         features_df: pd.DataFrame,
         save_per_seed: bool = False,
@@ -222,7 +225,11 @@ class ExplainerEnsemble:
         ``overwrite`` is ``False``) or computes a fresh explanation via
         :meth:`explain_seed`. Per-seed ``.pkl`` files land under
         ``{output_dir}/{classifier_name}/shap_values/`` when
-        ``save_per_seed`` is ``True``.
+        ``save_per_seed`` is ``True``. Parallelism is driven by
+        ``self.n_jobs``: ``1`` runs serially, ``> 1`` dispatches seeds via
+        ``joblib.Parallel(backend="loky")`` — mirrors the
+        :meth:`~eruption_forecast.model.training_model.TrainingModel._run_jobs`
+        pattern.
 
         Args:
             seed_ensemble (SeedEnsemble): Trained ensemble for a single
@@ -267,53 +274,32 @@ class ExplainerEnsemble:
         if save_per_seed:
             ensure_dir(output_shap_dir)
 
-        for seed in seeds:
-            seed_idx = seed["random_state"]
+        def _process_seed(seed: dict) -> SeedExplanation:
+            seed_idx = int(seed["random_state"])
+            seed_path = os.path.join(output_shap_dir, f"{seed_idx:05d}.pkl")
+            if not overwrite and os.path.exists(seed_path):
+                shap_values = load_pickle(seed_path)
+            else:
+                shap_values = ExplainerEnsemble.explain_seed(
+                    seed=seed,
+                    features_df=features_df,
+                    save_per_seed=save_per_seed,
+                    check_additivity=check_additivity,
+                    seed_explanation_filepath=seed_path,
+                )
+            return SeedExplanation(random_state=seed_idx, shap_values=shap_values)
 
-            seed_explanation_filepath = os.path.join(
-                output_shap_dir,
-                f"{seed_idx:05d}.pkl",
+        if self.n_jobs != 1:
+            logger.info(
+                f"[{classifier_name}]: Explaining {len(seeds)} seeds on {self.n_jobs} job(s)..."
             )
-
-            if not overwrite and os.path.exists(seed_explanation_filepath):
-                if verbose:
-                    logger.info(
-                        f"SeedExplanation {classifier_name}/{seed_idx:05d} exists."
-                    )
-                seed_explanation: shap.Explanation = load_pickle(
-                    seed_explanation_filepath
-                )
-                classifier_explanation.seeds.append(
-                    SeedExplanation(
-                        random_state=int(seed_idx),
-                        shap_values=seed_explanation,
-                    )
-                )
-                continue
-
-            if verbose:
-                logger.info(f"Explaining {classifier_name}/{seed_idx:05d}")
-
-            seed_explanation: shap.Explanation = ExplainerEnsemble.explain_seed(
-                seed=seed,
-                features_df=features_df,
-                save_per_seed=save_per_seed,
-                check_additivity=check_additivity,
-                seed_explanation_filepath=seed_explanation_filepath,
+            seed_explanations = joblib.Parallel(n_jobs=self.n_jobs, backend="loky")(
+                joblib.delayed(_process_seed)(seed) for seed in seeds
             )
+        else:
+            seed_explanations = [_process_seed(seed) for seed in seeds]
 
-            if save_per_seed and verbose:
-                logger.info(
-                    f"Done. Explanation {classifier_name}/{seed['random_state']}: "
-                    f"{seed_explanation_filepath}"
-                )
-
-            classifier_explanation.seeds.append(
-                SeedExplanation(
-                    random_state=int(seed_idx),
-                    shap_values=seed_explanation,
-                )
-            )
+        classifier_explanation.seeds.extend(seed_explanations)
 
         return classifier_explanation
 
