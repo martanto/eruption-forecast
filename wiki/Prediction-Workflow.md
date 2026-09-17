@@ -196,6 +196,8 @@ prediction/figures/forecast_{basename}.pdf       # when plot_pdf=True (default)
 | `plot_threshold` | `0.5` | Horizontal threshold line on the forecast plot |
 | `plot_title` | `None` | Optional title |
 | `plot_pdf` | `True` | Also save a vector PDF |
+| `plot_start_date` | `None` | Optional inclusive lower bound narrowing the plotted window. Forwarded to `plot_forecast` as `start_date`. `None` keeps the full forecast range. The `plot_` prefix avoids colliding with the constructor's `start_date` (which sets the forecast period itself). |
+| `plot_end_date` | `None` | Optional inclusive upper bound, mirror of `plot_start_date`. Forwarded to `plot_forecast` as `end_date`. |
 | `**plot_kwargs` | - | Forwarded to `eruption_forecast.plots.plot_forecast` - e.g. `eruption_dates=[...]` to render eruption markers |
 
 ---
@@ -229,7 +231,7 @@ Threading `training_hash` means re-training automatically invalidates the predic
 └── prediction/{hash}.PredictionModel.pkl       # content-addressable cache pickle (+ .params.json sidecar)
 ```
 
-`fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `scenarios.py` to attach the figure to a Telegram notification.
+`fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `ForecastModelScenario.run()` to attach the figure to a Telegram notification.
 
 ---
 

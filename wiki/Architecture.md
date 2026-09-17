@@ -323,7 +323,7 @@ ForecastConfig
 
 `notify(task)` wraps a function with success and error Telegram messages (MarkdownV2 body, hostname, elapsed time, exception details). `timer(name, send_to=None)` logs the wrapped function's elapsed wall-clock time via `loguru`; passing `send_to="telegram"` also mirrors the message to Telegram.
 
-Both decorators delegate to `TelegramNotification` (`notification/telegram.py`), a fluent-chain client wrapping the Telegram Bot API. It exposes `send_message(...)`, `send_document(...)`, `send_photo(...)`, and `send_media_group(...)`; every send method returns `self` so calls can be chained (`tn.send_message(...).send_document(...)`). Credentials are resolved from constructor arguments or the `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` environment variables. Every network failure is logged and swallowed, so a dead network never blocks the caller. `scenarios.py` uses this class directly to ship each per-scenario forecast PNG next to a title message.
+Both decorators delegate to `TelegramNotification` (`notification/telegram.py`), a fluent-chain client wrapping the Telegram Bot API. It exposes `send_message(...)`, `send_document(...)`, `send_photo(...)`, and `send_media_group(...)`; every send method returns `self` so calls can be chained (`tn.send_message(...).send_document(...)`). Credentials are resolved from constructor arguments or the `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` environment variables. Every network failure is logged and swallowed, so a dead network never blocks the caller. `ForecastModelScenario.run()` (driven by `forecast-scenario.py`) uses this class directly to ship each per-scenario forecast PNG.
 
 ### 3.10 Utils (`utils/`)
 
@@ -508,4 +508,4 @@ Evaluation is **never cached** - the on-disk matrices act as the cache and `Metr
 
 `utils/ml.save_model_json` writes the per-classifier trained-model JSON registry (one record per seed, each with the inline top-N feature list and the path to the seed's `.pkl`). `TrainingModel.build_seed_ensemble` reads that registry via `SeedEnsemble.from_any` to package every seed into a `SeedEnsemble`, and the per-classifier `SeedEnsemble`s are then merged into a `ClassifierEnsemble` (`build_classifier_ensemble`). All three steps run at the end of `TrainingModel.fit()`.
 
-`utils/formatting.slugify` is what turns `"Scenario 1"` into `scenario-1` for the per-scenario `output_dir` used in `scenarios.py`.
+`utils/formatting.slugify` is what turns `"Scenario 1"` into `scenario-1` for the per-scenario `output_dir` built inside `ForecastModelScenario.run()`.

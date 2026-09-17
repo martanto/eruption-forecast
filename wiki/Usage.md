@@ -299,4 +299,4 @@ em.compare().plot_all()
 
 ### Loop over multiple training/prediction splits
 
-Use `scenarios.py` - see [Pipeline Walkthrough → Scenarios Workflow](Pipeline-Walkthrough#scenarios-workflow-scenariospy).
+Use `forecast-scenario.py` (driven by `ForecastModelScenario`) - see [Pipeline Walkthrough → Scenarios Workflow](Pipeline-Walkthrough#scenarios-workflow-forecast-scenariopy).

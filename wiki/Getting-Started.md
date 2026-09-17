@@ -83,7 +83,7 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 | `uv run pytest tests/` | Run the test suite |
 | `uv run pytest tests/test_imports.py -v` | Confirm no circular imports |
 | `uv run python main.py` | Run the bundled Research Workflow |
-| `uv run python scenarios.py` | Run the bundled Scenarios Workflow |
+| `uv run python forecast-scenario.py` | Run the bundled Scenarios Workflow (`ForecastModelScenario`) |
 
 All `uv`, `uvx`, and `python` commands are pre-approved in the project hooks - no permission prompt will be shown.
 
@@ -109,4 +109,4 @@ Full usage is documented in [Configuration → Telegram Notifications](Configura
 
 1. Confirm a seismic data archive is reachable - see [Data Sources](Data-Sources).
 2. Run the [Usage](Usage) Quick Start to produce your first forecast.
-3. Dive into [Pipeline Walkthrough](Pipeline-Walkthrough) for the annotated `main.py` / `scenarios.py` tours.
+3. Dive into [Pipeline Walkthrough](Pipeline-Walkthrough) for the annotated `main.py` / `forecast-scenario.py` tours.

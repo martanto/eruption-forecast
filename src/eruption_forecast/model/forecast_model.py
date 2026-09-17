@@ -160,6 +160,25 @@ class ForecastModel:
             )
         )
 
+    def __repr__(self) -> str:
+        stages = [
+            name
+            for name, attr in (
+                ("calculate", self.CalculateTremor),
+                ("train", self.TrainingModel),
+                ("predict", self.PredictionModel),
+                ("evaluate", self.EvaluationModel),
+                ("explain", self.ExplanationModel),
+            )
+            if attr is not None
+        ]
+        stages_str = ", ".join(stages) if stages else "none"
+        return (
+            f"{type(self).__name__}(nslc={self.nslc!r}, "
+            f"day_to_forecast={self.day_to_forecast}, "
+            f"stages_run=[{stages_str}])"
+        )
+
     def calculate(
         self,
         start_date: str | datetime,
@@ -682,6 +701,8 @@ class ForecastModel:
         features_matrix_path: str | None = None,
         label_features_csv: str | None = None,
         enable_segments_plot: bool = False,
+        plot_start_date: str | None = None,
+        plot_end_date: str | None = None,
         output_dir: str | None = None,
         overwrite: bool | None = None,
         n_jobs: int | None = None,
@@ -758,6 +779,20 @@ class ForecastModel:
                 panels. When ``False``, the four date kwargs are passed
                 as ``None`` and the strip is omitted. Defaults to
                 ``False``.
+            plot_start_date (str | None): Left bound of the rendered
+                forecast plot in ``"YYYY-MM-DD"`` format. Forwarded to
+                :meth:`PredictionModel.forecast` and ultimately to
+                :func:`~eruption_forecast.plots.forecast_plots.plot_forecast`
+                as ``start_date`` to crop the x-axis. When both
+                ``plot_start_date`` and ``plot_end_date`` are supplied
+                they also override the plot filename stem to
+                ``forecast_{plot_start_date}_{plot_end_date}``. Defaults
+                to ``None``.
+            plot_end_date (str | None): Right bound of the rendered
+                forecast plot in ``"YYYY-MM-DD"`` format. Forwarded to
+                :meth:`PredictionModel.forecast`. Pairs with
+                ``plot_start_date`` for the filename override described
+                above. Defaults to ``None``.
             output_dir (str | None): Root output directory for
                 prediction artefacts. Defaults to the station
                 directory.
@@ -940,6 +975,8 @@ class ForecastModel:
             plot_threshold=plot_threshold,
             plot_title=plot_title,
             plot_pdf=plot_pdf,
+            plot_start_date=plot_start_date,
+            plot_end_date=plot_end_date,
             training_start_date=(
                 self.TrainingModel.start_date_str if enable_segments_plot else None
             ),
@@ -997,6 +1034,13 @@ class ForecastModel:
                 ``self.overwrite`` when ``None``. Defaults to ``None``.
             n_jobs (int | None): Parallel workers. Falls back to
                 ``self.n_jobs`` when ``None``. Defaults to ``None``.
+            use_cache (bool): Short-circuit re-evaluation when a cache
+                hit exists. Gated by ``use_cache and not self.overwrite``:
+                passing ``False`` skips the
+                :meth:`EvaluationModel.load` short-circuit even when a
+                cached pickle exists on disk, and also disables the
+                write by threading through as ``save_model=use_cache``.
+                Defaults to ``True``.
             verbose (bool | None): Verbose logging. Falls back to
                 ``self.verbose`` when ``None``. Defaults to ``None``.
 
@@ -1138,6 +1182,14 @@ class ForecastModel:
                 inherits from ``self.overwrite``. Defaults to ``None``.
             n_jobs (int | None): Parallel workers. ``None`` inherits from
                 ``self.n_jobs``. Defaults to ``None``.
+            use_cache (bool): Short-circuit re-explanation when a cache
+                hit exists. Gated by ``use_cache and not self.overwrite``:
+                passing ``False`` skips the
+                :meth:`ExplanationModel.load` short-circuit even when a
+                cached pickle exists on disk, and also disables the
+                write by threading through as ``save_model=use_cache``
+                (also forwarded to
+                :meth:`ExplanationModel.explain`). Defaults to ``True``.
             verbose (bool | None): Verbose logging. ``None`` inherits from
                 ``self.verbose``. Defaults to ``None``.
 
