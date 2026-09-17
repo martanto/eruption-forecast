@@ -160,6 +160,25 @@ class ForecastModel:
             )
         )
 
+    def __repr__(self) -> str:
+        stages = [
+            name
+            for name, attr in (
+                ("calculate", self.CalculateTremor),
+                ("train", self.TrainingModel),
+                ("predict", self.PredictionModel),
+                ("evaluate", self.EvaluationModel),
+                ("explain", self.ExplanationModel),
+            )
+            if attr is not None
+        ]
+        stages_str = ", ".join(stages) if stages else "none"
+        return (
+            f"{type(self).__name__}(nslc={self.nslc!r}, "
+            f"day_to_forecast={self.day_to_forecast}, "
+            f"stages_run=[{stages_str}])"
+        )
+
     def calculate(
         self,
         start_date: str | datetime,
@@ -1015,6 +1034,13 @@ class ForecastModel:
                 ``self.overwrite`` when ``None``. Defaults to ``None``.
             n_jobs (int | None): Parallel workers. Falls back to
                 ``self.n_jobs`` when ``None``. Defaults to ``None``.
+            use_cache (bool): Short-circuit re-evaluation when a cache
+                hit exists. Gated by ``use_cache and not self.overwrite``:
+                passing ``False`` skips the
+                :meth:`EvaluationModel.load` short-circuit even when a
+                cached pickle exists on disk, and also disables the
+                write by threading through as ``save_model=use_cache``.
+                Defaults to ``True``.
             verbose (bool | None): Verbose logging. Falls back to
                 ``self.verbose`` when ``None``. Defaults to ``None``.
 
@@ -1156,6 +1182,14 @@ class ForecastModel:
                 inherits from ``self.overwrite``. Defaults to ``None``.
             n_jobs (int | None): Parallel workers. ``None`` inherits from
                 ``self.n_jobs``. Defaults to ``None``.
+            use_cache (bool): Short-circuit re-explanation when a cache
+                hit exists. Gated by ``use_cache and not self.overwrite``:
+                passing ``False`` skips the
+                :meth:`ExplanationModel.load` short-circuit even when a
+                cached pickle exists on disk, and also disables the
+                write by threading through as ``save_model=use_cache``
+                (also forwarded to
+                :meth:`ExplanationModel.explain`). Defaults to ``True``.
             verbose (bool | None): Verbose logging. ``None`` inherits from
                 ``self.verbose``. Defaults to ``None``.
 
