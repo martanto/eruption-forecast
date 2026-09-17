@@ -88,7 +88,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 **Detailed documentation** — the wiki at https://github.com/martanto/eruption-forecast/wiki is the single source of truth (also mirrored under [`wiki/`](wiki/)):
 
 - [Getting Started](wiki/Getting-Started.md) — Prerequisites, install, dev commands
-- [Pipeline Walkthrough](wiki/Pipeline-Walkthrough.md) — Research (`main.py`) + Scenarios (`scenarios.py`) workflows
+- [Pipeline Walkthrough](wiki/Pipeline-Walkthrough.md) — Research (`main.py`) + Scenarios (`forecast-scenario.py`) workflows
 - [Training Workflow](wiki/Training-Workflow.md) — Classifiers, CV strategies, imbalance handling
 - [Prediction Workflow](wiki/Prediction-Workflow.md) — Forecast outputs and consensus probabilities
 - [Evaluation Workflow](wiki/Evaluation-Workflow.md) — `MetricsEnsemble`, `ClassifierComparator`
@@ -108,7 +108,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Label Building** — Standard sliding-window (`LabelBuilder`) or per-eruption (`DynamicLabelBuilder`) generation from known eruption dates.
 - **Feature Extraction** — tsfresh feature engineering on windowed tremor matrices, with FDR-controlled selection (tsfresh statistical filter; RandomForest permutation importance available as an alternative).
 - **Multi-seed Training** — 11 classifier families (`rf`, `gb`, `xgb`, `svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`, `lite-rf`), three CV strategies, automatic imbalance handling, and per-seed `GridSearchCV`.
-- **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface. Each exposes a `.features` attribute — a sorted union of the features actually used by at least one seed (per-classifier on `SeedEnsemble`, across every registered classifier on `ClassifierEnsemble`) — populated eagerly by every factory.
+- **Ensemble Packaging** — `SeedEnsemble` bundles every seed for one classifier; `ClassifierEnsemble` bundles multiple classifiers; both implement the sklearn `BaseEstimator + ClassifierMixin` interface. Each exposes a `.features` attribute — a sorted union of the features actually used by at least one seed (per-classifier on `SeedEnsemble`, across every registered classifier on `ClassifierEnsemble`) — populated eagerly by every factory. `SeedEnsemble` additionally caches per-seed `(n_samples, n_seeds)` probability / prediction matrices on `.probabilities` / `.predictions` during `predict_with_uncertainty` (via `save_matrices`, which also writes them to Parquet); `load_matrices(probabilities_path, predictions_path)` rehydrates them from those Parquet files after a bare pickle reload without re-running prediction.
 - **Probabilistic Forecasting** — `PredictionModel` produces per-seed, per-classifier, and consensus probabilities with uncertainty bands over an unlabelled window grid.
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
@@ -116,7 +116,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, and `ExplanationModel` cache their fitted state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`.
 - **Telegram Notifications** — `@notify` / `@timer` decorators + fluent `TelegramNotification` client (`send_message` / `send_document` / `send_photo` / `send_media_group`) for success/error messages and file attachments.
-- **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` / `FeatureSelector` workers) parallelism, clamped to `total_cpu - 2` automatically.
+- **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` workers) parallelism, capped so the product never exceeds `total_cpu` (which is `cpu_count() - 2` with a floor of 1, so the OS keeps 2 free cores). tsfresh's `FeatureSelector` is pinned to `n_jobs=1` whenever the outer loop is parallel to avoid `multiprocessing.Pool` oversubscription.
 
 ## Package Architecture
 
@@ -363,7 +363,7 @@ print(fm.TrainingModel.classifier_ensemble_path)
 4. **Evaluate** — score the forecast against the held-out eruption date by writing `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices per classifier and aggregate metric plots; cross-classifier ranking via `ClassifierComparator`.
 5. **Explain** — produce per-seed SHAP explanations for the tree classifiers in the ensemble, bundled into `ClassifierExplanation_*.pkl` per classifier and rendered as per-seed bar / beeswarm, per-classifier aggregate bar / beeswarm (NaN-padded union feature space), and per-eruption waterfall plots.
 
-See [`main.py`](main.py) for the full working example and [`scenarios.py`](scenarios.py) for the multi-scenario variant.
+See [`main.py`](main.py) for the full single-run example and [`forecast-scenario.py`](forecast-scenario.py) for the packaged `ForecastModelScenario` multi-scenario orchestrator.
 
 > Full per-stage guide: [wiki/Pipeline-Walkthrough.md](wiki/Pipeline-Walkthrough.md)
 
@@ -406,7 +406,7 @@ tm = (
 
 ### Reuse curated features (skip full tsfresh re-extraction)
 
-Once a `TrainingModel` run has persisted its `features-matrix_*.parquet` and `top_{N}_features.csv`, two shortcuts let later runs reuse that work:
+Once a `TrainingModel` run has persisted its `features-matrix-dt_*.parquet` (DatetimeIndex-first) and `top_{N}_features.csv`, two shortcuts let later runs reuse that work:
 
 ```python
 # Reuse features (fastest — tremor matrix unchanged)
@@ -477,6 +477,48 @@ fm.save_config(fmt="json")             # → forecast.config.json
 fm2 = ForecastModel.from_config("output/VG.OJN.00.EHZ/forecast.config.yaml")
 fm2.run()                              # replays every captured non-None stage
 ```
+
+### Multi-scenario sweep with `ForecastModelScenario`
+
+`ForecastModelScenario` (`src/eruption_forecast/model/forecast_model_scenario.py`) is a packaged sibling of `ForecastModel` that wraps one `ForecastModel` instance and loops `train → predict → evaluate → explain` over N `Scenario` `TypedDict`s. `calculate()` runs once; the shared tremor frame is reused by every scenario.
+
+```python
+from eruption_forecast.model.forecast_model_scenario import (
+    Scenario, ForecastModelScenario,
+)
+
+scenarios: list[Scenario] = [
+    {
+        "name": "Scenario 1",
+        "description": "Train on 1 eruption, forecast 2+",
+        "train_start_date": "2025-01-01", "train_end_date": "2025-03-31",
+        "prediction_start_date": "2025-04-01", "prediction_end_date": "2025-08-22",
+        "prediction_window_step": 10, "prediction_window_step_unit": "minutes",
+    },
+    # ... more scenarios (see forecast-scenario.py)
+]
+
+fms = ForecastModelScenario(
+    station="OJN", channel="EHZ", network="VG", location="00",
+    day_to_forecast=2, n_jobs=8,
+    eruption_dates=["2025-03-20", "2025-04-10", "2025-04-22"],
+    scenarios=scenarios,
+)
+
+(
+    fms.calculate(start_date="2025-01-01", end_date="2025-12-31",
+                  source="sds", sds_dir=r"D:\Data\OJN",
+                  methods=["rsam", "dsar", "entropy"])
+       .shared_training(window_step=6, window_step_unit="hours",
+                        classifiers=["lite-rf", "rf"], seeds=25)
+       .shared_prediction(use_features_from="files", plot_threshold=0.7)
+       .shared_evaluation(model="prediction", plot_aggregate=True)
+       .shared_explanation(model="prediction", max_display=20)
+)
+fms.run()   # loops the sweep, ships a Telegram document per scenario
+```
+
+`use_features_from="files"` extracts features once on scenario 1 and reuses the resulting matrix + labels CSV on scenarios 2..N — so **scenario 1's prediction window must span every datetime any later scenario predicts over**. Full walkthrough: [wiki/Pipeline-Walkthrough.md#forecastmodelscenario-workflow-forecast-scenariopy](wiki/Pipeline-Walkthrough.md#forecastmodelscenario-workflow-forecast-scenariopy).
 
 ### Persist stage outputs explicitly
 
@@ -695,8 +737,6 @@ uv run pytest tests/test_imports.py -v
 # Run the end-to-end pipeline
 uv run python main.py
 ```
-
-Project rules are documented in [`CLAUDE.md`](CLAUDE.md) — including the new-branch-before-any-commit convention, the comprehensive doc-update rule, and the `config.example.yaml` sync requirement.
 
 ---
 
