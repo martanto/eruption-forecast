@@ -151,6 +151,88 @@ on `plot_aggregate`.
 
 ---
 
+## Dataclass composition
+
+Two dataclass families back the stage, and `ExplanationModel` owns both.
+The SHAP payload tree in `dataclass/classifier_explanation.py` is
+populated eagerly by `explain()` and cached on
+`self.explanations`. The probability rollup in
+`dataclass/classifier_ensemble_summary.py` is built lazily inside
+`plot()` — one `ClassifierEnsembleSummary` per classifier, discarded
+after the waterfalls render. The waterfall picker crosses from the
+rollup to the SHAP payload through `(random_state, index)`.
+
+```
+model/explanation_model.py
+┌────────────────────────────────────────────────────────────────────┐
+│ ExplanationModel                                                   │
+│                                                                    │
+│   ClassifierEnsemble    reused from TrainingModel / PredictionModel│
+│   features_df, eruption_dates                                      │
+│                                                                    │
+│   .explain()  ── ExplainerEnsemble.explain() ─────►                │
+│                     .explanations: list[ClassifierExplanation]     │
+│                     (cached on the instance)                       │
+│                                                                    │
+│   .plot()     ── ExplainerEnsemble.plot_waterfall() ─────►         │
+│                     build_classifier_ensemble_summary(...)         │
+│                     → ClassifierEnsembleSummary per classifier     │
+│                     (transient; not stored on the instance)        │
+└──────────────────────────────┬─────────────────────────────────────┘
+                               │
+               ┌───────────────┴──────────────────┐
+               ▼                                  ▼
+  dataclass/classifier_                dataclass/classifier_
+  explanation.py                       ensemble_summary.py
+  (SHAP payload, eager)                (probability rollup, lazy)
+
+  ClassifierExplanation                ClassifierEnsembleSummary
+   ├─ classifier_name: str              ├─ classifier_name: str
+   └─ seeds: list[SeedExplanation]      ├─ highest / lowest
+        ├─ random_state: int            │     ProbabilityPick | None
+        └─ shap_values:                 └─ eruption_windows[]
+           shap.Explanation                  EruptionWindow
+           (n_samples × n_features)           ├─ eruption_date: str
+                                              ├─ highest / lowest
+                                              │     ProbabilityPick
+                                              │      ├─ random_state
+                                              │      ├─ index
+                                              │      ├─ datetime
+                                              │      └─ value
+                                              └─ seeds[]
+                                                   SeedSummary
+                                                    ├─ random_state
+                                                    ├─ highest  ProbabilityPick
+                                                    └─ lowest   ProbabilityPick
+
+── bridge: plot_classifier_waterfall crosses the two sides ──
+
+  EruptionWindow.highest.random_state ──┐
+                                        ├─► ClassifierExplanation
+  EruptionWindow.highest.index ─────────┘        .seeds[random_state]
+                                                 .shap_values[index]
+                                                 → single-row shap.Explanation
+                                                 → plot_shap_waterfall(...)
+```
+
+Both hierarchies live **per classifier** — one `ClassifierExplanation`
+and one `ClassifierEnsembleSummary` per `SeedEnsemble` in the wrapped
+`ClassifierEnsemble`. `SeedExplanation`, `ProbabilityPick`,
+`SeedSummary` and `EruptionWindow` are all `frozen` dataclasses so the
+rollup can be re-scanned or serialised without accidental mutation;
+`ClassifierExplanation` and `ClassifierEnsembleSummary` stay mutable
+because their inner lists are populated incrementally by their
+respective builders.
+
+The `(random_state, index)` bridge relies on the same alignment
+invariant `plot_classifier_waterfall` uses (see [Per-eruption waterfall
+selection](#per-eruption-waterfall-selection)): per-seed SHAP
+explanations are built against the same `features_df` positional order
+the ensemble scored, so `index` picks the same observation on both
+sides.
+
+---
+
 ## Plot inventory
 
 | Plot | Producer | Output stem |
