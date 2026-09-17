@@ -512,7 +512,7 @@ ExplainerEnsemble(
 )
 ```
 
-Per-seed SHAP engine driven by `shap.TreeExplainer`. Non-tree classifiers (`svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`) are skipped at the per-classifier loop with a warning. `explanation_dir` is the sibling-of-`classifiers/` root used for per-eruption waterfall plots; when omitted it falls back to `dirname(output_dir)`.
+Per-seed SHAP engine driven by `shap.TreeExplainer`. Non-tree classifiers (`svm`, `lr`, `nn`, `dt`, `knn`, `nb`, `voting`) are skipped at the per-classifier loop with a warning. `explanation_dir` is the sibling-of-`classifiers/` root used for per-eruption waterfall plots; when omitted it falls back to `dirname(output_dir)`. `n_jobs` drives both the per-seed SHAP compute inside `explain_classifier` and the per-seed plot dispatch inside `plot_seed` — both paths use `joblib.Parallel(backend="loky")` when `> 1`. The outer per-classifier loop and the `plot_waterfall` / `plot_aggregate` paths stay serial.
 
 ### Methods
 
@@ -549,6 +549,14 @@ ExplainerEnsemble.explain_seed(
     seed_explanation_filepath: str | None = None,
 ) -> shap.Explanation
 
+ExplainerEnsemble.normalise_shap_values(
+    explanation: shap.Explanation,
+) -> tuple[np.ndarray, np.ndarray]
+```
+
+### Instance helpers
+
+```python
 ExplainerEnsemble.explain_classifier(
     seed_ensemble: SeedEnsemble,
     features_df: pd.DataFrame,
@@ -559,11 +567,9 @@ ExplainerEnsemble.explain_classifier(
     overwrite: bool = False,
     verbose: bool = False,
 ) -> ClassifierExplanation
-
-ExplainerEnsemble.normalise_shap_values(
-    explanation: shap.Explanation,
-) -> tuple[np.ndarray, np.ndarray]
 ```
+
+Parallelism inside `explain_classifier` is driven by `self.n_jobs` from the `ExplainerEnsemble` constructor — `> 1` dispatches the per-seed SHAP compute via `joblib.Parallel(backend="loky")`, mirroring `TrainingModel._run_jobs`.
 
 Imported from `eruption_forecast.ensemble.explainer_ensemble` (intentionally **not** re-exported from `ensemble/__init__.py` to keep that subpackage cycle-free).
 

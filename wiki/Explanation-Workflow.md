@@ -72,7 +72,7 @@ Both modes share the same per-seed SHAP engine
 ```
 For each SeedEnsemble in ClassifierEnsemble:
     skip non-tree classifier (warn)
-    For each seed in SeedEnsemble.seeds:
+    For each seed in SeedEnsemble.seeds:              # parallel when n_jobs > 1
         shap.TreeExplainer(model, features_df[seed.feature_names])
             → shap.Explanation
         normalise_shap_values()       # pick positive-class slice
@@ -90,6 +90,10 @@ For each ClassifierExplanation:
 
 Result on the instance: `em.explanations: list[ClassifierExplanation]`.
 See [Per-eruption waterfall selection](#per-eruption-waterfall-selection) for how the argmax pick is chosen.
+
+### Parallelism
+
+The per-seed SHAP compute inside `ExplainerEnsemble.explain_classifier` reads `self.n_jobs` from the `ExplainerEnsemble` constructor (in turn forwarded from `ExplanationModel.n_jobs` — itself inherited from `ForecastModel(n_jobs=...)`). `n_jobs=1` runs the seed loop serially; `> 1` dispatches seeds via `joblib.Parallel(backend="loky")`, mirroring the `TrainingModel._run_jobs` pattern. Result order is preserved. The same `self.n_jobs` also drives `plot_seed()`'s per-seed bar/beeswarm dispatch; `plot_waterfall()` and `plot_aggregate()` run serially. Classifiers are always processed serially at the outer loop — only the seed loop parallelizes.
 
 ### `ForecastModel.explain()` signature
 
