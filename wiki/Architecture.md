@@ -409,7 +409,7 @@ Ten focused modules that the rest of the codebase pulls from - see the table in 
 
 | Stage              | Driver class               | Reads                          | Writes                                                                                       |
 |--------------------|----------------------------|--------------------------------|----------------------------------------------------------------------------------------------|
-| Tremor             | `CalculateTremor`          | `SeismicDataSource.get(date)`  | `tremor/daily/*.csv`, merged `{nslc}_{start}_{end}.csv`                                      |
+| Tremor             | `CalculateTremor`          | `SeismicDataSource.get(date)`  | `tremor/daily/*.csv`, merged `tremor-interpolated_{nslc}_{start}-{end}.csv`                  |
 | Label              | `LabelBuilder`             | Tremor index, eruption dates   | `training/labels/label_*.csv` + `label.config.yaml` + `eruption_dates_*.csv` (aligned copy: `training/features/{cv}/features-label_*.csv`) |
 | Tremor matrix      | `TremorMatrixBuilder`      | Tremor CSV + labels            | `training/tremor/tremor-matrix_*.csv` (+ `per_method/`)                                      |
 | Features           | `FeaturesBuilder`          | Tremor matrix                  | `training/features/{cv}/features-matrix_*.parquet`                                           |
@@ -425,9 +425,9 @@ Ten focused modules that the rest of the codebase pulls from - see the table in 
 ### 5.2 On-disk artefact graph
 
 ```
-            ┌────────────────────────────────────────┐
-            │   tremor/{nslc}_{start}_{end}.csv      │  ← CalculateTremor
-            └─────────┬──────────────────────────────┘
+            ┌─────────────────────────────────────────────────────────┐
+            │   tremor/tremor-interpolated_{nslc}_{start}-{end}.csv   │  ← CalculateTremor
+            └─────────┬───────────────────────────────────────────────┘
                       │ used by Training / Prediction / Evaluation
                       ▼
     ┌───────────────────────────────────────────────────────────────┐

@@ -650,7 +650,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 ├── tremor/                                  # CalculateTremor
 │   ├── daily/                               # per-day CSVs (removed when cleanup_daily_dir=True)
 │   ├── figures/                             # daily plots (plot_daily=True)
-│   └── {nslc}_{start}_{end}.csv             # merged tremor CSV
+│   └── tremor-interpolated_{nslc}_{start}-{end}.csv  # merged tremor CSV
 │
 ├── training/                                # TrainingModel
 │   ├── training.config.yaml                 # tm.save_config() — auto at end of fit()
@@ -734,7 +734,7 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 
 - [`ruff`](https://docs.astral.sh/ruff/) — linting + auto-fix
 - [`ty`](https://github.com/astral-sh/ty) — type checking
-- `pytest` — testing
+- `pytest` + `pytest-cov` — testing and coverage
 
 ---
 
@@ -747,8 +747,11 @@ uv run ruff check --fix src/
 # Type check
 uvx ty check src/
 
-# Run tests
-uv run pytest tests/
+# Run tests (skip the ones that call the real Telegram API)
+uv run pytest tests/ -m "not integration"
+
+# Coverage report with missing lines
+uv run pytest tests/ -m "not integration" --cov
 
 # Circular-import check (run after any module move)
 uv run pytest tests/test_imports.py -v

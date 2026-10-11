@@ -52,7 +52,7 @@ Auto-rendered by `CalculateTremor` / `fm.calculate(...)`:
 
 ```
 {station_dir}/tremor/figures/{YYYY-MM-DD}.png               # plot_daily=True — one per day
-{station_dir}/tremor/{nslc}_{start}_{end}.{png,pdf}         # save_plot=True — merged summary figure
+{station_dir}/tremor/tremor-interpolated_{nslc}_{start}-{end}.{png,pdf}  # save_plot=True — merged summary figure
 ```
 
 The summary figure honours the `plot_eruption_dates`, `plot_rsam_as_log`, `plot_rolling_window`, and `plot_filter_dsar_value` arguments of `fm.calculate(...)` / `CalculateTremor.run(...)`. `CalculateTremor.run(plot_interval=2)` controls its tick spacing in days. `fm.calculate()` does not expose `plot_interval` yet.

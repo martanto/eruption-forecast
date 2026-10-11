@@ -311,7 +311,7 @@ tm.fit(
 
 | Method | Notes |
 |--------|-------|
-| `TrainingModel.build_identity(**kwargs)` | Classmethod; returns canonical identity dict for hashing. Called both by `ForecastModel.train()` (before the instance exists, for cache lookup) and inside `fit()` (with kwargs pulled from `self`, for the save). |
+| `TrainingModel.build_identity(**kwargs)` | Classmethod; returns canonical identity dict for hashing. Called both by `ForecastModel.train()` (before the instance exists, for cache lookup) and inside `fit()` (with kwargs pulled from `self`, for the save). Dates are normalised to `YYYY-MM-DD` via `BaseModel.identity_date`, and `fit()` hashes the requested (pre-clamp) dates, so string and `datetime` callers resolve to the same pickle. |
 | `tm.save(identity)` | Cache mode: writes `{training_dir}/{hash}.TrainingModel.pkl` + `.params.json` sidecar |
 | `tm.save()` | Legacy mode (no identity): `{output_dir}/TrainingModel_{basename}.pkl` joblib dump |
 | `TrainingModel.load(stage_dir, identity)` | Classmethod; returns the instance on cache hit or `None` |

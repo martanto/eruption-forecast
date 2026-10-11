@@ -9,7 +9,7 @@ from eruption_forecast.logger import logger
 from eruption_forecast.utils.window import construct_windows
 from eruption_forecast.utils.pathutils import ensure_dir, save_figure
 from eruption_forecast.model.base_model import BaseModel
-from eruption_forecast.utils.date_utils import to_datetime_index
+from eruption_forecast.utils.date_utils import normalize_dates, to_datetime_index
 from eruption_forecast.utils.formatting import slugify
 from eruption_forecast.utils.validation import check_sampling_consistency
 from eruption_forecast.utils.feature_utils import load_select_features
@@ -273,8 +273,8 @@ class PredictionModel(BaseModel):
             "training_hash": training_hash,
             "tremor": cls.tremor_fingerprint(tremor_df),
             "constructor": {
-                "start_date": start_date,
-                "end_date": end_date,
+                "start_date": cls.identity_date(start_date),
+                "end_date": cls.identity_date(end_date),
                 "window_size": window_size,
             },
             "build_label": build_label_params,
@@ -813,8 +813,8 @@ class PredictionModel(BaseModel):
             nslc=self.nslc,
             tremor_df=self.tremor_df,
             training_hash=self.training_hash,
-            start_date=self.start_date,
-            end_date=self.end_date,
+            start_date=self._requested_start_date,
+            end_date=self._requested_end_date,
             window_size=self.window_size,
             build_label_params={
                 "window_step": self.window_step,
@@ -956,7 +956,10 @@ class PredictionModel(BaseModel):
         loaded_start: pd.Timestamp = label_df.index.min()
         loaded_end: pd.Timestamp = label_df.index.max()
 
-        sliced_labels = label_df.loc[self.start_date : self.end_date]
+        # Slice through 23:59:59 on ``end_date`` so the last day keeps all of
+        # its windows, matching the grid ``build_label()`` would have built.
+        _, slice_end, _, _ = normalize_dates(self.start_date, self.end_date)
+        sliced_labels = label_df.loc[self.start_date : slice_end]
 
         # Back-off case: the sliding-window extractor cannot emit a feature
         # row until it has ``window_size`` days of lookback, so a caller
@@ -974,7 +977,8 @@ class PredictionModel(BaseModel):
             self.end_date = loaded_end.to_pydatetime()
             self.start_date_str = loaded_start.strftime("%Y-%m-%d")
             self.end_date_str = loaded_end.strftime("%Y-%m-%d")
-            sliced_labels = label_df.loc[self.start_date : self.end_date]
+            _, slice_end, _, _ = normalize_dates(self.start_date, self.end_date)
+            sliced_labels = label_df.loc[self.start_date : slice_end]
 
         if (
             sliced_labels.empty

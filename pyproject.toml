@@ -65,14 +65,25 @@ dev = [
     "ipywidgets",
     "pandas-stubs~=3.0.3",
     "pip",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
+norecursedirs = [".*", "*.egg", "build", "dist", "venv", "node_modules", "output"]
 markers = [
     "integration: tests that send real external requests (e.g. Telegram API)",
+    "slow: end-to-end tests that run tsfresh or fit models",
 ]
+
+[tool.coverage.run]
+source = ["src/eruption_forecast"]
+branch = true
+
+[tool.coverage.report]
+skip_empty = true
+show_missing = true
 
 [tool.uv]
 cache-dir = "./.cache/uv"

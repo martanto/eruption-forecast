@@ -154,6 +154,11 @@ class BaseModel(ABC):
         self._tremor_data = tremor_data
         self.start_date = to_datetime(start_date)
         self.end_date = to_datetime(end_date)
+        # ``start_date`` / ``end_date`` may later be clamped to the tremor
+        # range; the cache identity must keep using what the caller asked for
+        # so it matches the lookup ``ForecastModel`` performs up front.
+        self._requested_start_date = self.start_date
+        self._requested_end_date = self.end_date
         self.window_size = window_size
         self.eruption_dates = sort_dates(eruption_dates) if eruption_dates else None
         self.overwrite = overwrite
@@ -469,6 +474,24 @@ class BaseModel(ABC):
         canon = cls._canonicalize(identity)
         payload = json.dumps(canon, sort_keys=True, default=str).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()[:length]
+
+    @staticmethod
+    def identity_date(value: str | datetime) -> str:
+        """Normalise a stage date to the ``"YYYY-MM-DD"`` form used in identities.
+
+        Stage periods are day-granular, but callers pass them either as
+        ``"YYYY-MM-DD"`` strings (``ForecastModel`` lookups) or as
+        ``datetime`` objects (instance state at save time). Hashing both
+        through this helper keeps the lookup and the save on the same key.
+
+        Args:
+            value (str | datetime): Date as a ``"YYYY-MM-DD"`` string or a
+                ``datetime``.
+
+        Returns:
+            str: The date formatted as ``"YYYY-MM-DD"``.
+        """
+        return to_datetime(value).strftime("%Y-%m-%d")
 
     @staticmethod
     def _canonicalize(value: Any) -> Any:

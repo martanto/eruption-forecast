@@ -314,8 +314,8 @@ class TrainingModel(BaseModel):
             "nslc": nslc,
             "tremor": cls.tremor_fingerprint(tremor_df),
             "constructor": {
-                "start_date": start_date,
-                "end_date": end_date,
+                "start_date": cls.identity_date(start_date),
+                "end_date": cls.identity_date(end_date),
                 "classifiers": sorted(classifiers_list),
                 "eruption_dates": sorted(eruption_dates),
                 "window_size": window_size,
@@ -1126,8 +1126,8 @@ class TrainingModel(BaseModel):
         identity = type(self).build_identity(
             nslc=self.nslc,
             tremor_df=self.tremor_df,
-            start_date=self.start_date,
-            end_date=self.end_date,
+            start_date=self._requested_start_date,
+            end_date=self._requested_end_date,
             classifiers=self.classifiers,
             eruption_dates=self.eruption_dates or [],
             window_size=self.window_size,

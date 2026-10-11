@@ -497,7 +497,7 @@ class ExplanationModel(BaseModel):
         dpi: int = 150,
         plot_per_seed: bool = True,
         plot_aggregate: bool = True,
-    ):
+    ) -> Self:
         """Render every SHAP plot the stage produces.
 
         Renders per-eruption waterfall plots (when ``eruption_dates`` is
@@ -523,6 +523,10 @@ class ExplanationModel(BaseModel):
                 ``classifiers/{name}/figures/aggregate/``. Stacks every
                 seed into the union feature space (NaN-padded) so a single
                 figure summarises the whole ensemble. Defaults to ``True``.
+
+        Returns:
+            Self: The current instance, so ``explain().plot()`` can be chained
+                and assigned.
 
         Raises:
             ValueError: If :meth:`explain` has not yet been called.
@@ -563,6 +567,8 @@ class ExplanationModel(BaseModel):
                 dpi=dpi,
                 group_remaining_features=group_remaining_features,
             )
+
+        return self
 
     def _upstream_hash(self) -> str:
         """Hash the upstream-model fingerprint so the explanation cache invalidates
