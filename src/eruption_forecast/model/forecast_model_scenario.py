@@ -435,10 +435,17 @@ class ForecastModelScenario:
             save_tremor_matrix_per_method (bool): Persist per-column
                 tremor matrices under ``per_method/``. Defaults to
                 ``True``.
-            exclude_features (list[str] | None): Feature substrings to
-                drop after tsfresh extraction. Defaults to ``None``.
-            select_features (str | list[str] | None): Feature selection
-                method. Defaults to ``None``.
+            exclude_features (list[str] | None): tsfresh feature
+                calculator names (e.g. ``["length"]``) to skip during
+                extraction. ``None`` excludes nothing. Defaults to
+                ``None``.
+            select_features (str | list[str] | None): Pre-filter
+                tsfresh to a curated feature set — either the path to
+                a prior run's ``top_{N}_features.csv`` /
+                ``top_features.csv`` / ``significant_features.csv`` or
+                an explicit ``list[str]`` of fully-qualified feature
+                names. ``None`` extracts every tsfresh feature.
+                Defaults to ``None``.
             minimum_completion (float): Minimum per-window completion
                 ratio required to keep a window. Defaults to ``1.0``.
             seeds (int): Number of seed models per classifier. Defaults

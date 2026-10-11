@@ -1,7 +1,7 @@
 # eruption-forecast ForecastModel configuration example
 # Copy this file to config.yaml and adjust the values for your run.
 # Load with: ForecastModel.from_config("config.yaml").run()
-version: '1.0'
+version: '0.5.0'          # Package version; save_config() stamps the installed release (plus saved_at) automatically
 
 model:
   station: OJN              # Station code (e.g. OJN, MEPAS)
@@ -13,12 +13,15 @@ model:
   root_dir: null            # Root directory anchor for relative output paths (null = cwd)
   overwrite: false          # Overwrite existing output files
   prefix_config: null       # Discriminator slugified into every stage save_config() filename before '.config' (e.g. 'scenario 1' -> forecast.scenario-1.config.yaml); null keeps default names
-  n_jobs: 1                 # Parallel workers for the outer pipeline
+  n_jobs: 1                 # Default parallel workers, inherited by every stage whose n_jobs is null
   verbose: false
 
 calculate:
-  start_date: '2025-03-16'  # Tremor calculation start date (YYYY-MM-DD)
-  end_date: '2025-03-22'    # Tremor calculation end date (YYYY-MM-DD)
+  # NOTE: the tremor range must span BOTH the train and predict windows —
+  # predict() slices its windows from this tremor series, so any prediction
+  # date outside [start_date, end_date] has no data to forecast from.
+  start_date: '2025-03-16'  # Tremor calculation start date (YYYY-MM-DD); auto-shifted back by day_to_forecast days
+  end_date: '2025-03-30'    # Tremor calculation end date (YYYY-MM-DD); must be >= predict.end_date
   source: sds               # Data source: 'sds' or 'fdsn'
   methods: null             # Tremor methods (null = all: rsam + dsar + entropy)
   remove_outlier_method: maximum   # Outlier removal: 'maximum' or 'all'
@@ -58,7 +61,7 @@ train:
   include_eruption_date: true   # Label the eruption date itself as erupted
   select_tremor_columns: null   # Subset of tremor columns (null = all)
   save_tremor_matrix_per_method: true  # Save a separate tremor matrix per column
-  exclude_features: null    # tsfresh feature names to skip (null = none)
+  exclude_features: null    # tsfresh calculator names to skip during extraction, e.g. ['length'] (null = none)
   select_features: null     # Pre-filter tsfresh to a curated set — path to a prior top_{N}_features.csv / top_features.csv / significant_features.csv or a list[str]; null disables pre-filtering
   minimum_completion: 1.0   # Minimum fraction of valid samples per window
   seeds: 10                 # Number of independent training seeds
@@ -68,8 +71,8 @@ train:
   plot_features: true       # Save feature-importance plots
   output_dir: null          # null = use station_dir
   overwrite: null           # null = inherit from model.overwrite
-  n_jobs: null              # null = inherit from model.n_jobs
-  n_grids: 1                # Grid-search iterations per seed
+  n_jobs: null              # Outer seed workers; null = inherit from model.n_jobs
+  n_grids: 1                # Inner GridSearchCV / FeatureSelector workers per seed (clamped so n_jobs x n_grids <= cpu_count - 2)
   use_cache: true           # Consult the content-addressable training cache
   verbose: null             # null = inherit from model.verbose
 
