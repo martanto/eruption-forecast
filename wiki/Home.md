@@ -96,13 +96,12 @@ from eruption_forecast import ForecastModel
 
 ```
 eruption-forecast/
-├── src/eruption_forecast/      Package source (74 .py files)
+├── src/eruption_forecast/      Package source (78 .py files)
 ├── wiki/                       This wiki (Markdown sources)
 ├── tests/                      Unit tests
 ├── main.py                     Research Workflow - single train + predict
 ├── forecast-scenario.py        Scenarios Workflow - packaged multi-scenario orchestrator (ForecastModelScenario)
-├── config.example.yaml         Annotated ForecastConfig template
-└── WIKI.md                     Local wiki-rewrite progress tracker
+└── config.example.yaml         Annotated ForecastConfig template
 ```
 
 ---
