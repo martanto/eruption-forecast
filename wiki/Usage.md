@@ -300,3 +300,8 @@ em.compare().plot_all()
 ### Loop over multiple training/prediction splits
 
 Use `forecast-scenario.py` (driven by `ForecastModelScenario`) - see [Pipeline Walkthrough → Scenarios Workflow](Pipeline-Walkthrough#scenarios-workflow-forecast-scenariopy).
+
+
+## Local research interface
+
+The UI exposes standalone stages and shared/per-scenario settings with named JSON/YAML profiles; see [UI Workflow](UI-Workflow.md).

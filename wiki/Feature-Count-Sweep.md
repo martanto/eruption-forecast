@@ -356,3 +356,8 @@ the baseline the operator actually trained at.
 - [Evaluation Workflow](Evaluation-Workflow) — how `EvaluationModel` builds `y_true` for prediction-reuse mode.
 - [Prediction Workflow → Feature Scoping](Prediction-Workflow#feature-scoping-via-use_features_from) — governs which features exist in the held-out matrix and therefore what the sweep can score against.
 - [Output Structure → Sweep outputs](Output-Structure#feature-count-sweep-experimental) — full on-disk layout.
+
+
+## Local research interface
+
+Use per-scenario top_n_features overrides to compare feature budgets through the local UI; see [UI Workflow](UI-Workflow.md).

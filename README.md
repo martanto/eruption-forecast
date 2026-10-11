@@ -767,3 +767,22 @@ MIT License — see [LICENSE](LICENSE) for details.
 **Version:** 0.4.0
 **Status:** Active Development
 **Last Updated:** 2026-07-19
+# Local research interface
+
+The ten-page application lives in `app/backend/` (independent FastAPI Python package, built with `uv_build`) and `app/frontend/` (React/TypeScript/Vite/Tailwind v4/ECharts). The scientific package remains in `src/eruption_forecast/`. Each application has its own `tests/` directory.
+
+```powershell
+uv sync --project app/backend --group dev
+npm --prefix app/frontend install
+uv run --project app/backend eruption-ui dev
+# In another terminal:
+npm --prefix app/frontend run dev
+```
+
+Open `http://127.0.0.1:5173`. General setup, scenarios, calculation, training, prediction, evaluation, SHAP explanation, results, jobs and system status connect to real package workflows through a persistent local queue. Root `openapi.json` records the HTTP contract.
+
+See [UI Workflow](wiki/UI-Workflow.md) for production builds, PyPI dependency mode, artifact reuse, tests and directory structure; [implementation progress](wiki/UI-Implementation-Plan.md) tracks delivery.
+
+General Setup offers a Windows native SDS folder chooser through `POST /api/v1/paths/pick-directory`. The dialog opens on the backend computer and returns an existing absolute directory, or null on cancellation. Manual absolute-path entry remains available for remote or headless backends; selecting a folder updates the draft until Save setup is used.
+
+If SDS selection is already open, use **Cancel folder selection** before retrying. `DELETE /api/v1/paths/pick-directory` terminates only the dialog owned by this backend; cancellation and timeout release the picker lock.

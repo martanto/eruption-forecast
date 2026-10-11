@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T10:01:55.3942649+07:00",
+  "title": "Design System: Eruption Forecast",
+  "extensions": {
+    "shadows": [
+      { "name": "toast", "value": "0 5px 20px #1b302326", "purpose": "Separate transient feedback from scientific content." },
+      { "name": "mobile-drawer", "value": "3px 0 15px #2535221a", "purpose": "Separate the off-canvas navigation from the page." }
+    ],
+    "motion": [
+      { "name": "control-state", "value": "color .15s, background-color .15s", "purpose": "Button and link state changes." },
+      { "name": "drawer", "value": "left .2s", "purpose": "Mobile navigation opening and closing." },
+      { "name": "toast-arrival", "value": "arrive .2s ease-out", "purpose": "Feedback arrival; disabled with all transitions under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "compact-desktop", "value": "1100px" },
+      { "name": "drawer-and-stacked-details", "value": "800px" },
+      { "name": "single-column-forms", "value": "480px" },
+      { "name": "wide-form-spacing", "value": "1600px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action for a configured stage.",
+      "html": "<button class=\"primary-button\">Run training</button>",
+      "css": ".primary-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 15px;min-height:38px;border-radius:5px;border:1px solid transparent;font:500 12px Inter,sans-serif;white-space:nowrap;background:#32634e;color:white;cursor:pointer;transition:color .15s,background-color .15s}.primary-button:hover{background:#244c39}.primary-button:focus-visible{outline:2px solid #32634e;outline-offset:3px}.primary-button:disabled{opacity:.55;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.primary-button{transition:none}}"
+    },
+    {
+      "name": "Labeled Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A parameter field with an explicit label and supporting hint.",
+      "html": "<label class=\"field-label\" for=\"station\">Station</label><input class=\"field-input\" id=\"station\" value=\"OJN\" aria-describedby=\"station-hint\"><small id=\"station-hint\" class=\"field-hint\">Seismic station code.</small>",
+      "css": ".field-label{display:block;font:500 12px Inter,sans-serif;margin-bottom:5px;color:#27362d}.field-input{box-sizing:border-box;display:block;width:100%;min-height:37px;padding:9px 11px;border:1px solid #cfd8ca;border-radius:4px;background:#fff;color:#27362d;font:13px Inter,sans-serif;caret-color:#32634e}.field-input:focus-visible{outline:2px solid #32634e;outline-offset:3px}.field-hint{display:block;color:#63735f;font:10px Inter,sans-serif;margin-top:6px;overflow-wrap:anywhere}"
+    }
+  ],
+  "narrative": {
+    "overview": "The implemented interface is a light scientific workspace with restrained forest accents, pale backgrounds, dense expert forms, and persistent navigation. Serif page headings distinguish page identity while compact sans-serif controls support repeated configuration.",
+    "keyCharacteristics": ["Light surfaces with muted green structure", "Compact explicit settings", "Flat panels and visible keyboard focus"],
+    "dos": ["Do reuse forest for actions, selection, and focus.", "Do preserve visible labels, hints, and textual job states.", "Do keep scientific artifacts faithful to their source."],
+    "donts": ["Don't add shadows to ordinary panels.", "Don't rely on color alone to explain job state.", "Don't remove reduced-motion treatment or visible keyboard focus."]
+  }
+}

@@ -379,3 +379,8 @@ register_error_category("telegram", level="ERROR")   # bump the level
 
 The `*.params.json` files next to each stage's cache pickle capture **exactly** what went into the cache hash. 
 They are handy when debugging a cache miss - `diff` two of them to see which kwarg differed.
+
+
+## Local research interface
+
+Named profiles and sparse scenario overrides preserve explicit nulls and shared defaults in the local UI; see [UI Workflow](UI-Workflow.md).

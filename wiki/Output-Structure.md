@@ -282,3 +282,8 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Standalone prediction config | `prediction/prediction.config.yaml` |
 | Standalone evaluation config | `evaluation/{kind}/evaluation.config.yaml` |
 | Standalone explanation config | `explanation/{kind}/explanation.config.yaml` |
+
+
+## Local research interface
+
+UI runs add an output_dir/ui-runs/run_id namespace, with scenarios/scenario_id beneath it and separate application logs; see [UI Workflow](UI-Workflow.md).

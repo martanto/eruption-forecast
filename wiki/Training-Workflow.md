@@ -508,3 +508,8 @@ for name, sweep in results.items():
 
 Full documentation, CV-mode variant, and `FeatureCountSweep.load(...)`
 reload flow: [Feature Count Sweep](Feature-Count-Sweep).
+
+
+## Local research interface
+
+The Training page covers constructor, labels, extraction, loaded features and fit settings; see [UI Workflow](UI-Workflow.md).

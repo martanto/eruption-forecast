@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS jobs(
+ id TEXT PRIMARY KEY, kind TEXT NOT NULL, state TEXT NOT NULL,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ configuration TEXT NOT NULL, resolved TEXT NOT NULL, workspace TEXT NOT NULL,
+ error TEXT, pid INTEGER, retry_of TEXT
+);
+CREATE TABLE IF NOT EXISTS events(
+ id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
+ stage TEXT NOT NULL, state TEXT NOT NULL, detail TEXT NOT NULL,
+ scenario TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS artifacts(
+ id TEXT PRIMARY KEY, path TEXT UNIQUE NOT NULL, job_id TEXT, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jobs_state_created ON jobs(state,created_at);

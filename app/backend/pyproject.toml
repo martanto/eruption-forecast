@@ -1,0 +1,44 @@
+[build-system]
+requires = ["uv_build>=0.9,<0.12"]
+build-backend = "uv_build"
+
+[project]
+name = "eruption-forecast-app"
+version = "0.1.0"
+description = "Local HTTP and worker application for eruption forecasting"
+requires-python = ">=3.11"
+dependencies = [
+    "eruption-forecast",
+    "fastapi>=0.115,<1",
+    "pydantic>=2.10,<3",
+    "uvicorn>=0.34,<1",
+    "click>=8.1,<9",
+    "loguru>=0.7,<1",
+    "psutil>=6,<8",
+    "data-availability>=0.3.2,<1",
+    "pyyaml>=6,<7",
+]
+
+[project.scripts]
+eruption-ui = "eruption_forecast_app.cli:cli"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff", "ty", "httpx>=0.28,<1"]
+
+[tool.uv.sources]
+eruption-forecast = { path = "../..", editable = true }
+
+[tool.uv]
+cache-dir = "./.cache/uv"
+
+[tool.uv.build-backend]
+module-name = "eruption_forecast_app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["../.."]
+cache_dir = "tests/output/.pytest_cache"
+norecursedirs = ["output", ".venv", "node_modules"]
+
+[tool.ty.environment]
+extra-paths = ["src", "../../src"]

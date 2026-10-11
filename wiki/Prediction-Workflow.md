@@ -315,3 +315,8 @@ prediction run always leaves a YAML snapshot at
 `tremor_data` fields preserve the path strings the user supplied (or `null` 
 when a live ensemble / pre-loaded DataFrame was passed). 
 See [Configuration](Configuration#per-stage-configs-standalone).
+
+
+## Local research interface
+
+The Prediction page supports extracted, training-selected and loaded features with package forecast figures; see [UI Workflow](UI-Workflow.md).

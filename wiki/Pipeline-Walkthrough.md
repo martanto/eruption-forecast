@@ -279,3 +279,8 @@ See [Output Structure](Output-Structure#scenarios-layout) for the full per-scena
 | Use case | a single research run on a fixed split | leave-one-out style sweeps, ablation over training windows |
 
 When the goal is to publish a single forecast plot on a fixed date split, use `main.py`. When you want to compare how forecast quality degrades as the training-window shifts (leave-one-out ablations, feature-matrix reuse, per-scenario artefacts, packaged Telegram hook), use `forecast-scenario.py`.
+
+
+## Local research interface
+
+The queue executes the documented stage methods in scientific subprocesses, preserving stage events and partial scenario failures; see [UI Workflow](UI-Workflow.md).

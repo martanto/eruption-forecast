@@ -1,0 +1,3537 @@
+{
+  "components": {
+    "schemas": {
+      "Calculation": {
+        "additionalProperties": false,
+        "properties": {
+          "client_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Url"
+          },
+          "constructor": {
+            "$ref": "#/components/schemas/CalculationConstructor"
+          },
+          "freq_bands": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Freq Bands",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/CalculationRun"
+          },
+          "sds_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sds Dir"
+          },
+          "source": {
+            "default": "sds",
+            "enum": [
+              "sds",
+              "fdsn"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "Calculation",
+        "type": "object"
+      },
+      "CalculationConstructor": {
+        "additionalProperties": false,
+        "description": "Parameters for ``tremor/calculate_tremor.py:__init__``.",
+        "properties": {
+          "buffer_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Buffer days. Package option: __init__.",
+            "title": "Buffer Days"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel. Package option: __init__.",
+            "title": "Channel"
+          },
+          "channel_type": {
+            "default": "D",
+            "description": "Channel type. Package option: __init__.",
+            "title": "Channel Type",
+            "type": "string"
+          },
+          "cleanup_daily_dir": {
+            "default": false,
+            "description": "Cleanup daily dir. Package option: __init__.",
+            "title": "Cleanup Daily Dir",
+            "type": "boolean"
+          },
+          "debug": {
+            "default": false,
+            "description": "Debug. Package option: __init__.",
+            "title": "Debug",
+            "type": "boolean"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "End date. Package option: __init__.",
+            "title": "End Date"
+          },
+          "filename_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Filename prefix. Package option: __init__.",
+            "title": "Filename Prefix"
+          },
+          "interpolate": {
+            "default": false,
+            "description": "Interpolate. Package option: __init__.",
+            "title": "Interpolate",
+            "type": "boolean"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Location. Package option: __init__.",
+            "title": "Location"
+          },
+          "methods": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Methods. Package option: __init__.",
+            "title": "Methods"
+          },
+          "minimum_completion_ratio": {
+            "default": 0.3,
+            "description": "Minimum completion ratio. Package option: __init__.",
+            "title": "Minimum Completion Ratio",
+            "type": "number"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "N jobs. Package option: __init__.",
+            "title": "N Jobs"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Network. Package option: __init__.",
+            "title": "Network"
+          },
+          "output_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Output dir. Package option: __init__.",
+            "title": "Output Dir"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: __init__.",
+            "title": "Overwrite"
+          },
+          "plot_daily": {
+            "default": false,
+            "description": "Plot daily. Package option: __init__.",
+            "title": "Plot Daily",
+            "type": "boolean"
+          },
+          "plot_overwrite": {
+            "default": false,
+            "description": "Plot overwrite. Package option: __init__.",
+            "title": "Plot Overwrite",
+            "type": "boolean"
+          },
+          "remove_outlier_method": {
+            "default": "maximum",
+            "description": "Remove outlier method. Package option: __init__.",
+            "enum": [
+              "all",
+              "maximum"
+            ],
+            "title": "Remove Outlier Method",
+            "type": "string"
+          },
+          "remove_tremor_anomalies": {
+            "default": false,
+            "description": "Remove tremor anomalies. Package option: __init__.",
+            "title": "Remove Tremor Anomalies",
+            "type": "boolean"
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Root dir. Package option: __init__.",
+            "title": "Root Dir"
+          },
+          "save_plot": {
+            "default": false,
+            "description": "Save plot. Package option: __init__.",
+            "title": "Save Plot",
+            "type": "boolean"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start date. Package option: __init__.",
+            "title": "Start Date"
+          },
+          "station": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Station. Package option: __init__.",
+            "title": "Station"
+          },
+          "value_multiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Value multiplier. Package option: __init__.",
+            "title": "Value Multiplier"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Verbose. Package option: __init__.",
+            "title": "Verbose"
+          }
+        },
+        "title": "CalculationConstructor",
+        "type": "object"
+      },
+      "CalculationRun": {
+        "additionalProperties": false,
+        "description": "Parameters for ``tremor/calculate_tremor.py:run``.",
+        "properties": {
+          "plot_eruption_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plot eruption dates. Package option: run.",
+            "title": "Plot Eruption Dates"
+          },
+          "plot_filter_dsar_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plot filter dsar value. Package option: run.",
+            "title": "Plot Filter Dsar Value"
+          },
+          "plot_interval": {
+            "default": 2,
+            "description": "Plot interval. Package option: run.",
+            "title": "Plot Interval",
+            "type": "integer"
+          },
+          "plot_rolling_window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plot rolling window. Package option: run.",
+            "title": "Plot Rolling Window"
+          },
+          "plot_rsam_as_log": {
+            "default": false,
+            "description": "Plot rsam as log. Package option: run.",
+            "title": "Plot Rsam As Log",
+            "type": "boolean"
+          }
+        },
+        "title": "CalculationRun",
+        "type": "object"
+      },
+      "Configuration": {
+        "additionalProperties": false,
+        "properties": {
+          "calculation": {
+            "$ref": "#/components/schemas/Calculation"
+          },
+          "evaluate_model": {
+            "default": true,
+            "title": "Evaluate Model",
+            "type": "boolean"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/Evaluation"
+          },
+          "explain_model": {
+            "default": true,
+            "title": "Explain Model",
+            "type": "boolean"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Explanation"
+          },
+          "name": {
+            "default": "Research configuration",
+            "title": "Name",
+            "type": "string"
+          },
+          "prediction": {
+            "$ref": "#/components/schemas/Prediction"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/Scenario"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "setup": {
+            "$ref": "#/components/schemas/Setup"
+          },
+          "training": {
+            "$ref": "#/components/schemas/Training"
+          }
+        },
+        "title": "Configuration",
+        "type": "object"
+      },
+      "DirectoryPickerRequest": {
+        "additionalProperties": false,
+        "description": "Optional starting directory for the native folder dialog.",
+        "properties": {
+          "initial_path": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Path"
+          }
+        },
+        "title": "DirectoryPickerRequest",
+        "type": "object"
+      },
+      "DirectoryPickerResult": {
+        "additionalProperties": false,
+        "description": "An absolute directory path, or null when the user cancels.",
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "DirectoryPickerResult",
+        "type": "object"
+      },
+      "Evaluation": {
+        "additionalProperties": false,
+        "properties": {
+          "compare": {
+            "$ref": "#/components/schemas/EvaluationCompare"
+          },
+          "constructor": {
+            "$ref": "#/components/schemas/EvaluationConstructor"
+          },
+          "execute": {
+            "$ref": "#/components/schemas/EvaluationExecute"
+          },
+          "label": {
+            "$ref": "#/components/schemas/EvaluationLabel"
+          },
+          "model_source": {
+            "default": "prediction",
+            "enum": [
+              "training",
+              "prediction"
+            ],
+            "title": "Model Source",
+            "type": "string"
+          }
+        },
+        "title": "Evaluation",
+        "type": "object"
+      },
+      "EvaluationCompare": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/evaluation_model.py:compare``.",
+        "properties": {
+          "metrics": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metrics. Package option: compare.",
+            "title": "Metrics"
+          }
+        },
+        "title": "EvaluationCompare",
+        "type": "object"
+      },
+      "EvaluationConstructor": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/evaluation_model.py:__init__``.",
+        "properties": {
+          "eruption_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Eruption dates. Package option: __init__.",
+            "title": "Eruption Dates"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model. Package option: __init__.",
+            "title": "Model"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "N jobs. Package option: __init__.",
+            "title": "N Jobs"
+          },
+          "output_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Output dir. Package option: __init__.",
+            "title": "Output Dir"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: __init__.",
+            "title": "Overwrite"
+          },
+          "prefix_config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prefix config. Package option: __init__.",
+            "title": "Prefix Config"
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Root dir. Package option: __init__.",
+            "title": "Root Dir"
+          },
+          "save_model": {
+            "default": false,
+            "description": "Save model. Package option: __init__.",
+            "title": "Save Model",
+            "type": "boolean"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Verbose. Package option: __init__.",
+            "title": "Verbose"
+          }
+        },
+        "title": "EvaluationConstructor",
+        "type": "object"
+      },
+      "EvaluationExecute": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/evaluation_model.py:evaluate``.",
+        "properties": {
+          "compare_classifiers": {
+            "default": true,
+            "description": "Compare classifiers. Package option: evaluate.",
+            "title": "Compare Classifiers",
+            "type": "boolean"
+          },
+          "plot_aggregate": {
+            "default": true,
+            "description": "Plot aggregate. Package option: evaluate.",
+            "title": "Plot Aggregate",
+            "type": "boolean"
+          },
+          "plot_per_seed": {
+            "default": false,
+            "description": "Plot per seed. Package option: evaluate.",
+            "title": "Plot Per Seed",
+            "type": "boolean"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Use cache. Package option: evaluate.",
+            "title": "Use Cache",
+            "type": "boolean"
+          }
+        },
+        "title": "EvaluationExecute",
+        "type": "object"
+      },
+      "EvaluationLabel": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/evaluation_model.py:build_label``.",
+        "properties": {
+          "window_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step. Package option: build_label.",
+            "title": "Window Step"
+          },
+          "window_step_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "minutes",
+                  "hours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step unit. Package option: build_label.",
+            "title": "Window Step Unit"
+          }
+        },
+        "title": "EvaluationLabel",
+        "type": "object"
+      },
+      "Explanation": {
+        "additionalProperties": false,
+        "properties": {
+          "constructor": {
+            "$ref": "#/components/schemas/ExplanationConstructor"
+          },
+          "execute": {
+            "$ref": "#/components/schemas/ExplanationExecute"
+          },
+          "model_source": {
+            "default": "prediction",
+            "enum": [
+              "training",
+              "prediction"
+            ],
+            "title": "Model Source",
+            "type": "string"
+          },
+          "plot": {
+            "$ref": "#/components/schemas/ExplanationPlot"
+          }
+        },
+        "title": "Explanation",
+        "type": "object"
+      },
+      "ExplanationConstructor": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/explanation_model.py:__init__``.",
+        "properties": {
+          "eruption_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Eruption dates. Package option: __init__.",
+            "title": "Eruption Dates"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model. Package option: __init__.",
+            "title": "Model"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "N jobs. Package option: __init__.",
+            "title": "N Jobs"
+          },
+          "output_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Output dir. Package option: __init__.",
+            "title": "Output Dir"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: __init__.",
+            "title": "Overwrite"
+          },
+          "prefix_config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prefix config. Package option: __init__.",
+            "title": "Prefix Config"
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Root dir. Package option: __init__.",
+            "title": "Root Dir"
+          },
+          "save_model": {
+            "default": false,
+            "description": "Save model. Package option: __init__.",
+            "title": "Save Model",
+            "type": "boolean"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Verbose. Package option: __init__.",
+            "title": "Verbose"
+          }
+        },
+        "title": "ExplanationConstructor",
+        "type": "object"
+      },
+      "ExplanationExecute": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/explanation_model.py:explain``.",
+        "properties": {
+          "check_additivity": {
+            "default": false,
+            "description": "Check additivity. Package option: explain.",
+            "title": "Check Additivity",
+            "type": "boolean"
+          },
+          "overwrite_classifier_explanation": {
+            "default": false,
+            "description": "Overwrite classifier explanation. Package option: explain.",
+            "title": "Overwrite Classifier Explanation",
+            "type": "boolean"
+          },
+          "save_per_seed": {
+            "default": true,
+            "description": "Save per seed. Package option: explain.",
+            "title": "Save Per Seed",
+            "type": "boolean"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Use cache. Package option: explain.",
+            "title": "Use Cache",
+            "type": "boolean"
+          }
+        },
+        "title": "ExplanationExecute",
+        "type": "object"
+      },
+      "ExplanationPlot": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/explanation_model.py:plot``.",
+        "properties": {
+          "dpi": {
+            "default": 150,
+            "description": "Dpi. Package option: plot.",
+            "title": "Dpi",
+            "type": "integer"
+          },
+          "figsize": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Figsize. Package option: plot.",
+            "title": "Figsize"
+          },
+          "group_remaining_features": {
+            "default": false,
+            "description": "Group remaining features. Package option: plot.",
+            "title": "Group Remaining Features",
+            "type": "boolean"
+          },
+          "max_display": {
+            "default": 20,
+            "description": "Max display. Package option: plot.",
+            "title": "Max Display",
+            "type": "integer"
+          },
+          "plot_aggregate": {
+            "default": true,
+            "description": "Plot aggregate. Package option: plot.",
+            "title": "Plot Aggregate",
+            "type": "boolean"
+          },
+          "plot_per_seed": {
+            "default": true,
+            "description": "Plot per seed. Package option: plot.",
+            "title": "Plot Per Seed",
+            "type": "boolean"
+          }
+        },
+        "title": "ExplanationPlot",
+        "type": "object"
+      },
+      "ForecastPlot": {
+        "additionalProperties": false,
+        "description": "Parameters for ``plots/forecast_plots.py:plot_forecast``.",
+        "properties": {
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "End date. Package option: plot_forecast.",
+            "title": "End Date"
+          },
+          "eruption_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Eruption dates. Package option: plot_forecast.",
+            "title": "Eruption Dates"
+          },
+          "fig_height": {
+            "default": 1.5,
+            "description": "Fig height. Package option: plot_forecast.",
+            "title": "Fig Height",
+            "type": "number"
+          },
+          "fig_width": {
+            "default": 8,
+            "description": "Fig width. Package option: plot_forecast.",
+            "title": "Fig Width",
+            "type": "number"
+          },
+          "legend_fontsize": {
+            "default": 6,
+            "description": "Legend fontsize. Package option: plot_forecast.",
+            "title": "Legend Fontsize",
+            "type": "integer"
+          },
+          "legend_n_cols": {
+            "default": 6,
+            "description": "Legend n cols. Package option: plot_forecast.",
+            "title": "Legend N Cols",
+            "type": "integer"
+          },
+          "legend_position": {
+            "default": [
+              0.5,
+              -0.075
+            ],
+            "description": "Legend position. Package option: plot_forecast.",
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Legend Position",
+            "type": "array"
+          },
+          "prediction_end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prediction end date. Package option: plot_forecast.",
+            "title": "Prediction End Date"
+          },
+          "prediction_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prediction start date. Package option: plot_forecast.",
+            "title": "Prediction Start Date"
+          },
+          "rolling_window": {
+            "default": "6h",
+            "description": "Rolling window. Package option: plot_forecast.",
+            "title": "Rolling Window",
+            "type": "string"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start date. Package option: plot_forecast.",
+            "title": "Start Date"
+          },
+          "threshold": {
+            "default": 0.7,
+            "description": "Threshold. Package option: plot_forecast.",
+            "title": "Threshold",
+            "type": "number"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Title. Package option: plot_forecast.",
+            "title": "Title"
+          },
+          "training_end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Training end date. Package option: plot_forecast.",
+            "title": "Training End Date"
+          },
+          "training_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Training start date. Package option: plot_forecast.",
+            "title": "Training Start Date"
+          },
+          "x_days_interval": {
+            "default": 2,
+            "description": "X days interval. Package option: plot_forecast.",
+            "title": "X Days Interval",
+            "type": "integer"
+          },
+          "x_label_fontsize": {
+            "default": 7,
+            "description": "X label fontsize. Package option: plot_forecast.",
+            "title": "X Label Fontsize",
+            "type": "integer"
+          },
+          "x_label_rotation": {
+            "default": -15,
+            "description": "X label rotation. Package option: plot_forecast.",
+            "title": "X Label Rotation",
+            "type": "integer"
+          },
+          "y_max": {
+            "default": 1.05,
+            "description": "Y max. Package option: plot_forecast.",
+            "title": "Y Max",
+            "type": "number"
+          }
+        },
+        "title": "ForecastPlot",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "maxLength": 1000000,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "ImportRequest",
+        "type": "object"
+      },
+      "Job": {
+        "properties": {
+          "configuration": {
+            "additionalProperties": true,
+            "title": "Configuration",
+            "type": "object"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "availability",
+              "calculation",
+              "training",
+              "prediction",
+              "evaluation",
+              "explanation",
+              "scenario"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "resolved": {
+            "additionalProperties": true,
+            "title": "Resolved",
+            "type": "object"
+          },
+          "retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Of"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "partial",
+              "failed",
+              "cancelling",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "created_at",
+          "updated_at",
+          "configuration",
+          "resolved",
+          "workspace"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "kind": {
+            "enum": [
+              "availability",
+              "calculation",
+              "training",
+              "prediction",
+              "evaluation",
+              "explanation",
+              "scenario"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "configuration"
+        ],
+        "title": "JobRequest",
+        "type": "object"
+      },
+      "Logs": {
+        "properties": {
+          "cursor": {
+            "title": "Cursor",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "cursor"
+        ],
+        "title": "Logs",
+        "type": "object"
+      },
+      "PathRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "PathRequest",
+        "type": "object"
+      },
+      "Prediction": {
+        "additionalProperties": false,
+        "properties": {
+          "constructor": {
+            "$ref": "#/components/schemas/PredictionConstructor"
+          },
+          "enable_segments_plot": {
+            "default": false,
+            "title": "Enable Segments Plot",
+            "type": "boolean"
+          },
+          "features": {
+            "$ref": "#/components/schemas/PredictionFeatures"
+          },
+          "forecast": {
+            "$ref": "#/components/schemas/PredictionForecast"
+          },
+          "label": {
+            "$ref": "#/components/schemas/PredictionLabel"
+          },
+          "load_features": {
+            "$ref": "#/components/schemas/PredictionLoadFeatures"
+          },
+          "plot": {
+            "$ref": "#/components/schemas/ForecastPlot"
+          },
+          "use_cache": {
+            "default": true,
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "use_features_from": {
+            "default": "all",
+            "enum": [
+              "all",
+              "files",
+              "training"
+            ],
+            "title": "Use Features From",
+            "type": "string"
+          }
+        },
+        "title": "Prediction",
+        "type": "object"
+      },
+      "PredictionConstructor": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/prediction_model.py:__init__``.",
+        "properties": {
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "End date. Package option: __init__.",
+            "title": "End Date"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model. Package option: __init__.",
+            "title": "Model"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "N jobs. Package option: __init__.",
+            "title": "N Jobs"
+          },
+          "nslc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nslc. Package option: __init__.",
+            "title": "Nslc"
+          },
+          "output_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Output dir. Package option: __init__.",
+            "title": "Output Dir"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: __init__.",
+            "title": "Overwrite"
+          },
+          "prefix_config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prefix config. Package option: __init__.",
+            "title": "Prefix Config"
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Root dir. Package option: __init__.",
+            "title": "Root Dir"
+          },
+          "save_model": {
+            "default": false,
+            "description": "Save model. Package option: __init__.",
+            "title": "Save Model",
+            "type": "boolean"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start date. Package option: __init__.",
+            "title": "Start Date"
+          },
+          "training_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Training hash. Package option: __init__.",
+            "title": "Training Hash"
+          },
+          "tremor_data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tremor data. Package option: __init__.",
+            "title": "Tremor Data"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Verbose. Package option: __init__.",
+            "title": "Verbose"
+          },
+          "window_size": {
+            "default": 2,
+            "description": "Window size. Package option: __init__.",
+            "title": "Window Size",
+            "type": "integer"
+          }
+        },
+        "title": "PredictionConstructor",
+        "type": "object"
+      },
+      "PredictionFeatures": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/prediction_model.py:extract_features``.",
+        "properties": {
+          "exclude_features": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exclude features. Package option: extract_features.",
+            "title": "Exclude Features"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "N jobs. Package option: extract_features.",
+            "title": "N Jobs"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: extract_features.",
+            "title": "Overwrite"
+          },
+          "save_tremor_matrix_per_method": {
+            "default": false,
+            "description": "Save tremor matrix per method. Package option: extract_features.",
+            "title": "Save Tremor Matrix Per Method",
+            "type": "boolean"
+          },
+          "select_features": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Select features. Package option: extract_features.",
+            "title": "Select Features"
+          },
+          "select_tremor_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Select tremor columns. Package option: extract_features.",
+            "title": "Select Tremor Columns"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Verbose. Package option: extract_features.",
+            "title": "Verbose"
+          }
+        },
+        "title": "PredictionFeatures",
+        "type": "object"
+      },
+      "PredictionForecast": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/prediction_model.py:forecast``.",
+        "properties": {
+          "plot_end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plot end date. Package option: forecast.",
+            "title": "Plot End Date"
+          },
+          "plot_pdf": {
+            "default": true,
+            "description": "Plot pdf. Package option: forecast.",
+            "title": "Plot Pdf",
+            "type": "boolean"
+          },
+          "plot_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plot start date. Package option: forecast.",
+            "title": "Plot Start Date"
+          },
+          "plot_threshold": {
+            "default": 0.5,
+            "description": "Plot threshold. Package option: forecast.",
+            "title": "Plot Threshold",
+            "type": "number"
+          },
+          "plot_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plot title. Package option: forecast.",
+            "title": "Plot Title"
+          },
+          "save_seed_result": {
+            "default": true,
+            "description": "Save seed result. Package option: forecast.",
+            "title": "Save Seed Result",
+            "type": "boolean"
+          }
+        },
+        "title": "PredictionForecast",
+        "type": "object"
+      },
+      "PredictionLabel": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/prediction_model.py:build_label``.",
+        "properties": {
+          "window_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step. Package option: build_label.",
+            "title": "Window Step"
+          },
+          "window_step_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "minutes",
+                  "hours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step unit. Package option: build_label.",
+            "title": "Window Step Unit"
+          }
+        },
+        "title": "PredictionLabel",
+        "type": "object"
+      },
+      "PredictionLoadFeatures": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/prediction_model.py:load_features``.",
+        "properties": {
+          "features_matrix_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Features matrix path. Package option: load_features.",
+            "title": "Features Matrix Path"
+          },
+          "label_features_csv": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Label features csv. Package option: load_features.",
+            "title": "Label Features Csv"
+          },
+          "window_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step. Package option: load_features.",
+            "title": "Window Step"
+          },
+          "window_step_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "minutes",
+                  "hours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step unit. Package option: load_features.",
+            "title": "Window Step Unit"
+          }
+        },
+        "title": "PredictionLoadFeatures",
+        "type": "object"
+      },
+      "Profile": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration": {
+            "$ref": "#/components/schemas/Configuration"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "configuration"
+        ],
+        "title": "Profile",
+        "type": "object"
+      },
+      "Scenario": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/Evaluation"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Explanation"
+          },
+          "id": {
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "Scenario 1",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "prediction": {
+            "$ref": "#/components/schemas/Prediction"
+          },
+          "training": {
+            "$ref": "#/components/schemas/Training"
+          }
+        },
+        "title": "Scenario",
+        "type": "object"
+      },
+      "Setup": {
+        "additionalProperties": false,
+        "description": "Directory and station defaults for local workflows.",
+        "properties": {
+          "channel": {
+            "default": "EHZ",
+            "title": "Channel",
+            "type": "string"
+          },
+          "channel_type": {
+            "default": "D",
+            "title": "Channel Type",
+            "type": "string"
+          },
+          "location": {
+            "default": "00",
+            "title": "Location",
+            "type": "string"
+          },
+          "n_jobs": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "N Jobs",
+            "type": "integer"
+          },
+          "network": {
+            "default": "VG",
+            "title": "Network",
+            "type": "string"
+          },
+          "output_dir": {
+            "default": "output",
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Dir"
+          },
+          "sds_dir": {
+            "default": "",
+            "title": "Sds Dir",
+            "type": "string"
+          },
+          "station": {
+            "default": "OJN",
+            "title": "Station",
+            "type": "string"
+          },
+          "tremor_dir": {
+            "default": "",
+            "title": "Tremor Dir",
+            "type": "string"
+          },
+          "verbose": {
+            "default": false,
+            "title": "Verbose",
+            "type": "boolean"
+          },
+          "window_size": {
+            "default": 2,
+            "minimum": 1.0,
+            "title": "Window Size",
+            "type": "integer"
+          }
+        },
+        "title": "Setup",
+        "type": "object"
+      },
+      "Training": {
+        "additionalProperties": false,
+        "properties": {
+          "constructor": {
+            "$ref": "#/components/schemas/TrainingConstructor"
+          },
+          "features": {
+            "$ref": "#/components/schemas/TrainingFeatures"
+          },
+          "fit": {
+            "$ref": "#/components/schemas/TrainingFit"
+          },
+          "label": {
+            "$ref": "#/components/schemas/TrainingLabel"
+          },
+          "load_features": {
+            "$ref": "#/components/schemas/TrainingLoadFeatures"
+          },
+          "use_cache": {
+            "default": true,
+            "title": "Use Cache",
+            "type": "boolean"
+          }
+        },
+        "title": "Training",
+        "type": "object"
+      },
+      "TrainingConstructor": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/training_model.py:__init__``.",
+        "properties": {
+          "classifiers": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Classifiers. Package option: __init__.",
+            "title": "Classifiers"
+          },
+          "cv_splits": {
+            "default": 5,
+            "description": "Cv splits. Package option: __init__.",
+            "title": "Cv Splits",
+            "type": "integer"
+          },
+          "cv_strategy": {
+            "default": "shuffle-stratified",
+            "description": "Cv strategy. Package option: __init__.",
+            "enum": [
+              "shuffle",
+              "stratified",
+              "shuffle-stratified"
+            ],
+            "title": "Cv Strategy",
+            "type": "string"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "End date. Package option: __init__.",
+            "title": "End Date"
+          },
+          "eruption_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Eruption dates. Package option: __init__.",
+            "title": "Eruption Dates"
+          },
+          "include_eruption_date": {
+            "default": false,
+            "description": "Include eruption date. Package option: __init__.",
+            "title": "Include Eruption Date",
+            "type": "boolean"
+          },
+          "n_grids": {
+            "default": 1,
+            "description": "N grids. Package option: __init__.",
+            "title": "N Grids",
+            "type": "integer"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "N jobs. Package option: __init__.",
+            "title": "N Jobs"
+          },
+          "nslc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nslc. Package option: __init__.",
+            "title": "Nslc"
+          },
+          "output_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Output dir. Package option: __init__.",
+            "title": "Output Dir"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: __init__.",
+            "title": "Overwrite"
+          },
+          "prefix_config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prefix config. Package option: __init__.",
+            "title": "Prefix Config"
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Root dir. Package option: __init__.",
+            "title": "Root Dir"
+          },
+          "save_model": {
+            "default": false,
+            "description": "Save model. Package option: __init__.",
+            "title": "Save Model",
+            "type": "boolean"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start date. Package option: __init__.",
+            "title": "Start Date"
+          },
+          "top_n_features": {
+            "default": 20,
+            "description": "Top n features. Package option: __init__.",
+            "title": "Top N Features",
+            "type": "integer"
+          },
+          "tremor_data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tremor data. Package option: __init__.",
+            "title": "Tremor Data"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Verbose. Package option: __init__.",
+            "title": "Verbose"
+          },
+          "window_size": {
+            "default": 2,
+            "description": "Window size. Package option: __init__.",
+            "title": "Window Size",
+            "type": "integer"
+          }
+        },
+        "title": "TrainingConstructor",
+        "type": "object"
+      },
+      "TrainingFeatures": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/training_model.py:extract_features``.",
+        "properties": {
+          "exclude_features": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exclude features. Package option: extract_features.",
+            "title": "Exclude Features"
+          },
+          "minimum_completion": {
+            "default": 1.0,
+            "description": "Minimum completion. Package option: extract_features.",
+            "title": "Minimum Completion",
+            "type": "number"
+          },
+          "n_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "N jobs. Package option: extract_features.",
+            "title": "N Jobs"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Overwrite. Package option: extract_features.",
+            "title": "Overwrite"
+          },
+          "save_tremor_matrix_per_id": {
+            "default": false,
+            "description": "Save tremor matrix per id. Package option: extract_features.",
+            "title": "Save Tremor Matrix Per Id",
+            "type": "boolean"
+          },
+          "save_tremor_matrix_per_method": {
+            "default": false,
+            "description": "Save tremor matrix per method. Package option: extract_features.",
+            "title": "Save Tremor Matrix Per Method",
+            "type": "boolean"
+          },
+          "select_features": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Select features. Package option: extract_features.",
+            "title": "Select Features"
+          },
+          "select_tremor_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Select tremor columns. Package option: extract_features.",
+            "title": "Select Tremor Columns"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Verbose. Package option: extract_features.",
+            "title": "Verbose"
+          }
+        },
+        "title": "TrainingFeatures",
+        "type": "object"
+      },
+      "TrainingFit": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/training_model.py:fit``.",
+        "properties": {
+          "compute_learning_curve": {
+            "default": false,
+            "description": "Compute learning curve. Package option: fit.",
+            "title": "Compute Learning Curve",
+            "type": "boolean"
+          },
+          "minority_threshold": {
+            "default": 0.15,
+            "description": "Minority threshold. Package option: fit.",
+            "title": "Minority Threshold",
+            "type": "number"
+          },
+          "plot_features": {
+            "default": false,
+            "description": "Plot features. Package option: fit.",
+            "title": "Plot Features",
+            "type": "boolean"
+          },
+          "resample_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "under",
+                  "over",
+                  "auto"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "auto",
+            "description": "Resample method. Package option: fit.",
+            "title": "Resample Method"
+          },
+          "sampling_strategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "default": 0.75,
+            "description": "Sampling strategy. Package option: fit.",
+            "title": "Sampling Strategy"
+          },
+          "scoring": {
+            "default": "balanced_accuracy",
+            "description": "Scoring. Package option: fit.",
+            "title": "Scoring",
+            "type": "string"
+          },
+          "seeds": {
+            "default": 25,
+            "description": "Seeds. Package option: fit.",
+            "title": "Seeds",
+            "type": "integer"
+          }
+        },
+        "title": "TrainingFit",
+        "type": "object"
+      },
+      "TrainingLabel": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/training_model.py:build_label``.",
+        "properties": {
+          "builder": {
+            "default": "standard",
+            "description": "Builder. Package option: build_label.",
+            "enum": [
+              "standard",
+              "dynamic"
+            ],
+            "title": "Builder",
+            "type": "string"
+          },
+          "days_before_eruption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Days before eruption. Package option: build_label.",
+            "title": "Days Before Eruption"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Verbose. Package option: build_label.",
+            "title": "Verbose"
+          },
+          "window_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step. Package option: build_label.",
+            "title": "Window Step"
+          },
+          "window_step_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "minutes",
+                  "hours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Window step unit. Package option: build_label.",
+            "title": "Window Step Unit"
+          }
+        },
+        "title": "TrainingLabel",
+        "type": "object"
+      },
+      "TrainingLoadFeatures": {
+        "additionalProperties": false,
+        "description": "Parameters for ``model/training_model.py:load_features``.",
+        "properties": {
+          "features_matrix_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Features matrix path. Package option: load_features.",
+            "title": "Features Matrix Path"
+          },
+          "label_features_csv": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Label features csv. Package option: load_features.",
+            "title": "Label Features Csv"
+          },
+          "select_features": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Select features. Package option: load_features.",
+            "title": "Select Features"
+          }
+        },
+        "title": "TrainingLoadFeatures",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Local research workflows, configurations, jobs, artifacts, and machine resources.",
+    "title": "Eruption Forecast",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/artifacts": {
+      "get": {
+        "description": "List artifact metadata, including existing local outputs.\n\nExample:\n    GET /api/v1/artifacts?job_id=job-id",
+        "operationId": "artifacts_api_v1_artifacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Artifacts Api V1 Artifacts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Artifacts",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/v1/artifacts/discover": {
+      "post": {
+        "description": "Index an existing configured output or tremor directory.\n\nExample:\n    POST /api/v1/artifacts/discover with a configured path.",
+        "operationId": "index_artifacts_api_v1_artifacts_discover_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PathRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Index Artifacts Api V1 Artifacts Discover Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Index Artifacts",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/v1/artifacts/{identifier}/download": {
+      "get": {
+        "description": "Download or display a registered file.\n\nExample:\n    GET /api/v1/artifacts/artifact-id/download",
+        "operationId": "download_api_v1_artifacts__identifier__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "title": "Identifier",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/v1/artifacts/{identifier}/preview": {
+      "get": {
+        "description": "Preview bounded tabular data.\n\nExample:\n    GET /api/v1/artifacts/artifact-id/preview?chart=true",
+        "operationId": "table_api_v1_artifacts__identifier__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "chart",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Chart",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Table Api V1 Artifacts  Identifier  Preview Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Table",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/v1/configurations": {
+      "get": {
+        "description": "List named saved research configurations.\n\nExample:\n    GET /api/v1/configurations",
+        "operationId": "profiles_api_v1_configurations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Profiles Api V1 Configurations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Profiles",
+        "tags": [
+          "configuration"
+        ]
+      },
+      "post": {
+        "description": "Save a profile, replacing the matching name.\n\nExample:\n    POST /api/v1/configurations with a named configuration.",
+        "operationId": "save_profile_api_v1_configurations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Profile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Profile",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/configurations/example": {
+      "get": {
+        "description": "Provide a small OJN preset inspired by forecast-scenario.py.\n\nExample:\n    GET /api/v1/configurations/example",
+        "operationId": "example_api_v1_configurations_example_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Configuration"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Example",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/configurations/export": {
+      "post": {
+        "description": "Download a reproducible configuration.\n\nExample:\n    POST /api/v1/configurations/export?format=json",
+        "operationId": "export_config_api_v1_configurations_export_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "yaml",
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Configuration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Config",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/configurations/import": {
+      "post": {
+        "description": "Validate an application JSON or YAML configuration.\n\nExample:\n    POST /api/v1/configurations/import with a content string.",
+        "operationId": "import_config_api_v1_configurations_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Configuration"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Config",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/configurations/resolve": {
+      "post": {
+        "description": "Inspect inherited settings before submission.\n\nExample:\n    POST /api/v1/configurations/resolve with Configuration JSON.",
+        "operationId": "resolved_api_v1_configurations_resolve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Configuration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resolved Api V1 Configurations Resolve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolved",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Check API readiness.\n\nExample:\n    GET /api/v1/health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "description": "List persisted job history.\n\nExample:\n    GET /api/v1/jobs",
+        "operationId": "jobs_api_v1_jobs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Job"
+                  },
+                  "title": "Response Jobs Api V1 Jobs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Jobs",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "description": "Validate and queue independent or scenario work.\n\nExample:\n    POST /api/v1/jobs with kind and configuration.",
+        "operationId": "create_job_api_v1_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{identifier}": {
+      "get": {
+        "description": "Read job status and stage events.\n\nExample:\n    GET /api/v1/jobs/job-id",
+        "operationId": "job_api_v1_jobs__identifier__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "title": "Identifier",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{identifier}/cancel": {
+      "post": {
+        "description": "Cancel queued work or request process-tree termination.\n\nExample:\n    POST /api/v1/jobs/job-id/cancel",
+        "operationId": "cancel_api_v1_jobs__identifier__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "title": "Identifier",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{identifier}/logs": {
+      "get": {
+        "description": "Read a bounded log chunk using a byte cursor.\n\nExample:\n    GET /api/v1/jobs/job-id/logs?cursor=0",
+        "operationId": "logs_api_v1_jobs__identifier__logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Cursor",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Logs"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logs",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{identifier}/retry": {
+      "post": {
+        "description": "Create a new attempt with the original workspace and caches.\n\nExample:\n    POST /api/v1/jobs/job-id/retry",
+        "operationId": "retry_api_v1_jobs__identifier__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "title": "Identifier",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/parameters": {
+      "get": {
+        "description": "Return the complete form catalog.\n\nExample:\n    GET /api/v1/parameters",
+        "operationId": "parameters_api_v1_parameters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Parameters Api V1 Parameters Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Parameters",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/paths/browse": {
+      "get": {
+        "description": "Browse configured roots, never arbitrary filesystem locations.\n\nExample:\n    GET /api/v1/paths/browse",
+        "operationId": "browse_api_v1_paths_browse_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Browse Api V1 Paths Browse Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Browse",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/paths/pick-directory": {
+      "delete": {
+        "description": "Cancel the backend's active native folder dialog, if any.",
+        "operationId": "cancel_folder_selection_api_v1_paths_pick_directory_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Cancel Folder Selection Api V1 Paths Pick Directory Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cancel Folder Selection",
+        "tags": [
+          "configuration"
+        ]
+      },
+      "post": {
+        "description": "Open the backend computer's native directory dialog.\n\nArgs:\n    value: Optional initial absolute directory.\n\nReturns:\n    An absolute path, or null when the dialog is cancelled.\n\nRaises:\n    HTTPException: A dialog is already open or selection is unavailable.",
+        "operationId": "select_directory_api_v1_paths_pick_directory_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPickerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPickerResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Directory",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/paths/validate": {
+      "post": {
+        "description": "Inspect a path within configured roots.\n\nExample:\n    POST /api/v1/paths/validate with {\"path\": \"output\"}.",
+        "operationId": "validate_path_api_v1_paths_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PathRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Validate Path Api V1 Paths Validate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Path",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "description": "Read directory and station defaults.\n\nExample:\n    GET /api/v1/settings",
+        "operationId": "get_setup_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Setup"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Setup",
+        "tags": [
+          "configuration"
+        ]
+      },
+      "put": {
+        "description": "Validate and save approved directory roots.\n\nExample:\n    PUT /api/v1/settings with a Setup JSON body.",
+        "operationId": "save_setup_api_v1_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Setup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Setup"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Setup",
+        "tags": [
+          "configuration"
+        ]
+      }
+    },
+    "/api/v1/system": {
+      "get": {
+        "description": "Report actual machine resources and worker health.\n\nExample:\n    GET /api/v1/system",
+        "operationId": "system_api_v1_system_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response System Api V1 System Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "System",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  }
+}

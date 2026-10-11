@@ -110,3 +110,8 @@ Full usage is documented in [Configuration → Telegram Notifications](Configura
 1. Confirm a seismic data archive is reachable - see [Data Sources](Data-Sources).
 2. Run the [Usage](Usage) Quick Start to produce your first forecast.
 3. Dive into [Pipeline Walkthrough](Pipeline-Walkthrough) for the annotated `main.py` / `forecast-scenario.py` tours.
+
+
+## Local research interface
+
+Install and run the local FastAPI backend and Vite frontend using [UI Workflow](UI-Workflow.md).

@@ -40,3 +40,22 @@ tests/output/
 /.github/
 output*
 *.html
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# Local application state and test captures
+/.app-state/
+/.playwright/
+app/backend/tests/output/
+app/frontend/tests/output/
+*.tsbuildinfo
+!/app/frontend/index.html
+/.impeccable/questions/

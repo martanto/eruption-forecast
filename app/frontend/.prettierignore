@@ -1,0 +1,4 @@
+src/api/generated/
+tests/output/
+dist/
+node_modules/

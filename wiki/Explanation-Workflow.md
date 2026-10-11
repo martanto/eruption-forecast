@@ -514,3 +514,8 @@ See [Configuration](Configuration#per-stage-configs-standalone).
 │           classifiers/{ClfName}/ + eruptions/{date}/            │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+
+## Local research interface
+
+The Explanation page exposes SHAP execution and per-seed/aggregate plotting and displays the package figures; see [UI Workflow](UI-Workflow.md).

@@ -1,0 +1,26 @@
+{
+  "name": "eruption-forecast",
+  "version": "1.0.0",
+  "description": "[![Version](https://img.shields.io/pypi/v/eruption-forecast?label=version)](https://pypi.org/project/eruption-forecast/) [![Python](https://img.shields.io/pypi/pyversions/eruption-forecast?label=python)](https://pypi.org/project/eruption-forecast/) [![License](https://img.shields.io/pypi/l/eruption-forecast?label=license)](https://pypi.org/project/eruption-forecast/) [![Status](https://img.shields.io/badge/status-active%20development-orange)](https://github.com/martanto/eruption-forecast) [![Downloads](https://static.pepy.tech/personalized-badge/eruption-forecast?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLUE&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/eruption-forecast)",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martanto/eruption-forecast.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/martanto/eruption-forecast/issues"
+  },
+  "homepage": "https://github.com/martanto/eruption-forecast#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.5"
+  }
+}

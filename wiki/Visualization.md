@@ -187,3 +187,8 @@ fig, ax = plt.subplots(figsize=(6, 3))
 ax.plot(df.index, df["consensus_eruption_probability"])
 fig.savefig("custom.png", dpi=300, bbox_inches="tight")
 ```
+
+
+## Local research interface
+
+Results displays package PNG/PDF figures and bounded CSV/Parquet previews with interactive ECharts time-series comparisons; see [UI Workflow](UI-Workflow.md).

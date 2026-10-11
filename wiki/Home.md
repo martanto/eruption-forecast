@@ -113,3 +113,8 @@ eruption-forecast/
 - [`main.py` - Research Workflow](https://github.com/martanto/eruption-forecast/blob/master/main.py)
 - [`forecast-scenario.py` - Scenarios Workflow](https://github.com/martanto/eruption-forecast/blob/master/forecast-scenario.py)
 - [`config.example.yaml` - config template](https://github.com/martanto/eruption-forecast/blob/master/config.example.yaml)
+
+
+## Local research interface
+
+The ten-page local research application and its installation, independent backend package, queue and testing are described in [UI Workflow](UI-Workflow.md).

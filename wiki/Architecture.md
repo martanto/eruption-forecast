@@ -509,3 +509,8 @@ Evaluation is **never cached** - the on-disk matrices act as the cache and `Metr
 `utils/ml.save_model_json` writes the per-classifier trained-model JSON registry (one record per seed, each with the inline top-N feature list and the path to the seed's `.pkl`). `TrainingModel.build_seed_ensemble` reads that registry via `SeedEnsemble.from_any` to package every seed into a `SeedEnsemble`, and the per-classifier `SeedEnsemble`s are then merged into a `ClassifierEnsemble` (`build_classifier_ensemble`). All three steps run at the end of `TrainingModel.fit()`.
 
 `utils/formatting.slugify` is what turns `"Scenario 1"` into `scenario-1` for the per-scenario `output_dir` built inside `ForecastModelScenario.run()`.
+
+
+## Local research interface
+
+The separate uv_build backend package wraps the scientific package with SQLite queue repositories and subprocess workers; React lives in app/frontend; see [UI Workflow](UI-Workflow.md).

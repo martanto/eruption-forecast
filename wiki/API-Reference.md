@@ -1529,3 +1529,12 @@ Credentials are read from constructor arguments or the `TELEGRAM_BOT_TOKEN` / `T
 - End-to-end example: [Usage](Usage)
 - Caching internals: [Architecture](Architecture#34-model-model) and [Training Workflow](Training-Workflow#caching)
 - Output paths for every artefact: [Output Structure](Output-Structure)
+
+
+## Local research interface
+
+The HTTP API is under /api/v1; root openapi.json and runtime /docs and /redoc expose its contract; see [UI Workflow](UI-Workflow.md).
+
+General Setup offers a Windows native SDS folder chooser through `POST /api/v1/paths/pick-directory`. The dialog opens on the backend computer and returns an existing absolute directory, or null on cancellation. Manual absolute-path entry remains available for remote or headless backends; selecting a folder updates the draft until Save setup is used.
+
+If SDS selection is already open, use **Cancel folder selection** before retrying. `DELETE /api/v1/paths/pick-directory` terminates only the dialog owned by this backend; cancellation and timeout release the picker lock.

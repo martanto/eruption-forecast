@@ -181,3 +181,8 @@ later switch to `source="sds"` pointing at the same `download_dir` once the arch
 
 The resulting CSV columns are `rsam_f0..f4`, `dsar_f0-f1..f3-f4`, and `entropy`. 
 Override the band list with `CalculateTremor(...).change_freq_bands([(0.1, 1.0), (1.0, 5.0)])`.
+
+
+## Local research interface
+
+The UI accepts SDS and FDSN inputs. General setup scans SDS completeness with data-availability; see [UI Workflow](UI-Workflow.md).

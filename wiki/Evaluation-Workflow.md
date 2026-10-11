@@ -223,3 +223,8 @@ See [Configuration](Configuration#per-stage-configs-standalone).
 │                    ranking CSV + comparison plots               │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+
+## Local research interface
+
+The Evaluation page reuses complete saved TrainingModel/PredictionModel artifacts and exposes metric/comparison settings; see [UI Workflow](UI-Workflow.md).
