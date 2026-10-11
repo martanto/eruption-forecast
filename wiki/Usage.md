@@ -48,7 +48,7 @@ That's the whole pipeline. The five stages - `calculate → train → predict �
 
 | Stage | What it does | Key output (under `{station_dir}/`) |
 |-------|--------------|-------------------------------------|
-| `calculate()` | Reads SDS/FDSN waveforms, computes RSAM / DSAR / entropy per band | `tremor/{nslc}_{start}_{end}.csv` |
+| `calculate()` | Reads SDS/FDSN waveforms, computes RSAM / DSAR / entropy per band | `tremor/tremor-interpolated_{nslc}_{start}-{end}.csv` |
 | `train()` | Builds labels → extracts tsfresh features → fits one `SeedEnsemble` per classifier into a `ClassifierEnsemble` | `training/...` (cache pickle: `training/{hash}.TrainingModel.pkl`) |
 | `predict()` | Re-extracts features over the forecast grid → runs ensemble inference | `prediction/...` (cache pickle: `prediction/{hash}.PredictionModel.pkl`) |
 | `evaluate()` | Re-uses the in-session `TrainingModel` or `PredictionModel` for per-seed metrics + aggregate plots | `evaluation/{training\|prediction}/...` |

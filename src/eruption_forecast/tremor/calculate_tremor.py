@@ -305,7 +305,9 @@ class CalculateTremor:
         self.n_days: int = len(self.dates)
         self.nslc = nslc
         self.daily_dir: str = os.path.join(tremor_dir, "daily")
-        self._filename = f"{self.nslc}_{self.start_date_str}_{self.end_date_str}.csv"
+        # Must match the name ``run()`` and ``update()`` write, otherwise the
+        # load-from-file short-circuit in ``run()`` can never find the CSV.
+        self._filename = f"{self.nslc}_{self.start_date_str}-{self.end_date_str}.csv"
         self.csv = os.path.join(tremor_dir, self.filename)
         self.remove_tremor_anomalies: bool = remove_tremor_anomalies
 
@@ -482,9 +484,9 @@ class CalculateTremor:
         Examples:
             >>> tremor = CalculateTremor(start_date="2025-01-01", end_date="2025-12-31", station="OJN", channel="EHZ")
             >>> print(tremor.filename)
-            tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31.csv
+            tremor-interpolated_VG.OJN.00.EHZ_2025-01-01-2025-12-31.csv
         """
-        # Example: tremor_VG.OJN.00.EHZ_2025-01-01_2025-12-31
+        # Example: tremor-interpolated_VG.OJN.00.EHZ_2025-01-01-2025-12-31
         return (
             f"tremor-interpolated_{self._filename}"
             if self.filename_prefix is None

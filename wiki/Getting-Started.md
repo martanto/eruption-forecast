@@ -69,6 +69,7 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 | `ruff` | Linting + autofix (`uv run ruff check --fix src/`) |
 | `ty` | Type checking (`uvx ty check src/` - note the forward slash) |
 | `pytest` | Test runner (`uv run pytest tests/`) |
+| `pytest-cov` | Coverage reports (`uv run pytest tests/ --cov`) |
 
 ---
 
@@ -81,6 +82,8 @@ A working install prints `<class 'eruption_forecast.model.forecast_model.Forecas
 | `uv run ruff check --fix src/` | Lint and autofix |
 | `uvx ty check src/` | Type check (always forward slashes on Windows) |
 | `uv run pytest tests/` | Run the test suite |
+| `uv run pytest tests/ -m "not integration"` | Run the suite without real external requests (Telegram) |
+| `uv run pytest tests/ -m "not integration" --cov` | Coverage report with missing lines |
 | `uv run pytest tests/test_imports.py -v` | Confirm no circular imports |
 | `uv run python main.py` | Run the bundled Research Workflow |
 | `uv run python forecast-scenario.py` | Run the bundled Scenarios Workflow (`ForecastModelScenario`) |

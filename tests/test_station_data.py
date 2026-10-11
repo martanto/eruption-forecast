@@ -32,9 +32,10 @@ class TestStationDataConstruction:
         assert sd.location == ""
         assert sd.nslc == "VG.OJN..EHZ"
 
-    def test_location_none_coerced_to_empty(self):
-        sd = StationData(station="OJN", channel="EHZ", network="VG", location=None)
-        assert sd.location == ""
+    def test_location_none_raises(self):
+        # ``None`` is no longer coerced to ``""``; it fails on ``.upper()``.
+        with pytest.raises(AttributeError):
+            StationData(station="OJN", channel="EHZ", network="VG", location=None)  # type: ignore[arg-type]
 
     def test_channel_type_default(self):
         sd = StationData(station="OJN", channel="EHZ", network="VG")
@@ -63,5 +64,5 @@ class TestStationDataValidation:
             StationData(station=123, channel="EHZ", network="VG")
 
     def test_non_string_location_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(AttributeError):
             StationData(station="OJN", channel="EHZ", network="VG", location=123)

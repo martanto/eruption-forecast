@@ -19,8 +19,9 @@ Every pipeline run writes under a single station directory:
 ├── tremor/                                                   # CalculateTremor
 │   ├── daily/                                                # Per-day CSVs (removed when cleanup_daily_dir=True)
 │   ├── figures/{YYYY-MM-DD}.png                              # Per-day band plots (plot_daily=True)
-│   ├── {nslc}_{start}_{end}.csv                              # Merged tremor CSV (DateTime index)
-│   └── {nslc}_{start}_{end}.{png,pdf}                        # Merged summary plot (save_plot=True)
+│   ├── tremor-interpolated_{nslc}_{start}-{end}.csv          # Merged tremor CSV (DateTime index); reused by run() unless overwrite=True
+│   ├── tremor-non-interpolated_{nslc}_{start}-{end}.csv      # Same, before gap interpolation
+│   └── tremor-interpolated_{nslc}_{start}-{end}.{png,pdf}    # Merged summary plot (save_plot=True)
 │
 ├── training/                                                 # TrainingModel
 │   ├── training.config.yaml                                  # tm.save_config() — auto-written at end of fit()
@@ -274,7 +275,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 
 | You want to inspect... | Look here |
 |------------------------|-----------|
-| The merged tremor CSV | `tremor/{nslc}_{start}_{end}.csv` |
+| The merged tremor CSV | `tremor/tremor-interpolated_{nslc}_{start}-{end}.csv` |
 | Per-day tremor plots | `tremor/figures/` |
 | The features tsfresh extracted | `training/features/{cv}/features-matrix_*.parquet` |
 | Per-seed feature picks | `training/features/{cv}/seed/{seed:05d}.csv` |

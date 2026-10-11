@@ -141,7 +141,8 @@ def to_safe_array(data: np.ndarray | np.ma.MaskedArray) -> np.ndarray:
         np.ndarray: Plain float64 ndarray with NaN in place of masked values.
     """
     if isinstance(data, np.ma.MaskedArray):
-        return np.ma.filled(data, np.nan).astype(float)
+        # Cast before filling: integer masked arrays cannot hold NaN.
+        return np.ma.filled(data.astype(float), np.nan)
     return np.asarray(data, dtype=float)
 
 

@@ -90,7 +90,8 @@ def load_pickle(path: str) -> Any:
     offending file path. If the file is missing, raises
     ``FileNotFoundError`` naming ``path``. If ``joblib.load`` raises an
     unpickle-related error (commonly triggered by a package upgrade that
-    moves or removes a class), the original exception is chained via
+    moves or removes a class, or by a truncated or corrupt file), the
+    original exception is chained via
     ``raise ... from e`` so the traceback still shows *why* it failed
     while the new top-level ``RuntimeError`` shows *which* file failed.
 
@@ -116,6 +117,11 @@ def load_pickle(path: str) -> Any:
         pickle.UnpicklingError,
         TypeError,
         ValueError,
+        # Corrupt or non-pickle bytes are dispatched as unknown opcodes, which
+        # the unpickler surfaces as KeyError / IndexError rather than
+        # UnpicklingError.
+        KeyError,
+        IndexError,
     ) as e:
         raise RuntimeError(f"Failed to load pickle: {path}") from e
 
