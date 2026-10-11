@@ -43,7 +43,7 @@ This page covers config persistence, the dataclass layout, Telegram notification
 {station_dir}/forecast.config.json      # fm.save_config(fmt="json")
 ```
 
-`{station_dir} = {output_dir}/{network}.{station}.{location}.{channel}` - sibling of the per-stage `cache/` directories.
+`{station_dir} = {output_dir}/{network}.{station}.{location}.{channel}` - the parent of the per-stage `training/`, `prediction/`, `evaluation/`, and `explanation/` directories. With `prefix_config="Scenario 1"` the file becomes `forecast.scenario-1.config.yaml`.
 
 ### Round-trip
 
@@ -199,6 +199,9 @@ standalone run always leaves a YAML snapshot behind without any extra wiring.
 | `PredictionModel` | `config/prediction_config.py` | end of `forecast()` | `{prediction_dir}/prediction.config.yaml` |
 | `EvaluationModel` | `config/evaluation_config.py` | end of `evaluate()` | `{evaluation_dir}/evaluation.config.yaml` |
 | `ExplanationModel` | `config/explanation_config.py` | end of `explain()` | `{explanation_dir}/explanation.config.yaml` |
+| `LabelBuilder` | `config/label_config.py` (`LabelConfig`) | end of `build()` | `{label_dir}/label.config.yaml` (e.g. `training/labels/`) |
+
+`prefix_config` (constructor kwarg on all four stage models, and on `ForecastModel`, which threads it down) is slugified and inserted before `.config`: `prefix_config="Scenario 1"` → `training.scenario-1.config.yaml`. That lets several runs share one station directory without overwriting each other's snapshots. `label.config.yaml` is never prefixed.
 
 `{evaluation_dir}` and `{explanation_dir}` are already mode-namespaced (`evaluation/training/` 
 vs `evaluation/prediction/`, same for `explanation/`), so training-reuse and 
@@ -369,10 +372,12 @@ register_error_category("telegram", level="ERROR")   # bump the level
 ├── prediction/prediction.config.yaml                   # pm.save_config()  - standalone PredictionModel
 ├── evaluation/{training|prediction}/evaluation.config.yaml   # em.save_config()  - standalone EvaluationModel
 ├── explanation/{training|prediction}/explanation.config.yaml # xm.save_config()  - standalone ExplanationModel
+├── training/labels/label.config.yaml                   # lb.save_config()  - LabelBuilder (auto in build())
 │   # Cache identity dumps (diff-able JSON sidecars) live next to each
 │   # stage's cache pickle — no central cache/ subtree:
 │   #   training/{hash}.TrainingModel.params.json
 │   #   prediction/{hash}.PredictionModel.params.json
+│   #   evaluation/{kind}/{hash}.EvaluationModel.params.json
 │   #   explanation/{kind}/{hash}.ExplanationModel.params.json
 └── ...
 ```

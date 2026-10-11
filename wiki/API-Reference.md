@@ -158,6 +158,8 @@ fm.predict(
     features_matrix_path: str | None = None,
     label_features_csv: str | None = None,
     enable_segments_plot: bool = False,
+    plot_start_date: str | None = None,
+    plot_end_date: str | None = None,
     output_dir: str | None = None,
     overwrite: bool | None = None,
     n_jobs: int | None = None,
@@ -166,6 +168,8 @@ fm.predict(
     **plot_kwargs: Any,
 ) -> Self
 ```
+
+`plot_start_date` / `plot_end_date` crop the forecast plot's x-axis (forwarded to `PredictionModel.forecast()`); they never change the inference window. When **both** are set, the plot filename stem also changes from `forecast_{basename}` to `forecast_{plot_start_date}_{plot_end_date}`. Neither is currently captured in `ForecastPredictConfig`, so `save_config()` / `run()` replays will not restore them.
 
 Requires `train()` first. `**plot_kwargs` is forwarded to `plot_forecast` (see [Visualization](Visualization#forecast--plot_forecast) for keys) and is **not** captured in `ForecastConfig` because matplotlib objects do not round-trip through YAML. Sets `self.PredictionModel`, `self.results`.
 
@@ -249,14 +253,25 @@ TrainingModel(
     cv_splits: int = 5,
     top_n_features: int = 20,
     include_eruption_date: bool = False,
+    nslc: str | None = None,
     output_dir: str | None = None,
     root_dir: str | None = None,
     overwrite: bool = False,
+    prefix_config: str | None = None,
     n_jobs: int = 1,
     n_grids: int = 1,
+    save_model: bool = False,
     verbose: bool = False,
 )
 ```
+
+**Shared stage-model kwargs** (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`):
+
+| Kwarg | Default | Effect |
+|-------|---------|--------|
+| `prefix_config` | `None` | Slugified and inserted before `.config` in the `save_config()` filename (`"scenario 1"` → `training.scenario-1.config.yaml`). |
+| `save_model` | `False` | When `True`, the main run method (`fit()` / `forecast()` / `evaluate()` / `explain()`) writes the content-addressed cache pickle `{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json`. `ForecastModel` passes `save_model=use_cache`, so standalone models skip the cache write unless you opt in. |
+| `nslc` | `None` | (`TrainingModel` / `PredictionModel` only) `Network.Station.Location.Channel` id folded into the cache identity. `ForecastModel` fills it in automatically. |
 
 ### Pipeline methods (all return `Self`)
 
@@ -319,10 +334,14 @@ PredictionModel(
     start_date: str | datetime,
     end_date: str | datetime,
     window_size: int = 2,
+    nslc: str | None = None,
+    training_hash: str | None = None,   # upstream TrainingModel hash; folded into the cache identity
     overwrite: bool = False,
     output_dir: str | None = None,
     root_dir: str | None = None,
+    prefix_config: str | None = None,
     n_jobs: int = 1,
+    save_model: bool = False,
     verbose: bool = False,
 )
 ```
@@ -357,7 +376,7 @@ pm.forecast(
 ) -> pd.DataFrame
 ```
 
-`plot_start_date` / `plot_end_date` narrow the forecast plot's x-axis without touching the inference window; both default to `None` (full range). Internally forwarded to `plot_forecast(start_date=..., end_date=...)`; the `plot_` prefix disambiguates from the constructor's forecast-period `start_date` / `end_date`. From `fm.predict(...)`, pass the same two names as extra kwargs — `**plot_kwargs` routes them through.
+`plot_start_date` / `plot_end_date` narrow the forecast plot's x-axis without touching the inference window; both default to `None` (full range). Internally forwarded to `plot_forecast(start_date=..., end_date=...)`; the `plot_` prefix disambiguates from the constructor's forecast-period `start_date` / `end_date`. When both are supplied, the plot filename stem becomes `forecast_{plot_start_date}_{plot_end_date}` instead of `forecast_{basename}`. `fm.predict(...)` exposes both as explicit keyword arguments.
 
 `forecast()` returns the results DataFrame indexed by datetime with one column per `{classifier}_{eruption_probability|uncertainty|confidence|prediction}` plus the four `consensus_*` columns. Also sets `pm.results` and `pm.forecast_plot_path`.
 
@@ -375,7 +394,7 @@ Same surface as `TrainingModel`: `build_identity(**kwargs)`, `save(identity)`, `
 
 ## EvaluationModel
 
-`BaseModel` subclass (no cache).
+`BaseModel` subclass. Participates in the content-addressable cache: `evaluate(use_cache=True)` (default) loads `{evaluation_dir}/{hash}.EvaluationModel.pkl` when the identity matches, and writes it (plus a `.params.json` sidecar) after a fresh run.
 
 ### Constructor
 
@@ -386,7 +405,9 @@ EvaluationModel(
     overwrite: bool = False,
     output_dir: str | None = None,
     root_dir: str | None = None,
+    prefix_config: str | None = None,
     n_jobs: int = 1,
+    save_model: bool = False,
     verbose: bool = False,
 )
 ```
@@ -445,7 +466,9 @@ ExplanationModel(
     overwrite: bool = False,
     output_dir: str | None = None,
     root_dir: str | None = None,
+    prefix_config: str | None = None,
     n_jobs: int = 1,
+    save_model: bool = False,
     verbose: bool = False,
 )
 ```
@@ -641,7 +664,7 @@ class StationData:
     station: str              # e.g. "OJN"  — must be non-empty
     channel: str              # e.g. "EHZ"  — must be non-empty
     network: str              # e.g. "VG"   — must be non-empty
-    location: str = ""        # e.g. "00"   — None coerced to ""
+    location: str = ""        # e.g. "00"   — must be a str; pass "" for no location
     channel_type: str = "D"   # SDS data-type suffix
 
     # Derived (init=False, repr=False):
@@ -657,7 +680,7 @@ class StationData:
 'VG.OJN.00.EHZ.D'
 ```
 
-Raises `ValueError` if `station` / `channel` / `network` is empty or non-`str`, or if `location` is neither a `str` nor `None`.
+Raises `ValueError` if `station` / `channel` / `network` is empty or non-`str`. `location` is no longer validated or coerced: passing `None` fails with `AttributeError` when it is uppercased. Callers that accept `None` (`CalculateTremor`, for example) convert it to `""` before building a `StationData`.
 
 ---
 
@@ -700,8 +723,16 @@ CalculateTremor(
 ct.from_sds(sds_dir: str)
 ct.from_fdsn(client_url: str | None = None)
 ct.change_freq_bands(freq_bands: list[tuple[float, float]])
-ct.run()
+ct.run(
+    plot_eruption_dates: list[str] | None = None,
+    plot_rsam_as_log: bool = False,
+    plot_rolling_window: str | None = None,
+    plot_filter_dsar_value: float | None = None,
+    plot_interval: int = 2,
+)
 ```
+
+The `plot_*` arguments only affect the merged summary figure written when `save_plot=True`. `plot_interval` sets the x-axis tick spacing in days and is forwarded to `plot_tremor(interval=..., interval_unit="days")`. Only `CalculateTremor.run()` exposes it; `fm.calculate(...)` does not forward it yet, so pipeline runs use the default of `2`.
 
 After `run()`: `ct.df` (the tremor DataFrame), `ct.csv` (path to the merged file), `ct.daily_files`, `ct.daily_dir`.
 
@@ -741,6 +772,20 @@ DynamicLabelBuilder(
 ```
 
 Both expose `.build() -> Self`. After `build()`: `lb.df` (DateTime-indexed `id`/`is_erupted` frame), `lb.csv` (path to the label CSV).
+
+`LabelBuilder.__init__` snapshots its arguments into a `LabelConfig` (`config/label_config.py`). `build()` then auto-calls `save_config()`; a failure is logged as a warning and never aborts the build.
+
+```python
+lb.save_config(
+    path: str | None = None,              # None → {label_dir}/label.config.{fmt}
+    fmt: Literal["yaml", "json"] = "yaml",
+) -> str
+
+from eruption_forecast.config import LabelConfig
+cfg = LabelConfig.load("output/.../training/labels/label.config.yaml")
+```
+
+`LabelConfig` stores `start_date` / `end_date` as ISO strings and `eruption_dates` as `"YYYY-MM-DD"` strings so the YAML round-trips cleanly. It inherits `version` / `saved_at` from `BaseConfig`. The label config filename does **not** take a `prefix_config` suffix.
 
 Note that within `TrainingModel`, `include_eruption_date` defaults to `False` (training pipeline behaviour); the `LabelBuilder` constructor's own default is `True`. The difference is intentional - see [Training Workflow](Training-Workflow).
 
@@ -1031,7 +1076,7 @@ class ClassifierEnsemble(BaseEnsemble, BaseEstimator, ClassifierMixin):
 | `from_any(source, verbose=False)` | `ClassifierEnsemble.{json,pkl}`, `SeedEnsemble_*.pkl`, trained-model registry `.json` (list) or `.csv`, or a live `SeedEnsemble` |
 | `from_seed_ensembles(seed_ensembles)` | Pre-built `SeedEnsemble` instances |
 | `from_dict(trained_model_paths, verbose=False)` | Dict mapping classifier name → trained-model registry path (`.json` or `.csv`); each value is dispatched through `SeedEnsemble.from_any` |
-| `from_json(json_path, verbose=False)` | Top-level results map (`ClassifierEnsemble_{cv}.json`) written by `TrainingModel.fit()` |
+| `from_json(json_path, verbose=False)` | Top-level results map (`ClassifierEnsemble_{CVName}.json`) written by `TrainingModel.fit()` |
 
 ### Inference
 
@@ -1319,6 +1364,8 @@ plot_common_features_heatmap(
     output_path: str | None = None,
     cmap: str = "viridis",
     label_style: Literal["short", "alias"] = "short",
+    show_colorbar: bool = True,
+    max_features: int | None = None,
 ) -> plt.Axes
 
 plot_common_features_correlation(
@@ -1334,6 +1381,12 @@ preserves the existing `shorten_feature_name` labels; `"alias"` uses the
 `ft_1..ft_N` aliases from the merged ranking returned by
 `find_common_features` — useful when the shortened names still crowd the
 axis.
+
+On the heatmap, `max_features` keeps only the top-N rows ranked by their
+total frequency across all scenarios (the row sum of the matrix). `None`, or
+an intersection already smaller than N, plots every common feature.
+`show_colorbar=False` hides the colour bar, which helps when you place
+several heatmaps side by side.
 
 ---
 

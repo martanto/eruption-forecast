@@ -197,7 +197,7 @@ prediction/figures/forecast_{basename}.pdf       # when plot_pdf=True (default)
 | `plot_title` | `None` | Optional title |
 | `plot_pdf` | `True` | Also save a vector PDF |
 | `plot_start_date` | `None` | Optional inclusive lower bound narrowing the plotted window. Forwarded to `plot_forecast` as `start_date`. `None` keeps the full forecast range. The `plot_` prefix avoids colliding with the constructor's `start_date` (which sets the forecast period itself). |
-| `plot_end_date` | `None` | Optional inclusive upper bound, mirror of `plot_start_date`. Forwarded to `plot_forecast` as `end_date`. |
+| `plot_end_date` | `None` | Optional inclusive upper bound, mirror of `plot_start_date`. Forwarded to `plot_forecast` as `end_date`. When **both** bounds are set, the plot file is renamed `forecast_{plot_start_date}_{plot_end_date}.{png,pdf}`. `fm.predict()` accepts both as explicit kwargs (not captured in `ForecastPredictConfig`). |
 | `**plot_kwargs` | - | Forwarded to `eruption_forecast.plots.plot_forecast` - e.g. `eruption_dates=[...]` to render eruption markers |
 
 ---
@@ -221,15 +221,21 @@ Threading `training_hash` means re-training automatically invalidates the predic
 
 ```
 {station_dir}/
-├── prediction/
-│   ├── features/
-│   │   ├── features-label_{basename}_step-{N}-{unit}.csv  # forecast grid
-│   │   └── features-matrix_*.parquet                       # tsfresh matrix (Snappy Parquet)
-│   ├── results/{clf-slug}/{seed:05d}.csv                   # per-seed probability (save_seed_result=True)
-│   └── figures/forecast_{basename}.{png,pdf}               # forecast plot
-├── forecast-results_{basename}.csv             # top-level results dump
-└── prediction/{hash}.PredictionModel.pkl       # content-addressable cache pickle (+ .params.json sidecar)
+└── prediction/
+    ├── prediction.config.yaml                              # pm.save_config() (prediction.{prefix}.config.yaml with prefix_config)
+    ├── {hash}.PredictionModel.pkl                          # content-addressable cache pickle (+ .params.json sidecar)
+    ├── tremor/tremor-matrix_*.csv                          # forecast-grid tremor matrix (+ per_method/)
+    ├── features/
+    │   ├── features-label_{basename}_step-{N}-{unit}.csv  # forecast grid
+    │   ├── features-matrix_*.parquet                       # tsfresh matrix (Snappy Parquet)
+    │   └── extracted/                                      # per-tremor-column tsfresh output
+    ├── results/
+    │   ├── {ClassifierName}/{seed:05d}.csv                 # per-seed probability (save_seed_result=True)
+    │   └── forecast-results_{basename}.csv                 # consensus + per-classifier results table
+    └── figures/forecast_{basename}.{png,pdf}               # forecast plot
 ```
+
+When both `plot_start_date` and `plot_end_date` are set, the figure is written as `forecast_{plot_start_date}_{plot_end_date}.{png,pdf}` instead.
 
 `fm.PredictionModel.forecast_plot_path` exposes the path to the rendered plot - used by `ForecastModelScenario.run()` to attach the figure to a Telegram notification.
 

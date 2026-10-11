@@ -96,7 +96,7 @@ trains on the first seven months, forecasts the next four weeks, evaluates again
 
 #### `fm.predict(...)`
 - `window_step=10, window_step_unit="minutes"` - 144 forecasts/day. The dense grid is what makes the forecast plot smooth.
-- `save_seed_result=True` writes one CSV per seed under `prediction/results/{clf-slug}/` for downstream uncertainty analysis.
+- `save_seed_result=True` writes one CSV per seed under `prediction/results/{ClassifierName}/` for downstream uncertainty analysis.
 - `use_cache=False` forces a fresh forecast - flip to `True` to short-circuit when nothing upstream changed.
 - The cache identity threads in `_training_cache_hash`, so re-training automatically invalidates downstream predictions.
 
