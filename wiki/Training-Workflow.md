@@ -64,8 +64,9 @@ what lands on disk for the downstream stages to pick up.
 │     • {hash}.TrainingModel.pkl          (cache pickle)                 │
 │     • {hash}.TrainingModel.params.json  (diff-able sidecar)            │
 │     • training.config.yaml              (auto-snapshot)                │
+│     • labels/                           (label CSV + label.config.yaml)│
 │     • features/{cv-slug}/...            (matrix, labels, per-seed)     │
-│     • classifiers/{clf-slug}/{cv-slug}/ (models, registry, ensemble)   │
+│     • classifiers/{ClfName}/{cv-slug}/  (models, registry, ensemble)   │
 │                                                                        │
 │   consumed by: PredictionModel, EvaluationModel, ExplanationModel      │
 └────────────────────────────────────────────────────────────────────────┘
@@ -391,16 +392,17 @@ for ad-hoc direct use, but `ForecastModel.train` does not expose it.
 
 ```
 {station_dir}/
-├── training/
-│   ├── features/{cv-slug}/...                                    (above)
-│   └── classifiers/{clf-slug}/{cv-slug}/
-│       ├── models/{seed:05d}.pkl                                 (per-seed best estimators)
-│       ├── trained-model__{Clf}_{CV}_seeds-{N}_features-{K}.json (trained-model registry, records with inline top-N features)
-│       └── SeedEnsemble_{suffix}.pkl                             (joblib-bundled SeedEnsemble)
 └── training/
+    ├── labels/                                                   (label_*.csv, label.config.yaml, eruption_dates_*.csv, distribution PNG)
+    ├── tremor/tremor-matrix_*.csv                                (windowed tremor matrix, + per_method/)
+    ├── features/{cv-slug}/...                                    (above)
     └── classifiers/
-        ├── ClassifierEnsemble_{CV}.pkl                           (one ClassifierEnsemble for all classifiers)
-        └── ClassifierEnsemble_{CV}.json                          (registry of paths per classifier)
+        ├── ClassifierEnsemble_{CVName}.pkl                       (one ClassifierEnsemble for all classifiers, e.g. ClassifierEnsemble_StratifiedShuffleSplit.pkl)
+        ├── ClassifierEnsemble_{CVName}.json                      (registry of paths per classifier)
+        └── {ClassifierName}/{cv-slug}/                           (e.g. RandomForestClassifier/stratified-shuffle-split/)
+            ├── models/{seed:05d}.pkl                             (per-seed best estimators)
+            ├── trained-model__{Clf}_{CV}_seeds-{N}_features-{K}.json (trained-model registry, records with inline top-N features)
+            └── SeedEnsemble_{suffix}.pkl                         (joblib-bundled SeedEnsemble)
 ```
 
 `fm.ClassifierEnsemble` is attached after `train()` returns and is what the Prediction stage consumes.

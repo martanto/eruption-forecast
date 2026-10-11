@@ -6,14 +6,14 @@ The pipeline auto-renders the most useful plots; you can also invoke each helper
 | Module | Re-exported as | Used by |
 |--------|----------------|---------|
 | `plots/styles.py` | `apply_nature_style`, `setup_nature_style`, `configure_spine`, `get_color`, `get_figure_size`, `NATURE_COLORS`, `OKABE_ITO` | Internal styling for every figure |
-| `plots/tremor_plots.py` | `plot_tremor` | `CalculateTremor` daily plots |
-| `plots/feature_plots.py` | `plot_significant_features`, `replot_significant_features`, `plot_frequency_band_contribution`, `plot_common_features_heatmap`, `plot_common_features_correlation` | `TrainingModel.fit()` when `plot_features=True`; cross-scenario analysis |
+| `plots/tremor_plots.py` | `plot_tremor`, `plot_tremor_from_file` | `CalculateTremor` daily + summary plots |
+| `plots/feature_plots.py` | `plot_significant_features`, `replot_significant_features`, `plot_frequency_band_contribution`, `plot_common_features_heatmap`, `plot_common_features_correlation`, `plot_features_matrix` | `TrainingModel.fit()` when `plot_features=True`; cross-scenario analysis; ad-hoc feature time-series |
 | `plots/forecast_plots.py` | `plot_forecast`, `plot_forecast_from_file` | `PredictionModel.forecast()` |
 | `plots/evaluation_plots.py` | `plot_roc_curve`, `plot_precision_recall_curve`, `plot_confusion_matrix`, `plot_threshold_analysis`, `plot_g_mean_curve`, `plot_mcc_curve`, aggregate counterparts (`plot_aggregate_*`), `render_one_plot`, `render_one_aggregate_plot` | `EvaluationModel.evaluate(plot_aggregate=…, plot_per_seed=…)` |
 | `plots/explanation_plots.py` | `plot_shap_waterfall`, `plot_shap_beeswarm`, `plot_shap_bar`, `plot_aggregate_shap_bar`, `plot_aggregate_shap_beeswarm`, `plot_classifier_waterfall`, `render_seed_plot` | `ExplanationModel.explain()` + `ExplainerEnsemble.plot_seed/plot_waterfall` |
 | `plots/label_plots.py` | `plot_label_distribution`, `plot_label_distribution_from_file`, `plot_label_distribution_comparison`, `plot_label_distribution_comparison_from_files` | `LabelBuilder.plot_distribution()`; cross-scenario label class comparisons |
 
-All of these are re-exported from `eruption_forecast.plots`:
+The most common helpers are re-exported from `eruption_forecast.plots`: the styling helpers, `plot_tremor` / `plot_tremor_from_file`, the five feature heatmap and importance plots, `plot_forecast` / `plot_forecast_from_file`, `plot_roc_curve` / `plot_precision_recall_curve` / `plot_confusion_matrix` / `plot_threshold_analysis` / `plot_feature_importance`, and `plot_label_distribution`:
 
 ```python
 from eruption_forecast.plots import (
@@ -22,22 +22,40 @@ from eruption_forecast.plots import (
 )
 ```
 
+Everything else (`plot_features_matrix`, the `plot_aggregate_*` evaluation curves, the SHAP helpers, and the `*_comparison*` label plots) is imported from its module directly, e.g. `from eruption_forecast.plots.feature_plots import plot_features_matrix`.
+
 ---
 
 ## Tremor - `plot_tremor`
 
-Multi-panel band-decomposed tremor plot. One panel per band/method (RSAM/DSAR/entropy).
+Multi-panel tremor plot with one subplot per detected method (RSAM / DSAR / entropy). By default each series shows a rolling median and a rolling mean; `metrics="median" | "mean" | "all"` restricts that.
 
 ```python
-from eruption_forecast.plots import plot_tremor
-fig = plot_tremor(tremor_df, methods=["rsam", "dsar", "entropy"])
+from eruption_forecast.plots import plot_tremor, plot_tremor_from_file
+
+fig = plot_tremor(
+    tremor_df,
+    interval=7, interval_unit="days",          # x-axis tick spacing
+    rolling_window="1D",
+    eruption_dates=["2025-03-20"],
+    selected_columns=["rsam_f2", "dsar_f3-f4", "entropy"],
+    filter_dsar_value=10, filter_rsam_value=None, filter_entropy_value=None,  # per-method upper bounds
+    rsam_as_log=True,
+    colors=None,                               # str | list[str] colour override
+    filepath="tremor.png",                     # None → return without saving
+)
+
+fig = plot_tremor_from_file("output/VG.OJN.00.EHZ/tremor/VG.OJN.00.EHZ_2025-01-01_2025-08-31.csv", interval=7, interval_unit="days")
 ```
 
-Auto-rendered when `fm.calculate(plot_daily=True, save_plot=True)`:
+Auto-rendered by `CalculateTremor` / `fm.calculate(...)`:
 
 ```
-{station_dir}/tremor/figures/{nslc}_{YYYY-MM-DD}.png
+{station_dir}/tremor/figures/{YYYY-MM-DD}.png               # plot_daily=True — one per day
+{station_dir}/tremor/{nslc}_{start}_{end}.{png,pdf}         # save_plot=True — merged summary figure
 ```
+
+The summary figure honours the `plot_eruption_dates`, `plot_rsam_as_log`, `plot_rolling_window`, and `plot_filter_dsar_value` arguments of `fm.calculate(...)` / `CalculateTremor.run(...)`. `CalculateTremor.run(plot_interval=2)` controls its tick spacing in days. `fm.calculate()` does not expose `plot_interval` yet.
 
 ---
 
@@ -48,8 +66,25 @@ Auto-rendered when `fm.calculate(plot_daily=True, save_plot=True)`:
 | `plot_significant_features(df, filepath, top_features, values_column)` | Horizontal bar chart of top-N selected features per seed | `{features_dir}/seed/figures/{seed:05d}.png` |
 | `replot_significant_features(...)` | Same chart re-rendered from a saved features CSV | ad-hoc |
 | `plot_frequency_band_contribution(df, filepath)` | Bar chart of feature counts per seismic band | `{features_dir}/frequency_band_contribution.png` |
+| `plot_common_features_heatmap(top_features_csv, ..., label_style, show_colorbar, max_features)` | Cross-scenario heatmap of shared top features; `max_features` keeps the top-N by total frequency, `show_colorbar=False` hides the bar | `output_path` (default `{cwd}/common_top_features_heatmap.png`) |
+| `plot_common_features_correlation(top_features_csv, ...)` | Cross-scenario correlation of shared features | `output_path` |
+| `plot_features_matrix(features_path, label_csv, figures_dir, ...)` | One PNG per feature column: raw 10-minute scatter + 12 h / 48 h centred rolling medians, with eruption markers | `{figures_dir}/{column_index}_{slugified_feature}.png` |
 
-Auto-rendered by `fm.train(..., plot_features=True)`.
+Auto-rendered by `fm.train(..., plot_features=True)` (the first three). The cross-scenario heatmaps and `plot_features_matrix` are ad-hoc.
+
+```python
+from eruption_forecast.plots.feature_plots import plot_features_matrix
+
+plot_features_matrix(
+    features_path="output/.../training/features/stratified-shuffle-split/features-matrix_2025-01-03_2025-03-31.parquet",
+    label_csv="output/.../training/features/stratified-shuffle-split/features-label_2025-01-03_2025-03-31.csv",
+    figures_dir="output/.../training/features/stratified-shuffle-split/figures/matrix",
+    eruption_dates=["2025-03-20"],                       # only dates inside the matrix range are drawn
+    select_features="output/.../top_20_features.csv",    # CSV path or list[str]; None plots every column
+    number_of_features=10,                               # cap when select_features is a CSV
+    figsize=(8, 2), dpi=150, overwrite=False,            # existing PNGs are skipped unless overwrite=True
+)
+```
 
 ---
 
@@ -87,7 +122,7 @@ Key kwargs forwarded via `**plot_kwargs` from `fm.predict(...)`:
 | `x_days_interval=2` | Major x-tick spacing in days |
 | `legend_n_cols=6`, `bbox_to_anchor=(0.5, -0.05)` | Legend positioning |
 | `title="..."` | Figure suptitle |
-| `start_date="YYYY-MM-DD"`, `end_date="YYYY-MM-DD"` | Optional window slice applied to `df` before envelope extraction and rolling smoothing. `None` on either bound keeps `df.index.min()` / `df.index.max()`. An empty resulting slice logs a warning and falls back to the full range. Also narrows the top segment strip's `forecast_start` / `forecast_end`. From `PredictionModel.forecast()` / `fm.predict()`, pass as `plot_start_date` / `plot_end_date` to avoid colliding with the forecast-period `start_date` / `end_date` on those callers. |
+| `start_date="YYYY-MM-DD"`, `end_date="YYYY-MM-DD"` | Optional window slice applied to `df` before envelope extraction and rolling smoothing. `None` on either bound keeps `df.index.min()` / `df.index.max()`. An empty resulting slice logs a warning and falls back to the full range. Also narrows the top segment strip's `forecast_start` / `forecast_end`. From `PredictionModel.forecast()` / `fm.predict()`, pass as the explicit `plot_start_date` / `plot_end_date` kwargs to avoid colliding with the forecast-period `start_date` / `end_date` on those callers. When both are set, the output file is renamed `forecast_{plot_start_date}_{plot_end_date}.{png,pdf}`. |
 
 To re-render a forecast plot from the persisted CSV:
 

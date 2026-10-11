@@ -18,12 +18,22 @@ Every pipeline run writes under a single station directory:
 │
 ├── tremor/                                                   # CalculateTremor
 │   ├── daily/                                                # Per-day CSVs (removed when cleanup_daily_dir=True)
-│   ├── figures/                                              # Per-day band plots (plot_daily=True)
-│   └── {nslc}_{start}_{end}.csv                              # Merged tremor CSV (DateTime index)
+│   ├── figures/{YYYY-MM-DD}.png                              # Per-day band plots (plot_daily=True)
+│   ├── {nslc}_{start}_{end}.csv                              # Merged tremor CSV (DateTime index)
+│   └── {nslc}_{start}_{end}.{png,pdf}                        # Merged summary plot (save_plot=True)
 │
 ├── training/                                                 # TrainingModel
 │   ├── training.config.yaml                                  # tm.save_config() — auto-written at end of fit()
+│   ├── labels/                                               # LabelBuilder (via tm.build_label())
+│   │   ├── label_{start}_{end}_step-{N}-{unit}_dtf-{D}_ie-{0|1}.csv   # Window labels (id, is_erupted)
+│   │   ├── label_…_distribution.png                          # Class-balance plot
+│   │   ├── eruption_dates_{volcano_id}.csv                   # Eruption dates used for labelling
+│   │   └── label.config.yaml                                 # LabelConfig — auto-written by LabelBuilder.build()
+│   ├── tremor/
+│   │   ├── tremor-matrix_{start}_{end}_ws-{W}.csv            # TremorMatrixBuilder windowed matrix
+│   │   └── per_method/                                       # Per-column matrices (save_tremor_matrix_per_method=True)
 │   ├── features/{cv-slug}/
+│   │   ├── extracted/features-matrix_{basename}_{column}.parquet  # Per-tremor-column tsfresh output
 │   │   ├── features-matrix_{basename}.parquet                # Full tsfresh feature matrix (Snappy Parquet)
 │   │   ├── features-label_{basename}.csv                     # Aligned binary labels
 │   │   ├── seed/{seed:05d}.csv                               # Top-N features per seed
@@ -42,20 +52,24 @@ Every pipeline run writes under a single station directory:
 │   │       └── FeatureCountSweep.pkl                         # Full sweep instance (FeatureCountSweep.load(path))
 │   │
 │   └── classifiers/
-│       ├── ClassifierEnsemble_{cv-slug}.pkl                  # Bundled ClassifierEnsemble (all classifiers)
-│       ├── ClassifierEnsemble_{cv-slug}.json                 # Registry of per-classifier paths
-│       └── {clf-slug}/{cv-slug}/
+│       ├── ClassifierEnsemble_{CVName}.pkl                   # Bundled ClassifierEnsemble (all classifiers)
+│       ├── ClassifierEnsemble_{CVName}.json                  # Registry of per-classifier paths
+│       └── {ClassifierName}/{cv-slug}/                       # e.g. RandomForestClassifier/stratified-shuffle-split/
 │           ├── models/{seed:05d}.pkl                         # One best_estimator_ per seed
 │           ├── trained-model__{suffix}.json                  # Per-classifier trained-model registry (records with inline top-N features)
 │           └── SeedEnsemble_{suffix}.pkl                     # Single-classifier SeedEnsemble
 │
 ├── prediction/                                               # PredictionModel
 │   ├── prediction.config.yaml                                # pm.save_config() — auto-written at end of forecast()
+│   ├── tremor/tremor-matrix_*.csv                            # Forecast-grid tremor matrix (+ per_method/)
 │   ├── features/
 │   │   ├── features-label_{basename}_step-{N}-{unit}.csv     # Forecast window grid
-│   │   └── features-matrix_*.parquet                         # tsfresh matrix for the grid (Snappy Parquet)
-│   ├── results/{clf-slug}/{seed:05d}.csv                     # Per-seed probability (save_seed_result=True)
-│   └── figures/forecast_{basename}.{png,pdf}                 # Forecast plot
+│   │   ├── features-matrix_*.parquet                         # tsfresh matrix for the grid (Snappy Parquet)
+│   │   └── extracted/                                        # Per-tremor-column tsfresh output
+│   ├── results/
+│   │   ├── {ClassifierName}/{seed:05d}.csv                   # Per-seed probability (save_seed_result=True)
+│   │   └── forecast-results_{basename}.csv                   # Consensus + per-classifier forecast table
+│   └── figures/forecast_{basename}.{png,pdf}                 # Forecast plot (forecast_{plot_start}_{plot_end} when both plot_*_date set)
 │
 ├── evaluation/                                               # EvaluationModel
 │   ├── training/                                             # When model.kind == "training"
@@ -94,17 +108,18 @@ Every pipeline run writes under a single station directory:
 │       ├── explanation.config.yaml                           # xm.save_config() — auto-written at end of explain()
 │       └── (identical sub-tree)
 │
-│   # Cache pickles for the three cache-using stages live next to each
+│   # Cache pickles for the four cache-using stages live next to each
 │   # stage's other outputs — no separate cache/ subtree:
 │   #   training/{hash}.TrainingModel.pkl                     # Cached fitted TrainingModel
 │   #   training/{hash}.TrainingModel.params.json             # Sidecar identity dump
 │   #   prediction/{hash}.PredictionModel.pkl                 # Cached PredictionModel
 │   #   prediction/{hash}.PredictionModel.params.json
+│   #   evaluation/{kind}/{hash}.EvaluationModel.pkl          # Cached EvaluationModel
+│   #   evaluation/{kind}/{hash}.EvaluationModel.params.json
 │   #   explanation/{kind}/{hash}.ExplanationModel.pkl        # Cached ExplanationModel
 │   #   explanation/{kind}/{hash}.ExplanationModel.params.json
 │
 ├── forecast.config.yaml                                      # fm.save_config()
-├── forecast-results_{basename}.csv               # PredictionModel.forecast() top-level dump
 ├── TrainingModel_{basename}.pkl                              # Optional, via fm.TrainingModel.save()
 ├── PredictionModel_{basename}.pkl                            # Optional, via fm.PredictionModel.save()
 ├── EvaluationModel_{basename}.pkl                            # Optional, via fm.EvaluationModel.save()
@@ -112,6 +127,8 @@ Every pipeline run writes under a single station directory:
 ```
 
 Where `basename` is typically `{start_date}_{end_date}` (training) or `{start_date}_{end_date}_ws-{window_size}` (prediction).
+
+**`prefix_config` naming.** When `prefix_config` is set (on `ForecastModel` or any stage model), every stage config file gets a slugified discriminator before `.config`: `forecast.scenario-1.config.yaml`, `training.scenario-1.config.yaml`, `prediction.scenario-1.config.yaml`, `evaluation.scenario-1.config.yaml`, `explanation.scenario-1.config.yaml`. `label.config.yaml` is never prefixed.
 
 ---
 
@@ -140,7 +157,7 @@ Folder slugs come from `ClassifierModel.slug_name` and `ClassifierModel.slug_cv_
 | `shuffle-stratified` | `stratified-shuffle-split` |
 | `timeseries` *(direct `ClassifierModel` only)* | `time-series-split` |
 
-Inside `evaluation/` and `explanation/`, the per-classifier folder uses the **unslugified** sklearn class name (`RandomForestClassifier`) - separate from training's slug (`random-forest-classifier`).
+The classifier slugs above are still used for the `slug_name` / `slug_cv_name` properties, but the **per-classifier folders on disk use the unslugified class name** (`ClassifierModel.name`, e.g. `RandomForestClassifier`, `LiteRandomForestClassifier`, `XGBClassifier`) everywhere: `training/classifiers/{ClassifierName}/{cv-slug}/`, `prediction/results/{ClassifierName}/`, `evaluation/{kind}/classifiers/{ClassifierName}/`, and `explanation/{kind}/classifiers/{ClassifierName}/`. The CV slug is still used as the sub-folder under training and as the `features/{cv-slug}/` directory.
 
 ---
 
@@ -171,14 +188,14 @@ Each `trained-model__*.json` is a list of per-seed records:
 
 `SeedEnsemble.from_json` (or `SeedEnsemble.from_any`, which dispatches on extension) reads this file as the single source of truth for the seed bundle. The legacy `.csv` registry remains loadable via `SeedEnsemble.from_registry` so older training outputs still work.
 
-The `ClassifierEnsemble` is named with the CV slug only (one ensemble holds every classifier):
+The `ClassifierEnsemble` is named with the sklearn CV class name only (one ensemble holds every classifier):
 
 ```
-ClassifierEnsemble_stratified-shuffle-split.pkl
-ClassifierEnsemble_stratified-shuffle-split.json
+ClassifierEnsemble_StratifiedShuffleSplit.pkl
+ClassifierEnsemble_StratifiedShuffleSplit.json
 ```
 
-Per-seed model files inside `classifiers/{clf}/{cv}/models/` are zero-padded:
+Per-seed model files inside `classifiers/{ClassifierName}/{cv-slug}/models/` are zero-padded:
 
 ```
 00000.pkl  00001.pkl  ...  00024.pkl
@@ -199,10 +216,16 @@ prediction/
 ├── 9c12d04f...88.PredictionModel.pkl
 └── 9c12d04f...88.PredictionModel.params.json
 
+evaluation/{training|prediction}/
+├── f4e6ca90e31f.EvaluationModel.pkl                # joblib-pickled EvaluationModel (incl. MetricsEnsemble)
+└── f4e6ca90e31f.EvaluationModel.params.json
+
 explanation/{training|prediction}/
 ├── 4e6f2a31...77.ExplanationModel.pkl              # joblib-pickled ExplanationModel
 └── 4e6f2a31...77.ExplanationModel.params.json
 ```
+
+Standalone stage models only write these pickles when constructed with `save_model=True`. `ForecastModel` passes `save_model=use_cache`, so pipeline runs write them by default.
 
 The `.params.json` is what was hashed to produce the filename. When `use_cache=True` 
 and the next run computes the same identity, the `.pkl` is loaded instead of recomputed.
@@ -223,22 +246,24 @@ regeneration.
 output/
 └── {nslc}/
     ├── tremor/                                # produced ONCE outside the loop, shared
-    └── scenarios/
+    ├── forecast.scenario-1.config.yaml        # fm.save_config() per scenario (prefix_config = slug)
+    ├── forecast.scenario-2.config.yaml
+    └── scenarios/                             # ForecastModelScenario(scenarios_dir="scenarios")
+        ├── scenarios.json                     # manifest of every Scenario dict
         ├── scenario-1/
-        │   ├── training/...
-        │   ├── prediction/...
+        │   ├── training/...                   # incl. training.scenario-1.config.yaml + cache pickle
+        │   ├── prediction/...                 # incl. results/forecast-results_*.csv
         │   ├── evaluation/prediction/...
-        │   ├── cache/...
-        │   ├── forecast.config.yaml
-        │   └── forecast-results_*.csv
+        │   └── explanation/prediction/...
         ├── scenario-2/
         ...
         └── scenario-9/
 ```
 
-Each scenario directory mirrors a full `{station_dir}` sub-tree, just rooted at 
-`output/{nslc}/scenarios/{slug}/` instead of `output/{nslc}/`. 
-Slugify is from `utils/formatting.py:slugify`: `"Scenario 1"` → `scenario-1`.
+Each scenario directory mirrors the stage sub-trees of a `{station_dir}`, rooted at 
+`output/{nslc}/{scenarios_dir}/{slug}/` instead of `output/{nslc}/`. 
+Slugify is from `utils/formatting.py:slugify`: `"Scenario 1"` → `scenario-1`. 
+`ForecastModelScenario.run()` also sets `fm.prefix_config = slug` per scenario, which is why every stage config carries the scenario suffix.
 
 The shared `tremor/` at the top means re-running scenarios never recomputes 
 tremor - only the train/predict/evaluate legs are repeated.
@@ -259,12 +284,14 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Alias ↔ canonical mapping for a ranked CSV or DataFrame | `load_feature_aliases(source)` — see the [Feature Alias Utilities](API-Reference#feature-alias-utilities) API section |
 | Backfill `alias` + `description` onto a legacy ranked CSV | `update_top_features_csv(csv_path)` — same section, `overwrite=True` to refresh |
 | ⚠ Experimental — post-hoc sweep results | `training/features/{cv}/sweep/{mode}/{classifier-name}/` |
-| Individual trained models | `training/classifiers/{clf}/{cv}/models/{seed:05d}.pkl` |
-| The single-classifier ensemble | `training/classifiers/{clf}/{cv}/SeedEnsemble_*.pkl` |
-| The all-classifiers ensemble | `training/classifiers/ClassifierEnsemble_{cv}.pkl` |
+| Training labels + label config | `training/labels/label_*.csv`, `training/labels/label.config.yaml` |
+| Windowed tremor matrix | `training/tremor/tremor-matrix_*.csv` (and `prediction/tremor/`) |
+| Individual trained models | `training/classifiers/{ClassifierName}/{cv-slug}/models/{seed:05d}.pkl` |
+| The single-classifier ensemble | `training/classifiers/{ClassifierName}/{cv-slug}/SeedEnsemble_*.pkl` |
+| The all-classifiers ensemble | `training/classifiers/ClassifierEnsemble_{CVName}.pkl` |
 | Forecast grid + features | `prediction/features/` |
-| Per-seed forecast probabilities | `prediction/results/{clf}/{seed:05d}.csv` |
-| Combined forecast CSV (consensus + per-classifier) | `forecast-results_{basename}.csv` |
+| Per-seed forecast probabilities | `prediction/results/{ClassifierName}/{seed:05d}.csv` |
+| Combined forecast CSV (consensus + per-classifier) | `prediction/results/forecast-results_{basename}.csv` |
 | Forecast PNG/PDF | `prediction/figures/forecast_{basename}.{png,pdf}` |
 | Per-seed probability matrix | `evaluation/{kind}/classifiers/{Clf}/predictions/y_proba.csv` |
 | Per-seed prediction matrix | `evaluation/{kind}/classifiers/{Clf}/predictions/y_pred.csv` |
@@ -276,7 +303,7 @@ tremor - only the train/predict/evaluate legs are repeated.
 | Per-seed bar / beeswarm plots | `explanation/{kind}/classifiers/{Clf}/figures/{bar,beeswarm}/{seed:05d}.png` |
 | Aggregate SHAP bar / beeswarm + sidecar CSV | `explanation/{kind}/classifiers/{Clf}/figures/aggregate/{bar,beeswarm}.{png,csv}` |
 | Per-eruption waterfall plots | `explanation/{kind}/eruptions/{YYYY-MM-DD}/{Clf}_*.png` |
-| Cache identity (diff-friendly) | `cache/{Stage}/{hash}.params.json` |
+| Cache identity (diff-friendly) | `{stage_dir}/{hash}.{ClassName}.params.json` |
 | Replayable pipeline config | `forecast.config.yaml` |
 | Standalone training config | `training/training.config.yaml` |
 | Standalone prediction config | `prediction/prediction.config.yaml` |

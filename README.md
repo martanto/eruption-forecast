@@ -113,8 +113,9 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Evaluation + Comparison** — `EvaluationModel` runs metrics over a training or prediction reuse mode; `MetricsEnsemble` persists `(n_samples, n_seeds)` `y_proba` / `y_pred` matrices and keeps per-seed metric tables in memory; `ClassifierComparator` ranks classifiers head-to-head.
 - **Model Explanation** — `ExplanationModel` produces per-seed SHAP explanations over the fitted ensemble via `ExplainerEnsemble` (tree classifiers only — RF / `lite-rf` / GB / XGB). Outputs include per-classifier `ClassifierExplanation_*.pkl`, per-seed bar / beeswarm plots, and per-eruption highest-probability waterfall plots.
 - **Feature Alias Utilities** — the aggregated `top_features.csv` / `top_{N}_features.csv` / `common_top_features.csv` now carry `frequency` (per-seed selection count; renamed from `score`), a rank-based `alias` (`ft_1`, `ft_2`, …), and a plain-English `description` for every row. Helpers: `humanize_feature_name(name, freq_bands=None)`, `load_feature_aliases(source)`, `update_top_features_csv(csv_path)` for legacy backfill; the cross-scenario heatmaps accept `label_style="alias"`.
-- **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, and `ExplanationModel` cache their fitted state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit.
-- **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`.
+- **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, `EvaluationModel`, and `ExplanationModel` cache their state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit. Every `fm.<stage>(..., use_cache=True)` call is on by default.
+- **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`, and `LabelBuilder.build()` writes a `label.config.yaml` (`LabelConfig`) next to its label CSV. Set `prefix_config="scenario 1"` to namespace every config file (`training.scenario-1.config.yaml`, …) when several runs share one directory.
+- **Multi-Scenario Sweeps** — `ForecastModelScenario` runs `calculate()` once, then loops `train → predict → evaluate → explain` over a list of `Scenario` dicts, writing each into its own `scenarios/{slug}/` directory.
 - **Telegram Notifications** — `@notify` / `@timer` decorators + fluent `TelegramNotification` client (`send_message` / `send_document` / `send_photo` / `send_media_group`) for success/error messages and file attachments.
 - **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` workers) parallelism, capped so the product never exceeds `total_cpu` (which is `cpu_count() - 2` with a floor of 1, so the OS keeps 2 free cores). tsfresh's `FeatureSelector` is pinned to `n_jobs=1` whenever the outer loop is parallel to avoid `multiprocessing.Pool` oversubscription.
 
@@ -123,24 +124,28 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 ```
 src/eruption_forecast/
 ├── __init__.py, logger.py, data_container.py
-├── config/        forecast_config, training_config, prediction_config,
-│                  evaluation_config, explanation_config, constants
+├── config/        base_config, forecast_config, training_config,
+│                  prediction_config, evaluation_config,
+│                  explanation_config, label_config, constants
 ├── dataclass/     station_data, classifier_ensemble_summary,
 │                  classifier_explanation
-├── decorators/    notify
+├── decorators/    notify, timer
+├── notification/  telegram
 ├── ensemble/      base_ensemble, seed_ensemble, classifier_ensemble,
 │                  metrics_ensemble, explainer_ensemble
-├── features/      tremor_matrix_builder, features_builder, feature_selector
-├── label/         label_builder, dynamic_label_builder, label_data
-├── model/         base_model, cache_model, forecast_model,
+├── features/      tremor_matrix_builder, features_builder, feature_selector,
+│                  feature_count_sweep, constants
+├── label/         label_builder, dynamic_label_builder, label_data, constants
+├── model/         base_model, forecast_model, forecast_model_scenario,
 │                  training_model, prediction_model, evaluation_model,
-│                  explanation_model, classifier_model, classifier_comparator
+│                  explanation_model, classifier_model, classifier_comparator,
+│                  constants
 ├── plots/         styles, tremor_plots, feature_plots, forecast_plots,
 │                  evaluation_plots, explanation_plots, label_plots
 ├── sources/       base, sds, fdsn
 ├── tremor/        calculate_tremor, rsam, dsar, shannon_entropy, tremor_data
-└── utils/         array, dataframe, date_utils, formatting, ml,
-                   pathutils, validation, window
+└── utils/         array, benchmark, dataframe, date_utils, feature_utils,
+                   formatting, ml, pathutils, validation, window
 ```
 
 > Full directory tree, class relationships, and per-component details: [wiki/Architecture.md](wiki/Architecture.md)
@@ -333,6 +338,8 @@ fm = ForecastModel(
         plot_pdf=True,
         use_features_from="all",       # "all" (default — every tsfresh feature) | "training" (narrow to features any seed picked during train()) | "files" (skip tsfresh; requires features_matrix_path + label_features_csv)
         enable_segments_plot=False,    # True overlays a training/prediction window strip above the forecast panels
+        plot_start_date=None,          # optional x-axis crop of the forecast plot (inference window is unchanged)
+        plot_end_date=None,            # when both are set, the plot file is renamed forecast_{start}_{end}
     )
     .evaluate(
         model="prediction",
@@ -438,7 +445,7 @@ from eruption_forecast import PredictionModel
 
 pm = (
     PredictionModel(
-        model="output/.../training/classifiers/ClassifierEnsemble_stratified-shuffle-split.pkl",
+        model="output/.../training/classifiers/ClassifierEnsemble_StratifiedShuffleSplit.pkl",
         tremor_data="output/.../tremor/VG.OJN.00.EHZ_2025-01-01_2025-08-31.csv",
         start_date="2025-07-27", end_date="2025-08-22",
         window_size=2,
@@ -540,7 +547,13 @@ dir:
 {station_dir}/prediction/prediction.config.yaml     # auto at end of forecast()
 {station_dir}/evaluation/{kind}/evaluation.config.yaml  # auto at end of evaluate()
 {station_dir}/explanation/{kind}/explanation.config.yaml # auto at end of explain()
+{station_dir}/training/labels/label.config.yaml     # auto at end of LabelBuilder.build()
 ```
+
+When `prefix_config` is set on `ForecastModel` (or any stage model), it is
+slugified and inserted before `.config` — e.g. `prefix_config="Scenario 1"`
+writes `training.scenario-1.config.yaml`. `ForecastModelScenario` sets it per
+scenario automatically.
 
 ### Silence logging during batch jobs
 
@@ -641,18 +654,24 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │
 ├── training/                                # TrainingModel
 │   ├── training.config.yaml                 # tm.save_config() — auto at end of fit()
-│   ├── features/{cv-slug}/                  # tsfresh matrix, per-seed CSVs, top-N features
+│   ├── labels/                              # LabelBuilder: label_*.csv, label.config.yaml,
+│   │                                        #   eruption_dates_*.csv, *_distribution.png
+│   ├── tremor/tremor-matrix_*.csv           # TremorMatrixBuilder (+ per_method/)
+│   ├── features/{cv-slug}/                  # tsfresh matrix (+ extracted/ per column), per-seed CSVs, top-N features
 │   └── classifiers/
-│       ├── ClassifierEnsemble_{cv}.{pkl,json}
-│       └── {clf-slug}/{cv-slug}/
+│       ├── ClassifierEnsemble_{CVName}.{pkl,json}   # e.g. ClassifierEnsemble_StratifiedShuffleSplit.pkl
+│       └── {ClassifierName}/{cv-slug}/              # e.g. RandomForestClassifier/stratified-shuffle-split/
 │           ├── models/{seed:05d}.pkl
 │           ├── trained-model__{suffix}.json
 │           └── SeedEnsemble_{suffix}.pkl
 │
 ├── prediction/                              # PredictionModel
 │   ├── prediction.config.yaml               # pm.save_config() — auto at end of forecast()
-│   ├── features/                            # forecast-grid features
-│   ├── results/{clf-slug}/{seed:05d}.csv    # per-seed probabilities (save_seed_result=True)
+│   ├── tremor/tremor-matrix_*.csv           # forecast-grid tremor matrix (+ per_method/)
+│   ├── features/                            # forecast-grid features (+ extracted/ per column)
+│   ├── results/
+│   │   ├── {ClassifierName}/{seed:05d}.csv  # per-seed probabilities (save_seed_result=True)
+│   │   └── forecast-results_{basename}.csv  # consensus + per-classifier forecast table
 │   └── figures/forecast_{basename}.{png,pdf}
 │
 ├── evaluation/                              # EvaluationModel
@@ -680,14 +699,14 @@ All outputs land under `{output_dir}/{network}.{station}.{location}.{channel}/` 
 │       └── eruptions/{YYYY-MM-DD}/
 │           └── {ClfName}_{datetime}_seed=_index=.png
 │
-│   # Cache pickles for the three cache-using stages now live next to
-│   # each stage's other outputs — no separate cache/ subtree:
+│   # Cache pickles live next to each stage's other outputs —
+│   # no separate cache/ subtree:
 │   #   training/{hash}.TrainingModel.pkl + .params.json
 │   #   prediction/{hash}.PredictionModel.pkl + .params.json
+│   #   evaluation/{kind}/{hash}.EvaluationModel.pkl + .params.json
 │   #   explanation/{kind}/{hash}.ExplanationModel.pkl + .params.json
 │
 ├── forecast.config.yaml                     # fm.save_config()
-├── forecast-results_{basename}.csv
 └── {Training,Prediction,Evaluation}Model_*.pkl   # optional legacy save — .save() without identity
 ```
 
@@ -764,6 +783,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Version:** 0.4.0
+**Version:** 0.5.0
 **Status:** Active Development
-**Last Updated:** 2026-07-19
+**Last Updated:** 2026-10-11

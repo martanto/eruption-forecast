@@ -21,7 +21,8 @@ src/eruption_forecast/
 │   ├── training_config.py     - TrainingConfig    (standalone TrainingModel)
 │   ├── prediction_config.py   - PredictionConfig  (standalone PredictionModel)
 │   ├── evaluation_config.py   - EvaluationConfig  (standalone EvaluationModel)
-│   └── explanation_config.py  - ExplanationConfig (standalone ExplanationModel)
+│   ├── explanation_config.py  - ExplanationConfig (standalone ExplanationModel)
+│   └── label_config.py        - LabelConfig       (LabelBuilder init snapshot → label.config.yaml)
 │
 ├── dataclass/
 │   ├── station_data.py                 - StationData (immutable nslc identity)
@@ -59,6 +60,7 @@ src/eruption_forecast/
 │   ├── constants.py
 │   ├── base_model.py            - BaseModel ABC (dates, I/O, dual-mode save/load + cache identity)
 │   ├── forecast_model.py        - ForecastModel orchestrator
+│   ├── forecast_model_scenario.py - ForecastModelScenario + Scenario TypedDict (multi-scenario sweep)
 │   ├── training_model.py        - TrainingModel(BaseModel)
 │   ├── prediction_model.py      - PredictionModel(BaseModel)
 │   ├── evaluation_model.py      - EvaluationModel(BaseModel)
@@ -68,8 +70,8 @@ src/eruption_forecast/
 │
 ├── plots/
 │   ├── styles.py
-│   ├── tremor_plots.py          - plot_tremor
-│   ├── feature_plots.py         - feature-importance plots
+│   ├── tremor_plots.py          - plot_tremor, plot_tremor_from_file
+│   ├── feature_plots.py         - feature-importance, cross-scenario heatmaps, plot_features_matrix
 │   ├── forecast_plots.py        - plot_forecast, plot_forecast_from_file
 │   ├── evaluation_plots.py      - ROC, PR, confusion, threshold, importance
 │   ├── explanation_plots.py     - SHAP waterfall / beeswarm / bar / aggregate
@@ -87,7 +89,7 @@ src/eruption_forecast/
 │
 └── utils/
     ├── array.py, benchmark.py, dataframe.py, date_utils.py
-    ├── formatting.py, ml.py, pathutils.py
+    ├── feature_utils.py, formatting.py, ml.py, pathutils.py
     ├── validation.py, window.py
 ```
 
@@ -253,9 +255,10 @@ The model layer follows a **mixin** pattern:
 - **`BaseModel`** - abstract base for every stage. Owns the date/window grid, the lazy `tremor_data` accessor, `output_dir` resolution, `n_jobs` clamping, the content-addressable cache identity helpers (`build_identity`, `compute_hash`, `_canonicalize`, `tremor_fingerprint`, `cache_path`), and the dual-mode joblib `save(identity=None, path=None)` / cache-only `load(stage_dir, identity)`. When `identity` is supplied, `save()` writes to `{stage_dir}/{hash}.{ClassName}.pkl` (plus a `.params.json` sidecar). When `identity` is omitted, the legacy `{output_dir}/{ClassName}_{basename}.pkl` joblib dump is preserved for standalone manual saves. Subclasses implement `set_directories`, `create_directories`, `validate`, `describe`, `to_dict`, `to_prompt`, `build_label`, `extract_features`, and override `stage_dir` + `build_identity` when they participate in the cache.
 - **`TrainingModel(BaseModel)`** - `build_label → extract_features → fit`. `fit()` runs per-seed `GridSearchCV` in `joblib.Parallel` over the selected classifiers, writes a per-classifier trained-model JSON registry via `save_model_json`, bundles every seed into a `SeedEnsemble` and every classifier into a `ClassifierEnsemble`, then calls `self.save(self.build_identity())` so the cache pickle lands at `{training_dir}/{hash}.TrainingModel.pkl` with a matching sidecar.
 - **`PredictionModel(BaseModel)`** - `build_label → extract_features → forecast`. Cache identity embeds the upstream `training_hash` (a constructor param threaded by `ForecastModel.predict`), so re-training automatically invalidates downstream forecasts. `forecast()` calls `self.save(self.build_identity())`; cache files live at `{prediction_dir}/{hash}.PredictionModel.pkl`.
-- **`EvaluationModel(BaseModel)`** - no cache; dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist.
+- **`EvaluationModel(BaseModel)`** - dispatches on `model.kind` (`"training"` or `"prediction"`). Output is namespaced under `evaluation/{kind}/` so both modes can coexist. `evaluate(use_cache=True)` short-circuits via `{evaluation_dir}/{hash}.EvaluationModel.pkl`, and `save_model=True` writes that pickle after a fresh run.
 - **`ExplanationModel(BaseModel)`** - per-seed SHAP explanations over a fitted `ClassifierEnsemble`. Reuses the upstream `TrainingModel` or `PredictionModel` and dispatches on `model.kind`. Restricted to tree classifiers (RF / lite-rf / GB / XGB); non-tree classifiers are skipped at the `ExplainerEnsemble` loop with a warning. Output is namespaced under `explanation/{kind}/`; cache pickles land at `{explanation_dir}/{hash}.ExplanationModel.pkl` (already mode-namespaced so training-reuse and prediction-reuse caches never collide).
-- **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the four stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping.
+- **`ForecastModel`** - the orchestrator. Not a `BaseModel` subclass - it owns `CalculateTremor`, builds the four stage classes lazily, and captures stage kwargs into a `ForecastConfig` for round-tripping. It threads `save_model=use_cache` and its own `prefix_config` into every stage. `repr(fm)` reports the `nslc`, `day_to_forecast`, and which stages have run.
+- **`ForecastModelScenario`** - a sibling orchestrator that wraps one `ForecastModel`. It runs `calculate()` once, captures shared stage kwargs via `shared_training` / `shared_prediction` / `shared_evaluation` / `shared_explanation`, then loops `train → predict → evaluate → explain` over a list of `Scenario` `TypedDict`s. Each scenario gets its own `{scenarios_dir}/{slug}/` output directory and `prefix_config = slug`.
 
 `ClassifierModel` is the per-classifier descriptor (sklearn estimator + hyperparameter grid + slug). 
 `ClassifierComparator` consumes the in-memory `MetricsEnsemble` cached on `EvaluationModel` to rank classifiers head-to-head.
@@ -327,7 +330,7 @@ Both decorators delegate to `TelegramNotification` (`notification/telegram.py`),
 
 ### 3.10 Utils (`utils/`)
 
-Nine focused modules that the rest of the codebase pulls from - see the table in [6](#6-utility-modules).
+Ten focused modules that the rest of the codebase pulls from - see the table in [6](#6-utility-modules).
 
 ---
 
@@ -388,7 +391,7 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
 | `BaseEnsemble`         | -                          | mixin                        | ✗ |
 | `TrainingModel`        | One date span              | `BaseModel`                  | ✓ |
 | `PredictionModel`      | One forecast window grid   | `BaseModel`                  | ✓ |
-| `EvaluationModel`      | One trained model          | `BaseModel`                  | ✗ |
+| `EvaluationModel`      | One trained model          | `BaseModel`                  | ✓ |
 | `ExplanationModel`     | One trained ensemble       | `BaseModel`                  | ✓ |
 | `SeedEnsemble`         | 1 classifier × N seeds     | `BaseEnsemble`               | ✗ |
 | `ClassifierEnsemble`   | M classifiers × N seeds    | `BaseEnsemble`               | ✗ |
@@ -396,6 +399,7 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
 | `ExplainerEnsemble`    | 1 ensemble × 1 dataset     | standalone                   | ✗ |
 | `ClassifierComparator` | M classifiers, post-eval   | standalone                   | ✗ |
 | `ForecastModel`        | Full pipeline              | standalone orchestrator      | via stages |
+| `ForecastModelScenario`| N scenarios, shared tremor | wraps one `ForecastModel`    | via stages |
 
 ---
 
@@ -406,13 +410,13 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
 | Stage              | Driver class               | Reads                          | Writes                                                                                       |
 |--------------------|----------------------------|--------------------------------|----------------------------------------------------------------------------------------------|
 | Tremor             | `CalculateTremor`          | `SeismicDataSource.get(date)`  | `tremor/daily/*.csv`, merged `{nslc}_{start}_{end}.csv`                                      |
-| Label              | `LabelBuilder`             | Tremor index, eruption dates   | `training/features/{cv}/features-label_*.csv`                                                |
-| Tremor matrix      | `TremorMatrixBuilder`      | Tremor CSV + labels            | `training/tremor/tremor_matrix_*.csv` (+ `per_method/`)                                      |
+| Label              | `LabelBuilder`             | Tremor index, eruption dates   | `training/labels/label_*.csv` + `label.config.yaml` + `eruption_dates_*.csv` (aligned copy: `training/features/{cv}/features-label_*.csv`) |
+| Tremor matrix      | `TremorMatrixBuilder`      | Tremor CSV + labels            | `training/tremor/tremor-matrix_*.csv` (+ `per_method/`)                                      |
 | Features           | `FeaturesBuilder`          | Tremor matrix                  | `training/features/{cv}/features-matrix_*.parquet`                                           |
 | Feature selection  | `FeatureSelector`          | Features + labels              | `training/features/{cv}/seed/{seed:05d}.csv` + `top_N_features.csv`                          |
-| Training fit       | `TrainingModel`            | Selected features + labels     | `training/classifiers/{clf}/{cv}/models/*.pkl` + `SeedEnsemble_*.pkl` + `ClassifierEnsemble_*.{pkl,json}` |
-| Prediction grid    | `PredictionModel`          | Tremor CSV + window grid       | `prediction/features/features-{matrix,label}_*.csv`                                          |
-| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{clf}/{seed:05d}.csv` + `forecast-results_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
+| Training fit       | `TrainingModel`            | Selected features + labels     | `training/classifiers/{ClassifierName}/{cv}/models/*.pkl` + `SeedEnsemble_*.pkl` + `ClassifierEnsemble_{CVName}.{pkl,json}` |
+| Prediction grid    | `PredictionModel`          | Tremor CSV + window grid       | `prediction/features/features-matrix_*.parquet` + `features-label_*.csv`                     |
+| Forecast           | `PredictionModel.forecast` | Forecast features + ensemble   | `prediction/results/{ClassifierName}/{seed:05d}.csv` + `prediction/results/forecast-results_*.csv` + `prediction/figures/forecast_*.{png,pdf}` |
 | Evaluation         | `EvaluationModel.evaluate` | y_proba + y_true               | `evaluation/{kind}/classifiers/{Clf}/predictions/{y_proba,y_pred}.csv` + `figures/aggregate/{plot}.{png,csv}` + (when `plot_per_seed=True`) `figures/{plot}/{seed:05d}.png` |
 | Compare            | `ClassifierComparator`     | Cached `MetricsEnsemble`       | `evaluation/{kind}/comparison/metrics/ranking_*.csv` + `comparison/figures/*.png`            |
 | Explanation        | `ExplanationModel.explain` | `ClassifierEnsemble` + features| `explanation/{kind}/classifiers/{Clf}/ClassifierExplanation_*.pkl` + `shap_values/{seed:05d}.pkl` + `figures/{bar,beeswarm}/{seed:05d}.png` |
@@ -437,18 +441,18 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
     │                              ──►  top_{N}_features.csv + .png │
     │                                                               │
     │  classifiers/                                                 │
-    │    {clf}/{cv}/models/{seed:05d}.pkl                           │
-    │    {clf}/{cv}/SeedEnsemble_*.pkl                              │
-    │    ClassifierEnsemble_{cv}.{pkl,json}                         │
+    │    {ClassifierName}/{cv}/models/{seed:05d}.pkl                │
+    │    {ClassifierName}/{cv}/SeedEnsemble_*.pkl                   │
+    │    ClassifierEnsemble_{CVName}.{pkl,json}                     │
     └─────────┬─────────────────────────────────────────────────────┘
               │ ClassifierEnsemble bundle
               ▼
     ┌───────────────────────────────────────────────────────────────┐
     │ prediction/                                                   │
     │   features/features-matrix_*.parquet + features-label_*.csv   │
-    │   results/{clf}/{seed:05d}.csv                                │
+    │   results/{ClassifierName}/{seed:05d}.csv                     │
+    │   results/forecast-results_*.csv                              │
     │   figures/forecast_*.{png,pdf}                                │
-    │ forecast-results_*.csv  (top-level dump)          │
     └─────────┬─────────────────────────────────────────────────────┘
               │ ClassifierEnsemble + features + y_true (rebuilt or training-derived)
               ▼
@@ -480,14 +484,16 @@ Nine focused modules that the rest of the codebase pulls from - see the table in
            │  Stage-internal caches (no separate cache/ subtree):       │
            │    training/{hash}.TrainingModel.pkl       + .params.json  │  ← BaseModel.save
            │    prediction/{hash}.PredictionModel.pkl   + .params.json  │
+           │    evaluation/{kind}/{hash}.EvaluationModel.pkl + sidecar  │
            │    explanation/{kind}/{hash}.ExplanationModel.pkl + sidecar│
            └────────────────────────────────────────────────────────────┘
 ```
 
 A cache hit on `TrainingModel` short-circuits everything in the `training/` box; 
 a cache hit on `PredictionModel` short-circuits the `prediction/` box; 
+a cache hit on `EvaluationModel` restores the metrics and the cached `MetricsEnsemble` without another `predict_proba` pass; 
 a cache hit on `ExplanationModel` short-circuits the per-classifier SHAP pass. 
-Evaluation is **never cached** - the on-disk matrices act as the cache and `MetricsEnsemble.compute()` is idempotent in memory once `y_probas` is populated.
+Within a single run, `MetricsEnsemble.compute()` is also idempotent in memory once `y_probas` is populated.
 
 ---
 
