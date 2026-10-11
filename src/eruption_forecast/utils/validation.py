@@ -177,7 +177,9 @@ def check_sampling_consistency(
 
     inconsistent_data = df[inconsistent_mask]
     consistent_data = df[~inconsistent_mask]
-    is_consistent = inconsistent_data.empty
+    # Count rows rather than using ``DataFrame.empty``, which is also True for
+    # an index-only frame and would hide every inconsistent row.
+    is_consistent = len(inconsistent_data) == 0
 
     if is_consistent:
         # ``Timedelta.seconds`` returns only the seconds component of the
