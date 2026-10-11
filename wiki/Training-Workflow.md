@@ -382,7 +382,7 @@ for ad-hoc direct use, but `ForecastModel.train` does not expose it.
 - every train kwarg that affects output (`classifiers`, `eruption_dates`, `cv_strategy`, `cv_splits`, `scoring`, `top_n_features`, `include_eruption_date`)
 - the kwargs passed into `build_label`, `extract_features`, and `fit`
 
-`fit()` calls `self.save(self.build_identity())` after the ensemble is built, so the hash lands at `{station_dir}/training/{hash}.TrainingModel.pkl` (+ a sidecar `{hash}.TrainingModel.params.json` for diff-able inspection). `ForecastModel.train()` consults the same path via `TrainingModel.load(training_dir, identity)` before instantiating the model — a hit short-circuits the entire build.
+`fit()` calls `self.save(self.build_identity())` after the ensemble is built, so the hash lands at `{station_dir}/training/{hash}.TrainingModel.pkl` (+ a sidecar `{hash}.TrainingModel.params.json` for diff-able inspection). `ForecastModel.train()` consults the same path via `TrainingModel.load(training_dir, identity)` before instantiating the model — a hit short-circuits the entire build. Both sides hash dates as `YYYY-MM-DD` (`BaseModel.identity_date`) and use the dates the caller requested, not the ones clamped to the tremor range, so the lookup and the save always agree.
 
 `fm.train(..., use_cache=True)` (default) short-circuits a re-fit when the identity matches; pass `use_cache=False` to force a fresh run.
 

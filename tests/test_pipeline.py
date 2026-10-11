@@ -296,15 +296,6 @@ class TestEvaluationModel:
 
 
 class TestExplanationModel:
-    @pytest.mark.xfail(
-        strict=True,
-        raises=AssertionError,
-        reason=(
-            "ExplanationModel.plot() returns None, and ForecastModel.explain() "
-            "assigns the result of .explain(...).plot(...), so "
-            "fm.ExplanationModel is always None."
-        ),
-    )
     def test_forecast_model_keeps_explanation_model(self, fm: ForecastModel) -> None:
         assert isinstance(fm.ExplanationModel, ExplanationModel)
         assert fm.ExplanationModel.explanations
@@ -362,21 +353,7 @@ def _forbid(monkeypatch, cls: type, method: str) -> None:
     monkeypatch.setattr(cls, method, _fail)
 
 
-CACHE_BUG = pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason=(
-        "ForecastModel.train()/predict() look the cache up with the raw string "
-        "dates, but TrainingModel.fit()/PredictionModel.forecast() save it "
-        "under self.start_date (a datetime). _canonicalize renders those as "
-        "'2025-01-03' vs '2025-01-03T00:00:00', so the hashes never match and "
-        "use_cache=True always retrains."
-    ),
-)
-
-
 class TestCache:
-    @CACHE_BUG
     def test_train_cache_hit(self, fm: ForecastModel, workspace, monkeypatch) -> None:
         second = _calculate(_forecast_model(workspace["output_dir"]), workspace["sds_dir"])
         _forbid(monkeypatch, TrainingModel, "extract_features")
@@ -385,7 +362,6 @@ class TestCache:
 
         assert second.TrainingModel.id == fm.TrainingModel.id
 
-    @CACHE_BUG
     def test_predict_cache_hit(self, fm: ForecastModel, workspace, monkeypatch) -> None:
         second = _calculate(_forecast_model(workspace["output_dir"]), workspace["sds_dir"])
         second.train(**TRAIN_KWARGS)
@@ -402,7 +378,6 @@ class TestCache:
         assert replayed._config.predict.start_date == PREDICT_KWARGS["start_date"]
         assert replayed._config.evaluate.model == "prediction"
 
-    @CACHE_BUG
     def test_replay_comes_from_cache(self, fm: ForecastModel, monkeypatch) -> None:
         replayed = ForecastModel.from_config(fm.save_config())
 

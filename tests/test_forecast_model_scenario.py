@@ -177,7 +177,6 @@ def test_run_two_scenarios(seeded, tiny_grids, monkeypatch) -> None:
         "[CI] Scenario 2: Narrow prediction window inside scenario 1"
     )
     assert runner.ForecastModel.results is not None
-    # Exact row counts for the reuse path live in test_prediction_model.py.
     index = runner.ForecastModel.results.index
     assert index.min() == pd.Timestamp("2025-01-20")
-    assert index.max().date() == pd.Timestamp("2025-01-27").date()
+    assert len(index) == 8 * 4  # 2025-01-20..27 at 6 h, last day included.

@@ -65,14 +65,6 @@ class TestInit:
 
 
 class TestLoadFeatures:
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "load_features slices labels with .loc[start_date:end_date] where "
-            "end_date is midnight, so the last day's later windows are dropped. "
-            "The fresh build_label grid runs to 23:59:59 on end_date."
-        ),
-    )
     def test_covers_the_whole_last_day(self, prediction_model, tmp_path) -> None:
         files = _write_feature_files(tmp_path, "2025-01-18", "2025-01-31")
 
@@ -92,14 +84,6 @@ class TestLoadFeatures:
         assert len(prediction_model.features_df) == len(prediction_model.labels)
         assert prediction_model.window_step == 6
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "check_sampling_consistency returns is_consistent=inconsistent_data.empty, "
-            "and DataFrame.empty is True for the column-less frame load_features "
-            "passes, so the sampling-rate mismatch is never detected."
-        ),
-    )
     def test_window_step_mismatch_raises(self, prediction_model, tmp_path) -> None:
         files = _write_feature_files(tmp_path, "2025-01-18", "2025-01-31")
         with pytest.raises(ValueError, match="Sampling-rate mismatch"):

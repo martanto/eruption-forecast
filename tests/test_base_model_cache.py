@@ -15,6 +15,8 @@ import pandas as pd
 import pytest
 
 from eruption_forecast.model.base_model import BaseModel
+from eruption_forecast.model.training_model import TrainingModel
+from eruption_forecast.model.prediction_model import PredictionModel
 
 
 class _StubModel(BaseModel):
@@ -317,3 +319,73 @@ class TestSaveLoad:
         target = tmp_path / "nested" / "model.pkl"
         assert stub_model.save(path=str(target)) == str(target)
         assert target.is_file()
+
+
+# ---------------------------------------------------------------------------
+# Identity dates
+# ---------------------------------------------------------------------------
+
+
+class TestIdentityDates:
+    """``ForecastModel`` looks caches up with string dates; stages save with
+    ``datetime`` state. Both must hash identically."""
+
+    @pytest.mark.parametrize(
+        "value", ["2025-01-03", datetime(2025, 1, 3), datetime(2025, 1, 3, 15, 30)]
+    )
+    def test_identity_date(self, value) -> None:
+        assert BaseModel.identity_date(value) == "2025-01-03"
+
+    def test_training_identity_ignores_date_type(self, synthetic_tremor_df) -> None:
+        common = {
+            "nslc": "VG.OJN.00.EHZ",
+            "tremor_df": synthetic_tremor_df,
+            "classifiers": ["rf"],
+            "eruption_dates": ["2025-01-08"],
+            "window_size": 2,
+            "cv_strategy": "shuffle-stratified",
+            "cv_splits": 5,
+            "scoring": "balanced_accuracy",
+            "top_n_features": 20,
+            "include_eruption_date": True,
+            "build_label_params": {},
+            "extract_features_params": {},
+            "fit_params": {},
+        }
+        from_strings = TrainingModel.build_identity(
+            start_date="2025-01-03", end_date="2025-01-08", **common
+        )
+        from_datetimes = TrainingModel.build_identity(
+            start_date=datetime(2025, 1, 3), end_date=datetime(2025, 1, 8), **common
+        )
+        assert TrainingModel.compute_hash(from_strings) == TrainingModel.compute_hash(
+            from_datetimes
+        )
+
+    def test_prediction_identity_ignores_date_type(self, synthetic_tremor_df) -> None:
+        common = {
+            "nslc": "VG.OJN.00.EHZ",
+            "tremor_df": synthetic_tremor_df,
+            "training_hash": "abc",
+            "window_size": 2,
+            "build_label_params": {},
+            "extract_features_params": {},
+        }
+        from_strings = PredictionModel.build_identity(
+            start_date="2025-01-03", end_date="2025-01-08", **common
+        )
+        from_datetimes = PredictionModel.build_identity(
+            start_date=datetime(2025, 1, 3), end_date=datetime(2025, 1, 8), **common
+        )
+        assert from_strings == from_datetimes
+
+    def test_requested_dates_survive_tremor_clamping(self, synthetic_tremor_df) -> None:
+        model = _StubModel(
+            tremor_data=synthetic_tremor_df,
+            start_date="2024-12-01",
+            end_date="2025-02-01",
+        )
+        model._sync_dates_to_tremor()
+        assert model.start_date != model._requested_start_date
+        assert model._requested_start_date == datetime(2024, 12, 1)
+        assert model._requested_end_date == datetime(2025, 2, 1)

@@ -183,13 +183,6 @@ class TestToDatetimeIndex:
             to_datetime_index(labels, pd.DataFrame({"x": [1]}))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "is_consistent is computed as inconsistent_data.empty, which is True "
-        "for any frame without columns, even when rows are inconsistent."
-    ),
-)
 def test_check_sampling_consistency_on_index_only_frame() -> None:
     index = pd.date_range("2025-01-01", periods=8, freq="6h")
     is_consistent, _, inconsistent, _ = check_sampling_consistency(
