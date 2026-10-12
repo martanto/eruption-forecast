@@ -1,0 +1,18 @@
+{
+  "fixedSectionOk": true,
+  "nodesRecovered": 0,
+  "edgesRestored": 1,
+  "crossBatchEdgesAdded": 3,
+  "typesRemapped": 0,
+  "complexityRemapped": 0,
+  "notes": [
+    "Merge report had no Fixed or Could-not-fix items; 316 nodes / 1105 edges, 0 dangling edges, all node types and complexity values valid.",
+    "All 293 importMap edges (96 entries) already present as imports edges in the assembled graph.",
+    "Known gap 1: function:src/eruption_forecast/utils/pathutils.py:load_json already exists (lines 63-83) with contains + exports edges; no action needed.",
+    "Known gap 2: verified class TremorData(BaseDataContainer) in tremor_data.py line 27; added missing inherits edge (weight 0.9, matching LabelData).",
+    "Known gap 3: calls targets humanize_feature_name and construct_windows resolve to existing function nodes; no dangling calls edges.",
+    "Known gap 4: scanner did not resolve absolute eruption_forecast.* imports for main.py and forecast-scenario.py (empty importMap entries). Added 3 source-verified imports edges (main.py -> model/forecast_model.py, main.py -> decorators/__init__.py, forecast-scenario.py -> model/forecast_model_scenario.py) and removed the 2 depends_on edges that duplicated them; kept main.py -> decorators/timer.py and notify.py depends_on edges as transitive usage.",
+    "Known gap 5: all 125 documents edges resolve to existing nodes.",
+    "Upstream: scanner importMap misses absolute package imports in root-level scripts; other root scripts may have similar gaps."
+  ]
+}

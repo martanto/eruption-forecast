@@ -1,0 +1,1285 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/model/constants.py",
+   "type": "file",
+   "name": "constants.py",
+   "filePath": "src/eruption_forecast/model/constants.py",
+   "summary": "Constants module defining evaluation metric keys, the list of supported classifier codes, and default GridSearchCV hyperparameter grids per classifier.",
+   "tags": [
+    "config",
+    "constants",
+    "hyperparameters",
+    "machine-learning"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/training_model.py",
+   "type": "file",
+   "name": "training_model.py",
+   "filePath": "src/eruption_forecast/model/training_model.py",
+   "summary": "Core training stage model that builds labels, extracts tsfresh features, selects features per seed, and fits multi-seed GridSearchCV classifiers, bundling results into SeedEnsemble/ClassifierEnsemble artefacts with content-addressed caching.",
+   "tags": [
+    "training",
+    "machine-learning",
+    "pipeline-stage",
+    "service",
+    "caching"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Extends BaseModel; parallelises seeds via the joblib loky backend while clamping inner GridSearchCV workers."
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/benchmark.py",
+   "type": "file",
+   "name": "benchmark.py",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "summary": "Benchmark utility comparing FeatureSelector methods side by side across seeds, measuring selection stability (Jaccard), runtime, and downstream CV scores with plots and CSV outputs.",
+   "tags": [
+    "benchmark",
+    "feature-selection",
+    "utility",
+    "evaluation"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/dataframe.py",
+   "type": "file",
+   "name": "dataframe.py",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "summary": "DataFrame helpers for loading label CSVs, datetime-indexed feature matrices, removing tremor anomalies, and computing envelope values.",
+   "tags": [
+    "utility",
+    "dataframe",
+    "io",
+    "pandas"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/ml.py",
+   "type": "file",
+   "name": "ml.py",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "summary": "Machine-learning utility module covering resampling, temporal splits, tsfresh significance filtering, classifier factory, grid search, model registry JSON persistence, threshold metrics, and per-eruption ensemble summaries.",
+   "tags": [
+    "utility",
+    "machine-learning",
+    "resampling",
+    "metrics",
+    "model-persistence"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "class",
+   "name": "TrainingModel",
+   "filePath": "src/eruption_forecast/model/training_model.py",
+   "lineRange": [
+    42,
+    2110
+   ],
+   "summary": "Training pipeline stage: build_label, extract_features, and fit multi-seed classifiers with feature selection, resampling, learning curves, ensemble building, and config snapshotting.",
+   "tags": [
+    "training",
+    "pipeline-stage",
+    "ensemble",
+    "caching"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/benchmark.py:_build_training_model",
+   "type": "function",
+   "name": "_build_training_model",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "lineRange": [
+    45,
+    83
+   ],
+   "summary": "Constructs a TrainingModel to build labels and features used as benchmark input.",
+   "tags": [
+    "benchmark",
+    "helper",
+    "training"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/benchmark.py:_run_seed",
+   "type": "function",
+   "name": "_run_seed",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "lineRange": [
+    86,
+    158
+   ],
+   "summary": "Runs every FeatureSelector method for one seed: resample, select, time, and score with a ClassifierModel via cross_val_score.",
+   "tags": [
+    "benchmark",
+    "seed",
+    "feature-selection"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/benchmark.py:_mean_pairwise_jaccard",
+   "type": "function",
+   "name": "_mean_pairwise_jaccard",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "lineRange": [
+    161,
+    185
+   ],
+   "summary": "Computes mean pairwise Jaccard similarity of feature sets across seeds as a stability metric.",
+   "tags": [
+    "metrics",
+    "stability",
+    "helper"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/benchmark.py:_write_outputs",
+   "type": "function",
+   "name": "_write_outputs",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "lineRange": [
+    188,
+    248
+   ],
+   "summary": "Writes per-seed and summary benchmark CSVs.",
+   "tags": [
+    "persistence",
+    "benchmark",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/benchmark.py:_render_plots",
+   "type": "function",
+   "name": "_render_plots",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "lineRange": [
+    251,
+    297
+   ],
+   "summary": "Renders benchmark comparison plots of runtime, score, and stability.",
+   "tags": [
+    "plotting",
+    "benchmark",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "type": "function",
+   "name": "benchmark_feature_selection",
+   "filePath": "src/eruption_forecast/utils/benchmark.py",
+   "lineRange": [
+    300,
+    493
+   ],
+   "summary": "Public entry point benchmarking feature-selection methods across seeds and producing summary tables and plots.",
+   "tags": [
+    "benchmark",
+    "entry-point",
+    "feature-selection"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/dataframe.py:remove_anomalies",
+   "type": "function",
+   "name": "remove_anomalies",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "lineRange": [
+    11,
+    88
+   ],
+   "summary": "Removes z-score anomalies from tremor columns.",
+   "tags": [
+    "data-cleaning",
+    "anomaly-detection",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/dataframe.py:to_series",
+   "type": "function",
+   "name": "to_series",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "lineRange": [
+    91,
+    131
+   ],
+   "summary": "Coerces a DataFrame or Series input into a Series for a given value column.",
+   "tags": [
+    "conversion",
+    "utility",
+    "pandas"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/dataframe.py:load_label_csv",
+   "type": "function",
+   "name": "load_label_csv",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "lineRange": [
+    134,
+    163
+   ],
+   "summary": "Loads a label CSV into a datetime-indexed DataFrame with validation.",
+   "tags": [
+    "io",
+    "labels",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/dataframe.py:load_datetime_indexed",
+   "type": "function",
+   "name": "load_datetime_indexed",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "lineRange": [
+    166,
+    222
+   ],
+   "summary": "Loads features and label files and aligns them on a datetime index.",
+   "tags": [
+    "io",
+    "alignment",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/dataframe.py:load_features_matrix",
+   "type": "function",
+   "name": "load_features_matrix",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "lineRange": [
+    225,
+    261
+   ],
+   "summary": "Loads a features matrix (Parquet/CSV) aligned with its label CSV.",
+   "tags": [
+    "io",
+    "features",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/dataframe.py:get_envelope_values",
+   "type": "function",
+   "name": "get_envelope_values",
+   "filePath": "src/eruption_forecast/utils/dataframe.py",
+   "lineRange": [
+    264,
+    352
+   ],
+   "summary": "Computes rolling envelope (upper/lower) values for a time series.",
+   "tags": [
+    "signal-processing",
+    "utility",
+    "pandas"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:build_y_true",
+   "type": "function",
+   "name": "build_y_true",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    45,
+    114
+   ],
+   "summary": "Builds ground-truth binary labels from eruption dates over a window grid.",
+   "tags": [
+    "labels",
+    "evaluation",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:temporal_train_test_split",
+   "type": "function",
+   "name": "temporal_train_test_split",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    117,
+    171
+   ],
+   "summary": "Splits features and labels chronologically to avoid leakage.",
+   "tags": [
+    "data-split",
+    "time-series",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:compute_threshold_metrics",
+   "type": "function",
+   "name": "compute_threshold_metrics",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    174,
+    227
+   ],
+   "summary": "Computes classification metrics across a range of probability thresholds.",
+   "tags": [
+    "metrics",
+    "threshold",
+    "evaluation"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:compute_aggregate_threshold_metrics",
+   "type": "function",
+   "name": "compute_aggregate_threshold_metrics",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    230,
+    315
+   ],
+   "summary": "Aggregates per-seed threshold metrics into mean/std curves.",
+   "tags": [
+    "metrics",
+    "aggregation",
+    "evaluation"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:random_under_sampler",
+   "type": "function",
+   "name": "random_under_sampler",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    318,
+    357
+   ],
+   "summary": "Applies imblearn RandomUnderSampler to balance classes.",
+   "tags": [
+    "resampling",
+    "imbalance",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "function",
+   "name": "resample",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    360,
+    424
+   ],
+   "summary": "Dispatches under/over/auto resampling based on minority-class share.",
+   "tags": [
+    "resampling",
+    "imbalance",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:load_features_resampled",
+   "type": "function",
+   "name": "load_features_resampled",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    427,
+    488
+   ],
+   "summary": "Loads per-seed resampled features and labels from disk.",
+   "tags": [
+    "io",
+    "resampling",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:get_significant_features",
+   "type": "function",
+   "name": "get_significant_features",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    491,
+    566
+   ],
+   "summary": "Runs tsfresh FeatureSelector FDR filtering and returns significant features with p-values.",
+   "tags": [
+    "feature-selection",
+    "tsfresh",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:get_classifier_models",
+   "type": "function",
+   "name": "get_classifier_models",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    569,
+    603
+   ],
+   "summary": "Factory creating ClassifierModel instances from classifier codes.",
+   "tags": [
+    "factory",
+    "classifier",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:grid_search_cv",
+   "type": "function",
+   "name": "grid_search_cv",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    606,
+    659
+   ],
+   "summary": "Runs GridSearchCV for a ClassifierModel and returns the best estimator.",
+   "tags": [
+    "hyperparameter-tuning",
+    "training",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:save_model_json",
+   "type": "function",
+   "name": "save_model_json",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    662,
+    720
+   ],
+   "summary": "Writes the per-classifier trained-model registry JSON of seed models and features.",
+   "tags": [
+    "persistence",
+    "registry",
+    "utility"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:compute_seed",
+   "type": "function",
+   "name": "compute_seed",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    723,
+    832
+   ],
+   "summary": "Computes per-seed predictions and metrics for an ensemble seed model.",
+   "tags": [
+    "evaluation",
+    "seed",
+    "metrics"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/ml.py:build_classifier_ensemble_summary",
+   "type": "function",
+   "name": "build_classifier_ensemble_summary",
+   "filePath": "src/eruption_forecast/utils/ml.py",
+   "lineRange": [
+    835,
+    955
+   ],
+   "summary": "Builds a ClassifierEnsembleSummary of per-eruption probability windows and picks.",
+   "tags": [
+    "summary",
+    "ensemble",
+    "evaluation"
+   ],
+   "complexity": "complex"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_build_training_model",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_run_seed",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_mean_pairwise_jaccard",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_write_outputs",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_render_plots",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:remove_anomalies",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:remove_anomalies",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:to_series",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:to_series",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_label_csv",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_label_csv",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_datetime_indexed",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_datetime_indexed",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_features_matrix",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_features_matrix",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:get_envelope_values",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:get_envelope_values",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:build_y_true",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:build_y_true",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:temporal_train_test_split",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:temporal_train_test_split",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_threshold_metrics",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_threshold_metrics",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_aggregate_threshold_metrics",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_aggregate_threshold_metrics",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:random_under_sampler",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:random_under_sampler",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:load_features_resampled",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:load_features_resampled",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:get_significant_features",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:get_significant_features",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:get_classifier_models",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:get_classifier_models",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:grid_search_cv",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:grid_search_cv",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:save_model_json",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:save_model_json",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_seed",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_seed",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:build_classifier_ensemble_summary",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "function:src/eruption_forecast/utils/ml.py:build_classifier_ensemble_summary",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/config/training_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/features/feature_selector.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/label/label_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/model/base_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/model/classifier_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/plots/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/utils/dataframe.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/utils/feature_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/training_model.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "file:src/eruption_forecast/features/feature_selector.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "file:src/eruption_forecast/model/classifier_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "file:src/eruption_forecast/model/training_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/benchmark.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "file:src/eruption_forecast/utils/array.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/dataframe.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/model/classifier_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/utils/dataframe.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/ml.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/ml.py:get_classifier_models",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/ml.py:save_model_json",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/ml.py:grid_search_cv",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/ml.py:load_features_resampled",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_label_csv",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/config/training_config.py:TrainingConfig",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "target": "function:src/eruption_forecast/utils/feature_utils.py:concat_significant_features",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:_build_training_model",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:_run_seed",
+   "target": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:_run_seed",
+   "target": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:_run_seed",
+   "target": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_run_seed",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_write_outputs",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_render_plots",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_build_training_model",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/benchmark.py:benchmark_feature_selection",
+   "target": "function:src/eruption_forecast/utils/benchmark.py:_mean_pairwise_jaccard",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/dataframe.py:load_features_matrix",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_datetime_indexed",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/dataframe.py:remove_anomalies",
+   "target": "function:src/eruption_forecast/utils/array.py:detect_anomalies_zscore",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/ml.py:resample",
+   "target": "function:src/eruption_forecast/utils/ml.py:random_under_sampler",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/ml.py:compute_aggregate_threshold_metrics",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_threshold_metrics",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/ml.py:get_significant_features",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:to_series",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/ml.py:get_classifier_models",
+   "target": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/ml.py:build_classifier_ensemble_summary",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ClassifierEnsembleSummary",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/utils/ml.py:save_model_json",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

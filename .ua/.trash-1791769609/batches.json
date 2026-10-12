@@ -1,0 +1,4785 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "louvain",
+  "totalFiles": 96,
+  "totalBatches": 9,
+  "exportsByPath": {
+    "forecast-scenario.py": [
+      "main"
+    ],
+    "main.py": [
+      "main"
+    ],
+    "src/eruption_forecast/__init__.py": [],
+    "src/eruption_forecast/config/__init__.py": [],
+    "src/eruption_forecast/config/base_config.py": [
+      "_package_version",
+      "BaseConfig"
+    ],
+    "src/eruption_forecast/config/constants.py": [],
+    "src/eruption_forecast/config/evaluation_config.py": [
+      "EvaluationConfig"
+    ],
+    "src/eruption_forecast/config/explanation_config.py": [
+      "ExplanationConfig"
+    ],
+    "src/eruption_forecast/config/forecast_config.py": [
+      "BaseForecastConfig",
+      "ForecastCalculateConfig",
+      "ForecastTrainConfig",
+      "ForecastPredictConfig",
+      "ForecastEvaluateConfig",
+      "ForecastExplainConfig",
+      "ForecastConfig"
+    ],
+    "src/eruption_forecast/config/label_config.py": [
+      "LabelConfig"
+    ],
+    "src/eruption_forecast/config/prediction_config.py": [
+      "PredictionConfig"
+    ],
+    "src/eruption_forecast/config/training_config.py": [
+      "TrainingConfig"
+    ],
+    "src/eruption_forecast/data_container.py": [
+      "BaseDataContainer"
+    ],
+    "src/eruption_forecast/dataclass/__init__.py": [],
+    "src/eruption_forecast/dataclass/classifier_ensemble_summary.py": [
+      "ProbabilityPick",
+      "SeedSummary",
+      "EruptionWindow",
+      "ClassifierEnsembleSummary"
+    ],
+    "src/eruption_forecast/dataclass/classifier_explanation.py": [
+      "SeedExplanation",
+      "ClassifierExplanation"
+    ],
+    "src/eruption_forecast/dataclass/station_data.py": [
+      "StationData"
+    ],
+    "src/eruption_forecast/decorators/__init__.py": [],
+    "src/eruption_forecast/decorators/notify.py": [
+      "_format_elapsed",
+      "_escape_md",
+      "_escape_pre",
+      "_error_message",
+      "_success_message",
+      "_dispatch",
+      "notify"
+    ],
+    "src/eruption_forecast/decorators/timer.py": [
+      "timer"
+    ],
+    "src/eruption_forecast/ensemble/__init__.py": [],
+    "src/eruption_forecast/ensemble/base_ensemble.py": [
+      "BaseEnsemble"
+    ],
+    "src/eruption_forecast/ensemble/classifier_ensemble.py": [
+      "ClassifierEnsemble"
+    ],
+    "src/eruption_forecast/ensemble/explainer_ensemble.py": [
+      "ExplainerEnsemble"
+    ],
+    "src/eruption_forecast/ensemble/metrics_ensemble.py": [
+      "MetricsEnsemble"
+    ],
+    "src/eruption_forecast/ensemble/seed_ensemble.py": [
+      "SeedEnsemble"
+    ],
+    "src/eruption_forecast/features/__init__.py": [],
+    "src/eruption_forecast/features/constants.py": [],
+    "src/eruption_forecast/features/feature_count_sweep.py": [
+      "FeatureCountSweep",
+      "_to_list",
+      "_score_fold",
+      "_pick_best",
+      "sweep_feature_count",
+      "_resolve_training_context",
+      "_discover_cv_dir",
+      "_load_features_matrix",
+      "_load_labels",
+      "_discover_trained_top_n",
+      "_discover_classifier_names",
+      "_harvest_per_seed_inputs",
+      "_resolve_forecast_inputs",
+      "_persist_sweep"
+    ],
+    "src/eruption_forecast/features/feature_selector.py": [
+      "FeatureSelector"
+    ],
+    "src/eruption_forecast/features/features_builder.py": [
+      "FeaturesBuilder"
+    ],
+    "src/eruption_forecast/features/tremor_matrix_builder.py": [
+      "TremorMatrixBuilder"
+    ],
+    "src/eruption_forecast/label/__init__.py": [],
+    "src/eruption_forecast/label/constants.py": [],
+    "src/eruption_forecast/label/dynamic_label_builder.py": [
+      "DynamicLabelBuilder"
+    ],
+    "src/eruption_forecast/label/label_builder.py": [
+      "LabelBuilder"
+    ],
+    "src/eruption_forecast/label/label_data.py": [
+      "LabelData"
+    ],
+    "src/eruption_forecast/logger.py": [
+      "_category_filter",
+      "_uncategorized_filter",
+      "_configure_handlers",
+      "get_logger",
+      "get_category_logger",
+      "register_error_category",
+      "set_log_level",
+      "set_log_directory",
+      "disable_logging",
+      "enable_logging"
+    ],
+    "src/eruption_forecast/model/__init__.py": [],
+    "src/eruption_forecast/model/base_model.py": [
+      "BaseModel"
+    ],
+    "src/eruption_forecast/model/classifier_comparator.py": [
+      "ClassifierComparator"
+    ],
+    "src/eruption_forecast/model/classifier_model.py": [
+      "ClassifierModel"
+    ],
+    "src/eruption_forecast/model/constants.py": [],
+    "src/eruption_forecast/model/evaluation_model.py": [
+      "EvaluationModel"
+    ],
+    "src/eruption_forecast/model/explanation_model.py": [
+      "ExplanationModel"
+    ],
+    "src/eruption_forecast/model/forecast_model.py": [
+      "ForecastModel"
+    ],
+    "src/eruption_forecast/model/forecast_model_scenario.py": [
+      "Scenario",
+      "ForecastModelScenario"
+    ],
+    "src/eruption_forecast/model/prediction_model.py": [
+      "PredictionModel"
+    ],
+    "src/eruption_forecast/model/training_model.py": [
+      "TrainingModel"
+    ],
+    "src/eruption_forecast/notification/__init__.py": [],
+    "src/eruption_forecast/notification/telegram.py": [
+      "_escape_markdown_v2",
+      "TelegramNotification"
+    ],
+    "src/eruption_forecast/plots/__init__.py": [],
+    "src/eruption_forecast/plots/evaluation_plots.py": [
+      "plot_threshold_analysis",
+      "plot_confusion_matrix",
+      "plot_roc_curve",
+      "plot_precision_recall_curve",
+      "plot_g_mean_curve",
+      "plot_mcc_curve",
+      "plot_feature_importance",
+      "plot_aggregate_roc_curve",
+      "plot_aggregate_precision_recall_curve",
+      "plot_aggregate_threshold_analysis",
+      "plot_aggregate_g_mean_curve",
+      "plot_aggregate_mcc_curve",
+      "plot_aggregate_feature_importance",
+      "render_one_plot",
+      "render_one_aggregate_plot"
+    ],
+    "src/eruption_forecast/plots/explanation_plots.py": [
+      "plot_shap_waterfall",
+      "plot_shap_beeswarm",
+      "plot_shap_bar",
+      "render_seed_plot",
+      "_aggregate_importance",
+      "_aggregate_explanation",
+      "plot_aggregate_shap_bar",
+      "plot_aggregate_shap_beeswarm",
+      "_build_explanation_plot",
+      "plot_classifier_waterfall"
+    ],
+    "src/eruption_forecast/plots/feature_plots.py": [
+      "plot_significant_features",
+      "_process_single_file",
+      "replot_significant_features",
+      "_extract_band_prefix",
+      "_annotate_bar_percentages",
+      "_finalize_frequency_band_layout",
+      "plot_frequency_band_contribution",
+      "plot_feature_correlations",
+      "plot_feature_count_curve",
+      "plot_common_features_heatmap",
+      "plot_common_features_correlation",
+      "plot_features_matrix"
+    ],
+    "src/eruption_forecast/plots/forecast_plots.py": [
+      "plot_forecast",
+      "plot_forecast_from_file",
+      "_ax_per_classifier",
+      "_ax_forecast",
+      "ax_eruption",
+      "_ax_segment"
+    ],
+    "src/eruption_forecast/plots/label_plots.py": [
+      "LabelScenarioEntry",
+      "LabelScenarioFileEntry",
+      "plot_label_distribution",
+      "plot_label_distribution_from_file",
+      "plot_label_distribution_comparison",
+      "plot_label_distribution_comparison_from_files"
+    ],
+    "src/eruption_forecast/plots/styles.py": [
+      "setup_nature_style",
+      "apply_nature_style",
+      "shap_figure",
+      "nature_figure",
+      "get_color",
+      "configure_spine",
+      "get_figure_size"
+    ],
+    "src/eruption_forecast/plots/tremor_plots.py": [
+      "plot_tremor",
+      "plot_tremor_from_file",
+      "_process_single_tremor_file",
+      "replot_tremor"
+    ],
+    "src/eruption_forecast/sources/__init__.py": [],
+    "src/eruption_forecast/sources/base.py": [
+      "SeismicDataSource"
+    ],
+    "src/eruption_forecast/sources/fdsn.py": [
+      "FDSN"
+    ],
+    "src/eruption_forecast/sources/sds.py": [
+      "SDS"
+    ],
+    "src/eruption_forecast/tremor/__init__.py": [],
+    "src/eruption_forecast/tremor/calculate_tremor.py": [
+      "CalculateTremor"
+    ],
+    "src/eruption_forecast/tremor/dsar.py": [
+      "DSAR"
+    ],
+    "src/eruption_forecast/tremor/rsam.py": [
+      "RSAM"
+    ],
+    "src/eruption_forecast/tremor/shannon_entropy.py": [
+      "ShannonEntropy"
+    ],
+    "src/eruption_forecast/tremor/tremor_data.py": [
+      "TremorData"
+    ],
+    "src/eruption_forecast/utils/__init__.py": [],
+    "src/eruption_forecast/utils/array.py": [
+      "save_forecast_seed",
+      "compute_model_probabilities",
+      "confidence_interval",
+      "detect_anomalies_zscore",
+      "mask_zero_values",
+      "get_completeness",
+      "count_valid_values",
+      "filter_nans",
+      "detect_maximum_outlier",
+      "remove_maximum_outlier",
+      "remove_outliers"
+    ],
+    "src/eruption_forecast/utils/benchmark.py": [
+      "_jaccard",
+      "_build_training_model",
+      "_run_seed",
+      "_mean_pairwise_jaccard",
+      "_write_outputs",
+      "_render_plots",
+      "benchmark_feature_selection"
+    ],
+    "src/eruption_forecast/utils/dataframe.py": [
+      "remove_anomalies",
+      "to_series",
+      "load_label_csv",
+      "load_datetime_indexed",
+      "load_features_matrix",
+      "get_envelope_values"
+    ],
+    "src/eruption_forecast/utils/date_utils.py": [
+      "to_datetime",
+      "sort_dates",
+      "sort_dates",
+      "sort_dates",
+      "normalize_dates",
+      "parse_label_filename",
+      "to_datetime_index"
+    ],
+    "src/eruption_forecast/utils/feature_utils.py": [
+      "load_select_features",
+      "load_feature_aliases",
+      "migrate_score_column",
+      "update_top_features_csv",
+      "concat_features",
+      "concat_significant_features",
+      "find_common_features",
+      "_prepare_features_frame",
+      "merge_features_matrix"
+    ],
+    "src/eruption_forecast/utils/formatting.py": [
+      "_fmt_hz",
+      "_humanize_column",
+      "slugify_class_name",
+      "slugify",
+      "shorten_feature_name",
+      "humanize_feature_name",
+      "get_classifier_label"
+    ],
+    "src/eruption_forecast/utils/ml.py": [
+      "build_y_true",
+      "temporal_train_test_split",
+      "compute_threshold_metrics",
+      "compute_aggregate_threshold_metrics",
+      "random_under_sampler",
+      "resample",
+      "load_features_resampled",
+      "get_significant_features",
+      "get_classifier_models",
+      "grid_search_cv",
+      "save_model_json",
+      "compute_seed",
+      "build_classifier_ensemble_summary"
+    ],
+    "src/eruption_forecast/utils/pathutils.py": [
+      "pdf_metadata",
+      "ensure_dir",
+      "load_json",
+      "load_pickle",
+      "resolve_output_dir",
+      "save_figure_as_pdf",
+      "save_figure",
+      "save_data",
+      "setup_nslc_directories",
+      "generate_features_filepaths"
+    ],
+    "src/eruption_forecast/utils/validation.py": [
+      "validate_random_state",
+      "validate_date_ranges",
+      "validate_window_step",
+      "check_sampling_consistency",
+      "validate_columns"
+    ],
+    "src/eruption_forecast/utils/window.py": [
+      "get_windows_information",
+      "shannon_entropy",
+      "to_safe_array",
+      "chunk_daily_data",
+      "calculate_window_metrics",
+      "construct_windows"
+    ]
+  },
+  "batches": [
+    {
+      "batchIndex": 1,
+      "files": [
+        {
+          "path": "src/eruption_forecast/dataclass/__init__.py",
+          "language": "python",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+          "language": "python",
+          "sizeLines": 114,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/dataclass/classifier_explanation.py",
+          "language": "python",
+          "sizeLines": 25,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/dataclass/station_data.py",
+          "language": "python",
+          "sizeLines": 82,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/ensemble/__init__.py",
+          "language": "python",
+          "sizeLines": 12,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/ensemble/base_ensemble.py",
+          "language": "python",
+          "sizeLines": 50,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "language": "python",
+          "sizeLines": 516,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+          "language": "python",
+          "sizeLines": 591,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+          "language": "python",
+          "sizeLines": 664,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/explanation_model.py",
+          "language": "python",
+          "sizeLines": 586,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/explanation_plots.py",
+          "language": "python",
+          "sizeLines": 688,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/array.py",
+          "language": "python",
+          "sizeLines": 444,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/formatting.py",
+          "language": "python",
+          "sizeLines": 408,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/dataclass/__init__.py": [
+          "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+          "src/eruption_forecast/dataclass/classifier_explanation.py",
+          "src/eruption_forecast/dataclass/station_data.py"
+        ],
+        "src/eruption_forecast/dataclass/classifier_ensemble_summary.py": [],
+        "src/eruption_forecast/dataclass/classifier_explanation.py": [],
+        "src/eruption_forecast/dataclass/station_data.py": [],
+        "src/eruption_forecast/ensemble/__init__.py": [
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/seed_ensemble.py"
+        ],
+        "src/eruption_forecast/ensemble/base_ensemble.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/ensemble/classifier_ensemble.py": [
+          "src/eruption_forecast/ensemble/base_ensemble.py",
+          "src/eruption_forecast/ensemble/seed_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/array.py"
+        ],
+        "src/eruption_forecast/ensemble/explainer_ensemble.py": [
+          "src/eruption_forecast/dataclass/classifier_explanation.py",
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/seed_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/explanation_plots.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/ensemble/seed_ensemble.py": [
+          "src/eruption_forecast/ensemble/base_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/array.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/model/explanation_model.py": [
+          "src/eruption_forecast/config/explanation_config.py",
+          "src/eruption_forecast/dataclass/classifier_explanation.py",
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/explainer_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/base_model.py",
+          "src/eruption_forecast/model/prediction_model.py",
+          "src/eruption_forecast/model/training_model.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/plots/explanation_plots.py": [
+          "src/eruption_forecast/dataclass/__init__.py",
+          "src/eruption_forecast/dataclass/classifier_explanation.py",
+          "src/eruption_forecast/ensemble/__init__.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/utils/ml.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/utils/array.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/utils/formatting.py": [
+          "src/eruption_forecast/config/constants.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/dataclass/classifier_ensemble_summary.py": [
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          }
+        ],
+        "src/eruption_forecast/ensemble/base_ensemble.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/ensemble/classifier_ensemble.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+            "batchIndex": 7,
+            "symbols": [
+              "MetricsEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/base_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "BaseModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/classifier_comparator.py",
+            "batchIndex": 7,
+            "symbols": [
+              "ClassifierComparator"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/ensemble/explainer_ensemble.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/ensemble/seed_ensemble.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/explanation_model.py": [
+          {
+            "path": "src/eruption_forecast/config/explanation_config.py",
+            "batchIndex": 6,
+            "symbols": [
+              "ExplanationConfig"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/base_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "BaseModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/explanation_plots.py": [
+          {
+            "path": "src/eruption_forecast/plots/styles.py",
+            "batchIndex": 7,
+            "symbols": [
+              "setup_nature_style",
+              "apply_nature_style",
+              "shap_figure",
+              "nature_figure",
+              "get_color",
+              "configure_spine",
+              "get_figure_size"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/array.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/dataframe.py",
+            "batchIndex": 4,
+            "symbols": [
+              "remove_anomalies",
+              "to_series",
+              "load_label_csv",
+              "load_datetime_indexed",
+              "load_features_matrix",
+              "get_envelope_values"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/window.py",
+            "batchIndex": 3,
+            "symbols": [
+              "get_windows_information",
+              "shannon_entropy",
+              "to_safe_array",
+              "chunk_daily_data",
+              "calculate_window_metrics",
+              "construct_windows"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/formatting.py": [
+          {
+            "path": "src/eruption_forecast/config/constants.py",
+            "batchIndex": 3,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/classifier_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "ClassifierModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model_scenario.py",
+            "batchIndex": 2,
+            "symbols": [
+              "Scenario",
+              "ForecastModelScenario"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/feature_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_significant_features",
+              "_process_single_file",
+              "replot_significant_features",
+              "_extract_band_prefix",
+              "_annotate_bar_percentages",
+              "_finalize_frequency_band_layout",
+              "plot_frequency_band_contribution",
+              "plot_feature_correlations",
+              "plot_feature_count_curve",
+              "plot_common_features_heatmap",
+              "plot_common_features_correlation",
+              "plot_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/forecast_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_forecast",
+              "plot_forecast_from_file",
+              "_ax_per_classifier",
+              "_ax_forecast",
+              "ax_eruption",
+              "_ax_segment"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/feature_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "load_select_features",
+              "load_feature_aliases",
+              "migrate_score_column",
+              "update_top_features_csv",
+              "concat_features",
+              "concat_significant_features",
+              "find_common_features",
+              "_prepare_features_frame",
+              "merge_features_matrix"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 2,
+      "files": [
+        {
+          "path": "src/eruption_forecast/__init__.py",
+          "language": "python",
+          "sizeLines": 89,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/data_container.py",
+          "language": "python",
+          "sizeLines": 100,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/decorators/__init__.py",
+          "language": "python",
+          "sizeLines": 8,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/decorators/notify.py",
+          "language": "python",
+          "sizeLines": 244,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/decorators/timer.py",
+          "language": "python",
+          "sizeLines": 68,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/label/constants.py",
+          "language": "python",
+          "sizeLines": 19,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/label/label_builder.py",
+          "language": "python",
+          "sizeLines": 1261,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/label/label_data.py",
+          "language": "python",
+          "sizeLines": 302,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/forecast_model_scenario.py",
+          "language": "python",
+          "sizeLines": 927,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/notification/__init__.py",
+          "language": "python",
+          "sizeLines": 6,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/notification/telegram.py",
+          "language": "python",
+          "sizeLines": 452,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/label_plots.py",
+          "language": "python",
+          "sizeLines": 437,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/__init__.py": [
+          "src/eruption_forecast/decorators/notify.py",
+          "src/eruption_forecast/decorators/timer.py",
+          "src/eruption_forecast/features/features_builder.py",
+          "src/eruption_forecast/features/tremor_matrix_builder.py",
+          "src/eruption_forecast/label/dynamic_label_builder.py",
+          "src/eruption_forecast/label/label_builder.py",
+          "src/eruption_forecast/label/label_data.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/evaluation_model.py",
+          "src/eruption_forecast/model/explanation_model.py",
+          "src/eruption_forecast/model/forecast_model.py",
+          "src/eruption_forecast/model/prediction_model.py",
+          "src/eruption_forecast/model/training_model.py",
+          "src/eruption_forecast/notification/telegram.py",
+          "src/eruption_forecast/tremor/calculate_tremor.py",
+          "src/eruption_forecast/tremor/tremor_data.py"
+        ],
+        "src/eruption_forecast/data_container.py": [],
+        "src/eruption_forecast/decorators/__init__.py": [
+          "src/eruption_forecast/decorators/notify.py",
+          "src/eruption_forecast/decorators/timer.py"
+        ],
+        "src/eruption_forecast/decorators/notify.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/notification/telegram.py"
+        ],
+        "src/eruption_forecast/decorators/timer.py": [
+          "src/eruption_forecast/notification/telegram.py"
+        ],
+        "src/eruption_forecast/label/constants.py": [],
+        "src/eruption_forecast/label/label_builder.py": [
+          "src/eruption_forecast/config/label_config.py",
+          "src/eruption_forecast/label/constants.py",
+          "src/eruption_forecast/label/label_data.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/label_plots.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py",
+          "src/eruption_forecast/utils/window.py"
+        ],
+        "src/eruption_forecast/label/label_data.py": [
+          "src/eruption_forecast/data_container.py",
+          "src/eruption_forecast/label/constants.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/date_utils.py"
+        ],
+        "src/eruption_forecast/model/forecast_model_scenario.py": [
+          "src/eruption_forecast/__init__.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/notification/__init__.py": [
+          "src/eruption_forecast/notification/telegram.py"
+        ],
+        "src/eruption_forecast/notification/telegram.py": [],
+        "src/eruption_forecast/plots/label_plots.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/__init__.py": [
+          {
+            "path": "src/eruption_forecast/features/features_builder.py",
+            "batchIndex": 5,
+            "symbols": [
+              "FeaturesBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/tremor_matrix_builder.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorMatrixBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+            "batchIndex": 4,
+            "symbols": [
+              "DynamicLabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/tremor_data.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorData"
+            ]
+          }
+        ],
+        "src/eruption_forecast/data_container.py": [
+          {
+            "path": "src/eruption_forecast/tremor/tremor_data.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorData"
+            ]
+          }
+        ],
+        "src/eruption_forecast/decorators/notify.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          }
+        ],
+        "src/eruption_forecast/label/label_builder.py": [
+          {
+            "path": "src/eruption_forecast/config/label_config.py",
+            "batchIndex": 6,
+            "symbols": [
+              "LabelConfig"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/window.py",
+            "batchIndex": 3,
+            "symbols": [
+              "get_windows_information",
+              "shannon_entropy",
+              "to_safe_array",
+              "chunk_daily_data",
+              "calculate_window_metrics",
+              "construct_windows"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+            "batchIndex": 4,
+            "symbols": [
+              "DynamicLabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/label/label_data.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/forecast_model_scenario.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/label_plots.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/__init__.py",
+            "batchIndex": 7,
+            "symbols": []
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 3,
+      "files": [
+        {
+          "path": "src/eruption_forecast/config/constants.py",
+          "language": "python",
+          "sizeLines": 32,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/sources/__init__.py",
+          "language": "python",
+          "sizeLines": 8,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/sources/base.py",
+          "language": "python",
+          "sizeLines": 48,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/sources/fdsn.py",
+          "language": "python",
+          "sizeLines": 212,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/sources/sds.py",
+          "language": "python",
+          "sizeLines": 362,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/tremor/__init__.py",
+          "language": "python",
+          "sizeLines": 14,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+          "language": "python",
+          "sizeLines": 1701,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/tremor/dsar.py",
+          "language": "python",
+          "sizeLines": 168,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/tremor/rsam.py",
+          "language": "python",
+          "sizeLines": 186,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/tremor/shannon_entropy.py",
+          "language": "python",
+          "sizeLines": 161,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/window.py",
+          "language": "python",
+          "sizeLines": 403,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/config/constants.py": [],
+        "src/eruption_forecast/sources/__init__.py": [
+          "src/eruption_forecast/sources/fdsn.py",
+          "src/eruption_forecast/sources/sds.py"
+        ],
+        "src/eruption_forecast/sources/base.py": [],
+        "src/eruption_forecast/sources/fdsn.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/sources/base.py",
+          "src/eruption_forecast/sources/sds.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/sources/sds.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/sources/base.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/tremor/__init__.py": [
+          "src/eruption_forecast/tremor/calculate_tremor.py",
+          "src/eruption_forecast/tremor/dsar.py",
+          "src/eruption_forecast/tremor/rsam.py",
+          "src/eruption_forecast/tremor/shannon_entropy.py",
+          "src/eruption_forecast/tremor/tremor_data.py"
+        ],
+        "src/eruption_forecast/tremor/calculate_tremor.py": [
+          "src/eruption_forecast/__init__.py",
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/tremor_plots.py",
+          "src/eruption_forecast/sources/fdsn.py",
+          "src/eruption_forecast/sources/sds.py",
+          "src/eruption_forecast/tremor/rsam.py",
+          "src/eruption_forecast/tremor/shannon_entropy.py",
+          "src/eruption_forecast/utils/dataframe.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/pathutils.py",
+          "src/eruption_forecast/utils/window.py"
+        ],
+        "src/eruption_forecast/tremor/dsar.py": [
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/utils/window.py"
+        ],
+        "src/eruption_forecast/tremor/rsam.py": [
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/utils/window.py"
+        ],
+        "src/eruption_forecast/tremor/shannon_entropy.py": [
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/utils/window.py"
+        ],
+        "src/eruption_forecast/utils/window.py": [
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/array.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/validation.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/config/constants.py": [
+          {
+            "path": "src/eruption_forecast/config/__init__.py",
+            "batchIndex": 6,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/plots/styles.py",
+            "batchIndex": 7,
+            "symbols": [
+              "setup_nature_style",
+              "apply_nature_style",
+              "shap_figure",
+              "nature_figure",
+              "get_color",
+              "configure_spine",
+              "get_figure_size"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/tremor_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_tremor",
+              "plot_tremor_from_file",
+              "_process_single_tremor_file",
+              "replot_tremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          }
+        ],
+        "src/eruption_forecast/sources/fdsn.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/sources/sds.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/tremor/__init__.py": [
+          {
+            "path": "src/eruption_forecast/tremor/tremor_data.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorData"
+            ]
+          }
+        ],
+        "src/eruption_forecast/tremor/calculate_tremor.py": [
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/tremor_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_tremor",
+              "plot_tremor_from_file",
+              "_process_single_tremor_file",
+              "replot_tremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/dataframe.py",
+            "batchIndex": 4,
+            "symbols": [
+              "remove_anomalies",
+              "to_series",
+              "load_label_csv",
+              "load_datetime_indexed",
+              "load_features_matrix",
+              "get_envelope_values"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/window.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/array.py",
+            "batchIndex": 1,
+            "symbols": [
+              "save_forecast_seed",
+              "compute_model_probabilities",
+              "confidence_interval",
+              "detect_anomalies_zscore",
+              "mask_zero_values",
+              "get_completeness",
+              "count_valid_values",
+              "filter_nans",
+              "detect_maximum_outlier",
+              "remove_maximum_outlier",
+              "remove_outliers"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/validation.py",
+            "batchIndex": 5,
+            "symbols": [
+              "validate_random_state",
+              "validate_date_ranges",
+              "validate_window_step",
+              "check_sampling_consistency",
+              "validate_columns"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 4,
+      "files": [
+        {
+          "path": "src/eruption_forecast/features/__init__.py",
+          "language": "python",
+          "sizeLines": 10,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/features/feature_count_sweep.py",
+          "language": "python",
+          "sizeLines": 1070,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/features/feature_selector.py",
+          "language": "python",
+          "sizeLines": 551,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+          "language": "python",
+          "sizeLines": 257,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/logger.py",
+          "language": "python",
+          "sizeLines": 298,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/classifier_model.py",
+          "language": "python",
+          "sizeLines": 630,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/constants.py",
+          "language": "python",
+          "sizeLines": 116,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/training_model.py",
+          "language": "python",
+          "sizeLines": 2110,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/benchmark.py",
+          "language": "python",
+          "sizeLines": 493,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/dataframe.py",
+          "language": "python",
+          "sizeLines": 352,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/ml.py",
+          "language": "python",
+          "sizeLines": 955,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/features/__init__.py": [
+          "src/eruption_forecast/features/feature_count_sweep.py"
+        ],
+        "src/eruption_forecast/features/feature_count_sweep.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/feature_plots.py",
+          "src/eruption_forecast/utils/dataframe.py",
+          "src/eruption_forecast/utils/ml.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/features/feature_selector.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/ml.py",
+          "src/eruption_forecast/utils/validation.py"
+        ],
+        "src/eruption_forecast/label/dynamic_label_builder.py": [
+          "src/eruption_forecast/label/label_builder.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/logger.py": [
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/model/classifier_model.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/constants.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/validation.py"
+        ],
+        "src/eruption_forecast/model/constants.py": [],
+        "src/eruption_forecast/model/training_model.py": [
+          "src/eruption_forecast/config/training_config.py",
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/seed_ensemble.py",
+          "src/eruption_forecast/features/feature_selector.py",
+          "src/eruption_forecast/label/dynamic_label_builder.py",
+          "src/eruption_forecast/label/label_builder.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/base_model.py",
+          "src/eruption_forecast/model/classifier_model.py",
+          "src/eruption_forecast/plots/__init__.py",
+          "src/eruption_forecast/utils/dataframe.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/feature_utils.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/ml.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/utils/benchmark.py": [
+          "src/eruption_forecast/features/feature_selector.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/classifier_model.py",
+          "src/eruption_forecast/model/training_model.py",
+          "src/eruption_forecast/utils/ml.py"
+        ],
+        "src/eruption_forecast/utils/dataframe.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/array.py",
+          "src/eruption_forecast/utils/date_utils.py"
+        ],
+        "src/eruption_forecast/utils/ml.py": [
+          "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+          "src/eruption_forecast/ensemble/seed_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/classifier_model.py",
+          "src/eruption_forecast/utils/dataframe.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/features/feature_count_sweep.py": [
+          {
+            "path": "src/eruption_forecast/plots/feature_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_significant_features",
+              "_process_single_file",
+              "replot_significant_features",
+              "_extract_band_prefix",
+              "_annotate_bar_percentages",
+              "_finalize_frequency_band_layout",
+              "plot_frequency_band_contribution",
+              "plot_feature_correlations",
+              "plot_feature_count_curve",
+              "plot_common_features_heatmap",
+              "plot_common_features_correlation",
+              "plot_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/features/feature_selector.py": [
+          {
+            "path": "src/eruption_forecast/utils/validation.py",
+            "batchIndex": 5,
+            "symbols": [
+              "validate_random_state",
+              "validate_date_ranges",
+              "validate_window_step",
+              "check_sampling_consistency",
+              "validate_columns"
+            ]
+          }
+        ],
+        "src/eruption_forecast/label/dynamic_label_builder.py": [
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          }
+        ],
+        "src/eruption_forecast/logger.py": [
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/decorators/notify.py",
+            "batchIndex": 2,
+            "symbols": [
+              "_format_elapsed",
+              "_escape_md",
+              "_escape_pre",
+              "_error_message",
+              "_success_message",
+              "_dispatch",
+              "notify"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/base_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "BaseEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplainerEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+            "batchIndex": 7,
+            "symbols": [
+              "MetricsEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "SeedEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/features_builder.py",
+            "batchIndex": 5,
+            "symbols": [
+              "FeaturesBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/tremor_matrix_builder.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorMatrixBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_data.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelData"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/base_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "BaseModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/classifier_comparator.py",
+            "batchIndex": 7,
+            "symbols": [
+              "ClassifierComparator"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model_scenario.py",
+            "batchIndex": 2,
+            "symbols": [
+              "Scenario",
+              "ForecastModelScenario"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/evaluation_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_threshold_analysis",
+              "plot_confusion_matrix",
+              "plot_roc_curve",
+              "plot_precision_recall_curve",
+              "plot_g_mean_curve",
+              "plot_mcc_curve",
+              "plot_feature_importance",
+              "plot_aggregate_roc_curve",
+              "plot_aggregate_precision_recall_curve",
+              "plot_aggregate_threshold_analysis",
+              "plot_aggregate_g_mean_curve",
+              "plot_aggregate_mcc_curve",
+              "plot_aggregate_feature_importance",
+              "render_one_plot",
+              "render_one_aggregate_plot"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/feature_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_significant_features",
+              "_process_single_file",
+              "replot_significant_features",
+              "_extract_band_prefix",
+              "_annotate_bar_percentages",
+              "_finalize_frequency_band_layout",
+              "plot_frequency_band_contribution",
+              "plot_feature_correlations",
+              "plot_feature_count_curve",
+              "plot_common_features_heatmap",
+              "plot_common_features_correlation",
+              "plot_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/forecast_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_forecast",
+              "plot_forecast_from_file",
+              "_ax_per_classifier",
+              "_ax_forecast",
+              "ax_eruption",
+              "_ax_segment"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/label_plots.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelScenarioEntry",
+              "LabelScenarioFileEntry",
+              "plot_label_distribution",
+              "plot_label_distribution_from_file",
+              "plot_label_distribution_comparison",
+              "plot_label_distribution_comparison_from_files"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/tremor_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_tremor",
+              "plot_tremor_from_file",
+              "_process_single_tremor_file",
+              "replot_tremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/sources/fdsn.py",
+            "batchIndex": 3,
+            "symbols": [
+              "FDSN"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/sources/sds.py",
+            "batchIndex": 3,
+            "symbols": [
+              "SDS"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/array.py",
+            "batchIndex": 1,
+            "symbols": [
+              "save_forecast_seed",
+              "compute_model_probabilities",
+              "confidence_interval",
+              "detect_anomalies_zscore",
+              "mask_zero_values",
+              "get_completeness",
+              "count_valid_values",
+              "filter_nans",
+              "detect_maximum_outlier",
+              "remove_maximum_outlier",
+              "remove_outliers"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/feature_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "load_select_features",
+              "load_feature_aliases",
+              "migrate_score_column",
+              "update_top_features_csv",
+              "concat_features",
+              "concat_significant_features",
+              "find_common_features",
+              "_prepare_features_frame",
+              "merge_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/validation.py",
+            "batchIndex": 5,
+            "symbols": [
+              "validate_random_state",
+              "validate_date_ranges",
+              "validate_window_step",
+              "check_sampling_consistency",
+              "validate_columns"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/window.py",
+            "batchIndex": 3,
+            "symbols": [
+              "get_windows_information",
+              "shannon_entropy",
+              "to_safe_array",
+              "chunk_daily_data",
+              "calculate_window_metrics",
+              "construct_windows"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/classifier_model.py": [
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/validation.py",
+            "batchIndex": 5,
+            "symbols": [
+              "validate_random_state",
+              "validate_date_ranges",
+              "validate_window_step",
+              "check_sampling_consistency",
+              "validate_columns"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/training_model.py": [
+          {
+            "path": "src/eruption_forecast/config/training_config.py",
+            "batchIndex": 6,
+            "symbols": [
+              "TrainingConfig"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "SeedEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/base_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "BaseModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/__init__.py",
+            "batchIndex": 7,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/feature_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "load_select_features",
+              "load_feature_aliases",
+              "migrate_score_column",
+              "update_top_features_csv",
+              "concat_features",
+              "concat_significant_features",
+              "find_common_features",
+              "_prepare_features_frame",
+              "merge_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/dataframe.py": [
+          {
+            "path": "src/eruption_forecast/utils/array.py",
+            "batchIndex": 1,
+            "symbols": [
+              "save_forecast_seed",
+              "compute_model_probabilities",
+              "confidence_interval",
+              "detect_anomalies_zscore",
+              "mask_zero_values",
+              "get_completeness",
+              "count_valid_values",
+              "filter_nans",
+              "detect_maximum_outlier",
+              "remove_maximum_outlier",
+              "remove_outliers"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/feature_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_significant_features",
+              "_process_single_file",
+              "replot_significant_features",
+              "_extract_band_prefix",
+              "_annotate_bar_percentages",
+              "_finalize_frequency_band_layout",
+              "plot_frequency_band_contribution",
+              "plot_feature_correlations",
+              "plot_feature_count_curve",
+              "plot_common_features_heatmap",
+              "plot_common_features_correlation",
+              "plot_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/forecast_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_forecast",
+              "plot_forecast_from_file",
+              "_ax_per_classifier",
+              "_ax_forecast",
+              "ax_eruption",
+              "_ax_segment"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/ml.py": [
+          {
+            "path": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ProbabilityPick",
+              "SeedSummary",
+              "EruptionWindow",
+              "ClassifierEnsembleSummary"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "SeedEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+            "batchIndex": 7,
+            "symbols": [
+              "MetricsEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/evaluation_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_threshold_analysis",
+              "plot_confusion_matrix",
+              "plot_roc_curve",
+              "plot_precision_recall_curve",
+              "plot_g_mean_curve",
+              "plot_mcc_curve",
+              "plot_feature_importance",
+              "plot_aggregate_roc_curve",
+              "plot_aggregate_precision_recall_curve",
+              "plot_aggregate_threshold_analysis",
+              "plot_aggregate_g_mean_curve",
+              "plot_aggregate_mcc_curve",
+              "plot_aggregate_feature_importance",
+              "render_one_plot",
+              "render_one_aggregate_plot"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/explanation_plots.py",
+            "batchIndex": 1,
+            "symbols": [
+              "plot_shap_waterfall",
+              "plot_shap_beeswarm",
+              "plot_shap_bar",
+              "render_seed_plot",
+              "_aggregate_importance",
+              "_aggregate_explanation",
+              "plot_aggregate_shap_bar",
+              "plot_aggregate_shap_beeswarm",
+              "_build_explanation_plot",
+              "plot_classifier_waterfall"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 5,
+      "files": [
+        {
+          "path": "src/eruption_forecast/features/constants.py",
+          "language": "python",
+          "sizeLines": 32,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/features/features_builder.py",
+          "language": "python",
+          "sizeLines": 923,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/features/tremor_matrix_builder.py",
+          "language": "python",
+          "sizeLines": 570,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/base_model.py",
+          "language": "python",
+          "sizeLines": 783,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/forecast_model.py",
+          "language": "python",
+          "sizeLines": 1376,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/prediction_model.py",
+          "language": "python",
+          "sizeLines": 1200,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/tremor/tremor_data.py",
+          "language": "python",
+          "sizeLines": 290,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/__init__.py",
+          "language": "python",
+          "sizeLines": 37,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/date_utils.py",
+          "language": "python",
+          "sizeLines": 381,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/feature_utils.py",
+          "language": "python",
+          "sizeLines": 772,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/validation.py",
+          "language": "python",
+          "sizeLines": 238,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/features/constants.py": [],
+        "src/eruption_forecast/features/features_builder.py": [
+          "src/eruption_forecast/features/constants.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/feature_utils.py",
+          "src/eruption_forecast/utils/pathutils.py",
+          "src/eruption_forecast/utils/validation.py"
+        ],
+        "src/eruption_forecast/features/tremor_matrix_builder.py": [
+          "src/eruption_forecast/features/constants.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/pathutils.py",
+          "src/eruption_forecast/utils/validation.py"
+        ],
+        "src/eruption_forecast/model/base_model.py": [
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/features/features_builder.py",
+          "src/eruption_forecast/features/tremor_matrix_builder.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/tremor/tremor_data.py",
+          "src/eruption_forecast/utils/__init__.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/model/forecast_model.py": [
+          "src/eruption_forecast/config/forecast_config.py",
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/evaluation_model.py",
+          "src/eruption_forecast/model/explanation_model.py",
+          "src/eruption_forecast/model/prediction_model.py",
+          "src/eruption_forecast/model/training_model.py",
+          "src/eruption_forecast/tremor/calculate_tremor.py",
+          "src/eruption_forecast/tremor/tremor_data.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/model/prediction_model.py": [
+          "src/eruption_forecast/config/prediction_config.py",
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/seed_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/base_model.py",
+          "src/eruption_forecast/plots/__init__.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/feature_utils.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py",
+          "src/eruption_forecast/utils/validation.py",
+          "src/eruption_forecast/utils/window.py"
+        ],
+        "src/eruption_forecast/tremor/tremor_data.py": [
+          "src/eruption_forecast/config/__init__.py",
+          "src/eruption_forecast/data_container.py",
+          "src/eruption_forecast/utils/validation.py"
+        ],
+        "src/eruption_forecast/utils/__init__.py": [
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/validation.py"
+        ],
+        "src/eruption_forecast/utils/date_utils.py": [],
+        "src/eruption_forecast/utils/feature_utils.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/formatting.py"
+        ],
+        "src/eruption_forecast/utils/validation.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/utils/date_utils.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/features/features_builder.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          }
+        ],
+        "src/eruption_forecast/features/tremor_matrix_builder.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          }
+        ],
+        "src/eruption_forecast/model/base_model.py": [
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/forecast_model.py": [
+          {
+            "path": "src/eruption_forecast/config/forecast_config.py",
+            "batchIndex": 6,
+            "symbols": [
+              "BaseForecastConfig",
+              "ForecastCalculateConfig",
+              "ForecastTrainConfig",
+              "ForecastPredictConfig",
+              "ForecastEvaluateConfig",
+              "ForecastExplainConfig",
+              "ForecastConfig"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          }
+        ],
+        "src/eruption_forecast/model/prediction_model.py": [
+          {
+            "path": "src/eruption_forecast/config/prediction_config.py",
+            "batchIndex": 6,
+            "symbols": [
+              "PredictionConfig"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "SeedEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/__init__.py",
+            "batchIndex": 7,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/window.py",
+            "batchIndex": 3,
+            "symbols": [
+              "get_windows_information",
+              "shannon_entropy",
+              "to_safe_array",
+              "chunk_daily_data",
+              "calculate_window_metrics",
+              "construct_windows"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/tremor/tremor_data.py": [
+          {
+            "path": "src/eruption_forecast/config/__init__.py",
+            "batchIndex": 6,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/data_container.py",
+            "batchIndex": 2,
+            "symbols": [
+              "BaseDataContainer"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/tremor/__init__.py",
+            "batchIndex": 3,
+            "symbols": []
+          }
+        ],
+        "src/eruption_forecast/utils/date_utils.py": [
+          {
+            "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+            "batchIndex": 4,
+            "symbols": [
+              "DynamicLabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_data.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelData"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/feature_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_significant_features",
+              "_process_single_file",
+              "replot_significant_features",
+              "_extract_band_prefix",
+              "_annotate_bar_percentages",
+              "_finalize_frequency_band_layout",
+              "plot_frequency_band_contribution",
+              "plot_feature_correlations",
+              "plot_feature_count_curve",
+              "plot_common_features_heatmap",
+              "plot_common_features_correlation",
+              "plot_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/forecast_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_forecast",
+              "plot_forecast_from_file",
+              "_ax_per_classifier",
+              "_ax_forecast",
+              "ax_eruption",
+              "_ax_segment"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/tremor_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_tremor",
+              "plot_tremor_from_file",
+              "_process_single_tremor_file",
+              "replot_tremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/sources/fdsn.py",
+            "batchIndex": 3,
+            "symbols": [
+              "FDSN"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/dataframe.py",
+            "batchIndex": 4,
+            "symbols": [
+              "remove_anomalies",
+              "to_series",
+              "load_label_csv",
+              "load_datetime_indexed",
+              "load_features_matrix",
+              "get_envelope_values"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/window.py",
+            "batchIndex": 3,
+            "symbols": [
+              "get_windows_information",
+              "shannon_entropy",
+              "to_safe_array",
+              "chunk_daily_data",
+              "calculate_window_metrics",
+              "construct_windows"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/feature_utils.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/feature_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_significant_features",
+              "_process_single_file",
+              "replot_significant_features",
+              "_extract_band_prefix",
+              "_annotate_bar_percentages",
+              "_finalize_frequency_band_layout",
+              "plot_frequency_band_contribution",
+              "plot_feature_correlations",
+              "plot_feature_count_curve",
+              "plot_common_features_heatmap",
+              "plot_common_features_correlation",
+              "plot_features_matrix"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/validation.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/feature_selector.py",
+            "batchIndex": 4,
+            "symbols": [
+              "FeatureSelector"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/classifier_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "ClassifierModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/window.py",
+            "batchIndex": 3,
+            "symbols": [
+              "get_windows_information",
+              "shannon_entropy",
+              "to_safe_array",
+              "chunk_daily_data",
+              "calculate_window_metrics",
+              "construct_windows"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 6,
+      "files": [
+        {
+          "path": "src/eruption_forecast/config/__init__.py",
+          "language": "python",
+          "sizeLines": 46,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/base_config.py",
+          "language": "python",
+          "sizeLines": 88,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/evaluation_config.py",
+          "language": "python",
+          "sizeLines": 137,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/explanation_config.py",
+          "language": "python",
+          "sizeLines": 137,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/forecast_config.py",
+          "language": "python",
+          "sizeLines": 578,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/label_config.py",
+          "language": "python",
+          "sizeLines": 156,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/prediction_config.py",
+          "language": "python",
+          "sizeLines": 169,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/config/training_config.py",
+          "language": "python",
+          "sizeLines": 183,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/utils/pathutils.py",
+          "language": "python",
+          "sizeLines": 393,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/config/__init__.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/config/evaluation_config.py",
+          "src/eruption_forecast/config/explanation_config.py",
+          "src/eruption_forecast/config/forecast_config.py",
+          "src/eruption_forecast/config/label_config.py",
+          "src/eruption_forecast/config/prediction_config.py",
+          "src/eruption_forecast/config/training_config.py"
+        ],
+        "src/eruption_forecast/config/base_config.py": [],
+        "src/eruption_forecast/config/evaluation_config.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/config/explanation_config.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/config/forecast_config.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/config/label_config.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/config/prediction_config.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/config/training_config.py": [
+          "src/eruption_forecast/config/base_config.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/utils/pathutils.py": [
+          "src/eruption_forecast/logger.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/config/__init__.py": [
+          {
+            "path": "src/eruption_forecast/config/constants.py",
+            "batchIndex": 3,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/plots/evaluation_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_threshold_analysis",
+              "plot_confusion_matrix",
+              "plot_roc_curve",
+              "plot_precision_recall_curve",
+              "plot_g_mean_curve",
+              "plot_mcc_curve",
+              "plot_feature_importance",
+              "plot_aggregate_roc_curve",
+              "plot_aggregate_precision_recall_curve",
+              "plot_aggregate_threshold_analysis",
+              "plot_aggregate_g_mean_curve",
+              "plot_aggregate_mcc_curve",
+              "plot_aggregate_feature_importance",
+              "render_one_plot",
+              "render_one_aggregate_plot"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/tremor_data.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorData"
+            ]
+          }
+        ],
+        "src/eruption_forecast/config/evaluation_config.py": [
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/config/explanation_config.py": [
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/config/forecast_config.py": [
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/config/label_config.py": [
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          }
+        ],
+        "src/eruption_forecast/config/prediction_config.py": [
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/config/training_config.py": [
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/utils/pathutils.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/base_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "BaseEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplainerEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+            "batchIndex": 7,
+            "symbols": [
+              "MetricsEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "SeedEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/feature_count_sweep.py",
+            "batchIndex": 4,
+            "symbols": [
+              "FeatureCountSweep",
+              "_to_list",
+              "_score_fold",
+              "_pick_best",
+              "sweep_feature_count",
+              "_resolve_training_context",
+              "_discover_cv_dir",
+              "_load_features_matrix",
+              "_load_labels",
+              "_discover_trained_top_n",
+              "_discover_classifier_names",
+              "_harvest_per_seed_inputs",
+              "_resolve_forecast_inputs",
+              "_persist_sweep"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/features_builder.py",
+            "batchIndex": 5,
+            "symbols": [
+              "FeaturesBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/tremor_matrix_builder.py",
+            "batchIndex": 5,
+            "symbols": [
+              "TremorMatrixBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+            "batchIndex": 4,
+            "symbols": [
+              "DynamicLabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/base_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "BaseModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/classifier_comparator.py",
+            "batchIndex": 7,
+            "symbols": [
+              "ClassifierComparator"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/evaluation_model.py",
+            "batchIndex": 7,
+            "symbols": [
+              "EvaluationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/explanation_model.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ExplanationModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model_scenario.py",
+            "batchIndex": 2,
+            "symbols": [
+              "Scenario",
+              "ForecastModelScenario"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/evaluation_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_threshold_analysis",
+              "plot_confusion_matrix",
+              "plot_roc_curve",
+              "plot_precision_recall_curve",
+              "plot_g_mean_curve",
+              "plot_mcc_curve",
+              "plot_feature_importance",
+              "plot_aggregate_roc_curve",
+              "plot_aggregate_precision_recall_curve",
+              "plot_aggregate_threshold_analysis",
+              "plot_aggregate_g_mean_curve",
+              "plot_aggregate_mcc_curve",
+              "plot_aggregate_feature_importance",
+              "render_one_plot",
+              "render_one_aggregate_plot"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/explanation_plots.py",
+            "batchIndex": 1,
+            "symbols": [
+              "plot_shap_waterfall",
+              "plot_shap_beeswarm",
+              "plot_shap_bar",
+              "render_seed_plot",
+              "_aggregate_importance",
+              "_aggregate_explanation",
+              "plot_aggregate_shap_bar",
+              "plot_aggregate_shap_beeswarm",
+              "_build_explanation_plot",
+              "plot_classifier_waterfall"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/label_plots.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelScenarioEntry",
+              "LabelScenarioFileEntry",
+              "plot_label_distribution",
+              "plot_label_distribution_from_file",
+              "plot_label_distribution_comparison",
+              "plot_label_distribution_comparison_from_files"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/plots/tremor_plots.py",
+            "batchIndex": 7,
+            "symbols": [
+              "plot_tremor",
+              "plot_tremor_from_file",
+              "_process_single_tremor_file",
+              "replot_tremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/sources/fdsn.py",
+            "batchIndex": 3,
+            "symbols": [
+              "FDSN"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/sources/sds.py",
+            "batchIndex": 3,
+            "symbols": [
+              "SDS"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/array.py",
+            "batchIndex": 1,
+            "symbols": [
+              "save_forecast_seed",
+              "compute_model_probabilities",
+              "confidence_interval",
+              "detect_anomalies_zscore",
+              "mask_zero_values",
+              "get_completeness",
+              "count_valid_values",
+              "filter_nans",
+              "detect_maximum_outlier",
+              "remove_maximum_outlier",
+              "remove_outliers"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 7,
+      "files": [
+        {
+          "path": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+          "language": "python",
+          "sizeLines": 578,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/classifier_comparator.py",
+          "language": "python",
+          "sizeLines": 1157,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/evaluation_model.py",
+          "language": "python",
+          "sizeLines": 754,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/__init__.py",
+          "language": "python",
+          "sizeLines": 75,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/evaluation_plots.py",
+          "language": "python",
+          "sizeLines": 1546,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/feature_plots.py",
+          "language": "python",
+          "sizeLines": 1300,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/forecast_plots.py",
+          "language": "python",
+          "sizeLines": 731,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/styles.py",
+          "language": "python",
+          "sizeLines": 406,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/plots/tremor_plots.py",
+          "language": "python",
+          "sizeLines": 606,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/eruption_forecast/ensemble/metrics_ensemble.py": [
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/evaluation_plots.py",
+          "src/eruption_forecast/utils/ml.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/model/classifier_comparator.py": [
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/metrics_ensemble.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/model/evaluation_model.py": [
+          "src/eruption_forecast/config/evaluation_config.py",
+          "src/eruption_forecast/ensemble/classifier_ensemble.py",
+          "src/eruption_forecast/ensemble/metrics_ensemble.py",
+          "src/eruption_forecast/label/label_builder.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/model/base_model.py",
+          "src/eruption_forecast/model/classifier_comparator.py",
+          "src/eruption_forecast/model/prediction_model.py",
+          "src/eruption_forecast/model/training_model.py",
+          "src/eruption_forecast/plots/__init__.py",
+          "src/eruption_forecast/utils/formatting.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/plots/__init__.py": [
+          "src/eruption_forecast/plots/evaluation_plots.py",
+          "src/eruption_forecast/plots/feature_plots.py",
+          "src/eruption_forecast/plots/forecast_plots.py",
+          "src/eruption_forecast/plots/label_plots.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/plots/tremor_plots.py"
+        ],
+        "src/eruption_forecast/plots/evaluation_plots.py": [
+          "src/eruption_forecast/config/__init__.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/utils/ml.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ],
+        "src/eruption_forecast/plots/feature_plots.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/forecast_plots.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/utils/dataframe.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/feature_utils.py",
+          "src/eruption_forecast/utils/formatting.py"
+        ],
+        "src/eruption_forecast/plots/forecast_plots.py": [
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/utils/dataframe.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/formatting.py"
+        ],
+        "src/eruption_forecast/plots/styles.py": [
+          "src/eruption_forecast/config/constants.py"
+        ],
+        "src/eruption_forecast/plots/tremor_plots.py": [
+          "src/eruption_forecast/config/constants.py",
+          "src/eruption_forecast/logger.py",
+          "src/eruption_forecast/plots/forecast_plots.py",
+          "src/eruption_forecast/plots/styles.py",
+          "src/eruption_forecast/utils/date_utils.py",
+          "src/eruption_forecast/utils/pathutils.py"
+        ]
+      },
+      "neighborMap": {
+        "src/eruption_forecast/ensemble/metrics_ensemble.py": [
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/classifier_comparator.py": [
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/model/evaluation_model.py": [
+          {
+            "path": "src/eruption_forecast/config/evaluation_config.py",
+            "batchIndex": 6,
+            "symbols": [
+              "EvaluationConfig"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+            "batchIndex": 1,
+            "symbols": [
+              "ClassifierEnsemble"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/label/label_builder.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelBuilder"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/base_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "BaseModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/__init__.py",
+            "batchIndex": 2,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/model/forecast_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "ForecastModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/__init__.py": [
+          {
+            "path": "src/eruption_forecast/plots/label_plots.py",
+            "batchIndex": 2,
+            "symbols": [
+              "LabelScenarioEntry",
+              "LabelScenarioFileEntry",
+              "plot_label_distribution",
+              "plot_label_distribution_from_file",
+              "plot_label_distribution_comparison",
+              "plot_label_distribution_comparison_from_files"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/prediction_model.py",
+            "batchIndex": 5,
+            "symbols": [
+              "PredictionModel"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/model/training_model.py",
+            "batchIndex": 4,
+            "symbols": [
+              "TrainingModel"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/evaluation_plots.py": [
+          {
+            "path": "src/eruption_forecast/config/__init__.py",
+            "batchIndex": 6,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/ml.py",
+            "batchIndex": 4,
+            "symbols": [
+              "build_y_true",
+              "temporal_train_test_split",
+              "compute_threshold_metrics",
+              "compute_aggregate_threshold_metrics",
+              "random_under_sampler",
+              "resample",
+              "load_features_resampled",
+              "get_significant_features",
+              "get_classifier_models",
+              "grid_search_cv",
+              "save_model_json",
+              "compute_seed",
+              "build_classifier_ensemble_summary"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/feature_plots.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/dataframe.py",
+            "batchIndex": 4,
+            "symbols": [
+              "remove_anomalies",
+              "to_series",
+              "load_label_csv",
+              "load_datetime_indexed",
+              "load_features_matrix",
+              "get_envelope_values"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/feature_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "load_select_features",
+              "load_feature_aliases",
+              "migrate_score_column",
+              "update_top_features_csv",
+              "concat_features",
+              "concat_significant_features",
+              "find_common_features",
+              "_prepare_features_frame",
+              "merge_features_matrix"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/features/feature_count_sweep.py",
+            "batchIndex": 4,
+            "symbols": [
+              "FeatureCountSweep",
+              "_to_list",
+              "_score_fold",
+              "_pick_best",
+              "sweep_feature_count",
+              "_resolve_training_context",
+              "_discover_cv_dir",
+              "_load_features_matrix",
+              "_load_labels",
+              "_discover_trained_top_n",
+              "_discover_classifier_names",
+              "_harvest_per_seed_inputs",
+              "_resolve_forecast_inputs",
+              "_persist_sweep"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/forecast_plots.py": [
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/dataframe.py",
+            "batchIndex": 4,
+            "symbols": [
+              "remove_anomalies",
+              "to_series",
+              "load_label_csv",
+              "load_datetime_indexed",
+              "load_features_matrix",
+              "get_envelope_values"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/formatting.py",
+            "batchIndex": 1,
+            "symbols": [
+              "_fmt_hz",
+              "_humanize_column",
+              "slugify_class_name",
+              "slugify",
+              "shorten_feature_name",
+              "humanize_feature_name",
+              "get_classifier_label"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/styles.py": [
+          {
+            "path": "src/eruption_forecast/config/constants.py",
+            "batchIndex": 3,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/plots/explanation_plots.py",
+            "batchIndex": 1,
+            "symbols": [
+              "plot_shap_waterfall",
+              "plot_shap_beeswarm",
+              "plot_shap_bar",
+              "render_seed_plot",
+              "_aggregate_importance",
+              "_aggregate_explanation",
+              "plot_aggregate_shap_bar",
+              "plot_aggregate_shap_beeswarm",
+              "_build_explanation_plot",
+              "plot_classifier_waterfall"
+            ]
+          }
+        ],
+        "src/eruption_forecast/plots/tremor_plots.py": [
+          {
+            "path": "src/eruption_forecast/config/constants.py",
+            "batchIndex": 3,
+            "symbols": []
+          },
+          {
+            "path": "src/eruption_forecast/logger.py",
+            "batchIndex": 4,
+            "symbols": [
+              "_category_filter",
+              "_uncategorized_filter",
+              "_configure_handlers",
+              "get_logger",
+              "get_category_logger",
+              "register_error_category",
+              "set_log_level",
+              "set_log_directory",
+              "disable_logging",
+              "enable_logging"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/date_utils.py",
+            "batchIndex": 5,
+            "symbols": [
+              "to_datetime",
+              "sort_dates",
+              "sort_dates",
+              "sort_dates",
+              "normalize_dates",
+              "parse_label_filename",
+              "to_datetime_index"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/utils/pathutils.py",
+            "batchIndex": 6,
+            "symbols": [
+              "pdf_metadata",
+              "ensure_dir",
+              "load_json",
+              "load_pickle",
+              "resolve_output_dir",
+              "save_figure_as_pdf",
+              "save_figure",
+              "save_data",
+              "setup_nslc_directories",
+              "generate_features_filepaths"
+            ]
+          },
+          {
+            "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+            "batchIndex": 3,
+            "symbols": [
+              "CalculateTremor"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchIndex": 8,
+      "files": [
+        {
+          "path": "wiki/API-Reference.md",
+          "language": "markdown",
+          "sizeLines": 1584,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Architecture.md",
+          "language": "markdown",
+          "sizeLines": 517,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Configuration.md",
+          "language": "markdown",
+          "sizeLines": 386,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Data-Sources.md",
+          "language": "markdown",
+          "sizeLines": 183,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Evaluation-Workflow.md",
+          "language": "markdown",
+          "sizeLines": 225,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Explanation-Workflow.md",
+          "language": "markdown",
+          "sizeLines": 516,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Feature-Count-Sweep.md",
+          "language": "markdown",
+          "sizeLines": 358,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Getting-Started.md",
+          "language": "markdown",
+          "sizeLines": 115,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Home.md",
+          "language": "markdown",
+          "sizeLines": 114,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Output-Structure.md",
+          "language": "markdown",
+          "sizeLines": 312,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Pipeline-Walkthrough.md",
+          "language": "markdown",
+          "sizeLines": 281,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Prediction-Workflow.md",
+          "language": "markdown",
+          "sizeLines": 323,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Training-Workflow.md",
+          "language": "markdown",
+          "sizeLines": 512,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Usage.md",
+          "language": "markdown",
+          "sizeLines": 302,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "wiki/Visualization.md",
+          "language": "markdown",
+          "sizeLines": 224,
+          "fileCategory": "docs"
+        }
+      ],
+      "batchImportData": {
+        "wiki/API-Reference.md": [],
+        "wiki/Architecture.md": [],
+        "wiki/Configuration.md": [],
+        "wiki/Data-Sources.md": [],
+        "wiki/Evaluation-Workflow.md": [],
+        "wiki/Explanation-Workflow.md": [],
+        "wiki/Feature-Count-Sweep.md": [],
+        "wiki/Getting-Started.md": [],
+        "wiki/Home.md": [],
+        "wiki/Output-Structure.md": [],
+        "wiki/Pipeline-Walkthrough.md": [],
+        "wiki/Prediction-Workflow.md": [],
+        "wiki/Training-Workflow.md": [],
+        "wiki/Usage.md": [],
+        "wiki/Visualization.md": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 9,
+      "files": [
+        {
+          "path": "README.md",
+          "language": "markdown",
+          "sizeLines": 791,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "forecast-scenario.py",
+          "language": "python",
+          "sizeLines": 226,
+          "fileCategory": "code"
+        },
+        {
+          "path": "main.py",
+          "language": "python",
+          "sizeLines": 112,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/label/__init__.py",
+          "language": "python",
+          "sizeLines": 0,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/eruption_forecast/model/__init__.py",
+          "language": "python",
+          "sizeLines": 0,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "README.md": [],
+        "forecast-scenario.py": [],
+        "main.py": [],
+        "src/eruption_forecast/label/__init__.py": [],
+        "src/eruption_forecast/model/__init__.py": []
+      },
+      "neighborMap": {}
+    }
+  ]
+}

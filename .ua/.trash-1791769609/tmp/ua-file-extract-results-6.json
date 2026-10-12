@@ -1,0 +1,1655 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 9,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 9,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 9,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/eruption_forecast/config/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 46,
+      "nonEmptyLines": 44,
+      "metrics": {
+        "importCount": 8,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/base_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 88,
+      "nonEmptyLines": 69,
+      "functions": [
+        {
+          "name": "_package_version",
+          "startLine": 7,
+          "endLine": 20,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "BaseConfig",
+          "startLine": 24,
+          "endLine": 88,
+          "methods": [
+            "to_dict",
+            "to_init_kwargs",
+            "from_dict"
+          ],
+          "properties": [
+            "version",
+            "saved_at"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "_package_version",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "BaseConfig",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_package_version",
+          "callee": "_pkg_version",
+          "lineNumber": 18
+        },
+        {
+          "caller": "to_dict",
+          "callee": "asdict",
+          "lineNumber": 55
+        },
+        {
+          "caller": "to_init_kwargs",
+          "callee": "self.to_dict",
+          "lineNumber": 69
+        },
+        {
+          "caller": "to_init_kwargs",
+          "callee": "d.pop",
+          "lineNumber": 70
+        },
+        {
+          "caller": "to_init_kwargs",
+          "callee": "d.pop",
+          "lineNumber": 71
+        },
+        {
+          "caller": "from_dict",
+          "callee": "data.items",
+          "lineNumber": 87
+        },
+        {
+          "caller": "from_dict",
+          "callee": "fields",
+          "lineNumber": 87
+        },
+        {
+          "caller": "from_dict",
+          "callee": "cls",
+          "lineNumber": 88
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/evaluation_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 137,
+      "nonEmptyLines": 113,
+      "classes": [
+        {
+          "name": "EvaluationConfig",
+          "startLine": 14,
+          "endLine": 137,
+          "methods": [
+            "to_dict",
+            "save",
+            "load"
+          ],
+          "properties": [
+            "eruption_dates",
+            "overwrite",
+            "output_dir",
+            "root_dir",
+            "prefix_config",
+            "n_jobs",
+            "save_model",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "EvaluationConfig",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_dict",
+          "callee": "getattr",
+          "lineNumber": 75
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 92
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 92
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 92
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 93
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now",
+          "lineNumber": 93
+        },
+        {
+          "caller": "save",
+          "callee": "self.to_dict",
+          "lineNumber": 94
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 97
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 98
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 100
+        },
+        {
+          "caller": "save",
+          "callee": "f.write",
+          "lineNumber": 101
+        },
+        {
+          "caller": "save",
+          "callee": "yaml.safe_dump",
+          "lineNumber": 102
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.exists",
+          "lineNumber": 127
+        },
+        {
+          "caller": "load",
+          "callee": "FileNotFoundError",
+          "lineNumber": 128
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext(path)[1].lower",
+          "lineNumber": 130
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext",
+          "lineNumber": 130
+        },
+        {
+          "caller": "load",
+          "callee": "open",
+          "lineNumber": 131
+        },
+        {
+          "caller": "load",
+          "callee": "json.load",
+          "lineNumber": 133
+        },
+        {
+          "caller": "load",
+          "callee": "yaml.safe_load",
+          "lineNumber": 135
+        },
+        {
+          "caller": "load",
+          "callee": "cls.from_dict",
+          "lineNumber": 137
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/explanation_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 137,
+      "nonEmptyLines": 113,
+      "classes": [
+        {
+          "name": "ExplanationConfig",
+          "startLine": 14,
+          "endLine": 137,
+          "methods": [
+            "to_dict",
+            "save",
+            "load"
+          ],
+          "properties": [
+            "eruption_dates",
+            "overwrite",
+            "output_dir",
+            "root_dir",
+            "prefix_config",
+            "n_jobs",
+            "save_model",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ExplanationConfig",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_dict",
+          "callee": "getattr",
+          "lineNumber": 75
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 92
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 92
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 92
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 93
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now",
+          "lineNumber": 93
+        },
+        {
+          "caller": "save",
+          "callee": "self.to_dict",
+          "lineNumber": 94
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 97
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 98
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 100
+        },
+        {
+          "caller": "save",
+          "callee": "f.write",
+          "lineNumber": 101
+        },
+        {
+          "caller": "save",
+          "callee": "yaml.safe_dump",
+          "lineNumber": 102
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.exists",
+          "lineNumber": 127
+        },
+        {
+          "caller": "load",
+          "callee": "FileNotFoundError",
+          "lineNumber": 128
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext(path)[1].lower",
+          "lineNumber": 130
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext",
+          "lineNumber": 130
+        },
+        {
+          "caller": "load",
+          "callee": "open",
+          "lineNumber": 131
+        },
+        {
+          "caller": "load",
+          "callee": "json.load",
+          "lineNumber": 133
+        },
+        {
+          "caller": "load",
+          "callee": "yaml.safe_load",
+          "lineNumber": 135
+        },
+        {
+          "caller": "load",
+          "callee": "cls.from_dict",
+          "lineNumber": 137
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/forecast_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 578,
+      "nonEmptyLines": 523,
+      "classes": [
+        {
+          "name": "BaseForecastConfig",
+          "startLine": 14,
+          "endLine": 57,
+          "methods": [],
+          "properties": [
+            "station",
+            "channel",
+            "network",
+            "location",
+            "day_to_forecast",
+            "output_dir",
+            "root_dir",
+            "overwrite",
+            "prefix_config",
+            "n_jobs",
+            "verbose"
+          ]
+        },
+        {
+          "name": "ForecastCalculateConfig",
+          "startLine": 61,
+          "endLine": 151,
+          "methods": [],
+          "properties": [
+            "start_date",
+            "end_date",
+            "source",
+            "methods",
+            "remove_outlier_method",
+            "remove_tremor_anomalies",
+            "interpolate",
+            "value_multiplier",
+            "cleanup_daily_dir",
+            "plot_daily",
+            "save_plot",
+            "plot_overwrite",
+            "sds_dir",
+            "client_url",
+            "minimum_completion_ratio",
+            "plot_eruption_dates",
+            "plot_rsam_as_log",
+            "plot_rolling_window",
+            "plot_filter_dsar_value",
+            "overwrite",
+            "n_jobs",
+            "verbose"
+          ]
+        },
+        {
+          "name": "ForecastTrainConfig",
+          "startLine": 155,
+          "endLine": 258,
+          "methods": [],
+          "properties": [
+            "start_date",
+            "end_date",
+            "eruption_dates",
+            "window_step",
+            "window_step_unit",
+            "label_builder",
+            "days_before_eruption",
+            "classifiers",
+            "cv_strategy",
+            "cv_splits",
+            "scoring",
+            "top_n_features",
+            "include_eruption_date",
+            "select_tremor_columns",
+            "save_tremor_matrix_per_method",
+            "exclude_features",
+            "select_features",
+            "minimum_completion",
+            "seeds",
+            "resample_method",
+            "minority_threshold",
+            "sampling_strategy",
+            "plot_features",
+            "output_dir",
+            "overwrite",
+            "n_jobs",
+            "n_grids",
+            "use_cache",
+            "verbose"
+          ]
+        },
+        {
+          "name": "ForecastPredictConfig",
+          "startLine": 262,
+          "endLine": 337,
+          "methods": [],
+          "properties": [
+            "start_date",
+            "end_date",
+            "window_step",
+            "window_step_unit",
+            "save_seed_result",
+            "plot_threshold",
+            "plot_title",
+            "plot_pdf",
+            "use_features_from",
+            "features_matrix_path",
+            "label_features_csv",
+            "enable_segments_plot",
+            "output_dir",
+            "overwrite",
+            "n_jobs",
+            "use_cache",
+            "verbose"
+          ]
+        },
+        {
+          "name": "ForecastEvaluateConfig",
+          "startLine": 341,
+          "endLine": 377,
+          "methods": [],
+          "properties": [
+            "model",
+            "eruption_dates",
+            "plot_per_seed",
+            "plot_aggregate",
+            "output_dir",
+            "overwrite",
+            "n_jobs",
+            "use_cache",
+            "verbose"
+          ]
+        },
+        {
+          "name": "ForecastExplainConfig",
+          "startLine": 381,
+          "endLine": 450,
+          "methods": [],
+          "properties": [
+            "model",
+            "eruption_dates",
+            "save_per_seed",
+            "plot_per_seed",
+            "plot_aggregate",
+            "figsize",
+            "max_display",
+            "group_remaining_features",
+            "dpi",
+            "check_additivity",
+            "overwrite_classifier_explanation",
+            "output_dir",
+            "overwrite",
+            "n_jobs",
+            "use_cache",
+            "verbose"
+          ]
+        },
+        {
+          "name": "ForecastConfig",
+          "startLine": 454,
+          "endLine": 578,
+          "methods": [
+            "to_dict",
+            "save",
+            "load"
+          ],
+          "properties": [
+            "model",
+            "calculate",
+            "train",
+            "predict",
+            "evaluate",
+            "explain"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "BaseForecastConfig",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastCalculateConfig",
+          "line": 60,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastTrainConfig",
+          "line": 154,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastPredictConfig",
+          "line": 261,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastEvaluateConfig",
+          "line": 340,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastExplainConfig",
+          "line": 380,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastConfig",
+          "line": 453,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_dict",
+          "callee": "self.model.to_dict",
+          "lineNumber": 494
+        },
+        {
+          "caller": "to_dict",
+          "callee": "getattr",
+          "lineNumber": 497
+        },
+        {
+          "caller": "to_dict",
+          "callee": "section.to_dict",
+          "lineNumber": 499
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 516
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 516
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 516
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 517
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now",
+          "lineNumber": 517
+        },
+        {
+          "caller": "save",
+          "callee": "self.to_dict",
+          "lineNumber": 518
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 521
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 522
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 524
+        },
+        {
+          "caller": "save",
+          "callee": "f.write",
+          "lineNumber": 525
+        },
+        {
+          "caller": "save",
+          "callee": "yaml.safe_dump",
+          "lineNumber": 526
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.exists",
+          "lineNumber": 551
+        },
+        {
+          "caller": "load",
+          "callee": "FileNotFoundError",
+          "lineNumber": 552
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext(path)[1].lower",
+          "lineNumber": 554
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext",
+          "lineNumber": 554
+        },
+        {
+          "caller": "load",
+          "callee": "open",
+          "lineNumber": 555
+        },
+        {
+          "caller": "load",
+          "callee": "json.load",
+          "lineNumber": 557
+        },
+        {
+          "caller": "load",
+          "callee": "yaml.safe_load",
+          "lineNumber": 559
+        },
+        {
+          "caller": "load",
+          "callee": "cls",
+          "lineNumber": 561
+        },
+        {
+          "caller": "load",
+          "callee": "data.get",
+          "lineNumber": 562
+        },
+        {
+          "caller": "load",
+          "callee": "_package_version",
+          "lineNumber": 562
+        },
+        {
+          "caller": "load",
+          "callee": "data.get",
+          "lineNumber": 563
+        },
+        {
+          "caller": "load",
+          "callee": "BaseForecastConfig.from_dict",
+          "lineNumber": 564
+        },
+        {
+          "caller": "load",
+          "callee": "data.get",
+          "lineNumber": 564
+        },
+        {
+          "caller": "load",
+          "callee": "section_map.items",
+          "lineNumber": 574
+        },
+        {
+          "caller": "load",
+          "callee": "setattr",
+          "lineNumber": 576
+        },
+        {
+          "caller": "load",
+          "callee": "section_cls.from_dict",
+          "lineNumber": 576
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 7,
+        "functionCount": 0,
+        "classCount": 7
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/label_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 156,
+      "nonEmptyLines": 132,
+      "classes": [
+        {
+          "name": "LabelConfig",
+          "startLine": 14,
+          "endLine": 156,
+          "methods": [
+            "to_dict",
+            "save",
+            "load"
+          ],
+          "properties": [
+            "start_date",
+            "end_date",
+            "window_step",
+            "window_step_unit",
+            "day_to_forecast",
+            "eruption_dates",
+            "volcano_id",
+            "include_eruption_date",
+            "output_dir",
+            "root_dir",
+            "verbose",
+            "debug"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "LabelConfig",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_dict",
+          "callee": "getattr",
+          "lineNumber": 94
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 111
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 111
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 111
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 112
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now",
+          "lineNumber": 112
+        },
+        {
+          "caller": "save",
+          "callee": "self.to_dict",
+          "lineNumber": 113
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 116
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 117
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 119
+        },
+        {
+          "caller": "save",
+          "callee": "f.write",
+          "lineNumber": 120
+        },
+        {
+          "caller": "save",
+          "callee": "yaml.safe_dump",
+          "lineNumber": 121
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.exists",
+          "lineNumber": 146
+        },
+        {
+          "caller": "load",
+          "callee": "FileNotFoundError",
+          "lineNumber": 147
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext(path)[1].lower",
+          "lineNumber": 149
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext",
+          "lineNumber": 149
+        },
+        {
+          "caller": "load",
+          "callee": "open",
+          "lineNumber": 150
+        },
+        {
+          "caller": "load",
+          "callee": "json.load",
+          "lineNumber": 152
+        },
+        {
+          "caller": "load",
+          "callee": "yaml.safe_load",
+          "lineNumber": 154
+        },
+        {
+          "caller": "load",
+          "callee": "cls.from_dict",
+          "lineNumber": 156
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/prediction_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 169,
+      "nonEmptyLines": 144,
+      "classes": [
+        {
+          "name": "PredictionConfig",
+          "startLine": 14,
+          "endLine": 169,
+          "methods": [
+            "to_dict",
+            "save",
+            "load"
+          ],
+          "properties": [
+            "model",
+            "tremor_data",
+            "start_date",
+            "end_date",
+            "window_size",
+            "nslc",
+            "training_hash",
+            "overwrite",
+            "output_dir",
+            "root_dir",
+            "prefix_config",
+            "n_jobs",
+            "save_model",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "PredictionConfig",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_dict",
+          "callee": "getattr",
+          "lineNumber": 107
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 124
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 124
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 124
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 125
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now",
+          "lineNumber": 125
+        },
+        {
+          "caller": "save",
+          "callee": "self.to_dict",
+          "lineNumber": 126
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 129
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 130
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 132
+        },
+        {
+          "caller": "save",
+          "callee": "f.write",
+          "lineNumber": 133
+        },
+        {
+          "caller": "save",
+          "callee": "yaml.safe_dump",
+          "lineNumber": 134
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.exists",
+          "lineNumber": 159
+        },
+        {
+          "caller": "load",
+          "callee": "FileNotFoundError",
+          "lineNumber": 160
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext(path)[1].lower",
+          "lineNumber": 162
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext",
+          "lineNumber": 162
+        },
+        {
+          "caller": "load",
+          "callee": "open",
+          "lineNumber": 163
+        },
+        {
+          "caller": "load",
+          "callee": "json.load",
+          "lineNumber": 165
+        },
+        {
+          "caller": "load",
+          "callee": "yaml.safe_load",
+          "lineNumber": 167
+        },
+        {
+          "caller": "load",
+          "callee": "cls.from_dict",
+          "lineNumber": 169
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/config/training_config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 183,
+      "nonEmptyLines": 159,
+      "classes": [
+        {
+          "name": "TrainingConfig",
+          "startLine": 14,
+          "endLine": 183,
+          "methods": [
+            "to_dict",
+            "save",
+            "load"
+          ],
+          "properties": [
+            "tremor_data",
+            "start_date",
+            "end_date",
+            "classifiers",
+            "eruption_dates",
+            "window_size",
+            "cv_strategy",
+            "cv_splits",
+            "top_n_features",
+            "include_eruption_date",
+            "nslc",
+            "output_dir",
+            "root_dir",
+            "overwrite",
+            "prefix_config",
+            "n_jobs",
+            "n_grids",
+            "save_model",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TrainingConfig",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_dict",
+          "callee": "getattr",
+          "lineNumber": 121
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 138
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 138
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 138
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 139
+        },
+        {
+          "caller": "save",
+          "callee": "datetime.now",
+          "lineNumber": 139
+        },
+        {
+          "caller": "save",
+          "callee": "self.to_dict",
+          "lineNumber": 140
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 143
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 144
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 146
+        },
+        {
+          "caller": "save",
+          "callee": "f.write",
+          "lineNumber": 147
+        },
+        {
+          "caller": "save",
+          "callee": "yaml.safe_dump",
+          "lineNumber": 148
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.exists",
+          "lineNumber": 173
+        },
+        {
+          "caller": "load",
+          "callee": "FileNotFoundError",
+          "lineNumber": 174
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext(path)[1].lower",
+          "lineNumber": 176
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.splitext",
+          "lineNumber": 176
+        },
+        {
+          "caller": "load",
+          "callee": "open",
+          "lineNumber": 177
+        },
+        {
+          "caller": "load",
+          "callee": "json.load",
+          "lineNumber": 179
+        },
+        {
+          "caller": "load",
+          "callee": "yaml.safe_load",
+          "lineNumber": 181
+        },
+        {
+          "caller": "load",
+          "callee": "cls.from_dict",
+          "lineNumber": 183
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/pathutils.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 393,
+      "nonEmptyLines": 323,
+      "functions": [
+        {
+          "name": "pdf_metadata",
+          "startLine": 14,
+          "endLine": 43,
+          "params": [
+            "title"
+          ]
+        },
+        {
+          "name": "ensure_dir",
+          "startLine": 46,
+          "endLine": 60,
+          "params": [
+            "path"
+          ]
+        },
+        {
+          "name": "load_json",
+          "startLine": 63,
+          "endLine": 83,
+          "params": [
+            "path"
+          ]
+        },
+        {
+          "name": "load_pickle",
+          "startLine": 86,
+          "endLine": 126,
+          "params": [
+            "path"
+          ]
+        },
+        {
+          "name": "resolve_output_dir",
+          "startLine": 129,
+          "endLine": 167,
+          "params": [
+            "output_dir",
+            "root_dir",
+            "default_subpath"
+          ]
+        },
+        {
+          "name": "save_figure_as_pdf",
+          "startLine": 170,
+          "endLine": 213,
+          "params": [
+            "fig",
+            "filepath",
+            "title",
+            "verbose"
+          ]
+        },
+        {
+          "name": "save_figure",
+          "startLine": 216,
+          "endLine": 285,
+          "params": [
+            "fig",
+            "filepath",
+            "dpi",
+            "filetype",
+            "save_as_pdf",
+            "pdf_title",
+            "verbose"
+          ]
+        },
+        {
+          "name": "save_data",
+          "startLine": 288,
+          "endLine": 323,
+          "params": [
+            "data",
+            "path",
+            "filetype"
+          ]
+        },
+        {
+          "name": "setup_nslc_directories",
+          "startLine": 326,
+          "endLine": 360,
+          "params": [
+            "network",
+            "station",
+            "location",
+            "channel",
+            "output_dir",
+            "root_dir"
+          ]
+        },
+        {
+          "name": "generate_features_filepaths",
+          "startLine": 363,
+          "endLine": 393,
+          "params": [
+            "random_state",
+            "features_seed_dir",
+            "features_resampled_dir",
+            "figures_seed_dir",
+            "plot_features",
+            "overwrite"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "pdf_metadata",
+          "line": 14,
+          "isDefault": false
+        },
+        {
+          "name": "ensure_dir",
+          "line": 46,
+          "isDefault": false
+        },
+        {
+          "name": "load_json",
+          "line": 63,
+          "isDefault": false
+        },
+        {
+          "name": "load_pickle",
+          "line": 86,
+          "isDefault": false
+        },
+        {
+          "name": "resolve_output_dir",
+          "line": 129,
+          "isDefault": false
+        },
+        {
+          "name": "save_figure_as_pdf",
+          "line": 170,
+          "isDefault": false
+        },
+        {
+          "name": "save_figure",
+          "line": 216,
+          "isDefault": false
+        },
+        {
+          "name": "save_data",
+          "line": 288,
+          "isDefault": false
+        },
+        {
+          "name": "setup_nslc_directories",
+          "line": 326,
+          "isDefault": false
+        },
+        {
+          "name": "generate_features_filepaths",
+          "line": 363,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "pdf_metadata",
+          "callee": "metadata",
+          "lineNumber": 27
+        },
+        {
+          "caller": "pdf_metadata",
+          "callee": "os.environ.get",
+          "lineNumber": 33
+        },
+        {
+          "caller": "pdf_metadata",
+          "callee": "os.environ.get",
+          "lineNumber": 34
+        },
+        {
+          "caller": "pdf_metadata",
+          "callee": "os.environ.get",
+          "lineNumber": 35
+        },
+        {
+          "caller": "ensure_dir",
+          "callee": "os.makedirs",
+          "lineNumber": 59
+        },
+        {
+          "caller": "load_json",
+          "callee": "os.path.isfile",
+          "lineNumber": 80
+        },
+        {
+          "caller": "load_json",
+          "callee": "FileNotFoundError",
+          "lineNumber": 81
+        },
+        {
+          "caller": "load_json",
+          "callee": "open",
+          "lineNumber": 82
+        },
+        {
+          "caller": "load_json",
+          "callee": "json.load",
+          "lineNumber": 83
+        },
+        {
+          "caller": "load_pickle",
+          "callee": "os.path.isfile",
+          "lineNumber": 108
+        },
+        {
+          "caller": "load_pickle",
+          "callee": "FileNotFoundError",
+          "lineNumber": 109
+        },
+        {
+          "caller": "load_pickle",
+          "callee": "joblib.load",
+          "lineNumber": 111
+        },
+        {
+          "caller": "load_pickle",
+          "callee": "RuntimeError",
+          "lineNumber": 126
+        },
+        {
+          "caller": "resolve_output_dir",
+          "callee": "os.getcwd",
+          "lineNumber": 162
+        },
+        {
+          "caller": "resolve_output_dir",
+          "callee": "os.path.join",
+          "lineNumber": 164
+        },
+        {
+          "caller": "resolve_output_dir",
+          "callee": "os.path.isabs",
+          "lineNumber": 165
+        },
+        {
+          "caller": "resolve_output_dir",
+          "callee": "os.path.join",
+          "lineNumber": 167
+        },
+        {
+          "caller": "save_figure_as_pdf",
+          "callee": "ensure_dir",
+          "lineNumber": 199
+        },
+        {
+          "caller": "save_figure_as_pdf",
+          "callee": "os.path.dirname",
+          "lineNumber": 199
+        },
+        {
+          "caller": "save_figure_as_pdf",
+          "callee": "matplotlib.rc_context",
+          "lineNumber": 203
+        },
+        {
+          "caller": "save_figure_as_pdf",
+          "callee": "fig.savefig",
+          "lineNumber": 204
+        },
+        {
+          "caller": "save_figure_as_pdf",
+          "callee": "pdf_metadata",
+          "lineNumber": 209
+        },
+        {
+          "caller": "save_figure_as_pdf",
+          "callee": "logger.info",
+          "lineNumber": 213
+        },
+        {
+          "caller": "save_figure",
+          "callee": "os.path.splitext(filepath)[1].lstrip(\".\").lower",
+          "lineNumber": 262
+        },
+        {
+          "caller": "save_figure",
+          "callee": "os.path.splitext(filepath)[1].lstrip",
+          "lineNumber": 262
+        },
+        {
+          "caller": "save_figure",
+          "callee": "os.path.splitext",
+          "lineNumber": 262
+        },
+        {
+          "caller": "save_figure",
+          "callee": "filetype.lower",
+          "lineNumber": 264
+        },
+        {
+          "caller": "save_figure",
+          "callee": "ensure_dir",
+          "lineNumber": 267
+        },
+        {
+          "caller": "save_figure",
+          "callee": "os.path.dirname",
+          "lineNumber": 267
+        },
+        {
+          "caller": "save_figure",
+          "callee": "fig.savefig",
+          "lineNumber": 269
+        },
+        {
+          "caller": "save_figure",
+          "callee": "logger.info",
+          "lineNumber": 274
+        },
+        {
+          "caller": "save_figure",
+          "callee": "os.path.splitext",
+          "lineNumber": 277
+        },
+        {
+          "caller": "save_figure",
+          "callee": "save_figure_as_pdf",
+          "lineNumber": 278
+        },
+        {
+          "caller": "save_figure",
+          "callee": "plt.close",
+          "lineNumber": 285
+        },
+        {
+          "caller": "save_data",
+          "callee": "ensure_dir",
+          "lineNumber": 314
+        },
+        {
+          "caller": "save_data",
+          "callee": "os.path.dirname",
+          "lineNumber": 314
+        },
+        {
+          "caller": "save_data",
+          "callee": "data.to_csv",
+          "lineNumber": 316
+        },
+        {
+          "caller": "save_data",
+          "callee": "data.to_parquet",
+          "lineNumber": 318
+        },
+        {
+          "caller": "save_data",
+          "callee": "joblib.dump",
+          "lineNumber": 322
+        },
+        {
+          "caller": "save_data",
+          "callee": "logger.info",
+          "lineNumber": 323
+        },
+        {
+          "caller": "setup_nslc_directories",
+          "callee": "resolve_output_dir",
+          "lineNumber": 357
+        },
+        {
+          "caller": "setup_nslc_directories",
+          "callee": "os.path.join",
+          "lineNumber": 358
+        },
+        {
+          "caller": "setup_nslc_directories",
+          "callee": "nslc.upper",
+          "lineNumber": 358
+        },
+        {
+          "caller": "generate_features_filepaths",
+          "callee": "os.path.join",
+          "lineNumber": 374
+        },
+        {
+          "caller": "generate_features_filepaths",
+          "callee": "os.path.join",
+          "lineNumber": 375
+        },
+        {
+          "caller": "generate_features_filepaths",
+          "callee": "all",
+          "lineNumber": 379
+        },
+        {
+          "caller": "generate_features_filepaths",
+          "callee": "os.path.isfile",
+          "lineNumber": 379
+        },
+        {
+          "caller": "generate_features_filepaths",
+          "callee": "os.path.join",
+          "lineNumber": 383
+        },
+        {
+          "caller": "generate_features_filepaths",
+          "callee": "os.path.isfile",
+          "lineNumber": 386
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 10,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    }
+  ]
+}

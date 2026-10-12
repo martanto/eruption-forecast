@@ -1,0 +1,1151 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/config/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/config/__init__.py",
+   "summary": "Package barrel for the config subpackage, re-exporting constants, BaseConfig, LabelConfig, the ForecastConfig family and the standalone per-stage configs (training, prediction, evaluation, explanation).",
+   "tags": [
+    "entry-point",
+    "barrel",
+    "configuration",
+    "exports"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/base_config.py",
+   "type": "file",
+   "name": "base_config.py",
+   "filePath": "src/eruption_forecast/config/base_config.py",
+   "summary": "Defines the BaseConfig dataclass mixin providing shared version/saved_at stamping plus dict round-tripping (to_dict, to_init_kwargs, from_dict) for every config dataclass.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "base-class"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/evaluation_config.py",
+   "type": "file",
+   "name": "evaluation_config.py",
+   "filePath": "src/eruption_forecast/config/evaluation_config.py",
+   "summary": "EvaluationConfig dataclass snapshotting EvaluationModel constructor and evaluate() arguments, with YAML/JSON save and load for per-stage config files.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "evaluation"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/explanation_config.py",
+   "type": "file",
+   "name": "explanation_config.py",
+   "filePath": "src/eruption_forecast/config/explanation_config.py",
+   "summary": "ExplanationConfig dataclass mirroring ExplanationModel settings (SHAP explain/plot options) with YAML/JSON persistence for explanation config files.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "explainability"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/forecast_config.py",
+   "type": "file",
+   "name": "forecast_config.py",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "summary": "Hierarchical ForecastConfig for the ForecastModel orchestrator: base station settings plus per-stage calculate/train/predict/evaluate/explain sub-configs, serialised to YAML/JSON so pipelines can be replayed via from_config() and run().",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "pipeline",
+    "orchestration"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/label_config.py",
+   "type": "file",
+   "name": "label_config.py",
+   "filePath": "src/eruption_forecast/config/label_config.py",
+   "summary": "LabelConfig dataclass capturing LabelBuilder init arguments (window size/step, day_to_forecast, eruption dates) and saving them as label.config.yaml.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "labeling"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/prediction_config.py",
+   "type": "file",
+   "name": "prediction_config.py",
+   "filePath": "src/eruption_forecast/config/prediction_config.py",
+   "summary": "PredictionConfig dataclass mirroring PredictionModel constructor parameters with YAML/JSON save/load used by forecast() to write prediction config files.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "prediction"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/training_config.py",
+   "type": "file",
+   "name": "training_config.py",
+   "filePath": "src/eruption_forecast/config/training_config.py",
+   "summary": "TrainingConfig dataclass mirroring TrainingModel.__init__ fields and defaults (classifiers, CV, seeds, resampling, features) with YAML/JSON persistence written at the end of fit().",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "training"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "file",
+   "name": "pathutils.py",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "summary": "Filesystem and I/O helpers used throughout the package: output-directory resolution, NSLC directory setup, figure/PDF saving with metadata, generic data saving (CSV/Parquet), and JSON/pickle loading.",
+   "tags": [
+    "utility",
+    "file-io",
+    "persistence",
+    "plotting"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/config/base_config.py:_package_version",
+   "type": "function",
+   "name": "_package_version",
+   "filePath": "src/eruption_forecast/config/base_config.py",
+   "lineRange": [
+    7,
+    20
+   ],
+   "summary": "Resolves the installed eruption-forecast version via importlib.metadata, falling back to 0.0.0 when not installed.",
+   "tags": [
+    "utility",
+    "versioning",
+    "metadata"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "class",
+   "name": "BaseConfig",
+   "filePath": "src/eruption_forecast/config/base_config.py",
+   "lineRange": [
+    24,
+    88
+   ],
+   "summary": "Base dataclass for all configs carrying version and saved_at stamps and providing to_dict, to_init_kwargs and from_dict helpers.",
+   "tags": [
+    "base-class",
+    "data-model",
+    "serialization"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/evaluation_config.py:EvaluationConfig",
+   "type": "class",
+   "name": "EvaluationConfig",
+   "filePath": "src/eruption_forecast/config/evaluation_config.py",
+   "lineRange": [
+    14,
+    137
+   ],
+   "summary": "Snapshot of EvaluationModel settings with to_dict/save/load supporting YAML and JSON.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "evaluation"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/explanation_config.py:ExplanationConfig",
+   "type": "class",
+   "name": "ExplanationConfig",
+   "filePath": "src/eruption_forecast/config/explanation_config.py",
+   "lineRange": [
+    14,
+    137
+   ],
+   "summary": "Snapshot of ExplanationModel SHAP settings with to_dict/save/load supporting YAML and JSON.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "explainability"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/label_config.py:LabelConfig",
+   "type": "class",
+   "name": "LabelConfig",
+   "filePath": "src/eruption_forecast/config/label_config.py",
+   "lineRange": [
+    14,
+    156
+   ],
+   "summary": "Snapshot of LabelBuilder initialisation arguments, persisted to label.config.yaml via save/load.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "labeling"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/prediction_config.py:PredictionConfig",
+   "type": "class",
+   "name": "PredictionConfig",
+   "filePath": "src/eruption_forecast/config/prediction_config.py",
+   "lineRange": [
+    14,
+    169
+   ],
+   "summary": "Snapshot of PredictionModel constructor parameters with YAML/JSON save and load.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "prediction"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/training_config.py:TrainingConfig",
+   "type": "class",
+   "name": "TrainingConfig",
+   "filePath": "src/eruption_forecast/config/training_config.py",
+   "lineRange": [
+    14,
+    183
+   ],
+   "summary": "Snapshot of TrainingModel constructor fields and defaults with YAML/JSON save and load; kept in sync with TrainingModel.__init__.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "training"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:BaseForecastConfig",
+   "type": "class",
+   "name": "BaseForecastConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    14,
+    57
+   ],
+   "summary": "Station-level ForecastModel constructor settings (station, channel, network, day_to_forecast, output dirs, n_jobs).",
+   "tags": [
+    "data-model",
+    "configuration",
+    "station"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:ForecastCalculateConfig",
+   "type": "class",
+   "name": "ForecastCalculateConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    61,
+    151
+   ],
+   "summary": "Captured arguments of ForecastModel.calculate(): date range, data source (SDS/FDSN), tremor methods and cleaning options.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "tremor"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:ForecastTrainConfig",
+   "type": "class",
+   "name": "ForecastTrainConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    155,
+    258
+   ],
+   "summary": "Captured arguments of ForecastModel.train(): eruption dates, window step, classifiers, CV strategy, seeds, feature and resampling options.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "training"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:ForecastPredictConfig",
+   "type": "class",
+   "name": "ForecastPredictConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    262,
+    337
+   ],
+   "summary": "Captured arguments of ForecastModel.predict(): forecast window, step, feature source and plotting options.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "prediction"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:ForecastEvaluateConfig",
+   "type": "class",
+   "name": "ForecastEvaluateConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    341,
+    377
+   ],
+   "summary": "Captured arguments of ForecastModel.evaluate(): reuse mode, eruption dates and plotting flags.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "evaluation"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:ForecastExplainConfig",
+   "type": "class",
+   "name": "ForecastExplainConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    381,
+    450
+   ],
+   "summary": "Captured arguments of ForecastModel.explain(): reuse mode, eruption dates, per-seed saving and SHAP plotting options.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "explainability"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/config/forecast_config.py:ForecastConfig",
+   "type": "class",
+   "name": "ForecastConfig",
+   "filePath": "src/eruption_forecast/config/forecast_config.py",
+   "lineRange": [
+    454,
+    578
+   ],
+   "summary": "Top-level container aggregating the base and per-stage forecast sub-configs, with to_dict/save/load in YAML or JSON for pipeline replay.",
+   "tags": [
+    "data-model",
+    "configuration",
+    "serialization",
+    "orchestration"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:pdf_metadata",
+   "type": "function",
+   "name": "pdf_metadata",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    14,
+    43
+   ],
+   "summary": "Builds PDF metadata (title, author, creator, version) from installed package metadata for saved figures.",
+   "tags": [
+    "utility",
+    "metadata",
+    "pdf"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "function",
+   "name": "ensure_dir",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    46,
+    60
+   ],
+   "summary": "Creates a directory (including parents) if missing and returns its path.",
+   "tags": [
+    "utility",
+    "file-io",
+    "filesystem"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:load_json",
+   "type": "function",
+   "name": "load_json",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    63,
+    83
+   ],
+   "summary": "Loads and returns parsed JSON content from a file path with existence checks.",
+   "tags": [
+    "utility",
+    "file-io",
+    "json"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:load_pickle",
+   "type": "function",
+   "name": "load_pickle",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    86,
+    126
+   ],
+   "summary": "Loads a pickled object from disk with joblib/pickle and error logging.",
+   "tags": [
+    "utility",
+    "file-io",
+    "deserialization"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:resolve_output_dir",
+   "type": "function",
+   "name": "resolve_output_dir",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    129,
+    167
+   ],
+   "summary": "Resolves an output directory from explicit, root-relative or default locations.",
+   "tags": [
+    "utility",
+    "filesystem",
+    "path-resolution"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:save_figure_as_pdf",
+   "type": "function",
+   "name": "save_figure_as_pdf",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    170,
+    213
+   ],
+   "summary": "Saves a matplotlib figure as a PDF with embedded package metadata.",
+   "tags": [
+    "utility",
+    "plotting",
+    "pdf"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:save_figure",
+   "type": "function",
+   "name": "save_figure",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    216,
+    285
+   ],
+   "summary": "Saves a matplotlib figure to image files, ensuring directories, handling dpi and closing figures.",
+   "tags": [
+    "utility",
+    "plotting",
+    "file-io"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:save_data",
+   "type": "function",
+   "name": "save_data",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    288,
+    323
+   ],
+   "summary": "Persists a DataFrame to CSV, Parquet or other formats based on extension, creating directories as needed.",
+   "tags": [
+    "utility",
+    "file-io",
+    "persistence"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:setup_nslc_directories",
+   "type": "function",
+   "name": "setup_nslc_directories",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    326,
+    360
+   ],
+   "summary": "Creates and returns the per-station NSLC output directory layout used by pipeline stages.",
+   "tags": [
+    "utility",
+    "filesystem",
+    "station"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/pathutils.py:generate_features_filepaths",
+   "type": "function",
+   "name": "generate_features_filepaths",
+   "filePath": "src/eruption_forecast/utils/pathutils.py",
+   "lineRange": [
+    363,
+    393
+   ],
+   "summary": "Generates standard file paths for the features matrix and aligned label CSVs within a features directory.",
+   "tags": [
+    "utility",
+    "path-resolution",
+    "features"
+   ],
+   "complexity": "simple"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/evaluation_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/explanation_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/forecast_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/label_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/prediction_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/__init__.py",
+   "target": "file:src/eruption_forecast/config/training_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/evaluation_config.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/evaluation_config.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/explanation_config.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/explanation_config.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/label_config.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/label_config.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/prediction_config.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/prediction_config.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/training_config.py",
+   "target": "file:src/eruption_forecast/config/base_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/training_config.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/config/base_config.py",
+   "target": "function:src/eruption_forecast/config/base_config.py:_package_version",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/base_config.py",
+   "target": "function:src/eruption_forecast/config/base_config.py:_package_version",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/base_config.py",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/base_config.py",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/evaluation_config.py",
+   "target": "class:src/eruption_forecast/config/evaluation_config.py:EvaluationConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/evaluation_config.py",
+   "target": "class:src/eruption_forecast/config/evaluation_config.py:EvaluationConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/evaluation_config.py:EvaluationConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/config/evaluation_config.py:EvaluationConfig",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/explanation_config.py",
+   "target": "class:src/eruption_forecast/config/explanation_config.py:ExplanationConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/explanation_config.py",
+   "target": "class:src/eruption_forecast/config/explanation_config.py:ExplanationConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/explanation_config.py:ExplanationConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/config/explanation_config.py:ExplanationConfig",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/label_config.py",
+   "target": "class:src/eruption_forecast/config/label_config.py:LabelConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/label_config.py",
+   "target": "class:src/eruption_forecast/config/label_config.py:LabelConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/label_config.py:LabelConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/config/label_config.py:LabelConfig",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/prediction_config.py",
+   "target": "class:src/eruption_forecast/config/prediction_config.py:PredictionConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/prediction_config.py",
+   "target": "class:src/eruption_forecast/config/prediction_config.py:PredictionConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/prediction_config.py:PredictionConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/config/prediction_config.py:PredictionConfig",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/training_config.py",
+   "target": "class:src/eruption_forecast/config/training_config.py:TrainingConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/training_config.py",
+   "target": "class:src/eruption_forecast/config/training_config.py:TrainingConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/training_config.py:TrainingConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/config/training_config.py:TrainingConfig",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:BaseForecastConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:BaseForecastConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:BaseForecastConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastCalculateConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastCalculateConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastCalculateConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastTrainConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastTrainConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastTrainConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastPredictConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastPredictConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastPredictConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastEvaluateConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastEvaluateConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastEvaluateConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastExplainConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastExplainConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastExplainConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastConfig",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/config/forecast_config.py",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastConfig",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastConfig",
+   "target": "class:src/eruption_forecast/config/base_config.py:BaseConfig",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/config/forecast_config.py:ForecastConfig",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:pdf_metadata",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:pdf_metadata",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:load_json",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:load_json",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:load_pickle",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:load_pickle",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:resolve_output_dir",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:resolve_output_dir",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_figure_as_pdf",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_figure_as_pdf",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_figure",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_figure",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_data",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_data",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:setup_nslc_directories",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:setup_nslc_directories",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:generate_features_filepaths",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/pathutils.py",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:generate_features_filepaths",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

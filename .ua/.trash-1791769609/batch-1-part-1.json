@@ -1,0 +1,483 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/dataclass/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/dataclass/__init__.py",
+   "summary": "Package barrel for the dataclass subpackage, re-exporting StationData, SHAP explanation payloads and classifier-ensemble summary dataclasses.",
+   "tags": [
+    "barrel",
+    "entry-point",
+    "data-model"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "type": "file",
+   "name": "classifier_ensemble_summary.py",
+   "filePath": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "summary": "Defines frozen dataclasses (ProbabilityPick, SeedSummary, EruptionWindow, ClassifierEnsembleSummary) that describe per-eruption probability summaries across a classifier ensemble's seeds.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "ensemble",
+    "summary"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ProbabilityPick",
+   "type": "class",
+   "name": "ProbabilityPick",
+   "filePath": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "lineRange": [
+    24,
+    38
+   ],
+   "summary": "Frozen record of a single probability pick (datetime, value and index) within an eruption window.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "ensemble",
+    "class"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:SeedSummary",
+   "type": "class",
+   "name": "SeedSummary",
+   "filePath": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "lineRange": [
+    42,
+    53
+   ],
+   "summary": "Frozen per-seed summary of the highest-probability pick around an eruption.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "ensemble",
+    "class"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:EruptionWindow",
+   "type": "class",
+   "name": "EruptionWindow",
+   "filePath": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "lineRange": [
+    57,
+    80
+   ],
+   "summary": "Frozen per-eruption window record aggregating seed summaries and probability picks for one eruption date.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "ensemble",
+    "class"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ClassifierEnsembleSummary",
+   "type": "class",
+   "name": "ClassifierEnsembleSummary",
+   "filePath": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "lineRange": [
+    84,
+    114
+   ],
+   "summary": "Mutable container of EruptionWindow records summarising a classifier ensemble's probabilities around every eruption.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "ensemble",
+    "class"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "type": "file",
+   "name": "classifier_explanation.py",
+   "filePath": "src/eruption_forecast/dataclass/classifier_explanation.py",
+   "summary": "Defines slotted dataclasses SeedExplanation and ClassifierExplanation holding per-seed and per-classifier SHAP explanation payloads.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "shap",
+    "explainability"
+   ],
+   "complexity": "simple",
+   "languageNotes": "Uses @dataclass(slots=True) for memory-efficient payloads holding many SHAP arrays."
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/classifier_explanation.py:SeedExplanation",
+   "type": "class",
+   "name": "SeedExplanation",
+   "filePath": "src/eruption_forecast/dataclass/classifier_explanation.py",
+   "lineRange": [
+    7,
+    11
+   ],
+   "summary": "Immutable per-seed SHAP explanation holding the seed index and shap.Explanation values.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "shap",
+    "class"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/classifier_explanation.py:ClassifierExplanation",
+   "type": "class",
+   "name": "ClassifierExplanation",
+   "filePath": "src/eruption_forecast/dataclass/classifier_explanation.py",
+   "lineRange": [
+    15,
+    25
+   ],
+   "summary": "Per-classifier SHAP payload bundling SeedExplanation objects, features and metadata for one classifier.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "shap",
+    "class"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/dataclass/station_data.py",
+   "type": "file",
+   "name": "station_data.py",
+   "filePath": "src/eruption_forecast/dataclass/station_data.py",
+   "summary": "Defines the StationData dataclass, an uppercased seismic station identity (network, station, location, channel) with derived nslc/nslct strings.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "seismic-station",
+    "identity"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/dataclass/station_data.py:StationData",
+   "type": "class",
+   "name": "StationData",
+   "filePath": "src/eruption_forecast/dataclass/station_data.py",
+   "lineRange": [
+    5,
+    82
+   ],
+   "summary": "Station identity dataclass that uppercases fields in __post_init__ and exposes nslc/nslct identifiers.",
+   "tags": [
+    "data-model",
+    "dataclass",
+    "seismic-station",
+    "class"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/ensemble/__init__.py",
+   "summary": "Package barrel for the ensemble subpackage re-exporting SeedEnsemble and ClassifierEnsemble; other ensemble classes are deliberately not re-exported to avoid import cycles.",
+   "tags": [
+    "barrel",
+    "entry-point",
+    "ensemble"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "type": "file",
+   "name": "base_ensemble.py",
+   "filePath": "src/eruption_forecast/ensemble/base_ensemble.py",
+   "summary": "Provides the BaseEnsemble mixin implementing joblib-based save/load persistence shared by the ensemble classes.",
+   "tags": [
+    "base-class",
+    "persistence",
+    "serialization",
+    "ensemble"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/ensemble/base_ensemble.py:BaseEnsemble",
+   "type": "class",
+   "name": "BaseEnsemble",
+   "filePath": "src/eruption_forecast/ensemble/base_ensemble.py",
+   "lineRange": [
+    10,
+    50
+   ],
+   "summary": "Mixin providing joblib save(path) and classmethod load(path) for ensemble objects.",
+   "tags": [
+    "base-class",
+    "persistence",
+    "serialization",
+    "class"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "file",
+   "name": "classifier_ensemble.py",
+   "filePath": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "summary": "Implements ClassifierEnsemble, a container of per-classifier SeedEnsembles with factory loaders (any/json/dict/seed ensembles) and consensus probability, prediction and uncertainty computation.",
+   "tags": [
+    "ensemble",
+    "machine-learning",
+    "factory",
+    "prediction",
+    "data-model"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "class",
+   "name": "ClassifierEnsemble",
+   "filePath": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "lineRange": [
+    15,
+    516
+   ],
+   "summary": "Wraps multiple SeedEnsembles keyed by classifier; provides from_any/from_json/from_dict/from_seed_ensembles factories, consensus predict_proba/predict and per-classifier uncertainty.",
+   "tags": [
+    "ensemble",
+    "machine-learning",
+    "factory",
+    "core-class"
+   ],
+   "complexity": "complex"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/dataclass/__init__.py",
+   "target": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/__init__.py",
+   "target": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/__init__.py",
+   "target": "file:src/eruption_forecast/dataclass/station_data.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ProbabilityPick",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ProbabilityPick",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:SeedSummary",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:SeedSummary",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:EruptionWindow",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:EruptionWindow",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ClassifierEnsembleSummary",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_ensemble_summary.py:ClassifierEnsembleSummary",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_explanation.py:SeedExplanation",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_explanation.py:SeedExplanation",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_explanation.py:ClassifierExplanation",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "target": "class:src/eruption_forecast/dataclass/classifier_explanation.py:ClassifierExplanation",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/station_data.py",
+   "target": "class:src/eruption_forecast/dataclass/station_data.py:StationData",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/dataclass/station_data.py",
+   "target": "class:src/eruption_forecast/dataclass/station_data.py:StationData",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/__init__.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/__init__.py",
+   "target": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/base_ensemble.py:BaseEnsemble",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/base_ensemble.py:BaseEnsemble",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "target": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "target": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/array.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "target": "class:src/eruption_forecast/ensemble/base_ensemble.py:BaseEnsemble",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "target": "function:src/eruption_forecast/utils/array.py:compute_model_probabilities",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

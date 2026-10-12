@@ -1,0 +1,29 @@
+{
+  "issues": [],
+  "warnings": [
+    "Node 'file:src/eruption_forecast/label/__init__.py' has no edges (orphan)",
+    "Node 'file:src/eruption_forecast/model/__init__.py' has no edges (orphan)"
+  ],
+  "stats": {
+    "totalNodes": 316,
+    "totalEdges": 1107,
+    "totalLayers": 9,
+    "tourSteps": 15,
+    "nodeTypes": {
+      "file": 80,
+      "class": 54,
+      "function": 166,
+      "document": 16
+    },
+    "edgeTypes": {
+      "imports": 296,
+      "contains": 220,
+      "exports": 200,
+      "inherits": 23,
+      "calls": 180,
+      "depends_on": 7,
+      "documents": 125,
+      "related": 56
+    }
+  }
+}

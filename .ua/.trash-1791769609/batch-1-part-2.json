@@ -1,0 +1,1315 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "type": "file",
+   "name": "explainer_ensemble.py",
+   "filePath": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "summary": "Implements ExplainerEnsemble, the per-seed SHAP TreeExplainer engine that computes ClassifierExplanation payloads in parallel and renders per-seed, aggregate and per-eruption waterfall plots.",
+   "tags": [
+    "explainability",
+    "shap",
+    "ensemble",
+    "parallel",
+    "visualization"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "type": "class",
+   "name": "ExplainerEnsemble",
+   "filePath": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "lineRange": [
+    42,
+    591
+   ],
+   "summary": "SHAP engine over a fitted ClassifierEnsemble: explains each seed with TreeExplainer (skipping non-tree classifiers) and renders seed, aggregate and waterfall plots.",
+   "tags": [
+    "explainability",
+    "shap",
+    "ensemble",
+    "core-class"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "file",
+   "name": "seed_ensemble.py",
+   "filePath": "src/eruption_forecast/ensemble/seed_ensemble.py",
+   "summary": "Implements SeedEnsemble, an sklearn-compatible classifier bundling all seed models for one classifier, with registry loaders, probability/uncertainty prediction and Parquet matrix caching.",
+   "tags": [
+    "ensemble",
+    "machine-learning",
+    "sklearn-estimator",
+    "factory",
+    "prediction"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "type": "class",
+   "name": "SeedEnsemble",
+   "filePath": "src/eruption_forecast/ensemble/seed_ensemble.py",
+   "lineRange": [
+    18,
+    664
+   ],
+   "summary": "sklearn BaseEstimator/ClassifierMixin bundling all seed models for one classifier, loading from JSON/CSV registries and caching (n_samples, n_seeds) probability matrices.",
+   "tags": [
+    "ensemble",
+    "machine-learning",
+    "sklearn-estimator",
+    "core-class"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/explanation_model.py",
+   "type": "file",
+   "name": "explanation_model.py",
+   "filePath": "src/eruption_forecast/model/explanation_model.py",
+   "summary": "Implements ExplanationModel, the pipeline stage that reuses a TrainingModel or PredictionModel to produce cached per-seed SHAP explanations and plots via ExplainerEnsemble.",
+   "tags": [
+    "pipeline-stage",
+    "explainability",
+    "shap",
+    "caching",
+    "service"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "type": "class",
+   "name": "ExplanationModel",
+   "filePath": "src/eruption_forecast/model/explanation_model.py",
+   "lineRange": [
+    16,
+    586
+   ],
+   "summary": "BaseModel subclass orchestrating SHAP explanation for training or prediction reuse, with content-addressed caching, config snapshotting, explain() and plot().",
+   "tags": [
+    "pipeline-stage",
+    "explainability",
+    "shap",
+    "core-class"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "type": "file",
+   "name": "explanation_plots.py",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "summary": "SHAP visualisation utilities: per-seed waterfall/beeswarm/bar plots, NaN-padded aggregate bar and beeswarm plots across seeds, and per-eruption classifier waterfalls.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting",
+    "explainability",
+    "utility"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_waterfall",
+   "type": "function",
+   "name": "plot_shap_waterfall",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    21,
+    72
+   ],
+   "summary": "Renders a SHAP waterfall plot for a single sample explanation.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_beeswarm",
+   "type": "function",
+   "name": "plot_shap_beeswarm",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    75,
+    121
+   ],
+   "summary": "Renders a SHAP beeswarm plot with plot_size=None to honour a pre-created figure size.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_bar",
+   "type": "function",
+   "name": "plot_shap_bar",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    124,
+    149
+   ],
+   "summary": "Renders a SHAP mean-absolute importance bar plot.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:render_seed_plot",
+   "type": "function",
+   "name": "render_seed_plot",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    152,
+    199
+   ],
+   "summary": "Dispatches and saves a per-seed bar or beeswarm SHAP plot to disk.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:_aggregate_importance",
+   "type": "function",
+   "name": "_aggregate_importance",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    202,
+    257
+   ],
+   "summary": "Aggregates mean absolute SHAP importance across seeds over the union feature space.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:_aggregate_explanation",
+   "type": "function",
+   "name": "_aggregate_explanation",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    260,
+    341
+   ],
+   "summary": "Builds a NaN-padded aggregate shap.Explanation by stacking per-seed explanations over the union of features.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_bar",
+   "type": "function",
+   "name": "plot_aggregate_shap_bar",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    344,
+    433
+   ],
+   "summary": "Plots and saves the aggregate per-classifier SHAP importance bar chart with a CSV of values.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_beeswarm",
+   "type": "function",
+   "name": "plot_aggregate_shap_beeswarm",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    436,
+    555
+   ],
+   "summary": "Plots and saves the aggregate per-classifier SHAP beeswarm across all seeds with CSV export.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:_build_explanation_plot",
+   "type": "function",
+   "name": "_build_explanation_plot",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    558,
+    605
+   ],
+   "summary": "Builds a single-sample shap.Explanation for waterfall rendering from per-seed SHAP values.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "type": "function",
+   "name": "plot_classifier_waterfall",
+   "filePath": "src/eruption_forecast/plots/explanation_plots.py",
+   "lineRange": [
+    608,
+    688
+   ],
+   "summary": "Renders per-eruption waterfall plots for the highest-probability samples of a classifier using ensemble summaries.",
+   "tags": [
+    "visualization",
+    "shap",
+    "plotting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/array.py",
+   "type": "file",
+   "name": "array.py",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "summary": "Numerical array helpers for tremor cleaning (outlier, z-score anomaly, zero masking, NaN filtering, completeness) plus ensemble probability aggregation and per-seed forecast saving.",
+   "tags": [
+    "utility",
+    "numpy",
+    "outlier-detection",
+    "signal-processing",
+    "statistics"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:save_forecast_seed",
+   "type": "function",
+   "name": "save_forecast_seed",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    12,
+    49
+   ],
+   "summary": "Saves a single seed's forecast probabilities to a CSV file.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:compute_model_probabilities",
+   "type": "function",
+   "name": "compute_model_probabilities",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    52,
+    86
+   ],
+   "summary": "Aggregates per-seed probabilities into mean probability, uncertainty and confidence arrays.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:confidence_interval",
+   "type": "function",
+   "name": "confidence_interval",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    89,
+    101
+   ],
+   "summary": "Computes a confidence interval half-width for an array of values.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:detect_anomalies_zscore",
+   "type": "function",
+   "name": "detect_anomalies_zscore",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    104,
+    131
+   ],
+   "summary": "Flags anomalous values using a z-score threshold.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:mask_zero_values",
+   "type": "function",
+   "name": "mask_zero_values",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    134,
+    160
+   ],
+   "summary": "Masks zero values in an array, replacing them with NaN.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:get_completeness",
+   "type": "function",
+   "name": "get_completeness",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    163,
+    195
+   ],
+   "summary": "Computes the data completeness ratio of an array.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:count_valid_values",
+   "type": "function",
+   "name": "count_valid_values",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    198,
+    223
+   ],
+   "summary": "Counts non-NaN valid values in an array.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:filter_nans",
+   "type": "function",
+   "name": "filter_nans",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    226,
+    238
+   ],
+   "summary": "Removes NaN values from an array.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:detect_maximum_outlier",
+   "type": "function",
+   "name": "detect_maximum_outlier",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    241,
+    305
+   ],
+   "summary": "Detects the maximum-amplitude outlier in a signal using a threshold test.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:remove_maximum_outlier",
+   "type": "function",
+   "name": "remove_maximum_outlier",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    308,
+    363
+   ],
+   "summary": "Removes the detected maximum outlier from a signal.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/array.py:remove_outliers",
+   "type": "function",
+   "name": "remove_outliers",
+   "filePath": "src/eruption_forecast/utils/array.py",
+   "lineRange": [
+    366,
+    444
+   ],
+   "summary": "Removes outliers from an array using a selectable method.",
+   "tags": [
+    "utility",
+    "numpy",
+    "array"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "file",
+   "name": "formatting.py",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "summary": "String formatting helpers: slugify utilities, tsfresh feature-name shortening and humanising using frequency-band aliases, and classifier display labels.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string",
+    "feature-names"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/formatting.py:_humanize_column",
+   "type": "function",
+   "name": "_humanize_column",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "lineRange": [
+    25,
+    61
+   ],
+   "summary": "Converts a tremor column name (e.g. rsam_f2) into a human-readable label with frequency band.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/formatting.py:slugify_class_name",
+   "type": "function",
+   "name": "slugify_class_name",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "lineRange": [
+    143,
+    171
+   ],
+   "summary": "Converts a CamelCase class name into a hyphenated slug.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "function",
+   "name": "slugify",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "lineRange": [
+    174,
+    201
+   ],
+   "summary": "Converts arbitrary text into a lowercase hyphenated slug.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/formatting.py:shorten_feature_name",
+   "type": "function",
+   "name": "shorten_feature_name",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "lineRange": [
+    204,
+    300
+   ],
+   "summary": "Shortens a long tsfresh feature name into a compact display form.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/formatting.py:humanize_feature_name",
+   "type": "function",
+   "name": "humanize_feature_name",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "lineRange": [
+    303,
+    373
+   ],
+   "summary": "Translates a tsfresh feature name into a plain-English description.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/utils/formatting.py:get_classifier_label",
+   "type": "function",
+   "name": "get_classifier_label",
+   "filePath": "src/eruption_forecast/utils/formatting.py",
+   "lineRange": [
+    376,
+    408
+   ],
+   "summary": "Returns a short display label for a classifier name.",
+   "tags": [
+    "utility",
+    "formatting",
+    "string"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "target": "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/array.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/config/explanation_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/model/base_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/model/prediction_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/model/training_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/explanation_model.py",
+   "target": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "file:src/eruption_forecast/dataclass/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "file:src/eruption_forecast/ensemble/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_waterfall",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_waterfall",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_beeswarm",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_beeswarm",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_bar",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_shap_bar",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:render_seed_plot",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:render_seed_plot",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:_aggregate_importance",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:_aggregate_explanation",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_bar",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_bar",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_beeswarm",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_beeswarm",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:_build_explanation_plot",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:save_forecast_seed",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:save_forecast_seed",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:compute_model_probabilities",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:compute_model_probabilities",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:confidence_interval",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:confidence_interval",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:detect_anomalies_zscore",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:detect_anomalies_zscore",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:mask_zero_values",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:mask_zero_values",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:get_completeness",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:get_completeness",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:count_valid_values",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:count_valid_values",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:filter_nans",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:filter_nans",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:detect_maximum_outlier",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:detect_maximum_outlier",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:remove_maximum_outlier",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:remove_maximum_outlier",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:remove_outliers",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/array.py",
+   "target": "function:src/eruption_forecast/utils/array.py:remove_outliers",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "file:src/eruption_forecast/config/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:_humanize_column",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify_class_name",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify_class_name",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:shorten_feature_name",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:shorten_feature_name",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:humanize_feature_name",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:humanize_feature_name",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:get_classifier_label",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/utils/formatting.py",
+   "target": "function:src/eruption_forecast/utils/formatting.py:get_classifier_label",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "target": "class:src/eruption_forecast/ensemble/base_ensemble.py:BaseEnsemble",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:render_seed_plot",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_bar",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_beeswarm",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "target": "function:src/eruption_forecast/utils/formatting.py:shorten_feature_name",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "target": "function:src/eruption_forecast/utils/array.py:compute_model_probabilities",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "target": "function:src/eruption_forecast/utils/array.py:save_forecast_seed",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "target": "class:src/eruption_forecast/ensemble/explainer_ensemble.py:ExplainerEnsemble",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "target": "function:src/eruption_forecast/utils/ml.py:build_classifier_ensemble_summary",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_bar",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:_aggregate_explanation",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/explanation_plots.py:plot_aggregate_shap_beeswarm",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:_aggregate_explanation",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:_build_explanation_plot",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

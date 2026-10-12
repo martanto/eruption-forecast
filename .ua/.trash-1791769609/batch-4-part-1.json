@@ -1,0 +1,1003 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/features/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/features/__init__.py",
+   "summary": "Package barrel for the features subpackage that re-exports the experimental FeatureCountSweep class and sweep_feature_count helper.",
+   "tags": [
+    "barrel",
+    "entry-point",
+    "features",
+    "exports"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "type": "file",
+   "name": "feature_count_sweep.py",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "summary": "Experimental post-hoc recommender that sweeps top-N feature counts over persisted per-seed training artefacts, scoring each count with cross-validation to recommend an optimal top_n_features value.",
+   "tags": [
+    "feature-selection",
+    "experimental",
+    "cross-validation",
+    "model-tuning",
+    "parallel"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Uses joblib Parallel/delayed for per-seed fan-out and sklearn clone/get_scorer for estimator-agnostic CV scoring."
+  },
+  {
+   "id": "file:src/eruption_forecast/features/feature_selector.py",
+   "type": "file",
+   "name": "feature_selector.py",
+   "filePath": "src/eruption_forecast/features/feature_selector.py",
+   "summary": "Single-stage feature selector supporting tsfresh FDR p-value filtering or random-forest permutation importance, exposing an sklearn-style fit/transform API.",
+   "tags": [
+    "feature-selection",
+    "tsfresh",
+    "machine-learning",
+    "service"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "type": "file",
+   "name": "dynamic_label_builder.py",
+   "filePath": "src/eruption_forecast/label/dynamic_label_builder.py",
+   "summary": "Label builder subclass that constructs per-eruption sliding-window labels in three phases: zero frames per eruption, concatenate and deduplicate, then mark positives.",
+   "tags": [
+    "label-builder",
+    "data-labeling",
+    "inheritance",
+    "eruption-windows"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/logger.py",
+   "type": "file",
+   "name": "logger.py",
+   "filePath": "src/eruption_forecast/logger.py",
+   "summary": "Loguru-based logging wrapper providing console/file handlers, per-category error log routing, and enable/disable/level/directory controls for the package.",
+   "tags": [
+    "logging",
+    "utility",
+    "configuration",
+    "singleton"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Honors the DISABLE_LOGGING env var at import time so worker processes inherit a handler-free logger."
+  },
+  {
+   "id": "file:src/eruption_forecast/model/classifier_model.py",
+   "type": "file",
+   "name": "classifier_model.py",
+   "filePath": "src/eruption_forecast/model/classifier_model.py",
+   "summary": "Defines ClassifierModel, an sklearn-compatible wrapper that builds one of 11 classifier estimators with its hyperparameter grid, CV splitter, and slugified output names.",
+   "tags": [
+    "data-model",
+    "machine-learning",
+    "factory",
+    "classifier",
+    "hyperparameters"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/features/feature_count_sweep.py:FeatureCountSweep",
+   "type": "class",
+   "name": "FeatureCountSweep",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    68,
+    519
+   ],
+   "summary": "Estimator-style sweep over candidate top-N feature counts that fits per-seed CV scores, picks the best count, and supports save/load persistence.",
+   "tags": [
+    "feature-selection",
+    "experimental",
+    "model-tuning"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "type": "class",
+   "name": "FeatureSelector",
+   "filePath": "src/eruption_forecast/features/feature_selector.py",
+   "lineRange": [
+    13,
+    551
+   ],
+   "summary": "Selects relevant features via tsfresh FDR filtering or random-forest permutation importance with fit/transform/fit_transform and score retrieval.",
+   "tags": [
+    "feature-selection",
+    "tsfresh",
+    "transformer"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "type": "class",
+   "name": "DynamicLabelBuilder",
+   "filePath": "src/eruption_forecast/label/dynamic_label_builder.py",
+   "lineRange": [
+    13,
+    257
+   ],
+   "summary": "LabelBuilder subclass producing per-eruption label windows, deduplicating overlapping datetimes and marking positive windows before each eruption.",
+   "tags": [
+    "label-builder",
+    "inheritance",
+    "data-labeling"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "class",
+   "name": "ClassifierModel",
+   "filePath": "src/eruption_forecast/model/classifier_model.py",
+   "lineRange": [
+    31,
+    630
+   ],
+   "summary": "Wraps an sklearn/XGBoost estimator with its hyperparameter grid, random state, CV splitter, GPU option, and slug names used for output paths.",
+   "tags": [
+    "classifier",
+    "factory",
+    "hyperparameters"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:sweep_feature_count",
+   "type": "function",
+   "name": "sweep_feature_count",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    631,
+    816
+   ],
+   "summary": "Public entry point that resolves a training run's artefacts and runs a FeatureCountSweep, persisting results and the feature-count curve plot.",
+   "tags": [
+    "feature-selection",
+    "entry-point",
+    "experimental"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_score_fold",
+   "type": "function",
+   "name": "_score_fold",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    534,
+    565
+   ],
+   "summary": "Scores one CV fold for a given feature subset after resampling the training split.",
+   "tags": [
+    "cross-validation",
+    "scoring",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_pick_best",
+   "type": "function",
+   "name": "_pick_best",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    568,
+    623
+   ],
+   "summary": "Chooses the recommended feature count from aggregated scores using a tolerance/parsimony rule.",
+   "tags": [
+    "model-selection",
+    "scoring",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_resolve_training_context",
+   "type": "function",
+   "name": "_resolve_training_context",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    824,
+    850
+   ],
+   "summary": "Resolves features, labels, and classifier context from a TrainingModel or training directory.",
+   "tags": [
+    "path-resolution",
+    "helper",
+    "io"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_discover_cv_dir",
+   "type": "function",
+   "name": "_discover_cv_dir",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    853,
+    869
+   ],
+   "summary": "Locates the CV-slug features directory inside a training output tree.",
+   "tags": [
+    "path-resolution",
+    "helper",
+    "discovery"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_discover_classifier_names",
+   "type": "function",
+   "name": "_discover_classifier_names",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    906,
+    922
+   ],
+   "summary": "Discovers trained classifier names from the classifiers output directory.",
+   "tags": [
+    "discovery",
+    "helper",
+    "io"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_harvest_per_seed_inputs",
+   "type": "function",
+   "name": "_harvest_per_seed_inputs",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    925,
+    984
+   ],
+   "summary": "Collects per-seed selected-feature rankings and fitted models needed by the sweep.",
+   "tags": [
+    "io",
+    "seed",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_resolve_forecast_inputs",
+   "type": "function",
+   "name": "_resolve_forecast_inputs",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    987,
+    1027
+   ],
+   "summary": "Resolves the feature matrix, labels, and classifier inputs for sweep execution.",
+   "tags": [
+    "io",
+    "helper",
+    "path-resolution"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/features/feature_count_sweep.py:_persist_sweep",
+   "type": "function",
+   "name": "_persist_sweep",
+   "filePath": "src/eruption_forecast/features/feature_count_sweep.py",
+   "lineRange": [
+    1030,
+    1070
+   ],
+   "summary": "Writes sweep results to disk and renders the feature-count curve plot.",
+   "tags": [
+    "persistence",
+    "plotting",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:_category_filter",
+   "type": "function",
+   "name": "_category_filter",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    92,
+    108
+   ],
+   "summary": "Builds a loguru filter routing records bound to a given category.",
+   "tags": [
+    "logging",
+    "filter",
+    "helper"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:_uncategorized_filter",
+   "type": "function",
+   "name": "_uncategorized_filter",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    111,
+    124
+   ],
+   "summary": "Filter passing only records without a category binding.",
+   "tags": [
+    "logging",
+    "filter",
+    "helper"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "type": "function",
+   "name": "_configure_handlers",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    127,
+    181
+   ],
+   "summary": "Removes and re-registers console, general file, and per-category error handlers.",
+   "tags": [
+    "logging",
+    "configuration",
+    "helper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:get_logger",
+   "type": "function",
+   "name": "get_logger",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    189,
+    195
+   ],
+   "summary": "Returns the shared configured loguru logger.",
+   "tags": [
+    "logging",
+    "accessor",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:get_category_logger",
+   "type": "function",
+   "name": "get_category_logger",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    198,
+    215
+   ],
+   "summary": "Returns a logger bound to a category so records go to that category's log file.",
+   "tags": [
+    "logging",
+    "accessor",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:register_error_category",
+   "type": "function",
+   "name": "register_error_category",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    218,
+    243
+   ],
+   "summary": "Registers a new per-category error log file with level and retention, then reconfigures handlers.",
+   "tags": [
+    "logging",
+    "configuration",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:set_log_level",
+   "type": "function",
+   "name": "set_log_level",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    246,
+    257
+   ],
+   "summary": "Changes the console log level by reconfiguring handlers.",
+   "tags": [
+    "logging",
+    "configuration",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:set_log_directory",
+   "type": "function",
+   "name": "set_log_directory",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    260,
+    273
+   ],
+   "summary": "Redirects log files to a new directory.",
+   "tags": [
+    "logging",
+    "configuration",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:disable_logging",
+   "type": "function",
+   "name": "disable_logging",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    276,
+    285
+   ],
+   "summary": "Disables all package logging output.",
+   "tags": [
+    "logging",
+    "configuration",
+    "utility"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/logger.py:enable_logging",
+   "type": "function",
+   "name": "enable_logging",
+   "filePath": "src/eruption_forecast/logger.py",
+   "lineRange": [
+    288,
+    298
+   ],
+   "summary": "Re-enables package logging and restores handlers.",
+   "tags": [
+    "logging",
+    "configuration",
+    "utility"
+   ],
+   "complexity": "simple"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "class:src/eruption_forecast/features/feature_count_sweep.py:FeatureCountSweep",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "class:src/eruption_forecast/features/feature_count_sweep.py:FeatureCountSweep",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_selector.py",
+   "target": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_selector.py",
+   "target": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "target": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "target": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_model.py",
+   "target": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_model.py",
+   "target": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:sweep_feature_count",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:sweep_feature_count",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_score_fold",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_pick_best",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_resolve_training_context",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_discover_cv_dir",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_discover_classifier_names",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_harvest_per_seed_inputs",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_resolve_forecast_inputs",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_persist_sweep",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:_category_filter",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:_uncategorized_filter",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:get_logger",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:get_logger",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:get_category_logger",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:get_category_logger",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:register_error_category",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:register_error_category",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:set_log_level",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:set_log_level",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:set_log_directory",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:set_log_directory",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:disable_logging",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:disable_logging",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:enable_logging",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "function:src/eruption_forecast/logger.py:enable_logging",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/features/__init__.py",
+   "target": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "file:src/eruption_forecast/plots/feature_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "file:src/eruption_forecast/utils/dataframe.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_count_sweep.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_selector.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_selector.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/feature_selector.py",
+   "target": "file:src/eruption_forecast/utils/validation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "target": "file:src/eruption_forecast/label/label_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/logger.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_model.py",
+   "target": "file:src/eruption_forecast/model/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_model.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_model.py",
+   "target": "file:src/eruption_forecast/utils/validation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "target": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/features/feature_count_sweep.py:FeatureCountSweep",
+   "target": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/features/feature_count_sweep.py:_score_fold",
+   "target": "function:src/eruption_forecast/utils/ml.py:resample",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/features/feature_count_sweep.py:sweep_feature_count",
+   "target": "class:src/eruption_forecast/features/feature_count_sweep.py:FeatureCountSweep",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/features/feature_count_sweep.py:sweep_feature_count",
+   "target": "function:src/eruption_forecast/features/feature_count_sweep.py:_resolve_training_context",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/features/feature_count_sweep.py:_persist_sweep",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_count_curve",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/features/feature_count_sweep.py:_persist_sweep",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/features/feature_count_sweep.py:_resolve_training_context",
+   "target": "function:src/eruption_forecast/utils/dataframe.py:load_label_csv",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "target": "function:src/eruption_forecast/utils/ml.py:get_significant_features",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "target": "function:src/eruption_forecast/utils/validation.py:validate_random_state",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:sort_dates",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:resolve_output_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:register_error_category",
+   "target": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:set_log_level",
+   "target": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:set_log_directory",
+   "target": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:enable_logging",
+   "target": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "target": "function:src/eruption_forecast/logger.py:_category_filter",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/logger.py:_configure_handlers",
+   "target": "function:src/eruption_forecast/logger.py:_uncategorized_filter",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify_class_name",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "target": "function:src/eruption_forecast/utils/validation.py:validate_random_state",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

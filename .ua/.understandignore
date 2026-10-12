@@ -1,0 +1,25 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+#
+# Scope: only src/, main.py, forecast-scenario.py, README.md and wiki/ are analysed.
+# Everything else at the project root (notebooks, scratch scripts, output/,
+# output-test/, logs/, examples/, dist/, tests/, ...) is excluded.
+
+/*
+!/src/
+!/main.py
+!/forecast-scenario.py
+!/README.md
+!/wiki/
+
+# Explicit exclusions requested for this project (belt-and-braces).
+output/
+output-test/
+logs/
+examples/
+dist/
+
+# Never useful inside src/.
+__pycache__/
+*.py[oc]
+*.egg-info

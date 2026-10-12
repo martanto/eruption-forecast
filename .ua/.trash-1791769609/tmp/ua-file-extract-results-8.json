@@ -1,0 +1,1584 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 15,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 15,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 15
+    }
+  },
+  "results": [
+    {
+      "path": "wiki/API-Reference.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 1584,
+      "nonEmptyLines": 1293,
+      "sections": [
+        {
+          "heading": "API Reference",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "ForecastModel",
+          "level": 2,
+          "line": 46
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 50
+        },
+        {
+          "heading": "`calculate(...)`",
+          "level": 3,
+          "line": 80
+        },
+        {
+          "heading": "`train(...)`",
+          "level": 3,
+          "line": 107
+        },
+        {
+          "heading": "`predict(...)`",
+          "level": 3,
+          "line": 145
+        },
+        {
+          "heading": "`evaluate(...)`",
+          "level": 3,
+          "line": 186
+        },
+        {
+          "heading": "`explain(...)`",
+          "level": 3,
+          "line": 204
+        },
+        {
+          "heading": "Config round-trip",
+          "level": 3,
+          "line": 228
+        },
+        {
+          "heading": "TrainingModel",
+          "level": 2,
+          "line": 238
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 242
+        },
+        {
+          "heading": "Pipeline methods (all return `Self`)",
+          "level": 3,
+          "line": 276
+        },
+        {
+          "heading": "Cache + persistence",
+          "level": 3,
+          "line": 310
+        },
+        {
+          "heading": "PredictionModel",
+          "level": 2,
+          "line": 324
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 328
+        },
+        {
+          "heading": "Pipeline methods",
+          "level": 3,
+          "line": 351
+        },
+        {
+          "heading": "Cache + persistence",
+          "level": 3,
+          "line": 383
+        },
+        {
+          "heading": "EvaluationModel",
+          "level": 2,
+          "line": 395
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 399
+        },
+        {
+          "heading": "Methods",
+          "level": 3,
+          "line": 417
+        },
+        {
+          "heading": "ExplanationModel",
+          "level": 2,
+          "line": 456
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 460
+        },
+        {
+          "heading": "Methods",
+          "level": 3,
+          "line": 478
+        },
+        {
+          "heading": "ExplainerEnsemble",
+          "level": 2,
+          "line": 522
+        },
+        {
+          "heading": "Methods",
+          "level": 3,
+          "line": 540
+        },
+        {
+          "heading": "Static helpers",
+          "level": 3,
+          "line": 564
+        },
+        {
+          "heading": "Instance helpers",
+          "level": 3,
+          "line": 580
+        },
+        {
+          "heading": "SeedExplanation / ClassifierExplanation",
+          "level": 2,
+          "line": 601
+        },
+        {
+          "heading": "ClassifierEnsembleSummary family",
+          "level": 2,
+          "line": 619
+        },
+        {
+          "heading": "StationData",
+          "level": 2,
+          "line": 657
+        },
+        {
+          "heading": "CalculateTremor",
+          "level": 2,
+          "line": 687
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 689
+        },
+        {
+          "heading": "Source binding + execution (all return `Self`)",
+          "level": 3,
+          "line": 720
+        },
+        {
+          "heading": "LabelBuilder / DynamicLabelBuilder",
+          "level": 2,
+          "line": 741
+        },
+        {
+          "heading": "FeaturesBuilder",
+          "level": 2,
+          "line": 794
+        },
+        {
+          "heading": "TremorMatrixBuilder",
+          "level": 2,
+          "line": 818
+        },
+        {
+          "heading": "FeatureSelector",
+          "level": 2,
+          "line": 843
+        },
+        {
+          "heading": "FeatureCountSweep (Experimental)",
+          "level": 2,
+          "line": 859
+        },
+        {
+          "heading": "Constructor",
+          "level": 3,
+          "line": 871
+        },
+        {
+          "heading": "`.fit(...)`",
+          "level": 3,
+          "line": 900
+        },
+        {
+          "heading": "`sweep_feature_count(...)`",
+          "level": 3,
+          "line": 925
+        },
+        {
+          "heading": "Persistence",
+          "level": 3,
+          "line": 957
+        },
+        {
+          "heading": "SeedEnsemble",
+          "level": 2,
+          "line": 971
+        },
+        {
+          "heading": "Construction",
+          "level": 3,
+          "line": 982
+        },
+        {
+          "heading": "Inference",
+          "level": 3,
+          "line": 1009
+        },
+        {
+          "heading": "Inspection",
+          "level": 3,
+          "line": 1021
+        },
+        {
+          "heading": "Per-seed matrix cache",
+          "level": 3,
+          "line": 1030
+        },
+        {
+          "heading": "ClassifierEnsemble",
+          "level": 2,
+          "line": 1061
+        },
+        {
+          "heading": "Construction (classmethods)",
+          "level": 3,
+          "line": 1072
+        },
+        {
+          "heading": "Inference",
+          "level": 3,
+          "line": 1081
+        },
+        {
+          "heading": "Inspection",
+          "level": 3,
+          "line": 1089
+        },
+        {
+          "heading": "MetricsEnsemble",
+          "level": 2,
+          "line": 1103
+        },
+        {
+          "heading": "BaseEnsemble",
+          "level": 2,
+          "line": 1144
+        },
+        {
+          "heading": "ClassifierComparator",
+          "level": 2,
+          "line": 1157
+        },
+        {
+          "heading": "TremorData",
+          "level": 2,
+          "line": 1188
+        },
+        {
+          "heading": "LabelData",
+          "level": 2,
+          "line": 1201
+        },
+        {
+          "heading": "Feature alias utilities",
+          "level": 2,
+          "line": 1214
+        },
+        {
+          "heading": "Writers — `alias` + `description` columns",
+          "level": 3,
+          "line": 1223
+        },
+        {
+          "heading": "Reader — `load_feature_aliases`",
+          "level": 3,
+          "line": 1259
+        },
+        {
+          "heading": "Backfill — `update_top_features_csv`",
+          "level": 3,
+          "line": 1285
+        },
+        {
+          "heading": "Label formatters — `shorten_feature_name` / `humanize_feature_name`",
+          "level": 3,
+          "line": 1326
+        },
+        {
+          "heading": "Heatmap label style",
+          "level": 3,
+          "line": 1354
+        },
+        {
+          "heading": "Feature matrix loaders",
+          "level": 2,
+          "line": 1393
+        },
+        {
+          "heading": "Merging training + prediction feature matrices",
+          "level": 2,
+          "line": 1438
+        },
+        {
+          "heading": "Logger helpers",
+          "level": 2,
+          "line": 1507
+        },
+        {
+          "heading": "Telegram helpers",
+          "level": 2,
+          "line": 1539
+        },
+        {
+          "heading": "Cross-references",
+          "level": 2,
+          "line": 1579
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 67
+      }
+    },
+    {
+      "path": "wiki/Architecture.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 517,
+      "nonEmptyLines": 450,
+      "sections": [
+        {
+          "heading": "Architecture",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "1. Package Layout",
+          "level": 2,
+          "line": 9
+        },
+        {
+          "heading": "2. Pipeline Overview",
+          "level": 2,
+          "line": 98
+        },
+        {
+          "heading": "3. Component Details",
+          "level": 2,
+          "line": 165
+        },
+        {
+          "heading": "3.1 Tremor (`tremor/`)",
+          "level": 3,
+          "line": 167
+        },
+        {
+          "heading": "3.2 Labels (`label/`)",
+          "level": 3,
+          "line": 175
+        },
+        {
+          "heading": "3.3 Features (`features/`)",
+          "level": 3,
+          "line": 219
+        },
+        {
+          "heading": "3.4 Model (`model/`)",
+          "level": 3,
+          "line": 251
+        },
+        {
+          "heading": "3.5 Ensemble (`ensemble/`)",
+          "level": 3,
+          "line": 266
+        },
+        {
+          "heading": "3.6 Sources (`sources/`)",
+          "level": 3,
+          "line": 297
+        },
+        {
+          "heading": "3.7 Plots (`plots/`)",
+          "level": 3,
+          "line": 304
+        },
+        {
+          "heading": "3.8 Config (`config/`)",
+          "level": 3,
+          "line": 309
+        },
+        {
+          "heading": "3.9 Decorators (`decorators/`) and Notification (`notification/`)",
+          "level": 3,
+          "line": 325
+        },
+        {
+          "heading": "3.10 Utils (`utils/`)",
+          "level": 3,
+          "line": 331
+        },
+        {
+          "heading": "4. Model Class Relationships",
+          "level": 2,
+          "line": 337
+        },
+        {
+          "heading": "5. Pipeline Data Flow",
+          "level": 2,
+          "line": 406
+        },
+        {
+          "heading": "5.1 Per-stage I/O",
+          "level": 3,
+          "line": 408
+        },
+        {
+          "heading": "5.2 On-disk artefact graph",
+          "level": 3,
+          "line": 425
+        },
+        {
+          "heading": "6. Utility Modules",
+          "level": 2,
+          "line": 500
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 19
+      }
+    },
+    {
+      "path": "wiki/Configuration.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 386,
+      "nonEmptyLines": 306,
+      "sections": [
+        {
+          "heading": "Configuration",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "ForecastConfig Lifecycle",
+          "level": 2,
+          "line": 9
+        },
+        {
+          "heading": "Default path",
+          "level": 3,
+          "line": 39
+        },
+        {
+          "heading": "Round-trip",
+          "level": 3,
+          "line": 48
+        },
+        {
+          "heading": "ForecastConfig Schema (YAML)",
+          "level": 2,
+          "line": 58
+        },
+        {
+          "heading": "ForecastExplainConfig fields",
+          "level": 3,
+          "line": 161
+        },
+        {
+          "heading": "`None`-as-inherit",
+          "level": 3,
+          "line": 180
+        },
+        {
+          "heading": "Per-stage configs (Standalone)",
+          "level": 2,
+          "line": 188
+        },
+        {
+          "heading": "`config.example.yaml`",
+          "level": 2,
+          "line": 235
+        },
+        {
+          "heading": "Telegram Notifications",
+          "level": 2,
+          "line": 243
+        },
+        {
+          "heading": "`notify` decorator",
+          "level": 3,
+          "line": 247
+        },
+        {
+          "heading": "`timer` decorator",
+          "level": 3,
+          "line": 265
+        },
+        {
+          "heading": "`TelegramNotification` client",
+          "level": 3,
+          "line": 276
+        },
+        {
+          "heading": "Credentials (`.env`)",
+          "level": 3,
+          "line": 302
+        },
+        {
+          "heading": "Logging",
+          "level": 2,
+          "line": 316
+        },
+        {
+          "heading": "Per-category error log files",
+          "level": 3,
+          "line": 341
+        },
+        {
+          "heading": "Where Configuration Lives in the Filesystem",
+          "level": 2,
+          "line": 366
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 17
+      }
+    },
+    {
+      "path": "wiki/Data-Sources.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 183,
+      "nonEmptyLines": 140,
+      "sections": [
+        {
+          "heading": "Data Sources",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "The `SeismicDataSource` ABC",
+          "level": 2,
+          "line": 14
+        },
+        {
+          "heading": "SDS - Local SeisComP Archive",
+          "level": 2,
+          "line": 31
+        },
+        {
+          "heading": "Use from `ForecastModel`",
+          "level": 3,
+          "line": 45
+        },
+        {
+          "heading": "Use directly",
+          "level": 3,
+          "line": 58
+        },
+        {
+          "heading": "Key methods",
+          "level": 3,
+          "line": 73
+        },
+        {
+          "heading": "FDSN - Web Service with Local Cache",
+          "level": 2,
+          "line": 84
+        },
+        {
+          "heading": "Read path",
+          "level": 3,
+          "line": 90
+        },
+        {
+          "heading": "Use from `ForecastModel`",
+          "level": 3,
+          "line": 117
+        },
+        {
+          "heading": "Constructor parameters",
+          "level": 3,
+          "line": 142
+        },
+        {
+          "heading": "SDS vs FDSN at a Glance",
+          "level": 2,
+          "line": 155
+        },
+        {
+          "heading": "Frequency Bands Read by `CalculateTremor`",
+          "level": 2,
+          "line": 170
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    },
+    {
+      "path": "wiki/Evaluation-Workflow.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 225,
+      "nonEmptyLines": 178,
+      "sections": [
+        {
+          "heading": "Evaluation Workflow",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Two Operating Modes",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "What `evaluate()` Does",
+          "level": 2,
+          "line": 48
+        },
+        {
+          "heading": "Method signature",
+          "level": 3,
+          "line": 76
+        },
+        {
+          "heading": "Cross-Classifier Comparison",
+          "level": 2,
+          "line": 91
+        },
+        {
+          "heading": "Outputs",
+          "level": 2,
+          "line": 118
+        },
+        {
+          "heading": "Cache Semantics",
+          "level": 2,
+          "line": 144
+        },
+        {
+          "heading": "Standalone Use",
+          "level": 2,
+          "line": 150
+        },
+        {
+          "heading": "Reload from a saved `TrainingModel` / `PredictionModel` `.pkl`",
+          "level": 3,
+          "line": 152
+        },
+        {
+          "heading": "Inspect the per-seed metrics",
+          "level": 3,
+          "line": 174
+        },
+        {
+          "heading": "Drive ranking by a custom metric",
+          "level": 3,
+          "line": 183
+        },
+        {
+          "heading": "Persist the evaluation config",
+          "level": 3,
+          "line": 189
+        },
+        {
+          "heading": "ASCII Quick Reference",
+          "level": 2,
+          "line": 207
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 13
+      }
+    },
+    {
+      "path": "wiki/Explanation-Workflow.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 516,
+      "nonEmptyLines": 428,
+      "sections": [
+        {
+          "heading": "Explanation Workflow",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "TreeExplainer constraint",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "Two operating modes",
+          "level": 2,
+          "line": 33
+        },
+        {
+          "heading": "What `explain()` does",
+          "level": 2,
+          "line": 70
+        },
+        {
+          "heading": "Parallelism",
+          "level": 3,
+          "line": 94
+        },
+        {
+          "heading": "`ForecastModel.explain()` signature",
+          "level": 3,
+          "line": 98
+        },
+        {
+          "heading": "Standalone `ExplanationModel.explain()` signature",
+          "level": 3,
+          "line": 123
+        },
+        {
+          "heading": "Standalone `ExplanationModel.plot()` signature",
+          "level": 3,
+          "line": 133
+        },
+        {
+          "heading": "Dataclass composition",
+          "level": 2,
+          "line": 154
+        },
+        {
+          "heading": "Plot inventory",
+          "level": 2,
+          "line": 236
+        },
+        {
+          "heading": "Per-eruption waterfall selection",
+          "level": 2,
+          "line": 264
+        },
+        {
+          "heading": "Outputs",
+          "level": 2,
+          "line": 368
+        },
+        {
+          "heading": "Cache semantics",
+          "level": 2,
+          "line": 395
+        },
+        {
+          "heading": "Standalone use",
+          "level": 2,
+          "line": 434
+        },
+        {
+          "heading": "Reload from a saved `PredictionModel` `.pkl`",
+          "level": 3,
+          "line": 436
+        },
+        {
+          "heading": "Reload from a saved `TrainingModel` `.pkl`",
+          "level": 3,
+          "line": 454
+        },
+        {
+          "heading": "Drive the waterfall path directly",
+          "level": 3,
+          "line": 463
+        },
+        {
+          "heading": "Persist the explanation config",
+          "level": 3,
+          "line": 479
+        },
+        {
+          "heading": "ASCII quick reference",
+          "level": 2,
+          "line": 496
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 19
+      }
+    },
+    {
+      "path": "wiki/Feature-Count-Sweep.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 358,
+      "nonEmptyLines": 283,
+      "sections": [
+        {
+          "heading": "Feature Count Sweep",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Quick Start",
+          "level": 2,
+          "line": 32
+        },
+        {
+          "heading": "Two Scoring Modes",
+          "level": 2,
+          "line": 96
+        },
+        {
+          "heading": "Fail-fast on missing features",
+          "level": 3,
+          "line": 109
+        },
+        {
+          "heading": "`estimator_mode` — Default vs Tuned",
+          "level": 2,
+          "line": 121
+        },
+        {
+          "heading": "Picking `N*`",
+          "level": 2,
+          "line": 136
+        },
+        {
+          "heading": "Forecast-Mode Wiring",
+          "level": 2,
+          "line": 157
+        },
+        {
+          "heading": "Complete Example",
+          "level": 2,
+          "line": 194
+        },
+        {
+          "heading": "Outputs",
+          "level": 2,
+          "line": 244
+        },
+        {
+          "heading": "Attributes After `fit()`",
+          "level": 2,
+          "line": 265
+        },
+        {
+          "heading": "Constructor / Function Reference",
+          "level": 2,
+          "line": 279
+        },
+        {
+          "heading": "`FeatureCountSweep`",
+          "level": 3,
+          "line": 281
+        },
+        {
+          "heading": "`sweep_feature_count`",
+          "level": 3,
+          "line": 319
+        },
+        {
+          "heading": "Cross-References",
+          "level": 2,
+          "line": 353
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 14
+      }
+    },
+    {
+      "path": "wiki/Getting-Started.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 115,
+      "nonEmptyLines": 84,
+      "sections": [
+        {
+          "heading": "Getting Started",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Prerequisites",
+          "level": 2,
+          "line": 8
+        },
+        {
+          "heading": "Installation",
+          "level": 2,
+          "line": 21
+        },
+        {
+          "heading": "Verify the install",
+          "level": 3,
+          "line": 37
+        },
+        {
+          "heading": "Runtime Dependencies",
+          "level": 2,
+          "line": 47
+        },
+        {
+          "heading": "Development Dependencies (`--group dev`)",
+          "level": 2,
+          "line": 65
+        },
+        {
+          "heading": "Development Commands",
+          "level": 2,
+          "line": 76
+        },
+        {
+          "heading": "Telegram Notifications (Optional)",
+          "level": 2,
+          "line": 95
+        },
+        {
+          "heading": "Next Steps",
+          "level": 2,
+          "line": 111
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 9
+      }
+    },
+    {
+      "path": "wiki/Home.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 114,
+      "nonEmptyLines": 95,
+      "sections": [
+        {
+          "heading": "eruption-forecast Wiki",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "⚠️ Research Use Only",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Navigation",
+          "level": 2,
+          "line": 14
+        },
+        {
+          "heading": "What This Package Does",
+          "level": 2,
+          "line": 35
+        },
+        {
+          "heading": "Repository Map",
+          "level": 2,
+          "line": 95
+        },
+        {
+          "heading": "Key Links",
+          "level": 2,
+          "line": 109
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "wiki/Output-Structure.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 312,
+      "nonEmptyLines": 266,
+      "sections": [
+        {
+          "heading": "Output Structure",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Full Directory Tree",
+          "level": 2,
+          "line": 14
+        },
+        {
+          "heading": "Slug Mappings",
+          "level": 2,
+          "line": 136
+        },
+        {
+          "heading": "Filename Conventions",
+          "level": 2,
+          "line": 165
+        },
+        {
+          "heading": "Cache Layout",
+          "level": 2,
+          "line": 207
+        },
+        {
+          "heading": "Scenarios Layout",
+          "level": 2,
+          "line": 242
+        },
+        {
+          "heading": "What Lives Where - Cheat Sheet",
+          "level": 2,
+          "line": 274
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "wiki/Pipeline-Walkthrough.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 281,
+      "nonEmptyLines": 242,
+      "sections": [
+        {
+          "heading": "Pipeline Walkthrough",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Research Workflow (`main.py`)",
+          "level": 2,
+          "line": 12
+        },
+        {
+          "heading": "Stage flow",
+          "level": 3,
+          "line": 17
+        },
+        {
+          "heading": "Per-stage notes",
+          "level": 3,
+          "line": 82
+        },
+        {
+          "heading": "`fm.calculate(...)`",
+          "level": 4,
+          "line": 84
+        },
+        {
+          "heading": "`fm.train(...)`",
+          "level": 4,
+          "line": 90
+        },
+        {
+          "heading": "`fm.predict(...)`",
+          "level": 4,
+          "line": 97
+        },
+        {
+          "heading": "`fm.evaluate(model=\"prediction\", plot_per_seed=True)`",
+          "level": 4,
+          "line": 103
+        },
+        {
+          "heading": "`fm.EvaluationModel.compare()`",
+          "level": 4,
+          "line": 110
+        },
+        {
+          "heading": "`fm.explain(model=\"prediction\", save_per_seed=True, plot_per_seed=False, max_display=20, dpi=150)`",
+          "level": 4,
+          "line": 115
+        },
+        {
+          "heading": "Scenarios Workflow (`forecast-scenario.py`)",
+          "level": 2,
+          "line": 125
+        },
+        {
+          "heading": "Stage flow",
+          "level": 3,
+          "line": 131
+        },
+        {
+          "heading": "Per-stage notes",
+          "level": 3,
+          "line": 196
+        },
+        {
+          "heading": "`ForecastModelScenario(...)` constructor",
+          "level": 4,
+          "line": 200
+        },
+        {
+          "heading": "`fms.calculate(...)` &nbsp;— mirrors [`ForecastModel.calculate(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L182)",
+          "level": 4,
+          "line": 205
+        },
+        {
+          "heading": "`fms.shared_training(...)` &nbsp;— mirrors [`ForecastModel.train(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L399)",
+          "level": 4,
+          "line": 211
+        },
+        {
+          "heading": "`fms.shared_prediction(...)` &nbsp;— mirrors [`ForecastModel.predict(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L690)",
+          "level": 4,
+          "line": 218
+        },
+        {
+          "heading": "`fms.shared_evaluation(...)` &nbsp;— mirrors [`ForecastModel.evaluate(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L997)",
+          "level": 4,
+          "line": 225
+        },
+        {
+          "heading": "`fms.shared_explanation(...)` &nbsp;— mirrors [`ForecastModel.explain(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L1121)",
+          "level": 4,
+          "line": 232
+        },
+        {
+          "heading": "`fms.run(evaluate_model=True, explain_model=True, notification_message=None)`",
+          "level": 4,
+          "line": 239
+        },
+        {
+          "heading": "Resulting directory layout",
+          "level": 3,
+          "line": 246
+        },
+        {
+          "heading": "Choosing Between the Workflows",
+          "level": 2,
+          "line": 269
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 22
+      }
+    },
+    {
+      "path": "wiki/Prediction-Workflow.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 323,
+      "nonEmptyLines": 245,
+      "sections": [
+        {
+          "heading": "Prediction Workflow",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Internal Pipeline",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "Trained Model Sources",
+          "level": 2,
+          "line": 35
+        },
+        {
+          "heading": "Build Forecast Grid (`build_label`)",
+          "level": 2,
+          "line": 52
+        },
+        {
+          "heading": "Extract Features (`extract_features`)",
+          "level": 2,
+          "line": 67
+        },
+        {
+          "heading": "Feature Scoping via `use_features_from`",
+          "level": 2,
+          "line": 81
+        },
+        {
+          "heading": "Validation and failure modes",
+          "level": 3,
+          "line": 119
+        },
+        {
+          "heading": "Cache identity implications",
+          "level": 3,
+          "line": 131
+        },
+        {
+          "heading": "Config round-trip",
+          "level": 3,
+          "line": 136
+        },
+        {
+          "heading": "Choosing between the modes",
+          "level": 3,
+          "line": 140
+        },
+        {
+          "heading": "Forecast (`forecast`)",
+          "level": 2,
+          "line": 160
+        },
+        {
+          "heading": "Plotting",
+          "level": 3,
+          "line": 186
+        },
+        {
+          "heading": "Cache",
+          "level": 2,
+          "line": 205
+        },
+        {
+          "heading": "Outputs",
+          "level": 2,
+          "line": 220
+        },
+        {
+          "heading": "Standalone Use",
+          "level": 2,
+          "line": 244
+        },
+        {
+          "heading": "Reload a saved `.pkl`",
+          "level": 3,
+          "line": 276
+        },
+        {
+          "heading": "Reuse a feature matrix from a prior run",
+          "level": 3,
+          "line": 285
+        },
+        {
+          "heading": "Persist the prediction config",
+          "level": 3,
+          "line": 312
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 18
+      }
+    },
+    {
+      "path": "wiki/Training-Workflow.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 512,
+      "nonEmptyLines": 418,
+      "sections": [
+        {
+          "heading": "Training Workflow",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Workflow",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "Internal Pipeline",
+          "level": 2,
+          "line": 81
+        },
+        {
+          "heading": "Label Building (`build_label`)",
+          "level": 2,
+          "line": 195
+        },
+        {
+          "heading": "`LabelBuilder` - single global window",
+          "level": 3,
+          "line": 206
+        },
+        {
+          "heading": "`DynamicLabelBuilder` - one window per eruption, with overlap dedup",
+          "level": 3,
+          "line": 224
+        },
+        {
+          "heading": "Feature Pipeline (`extract_features`)",
+          "level": 2,
+          "line": 244
+        },
+        {
+          "heading": "Classifier Fitting (`fit`)",
+          "level": 2,
+          "line": 275
+        },
+        {
+          "heading": "Imbalance handling",
+          "level": 3,
+          "line": 292
+        },
+        {
+          "heading": "Parallelism",
+          "level": 3,
+          "line": 303
+        },
+        {
+          "heading": "Behaviour matrix",
+          "level": 4,
+          "line": 319
+        },
+        {
+          "heading": "Scoring",
+          "level": 3,
+          "line": 333
+        },
+        {
+          "heading": "Classifier Catalog",
+          "level": 2,
+          "line": 339
+        },
+        {
+          "heading": "Cross-Validation Strategies",
+          "level": 2,
+          "line": 361
+        },
+        {
+          "heading": "Cache",
+          "level": 2,
+          "line": 376
+        },
+        {
+          "heading": "Outputs",
+          "level": 2,
+          "line": 391
+        },
+        {
+          "heading": "Standalone Use",
+          "level": 2,
+          "line": 412
+        },
+        {
+          "heading": "Reuse a feature matrix from a prior run",
+          "level": 3,
+          "line": 440
+        },
+        {
+          "heading": "Persist the training config",
+          "level": 3,
+          "line": 451
+        },
+        {
+          "heading": "Post-Hoc `top_n_features` Sweep (Experimental)",
+          "level": 2,
+          "line": 466
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 20
+      }
+    },
+    {
+      "path": "wiki/Usage.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 302,
+      "nonEmptyLines": 244,
+      "sections": [
+        {
+          "heading": "Usage",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Quick Start",
+          "level": 2,
+          "line": 8
+        },
+        {
+          "heading": "Stage Cheat Sheet",
+          "level": 2,
+          "line": 47
+        },
+        {
+          "heading": "Annotated Example (`main.py`)",
+          "level": 2,
+          "line": 61
+        },
+        {
+          "heading": "Why these parameters?",
+          "level": 3,
+          "line": 164
+        },
+        {
+          "heading": "Accessing Results",
+          "level": 2,
+          "line": 179
+        },
+        {
+          "heading": "Common Variants",
+          "level": 2,
+          "line": 208
+        },
+        {
+          "heading": "FDSN instead of SDS",
+          "level": 3,
+          "line": 210
+        },
+        {
+          "heading": "Skip recomputation by replaying a saved config",
+          "level": 3,
+          "line": 223
+        },
+        {
+          "heading": "Persist intermediate stage objects",
+          "level": 3,
+          "line": 234
+        },
+        {
+          "heading": "Per-stage config snapshots",
+          "level": 3,
+          "line": 242
+        },
+        {
+          "heading": "Reuse features already selected during `train()`",
+          "level": 3,
+          "line": 258
+        },
+        {
+          "heading": "Standalone evaluation from a saved `.pkl`",
+          "level": 3,
+          "line": 287
+        },
+        {
+          "heading": "Loop over multiple training/prediction splits",
+          "level": 3,
+          "line": 300
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 14
+      }
+    },
+    {
+      "path": "wiki/Visualization.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 224,
+      "nonEmptyLines": 167,
+      "sections": [
+        {
+          "heading": "Visualization",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Tremor - `plot_tremor`",
+          "level": 2,
+          "line": 29
+        },
+        {
+          "heading": "Features - `plot_significant_features` & friends",
+          "level": 2,
+          "line": 62
+        },
+        {
+          "heading": "Forecast - `plot_forecast`",
+          "level": 2,
+          "line": 91
+        },
+        {
+          "heading": "Evaluation - `plot_roc_curve` etc.",
+          "level": 2,
+          "line": 140
+        },
+        {
+          "heading": "Labels - `plot_label_distribution`",
+          "level": 2,
+          "line": 164
+        },
+        {
+          "heading": "SHAP — `plot_classifier_waterfall` etc.",
+          "level": 2,
+          "line": 178
+        },
+        {
+          "heading": "Styling - Nature-Style Defaults",
+          "level": 2,
+          "line": 205
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 8
+      }
+    }
+  ]
+}

@@ -1,0 +1,3624 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 13,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 13,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 13,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/eruption_forecast/dataclass/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 22,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 114,
+      "nonEmptyLines": 91,
+      "classes": [
+        {
+          "name": "ProbabilityPick",
+          "startLine": 24,
+          "endLine": 38,
+          "methods": [],
+          "properties": [
+            "random_state",
+            "index",
+            "datetime",
+            "value"
+          ]
+        },
+        {
+          "name": "SeedSummary",
+          "startLine": 42,
+          "endLine": 53,
+          "methods": [],
+          "properties": [
+            "random_state",
+            "highest",
+            "lowest"
+          ]
+        },
+        {
+          "name": "EruptionWindow",
+          "startLine": 57,
+          "endLine": 80,
+          "methods": [
+            "__repr__"
+          ],
+          "properties": [
+            "eruption_date",
+            "highest",
+            "lowest",
+            "seeds"
+          ]
+        },
+        {
+          "name": "ClassifierEnsembleSummary",
+          "startLine": 84,
+          "endLine": 114,
+          "methods": [
+            "__repr__"
+          ],
+          "properties": [
+            "classifier_name",
+            "eruption_windows",
+            "highest",
+            "lowest"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ProbabilityPick",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "SeedSummary",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "EruptionWindow",
+          "line": 56,
+          "isDefault": false
+        },
+        {
+          "name": "ClassifierEnsembleSummary",
+          "line": 83,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__repr__",
+          "callee": "len",
+          "lineNumber": 79
+        },
+        {
+          "caller": "__repr__",
+          "callee": "len",
+          "lineNumber": 113
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 0,
+        "classCount": 4
+      }
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/classifier_explanation.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 17,
+      "classes": [
+        {
+          "name": "SeedExplanation",
+          "startLine": 7,
+          "endLine": 11,
+          "methods": [],
+          "properties": [
+            "random_state",
+            "shap_values"
+          ]
+        },
+        {
+          "name": "ClassifierExplanation",
+          "startLine": 15,
+          "endLine": 25,
+          "methods": [
+            "__repr__"
+          ],
+          "properties": [
+            "classifier_name",
+            "seeds"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SeedExplanation",
+          "line": 6,
+          "isDefault": false
+        },
+        {
+          "name": "ClassifierExplanation",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__repr__",
+          "callee": "len",
+          "lineNumber": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 2
+      }
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/station_data.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 82,
+      "nonEmptyLines": 68,
+      "classes": [
+        {
+          "name": "StationData",
+          "startLine": 5,
+          "endLine": 82,
+          "methods": [
+            "__post_init__"
+          ],
+          "properties": [
+            "station",
+            "channel",
+            "network",
+            "location",
+            "channel_type",
+            "nslc",
+            "nslct"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "StationData",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__post_init__",
+          "callee": "isinstance",
+          "lineNumber": 68
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "ValueError",
+          "lineNumber": 69
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "isinstance",
+          "lineNumber": 70
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "ValueError",
+          "lineNumber": 71
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "isinstance",
+          "lineNumber": 72
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "ValueError",
+          "lineNumber": 73
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "self.station.upper",
+          "lineNumber": 75
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "self.channel.upper",
+          "lineNumber": 76
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "self.network.upper",
+          "lineNumber": 77
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "self.location.upper",
+          "lineNumber": 78
+        },
+        {
+          "caller": "__post_init__",
+          "callee": "self.channel_type.upper",
+          "lineNumber": 79
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 12,
+      "nonEmptyLines": 10,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/base_ensemble.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 50,
+      "nonEmptyLines": 37,
+      "classes": [
+        {
+          "name": "BaseEnsemble",
+          "startLine": 10,
+          "endLine": 50,
+          "methods": [
+            "save",
+            "load"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "BaseEnsemble",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 29
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 29
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 29
+        },
+        {
+          "caller": "save",
+          "callee": "joblib.dump",
+          "lineNumber": 30
+        },
+        {
+          "caller": "save",
+          "callee": "logger.info",
+          "lineNumber": 31
+        },
+        {
+          "caller": "save",
+          "callee": "type",
+          "lineNumber": 31
+        },
+        {
+          "caller": "load",
+          "callee": "load_pickle",
+          "lineNumber": 48
+        },
+        {
+          "caller": "load",
+          "callee": "logger.info",
+          "lineNumber": 49
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 516,
+      "nonEmptyLines": 426,
+      "classes": [
+        {
+          "name": "ClassifierEnsemble",
+          "startLine": 15,
+          "endLine": 516,
+          "methods": [
+            "__init__",
+            "__getitem__",
+            "__len__",
+            "__repr__",
+            "classifiers",
+            "from_any",
+            "from_seed_ensembles",
+            "from_dict",
+            "from_json",
+            "predict_proba",
+            "predict",
+            "predict_per_classifier",
+            "predict_with_uncertainty",
+            "get_params",
+            "_compute_features_union"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ClassifierEnsemble",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__len__",
+          "callee": "len",
+          "lineNumber": 65
+        },
+        {
+          "caller": "__repr__",
+          "callee": "list",
+          "lineNumber": 81
+        },
+        {
+          "caller": "__repr__",
+          "callee": "self.ensembles.keys",
+          "lineNumber": 81
+        },
+        {
+          "caller": "__repr__",
+          "callee": "len",
+          "lineNumber": 82
+        },
+        {
+          "caller": "classifiers",
+          "callee": "list",
+          "lineNumber": 91
+        },
+        {
+          "caller": "classifiers",
+          "callee": "self.ensembles.keys",
+          "lineNumber": 91
+        },
+        {
+          "caller": "from_any",
+          "callee": "isinstance",
+          "lineNumber": 136
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_seed_ensembles",
+          "lineNumber": 137
+        },
+        {
+          "caller": "from_any",
+          "callee": "source.endswith",
+          "lineNumber": 139
+        },
+        {
+          "caller": "from_any",
+          "callee": "os.path.isfile",
+          "lineNumber": 140
+        },
+        {
+          "caller": "from_any",
+          "callee": "FileNotFoundError",
+          "lineNumber": 141
+        },
+        {
+          "caller": "from_any",
+          "callee": "open",
+          "lineNumber": 142
+        },
+        {
+          "caller": "from_any",
+          "callee": "json.load",
+          "lineNumber": 143
+        },
+        {
+          "caller": "from_any",
+          "callee": "isinstance",
+          "lineNumber": 145
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_dict",
+          "lineNumber": 146
+        },
+        {
+          "caller": "from_any",
+          "callee": "isinstance",
+          "lineNumber": 148
+        },
+        {
+          "caller": "from_any",
+          "callee": "SeedEnsemble.from_any",
+          "lineNumber": 149
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_seed_ensembles",
+          "lineNumber": 150
+        },
+        {
+          "caller": "from_any",
+          "callee": "ValueError",
+          "lineNumber": 154
+        },
+        {
+          "caller": "from_any",
+          "callee": "type",
+          "lineNumber": 157
+        },
+        {
+          "caller": "from_any",
+          "callee": "source.endswith",
+          "lineNumber": 160
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.load",
+          "lineNumber": 161
+        },
+        {
+          "caller": "from_any",
+          "callee": "isinstance",
+          "lineNumber": 162
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_seed_ensembles",
+          "lineNumber": 163
+        },
+        {
+          "caller": "from_any",
+          "callee": "source.endswith",
+          "lineNumber": 168
+        },
+        {
+          "caller": "from_any",
+          "callee": "SeedEnsemble.from_any",
+          "lineNumber": 169
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_seed_ensembles",
+          "lineNumber": 170
+        },
+        {
+          "caller": "from_any",
+          "callee": "ValueError",
+          "lineNumber": 174
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "ValueError",
+          "lineNumber": 199
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "cls",
+          "lineNumber": 200
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "dict",
+          "lineNumber": 201
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "obj._compute_features_union",
+          "lineNumber": 202
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "logger.info",
+          "lineNumber": 205
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "len",
+          "lineNumber": 206
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "list",
+          "lineNumber": 207
+        },
+        {
+          "caller": "from_seed_ensembles",
+          "callee": "ensembles.keys",
+          "lineNumber": 207
+        },
+        {
+          "caller": "from_dict",
+          "callee": "ValueError",
+          "lineNumber": 239
+        },
+        {
+          "caller": "from_dict",
+          "callee": "trained_model_paths.items",
+          "lineNumber": 241
+        },
+        {
+          "caller": "from_dict",
+          "callee": "SeedEnsemble.from_any",
+          "lineNumber": 242
+        },
+        {
+          "caller": "from_dict",
+          "callee": "logger.info",
+          "lineNumber": 244
+        },
+        {
+          "caller": "from_dict",
+          "callee": "cls.from_seed_ensembles",
+          "lineNumber": 245
+        },
+        {
+          "caller": "from_json",
+          "callee": "os.path.isfile",
+          "lineNumber": 271
+        },
+        {
+          "caller": "from_json",
+          "callee": "FileNotFoundError",
+          "lineNumber": 272
+        },
+        {
+          "caller": "from_json",
+          "callee": "open",
+          "lineNumber": 273
+        },
+        {
+          "caller": "from_json",
+          "callee": "json.load",
+          "lineNumber": 274
+        },
+        {
+          "caller": "from_json",
+          "callee": "isinstance",
+          "lineNumber": 275
+        },
+        {
+          "caller": "from_json",
+          "callee": "ValueError",
+          "lineNumber": 276
+        },
+        {
+          "caller": "from_json",
+          "callee": "type",
+          "lineNumber": 279
+        },
+        {
+          "caller": "from_json",
+          "callee": "cls.from_dict",
+          "lineNumber": 281
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "self.predict_per_classifier",
+          "lineNumber": 297
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "np.stack",
+          "lineNumber": 299
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "clf_results.values",
+          "lineNumber": 300
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "classifier_probability_means.mean",
+          "lineNumber": 303
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "np.column_stack",
+          "lineNumber": 304
+        },
+        {
+          "caller": "predict",
+          "callee": "(self.predict_proba(X)[:, 1] >= threshold).astype",
+          "lineNumber": 315
+        },
+        {
+          "caller": "predict",
+          "callee": "self.predict_proba",
+          "lineNumber": 315
+        },
+        {
+          "caller": "predict_per_classifier",
+          "callee": "self.ensembles.items",
+          "lineNumber": 353
+        },
+        {
+          "caller": "predict_per_classifier",
+          "callee": "os.path.join",
+          "lineNumber": 355
+        },
+        {
+          "caller": "predict_per_classifier",
+          "callee": "logger.info",
+          "lineNumber": 361
+        },
+        {
+          "caller": "predict_per_classifier",
+          "callee": "len",
+          "lineNumber": 362
+        },
+        {
+          "caller": "predict_per_classifier",
+          "callee": "seed_ensemble.predict_with_uncertainty",
+          "lineNumber": 370
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "self.predict_per_classifier",
+          "lineNumber": 436
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "np.stack",
+          "lineNumber": 441
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "clf_results.values",
+          "lineNumber": 442
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "np.stack",
+          "lineNumber": 444
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "clf_results.values",
+          "lineNumber": 445
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "compute_model_probabilities",
+          "lineNumber": 453
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "clf_results.items",
+          "lineNumber": 464
+        },
+        {
+          "caller": "get_params",
+          "callee": "len",
+          "lineNumber": 499
+        },
+        {
+          "caller": "get_params",
+          "callee": "params.update",
+          "lineNumber": 500
+        },
+        {
+          "caller": "_compute_features_union",
+          "callee": "sorted",
+          "lineNumber": 516
+        },
+        {
+          "caller": "_compute_features_union",
+          "callee": "self.ensembles.values",
+          "lineNumber": 516
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 591,
+      "nonEmptyLines": 507,
+      "classes": [
+        {
+          "name": "ExplainerEnsemble",
+          "startLine": 42,
+          "endLine": 591,
+          "methods": [
+            "__init__",
+            "normalise_shap_values",
+            "explain_seed",
+            "explain_classifier",
+            "explain",
+            "plot_seed",
+            "plot_waterfall",
+            "plot_aggregate"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ExplainerEnsemble",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "resolve_output_dir",
+          "lineNumber": 88
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 91
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.dirname",
+          "lineNumber": 101
+        },
+        {
+          "caller": "__init__",
+          "callee": "output_dir.rstrip",
+          "lineNumber": 101
+        },
+        {
+          "caller": "normalise_shap_values",
+          "callee": "np.asarray",
+          "lineNumber": 129
+        },
+        {
+          "caller": "normalise_shap_values",
+          "callee": "np.asarray",
+          "lineNumber": 132
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "shap.TreeExplainer",
+          "lineNumber": 179
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "explainer",
+          "lineNumber": 186
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "ExplainerEnsemble.normalise_shap_values",
+          "lineNumber": 190
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "shap.Explanation",
+          "lineNumber": 194
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "shorten_feature_name",
+          "lineNumber": 198
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "joblib.dump",
+          "lineNumber": 202
+        },
+        {
+          "caller": "explain_seed",
+          "callee": "ValueError",
+          "lineNumber": 206
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "ClassifierExplanation",
+          "lineNumber": 259
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "logger.info",
+          "lineNumber": 264
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "len",
+          "lineNumber": 265
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "ensure_dir",
+          "lineNumber": 268
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "os.path.join",
+          "lineNumber": 270
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "os.getcwd",
+          "lineNumber": 270
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "os.path.join",
+          "lineNumber": 273
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "ensure_dir",
+          "lineNumber": 275
+        },
+        {
+          "caller": "_process_seed",
+          "callee": "int",
+          "lineNumber": 278
+        },
+        {
+          "caller": "_process_seed",
+          "callee": "os.path.join",
+          "lineNumber": 279
+        },
+        {
+          "caller": "_process_seed",
+          "callee": "os.path.exists",
+          "lineNumber": 280
+        },
+        {
+          "caller": "_process_seed",
+          "callee": "load_pickle",
+          "lineNumber": 281
+        },
+        {
+          "caller": "_process_seed",
+          "callee": "ExplainerEnsemble.explain_seed",
+          "lineNumber": 283
+        },
+        {
+          "caller": "_process_seed",
+          "callee": "SeedExplanation",
+          "lineNumber": 290
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "logger.info",
+          "lineNumber": 293
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "len",
+          "lineNumber": 294
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "joblib.Parallel",
+          "lineNumber": 296
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "joblib.delayed",
+          "lineNumber": 297
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "_process_seed",
+          "lineNumber": 300
+        },
+        {
+          "caller": "explain_classifier",
+          "callee": "classifier_explanation.seeds.extend",
+          "lineNumber": 302
+        },
+        {
+          "caller": "explain",
+          "callee": "self.ClassifierEnsemble.ensembles.values",
+          "lineNumber": 334
+        },
+        {
+          "caller": "explain",
+          "callee": "os.path.join",
+          "lineNumber": 337
+        },
+        {
+          "caller": "explain",
+          "callee": "ensure_dir",
+          "lineNumber": 343
+        },
+        {
+          "caller": "explain",
+          "callee": "os.path.dirname",
+          "lineNumber": 343
+        },
+        {
+          "caller": "explain",
+          "callee": "os.path.exists",
+          "lineNumber": 345
+        },
+        {
+          "caller": "explain",
+          "callee": "load_pickle",
+          "lineNumber": 346
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.info",
+          "lineNumber": 349
+        },
+        {
+          "caller": "explain",
+          "callee": "self.explanations.append",
+          "lineNumber": 353
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.warning",
+          "lineNumber": 357
+        },
+        {
+          "caller": "explain",
+          "callee": "isinstance",
+          "lineNumber": 362
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.warning",
+          "lineNumber": 363
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.info",
+          "lineNumber": 370
+        },
+        {
+          "caller": "explain",
+          "callee": "self.explain_classifier",
+          "lineNumber": 372
+        },
+        {
+          "caller": "explain",
+          "callee": "joblib.dump",
+          "lineNumber": 382
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.info",
+          "lineNumber": 383
+        },
+        {
+          "caller": "explain",
+          "callee": "self.explanations.append",
+          "lineNumber": 387
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.info",
+          "lineNumber": 389
+        },
+        {
+          "caller": "explain",
+          "callee": "len",
+          "lineNumber": 389
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "len",
+          "lineNumber": 417
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "ValueError",
+          "lineNumber": 418
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "os.path.join",
+          "lineNumber": 423
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "int",
+          "lineNumber": 426
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "os.path.join",
+          "lineNumber": 431
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "os.path.exists",
+          "lineNumber": 435
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "jobs.append",
+          "lineNumber": 438
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "joblib.Parallel",
+          "lineNumber": 454
+        },
+        {
+          "caller": "plot_seed",
+          "callee": "joblib.delayed",
+          "lineNumber": 455
+        },
+        {
+          "caller": "plot_waterfall",
+          "callee": "len",
+          "lineNumber": 493
+        },
+        {
+          "caller": "plot_waterfall",
+          "callee": "ValueError",
+          "lineNumber": 494
+        },
+        {
+          "caller": "plot_waterfall",
+          "callee": "os.path.join",
+          "lineNumber": 496
+        },
+        {
+          "caller": "plot_waterfall",
+          "callee": "plot_classifier_waterfall",
+          "lineNumber": 499
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "len",
+          "lineNumber": 557
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "ValueError",
+          "lineNumber": 558
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "os.path.join",
+          "lineNumber": 564
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "ensure_dir",
+          "lineNumber": 567
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "os.path.join",
+          "lineNumber": 569
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "plot_aggregate_shap_bar",
+          "lineNumber": 570
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "save_data",
+          "lineNumber": 579
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "os.path.join",
+          "lineNumber": 581
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "plot_aggregate_shap_beeswarm",
+          "lineNumber": 582
+        },
+        {
+          "caller": "plot_aggregate",
+          "callee": "save_data",
+          "lineNumber": 591
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 664,
+      "nonEmptyLines": 552,
+      "classes": [
+        {
+          "name": "SeedEnsemble",
+          "startLine": 18,
+          "endLine": 664,
+          "methods": [
+            "__init__",
+            "__getitem__",
+            "__len__",
+            "__repr__",
+            "from_registry",
+            "from_json",
+            "from_any",
+            "compute_probabilities_and_predictions",
+            "predict_proba",
+            "predict",
+            "predict_with_uncertainty",
+            "save_matrices",
+            "load_matrices",
+            "get_params",
+            "_compute_features_union"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "SeedEnsemble",
+          "line": 18,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__len__",
+          "callee": "len",
+          "lineNumber": 75
+        },
+        {
+          "caller": "__repr__",
+          "callee": "len",
+          "lineNumber": 93
+        },
+        {
+          "caller": "from_registry",
+          "callee": "os.path.isfile",
+          "lineNumber": 130
+        },
+        {
+          "caller": "from_registry",
+          "callee": "FileNotFoundError",
+          "lineNumber": 131
+        },
+        {
+          "caller": "from_registry",
+          "callee": "pd.read_csv",
+          "lineNumber": 135
+        },
+        {
+          "caller": "from_registry",
+          "callee": "ValueError",
+          "lineNumber": 138
+        },
+        {
+          "caller": "from_registry",
+          "callee": "df.columns.tolist",
+          "lineNumber": 141
+        },
+        {
+          "caller": "from_registry",
+          "callee": "ValueError",
+          "lineNumber": 142
+        },
+        {
+          "caller": "from_registry",
+          "callee": "df.iterrows",
+          "lineNumber": 145
+        },
+        {
+          "caller": "from_registry",
+          "callee": "pd.read_csv(\n                features_csv, index_col=0\n            ).index.tolist",
+          "lineNumber": 149
+        },
+        {
+          "caller": "from_registry",
+          "callee": "pd.read_csv",
+          "lineNumber": 149
+        },
+        {
+          "caller": "from_registry",
+          "callee": "load_pickle",
+          "lineNumber": 153
+        },
+        {
+          "caller": "from_registry",
+          "callee": "type",
+          "lineNumber": 157
+        },
+        {
+          "caller": "from_registry",
+          "callee": "seeds.append",
+          "lineNumber": 159
+        },
+        {
+          "caller": "from_registry",
+          "callee": "int",
+          "lineNumber": 161
+        },
+        {
+          "caller": "from_registry",
+          "callee": "cls",
+          "lineNumber": 167
+        },
+        {
+          "caller": "from_registry",
+          "callee": "ensemble._compute_features_union",
+          "lineNumber": 169
+        },
+        {
+          "caller": "from_registry",
+          "callee": "logger.info",
+          "lineNumber": 172
+        },
+        {
+          "caller": "from_registry",
+          "callee": "len",
+          "lineNumber": 173
+        },
+        {
+          "caller": "from_json",
+          "callee": "os.path.isfile",
+          "lineNumber": 214
+        },
+        {
+          "caller": "from_json",
+          "callee": "FileNotFoundError",
+          "lineNumber": 215
+        },
+        {
+          "caller": "from_json",
+          "callee": "open",
+          "lineNumber": 219
+        },
+        {
+          "caller": "from_json",
+          "callee": "json.load",
+          "lineNumber": 220
+        },
+        {
+          "caller": "from_json",
+          "callee": "isinstance",
+          "lineNumber": 222
+        },
+        {
+          "caller": "from_json",
+          "callee": "ValueError",
+          "lineNumber": 223
+        },
+        {
+          "caller": "from_json",
+          "callee": "type",
+          "lineNumber": 225
+        },
+        {
+          "caller": "from_json",
+          "callee": "ValueError",
+          "lineNumber": 229
+        },
+        {
+          "caller": "from_json",
+          "callee": "set",
+          "lineNumber": 236
+        },
+        {
+          "caller": "from_json",
+          "callee": "ValueError",
+          "lineNumber": 238
+        },
+        {
+          "caller": "from_json",
+          "callee": "sorted",
+          "lineNumber": 239
+        },
+        {
+          "caller": "from_json",
+          "callee": "load_pickle",
+          "lineNumber": 244
+        },
+        {
+          "caller": "from_json",
+          "callee": "type",
+          "lineNumber": 246
+        },
+        {
+          "caller": "from_json",
+          "callee": "seeds.append",
+          "lineNumber": 248
+        },
+        {
+          "caller": "from_json",
+          "callee": "int",
+          "lineNumber": 250
+        },
+        {
+          "caller": "from_json",
+          "callee": "list",
+          "lineNumber": 252
+        },
+        {
+          "caller": "from_json",
+          "callee": "RuntimeError",
+          "lineNumber": 256
+        },
+        {
+          "caller": "from_json",
+          "callee": "cls",
+          "lineNumber": 276
+        },
+        {
+          "caller": "from_json",
+          "callee": "ensemble._compute_features_union",
+          "lineNumber": 278
+        },
+        {
+          "caller": "from_json",
+          "callee": "logger.info",
+          "lineNumber": 281
+        },
+        {
+          "caller": "from_json",
+          "callee": "len",
+          "lineNumber": 282
+        },
+        {
+          "caller": "from_any",
+          "callee": "os.path.splitext(trained_model_path)[1].lower",
+          "lineNumber": 317
+        },
+        {
+          "caller": "from_any",
+          "callee": "os.path.splitext",
+          "lineNumber": 317
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_json",
+          "lineNumber": 319
+        },
+        {
+          "caller": "from_any",
+          "callee": "cls.from_registry",
+          "lineNumber": 325
+        },
+        {
+          "caller": "from_any",
+          "callee": "ValueError",
+          "lineNumber": 330
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "hasattr",
+          "lineNumber": 366
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "seed_model.predict_proba",
+          "lineNumber": 367
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "seed_model.predict",
+          "lineNumber": 369
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "hasattr",
+          "lineNumber": 370
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "seed_model.decision_function",
+          "lineNumber": 371
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "np.exp",
+          "lineNumber": 372
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "np.asarray(eruption_probabilities >= 0.5).astype",
+          "lineNumber": 373
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "np.asarray",
+          "lineNumber": 373
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "RuntimeError",
+          "lineNumber": 377
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "seed_probabilities.append",
+          "lineNumber": 381
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "seed_predictions.append",
+          "lineNumber": 382
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "np.stack",
+          "lineNumber": 384
+        },
+        {
+          "caller": "compute_probabilities_and_predictions",
+          "callee": "np.stack",
+          "lineNumber": 384
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "self.compute_probabilities_and_predictions",
+          "lineNumber": 396
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "np.mean",
+          "lineNumber": 397
+        },
+        {
+          "caller": "predict_proba",
+          "callee": "np.column_stack",
+          "lineNumber": 398
+        },
+        {
+          "caller": "predict",
+          "callee": "(self.predict_proba(X)[:, 1] >= threshold).astype",
+          "lineNumber": 414
+        },
+        {
+          "caller": "predict",
+          "callee": "self.predict_proba",
+          "lineNumber": 414
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "self.compute_probabilities_and_predictions",
+          "lineNumber": 454
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "os.path.join",
+          "lineNumber": 459
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "os.getcwd",
+          "lineNumber": 460
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "os.path.join",
+          "lineNumber": 466
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "ensure_dir",
+          "lineNumber": 467
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "enumerate",
+          "lineNumber": 469
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "save_forecast_seed",
+          "lineNumber": 470
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "self.save_matrices",
+          "lineNumber": 479
+        },
+        {
+          "caller": "predict_with_uncertainty",
+          "callee": "compute_model_probabilities",
+          "lineNumber": 487
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "ensure_dir",
+          "lineNumber": 533
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "os.path.join",
+          "lineNumber": 537
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "os.path.join",
+          "lineNumber": 540
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "pd.DataFrame",
+          "lineNumber": 544
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "pd.DataFrame",
+          "lineNumber": 547
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "predictions.astype",
+          "lineNumber": 548
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "probabilities_df.to_parquet",
+          "lineNumber": 555
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "predictions_df.to_parquet",
+          "lineNumber": 556
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "logger.info",
+          "lineNumber": 559
+        },
+        {
+          "caller": "save_matrices",
+          "callee": "logger.info",
+          "lineNumber": 560
+        },
+        {
+          "caller": "load_matrices",
+          "callee": "os.path.isfile",
+          "lineNumber": 604
+        },
+        {
+          "caller": "load_matrices",
+          "callee": "FileNotFoundError",
+          "lineNumber": 605
+        },
+        {
+          "caller": "load_matrices",
+          "callee": "pd.read_parquet",
+          "lineNumber": 610
+        },
+        {
+          "caller": "load_matrices",
+          "callee": "pd.read_parquet",
+          "lineNumber": 611
+        },
+        {
+          "caller": "load_matrices",
+          "callee": "logger.info",
+          "lineNumber": 614
+        },
+        {
+          "caller": "load_matrices",
+          "callee": "logger.info",
+          "lineNumber": 615
+        },
+        {
+          "caller": "get_params",
+          "callee": "len",
+          "lineNumber": 647
+        },
+        {
+          "caller": "_compute_features_union",
+          "callee": "sorted",
+          "lineNumber": 664
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/explanation_model.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 586,
+      "nonEmptyLines": 513,
+      "classes": [
+        {
+          "name": "ExplanationModel",
+          "startLine": 16,
+          "endLine": 586,
+          "methods": [
+            "__init__",
+            "from_file",
+            "stage_dir",
+            "build_identity",
+            "set_directories",
+            "create_directories",
+            "describe",
+            "to_dict",
+            "to_prompt",
+            "save_config",
+            "explain",
+            "plot",
+            "_upstream_hash"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ExplanationModel",
+          "line": 16,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "ValueError",
+          "lineNumber": 87
+        },
+        {
+          "caller": "__init__",
+          "callee": "type",
+          "lineNumber": 88
+        },
+        {
+          "caller": "__init__",
+          "callee": "ValueError",
+          "lineNumber": 92
+        },
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 105
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 105
+        },
+        {
+          "caller": "__init__",
+          "callee": "type",
+          "lineNumber": 126
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.set_directories",
+          "lineNumber": 129
+        },
+        {
+          "caller": "__init__",
+          "callee": "ExplainerEnsemble",
+          "lineNumber": 131
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 143
+        },
+        {
+          "caller": "__init__",
+          "callee": "ExplanationConfig",
+          "lineNumber": 146
+        },
+        {
+          "caller": "__init__",
+          "callee": "list",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "logger.info",
+          "lineNumber": 160
+        },
+        {
+          "caller": "__init__",
+          "callee": "type",
+          "lineNumber": 160
+        },
+        {
+          "caller": "from_file",
+          "callee": "load_pickle",
+          "lineNumber": 207
+        },
+        {
+          "caller": "from_file",
+          "callee": "isinstance",
+          "lineNumber": 209
+        },
+        {
+          "caller": "from_file",
+          "callee": "TypeError",
+          "lineNumber": 210
+        },
+        {
+          "caller": "from_file",
+          "callee": "type",
+          "lineNumber": 212
+        },
+        {
+          "caller": "from_file",
+          "callee": "cls",
+          "lineNumber": 215
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 281
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 282
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 290
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 291
+        },
+        {
+          "caller": "describe",
+          "callee": "\", \".join",
+          "lineNumber": 301
+        },
+        {
+          "caller": "to_dict",
+          "callee": "list",
+          "lineNumber": 320
+        },
+        {
+          "caller": "to_dict",
+          "callee": "list",
+          "lineNumber": 321
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "\", \".join",
+          "lineNumber": 356
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "os.path.basename",
+          "lineNumber": 358
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "self.output_dir.rstrip",
+          "lineNumber": 358
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "len",
+          "lineNumber": 368
+        },
+        {
+          "caller": "save_config",
+          "callee": "slugify",
+          "lineNumber": 412
+        },
+        {
+          "caller": "save_config",
+          "callee": "os.path.join",
+          "lineNumber": 415
+        },
+        {
+          "caller": "save_config",
+          "callee": "self._config.save",
+          "lineNumber": 418
+        },
+        {
+          "caller": "explain",
+          "callee": "type(self).build_identity",
+          "lineNumber": 455
+        },
+        {
+          "caller": "explain",
+          "callee": "type",
+          "lineNumber": 455
+        },
+        {
+          "caller": "explain",
+          "callee": "self._upstream_hash",
+          "lineNumber": 456
+        },
+        {
+          "caller": "explain",
+          "callee": "type(self).compute_hash",
+          "lineNumber": 459
+        },
+        {
+          "caller": "explain",
+          "callee": "type",
+          "lineNumber": 459
+        },
+        {
+          "caller": "explain",
+          "callee": "type(self).load",
+          "lineNumber": 462
+        },
+        {
+          "caller": "explain",
+          "callee": "type",
+          "lineNumber": 462
+        },
+        {
+          "caller": "explain",
+          "callee": "self.create_directories",
+          "lineNumber": 472
+        },
+        {
+          "caller": "explain",
+          "callee": "self.ExplainerEnsemble.explain",
+          "lineNumber": 473
+        },
+        {
+          "caller": "explain",
+          "callee": "self.save",
+          "lineNumber": 483
+        },
+        {
+          "caller": "explain",
+          "callee": "self.save_config",
+          "lineNumber": 486
+        },
+        {
+          "caller": "explain",
+          "callee": "logger.warning",
+          "lineNumber": 488
+        },
+        {
+          "caller": "plot",
+          "callee": "len",
+          "lineNumber": 534
+        },
+        {
+          "caller": "plot",
+          "callee": "ValueError",
+          "lineNumber": 535
+        },
+        {
+          "caller": "plot",
+          "callee": "logger.warning",
+          "lineNumber": 540
+        },
+        {
+          "caller": "plot",
+          "callee": "explainer_ensemble.plot_waterfall",
+          "lineNumber": 544
+        },
+        {
+          "caller": "plot",
+          "callee": "explainer_ensemble.plot_seed",
+          "lineNumber": 554
+        },
+        {
+          "caller": "plot",
+          "callee": "explainer_ensemble.plot_aggregate",
+          "lineNumber": 563
+        },
+        {
+          "caller": "_upstream_hash",
+          "callee": "list",
+          "lineNumber": 579
+        },
+        {
+          "caller": "_upstream_hash",
+          "callee": "list",
+          "lineNumber": 580
+        },
+        {
+          "caller": "_upstream_hash",
+          "callee": "sorted",
+          "lineNumber": 581
+        },
+        {
+          "caller": "_upstream_hash",
+          "callee": "map",
+          "lineNumber": 581
+        },
+        {
+          "caller": "_upstream_hash",
+          "callee": "type(self).compute_hash",
+          "lineNumber": 586
+        },
+        {
+          "caller": "_upstream_hash",
+          "callee": "type",
+          "lineNumber": 586
+        }
+      ],
+      "metrics": {
+        "importCount": 10,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/plots/explanation_plots.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 688,
+      "nonEmptyLines": 594,
+      "functions": [
+        {
+          "name": "plot_shap_waterfall",
+          "startLine": 21,
+          "endLine": 72,
+          "params": [
+            "explanation",
+            "max_display",
+            "title",
+            "figsize",
+            "save_filepath",
+            "dpi",
+            "verbose"
+          ]
+        },
+        {
+          "name": "plot_shap_beeswarm",
+          "startLine": 75,
+          "endLine": 121,
+          "params": [
+            "explanation",
+            "max_display",
+            "title",
+            "figsize",
+            "save_filepath",
+            "dpi",
+            "verbose",
+            "group_remaining_features"
+          ]
+        },
+        {
+          "name": "plot_shap_bar",
+          "startLine": 124,
+          "endLine": 149,
+          "params": [
+            "explanation",
+            "max_display",
+            "title",
+            "figsize",
+            "save_filepath",
+            "dpi",
+            "verbose"
+          ]
+        },
+        {
+          "name": "render_seed_plot",
+          "startLine": 152,
+          "endLine": 199,
+          "params": [
+            "plot_kind",
+            "explanation",
+            "save_filepath",
+            "title",
+            "max_display",
+            "group_remaining_features",
+            "dpi",
+            "verbose"
+          ]
+        },
+        {
+          "name": "_aggregate_importance",
+          "startLine": 202,
+          "endLine": 257,
+          "params": [
+            "classifier_explanation"
+          ]
+        },
+        {
+          "name": "_aggregate_explanation",
+          "startLine": 260,
+          "endLine": 341,
+          "params": [
+            "classifier_explanation"
+          ]
+        },
+        {
+          "name": "plot_aggregate_shap_bar",
+          "startLine": 344,
+          "endLine": 433,
+          "params": [
+            "classifier_explanation",
+            "top_n",
+            "figsize",
+            "dpi",
+            "title",
+            "save_filepath",
+            "verbose"
+          ]
+        },
+        {
+          "name": "plot_aggregate_shap_beeswarm",
+          "startLine": 436,
+          "endLine": 555,
+          "params": [
+            "classifier_explanation",
+            "max_display",
+            "figsize",
+            "dpi",
+            "title",
+            "dot_size",
+            "group_remaining_features",
+            "save_filepath",
+            "verbose"
+          ]
+        },
+        {
+          "name": "_build_explanation_plot",
+          "startLine": 558,
+          "endLine": 605,
+          "params": [
+            "classifier_explanation",
+            "eruption_window",
+            "eruption_dir",
+            "classifier_name"
+          ]
+        },
+        {
+          "name": "plot_classifier_waterfall",
+          "startLine": 608,
+          "endLine": 688,
+          "params": [
+            "classifier_explanation",
+            "classifier_ensemble",
+            "labels",
+            "eruption_dates",
+            "figsize",
+            "max_display",
+            "output_dir",
+            "dpi",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "plot_shap_waterfall",
+          "line": 21,
+          "isDefault": false
+        },
+        {
+          "name": "plot_shap_beeswarm",
+          "line": 75,
+          "isDefault": false
+        },
+        {
+          "name": "plot_shap_bar",
+          "line": 124,
+          "isDefault": false
+        },
+        {
+          "name": "render_seed_plot",
+          "line": 152,
+          "isDefault": false
+        },
+        {
+          "name": "_aggregate_importance",
+          "line": 202,
+          "isDefault": false
+        },
+        {
+          "name": "_aggregate_explanation",
+          "line": 260,
+          "isDefault": false
+        },
+        {
+          "name": "plot_aggregate_shap_bar",
+          "line": 344,
+          "isDefault": false
+        },
+        {
+          "name": "plot_aggregate_shap_beeswarm",
+          "line": 436,
+          "isDefault": false
+        },
+        {
+          "name": "_build_explanation_plot",
+          "line": 558,
+          "isDefault": false
+        },
+        {
+          "name": "plot_classifier_waterfall",
+          "line": 608,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "plot_shap_waterfall",
+          "callee": "max",
+          "lineNumber": 57
+        },
+        {
+          "caller": "plot_shap_waterfall",
+          "callee": "shap_figure",
+          "lineNumber": 60
+        },
+        {
+          "caller": "plot_shap_waterfall",
+          "callee": "shap.plots.waterfall",
+          "lineNumber": 61
+        },
+        {
+          "caller": "plot_shap_waterfall",
+          "callee": "fig.suptitle",
+          "lineNumber": 67
+        },
+        {
+          "caller": "plot_shap_waterfall",
+          "callee": "save_figure",
+          "lineNumber": 70
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "max",
+          "lineNumber": 86
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "shap_figure",
+          "lineNumber": 89
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "shap.plots.beeswarm",
+          "lineNumber": 90
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "ax.set_xlabel",
+          "lineNumber": 106
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "ax.get_position",
+          "lineNumber": 107
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "fig.suptitle",
+          "lineNumber": 109
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "save_figure",
+          "lineNumber": 117
+        },
+        {
+          "caller": "plot_shap_beeswarm",
+          "callee": "plt.close",
+          "lineNumber": 119
+        },
+        {
+          "caller": "plot_shap_bar",
+          "callee": "max",
+          "lineNumber": 134
+        },
+        {
+          "caller": "plot_shap_bar",
+          "callee": "shap_figure",
+          "lineNumber": 137
+        },
+        {
+          "caller": "plot_shap_bar",
+          "callee": "shap.plots.bar",
+          "lineNumber": 138
+        },
+        {
+          "caller": "plot_shap_bar",
+          "callee": "fig.suptitle",
+          "lineNumber": 144
+        },
+        {
+          "caller": "plot_shap_bar",
+          "callee": "save_figure",
+          "lineNumber": 147
+        },
+        {
+          "caller": "render_seed_plot",
+          "callee": "plot_shap_beeswarm",
+          "lineNumber": 181
+        },
+        {
+          "caller": "render_seed_plot",
+          "callee": "plot_shap_bar",
+          "lineNumber": 191
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "len",
+          "lineNumber": 226
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "np.asarray",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "np.abs(values).mean",
+          "lineNumber": 233
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "np.abs",
+          "lineNumber": 233
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "zip",
+          "lineNumber": 234
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "list",
+          "lineNumber": 234
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "accumulator.setdefault(name, []).append",
+          "lineNumber": 235
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "accumulator.setdefault",
+          "lineNumber": 235
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "float",
+          "lineNumber": 235
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "float",
+          "lineNumber": 240
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "np.mean",
+          "lineNumber": 240
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "len",
+          "lineNumber": 241
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "len",
+          "lineNumber": 242
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "accumulator.items",
+          "lineNumber": 244
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "pd.DataFrame",
+          "lineNumber": 246
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "importance_df.sort_values(\"mean_abs_shap\", ascending=False).reset_index",
+          "lineNumber": 255
+        },
+        {
+          "caller": "_aggregate_importance",
+          "callee": "importance_df.sort_values",
+          "lineNumber": 255
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "set",
+          "lineNumber": 294
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "seen.add",
+          "lineNumber": 298
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "all_names.append",
+          "lineNumber": 299
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "enumerate",
+          "lineNumber": 300
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "len",
+          "lineNumber": 301
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.asarray",
+          "lineNumber": 310
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "getattr",
+          "lineNumber": 313
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.asarray",
+          "lineNumber": 315
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.full_like",
+          "lineNumber": 317
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.full",
+          "lineNumber": 321
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.full",
+          "lineNumber": 322
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "enumerate",
+          "lineNumber": 323
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "values_blocks.append",
+          "lineNumber": 328
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "data_blocks.append",
+          "lineNumber": 329
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "row_seed.extend",
+          "lineNumber": 330
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "int",
+          "lineNumber": 330
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "row_obs.extend",
+          "lineNumber": 331
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "range",
+          "lineNumber": 331
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.concatenate",
+          "lineNumber": 333
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "np.concatenate",
+          "lineNumber": 334
+        },
+        {
+          "caller": "_aggregate_explanation",
+          "callee": "shap.Explanation",
+          "lineNumber": 336
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "_aggregate_importance",
+          "lineNumber": 384
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "importance_df.head(top_n).copy",
+          "lineNumber": 386
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "importance_df.head",
+          "lineNumber": 386
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "max",
+          "lineNumber": 387
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "df.iloc[::-1].reset_index",
+          "lineNumber": 392
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "shap_figure",
+          "lineNumber": 394
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "fig.add_subplot",
+          "lineNumber": 395
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.barh",
+          "lineNumber": 397
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "range",
+          "lineNumber": 398
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "len",
+          "lineNumber": 398
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.set_yticks",
+          "lineNumber": 403
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "range",
+          "lineNumber": 403
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "len",
+          "lineNumber": 403
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.set_yticklabels",
+          "lineNumber": 404
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "df_plot[\"feature\"].tolist",
+          "lineNumber": 404
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "enumerate",
+          "lineNumber": 406
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "zip",
+          "lineNumber": 407
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.text",
+          "lineNumber": 414
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "configure_spine",
+          "lineNumber": 424
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.set_xlabel",
+          "lineNumber": 425
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.set_ylabel",
+          "lineNumber": 426
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.tick_params",
+          "lineNumber": 427
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "ax.set_title",
+          "lineNumber": 428
+        },
+        {
+          "caller": "plot_aggregate_shap_bar",
+          "callee": "save_figure",
+          "lineNumber": 431
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "_aggregate_explanation",
+          "lineNumber": 485
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "max",
+          "lineNumber": 488
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "shap_figure",
+          "lineNumber": 491
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "shap.plots.beeswarm",
+          "lineNumber": 492
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "ax.get_position",
+          "lineNumber": 506
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "fig.suptitle",
+          "lineNumber": 507
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "save_figure",
+          "lineNumber": 515
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "np.asarray",
+          "lineNumber": 520
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "np.asarray",
+          "lineNumber": 521
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "list",
+          "lineNumber": 522
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "np.asarray",
+          "lineNumber": 524
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "np.asarray",
+          "lineNumber": 525
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "enumerate",
+          "lineNumber": 528
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "np.isnan",
+          "lineNumber": 531
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "mask.any",
+          "lineNumber": 532
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "zip",
+          "lineNumber": 534
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "tidy_rows.append",
+          "lineNumber": 541
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "int",
+          "lineNumber": 544
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "int",
+          "lineNumber": 545
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "float",
+          "lineNumber": 546
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "float",
+          "lineNumber": 547
+        },
+        {
+          "caller": "plot_aggregate_shap_beeswarm",
+          "callee": "pd.DataFrame",
+          "lineNumber": 551
+        },
+        {
+          "caller": "_build_explanation_plot",
+          "callee": "os.path.join",
+          "lineNumber": 586
+        },
+        {
+          "caller": "_build_explanation_plot",
+          "callee": "os.path.join",
+          "lineNumber": 594
+        },
+        {
+          "caller": "plot_classifier_waterfall",
+          "callee": "os.path.join",
+          "lineNumber": 658
+        },
+        {
+          "caller": "plot_classifier_waterfall",
+          "callee": "os.getcwd",
+          "lineNumber": 658
+        },
+        {
+          "caller": "plot_classifier_waterfall",
+          "callee": "build_classifier_ensemble_summary",
+          "lineNumber": 664
+        },
+        {
+          "caller": "plot_classifier_waterfall",
+          "callee": "_build_explanation_plot",
+          "lineNumber": 671
+        },
+        {
+          "caller": "plot_classifier_waterfall",
+          "callee": "plot_shap_waterfall",
+          "lineNumber": 678
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 10,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/array.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 444,
+      "nonEmptyLines": 341,
+      "functions": [
+        {
+          "name": "save_forecast_seed",
+          "startLine": 12,
+          "endLine": 49,
+          "params": [
+            "output_dir",
+            "random_state",
+            "probabilities",
+            "predictions",
+            "overwrite",
+            "verbose"
+          ]
+        },
+        {
+          "name": "compute_model_probabilities",
+          "startLine": 52,
+          "endLine": 86,
+          "params": [
+            "probabilities_matrix",
+            "predictions_matrix"
+          ]
+        },
+        {
+          "name": "confidence_interval",
+          "startLine": 89,
+          "endLine": 101,
+          "params": [
+            "predictions",
+            "total_predictions"
+          ]
+        },
+        {
+          "name": "detect_anomalies_zscore",
+          "startLine": 104,
+          "endLine": 131,
+          "params": [
+            "data",
+            "threshold"
+          ]
+        },
+        {
+          "name": "mask_zero_values",
+          "startLine": 134,
+          "endLine": 160,
+          "params": [
+            "data"
+          ]
+        },
+        {
+          "name": "get_completeness",
+          "startLine": 163,
+          "endLine": 195,
+          "params": [
+            "stream_or_trace"
+          ]
+        },
+        {
+          "name": "count_valid_values",
+          "startLine": 198,
+          "endLine": 223,
+          "params": [
+            "data"
+          ]
+        },
+        {
+          "name": "filter_nans",
+          "startLine": 226,
+          "endLine": 238,
+          "params": [
+            "data"
+          ]
+        },
+        {
+          "name": "detect_maximum_outlier",
+          "startLine": 241,
+          "endLine": 305,
+          "params": [
+            "data",
+            "outlier_threshold"
+          ]
+        },
+        {
+          "name": "remove_maximum_outlier",
+          "startLine": 308,
+          "endLine": 363,
+          "params": [
+            "data",
+            "mask_zero_value",
+            "outlier_threshold"
+          ]
+        },
+        {
+          "name": "remove_outliers",
+          "startLine": 366,
+          "endLine": 444,
+          "params": [
+            "data",
+            "outlier_threshold",
+            "mask_zero_value",
+            "return_outliers"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "save_forecast_seed",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "compute_model_probabilities",
+          "line": 52,
+          "isDefault": false
+        },
+        {
+          "name": "confidence_interval",
+          "line": 89,
+          "isDefault": false
+        },
+        {
+          "name": "detect_anomalies_zscore",
+          "line": 104,
+          "isDefault": false
+        },
+        {
+          "name": "mask_zero_values",
+          "line": 134,
+          "isDefault": false
+        },
+        {
+          "name": "get_completeness",
+          "line": 163,
+          "isDefault": false
+        },
+        {
+          "name": "count_valid_values",
+          "line": 198,
+          "isDefault": false
+        },
+        {
+          "name": "filter_nans",
+          "line": 226,
+          "isDefault": false
+        },
+        {
+          "name": "detect_maximum_outlier",
+          "line": 241,
+          "isDefault": false
+        },
+        {
+          "name": "remove_maximum_outlier",
+          "line": 308,
+          "isDefault": false
+        },
+        {
+          "name": "remove_outliers",
+          "line": 366,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "save_forecast_seed",
+          "callee": "ensure_dir",
+          "lineNumber": 36
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "os.path.join",
+          "lineNumber": 37
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "os.path.exists",
+          "lineNumber": 38
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "pd.DataFrame(\n        np.column_stack((1 - probabilities, probabilities, predictions)),\n        columns=[\"p_no_eruption\", \"p_eruption\", \"prediction\"],\n    ).astype",
+          "lineNumber": 41
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "pd.DataFrame",
+          "lineNumber": 41
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "np.column_stack",
+          "lineNumber": 42
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "df.to_csv",
+          "lineNumber": 47
+        },
+        {
+          "caller": "save_forecast_seed",
+          "callee": "logger.info",
+          "lineNumber": 49
+        },
+        {
+          "caller": "compute_model_probabilities",
+          "callee": "probabilities_matrix.mean",
+          "lineNumber": 81
+        },
+        {
+          "caller": "compute_model_probabilities",
+          "callee": "probabilities_matrix.std",
+          "lineNumber": 82
+        },
+        {
+          "caller": "compute_model_probabilities",
+          "callee": "predictions_matrix.mean",
+          "lineNumber": 83
+        },
+        {
+          "caller": "compute_model_probabilities",
+          "callee": "confidence_interval",
+          "lineNumber": 84
+        },
+        {
+          "caller": "confidence_interval",
+          "callee": "np.sqrt",
+          "lineNumber": 99
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "filter_nans",
+          "lineNumber": 118
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "np.median",
+          "lineNumber": 119
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "np.median",
+          "lineNumber": 122
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "np.abs",
+          "lineNumber": 122
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "np.zeros",
+          "lineNumber": 124
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "len",
+          "lineNumber": 124
+        },
+        {
+          "caller": "detect_anomalies_zscore",
+          "callee": "np.abs",
+          "lineNumber": 130
+        },
+        {
+          "caller": "mask_zero_values",
+          "callee": "isinstance",
+          "lineNumber": 156
+        },
+        {
+          "caller": "mask_zero_values",
+          "callee": "TypeError",
+          "lineNumber": 157
+        },
+        {
+          "caller": "get_completeness",
+          "callee": "isinstance",
+          "lineNumber": 184
+        },
+        {
+          "caller": "get_completeness",
+          "callee": "stream_or_trace.merge",
+          "lineNumber": 185
+        },
+        {
+          "caller": "get_completeness",
+          "callee": "isinstance",
+          "lineNumber": 187
+        },
+        {
+          "caller": "get_completeness",
+          "callee": "TypeError",
+          "lineNumber": 190
+        },
+        {
+          "caller": "get_completeness",
+          "callee": "count_valid_values",
+          "lineNumber": 194
+        },
+        {
+          "caller": "get_completeness",
+          "callee": "float",
+          "lineNumber": 195
+        },
+        {
+          "caller": "count_valid_values",
+          "callee": "isinstance",
+          "lineNumber": 220
+        },
+        {
+          "caller": "count_valid_values",
+          "callee": "TypeError",
+          "lineNumber": 221
+        },
+        {
+          "caller": "count_valid_values",
+          "callee": "int",
+          "lineNumber": 223
+        },
+        {
+          "caller": "count_valid_values",
+          "callee": "np.sum",
+          "lineNumber": 223
+        },
+        {
+          "caller": "count_valid_values",
+          "callee": "np.isnan",
+          "lineNumber": 223
+        },
+        {
+          "caller": "filter_nans",
+          "callee": "np.isnan",
+          "lineNumber": 238
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "isinstance",
+          "lineNumber": 274
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "TypeError",
+          "lineNumber": 275
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "len",
+          "lineNumber": 277
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "ValueError",
+          "lineNumber": 278
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "ValueError",
+          "lineNumber": 281
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "np.any",
+          "lineNumber": 284
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "np.isnan",
+          "lineNumber": 284
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "filter_nans",
+          "lineNumber": 285
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "len",
+          "lineNumber": 286
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "np.argmax",
+          "lineNumber": 289
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "np.abs",
+          "lineNumber": 289
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "np.std",
+          "lineNumber": 293
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "np.mean",
+          "lineNumber": 298
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "abs",
+          "lineNumber": 299
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "int",
+          "lineNumber": 303
+        },
+        {
+          "caller": "detect_maximum_outlier",
+          "callee": "float",
+          "lineNumber": 303
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "isinstance",
+          "lineNumber": 337
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "TypeError",
+          "lineNumber": 338
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "data.copy",
+          "lineNumber": 341
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "mask_zero_values",
+          "lineNumber": 345
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "len",
+          "lineNumber": 348
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "np.array",
+          "lineNumber": 349
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "detect_maximum_outlier",
+          "lineNumber": 353
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "np.isnan",
+          "lineNumber": 357
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "np.delete",
+          "lineNumber": 358
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "int",
+          "lineNumber": 358
+        },
+        {
+          "caller": "remove_maximum_outlier",
+          "callee": "logger.warning",
+          "lineNumber": 360
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "isinstance",
+          "lineNumber": 403
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "TypeError",
+          "lineNumber": 404
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "ValueError",
+          "lineNumber": 407
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "mask_zero_values",
+          "lineNumber": 411
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "len",
+          "lineNumber": 414
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.array",
+          "lineNumber": 415
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.any",
+          "lineNumber": 418
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.isnan",
+          "lineNumber": 418
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "filter_nans",
+          "lineNumber": 419
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "len",
+          "lineNumber": 420
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.array",
+          "lineNumber": 421
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.nanmean",
+          "lineNumber": 424
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.nanstd",
+          "lineNumber": 425
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.array",
+          "lineNumber": 429
+        },
+        {
+          "caller": "remove_outliers",
+          "callee": "np.abs",
+          "lineNumber": 432
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 11,
+        "functionCount": 11,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/formatting.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 408,
+      "nonEmptyLines": 349,
+      "functions": [
+        {
+          "name": "_fmt_hz",
+          "startLine": 20,
+          "endLine": 22,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "_humanize_column",
+          "startLine": 25,
+          "endLine": 61,
+          "params": [
+            "column",
+            "freq_bands"
+          ]
+        },
+        {
+          "name": "slugify_class_name",
+          "startLine": 143,
+          "endLine": 171,
+          "params": [
+            "class_name"
+          ]
+        },
+        {
+          "name": "slugify",
+          "startLine": 174,
+          "endLine": 201,
+          "params": [
+            "text",
+            "hyphen"
+          ]
+        },
+        {
+          "name": "shorten_feature_name",
+          "startLine": 204,
+          "endLine": 300,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "humanize_feature_name",
+          "startLine": 303,
+          "endLine": 373,
+          "params": [
+            "name",
+            "freq_bands"
+          ]
+        },
+        {
+          "name": "get_classifier_label",
+          "startLine": 376,
+          "endLine": 408,
+          "params": [
+            "classifier_name"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "_fmt_hz",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "_humanize_column",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "slugify_class_name",
+          "line": 143,
+          "isDefault": false
+        },
+        {
+          "name": "slugify",
+          "line": 174,
+          "isDefault": false
+        },
+        {
+          "name": "shorten_feature_name",
+          "line": 204,
+          "isDefault": false
+        },
+        {
+          "name": "humanize_feature_name",
+          "line": 303,
+          "isDefault": false
+        },
+        {
+          "name": "get_classifier_label",
+          "line": 376,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_humanize_column",
+          "callee": "column.partition",
+          "lineNumber": 46
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "column.replace",
+          "lineNumber": 48
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "_fmt_hz",
+          "lineNumber": 52
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "_fmt_hz",
+          "lineNumber": 52
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "band_spec.split",
+          "lineNumber": 55
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "_fmt_hz",
+          "lineNumber": 59
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "_fmt_hz",
+          "lineNumber": 59
+        },
+        {
+          "caller": "_humanize_column",
+          "callee": "column.replace",
+          "lineNumber": 61
+        },
+        {
+          "caller": "slugify_class_name",
+          "callee": "re.sub",
+          "lineNumber": 167
+        },
+        {
+          "caller": "slugify_class_name",
+          "callee": "re.sub",
+          "lineNumber": 169
+        },
+        {
+          "caller": "slugify_class_name",
+          "callee": "s.lower",
+          "lineNumber": 171
+        },
+        {
+          "caller": "slugify",
+          "callee": "text.lower",
+          "lineNumber": 196
+        },
+        {
+          "caller": "slugify",
+          "callee": "re.sub",
+          "lineNumber": 197
+        },
+        {
+          "caller": "slugify",
+          "callee": "re.escape",
+          "lineNumber": 198
+        },
+        {
+          "caller": "slugify",
+          "callee": "re.sub",
+          "lineNumber": 199
+        },
+        {
+          "caller": "slugify",
+          "callee": "re.sub",
+          "lineNumber": 200
+        },
+        {
+          "caller": "slugify",
+          "callee": "s.strip",
+          "lineNumber": 201
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "name.split",
+          "lineNumber": 287
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "len",
+          "lineNumber": 288
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "calc_abbrev.get",
+          "lineNumber": 291
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "_PARAM_VALUE_RE.search",
+          "lineNumber": 295
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "values.append",
+          "lineNumber": 296
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "match.group(1).strip",
+          "lineNumber": 296
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "match.group",
+          "lineNumber": 296
+        },
+        {
+          "caller": "shorten_feature_name",
+          "callee": "', '.join",
+          "lineNumber": 299
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "name.split",
+          "lineNumber": 349
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "len",
+          "lineNumber": 350
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "_humanize_column",
+          "lineNumber": 355
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "_CALCULATOR_HUMANIZATIONS.get",
+          "lineNumber": 356
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "calculator.replace",
+          "lineNumber": 357
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "_PARAM_VALUE_RE.search",
+          "lineNumber": 362
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "formatted_params.append",
+          "lineNumber": 364
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "match.start",
+          "lineNumber": 366
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "match.group(1).strip",
+          "lineNumber": 367
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "match.group",
+          "lineNumber": 367
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "formatted_params.append",
+          "lineNumber": 368
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "humanized_calc[:1].upper",
+          "lineNumber": 370
+        },
+        {
+          "caller": "humanize_feature_name",
+          "callee": "', '.join",
+          "lineNumber": 372
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    }
+  ]
+}

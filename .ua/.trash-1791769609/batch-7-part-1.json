@@ -1,0 +1,1069 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "type": "file",
+   "name": "metrics_ensemble.py",
+   "filePath": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "summary": "Per-seed metric engine over a fitted ClassifierEnsemble: computes (n_samples, n_seeds) probability/prediction matrices, persists them as CSV, renders per-seed and aggregate evaluation plots in parallel, and round-trips via joblib.",
+   "tags": [
+    "service",
+    "evaluation",
+    "metrics",
+    "ensemble",
+    "parallel-processing"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Uses joblib Parallel with module-level plot dispatchers so plotting jobs can be pickled into loky worker processes."
+  },
+  {
+   "id": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "type": "class",
+   "name": "MetricsEnsemble",
+   "filePath": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "lineRange": [
+    26,
+    578
+   ],
+   "summary": "Per-seed evaluation engine computing probability/prediction matrices for each classifier, persisting them, plotting per-seed and aggregate metrics, and joblib save/load.",
+   "tags": [
+    "service",
+    "metrics",
+    "ensemble",
+    "evaluation"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "type": "file",
+   "name": "classifier_comparator.py",
+   "filePath": "src/eruption_forecast/model/classifier_comparator.py",
+   "summary": "Cross-classifier comparison utility that ranks classifiers by per-seed metrics and draws ROC, PR, metric-bar, seed-stability and grid comparison figures from a MetricsEnsemble.",
+   "tags": [
+    "evaluation",
+    "visualization",
+    "ranking",
+    "model-comparison",
+    "service"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "type": "class",
+   "name": "ClassifierComparator",
+   "filePath": "src/eruption_forecast/model/classifier_comparator.py",
+   "lineRange": [
+    44,
+    1157
+   ],
+   "summary": "Ranks classifiers and renders cross-classifier ROC, PR, metric bar, stability and grid plots from per-seed metrics.",
+   "tags": [
+    "evaluation",
+    "ranking",
+    "visualization",
+    "comparison"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/evaluation_model.py",
+   "type": "file",
+   "name": "evaluation_model.py",
+   "filePath": "src/eruption_forecast/model/evaluation_model.py",
+   "summary": "EvaluationModel pipeline stage that scores a pre-trained ensemble against ground truth in training-reuse or prediction-reuse mode, with content-addressed caching, config snapshots and classifier comparison.",
+   "tags": [
+    "service",
+    "evaluation",
+    "pipeline-stage",
+    "caching",
+    "api-handler"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "type": "class",
+   "name": "EvaluationModel",
+   "filePath": "src/eruption_forecast/model/evaluation_model.py",
+   "lineRange": [
+    20,
+    754
+   ],
+   "summary": "BaseModel stage that evaluates a fitted ensemble in training or prediction reuse mode, caching results and building a ClassifierComparator.",
+   "tags": [
+    "pipeline-stage",
+    "evaluation",
+    "caching",
+    "service"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/plots/__init__.py",
+   "summary": "Barrel module for the plots package that re-exports style helpers and the public tremor, label, feature, forecast and evaluation plotting functions.",
+   "tags": [
+    "barrel",
+    "entry-point",
+    "visualization",
+    "exports"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "type": "file",
+   "name": "evaluation_plots.py",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "summary": "Evaluation plotting library producing per-seed and aggregate threshold, confusion matrix, ROC, PR, G-mean, MCC and feature-importance figures, plus dispatcher-based renderers for parallel workers.",
+   "tags": [
+    "visualization",
+    "evaluation",
+    "metrics",
+    "utility",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_threshold_analysis",
+   "type": "function",
+   "name": "plot_threshold_analysis",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    34,
+    170
+   ],
+   "summary": "Plots precision, recall, F1 and related metrics across decision thresholds for a single seed.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_confusion_matrix",
+   "type": "function",
+   "name": "plot_confusion_matrix",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    173,
+    233
+   ],
+   "summary": "Renders a confusion matrix heatmap for binary eruption predictions.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_roc_curve",
+   "type": "function",
+   "name": "plot_roc_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    236,
+    303
+   ],
+   "summary": "Plots a single-seed ROC curve with AUC annotation.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_precision_recall_curve",
+   "type": "function",
+   "name": "plot_precision_recall_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    306,
+    371
+   ],
+   "summary": "Plots a single-seed precision-recall curve with average precision.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_g_mean_curve",
+   "type": "function",
+   "name": "plot_g_mean_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    374,
+    462
+   ],
+   "summary": "Plots geometric mean of sensitivity and specificity versus threshold, marking the optimum.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_mcc_curve",
+   "type": "function",
+   "name": "plot_mcc_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    465,
+    538
+   ],
+   "summary": "Plots Matthews correlation coefficient versus threshold, marking the best threshold.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_feature_importance",
+   "type": "function",
+   "name": "plot_feature_importance",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    541,
+    640
+   ],
+   "summary": "Draws a horizontal bar chart of top feature importances for a single model.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_roc_curve",
+   "type": "function",
+   "name": "plot_aggregate_roc_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    643,
+    746
+   ],
+   "summary": "Plots mean ROC curve with variability band across all seeds.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_precision_recall_curve",
+   "type": "function",
+   "name": "plot_aggregate_precision_recall_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    749,
+    841
+   ],
+   "summary": "Plots mean precision-recall curve with spread across seeds.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_threshold_analysis",
+   "type": "function",
+   "name": "plot_aggregate_threshold_analysis",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    844,
+    993
+   ],
+   "summary": "Plots seed-aggregated threshold metrics with confidence bands.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_g_mean_curve",
+   "type": "function",
+   "name": "plot_aggregate_g_mean_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    996,
+    1142
+   ],
+   "summary": "Plots seed-aggregated G-mean versus threshold with uncertainty band.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_mcc_curve",
+   "type": "function",
+   "name": "plot_aggregate_mcc_curve",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    1145,
+    1291
+   ],
+   "summary": "Plots seed-aggregated MCC versus threshold with uncertainty band.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_feature_importance",
+   "type": "function",
+   "name": "plot_aggregate_feature_importance",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    1294,
+    1399
+   ],
+   "summary": "Aggregates feature importance across seeds and plots mean with error bars.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_plot",
+   "type": "function",
+   "name": "render_one_plot",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    1412,
+    1472
+   ],
+   "summary": "Worker-side renderer that dispatches a named per-seed plot via PER_SEED_PLOT_DISPATCHER and saves the figure.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_aggregate_plot",
+   "type": "function",
+   "name": "render_one_aggregate_plot",
+   "filePath": "src/eruption_forecast/plots/evaluation_plots.py",
+   "lineRange": [
+    1484,
+    1546
+   ],
+   "summary": "Worker-side renderer that dispatches a named aggregate plot via AGGREGATE_PLOT_DISPATCHER and saves figure plus CSV.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/config/evaluation_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/label/label_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/model/base_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/model/classifier_comparator.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/model/prediction_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/model/training_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/plots/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/evaluation_model.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "file:src/eruption_forecast/plots/feature_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "file:src/eruption_forecast/plots/label_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_threshold_analysis",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_threshold_analysis",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_confusion_matrix",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_confusion_matrix",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_roc_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_roc_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_precision_recall_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_precision_recall_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_g_mean_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_g_mean_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_mcc_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_mcc_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_feature_importance",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_feature_importance",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_roc_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_roc_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_precision_recall_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_precision_recall_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_threshold_analysis",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_threshold_analysis",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_g_mean_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_g_mean_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_mcc_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_mcc_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_feature_importance",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_feature_importance",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_plot",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_plot",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_aggregate_plot",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_aggregate_plot",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "file:src/eruption_forecast/config/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_plot",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_aggregate_plot",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "target": "function:src/eruption_forecast/utils/ml.py:build_y_true",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_seed",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "target": "function:src/eruption_forecast/plots/styles.py:apply_nature_style",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "target": "function:src/eruption_forecast/plots/styles.py:configure_spine",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "target": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "target": "class:src/eruption_forecast/ensemble/metrics_ensemble.py:MetricsEnsemble",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "target": "class:src/eruption_forecast/model/classifier_comparator.py:ClassifierComparator",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "target": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_aggregate_plot",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_roc_curve",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/evaluation_plots.py:render_one_plot",
+   "target": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_roc_curve",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_threshold_analysis",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_threshold_metrics",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/evaluation_plots.py:plot_aggregate_threshold_analysis",
+   "target": "function:src/eruption_forecast/utils/ml.py:compute_aggregate_threshold_metrics",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor_from_file",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_significant_features",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:replot_significant_features",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_heatmap",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_correlation",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_frequency_band_contribution",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:get_color",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:configure_spine",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:get_figure_size",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:apply_nature_style",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/__init__.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:setup_nature_style",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

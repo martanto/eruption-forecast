@@ -1,0 +1,370 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 5,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 5,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 4,
+      "failed": 0,
+      "skipped": 1
+    }
+  },
+  "results": [
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 791,
+      "nonEmptyLines": 637,
+      "sections": [
+        {
+          "heading": "eruption-forecast",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "References and Acknowledgments",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "Important Disclaimers",
+          "level": 2,
+          "line": 53
+        },
+        {
+          "heading": "Table of Contents",
+          "level": 2,
+          "line": 71
+        },
+        {
+          "heading": "Features",
+          "level": 2,
+          "line": 105
+        },
+        {
+          "heading": "Package Architecture",
+          "level": 2,
+          "line": 122
+        },
+        {
+          "heading": "Pipeline Overview",
+          "level": 2,
+          "line": 153
+        },
+        {
+          "heading": "Installation",
+          "level": 2,
+          "line": 214
+        },
+        {
+          "heading": "Data Sources",
+          "level": 2,
+          "line": 230
+        },
+        {
+          "heading": "SDS — SeisComP Data Structure",
+          "level": 3,
+          "line": 234
+        },
+        {
+          "heading": "FDSN — Web Service",
+          "level": 3,
+          "line": 272
+        },
+        {
+          "heading": "Quick Start",
+          "level": 2,
+          "line": 289
+        },
+        {
+          "heading": "Common Patterns",
+          "level": 2,
+          "line": 379
+        },
+        {
+          "heading": "Use FDSN instead of a local SDS archive",
+          "level": 3,
+          "line": 381
+        },
+        {
+          "heading": "Skip tremor calculation when the CSV already exists",
+          "level": 3,
+          "line": 392
+        },
+        {
+          "heading": "Reuse curated features (skip full tsfresh re-extraction)",
+          "level": 3,
+          "line": 414
+        },
+        {
+          "heading": "Forecast from a saved `ClassifierEnsemble`",
+          "level": 3,
+          "line": 441
+        },
+        {
+          "heading": "Evaluate from a saved `.pkl`",
+          "level": 3,
+          "line": 461
+        },
+        {
+          "heading": "Save and replay the pipeline configuration",
+          "level": 3,
+          "line": 475
+        },
+        {
+          "heading": "Multi-scenario sweep with `ForecastModelScenario`",
+          "level": 3,
+          "line": 488
+        },
+        {
+          "heading": "Persist stage outputs explicitly",
+          "level": 3,
+          "line": 530
+        },
+        {
+          "heading": "Per-stage config snapshots",
+          "level": 3,
+          "line": 538
+        },
+        {
+          "heading": "Silence logging during batch jobs",
+          "level": 3,
+          "line": 558
+        },
+        {
+          "heading": "Per-category error log files",
+          "level": 3,
+          "line": 572
+        },
+        {
+          "heading": "Supported Classifiers",
+          "level": 2,
+          "line": 601
+        },
+        {
+          "heading": "Cross-Validation Strategies",
+          "level": 2,
+          "line": 621
+        },
+        {
+          "heading": "Imbalance Handling",
+          "level": 2,
+          "line": 631
+        },
+        {
+          "heading": "Output Directory Structure",
+          "level": 2,
+          "line": 644
+        },
+        {
+          "heading": "Requirements",
+          "level": 2,
+          "line": 717
+        },
+        {
+          "heading": "Core dependencies",
+          "level": 3,
+          "line": 719
+        },
+        {
+          "heading": "Development dependencies",
+          "level": 3,
+          "line": 733
+        },
+        {
+          "heading": "Development",
+          "level": 2,
+          "line": 741
+        },
+        {
+          "heading": "Contributing",
+          "level": 2,
+          "line": 765
+        },
+        {
+          "heading": "License",
+          "level": 2,
+          "line": 781
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 34
+      }
+    },
+    {
+      "path": "forecast-scenario.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 226,
+      "nonEmptyLines": 210,
+      "functions": [
+        {
+          "name": "main",
+          "startLine": 12,
+          "endLine": 122,
+          "params": [
+            "network",
+            "station",
+            "location",
+            "channel",
+            "eruption_dates",
+            "scenarios",
+            "sds_dir",
+            "day_to_forecast",
+            "n_jobs",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "line": 12,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "main",
+          "callee": "ForecastModelScenario",
+          "lineNumber": 26
+        },
+        {
+          "caller": "main",
+          "callee": "fms.calculate",
+          "lineNumber": 40
+        },
+        {
+          "caller": "main",
+          "callee": "fms.shared_training",
+          "lineNumber": 61
+        },
+        {
+          "caller": "main",
+          "callee": "fms.shared_prediction",
+          "lineNumber": 95
+        },
+        {
+          "caller": "main",
+          "callee": "fms.shared_evaluation",
+          "lineNumber": 105
+        },
+        {
+          "caller": "main",
+          "callee": "fms.shared_explanation",
+          "lineNumber": 112
+        },
+        {
+          "caller": "main",
+          "callee": "fms.run",
+          "lineNumber": 122
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "main.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 112,
+      "nonEmptyLines": 104,
+      "functions": [
+        {
+          "name": "main",
+          "startLine": 20,
+          "endLine": 107,
+          "params": [
+            "sds_dir",
+            "n_jobs"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "line": 18,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "main",
+          "callee": "ForecastModel",
+          "lineNumber": 22
+        },
+        {
+          "caller": "main",
+          "callee": "fm.calculate",
+          "lineNumber": 32
+        },
+        {
+          "caller": "main",
+          "callee": "fm.train",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "fm.predict",
+          "lineNumber": 81
+        },
+        {
+          "caller": "main",
+          "callee": "fm.evaluate",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "fm.explain",
+          "lineNumber": 100
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/label/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 0,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 0,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,1134 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/plots/feature_plots.py",
+   "type": "file",
+   "name": "feature_plots.py",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "summary": "Feature visualisation module for significant-feature rankings, frequency-band contribution, feature correlations, feature-count curves, cross-run common-feature heatmaps and features-matrix time series.",
+   "tags": [
+    "visualization",
+    "features",
+    "utility",
+    "matplotlib",
+    "tsfresh"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_significant_features",
+   "type": "function",
+   "name": "plot_significant_features",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    33,
+    185
+   ],
+   "summary": "Plots a ranked bar chart of top significant features with frequency/score values.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:_process_single_file",
+   "type": "function",
+   "name": "_process_single_file",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    188,
+    287
+   ],
+   "summary": "Helper that loads one significant-features CSV and renders its plot for batch replotting.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:replot_significant_features",
+   "type": "function",
+   "name": "replot_significant_features",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    290,
+    445
+   ],
+   "summary": "Re-renders significant-feature plots for all CSVs in a directory, optionally in parallel.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:_extract_band_prefix",
+   "type": "function",
+   "name": "_extract_band_prefix",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    462,
+    477
+   ],
+   "summary": "Extracts the tremor-column/frequency-band prefix from a tsfresh feature name.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:_annotate_bar_percentages",
+   "type": "function",
+   "name": "_annotate_bar_percentages",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    480,
+    515
+   ],
+   "summary": "Annotates bar chart bars with their percentage share.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:_finalize_frequency_band_layout",
+   "type": "function",
+   "name": "_finalize_frequency_band_layout",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    518,
+    541
+   ],
+   "summary": "Applies final axis labels, styling and layout for frequency-band contribution plots.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_frequency_band_contribution",
+   "type": "function",
+   "name": "plot_frequency_band_contribution",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    544,
+    701
+   ],
+   "summary": "Plots how much each tremor frequency band contributes to the selected feature set.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_correlations",
+   "type": "function",
+   "name": "plot_feature_correlations",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    704,
+    818
+   ],
+   "summary": "Plots a correlation heatmap among selected features.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_count_curve",
+   "type": "function",
+   "name": "plot_feature_count_curve",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    821,
+    936
+   ],
+   "summary": "Plots a performance metric against number of top features for the feature-count sweep.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_heatmap",
+   "type": "function",
+   "name": "plot_common_features_heatmap",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    939,
+    1039
+   ],
+   "summary": "Plots a heatmap of features shared across multiple training runs.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_correlation",
+   "type": "function",
+   "name": "plot_common_features_correlation",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    1042,
+    1138
+   ],
+   "summary": "Plots correlations among features common across runs.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/feature_plots.py:plot_features_matrix",
+   "type": "function",
+   "name": "plot_features_matrix",
+   "filePath": "src/eruption_forecast/plots/feature_plots.py",
+   "lineRange": [
+    1141,
+    1300
+   ],
+   "summary": "Plots feature values from a features matrix over time with eruption markers.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "type": "file",
+   "name": "forecast_plots.py",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "summary": "Forecast plotting module drawing eruption probability, uncertainty and per-classifier panels over time, with eruption markers and optional training/gap/prediction segment strips.",
+   "tags": [
+    "visualization",
+    "forecast",
+    "utility",
+    "matplotlib",
+    "time-series"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "type": "function",
+   "name": "plot_forecast",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "lineRange": [
+    20,
+    378
+   ],
+   "summary": "Main forecast figure: consensus eruption probability, uncertainty, per-classifier panels, threshold and eruption markers, optional segment strip.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast_from_file",
+   "type": "function",
+   "name": "plot_forecast_from_file",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "lineRange": [
+    381,
+    420
+   ],
+   "summary": "Loads a forecast-results CSV and delegates to plot_forecast.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_per_classifier",
+   "type": "function",
+   "name": "_ax_per_classifier",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "lineRange": [
+    423,
+    450
+   ],
+   "summary": "Draws per-classifier probability lines on an axis.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_forecast",
+   "type": "function",
+   "name": "_ax_forecast",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "lineRange": [
+    453,
+    526
+   ],
+   "summary": "Draws consensus probability with uncertainty envelope and threshold on an axis.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/forecast_plots.py:ax_eruption",
+   "type": "function",
+   "name": "ax_eruption",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "lineRange": [
+    529,
+    609
+   ],
+   "summary": "Draws vertical eruption-date markers and annotations on a time-series axis; reused by tremor and feature plots.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_segment",
+   "type": "function",
+   "name": "_ax_segment",
+   "filePath": "src/eruption_forecast/plots/forecast_plots.py",
+   "lineRange": [
+    612,
+    731
+   ],
+   "summary": "Draws the Training / Gap / Prediction timeline strip axis.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/styles.py",
+   "type": "file",
+   "name": "styles.py",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "summary": "Central Nature/Science-style matplotlib configuration: colorblind-safe palettes, rcParams setup, figure context managers, color lookup, spine configuration and journal figure sizing.",
+   "tags": [
+    "config",
+    "visualization",
+    "styling",
+    "utility",
+    "matplotlib"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Sets the non-interactive matplotlib backend before importing pyplot so plotting is safe in worker threads and processes."
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:setup_nature_style",
+   "type": "function",
+   "name": "setup_nature_style",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    125,
+    189
+   ],
+   "summary": "Configures global matplotlib rcParams for Nature/Science publication style.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:apply_nature_style",
+   "type": "function",
+   "name": "apply_nature_style",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    193,
+    215
+   ],
+   "summary": "Context manager that temporarily applies Nature-style rcParams.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:shap_figure",
+   "type": "function",
+   "name": "shap_figure",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    219,
+    249
+   ],
+   "summary": "Context manager creating figures compatible with SHAP plotting under the house style.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:nature_figure",
+   "type": "function",
+   "name": "nature_figure",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    253,
+    282
+   ],
+   "summary": "Context manager that yields a styled figure and axes with journal sizing.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:get_color",
+   "type": "function",
+   "name": "get_color",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    285,
+    339
+   ],
+   "summary": "Looks up a named or indexed color from the project palettes.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:configure_spine",
+   "type": "function",
+   "name": "configure_spine",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    342,
+    372
+   ],
+   "summary": "Hides top/right spines and styles remaining axis spines.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/styles.py:get_figure_size",
+   "type": "function",
+   "name": "get_figure_size",
+   "filePath": "src/eruption_forecast/plots/styles.py",
+   "lineRange": [
+    375,
+    406
+   ],
+   "summary": "Returns figure dimensions for single/double-column journal layouts.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "type": "file",
+   "name": "tremor_plots.py",
+   "filePath": "src/eruption_forecast/plots/tremor_plots.py",
+   "summary": "Tremor plotting module rendering RSAM/DSAR/entropy time series per column with eruption markers, plus file-based replot and batch replot helpers.",
+   "tags": [
+    "visualization",
+    "tremor",
+    "seismic",
+    "utility",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor",
+   "type": "function",
+   "name": "plot_tremor",
+   "filePath": "src/eruption_forecast/plots/tremor_plots.py",
+   "lineRange": [
+    17,
+    346
+   ],
+   "summary": "Plots tremor metrics (RSAM, DSAR, entropy) as stacked time-series panels with eruption markers.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor_from_file",
+   "type": "function",
+   "name": "plot_tremor_from_file",
+   "filePath": "src/eruption_forecast/plots/tremor_plots.py",
+   "lineRange": [
+    349,
+    391
+   ],
+   "summary": "Loads a tremor CSV and delegates to plot_tremor.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/tremor_plots.py:_process_single_tremor_file",
+   "type": "function",
+   "name": "_process_single_tremor_file",
+   "filePath": "src/eruption_forecast/plots/tremor_plots.py",
+   "lineRange": [
+    394,
+    455
+   ],
+   "summary": "Helper that replots one tremor CSV during batch replotting.",
+   "tags": [
+    "helper",
+    "visualization",
+    "private"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/tremor_plots.py:replot_tremor",
+   "type": "function",
+   "name": "replot_tremor",
+   "filePath": "src/eruption_forecast/plots/tremor_plots.py",
+   "lineRange": [
+    458,
+    606
+   ],
+   "summary": "Re-renders tremor plots for all tremor CSVs in a directory, optionally in parallel.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_significant_features",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_significant_features",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:_process_single_file",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:replot_significant_features",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:replot_significant_features",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:_extract_band_prefix",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:_annotate_bar_percentages",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:_finalize_frequency_band_layout",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_frequency_band_contribution",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_frequency_band_contribution",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_correlations",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_correlations",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_count_curve",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_count_curve",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_heatmap",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_heatmap",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_correlation",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_correlation",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_features_matrix",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_features_matrix",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/utils/dataframe.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/utils/feature_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/feature_plots.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast_from_file",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast_from_file",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_per_classifier",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_forecast",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:ax_eruption",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:ax_eruption",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_segment",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "file:src/eruption_forecast/utils/dataframe.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:setup_nature_style",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:setup_nature_style",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:apply_nature_style",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:apply_nature_style",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:shap_figure",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:shap_figure",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:nature_figure",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:nature_figure",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:get_color",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:get_color",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:configure_spine",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:configure_spine",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:get_figure_size",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "function:src/eruption_forecast/plots/styles.py:get_figure_size",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/styles.py",
+   "target": "file:src/eruption_forecast/config/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor_from_file",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor_from_file",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:_process_single_tremor_file",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:replot_tremor",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:replot_tremor",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "file:src/eruption_forecast/config/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/feature_plots.py:plot_features_matrix",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:ax_eruption",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:ax_eruption",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:ax_eruption",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_forecast",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_per_classifier",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:_ax_segment",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast_from_file",
+   "target": "function:src/eruption_forecast/plots/forecast_plots.py:plot_forecast",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor_from_file",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:plot_tremor",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/tremor_plots.py:replot_tremor",
+   "target": "function:src/eruption_forecast/plots/tremor_plots.py:_process_single_tremor_file",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/feature_plots.py:replot_significant_features",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:_process_single_file",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/feature_plots.py:_process_single_file",
+   "target": "function:src/eruption_forecast/plots/feature_plots.py:plot_significant_features",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/feature_plots.py:plot_feature_correlations",
+   "target": "function:src/eruption_forecast/utils/formatting.py:shorten_feature_name",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/feature_plots.py:plot_common_features_heatmap",
+   "target": "function:src/eruption_forecast/utils/feature_utils.py:find_common_features",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

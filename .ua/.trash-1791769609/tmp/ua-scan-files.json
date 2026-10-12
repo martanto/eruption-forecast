@@ -1,0 +1,597 @@
+{
+  "scriptCompleted": true,
+  "contentDigest": "ee88e90c387075a5a008ce13106d1fabd78fbc516991e3188427cefbce2fac53",
+  "files": [
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 791,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "forecast-scenario.py",
+      "language": "python",
+      "sizeLines": 226,
+      "fileCategory": "code"
+    },
+    {
+      "path": "main.py",
+      "language": "python",
+      "sizeLines": 112,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/__init__.py",
+      "language": "python",
+      "sizeLines": 89,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/__init__.py",
+      "language": "python",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/base_config.py",
+      "language": "python",
+      "sizeLines": 88,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/constants.py",
+      "language": "python",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/evaluation_config.py",
+      "language": "python",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/explanation_config.py",
+      "language": "python",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/forecast_config.py",
+      "language": "python",
+      "sizeLines": 578,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/label_config.py",
+      "language": "python",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/prediction_config.py",
+      "language": "python",
+      "sizeLines": 169,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/config/training_config.py",
+      "language": "python",
+      "sizeLines": 183,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/data_container.py",
+      "language": "python",
+      "sizeLines": 100,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/__init__.py",
+      "language": "python",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+      "language": "python",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/classifier_explanation.py",
+      "language": "python",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/dataclass/station_data.py",
+      "language": "python",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/decorators/__init__.py",
+      "language": "python",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/decorators/notify.py",
+      "language": "python",
+      "sizeLines": 244,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/decorators/timer.py",
+      "language": "python",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/__init__.py",
+      "language": "python",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/base_ensemble.py",
+      "language": "python",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/classifier_ensemble.py",
+      "language": "python",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/explainer_ensemble.py",
+      "language": "python",
+      "sizeLines": 591,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/metrics_ensemble.py",
+      "language": "python",
+      "sizeLines": 578,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/ensemble/seed_ensemble.py",
+      "language": "python",
+      "sizeLines": 664,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/features/__init__.py",
+      "language": "python",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/features/constants.py",
+      "language": "python",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/features/feature_count_sweep.py",
+      "language": "python",
+      "sizeLines": 1070,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/features/feature_selector.py",
+      "language": "python",
+      "sizeLines": 551,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/features/features_builder.py",
+      "language": "python",
+      "sizeLines": 923,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/features/tremor_matrix_builder.py",
+      "language": "python",
+      "sizeLines": 570,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/label/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/label/constants.py",
+      "language": "python",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+      "language": "python",
+      "sizeLines": 257,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/label/label_builder.py",
+      "language": "python",
+      "sizeLines": 1261,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/label/label_data.py",
+      "language": "python",
+      "sizeLines": 302,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/logger.py",
+      "language": "python",
+      "sizeLines": 298,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/base_model.py",
+      "language": "python",
+      "sizeLines": 783,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/classifier_comparator.py",
+      "language": "python",
+      "sizeLines": 1157,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/classifier_model.py",
+      "language": "python",
+      "sizeLines": 630,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/constants.py",
+      "language": "python",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/evaluation_model.py",
+      "language": "python",
+      "sizeLines": 754,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/explanation_model.py",
+      "language": "python",
+      "sizeLines": 586,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/forecast_model.py",
+      "language": "python",
+      "sizeLines": 1376,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/forecast_model_scenario.py",
+      "language": "python",
+      "sizeLines": 927,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/prediction_model.py",
+      "language": "python",
+      "sizeLines": 1200,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/model/training_model.py",
+      "language": "python",
+      "sizeLines": 2110,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/notification/__init__.py",
+      "language": "python",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/notification/telegram.py",
+      "language": "python",
+      "sizeLines": 452,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/__init__.py",
+      "language": "python",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/evaluation_plots.py",
+      "language": "python",
+      "sizeLines": 1546,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/explanation_plots.py",
+      "language": "python",
+      "sizeLines": 688,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/feature_plots.py",
+      "language": "python",
+      "sizeLines": 1300,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/forecast_plots.py",
+      "language": "python",
+      "sizeLines": 731,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/label_plots.py",
+      "language": "python",
+      "sizeLines": 437,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/styles.py",
+      "language": "python",
+      "sizeLines": 406,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/plots/tremor_plots.py",
+      "language": "python",
+      "sizeLines": 606,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/sources/__init__.py",
+      "language": "python",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/sources/base.py",
+      "language": "python",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/sources/fdsn.py",
+      "language": "python",
+      "sizeLines": 212,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/sources/sds.py",
+      "language": "python",
+      "sizeLines": 362,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/tremor/__init__.py",
+      "language": "python",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/tremor/calculate_tremor.py",
+      "language": "python",
+      "sizeLines": 1701,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/tremor/dsar.py",
+      "language": "python",
+      "sizeLines": 168,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/tremor/rsam.py",
+      "language": "python",
+      "sizeLines": 186,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/tremor/shannon_entropy.py",
+      "language": "python",
+      "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/tremor/tremor_data.py",
+      "language": "python",
+      "sizeLines": 290,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/__init__.py",
+      "language": "python",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/array.py",
+      "language": "python",
+      "sizeLines": 444,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/benchmark.py",
+      "language": "python",
+      "sizeLines": 493,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/dataframe.py",
+      "language": "python",
+      "sizeLines": 352,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/date_utils.py",
+      "language": "python",
+      "sizeLines": 381,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/feature_utils.py",
+      "language": "python",
+      "sizeLines": 772,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/formatting.py",
+      "language": "python",
+      "sizeLines": 408,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/ml.py",
+      "language": "python",
+      "sizeLines": 955,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/pathutils.py",
+      "language": "python",
+      "sizeLines": 393,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/validation.py",
+      "language": "python",
+      "sizeLines": 238,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/eruption_forecast/utils/window.py",
+      "language": "python",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "wiki/API-Reference.md",
+      "language": "markdown",
+      "sizeLines": 1584,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Architecture.md",
+      "language": "markdown",
+      "sizeLines": 517,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Configuration.md",
+      "language": "markdown",
+      "sizeLines": 386,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Data-Sources.md",
+      "language": "markdown",
+      "sizeLines": 183,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Evaluation-Workflow.md",
+      "language": "markdown",
+      "sizeLines": 225,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Explanation-Workflow.md",
+      "language": "markdown",
+      "sizeLines": 516,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Feature-Count-Sweep.md",
+      "language": "markdown",
+      "sizeLines": 358,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Getting-Started.md",
+      "language": "markdown",
+      "sizeLines": 115,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Home.md",
+      "language": "markdown",
+      "sizeLines": 114,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Output-Structure.md",
+      "language": "markdown",
+      "sizeLines": 312,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Pipeline-Walkthrough.md",
+      "language": "markdown",
+      "sizeLines": 281,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Prediction-Workflow.md",
+      "language": "markdown",
+      "sizeLines": 323,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Training-Workflow.md",
+      "language": "markdown",
+      "sizeLines": 512,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Usage.md",
+      "language": "markdown",
+      "sizeLines": 302,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "wiki/Visualization.md",
+      "language": "markdown",
+      "sizeLines": 224,
+      "fileCategory": "docs"
+    }
+  ],
+  "totalFiles": 96,
+  "filteredByIgnore": 62,
+  "estimatedComplexity": "moderate",
+  "failures": [],
+  "stats": {
+    "filesScanned": 96,
+    "byCategory": {
+      "docs": 16,
+      "code": 80
+    },
+    "byLanguage": {
+      "markdown": 16,
+      "python": 80
+    }
+  }
+}

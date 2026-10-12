@@ -1,0 +1,4371 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 11,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 11,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 11,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/eruption_forecast/features/constants.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 28,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/features/features_builder.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 923,
+      "nonEmptyLines": 797,
+      "classes": [
+        {
+          "name": "FeaturesBuilder",
+          "startLine": 28,
+          "endLine": 923,
+          "methods": [
+            "__init__",
+            "_initialize_feature_parameters",
+            "_prepare_prediction_mode",
+            "validate",
+            "extract_features",
+            "_exclude_features",
+            "_concat_features",
+            "_try_load_cached_features_matrix",
+            "_prepare_extraction_parameters",
+            "_extract_features_for_column",
+            "_prepare_training_mode"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "FeaturesBuilder",
+          "line": 28,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "resolve_output_dir",
+          "lineNumber": 170
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 171
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 173
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._initialize_feature_parameters",
+          "lineNumber": 186
+        },
+        {
+          "caller": "__init__",
+          "callee": "from_columns",
+          "lineNumber": 194
+        },
+        {
+          "caller": "__init__",
+          "callee": "set",
+          "lineNumber": 199
+        },
+        {
+          "caller": "__init__",
+          "callee": "set",
+          "lineNumber": 200
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 202
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 209
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 210
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 212
+        },
+        {
+          "caller": "_initialize_feature_parameters",
+          "callee": "ComprehensiveFCParameters",
+          "lineNumber": 234
+        },
+        {
+          "caller": "_initialize_feature_parameters",
+          "callee": "set",
+          "lineNumber": 235
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "isinstance",
+          "lineNumber": 266
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "pd.to_datetime",
+          "lineNumber": 267
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "tremor_matrix_df[DATETIME_COLUMN].sort_values().unique().tolist",
+          "lineNumber": 271
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "tremor_matrix_df[DATETIME_COLUMN].sort_values().unique",
+          "lineNumber": 271
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "tremor_matrix_df[DATETIME_COLUMN].sort_values",
+          "lineNumber": 271
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "tremor_dates[0].strftime",
+          "lineNumber": 272
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "tremor_dates[-1].strftime",
+          "lineNumber": 273
+        },
+        {
+          "caller": "_prepare_prediction_mode",
+          "callee": "pd.DataFrame",
+          "lineNumber": 275
+        },
+        {
+          "caller": "validate",
+          "callee": "validate_columns",
+          "lineNumber": 293
+        },
+        {
+          "caller": "validate",
+          "callee": "validate_columns",
+          "lineNumber": 297
+        },
+        {
+          "caller": "extract_features",
+          "callee": "validate_columns",
+          "lineNumber": 368
+        },
+        {
+          "caller": "extract_features",
+          "callee": "tremor_matrix_df[ID_COLUMN].unique().tolist",
+          "lineNumber": 374
+        },
+        {
+          "caller": "extract_features",
+          "callee": "tremor_matrix_df[ID_COLUMN].unique",
+          "lineNumber": 374
+        },
+        {
+          "caller": "extract_features",
+          "callee": "isinstance",
+          "lineNumber": 378
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._prepare_training_mode",
+          "lineNumber": 382
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._prepare_prediction_mode",
+          "lineNumber": 384
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.info",
+          "lineNumber": 393
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._prepare_extraction_parameters",
+          "lineNumber": 399
+        },
+        {
+          "caller": "extract_features",
+          "callee": "calc_dict.items",
+          "lineNumber": 408
+        },
+        {
+          "caller": "extract_features",
+          "callee": "kind_to_fc_parameters.items",
+          "lineNumber": 411
+        },
+        {
+          "caller": "extract_features",
+          "callee": "os.path.join",
+          "lineNumber": 415
+        },
+        {
+          "caller": "extract_features",
+          "callee": "ensure_dir",
+          "lineNumber": 416
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._try_load_cached_features_matrix",
+          "lineNumber": 425
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.info",
+          "lineNumber": 436
+        },
+        {
+          "caller": "extract_features",
+          "callee": "set",
+          "lineNumber": 443
+        },
+        {
+          "caller": "extract_features",
+          "callee": "tremor_matrix_df.columns.tolist",
+          "lineNumber": 446
+        },
+        {
+          "caller": "extract_features",
+          "callee": "kind_to_fc_parameters.get",
+          "lineNumber": 458
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.warning",
+          "lineNumber": 460
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._extract_features_for_column",
+          "lineNumber": 471
+        },
+        {
+          "caller": "extract_features",
+          "callee": "extracted_paths.add",
+          "lineNumber": 482
+        },
+        {
+          "caller": "extract_features",
+          "callee": "in_memory_frames.append",
+          "lineNumber": 484
+        },
+        {
+          "caller": "extract_features",
+          "callee": "paths_to_load.append",
+          "lineNumber": 486
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self.relevant_features_paths.update",
+          "lineNumber": 490
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self.all_features_paths.update",
+          "lineNumber": 492
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._concat_features",
+          "lineNumber": 496
+        },
+        {
+          "caller": "_exclude_features",
+          "callee": "self.excludes_features.update",
+          "lineNumber": 530
+        },
+        {
+          "caller": "_exclude_features",
+          "callee": "len",
+          "lineNumber": 532
+        },
+        {
+          "caller": "_exclude_features",
+          "callee": "list",
+          "lineNumber": 535
+        },
+        {
+          "caller": "_exclude_features",
+          "callee": "default_fc_parameters_data.keys",
+          "lineNumber": 535
+        },
+        {
+          "caller": "_exclude_features",
+          "callee": "default_fc_parameters.pop",
+          "lineNumber": 536
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "len",
+          "lineNumber": 590
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "FileNotFoundError",
+          "lineNumber": 591
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "logger.info",
+          "lineNumber": 594
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "os.path.join",
+          "lineNumber": 596
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "concat_features",
+          "lineNumber": 597
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "list",
+          "lineNumber": 598
+        },
+        {
+          "caller": "_concat_features",
+          "callee": "logger.info",
+          "lineNumber": 602
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "os.path.join",
+          "lineNumber": 676
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "os.path.exists",
+          "lineNumber": 677
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "glob.glob",
+          "lineNumber": 680
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "os.path.join",
+          "lineNumber": 681
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "os.path.getmtime",
+          "lineNumber": 686
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "max",
+          "lineNumber": 687
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "os.path.getmtime",
+          "lineNumber": 687
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "logger.info",
+          "lineNumber": 692
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "pd.read_parquet",
+          "lineNumber": 693
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "self.relevant_features_paths.update",
+          "lineNumber": 703
+        },
+        {
+          "caller": "_try_load_cached_features_matrix",
+          "callee": "self.all_features_paths.update",
+          "lineNumber": 707
+        },
+        {
+          "caller": "_prepare_extraction_parameters",
+          "callee": "isinstance",
+          "lineNumber": 746
+        },
+        {
+          "caller": "_prepare_extraction_parameters",
+          "callee": "self._exclude_features",
+          "lineNumber": 747
+        },
+        {
+          "caller": "_prepare_extraction_parameters",
+          "callee": "isinstance",
+          "lineNumber": 748
+        },
+        {
+          "caller": "_prepare_extraction_parameters",
+          "callee": "set",
+          "lineNumber": 749
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "os.path.join",
+          "lineNumber": 811
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "os.path.exists",
+          "lineNumber": 818
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "logger.info",
+          "lineNumber": 820
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "logger.info",
+          "lineNumber": 829
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "pd.Series",
+          "lineNumber": 834
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "df[\"id\"].isin",
+          "lineNumber": 839
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "len",
+          "lineNumber": 842
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "df[\"id\"].unique",
+          "lineNumber": 842
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "len",
+          "lineNumber": 843
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "logger.error",
+          "lineNumber": 847
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "ValueError",
+          "lineNumber": 848
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "extract_relevant_features",
+          "lineNumber": 851
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "tsfresh_extract_features",
+          "lineNumber": 855
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "extracted_features.to_parquet",
+          "lineNumber": 864
+        },
+        {
+          "caller": "_extract_features_for_column",
+          "callee": "logger.info",
+          "lineNumber": 869
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "label_df[ID_COLUMN].isin",
+          "lineNumber": 906
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "label_df.index.min().strftime",
+          "lineNumber": 907
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "label_df.index.min",
+          "lineNumber": 907
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "label_df.index.max().strftime",
+          "lineNumber": 908
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "label_df.index.max",
+          "lineNumber": 908
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "os.path.join",
+          "lineNumber": 911
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "ensure_dir",
+          "lineNumber": 915
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "label_df.to_csv",
+          "lineNumber": 917
+        },
+        {
+          "caller": "_prepare_training_mode",
+          "callee": "logger.info",
+          "lineNumber": 921
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/features/tremor_matrix_builder.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 570,
+      "nonEmptyLines": 489,
+      "classes": [
+        {
+          "name": "TremorMatrixBuilder",
+          "startLine": 19,
+          "endLine": 570,
+          "methods": [
+            "__init__",
+            "validate",
+            "create_directories",
+            "save_matrix_per_method",
+            "_build_tremor_matrices",
+            "build"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "TremorMatrixBuilder",
+          "line": 19,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "isinstance",
+          "lineNumber": 143
+        },
+        {
+          "caller": "__init__",
+          "callee": "TypeError",
+          "lineNumber": 144
+        },
+        {
+          "caller": "__init__",
+          "callee": "isinstance",
+          "lineNumber": 145
+        },
+        {
+          "caller": "__init__",
+          "callee": "TypeError",
+          "lineNumber": 146
+        },
+        {
+          "caller": "__init__",
+          "callee": "tremor_df.sort_index",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "label_df.sort_index",
+          "lineNumber": 148
+        },
+        {
+          "caller": "__init__",
+          "callee": "resolve_output_dir",
+          "lineNumber": 149
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 150
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 152
+        },
+        {
+          "caller": "__init__",
+          "callee": "tremor_df.index.min().strftime",
+          "lineNumber": 153
+        },
+        {
+          "caller": "__init__",
+          "callee": "tremor_df.index.min",
+          "lineNumber": 153
+        },
+        {
+          "caller": "__init__",
+          "callee": "tremor_df.index.max().strftime",
+          "lineNumber": 154
+        },
+        {
+          "caller": "__init__",
+          "callee": "tremor_df.index.max",
+          "lineNumber": 154
+        },
+        {
+          "caller": "__init__",
+          "callee": "np.clip",
+          "lineNumber": 164
+        },
+        {
+          "caller": "__init__",
+          "callee": "label_df.index.min",
+          "lineNumber": 171
+        },
+        {
+          "caller": "__init__",
+          "callee": "timedelta",
+          "lineNumber": 171
+        },
+        {
+          "caller": "__init__",
+          "callee": "label_df.index.max",
+          "lineNumber": 172
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 179
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 187
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.create_directories",
+          "lineNumber": 188
+        },
+        {
+          "caller": "validate",
+          "callee": "self.label_df.columns.tolist",
+          "lineNumber": 205
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 208
+        },
+        {
+          "caller": "validate",
+          "callee": "self.tremor_df.index.min",
+          "lineNumber": 214
+        },
+        {
+          "caller": "validate",
+          "callee": "self.tremor_df.index.max",
+          "lineNumber": 215
+        },
+        {
+          "caller": "validate",
+          "callee": "logger.info",
+          "lineNumber": 219
+        },
+        {
+          "caller": "validate",
+          "callee": "logger.info",
+          "lineNumber": 224
+        },
+        {
+          "caller": "validate",
+          "callee": "logger.info",
+          "lineNumber": 228
+        },
+        {
+          "caller": "validate",
+          "callee": "logger.info",
+          "lineNumber": 233
+        },
+        {
+          "caller": "validate",
+          "callee": "self.start_date.strftime",
+          "lineNumber": 235
+        },
+        {
+          "caller": "validate",
+          "callee": "self.end_date.strftime",
+          "lineNumber": 236
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 252
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "os.path.join",
+          "lineNumber": 276
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "ensure_dir",
+          "lineNumber": 277
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "tremor_df.columns.tolist",
+          "lineNumber": 280
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "os.path.join",
+          "lineNumber": 287
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "os.path.isfile",
+          "lineNumber": 292
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "tremor_df_matrix.to_csv",
+          "lineNumber": 296
+        },
+        {
+          "caller": "save_matrix_per_method",
+          "callee": "logger.info",
+          "lineNumber": 299
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "ensure_dir",
+          "lineNumber": 355
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "filtered_label_df.itertuples",
+          "lineNumber": 368
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "timedelta",
+          "lineNumber": 369
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "timedelta",
+          "lineNumber": 370
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "int",
+          "lineNumber": 371
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "len",
+          "lineNumber": 376
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "tremor_df_sliced.sort_index",
+          "lineNumber": 382
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "tremor_df_sliced.reset_index",
+          "lineNumber": 383
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "tremor_matrices.append",
+          "lineNumber": 391
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "start_datetime.strftime",
+          "lineNumber": 398
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "end_datetime.strftime",
+          "lineNumber": 399
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "os.path.join",
+          "lineNumber": 404
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "tremor_df_sliced.to_csv",
+          "lineNumber": 407
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "len",
+          "lineNumber": 414
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "logger.warning",
+          "lineNumber": 416
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "len",
+          "lineNumber": 419
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "self.start_date.strftime",
+          "lineNumber": 421
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "self.end_date.strftime",
+          "lineNumber": 422
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "logger.error",
+          "lineNumber": 426
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "ValueError",
+          "lineNumber": 427
+        },
+        {
+          "caller": "_build_tremor_matrices",
+          "callee": "pd.concat",
+          "lineNumber": 429
+        },
+        {
+          "caller": "build",
+          "callee": "os.path.join",
+          "lineNumber": 509
+        },
+        {
+          "caller": "build",
+          "callee": "os.path.isfile",
+          "lineNumber": 512
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 514
+        },
+        {
+          "caller": "build",
+          "callee": "pd.read_csv",
+          "lineNumber": 515
+        },
+        {
+          "caller": "build",
+          "callee": "df.columns.tolist",
+          "lineNumber": 516
+        },
+        {
+          "caller": "build",
+          "callee": "all",
+          "lineNumber": 519
+        },
+        {
+          "caller": "build",
+          "callee": "logger.warning",
+          "lineNumber": 527
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 530
+        },
+        {
+          "caller": "build",
+          "callee": "validate_columns",
+          "lineNumber": 538
+        },
+        {
+          "caller": "build",
+          "callee": "tremor_df.columns.tolist",
+          "lineNumber": 543
+        },
+        {
+          "caller": "build",
+          "callee": "self._build_tremor_matrices",
+          "lineNumber": 546
+        },
+        {
+          "caller": "build",
+          "callee": "ensure_dir",
+          "lineNumber": 555
+        },
+        {
+          "caller": "build",
+          "callee": "unified_tremor_matrix.to_csv",
+          "lineNumber": 556
+        },
+        {
+          "caller": "build",
+          "callee": "self.save_matrix_per_method",
+          "lineNumber": 560
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 565
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/base_model.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 783,
+      "nonEmptyLines": 668,
+      "classes": [
+        {
+          "name": "BaseModel",
+          "startLine": 29,
+          "endLine": 783,
+          "methods": [
+            "__init__",
+            "_validate",
+            "_sync_dates_to_tremor",
+            "tremor_df",
+            "tremor_data",
+            "set_directories",
+            "create_directories",
+            "validate",
+            "describe",
+            "to_dict",
+            "to_prompt",
+            "save_config",
+            "stage_dir",
+            "build_identity",
+            "cache_path",
+            "compute_hash",
+            "identity_date",
+            "_canonicalize",
+            "tremor_fingerprint",
+            "save",
+            "load",
+            "build_label",
+            "_build_features",
+            "extract_features"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "BaseModel",
+          "line": 29,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "resolve_output_dir",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "to_datetime",
+          "lineNumber": 155
+        },
+        {
+          "caller": "__init__",
+          "callee": "to_datetime",
+          "lineNumber": 156
+        },
+        {
+          "caller": "__init__",
+          "callee": "sort_dates",
+          "lineNumber": 163
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.start_date.strftime",
+          "lineNumber": 172
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.end_date.strftime",
+          "lineNumber": 173
+        },
+        {
+          "caller": "__init__",
+          "callee": "max",
+          "lineNumber": 181
+        },
+        {
+          "caller": "__init__",
+          "callee": "multiprocessing.cpu_count",
+          "lineNumber": 181
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 184
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._validate",
+          "lineNumber": 200
+        },
+        {
+          "caller": "_validate",
+          "callee": "validate_date_ranges",
+          "lineNumber": 219
+        },
+        {
+          "caller": "_validate",
+          "callee": "logger.warning",
+          "lineNumber": 224
+        },
+        {
+          "caller": "_sync_dates_to_tremor",
+          "callee": "logger.info",
+          "lineNumber": 248
+        },
+        {
+          "caller": "_sync_dates_to_tremor",
+          "callee": "tremor_start_date.strftime",
+          "lineNumber": 250
+        },
+        {
+          "caller": "_sync_dates_to_tremor",
+          "callee": "logger.info",
+          "lineNumber": 254
+        },
+        {
+          "caller": "_sync_dates_to_tremor",
+          "callee": "tremor_end_date.strftime",
+          "lineNumber": 256
+        },
+        {
+          "caller": "tremor_data",
+          "callee": "isinstance",
+          "lineNumber": 290
+        },
+        {
+          "caller": "tremor_data",
+          "callee": "TypeError",
+          "lineNumber": 291
+        },
+        {
+          "caller": "tremor_data",
+          "callee": "type",
+          "lineNumber": 293
+        },
+        {
+          "caller": "tremor_data",
+          "callee": "isinstance",
+          "lineNumber": 296
+        },
+        {
+          "caller": "tremor_data",
+          "callee": "TremorData.from_csv",
+          "lineNumber": 297
+        },
+        {
+          "caller": "tremor_data",
+          "callee": "TremorData",
+          "lineNumber": 299
+        },
+        {
+          "caller": "build_identity",
+          "callee": "NotImplementedError",
+          "lineNumber": 442
+        },
+        {
+          "caller": "cache_path",
+          "callee": "os.path.join",
+          "lineNumber": 458
+        },
+        {
+          "caller": "cache_path",
+          "callee": "cls.compute_hash",
+          "lineNumber": 459
+        },
+        {
+          "caller": "compute_hash",
+          "callee": "cls._canonicalize",
+          "lineNumber": 474
+        },
+        {
+          "caller": "compute_hash",
+          "callee": "json.dumps(canon, sort_keys=True, default=str).encode",
+          "lineNumber": 475
+        },
+        {
+          "caller": "compute_hash",
+          "callee": "json.dumps",
+          "lineNumber": 475
+        },
+        {
+          "caller": "compute_hash",
+          "callee": "hashlib.sha256(payload).hexdigest",
+          "lineNumber": 476
+        },
+        {
+          "caller": "compute_hash",
+          "callee": "hashlib.sha256",
+          "lineNumber": 476
+        },
+        {
+          "caller": "identity_date",
+          "callee": "to_datetime(value).strftime",
+          "lineNumber": 494
+        },
+        {
+          "caller": "identity_date",
+          "callee": "to_datetime",
+          "lineNumber": 494
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 512
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 514
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 516
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "value.isoformat",
+          "lineNumber": 517
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 518
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "value.as_posix",
+          "lineNumber": 519
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 520
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "int",
+          "lineNumber": 521
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 522
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "float",
+          "lineNumber": 523
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 524
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "BaseModel._canonicalize",
+          "lineNumber": 525
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "value.tolist",
+          "lineNumber": 525
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 526
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "str",
+          "lineNumber": 528
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "BaseModel._canonicalize",
+          "lineNumber": 528
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "sorted",
+          "lineNumber": 529
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 531
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "sorted",
+          "lineNumber": 532
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "BaseModel._canonicalize",
+          "lineNumber": 533
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "json.dumps",
+          "lineNumber": 534
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "isinstance",
+          "lineNumber": 536
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "BaseModel._canonicalize",
+          "lineNumber": 537
+        },
+        {
+          "caller": "_canonicalize",
+          "callee": "str",
+          "lineNumber": 538
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "pd.Timestamp(df.index.min()).isoformat",
+          "lineNumber": 561
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "pd.Timestamp",
+          "lineNumber": 561
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "df.index.min",
+          "lineNumber": 561
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "pd.Timestamp(df.index.max()).isoformat",
+          "lineNumber": 562
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "pd.Timestamp",
+          "lineNumber": 562
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "df.index.max",
+          "lineNumber": 562
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "int",
+          "lineNumber": 563
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "len",
+          "lineNumber": 563
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "sorted",
+          "lineNumber": 564
+        },
+        {
+          "caller": "tremor_fingerprint",
+          "callee": "str",
+          "lineNumber": 564
+        },
+        {
+          "caller": "save",
+          "callee": "type(self).cache_path",
+          "lineNumber": 601
+        },
+        {
+          "caller": "save",
+          "callee": "type",
+          "lineNumber": 601
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 602
+        },
+        {
+          "caller": "save",
+          "callee": "joblib.dump",
+          "lineNumber": 603
+        },
+        {
+          "caller": "save",
+          "callee": "len",
+          "lineNumber": 605
+        },
+        {
+          "caller": "save",
+          "callee": "open",
+          "lineNumber": 606
+        },
+        {
+          "caller": "save",
+          "callee": "json.dump",
+          "lineNumber": 607
+        },
+        {
+          "caller": "save",
+          "callee": "type(self)._canonicalize",
+          "lineNumber": 607
+        },
+        {
+          "caller": "save",
+          "callee": "type",
+          "lineNumber": 607
+        },
+        {
+          "caller": "save",
+          "callee": "logger.info",
+          "lineNumber": 609
+        },
+        {
+          "caller": "save",
+          "callee": "type",
+          "lineNumber": 609
+        },
+        {
+          "caller": "save",
+          "callee": "getattr",
+          "lineNumber": 613
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.join",
+          "lineNumber": 615
+        },
+        {
+          "caller": "save",
+          "callee": "type",
+          "lineNumber": 615
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 617
+        },
+        {
+          "caller": "save",
+          "callee": "str",
+          "lineNumber": 617
+        },
+        {
+          "caller": "save",
+          "callee": "Path(path).resolve",
+          "lineNumber": 617
+        },
+        {
+          "caller": "save",
+          "callee": "Path",
+          "lineNumber": 617
+        },
+        {
+          "caller": "save",
+          "callee": "joblib.dump",
+          "lineNumber": 618
+        },
+        {
+          "caller": "save",
+          "callee": "logger.info",
+          "lineNumber": 619
+        },
+        {
+          "caller": "save",
+          "callee": "type",
+          "lineNumber": 619
+        },
+        {
+          "caller": "load",
+          "callee": "cls.cache_path",
+          "lineNumber": 640
+        },
+        {
+          "caller": "load",
+          "callee": "os.path.isfile",
+          "lineNumber": 641
+        },
+        {
+          "caller": "load",
+          "callee": "load_pickle",
+          "lineNumber": 645
+        },
+        {
+          "caller": "load",
+          "callee": "logger.info",
+          "lineNumber": 646
+        },
+        {
+          "caller": "load",
+          "callee": "logger.warning",
+          "lineNumber": 649
+        },
+        {
+          "caller": "_build_features",
+          "callee": "TremorMatrixBuilder(\n                tremor_df=self.tremor_df,\n                label_df=label_df,\n                output_dir=os.path.join(output_dir, \"tremor\"),\n                window_size=self.window_size,\n                overwrite=overwrite or self.overwrite,\n                minimum_completion=minimum_completion,\n                verbose=verbose if verbose else self.verbose,\n            )\n            .build",
+          "lineNumber": 741
+        },
+        {
+          "caller": "_build_features",
+          "callee": "TremorMatrixBuilder",
+          "lineNumber": 741
+        },
+        {
+          "caller": "_build_features",
+          "callee": "os.path.join",
+          "lineNumber": 744
+        },
+        {
+          "caller": "_build_features",
+          "callee": "FeaturesBuilder",
+          "lineNumber": 758
+        }
+      ],
+      "metrics": {
+        "importCount": 8,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/forecast_model.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1376,
+      "nonEmptyLines": 1264,
+      "classes": [
+        {
+          "name": "ForecastModel",
+          "startLine": 29,
+          "endLine": 1376,
+          "methods": [
+            "__init__",
+            "__repr__",
+            "calculate",
+            "train",
+            "predict",
+            "evaluate",
+            "explain",
+            "save_config",
+            "from_config",
+            "run"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ForecastModel",
+          "line": 29,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "os.path.abspath",
+          "lineNumber": 99
+        },
+        {
+          "caller": "__init__",
+          "callee": "setup_nslc_directories",
+          "lineNumber": 100
+        },
+        {
+          "caller": "__init__",
+          "callee": "station.upper",
+          "lineNumber": 104
+        },
+        {
+          "caller": "__init__",
+          "callee": "channel.upper",
+          "lineNumber": 105
+        },
+        {
+          "caller": "__init__",
+          "callee": "network.upper",
+          "lineNumber": 106
+        },
+        {
+          "caller": "__init__",
+          "callee": "location.upper",
+          "lineNumber": 107
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 121
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 136
+        },
+        {
+          "caller": "__init__",
+          "callee": "ForecastConfig",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "BaseForecastConfig",
+          "lineNumber": 148
+        },
+        {
+          "caller": "__repr__",
+          "callee": "\", \".join",
+          "lineNumber": 175
+        },
+        {
+          "caller": "__repr__",
+          "callee": "type",
+          "lineNumber": 177
+        },
+        {
+          "caller": "calculate",
+          "callee": "isinstance",
+          "lineNumber": 300
+        },
+        {
+          "caller": "calculate",
+          "callee": "start_date.isoformat",
+          "lineNumber": 300
+        },
+        {
+          "caller": "calculate",
+          "callee": "isinstance",
+          "lineNumber": 302
+        },
+        {
+          "caller": "calculate",
+          "callee": "end_date.isoformat",
+          "lineNumber": 302
+        },
+        {
+          "caller": "calculate",
+          "callee": "to_datetime",
+          "lineNumber": 308
+        },
+        {
+          "caller": "calculate",
+          "callee": "timedelta",
+          "lineNumber": 308
+        },
+        {
+          "caller": "calculate",
+          "callee": "isinstance",
+          "lineNumber": 309
+        },
+        {
+          "caller": "calculate",
+          "callee": "logger.info",
+          "lineNumber": 314
+        },
+        {
+          "caller": "calculate",
+          "callee": "CalculateTremor",
+          "lineNumber": 319
+        },
+        {
+          "caller": "calculate",
+          "callee": "source.upper",
+          "lineNumber": 342
+        },
+        {
+          "caller": "calculate",
+          "callee": "ValueError",
+          "lineNumber": 344
+        },
+        {
+          "caller": "calculate",
+          "callee": "calculate.from_sds",
+          "lineNumber": 348
+        },
+        {
+          "caller": "calculate",
+          "callee": "source.upper",
+          "lineNumber": 349
+        },
+        {
+          "caller": "calculate",
+          "callee": "calculate.from_fdsn",
+          "lineNumber": 350
+        },
+        {
+          "caller": "calculate",
+          "callee": "ValueError",
+          "lineNumber": 352
+        },
+        {
+          "caller": "calculate",
+          "callee": "calculate.run",
+          "lineNumber": 354
+        },
+        {
+          "caller": "calculate",
+          "callee": "start_date.strftime",
+          "lineNumber": 362
+        },
+        {
+          "caller": "calculate",
+          "callee": "logger.info",
+          "lineNumber": 363
+        },
+        {
+          "caller": "calculate",
+          "callee": "TremorData",
+          "lineNumber": 365
+        },
+        {
+          "caller": "calculate",
+          "callee": "ForecastCalculateConfig",
+          "lineNumber": 370
+        },
+        {
+          "caller": "calculate",
+          "callee": "list",
+          "lineNumber": 386
+        },
+        {
+          "caller": "train",
+          "callee": "ValueError",
+          "lineNumber": 536
+        },
+        {
+          "caller": "train",
+          "callee": "ForecastTrainConfig",
+          "lineNumber": 541
+        },
+        {
+          "caller": "train",
+          "callee": "isinstance",
+          "lineNumber": 543
+        },
+        {
+          "caller": "train",
+          "callee": "start_date.isoformat",
+          "lineNumber": 543
+        },
+        {
+          "caller": "train",
+          "callee": "isinstance",
+          "lineNumber": 545
+        },
+        {
+          "caller": "train",
+          "callee": "end_date.isoformat",
+          "lineNumber": 545
+        },
+        {
+          "caller": "train",
+          "callee": "list",
+          "lineNumber": 546
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel.build_identity",
+          "lineNumber": 581
+        },
+        {
+          "caller": "train",
+          "callee": "os.path.join",
+          "lineNumber": 615
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel.load",
+          "lineNumber": 618
+        },
+        {
+          "caller": "train",
+          "callee": "logger.warning",
+          "lineNumber": 621
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel.compute_hash",
+          "lineNumber": 629
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel(\n                tremor_data=self.tremor_df,\n                start_date=start_date,\n                end_date=end_date,\n                classifiers=classifiers,\n                eruption_dates=eruption_dates,\n                window_size=self.day_to_forecast,\n                cv_strategy=cv_strategy,\n                cv_splits=cv_splits,\n                top_n_features=top_n_features,\n                include_eruption_date=include_eruption_date,\n                nslc=self.nslc,\n                output_dir=resolved_output_dir,\n                overwrite=overwrite,\n                prefix_config=self.prefix_config,\n                n_jobs=n_jobs,\n                n_grids=n_grids,\n                save_model=use_cache,\n                verbose=verbose,\n            )\n            .build_label(\n                window_step=window_step,\n                window_step_unit=window_step_unit,\n                builder=label_builder,\n                days_before_eruption=days_before_eruption,\n                verbose=verbose,\n            )\n            .extract_features(\n                select_tremor_columns=select_tremor_columns,\n                save_tremor_matrix_per_method=save_tremor_matrix_per_method,\n                exclude_features=exclude_features,\n                select_features=select_features,\n                minimum_completion=minimum_completion,\n                overwrite=overwrite,\n                n_jobs=n_jobs,\n                verbose=verbose,\n            )\n            .fit",
+          "lineNumber": 633
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel(\n                tremor_data=self.tremor_df,\n                start_date=start_date,\n                end_date=end_date,\n                classifiers=classifiers,\n                eruption_dates=eruption_dates,\n                window_size=self.day_to_forecast,\n                cv_strategy=cv_strategy,\n                cv_splits=cv_splits,\n                top_n_features=top_n_features,\n                include_eruption_date=include_eruption_date,\n                nslc=self.nslc,\n                output_dir=resolved_output_dir,\n                overwrite=overwrite,\n                prefix_config=self.prefix_config,\n                n_jobs=n_jobs,\n                n_grids=n_grids,\n                save_model=use_cache,\n                verbose=verbose,\n            )\n            .build_label(\n                window_step=window_step,\n                window_step_unit=window_step_unit,\n                builder=label_builder,\n                days_before_eruption=days_before_eruption,\n                verbose=verbose,\n            )\n            .extract_features",
+          "lineNumber": 633
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel(\n                tremor_data=self.tremor_df,\n                start_date=start_date,\n                end_date=end_date,\n                classifiers=classifiers,\n                eruption_dates=eruption_dates,\n                window_size=self.day_to_forecast,\n                cv_strategy=cv_strategy,\n                cv_splits=cv_splits,\n                top_n_features=top_n_features,\n                include_eruption_date=include_eruption_date,\n                nslc=self.nslc,\n                output_dir=resolved_output_dir,\n                overwrite=overwrite,\n                prefix_config=self.prefix_config,\n                n_jobs=n_jobs,\n                n_grids=n_grids,\n                save_model=use_cache,\n                verbose=verbose,\n            )\n            .build_label",
+          "lineNumber": 633
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel",
+          "lineNumber": 633
+        },
+        {
+          "caller": "train",
+          "callee": "TrainingModel.compute_hash",
+          "lineNumber": 689
+        },
+        {
+          "caller": "predict",
+          "callee": "ValueError",
+          "lineNumber": 841
+        },
+        {
+          "caller": "predict",
+          "callee": "ValueError",
+          "lineNumber": 844
+        },
+        {
+          "caller": "predict",
+          "callee": "ValueError",
+          "lineNumber": 853
+        },
+        {
+          "caller": "predict",
+          "callee": "os.path.exists",
+          "lineNumber": 857
+        },
+        {
+          "caller": "predict",
+          "callee": "FileNotFoundError",
+          "lineNumber": 858
+        },
+        {
+          "caller": "predict",
+          "callee": "os.path.exists",
+          "lineNumber": 861
+        },
+        {
+          "caller": "predict",
+          "callee": "FileNotFoundError",
+          "lineNumber": 862
+        },
+        {
+          "caller": "predict",
+          "callee": "self.TrainingModel.features_selected_df.index.tolist",
+          "lineNumber": 870
+        },
+        {
+          "caller": "predict",
+          "callee": "ForecastPredictConfig",
+          "lineNumber": 879
+        },
+        {
+          "caller": "predict",
+          "callee": "isinstance",
+          "lineNumber": 881
+        },
+        {
+          "caller": "predict",
+          "callee": "start_date.isoformat",
+          "lineNumber": 881
+        },
+        {
+          "caller": "predict",
+          "callee": "isinstance",
+          "lineNumber": 883
+        },
+        {
+          "caller": "predict",
+          "callee": "end_date.isoformat",
+          "lineNumber": 883
+        },
+        {
+          "caller": "predict",
+          "callee": "PredictionModel.build_identity",
+          "lineNumber": 907
+        },
+        {
+          "caller": "predict",
+          "callee": "os.path.join",
+          "lineNumber": 926
+        },
+        {
+          "caller": "predict",
+          "callee": "PredictionModel.load",
+          "lineNumber": 929
+        },
+        {
+          "caller": "predict",
+          "callee": "logger.warning",
+          "lineNumber": 932
+        },
+        {
+          "caller": "predict",
+          "callee": "PredictionModel",
+          "lineNumber": 938
+        },
+        {
+          "caller": "predict",
+          "callee": "prediction_model.load_features",
+          "lineNumber": 956
+        },
+        {
+          "caller": "predict",
+          "callee": "prediction_model.build_label(\n                window_step=window_step,\n                window_step_unit=window_step_unit,\n            ).extract_features",
+          "lineNumber": 964
+        },
+        {
+          "caller": "predict",
+          "callee": "prediction_model.build_label",
+          "lineNumber": 964
+        },
+        {
+          "caller": "predict",
+          "callee": "prediction_model.forecast",
+          "lineNumber": 978
+        },
+        {
+          "caller": "evaluate",
+          "callee": "ValueError",
+          "lineNumber": 1060
+        },
+        {
+          "caller": "evaluate",
+          "callee": "ValueError",
+          "lineNumber": 1065
+        },
+        {
+          "caller": "evaluate",
+          "callee": "ForecastEvaluateConfig",
+          "lineNumber": 1070
+        },
+        {
+          "caller": "evaluate",
+          "callee": "list",
+          "lineNumber": 1072
+        },
+        {
+          "caller": "evaluate",
+          "callee": "ValueError",
+          "lineNumber": 1098
+        },
+        {
+          "caller": "evaluate",
+          "callee": "EvaluationModel",
+          "lineNumber": 1103
+        },
+        {
+          "caller": "evaluate",
+          "callee": "evaluation_model.evaluate",
+          "lineNumber": 1115
+        },
+        {
+          "caller": "evaluate",
+          "callee": "self.save_config",
+          "lineNumber": 1122
+        },
+        {
+          "caller": "explain",
+          "callee": "ValueError",
+          "lineNumber": 1209
+        },
+        {
+          "caller": "explain",
+          "callee": "ValueError",
+          "lineNumber": 1214
+        },
+        {
+          "caller": "explain",
+          "callee": "ForecastExplainConfig",
+          "lineNumber": 1219
+        },
+        {
+          "caller": "explain",
+          "callee": "list",
+          "lineNumber": 1221
+        },
+        {
+          "caller": "explain",
+          "callee": "ValueError",
+          "lineNumber": 1252
+        },
+        {
+          "caller": "explain",
+          "callee": "ExplanationModel(\n                model=model_object,\n                eruption_dates=eruption_dates,\n                output_dir=output_dir or self.station_dir,\n                overwrite=overwrite,\n                prefix_config=self.prefix_config,\n                n_jobs=n_jobs,\n                save_model=use_cache,\n                verbose=verbose,\n            )\n            .explain(\n                save_per_seed=save_per_seed,\n                check_additivity=check_additivity,\n                overwrite_classifier_explanation=overwrite_classifier_explanation,\n                use_cache=use_cache,\n            )\n            .plot",
+          "lineNumber": 1258
+        },
+        {
+          "caller": "explain",
+          "callee": "ExplanationModel(\n                model=model_object,\n                eruption_dates=eruption_dates,\n                output_dir=output_dir or self.station_dir,\n                overwrite=overwrite,\n                prefix_config=self.prefix_config,\n                n_jobs=n_jobs,\n                save_model=use_cache,\n                verbose=verbose,\n            )\n            .explain",
+          "lineNumber": 1258
+        },
+        {
+          "caller": "explain",
+          "callee": "ExplanationModel",
+          "lineNumber": 1258
+        },
+        {
+          "caller": "explain",
+          "callee": "self.save_config",
+          "lineNumber": 1286
+        },
+        {
+          "caller": "save_config",
+          "callee": "slugify",
+          "lineNumber": 1326
+        },
+        {
+          "caller": "save_config",
+          "callee": "os.path.join",
+          "lineNumber": 1329
+        },
+        {
+          "caller": "save_config",
+          "callee": "self._config.save",
+          "lineNumber": 1330
+        },
+        {
+          "caller": "from_config",
+          "callee": "ForecastConfig.load",
+          "lineNumber": 1350
+        },
+        {
+          "caller": "from_config",
+          "callee": "cls",
+          "lineNumber": 1351
+        },
+        {
+          "caller": "from_config",
+          "callee": "config.model.to_init_kwargs",
+          "lineNumber": 1351
+        },
+        {
+          "caller": "run",
+          "callee": "self.calculate",
+          "lineNumber": 1367
+        },
+        {
+          "caller": "run",
+          "callee": "self._config.calculate.to_init_kwargs",
+          "lineNumber": 1367
+        },
+        {
+          "caller": "run",
+          "callee": "self.train",
+          "lineNumber": 1369
+        },
+        {
+          "caller": "run",
+          "callee": "self._config.train.to_init_kwargs",
+          "lineNumber": 1369
+        },
+        {
+          "caller": "run",
+          "callee": "self.predict",
+          "lineNumber": 1371
+        },
+        {
+          "caller": "run",
+          "callee": "self._config.predict.to_init_kwargs",
+          "lineNumber": 1371
+        },
+        {
+          "caller": "run",
+          "callee": "self.evaluate",
+          "lineNumber": 1373
+        },
+        {
+          "caller": "run",
+          "callee": "self._config.evaluate.to_init_kwargs",
+          "lineNumber": 1373
+        },
+        {
+          "caller": "run",
+          "callee": "self.explain",
+          "lineNumber": 1375
+        },
+        {
+          "caller": "run",
+          "callee": "self._config.explain.to_init_kwargs",
+          "lineNumber": 1375
+        }
+      ],
+      "metrics": {
+        "importCount": 12,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/prediction_model.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1200,
+      "nonEmptyLines": 1050,
+      "classes": [
+        {
+          "name": "PredictionModel",
+          "startLine": 21,
+          "endLine": 1200,
+          "methods": [
+            "__init__",
+            "stage_dir",
+            "build_identity",
+            "set_directories",
+            "create_directories",
+            "validate",
+            "describe",
+            "to_dict",
+            "to_prompt",
+            "save_config",
+            "build_label",
+            "extract_features",
+            "forecast",
+            "load_features",
+            "_init_config",
+            "_write_load_features_note",
+            "_plot_forecast"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "PredictionModel",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "self._init_config",
+          "lineNumber": 149
+        },
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 166
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 166
+        },
+        {
+          "caller": "__init__",
+          "callee": "isinstance",
+          "lineNumber": 181
+        },
+        {
+          "caller": "__init__",
+          "callee": "ClassifierEnsemble.from_any",
+          "lineNumber": 182
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.set_directories",
+          "lineNumber": 203
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.Series",
+          "lineNumber": 209
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 210
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 215
+        },
+        {
+          "caller": "build_identity",
+          "callee": "cls.tremor_fingerprint",
+          "lineNumber": 274
+        },
+        {
+          "caller": "build_identity",
+          "callee": "cls.identity_date",
+          "lineNumber": 276
+        },
+        {
+          "caller": "build_identity",
+          "callee": "cls.identity_date",
+          "lineNumber": 277
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 296
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 297
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 298
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 308
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 309
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 310
+        },
+        {
+          "caller": "describe",
+          "callee": "\", \".join",
+          "lineNumber": 342
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "\", \".join",
+          "lineNumber": 429
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "os.path.basename",
+          "lineNumber": 437
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "os.path.basename",
+          "lineNumber": 442
+        },
+        {
+          "caller": "save_config",
+          "callee": "slugify",
+          "lineNumber": 496
+        },
+        {
+          "caller": "save_config",
+          "callee": "os.path.join",
+          "lineNumber": 499
+        },
+        {
+          "caller": "save_config",
+          "callee": "self._config.save",
+          "lineNumber": 500
+        },
+        {
+          "caller": "build_label",
+          "callee": "ValueError",
+          "lineNumber": 531
+        },
+        {
+          "caller": "build_label",
+          "callee": "os.path.join",
+          "lineNumber": 539
+        },
+        {
+          "caller": "build_label",
+          "callee": "ensure_dir",
+          "lineNumber": 540
+        },
+        {
+          "caller": "build_label",
+          "callee": "os.path.exists",
+          "lineNumber": 542
+        },
+        {
+          "caller": "build_label",
+          "callee": "pd.read_csv",
+          "lineNumber": 543
+        },
+        {
+          "caller": "build_label",
+          "callee": "construct_windows",
+          "lineNumber": 556
+        },
+        {
+          "caller": "build_label",
+          "callee": "ValueError",
+          "lineNumber": 564
+        },
+        {
+          "caller": "build_label",
+          "callee": "label_df.to_csv",
+          "lineNumber": 570
+        },
+        {
+          "caller": "build_label",
+          "callee": "logger.info",
+          "lineNumber": 578
+        },
+        {
+          "caller": "extract_features",
+          "callee": "load_select_features",
+          "lineNumber": 648
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.warning",
+          "lineNumber": 669
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.info",
+          "lineNumber": 676
+        },
+        {
+          "caller": "extract_features",
+          "callee": "ValueError",
+          "lineNumber": 680
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._build_features",
+          "lineNumber": 684
+        },
+        {
+          "caller": "extract_features",
+          "callee": "features_builder.extract_features",
+          "lineNumber": 697
+        },
+        {
+          "caller": "extract_features",
+          "callee": "len",
+          "lineNumber": 709
+        },
+        {
+          "caller": "extract_features",
+          "callee": "len",
+          "lineNumber": 709
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._labels[\"id\"].isin",
+          "lineNumber": 710
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._labels.to_csv",
+          "lineNumber": 711
+        },
+        {
+          "caller": "forecast",
+          "callee": "ValueError",
+          "lineNumber": 772
+        },
+        {
+          "caller": "forecast",
+          "callee": "ValueError",
+          "lineNumber": 775
+        },
+        {
+          "caller": "forecast",
+          "callee": "self.create_directories",
+          "lineNumber": 780
+        },
+        {
+          "caller": "forecast",
+          "callee": "self.ClassifierEnsemble.predict_with_uncertainty",
+          "lineNumber": 782
+        },
+        {
+          "caller": "forecast",
+          "callee": "pd.DataFrame",
+          "lineNumber": 790
+        },
+        {
+          "caller": "forecast",
+          "callee": "os.path.join",
+          "lineNumber": 791
+        },
+        {
+          "caller": "forecast",
+          "callee": "to_datetime_index",
+          "lineNumber": 795
+        },
+        {
+          "caller": "forecast",
+          "callee": "df_forecast.to_csv",
+          "lineNumber": 797
+        },
+        {
+          "caller": "forecast",
+          "callee": "logger.info",
+          "lineNumber": 798
+        },
+        {
+          "caller": "forecast",
+          "callee": "self._plot_forecast",
+          "lineNumber": 800
+        },
+        {
+          "caller": "forecast",
+          "callee": "type(self).build_identity",
+          "lineNumber": 812
+        },
+        {
+          "caller": "forecast",
+          "callee": "type",
+          "lineNumber": 812
+        },
+        {
+          "caller": "forecast",
+          "callee": "dict",
+          "lineNumber": 823
+        },
+        {
+          "caller": "forecast",
+          "callee": "type(self).compute_hash",
+          "lineNumber": 825
+        },
+        {
+          "caller": "forecast",
+          "callee": "type",
+          "lineNumber": 825
+        },
+        {
+          "caller": "forecast",
+          "callee": "self.save",
+          "lineNumber": 828
+        },
+        {
+          "caller": "forecast",
+          "callee": "self.save_config",
+          "lineNumber": 831
+        },
+        {
+          "caller": "forecast",
+          "callee": "logger.warning",
+          "lineNumber": 833
+        },
+        {
+          "caller": "load_features",
+          "callee": "os.path.isfile",
+          "lineNumber": 913
+        },
+        {
+          "caller": "load_features",
+          "callee": "FileNotFoundError",
+          "lineNumber": 914
+        },
+        {
+          "caller": "load_features",
+          "callee": "os.path.isfile",
+          "lineNumber": 917
+        },
+        {
+          "caller": "load_features",
+          "callee": "FileNotFoundError",
+          "lineNumber": 918
+        },
+        {
+          "caller": "load_features",
+          "callee": "logger.info",
+          "lineNumber": 923
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.read_csv",
+          "lineNumber": 929
+        },
+        {
+          "caller": "load_features",
+          "callee": "check_sampling_consistency",
+          "lineNumber": 936
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.DataFrame",
+          "lineNumber": 937
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.DatetimeIndex",
+          "lineNumber": 937
+        },
+        {
+          "caller": "load_features",
+          "callee": "ValueError",
+          "lineNumber": 942
+        },
+        {
+          "caller": "load_features",
+          "callee": "len",
+          "lineNumber": 945
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.read_csv",
+          "lineNumber": 949
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.read_parquet",
+          "lineNumber": 954
+        },
+        {
+          "caller": "load_features",
+          "callee": "label_df.index.min",
+          "lineNumber": 956
+        },
+        {
+          "caller": "load_features",
+          "callee": "label_df.index.max",
+          "lineNumber": 957
+        },
+        {
+          "caller": "load_features",
+          "callee": "normalize_dates",
+          "lineNumber": 961
+        },
+        {
+          "caller": "load_features",
+          "callee": "self.start_date.date",
+          "lineNumber": 969
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_start.date",
+          "lineNumber": 970
+        },
+        {
+          "caller": "load_features",
+          "callee": "timedelta",
+          "lineNumber": 970
+        },
+        {
+          "caller": "load_features",
+          "callee": "self.end_date.date",
+          "lineNumber": 971
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_end.date",
+          "lineNumber": 971
+        },
+        {
+          "caller": "load_features",
+          "callee": "logger.info",
+          "lineNumber": 973
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_start.to_pydatetime",
+          "lineNumber": 976
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_end.to_pydatetime",
+          "lineNumber": 977
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_start.strftime",
+          "lineNumber": 978
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_end.strftime",
+          "lineNumber": 979
+        },
+        {
+          "caller": "load_features",
+          "callee": "normalize_dates",
+          "lineNumber": 980
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels.index.min().date",
+          "lineNumber": 985
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels.index.min",
+          "lineNumber": 985
+        },
+        {
+          "caller": "load_features",
+          "callee": "self.start_date.date",
+          "lineNumber": 985
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels.index.max().date",
+          "lineNumber": 986
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels.index.max",
+          "lineNumber": 986
+        },
+        {
+          "caller": "load_features",
+          "callee": "self.end_date.date",
+          "lineNumber": 986
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels.index.min",
+          "lineNumber": 989
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels.index.max",
+          "lineNumber": 990
+        },
+        {
+          "caller": "load_features",
+          "callee": "ValueError",
+          "lineNumber": 994
+        },
+        {
+          "caller": "load_features",
+          "callee": "features_df.index.isin",
+          "lineNumber": 1003
+        },
+        {
+          "caller": "load_features",
+          "callee": "sliced_labels[\"id\"].isin",
+          "lineNumber": 1004
+        },
+        {
+          "caller": "load_features",
+          "callee": "logger.info",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "load_features",
+          "callee": "self._write_load_features_note",
+          "lineNumber": 1021
+        },
+        {
+          "caller": "_init_config",
+          "callee": "PredictionConfig",
+          "lineNumber": 1073
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1074
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1075
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1077
+        },
+        {
+          "caller": "_init_config",
+          "callee": "start_date.isoformat",
+          "lineNumber": 1078
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1079
+        },
+        {
+          "caller": "_init_config",
+          "callee": "end_date.isoformat",
+          "lineNumber": 1079
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "ensure_dir",
+          "lineNumber": 1120
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "os.path.join",
+          "lineNumber": 1121
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "open",
+          "lineNumber": 1122
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "f.write",
+          "lineNumber": 1123
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "datetime.now().isoformat",
+          "lineNumber": 1131
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "datetime.now",
+          "lineNumber": 1131
+        },
+        {
+          "caller": "_write_load_features_note",
+          "callee": "logger.info",
+          "lineNumber": 1135
+        },
+        {
+          "caller": "_plot_forecast",
+          "callee": "plot_forecast",
+          "lineNumber": 1170
+        },
+        {
+          "caller": "_plot_forecast",
+          "callee": "os.path.join",
+          "lineNumber": 1186
+        },
+        {
+          "caller": "_plot_forecast",
+          "callee": "os.path.join",
+          "lineNumber": 1187
+        },
+        {
+          "caller": "_plot_forecast",
+          "callee": "save_figure",
+          "lineNumber": 1189
+        },
+        {
+          "caller": "_plot_forecast",
+          "callee": "png_path.replace",
+          "lineNumber": 1199
+        }
+      ],
+      "metrics": {
+        "importCount": 12,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/tremor/tremor_data.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 290,
+      "nonEmptyLines": 232,
+      "classes": [
+        {
+          "name": "TremorData",
+          "startLine": 27,
+          "endLine": 290,
+          "methods": [
+            "__init__",
+            "df",
+            "__repr__",
+            "from_csv",
+            "columns",
+            "start_date",
+            "end_date",
+            "start_date_str",
+            "end_date_str",
+            "n_days",
+            "data",
+            "check_consistency"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "TremorData",
+          "line": 27,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 82
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 82
+        },
+        {
+          "caller": "df",
+          "callee": "isinstance",
+          "lineNumber": 102
+        },
+        {
+          "caller": "df",
+          "callee": "self._df.copy",
+          "lineNumber": 103
+        },
+        {
+          "caller": "df",
+          "callee": "df.columns.tolist",
+          "lineNumber": 104
+        },
+        {
+          "caller": "df",
+          "callee": "pd.to_datetime",
+          "lineNumber": 105
+        },
+        {
+          "caller": "df",
+          "callee": "df.drop",
+          "lineNumber": 106
+        },
+        {
+          "caller": "df",
+          "callee": "ValueError",
+          "lineNumber": 109
+        },
+        {
+          "caller": "from_csv",
+          "callee": "os.path.exists",
+          "lineNumber": 153
+        },
+        {
+          "caller": "from_csv",
+          "callee": "FileNotFoundError",
+          "lineNumber": 154
+        },
+        {
+          "caller": "from_csv",
+          "callee": "pd.read_csv",
+          "lineNumber": 157
+        },
+        {
+          "caller": "from_csv",
+          "callee": "df.sort_index",
+          "lineNumber": 158
+        },
+        {
+          "caller": "from_csv",
+          "callee": "cls",
+          "lineNumber": 159
+        },
+        {
+          "caller": "from_csv",
+          "callee": "KeyError",
+          "lineNumber": 162
+        },
+        {
+          "caller": "columns",
+          "callee": "self.df.columns.tolist",
+          "lineNumber": 174
+        },
+        {
+          "caller": "start_date",
+          "callee": "self.df.index.min().to_pydatetime",
+          "lineNumber": 187
+        },
+        {
+          "caller": "start_date",
+          "callee": "self.df.index.min",
+          "lineNumber": 187
+        },
+        {
+          "caller": "end_date",
+          "callee": "self.df.index.max().to_pydatetime",
+          "lineNumber": 201
+        },
+        {
+          "caller": "end_date",
+          "callee": "self.df.index.max",
+          "lineNumber": 201
+        },
+        {
+          "caller": "start_date_str",
+          "callee": "self.start_date.strftime",
+          "lineNumber": 214
+        },
+        {
+          "caller": "end_date_str",
+          "callee": "self.end_date.strftime",
+          "lineNumber": 226
+        },
+        {
+          "caller": "n_days",
+          "callee": "int",
+          "lineNumber": 239
+        },
+        {
+          "caller": "check_consistency",
+          "callee": "check_sampling_consistency",
+          "lineNumber": 286
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 32,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/date_utils.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 381,
+      "nonEmptyLines": 313,
+      "functions": [
+        {
+          "name": "to_datetime",
+          "startLine": 7,
+          "endLine": 40,
+          "params": [
+            "date",
+            "variable_name"
+          ]
+        },
+        {
+          "name": "sort_dates",
+          "startLine": 44,
+          "endLine": 47,
+          "params": [
+            "dates",
+            "as_datetime"
+          ]
+        },
+        {
+          "name": "sort_dates",
+          "startLine": 51,
+          "endLine": 54,
+          "params": [
+            "dates",
+            "as_datetime"
+          ]
+        },
+        {
+          "name": "sort_dates",
+          "startLine": 57,
+          "endLine": 88,
+          "params": [
+            "dates",
+            "as_datetime"
+          ]
+        },
+        {
+          "name": "normalize_dates",
+          "startLine": 91,
+          "endLine": 123,
+          "params": [
+            "start_date",
+            "end_date"
+          ]
+        },
+        {
+          "name": "parse_label_filename",
+          "startLine": 126,
+          "endLine": 275,
+          "params": [
+            "basename"
+          ]
+        },
+        {
+          "name": "to_datetime_index",
+          "startLine": 278,
+          "endLine": 381,
+          "params": [
+            "datetime_map",
+            "df",
+            "on"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "to_datetime",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "sort_dates",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "sort_dates",
+          "line": 50,
+          "isDefault": false
+        },
+        {
+          "name": "sort_dates",
+          "line": 57,
+          "isDefault": false
+        },
+        {
+          "name": "normalize_dates",
+          "line": 91,
+          "isDefault": false
+        },
+        {
+          "name": "parse_label_filename",
+          "line": 126,
+          "isDefault": false
+        },
+        {
+          "name": "to_datetime_index",
+          "line": 278,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "to_datetime",
+          "callee": "isinstance",
+          "lineNumber": 30
+        },
+        {
+          "caller": "to_datetime",
+          "callee": "datetime.strptime",
+          "lineNumber": 36
+        },
+        {
+          "caller": "to_datetime",
+          "callee": "ValueError",
+          "lineNumber": 38
+        },
+        {
+          "caller": "sort_dates",
+          "callee": "sorted",
+          "lineNumber": 83
+        },
+        {
+          "caller": "sort_dates",
+          "callee": "to_datetime",
+          "lineNumber": 83
+        },
+        {
+          "caller": "sort_dates",
+          "callee": "_date.strftime",
+          "lineNumber": 88
+        },
+        {
+          "caller": "normalize_dates",
+          "callee": "to_datetime(start_date).replace",
+          "lineNumber": 117
+        },
+        {
+          "caller": "normalize_dates",
+          "callee": "to_datetime",
+          "lineNumber": 117
+        },
+        {
+          "caller": "normalize_dates",
+          "callee": "to_datetime(end_date).replace",
+          "lineNumber": 118
+        },
+        {
+          "caller": "normalize_dates",
+          "callee": "to_datetime",
+          "lineNumber": 118
+        },
+        {
+          "caller": "normalize_dates",
+          "callee": "_start_date.strftime",
+          "lineNumber": 120
+        },
+        {
+          "caller": "normalize_dates",
+          "callee": "_end_date.strftime",
+          "lineNumber": 121
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "basename.split",
+          "lineNumber": 171
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "len",
+          "lineNumber": 173
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 174
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "len",
+          "lineNumber": 175
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "len",
+          "lineNumber": 180
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "window_step_and_unit.startswith",
+          "lineNumber": 196
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 197
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "day_to_forecast_part.startswith",
+          "lineNumber": 202
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 203
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "window_step_and_unit.split",
+          "lineNumber": 208
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "len",
+          "lineNumber": 209
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 210
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "int",
+          "lineNumber": 216
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 218
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 225
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "day_to_forecast_part.split",
+          "lineNumber": 230
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "len",
+          "lineNumber": 231
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 232
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "int",
+          "lineNumber": 238
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 240
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ie_part.startswith",
+          "lineNumber": 247
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 248
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "ValueError",
+          "lineNumber": 254
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "to_datetime",
+          "lineNumber": 263
+        },
+        {
+          "caller": "parse_label_filename",
+          "callee": "to_datetime",
+          "lineNumber": 264
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "isinstance",
+          "lineNumber": 333
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "isinstance",
+          "lineNumber": 336
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "isinstance",
+          "lineNumber": 337
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "ValueError",
+          "lineNumber": 338
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "type",
+          "lineNumber": 339
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "datetime_map.to_frame",
+          "lineNumber": 343
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "len",
+          "lineNumber": 345
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "len",
+          "lineNumber": 345
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "ValueError",
+          "lineNumber": 346
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "len",
+          "lineNumber": 347
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "len",
+          "lineNumber": 348
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "isinstance",
+          "lineNumber": 351
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "ValueError",
+          "lineNumber": 353
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "datetime_map.columns.tolist",
+          "lineNumber": 355
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "datetime_map.reset_index",
+          "lineNumber": 357
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "datetime_map.set_index",
+          "lineNumber": 358
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "ValueError",
+          "lineNumber": 361
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "datetime_map.columns.tolist",
+          "lineNumber": 362
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "ValueError",
+          "lineNumber": 366
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "df.columns.tolist",
+          "lineNumber": 368
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "df.merge(datetime_map, left_on=on, right_index=True).drop",
+          "lineNumber": 374
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "df.merge",
+          "lineNumber": 374
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "df.merge",
+          "lineNumber": 376
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "pd.to_datetime",
+          "lineNumber": 378
+        },
+        {
+          "caller": "to_datetime_index",
+          "callee": "result.drop",
+          "lineNumber": 379
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/feature_utils.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 772,
+      "nonEmptyLines": 667,
+      "functions": [
+        {
+          "name": "load_select_features",
+          "startLine": 21,
+          "endLine": 72,
+          "params": [
+            "value",
+            "number_of_features"
+          ]
+        },
+        {
+          "name": "load_feature_aliases",
+          "startLine": 75,
+          "endLine": 150,
+          "params": [
+            "source",
+            "reverse"
+          ]
+        },
+        {
+          "name": "migrate_score_column",
+          "startLine": 153,
+          "endLine": 188,
+          "params": [
+            "df"
+          ]
+        },
+        {
+          "name": "update_top_features_csv",
+          "startLine": 191,
+          "endLine": 297,
+          "params": [
+            "csv_path",
+            "output_path",
+            "freq_bands",
+            "overwrite"
+          ]
+        },
+        {
+          "name": "concat_features",
+          "startLine": 300,
+          "endLine": 360,
+          "params": [
+            "paths",
+            "filepath",
+            "frames"
+          ]
+        },
+        {
+          "name": "concat_significant_features",
+          "startLine": 363,
+          "endLine": 467,
+          "params": [
+            "features_csvs",
+            "features_dir",
+            "number_of_features",
+            "freq_bands"
+          ]
+        },
+        {
+          "name": "find_common_features",
+          "startLine": 470,
+          "endLine": 565,
+          "params": [
+            "top_features_csv",
+            "output_dir",
+            "freq_bands"
+          ]
+        },
+        {
+          "name": "_prepare_features_frame",
+          "startLine": 568,
+          "endLine": 614,
+          "params": [
+            "matrix",
+            "label_csv",
+            "stage"
+          ]
+        },
+        {
+          "name": "merge_features_matrix",
+          "startLine": 617,
+          "endLine": 772,
+          "params": [
+            "training_features_matrix",
+            "prediction_features_matrix",
+            "training_label_csv",
+            "prediction_label_csv",
+            "select_features",
+            "number_of_features",
+            "output_path"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "load_select_features",
+          "line": 21,
+          "isDefault": false
+        },
+        {
+          "name": "load_feature_aliases",
+          "line": 75,
+          "isDefault": false
+        },
+        {
+          "name": "migrate_score_column",
+          "line": 153,
+          "isDefault": false
+        },
+        {
+          "name": "update_top_features_csv",
+          "line": 191,
+          "isDefault": false
+        },
+        {
+          "name": "concat_features",
+          "line": 300,
+          "isDefault": false
+        },
+        {
+          "name": "concat_significant_features",
+          "line": 363,
+          "isDefault": false
+        },
+        {
+          "name": "find_common_features",
+          "line": 470,
+          "isDefault": false
+        },
+        {
+          "name": "_prepare_features_frame",
+          "line": 568,
+          "isDefault": false
+        },
+        {
+          "name": "merge_features_matrix",
+          "line": 617,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "load_select_features",
+          "callee": "isinstance",
+          "lineNumber": 60
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "os.path.isfile",
+          "lineNumber": 61
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "FileNotFoundError",
+          "lineNumber": 62
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "pd.read_csv(value, index_col=0).index.astype(str).tolist",
+          "lineNumber": 63
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "pd.read_csv(value, index_col=0).index.astype",
+          "lineNumber": 63
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "pd.read_csv",
+          "lineNumber": 63
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "str",
+          "lineNumber": 65
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "name.strip",
+          "lineNumber": 67
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "name.strip",
+          "lineNumber": 67
+        },
+        {
+          "caller": "load_select_features",
+          "callee": "ValueError",
+          "lineNumber": 69
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "isinstance",
+          "lineNumber": 131
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "os.path.isfile",
+          "lineNumber": 135
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "FileNotFoundError",
+          "lineNumber": 136
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "pd.read_csv",
+          "lineNumber": 137
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "ValueError",
+          "lineNumber": 141
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "df[\"alias\"].astype",
+          "lineNumber": 146
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "df.index.astype",
+          "lineNumber": 147
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "dict",
+          "lineNumber": 149
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "zip",
+          "lineNumber": 149
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "dict",
+          "lineNumber": 150
+        },
+        {
+          "caller": "load_feature_aliases",
+          "callee": "zip",
+          "lineNumber": 150
+        },
+        {
+          "caller": "migrate_score_column",
+          "callee": "df.rename",
+          "lineNumber": 183
+        },
+        {
+          "caller": "migrate_score_column",
+          "callee": "df.rename",
+          "lineNumber": 185
+        },
+        {
+          "caller": "migrate_score_column",
+          "callee": "df.assign",
+          "lineNumber": 187
+        },
+        {
+          "caller": "migrate_score_column",
+          "callee": "float",
+          "lineNumber": 187
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "os.path.isfile",
+          "lineNumber": 266
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "FileNotFoundError",
+          "lineNumber": 267
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "pd.read_csv",
+          "lineNumber": 269
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "migrate_score_column",
+          "lineNumber": 275
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "df.drop",
+          "lineNumber": 284
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "range",
+          "lineNumber": 289
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "len",
+          "lineNumber": 289
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "humanize_feature_name",
+          "lineNumber": 292
+        },
+        {
+          "caller": "update_top_features_csv",
+          "callee": "df.to_csv",
+          "lineNumber": 296
+        },
+        {
+          "caller": "concat_features",
+          "callee": "len",
+          "lineNumber": 344
+        },
+        {
+          "caller": "concat_features",
+          "callee": "len",
+          "lineNumber": 344
+        },
+        {
+          "caller": "concat_features",
+          "callee": "ValueError",
+          "lineNumber": 346
+        },
+        {
+          "caller": "concat_features",
+          "callee": "pd.read_parquet",
+          "lineNumber": 350
+        },
+        {
+          "caller": "concat_features",
+          "callee": "pieces.extend",
+          "lineNumber": 351
+        },
+        {
+          "caller": "concat_features",
+          "callee": "pd.concat",
+          "lineNumber": 353
+        },
+        {
+          "caller": "concat_features",
+          "callee": "ValueError",
+          "lineNumber": 356
+        },
+        {
+          "caller": "concat_features",
+          "callee": "df.to_parquet",
+          "lineNumber": 358
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "pd.concat",
+          "lineNumber": 423
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "pd.read_csv",
+          "lineNumber": 424
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "ValueError",
+          "lineNumber": 429
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "combined_features_df.to_csv",
+          "lineNumber": 431
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "os.path.join",
+          "lineNumber": 432
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "combined_features_df.groupby(by=\"features\")\n            .agg(\n                frequency=(\"score\", \"count\"),\n                score_mean=(\"score\", \"mean\"),\n                score_std=(\"score\", \"std\"),\n            )\n            .sort_values",
+          "lineNumber": 437
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "combined_features_df.groupby(by=\"features\")\n            .agg",
+          "lineNumber": 437
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "combined_features_df.groupby",
+          "lineNumber": 437
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "range",
+          "lineNumber": 450
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "len",
+          "lineNumber": 450
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "humanize_feature_name",
+          "lineNumber": 453
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "combined_features_df.to_csv",
+          "lineNumber": 456
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "os.path.join",
+          "lineNumber": 457
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "combined_features_df.head",
+          "lineNumber": 461
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "top_n_features_df.to_csv",
+          "lineNumber": 462
+        },
+        {
+          "caller": "concat_significant_features",
+          "callee": "os.path.join",
+          "lineNumber": 463
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "ValueError",
+          "lineNumber": 539
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "load_select_features",
+          "lineNumber": 543
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "frames.append",
+          "lineNumber": 544
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "migrate_score_column",
+          "lineNumber": 544
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "pd.read_csv",
+          "lineNumber": 544
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "sorted",
+          "lineNumber": 546
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "set.intersection",
+          "lineNumber": 546
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "set",
+          "lineNumber": 546
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "ValueError",
+          "lineNumber": 548
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "df.index.intersection",
+          "lineNumber": 551
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "pd.concat(aligned).groupby(level=0).sum",
+          "lineNumber": 554
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "pd.concat(aligned).groupby",
+          "lineNumber": 554
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "pd.concat",
+          "lineNumber": 554
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "combined.sort_values",
+          "lineNumber": 555
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "range",
+          "lineNumber": 558
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "len",
+          "lineNumber": 558
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "humanize_feature_name",
+          "lineNumber": 560
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "os.path.join",
+          "lineNumber": 563
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "os.getcwd",
+          "lineNumber": 563
+        },
+        {
+          "caller": "find_common_features",
+          "callee": "combined.to_csv",
+          "lineNumber": 564
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "isinstance",
+          "lineNumber": 596
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "os.path.splitext(matrix)[1].lower",
+          "lineNumber": 599
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "os.path.splitext",
+          "lineNumber": 599
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "pd.read_parquet",
+          "lineNumber": 601
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "pd.read_csv",
+          "lineNumber": 603
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "ValueError",
+          "lineNumber": 605
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "isinstance",
+          "lineNumber": 610
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "pd.read_csv",
+          "lineNumber": 613
+        },
+        {
+          "caller": "_prepare_features_frame",
+          "callee": "to_datetime_index",
+          "lineNumber": 614
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "load_select_features",
+          "lineNumber": 707
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "_prepare_features_frame",
+          "lineNumber": 711
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "_prepare_features_frame",
+          "lineNumber": 714
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 718
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "ValueError",
+          "lineNumber": 719
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "training_df.index.max",
+          "lineNumber": 724
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 725
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 727
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "logger.info",
+          "lineNumber": 729
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 732
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "set",
+          "lineNumber": 737
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "set",
+          "lineNumber": 737
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "set",
+          "lineNumber": 738
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "set",
+          "lineNumber": 738
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "logger.info",
+          "lineNumber": 740
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 741
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 742
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 742
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "logger.info",
+          "lineNumber": 745
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 746
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 747
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 747
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "ValueError",
+          "lineNumber": 750
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "len",
+          "lineNumber": 752
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "pd.concat([training_df, prediction_df], axis=0).sort_index",
+          "lineNumber": 758
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "pd.concat",
+          "lineNumber": 758
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "int",
+          "lineNumber": 759
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "merged.index.duplicated(keep=\"first\").sum",
+          "lineNumber": 759
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "merged.index.duplicated",
+          "lineNumber": 759
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "merged.index.duplicated",
+          "lineNumber": 761
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "logger.info",
+          "lineNumber": 762
+        },
+        {
+          "caller": "merge_features_matrix",
+          "callee": "merged.to_parquet",
+          "lineNumber": 768
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 9,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/validation.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 238,
+      "nonEmptyLines": 188,
+      "functions": [
+        {
+          "name": "validate_random_state",
+          "startLine": 17,
+          "endLine": 31,
+          "params": [
+            "random_state"
+          ]
+        },
+        {
+          "name": "validate_date_ranges",
+          "startLine": 34,
+          "endLine": 75,
+          "params": [
+            "start_date",
+            "end_date"
+          ]
+        },
+        {
+          "name": "validate_window_step",
+          "startLine": 78,
+          "endLine": 115,
+          "params": [
+            "window_step",
+            "window_step_unit"
+          ]
+        },
+        {
+          "name": "check_sampling_consistency",
+          "startLine": 118,
+          "endLine": 198,
+          "params": [
+            "df",
+            "expected_freq",
+            "tolerance",
+            "verbose"
+          ]
+        },
+        {
+          "name": "validate_columns",
+          "startLine": 201,
+          "endLine": 238,
+          "params": [
+            "df",
+            "columns",
+            "exclude_columns"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validate_random_state",
+          "line": 17,
+          "isDefault": false
+        },
+        {
+          "name": "validate_date_ranges",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "validate_window_step",
+          "line": 78,
+          "isDefault": false
+        },
+        {
+          "name": "check_sampling_consistency",
+          "line": 118,
+          "isDefault": false
+        },
+        {
+          "name": "validate_columns",
+          "line": 201,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "validate_random_state",
+          "callee": "ValueError",
+          "lineNumber": 31
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "isinstance",
+          "lineNumber": 60
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "to_datetime",
+          "lineNumber": 61
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "isinstance",
+          "lineNumber": 62
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "to_datetime",
+          "lineNumber": 63
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "start_date.strftime",
+          "lineNumber": 65
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "end_date.strftime",
+          "lineNumber": 66
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "ValueError",
+          "lineNumber": 69
+        },
+        {
+          "caller": "validate_date_ranges",
+          "callee": "int",
+          "lineNumber": 73
+        },
+        {
+          "caller": "validate_window_step",
+          "callee": "isinstance",
+          "lineNumber": 104
+        },
+        {
+          "caller": "validate_window_step",
+          "callee": "TypeError",
+          "lineNumber": 105
+        },
+        {
+          "caller": "validate_window_step",
+          "callee": "isinstance",
+          "lineNumber": 106
+        },
+        {
+          "caller": "validate_window_step",
+          "callee": "TypeError",
+          "lineNumber": 107
+        },
+        {
+          "caller": "validate_window_step",
+          "callee": "ValueError",
+          "lineNumber": 111
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "len",
+          "lineNumber": 157
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "ValueError",
+          "lineNumber": 158
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "isinstance",
+          "lineNumber": 161
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "TypeError",
+          "lineNumber": 162
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "df.sort_index",
+          "lineNumber": 164
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "df.index.to_series().diff",
+          "lineNumber": 167
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "df.index.to_series",
+          "lineNumber": 167
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "pd.Timedelta",
+          "lineNumber": 168
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "pd.Timedelta",
+          "lineNumber": 169
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "len",
+          "lineNumber": 182
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "int",
+          "lineNumber": 188
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "(df.index[1] - df.index[0]).total_seconds",
+          "lineNumber": 188
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "logger.info",
+          "lineNumber": 191
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "len",
+          "lineNumber": 191
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "logger.info",
+          "lineNumber": 192
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "len",
+          "lineNumber": 192
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "logger.info",
+          "lineNumber": 193
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "len",
+          "lineNumber": 193
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "len",
+          "lineNumber": 194
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "logger.warning",
+          "lineNumber": 195
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "logger.warning",
+          "lineNumber": 196
+        },
+        {
+          "caller": "check_sampling_consistency",
+          "callee": "time_diffs[inconsistent_mask].describe",
+          "lineNumber": 196
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "df.columns.tolist",
+          "lineNumber": 233
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "ValueError",
+          "lineNumber": 234
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "df.head",
+          "lineNumber": 237
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 5,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    }
+  ]
+}

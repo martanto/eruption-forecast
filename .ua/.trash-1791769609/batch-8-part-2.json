@@ -1,0 +1,566 @@
+{
+ "nodes": [
+  {
+   "id": "document:wiki/Home.md",
+   "type": "document",
+   "name": "Home.md",
+   "filePath": "wiki/Home.md",
+   "summary": "Wiki landing page with a research-use-only disclaimer, navigation to all wiki pages, a summary of what the package does, a repository map and key links.",
+   "tags": [
+    "documentation",
+    "entry-point",
+    "overview",
+    "navigation"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "document:wiki/Output-Structure.md",
+   "type": "document",
+   "name": "Output-Structure.md",
+   "filePath": "wiki/Output-Structure.md",
+   "summary": "Full reference of the on-disk output tree per station directory, classifier/CV slug mappings, filename conventions, content-addressed cache layout, scenarios layout and a cheat sheet of where artifacts live.",
+   "tags": [
+    "documentation",
+    "output-layout",
+    "cache",
+    "filesystem"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "document:wiki/Pipeline-Walkthrough.md",
+   "type": "document",
+   "name": "Pipeline-Walkthrough.md",
+   "filePath": "wiki/Pipeline-Walkthrough.md",
+   "summary": "Walks through the two end-to-end workflows: the research pipeline in main.py using ForecastModel, and the multi-scenario sweep in forecast-scenario.py using ForecastModelScenario, with guidance on choosing between them.",
+   "tags": [
+    "documentation",
+    "pipeline",
+    "tutorial",
+    "scenarios"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "document:wiki/Prediction-Workflow.md",
+   "type": "document",
+   "name": "Prediction-Workflow.md",
+   "filePath": "wiki/Prediction-Workflow.md",
+   "summary": "Guide to PredictionModel: internal pipeline, accepted trained-model sources, forecast grid labelling, feature extraction and use_features_from scoping, forecast() outputs, caching and standalone use.",
+   "tags": [
+    "documentation",
+    "prediction",
+    "forecasting",
+    "workflow"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "document:wiki/Training-Workflow.md",
+   "type": "document",
+   "name": "Training-Workflow.md",
+   "filePath": "wiki/Training-Workflow.md",
+   "summary": "Guide to TrainingModel: label building, tsfresh feature pipeline and selection, multi-seed classifier fitting, classifier catalog, CV strategies, caching, outputs, standalone use and the experimental top_n_features sweep.",
+   "tags": [
+    "documentation",
+    "training",
+    "machine-learning",
+    "workflow"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "document:wiki/Usage.md",
+   "type": "document",
+   "name": "Usage.md",
+   "filePath": "wiki/Usage.md",
+   "summary": "Usage guide with a quick start, stage cheat sheet, annotated main.py example, how to access per-stage results, and common pipeline variants.",
+   "tags": [
+    "documentation",
+    "usage",
+    "quick-start",
+    "examples"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "document:wiki/Visualization.md",
+   "type": "document",
+   "name": "Visualization.md",
+   "filePath": "wiki/Visualization.md",
+   "summary": "Catalog of plotting utilities for tremor, features, forecasts, evaluation curves, label distributions and SHAP plots, plus the Nature-style default styling.",
+   "tags": [
+    "documentation",
+    "visualization",
+    "plotting",
+    "shap"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "document:wiki/Home.md",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/API-Reference.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Architecture.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Configuration.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Data-Sources.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Evaluation-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Explanation-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Feature-Count-Sweep.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Getting-Started.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Output-Structure.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Pipeline-Walkthrough.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Prediction-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Training-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Usage.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Home.md",
+   "target": "document:wiki/Visualization.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Output-Structure.md",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Output-Structure.md",
+   "target": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Output-Structure.md",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Output-Structure.md",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Output-Structure.md",
+   "target": "file:src/eruption_forecast/utils/ml.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Output-Structure.md",
+   "target": "document:wiki/API-Reference.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Pipeline-Walkthrough.md",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Pipeline-Walkthrough.md",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Pipeline-Walkthrough.md",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:Scenario",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Pipeline-Walkthrough.md",
+   "target": "document:wiki/Explanation-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Pipeline-Walkthrough.md",
+   "target": "document:wiki/Output-Structure.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Prediction-Workflow.md",
+   "target": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Prediction-Workflow.md",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Prediction-Workflow.md",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Prediction-Workflow.md",
+   "target": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Prediction-Workflow.md",
+   "target": "document:wiki/Configuration.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/label/dynamic_label_builder.py:DynamicLabelBuilder",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/features/feature_selector.py:FeatureSelector",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/model/classifier_model.py:ClassifierModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "document:wiki/Configuration.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "document:wiki/Evaluation-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "document:wiki/Feature-Count-Sweep.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Training-Workflow.md",
+   "target": "document:wiki/Prediction-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "document:wiki/API-Reference.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "document:wiki/Configuration.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "document:wiki/Data-Sources.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "document:wiki/Output-Structure.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "document:wiki/Pipeline-Walkthrough.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Usage.md",
+   "target": "document:wiki/Prediction-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/tremor_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/feature_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/forecast_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/label_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/explanation_plots.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "file:src/eruption_forecast/plots/styles.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "function:src/eruption_forecast/plots/explanation_plots.py:plot_classifier_waterfall",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "document:wiki/Evaluation-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:wiki/Visualization.md",
+   "target": "document:wiki/Explanation-Workflow.md",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  }
+ ]
+}

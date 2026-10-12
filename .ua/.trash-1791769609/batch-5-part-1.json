@@ -1,0 +1,796 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/features/constants.py",
+   "type": "file",
+   "name": "constants.py",
+   "filePath": "src/eruption_forecast/features/constants.py",
+   "summary": "Defines shared column-name constants (id, datetime, is_erupted), seconds-per-day, and the default set of tsfresh calculators excluded from feature extraction.",
+   "tags": [
+    "constants",
+    "configuration",
+    "tsfresh",
+    "features"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/features/features_builder.py",
+   "type": "file",
+   "name": "features_builder.py",
+   "filePath": "src/eruption_forecast/features/features_builder.py",
+   "summary": "Implements FeaturesBuilder, which runs per-column tsfresh feature extraction over windowed tremor matrices in training or prediction mode, caches Parquet outputs, and merges them into a unified features matrix.",
+   "tags": [
+    "feature-extraction",
+    "tsfresh",
+    "builder",
+    "caching",
+    "service"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "type": "file",
+   "name": "tremor_matrix_builder.py",
+   "filePath": "src/eruption_forecast/features/tremor_matrix_builder.py",
+   "summary": "Implements TremorMatrixBuilder, which slices tremor time-series into label-aligned windows, validates per-window sample counts, and concatenates them into a single id/datetime-indexed matrix (optionally saved per tremor column).",
+   "tags": [
+    "builder",
+    "windowing",
+    "time-series",
+    "data-preparation"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/base_model.py",
+   "type": "file",
+   "name": "base_model.py",
+   "filePath": "src/eruption_forecast/model/base_model.py",
+   "summary": "Abstract base for all stage models (training, prediction, evaluation, explanation) providing tremor loading, date/directory resolution, label and feature building, config saving, and a content-addressable cache with hashed identities and dual-mode save/load.",
+   "tags": [
+    "base-class",
+    "abstract",
+    "caching",
+    "persistence",
+    "model"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Uses abc.ABC with abstract methods, functools.cached_property, and hashing of canonicalized identity dicts for cache keys."
+  },
+  {
+   "id": "file:src/eruption_forecast/model/forecast_model.py",
+   "type": "file",
+   "name": "forecast_model.py",
+   "filePath": "src/eruption_forecast/model/forecast_model.py",
+   "summary": "Top-level ForecastModel orchestrator chaining calculate, train, predict, evaluate and explain stages, capturing each stage kwargs into a ForecastConfig for save_config/from_config/run replay with cache-aware stage reuse.",
+   "tags": [
+    "orchestrator",
+    "pipeline",
+    "entry-point",
+    "fluent-api",
+    "configuration"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Fluent method chaining where every stage method returns Self."
+  },
+  {
+   "id": "file:src/eruption_forecast/model/prediction_model.py",
+   "type": "file",
+   "name": "prediction_model.py",
+   "filePath": "src/eruption_forecast/model/prediction_model.py",
+   "summary": "Implements PredictionModel, which loads a trained ClassifierEnsemble, builds an unlabelled forecast window grid, extracts (or loads) features, computes per-classifier and consensus eruption probabilities, and plots the forecast with cache identity tied to the training hash.",
+   "tags": [
+    "prediction",
+    "model",
+    "forecasting",
+    "caching",
+    "visualization"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "type": "class",
+   "name": "FeaturesBuilder",
+   "filePath": "src/eruption_forecast/features/features_builder.py",
+   "lineRange": [
+    28,
+    923
+   ],
+   "summary": "Extracts tsfresh features per tremor column in training (label-filtered) or prediction mode, with feature exclusion, cached-matrix reuse and Parquet merging.",
+   "tags": [
+    "class",
+    "feature-extraction",
+    "tsfresh",
+    "builder"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "type": "class",
+   "name": "TremorMatrixBuilder",
+   "filePath": "src/eruption_forecast/features/tremor_matrix_builder.py",
+   "lineRange": [
+    19,
+    570
+   ],
+   "summary": "Builds windowed tremor matrices aligned with label windows, validating sample counts and saving combined and per-method matrices.",
+   "tags": [
+    "class",
+    "builder",
+    "windowing",
+    "time-series"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "class",
+   "name": "BaseModel",
+   "filePath": "src/eruption_forecast/model/base_model.py",
+   "lineRange": [
+    29,
+    783
+   ],
+   "summary": "Abstract stage-model base with tremor/date handling, label and feature extraction helpers, config snapshotting, and hash-based cache identity with save/load.",
+   "tags": [
+    "class",
+    "abstract",
+    "base-class",
+    "caching",
+    "persistence"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "class",
+   "name": "ForecastModel",
+   "filePath": "src/eruption_forecast/model/forecast_model.py",
+   "lineRange": [
+    29,
+    1376
+   ],
+   "summary": "Pipeline orchestrator exposing calculate/train/predict/evaluate/explain stage methods, config capture, from_config factory, and run() replay.",
+   "tags": [
+    "class",
+    "orchestrator",
+    "pipeline",
+    "fluent-api"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "class",
+   "name": "PredictionModel",
+   "filePath": "src/eruption_forecast/model/prediction_model.py",
+   "lineRange": [
+    21,
+    1200
+   ],
+   "summary": "Stage model that forecasts eruption probabilities over an unlabelled window grid using a trained ensemble, writes results tables, and plots the forecast.",
+   "tags": [
+    "class",
+    "prediction",
+    "model",
+    "forecasting"
+   ],
+   "complexity": "complex"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "file:src/eruption_forecast/features/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "file:src/eruption_forecast/utils/feature_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "file:src/eruption_forecast/utils/validation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "target": "file:src/eruption_forecast/features/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "target": "file:src/eruption_forecast/utils/validation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/features/features_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/tremor/tremor_data.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/utils/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/config/forecast_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/model/evaluation_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/model/explanation_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/model/prediction_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/model/training_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/tremor/calculate_tremor.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/tremor/tremor_data.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/config/prediction_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/model/base_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/plots/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/utils/feature_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/utils/validation.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "file:src/eruption_forecast/utils/window.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/features_builder.py",
+   "target": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "target": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "target": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/base_model.py",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model.py",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/prediction_model.py",
+   "target": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "class:src/eruption_forecast/tremor/tremor_data.py:TremorData",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "function:src/eruption_forecast/utils/validation.py:validate_date_ranges",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:sort_dates",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:to_datetime",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/base_model.py:BaseModel",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/tremor/calculate_tremor.py:CalculateTremor",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/tremor/tremor_data.py:TremorData",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:to_datetime",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:setup_nslc_directories",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "target": "class:src/eruption_forecast/config/forecast_config.py:ForecastConfig",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:normalize_dates",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:to_datetime_index",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/validation.py:check_sampling_consistency",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/feature_utils.py:load_select_features",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "class:src/eruption_forecast/ensemble/seed_ensemble.py:SeedEnsemble",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "class:src/eruption_forecast/config/prediction_config.py:PredictionConfig",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/window.py:construct_windows",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:save_figure",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "target": "function:src/eruption_forecast/utils/validation.py:validate_columns",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "target": "function:src/eruption_forecast/utils/feature_utils.py:concat_features",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/features_builder.py:FeaturesBuilder",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:resolve_output_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "target": "function:src/eruption_forecast/utils/validation.py:validate_columns",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:ensure_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/features/tremor_matrix_builder.py:TremorMatrixBuilder",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:resolve_output_dir",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

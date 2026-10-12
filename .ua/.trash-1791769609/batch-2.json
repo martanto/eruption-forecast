@@ -1,0 +1,1212 @@
+{
+ "nodes": [
+  {
+   "id": "file:src/eruption_forecast/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/__init__.py",
+   "summary": "Package root that sets up logging and re-exports the public API: tremor calculation, label builders, feature builders, stage models, ForecastModel, decorators and TelegramNotification.",
+   "tags": [
+    "entry-point",
+    "barrel",
+    "public-api"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/data_container.py",
+   "type": "file",
+   "name": "data_container.py",
+   "filePath": "src/eruption_forecast/data_container.py",
+   "summary": "Defines BaseDataContainer, the abstract base for TremorData and LabelData providing cached filename/basename/filetype properties and abstract date/data accessors.",
+   "tags": [
+    "data-model",
+    "abstract-base-class",
+    "container"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/decorators/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/decorators/__init__.py",
+   "summary": "Barrel for the decorators subpackage, re-exporting the notify and timer decorators.",
+   "tags": [
+    "barrel",
+    "decorator",
+    "entry-point"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/decorators/notify.py",
+   "type": "file",
+   "name": "notify.py",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "summary": "Implements the @notify decorator that times a wrapped task and sends MarkdownV2-formatted Telegram success or error messages including hostname, elapsed time and exception details.",
+   "tags": [
+    "decorator",
+    "notification",
+    "telegram",
+    "error-handling"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Uses a functools.wraps-based decorator factory pattern; Telegram MarkdownV2 requires escaping of reserved characters."
+  },
+  {
+   "id": "file:src/eruption_forecast/decorators/timer.py",
+   "type": "file",
+   "name": "timer.py",
+   "filePath": "src/eruption_forecast/decorators/timer.py",
+   "summary": "Provides the @timer decorator that logs elapsed wall-clock time of a function and optionally forwards it to Telegram.",
+   "tags": [
+    "decorator",
+    "timing",
+    "utility",
+    "telegram"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/constants.py",
+   "type": "file",
+   "name": "constants.py",
+   "filePath": "src/eruption_forecast/label/constants.py",
+   "summary": "Constants for label filename prefixes, minimum date range, valid window step units, date format and an example label filename used in validation messages.",
+   "tags": [
+    "constants",
+    "config",
+    "label"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/label_builder.py",
+   "type": "file",
+   "name": "label_builder.py",
+   "filePath": "src/eruption_forecast/label/label_builder.py",
+   "summary": "Implements LabelBuilder, which builds sliding-window binary eruption labels over a date range using day_to_forecast look-ahead, validates inputs, saves label CSVs and config snapshots, and plots label distributions.",
+   "tags": [
+    "label",
+    "builder",
+    "data-preparation",
+    "time-window",
+    "core"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/label_data.py",
+   "type": "file",
+   "name": "label_data.py",
+   "filePath": "src/eruption_forecast/label/label_data.py",
+   "summary": "Defines LabelData, a BaseDataContainer wrapper around a label CSV that parses window/forecast parameters from the filename and exposes cached dates, DataFrame and validation.",
+   "tags": [
+    "data-model",
+    "label",
+    "parser",
+    "container"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "type": "file",
+   "name": "forecast_model_scenario.py",
+   "filePath": "src/eruption_forecast/model/forecast_model_scenario.py",
+   "summary": "Defines the Scenario TypedDict and ForecastModelScenario, which runs tremor calculation once then loops train, predict, evaluate and explain over multiple scenarios with shared stage settings, a scenarios.json manifest and Telegram delivery of forecast plots.",
+   "tags": [
+    "orchestrator",
+    "scenario-sweep",
+    "pipeline",
+    "service",
+    "notification"
+   ],
+   "complexity": "complex",
+   "languageNotes": "Scenario uses TypedDict with NotRequired for optional keys, giving typed dict-based configuration."
+  },
+  {
+   "id": "file:src/eruption_forecast/notification/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/notification/__init__.py",
+   "summary": "Barrel for the notification subpackage, re-exporting TelegramNotification.",
+   "tags": [
+    "barrel",
+    "notification",
+    "entry-point"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/notification/telegram.py",
+   "type": "file",
+   "name": "telegram.py",
+   "filePath": "src/eruption_forecast/notification/telegram.py",
+   "summary": "Implements TelegramNotification, a fluent Telegram Bot API client for sending messages, documents, photos and media groups with credentials from arguments or .env, logging and swallowing network failures.",
+   "tags": [
+    "notification",
+    "telegram",
+    "api-client",
+    "service",
+    "fluent-interface"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/label_plots.py",
+   "type": "file",
+   "name": "label_plots.py",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "summary": "Plotting utilities for label class distributions, single and multi-scenario comparisons, with file-loading wrapper variants and TypedDict scenario entry specs.",
+   "tags": [
+    "visualization",
+    "plotting",
+    "label",
+    "matplotlib"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:_format_elapsed",
+   "type": "function",
+   "name": "_format_elapsed",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    27,
+    42
+   ],
+   "summary": "Formats an elapsed duration into a human-readable string for notification messages.",
+   "tags": [
+    "utility",
+    "formatting",
+    "time"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:_escape_md",
+   "type": "function",
+   "name": "_escape_md",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    45,
+    60
+   ],
+   "summary": "Escapes Telegram MarkdownV2 reserved characters in plain text.",
+   "tags": [
+    "utility",
+    "markdown",
+    "escaping"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:_escape_pre",
+   "type": "function",
+   "name": "_escape_pre",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    63,
+    77
+   ],
+   "summary": "Escapes text for safe inclusion in a MarkdownV2 pre-formatted code block.",
+   "tags": [
+    "utility",
+    "markdown",
+    "escaping"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:_error_message",
+   "type": "function",
+   "name": "_error_message",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    80,
+    111
+   ],
+   "summary": "Builds the MarkdownV2 error notification with task name, hostname, elapsed time and exception details.",
+   "tags": [
+    "notification",
+    "error-handling",
+    "formatting"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:_success_message",
+   "type": "function",
+   "name": "_success_message",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    114,
+    141
+   ],
+   "summary": "Builds the MarkdownV2 success notification with task name, hostname and elapsed time.",
+   "tags": [
+    "notification",
+    "formatting"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:_dispatch",
+   "type": "function",
+   "name": "_dispatch",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    144,
+    167
+   ],
+   "summary": "Sends a formatted message through TelegramNotification and logs failures without raising.",
+   "tags": [
+    "notification",
+    "telegram",
+    "dispatch"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "type": "function",
+   "name": "notify",
+   "filePath": "src/eruption_forecast/decorators/notify.py",
+   "lineRange": [
+    170,
+    244
+   ],
+   "summary": "Decorator factory that wraps a task, measures its runtime, and sends a Telegram success or error notification, re-raising exceptions.",
+   "tags": [
+    "decorator",
+    "notification",
+    "telegram"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/decorators/timer.py:timer",
+   "type": "function",
+   "name": "timer",
+   "filePath": "src/eruption_forecast/decorators/timer.py",
+   "lineRange": [
+    20,
+    68
+   ],
+   "summary": "Decorator factory that logs the elapsed wall-clock time of a function and optionally sends it to Telegram when send_to is 'telegram'.",
+   "tags": [
+    "decorator",
+    "timing",
+    "logging"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/data_container.py:BaseDataContainer",
+   "type": "class",
+   "name": "BaseDataContainer",
+   "filePath": "src/eruption_forecast/data_container.py",
+   "lineRange": [
+    10,
+    100
+   ],
+   "summary": "Abstract base class for CSV-backed data containers, providing cached filename, basename and filetype plus abstract start/end date strings and data accessors.",
+   "tags": [
+    "abstract-base-class",
+    "data-model",
+    "container"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "class",
+   "name": "LabelBuilder",
+   "filePath": "src/eruption_forecast/label/label_builder.py",
+   "lineRange": [
+    26,
+    1261
+   ],
+   "summary": "Builds sliding-window binary eruption labels from eruption dates and window parameters, with validation, directory setup, CSV persistence, config snapshotting, from_csv loading and distribution plotting.",
+   "tags": [
+    "label",
+    "builder",
+    "core",
+    "time-window"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/label/label_data.py:LabelData",
+   "type": "class",
+   "name": "LabelData",
+   "filePath": "src/eruption_forecast/label/label_data.py",
+   "lineRange": [
+    19,
+    302
+   ],
+   "summary": "Wraps a label CSV, parsing parameters such as window step and day_to_forecast from its filename and exposing validated, cached DataFrame and date properties.",
+   "tags": [
+    "data-model",
+    "label",
+    "parser"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/forecast_model_scenario.py:Scenario",
+   "type": "class",
+   "name": "Scenario",
+   "filePath": "src/eruption_forecast/model/forecast_model_scenario.py",
+   "lineRange": [
+    13,
+    56
+   ],
+   "summary": "TypedDict describing one scenario: name, description, training and prediction windows, prediction step and optional plot kwargs.",
+   "tags": [
+    "type-definition",
+    "config",
+    "scenario"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "class",
+   "name": "ForecastModelScenario",
+   "filePath": "src/eruption_forecast/model/forecast_model_scenario.py",
+   "lineRange": [
+    59,
+    927
+   ],
+   "summary": "Wraps a ForecastModel to calculate tremor once and run train/predict/evaluate/explain per scenario with shared stage kwargs, slugified output directories, a scenarios.json manifest and Telegram notifications.",
+   "tags": [
+    "orchestrator",
+    "scenario-sweep",
+    "pipeline",
+    "fluent-interface"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/notification/telegram.py:_escape_markdown_v2",
+   "type": "function",
+   "name": "_escape_markdown_v2",
+   "filePath": "src/eruption_forecast/notification/telegram.py",
+   "lineRange": [
+    41,
+    60
+   ],
+   "summary": "Escapes reserved Telegram MarkdownV2 characters in a text string.",
+   "tags": [
+    "utility",
+    "markdown",
+    "escaping"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "type": "class",
+   "name": "TelegramNotification",
+   "filePath": "src/eruption_forecast/notification/telegram.py",
+   "lineRange": [
+    63,
+    452
+   ],
+   "summary": "Fluent Telegram Bot API client with send_message, send_document, send_photo and send_media_group methods; resolves credentials from args or environment and chunks media groups.",
+   "tags": [
+    "notification",
+    "api-client",
+    "telegram",
+    "fluent-interface"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "class:src/eruption_forecast/plots/label_plots.py:LabelScenarioEntry",
+   "type": "class",
+   "name": "LabelScenarioEntry",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "lineRange": [
+    12,
+    22
+   ],
+   "summary": "TypedDict describing an in-memory label DataFrame entry for multi-scenario distribution comparison plots.",
+   "tags": [
+    "type-definition",
+    "plotting",
+    "label"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "class:src/eruption_forecast/plots/label_plots.py:LabelScenarioFileEntry",
+   "type": "class",
+   "name": "LabelScenarioFileEntry",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "lineRange": [
+    25,
+    36
+   ],
+   "summary": "TypedDict describing a label CSV file entry for file-based multi-scenario distribution comparison plots.",
+   "tags": [
+    "type-definition",
+    "plotting",
+    "label"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "function",
+   "name": "plot_label_distribution",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "lineRange": [
+    39,
+    129
+   ],
+   "summary": "Plots the eruption vs non-eruption label class distribution for a label DataFrame and optionally saves the figure.",
+   "tags": [
+    "visualization",
+    "label",
+    "matplotlib"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_from_file",
+   "type": "function",
+   "name": "plot_label_distribution_from_file",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "lineRange": [
+    132,
+    200
+   ],
+   "summary": "Loads a label CSV and delegates to plot_label_distribution.",
+   "tags": [
+    "visualization",
+    "file-loader",
+    "wrapper"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison",
+   "type": "function",
+   "name": "plot_label_distribution_comparison",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "lineRange": [
+    203,
+    349
+   ],
+   "summary": "Plots side-by-side label class distributions for several scenarios to compare class balance.",
+   "tags": [
+    "visualization",
+    "comparison",
+    "label"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison_from_files",
+   "type": "function",
+   "name": "plot_label_distribution_comparison_from_files",
+   "filePath": "src/eruption_forecast/plots/label_plots.py",
+   "lineRange": [
+    352,
+    437
+   ],
+   "summary": "Loads multiple label CSVs and delegates to plot_label_distribution_comparison.",
+   "tags": [
+    "visualization",
+    "file-loader",
+    "wrapper"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_format_elapsed",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_escape_md",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_escape_pre",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_error_message",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_success_message",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_dispatch",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/timer.py",
+   "target": "function:src/eruption_forecast/decorators/timer.py:timer",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/timer.py",
+   "target": "function:src/eruption_forecast/decorators/timer.py:timer",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/data_container.py",
+   "target": "class:src/eruption_forecast/data_container.py:BaseDataContainer",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/data_container.py",
+   "target": "class:src/eruption_forecast/data_container.py:BaseDataContainer",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_data.py",
+   "target": "class:src/eruption_forecast/label/label_data.py:LabelData",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_data.py",
+   "target": "class:src/eruption_forecast/label/label_data.py:LabelData",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:Scenario",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:Scenario",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/notification/telegram.py",
+   "target": "function:src/eruption_forecast/notification/telegram.py:_escape_markdown_v2",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/notification/telegram.py",
+   "target": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/notification/telegram.py",
+   "target": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "class:src/eruption_forecast/plots/label_plots.py:LabelScenarioEntry",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "class:src/eruption_forecast/plots/label_plots.py:LabelScenarioEntry",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "class:src/eruption_forecast/plots/label_plots.py:LabelScenarioFileEntry",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "class:src/eruption_forecast/plots/label_plots.py:LabelScenarioFileEntry",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_from_file",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_from_file",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison_from_files",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison_from_files",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/decorators/notify.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/decorators/timer.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/features/features_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/label/label_builder.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/label/label_data.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/model/evaluation_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/model/explanation_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/model/forecast_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/model/prediction_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/model/training_model.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/notification/telegram.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/tremor/calculate_tremor.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/__init__.py",
+   "target": "file:src/eruption_forecast/tremor/tremor_data.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/__init__.py",
+   "target": "file:src/eruption_forecast/decorators/notify.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/__init__.py",
+   "target": "file:src/eruption_forecast/decorators/timer.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/notify.py",
+   "target": "file:src/eruption_forecast/notification/telegram.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/decorators/timer.py",
+   "target": "file:src/eruption_forecast/notification/telegram.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/config/label_config.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/label/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/label/label_data.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/plots/label_plots.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_builder.py",
+   "target": "file:src/eruption_forecast/utils/window.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_data.py",
+   "target": "file:src/eruption_forecast/data_container.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_data.py",
+   "target": "file:src/eruption_forecast/label/constants.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_data.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/label/label_data.py",
+   "target": "file:src/eruption_forecast/utils/date_utils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "file:src/eruption_forecast/__init__.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "file:src/eruption_forecast/utils/formatting.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/notification/__init__.py",
+   "target": "file:src/eruption_forecast/notification/telegram.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "file:src/eruption_forecast/plots/label_plots.py",
+   "target": "file:src/eruption_forecast/utils/pathutils.py",
+   "type": "imports",
+   "direction": "forward",
+   "weight": 0.7
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_error_message",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_success_message",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_dispatch",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:_error_message",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_format_elapsed",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:_error_message",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_escape_md",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:_error_message",
+   "target": "function:src/eruption_forecast/decorators/notify.py:_escape_pre",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/notify.py:_dispatch",
+   "target": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/decorators/timer.py:timer",
+   "target": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "target": "function:src/eruption_forecast/notification/telegram.py:_escape_markdown_v2",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/label_data.py:LabelData",
+   "target": "class:src/eruption_forecast/data_container.py:BaseDataContainer",
+   "type": "inherits",
+   "direction": "forward",
+   "weight": 0.9
+  },
+  {
+   "source": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "target": "class:src/eruption_forecast/label/label_data.py:LabelData",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "target": "function:src/eruption_forecast/utils/window.py:construct_windows",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/label_builder.py:LabelBuilder",
+   "target": "class:src/eruption_forecast/config/label_config.py:LabelConfig",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/label/label_data.py:LabelData",
+   "target": "function:src/eruption_forecast/utils/date_utils.py:parse_label_filename",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_from_file",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison_from_files",
+   "target": "function:src/eruption_forecast/plots/label_plots.py:plot_label_distribution_comparison",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "target": "class:src/eruption_forecast/notification/telegram.py:TelegramNotification",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "target": "function:src/eruption_forecast/utils/pathutils.py:setup_nslc_directories",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "target": "function:src/eruption_forecast/utils/formatting.py:slugify",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}

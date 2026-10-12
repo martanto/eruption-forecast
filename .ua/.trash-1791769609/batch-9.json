@@ -1,0 +1,263 @@
+{
+ "nodes": [
+  {
+   "id": "document:README.md",
+   "type": "document",
+   "name": "README.md",
+   "filePath": "README.md",
+   "summary": "Primary project documentation for eruption-forecast covering features, package architecture, the CalculateTremor-to-ExplanationModel pipeline, SDS/FDSN data sources, quick start, common patterns (scenario sweeps, cache reuse, config replay), supported classifiers, output directory layout, and development workflow.",
+   "tags": [
+    "documentation",
+    "entry-point",
+    "overview",
+    "pipeline",
+    "getting-started"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:forecast-scenario.py",
+   "type": "file",
+   "name": "forecast-scenario.py",
+   "filePath": "forecast-scenario.py",
+   "summary": "End-to-end script that defines a list of Scenario dicts and runs a ForecastModelScenario sweep: tremor calculation once, then shared training/prediction/evaluation/explanation settings looped over each train/forecast date split.",
+   "tags": [
+    "entry-point",
+    "script",
+    "scenario-sweep",
+    "pipeline"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:forecast-scenario.py:main",
+   "type": "function",
+   "name": "main",
+   "filePath": "forecast-scenario.py",
+   "lineRange": [
+    12,
+    122
+   ],
+   "summary": "Builds a ForecastModelScenario for a station, calculates tremor from an SDS archive, configures shared training, prediction, evaluation and explanation stages, and runs all scenarios.",
+   "tags": [
+    "entry-point",
+    "orchestration",
+    "scenario-sweep"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:main.py",
+   "type": "file",
+   "name": "main.py",
+   "filePath": "main.py",
+   "summary": "Reference end-to-end pipeline script that chains ForecastModel calculate, train, predict, evaluate and explain over a list of known eruption dates, wrapped with timer and Telegram notify decorators.",
+   "tags": [
+    "entry-point",
+    "script",
+    "pipeline",
+    "example"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:main.py:main",
+   "type": "function",
+   "name": "main",
+   "filePath": "main.py",
+   "lineRange": [
+    20,
+    107
+   ],
+   "summary": "Runs the complete ForecastModel pipeline (tremor calculation from SDS, multi-classifier training, forecasting, evaluation and SHAP explanation), decorated with @timer and @notify.",
+   "tags": [
+    "entry-point",
+    "orchestration",
+    "pipeline"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/label/__init__.py",
+   "summary": "Empty package marker for the label subpackage (LabelBuilder, DynamicLabelBuilder, LabelData); no re-exports.",
+   "tags": [
+    "package-marker",
+    "label",
+    "python-package"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/__init__.py",
+   "type": "file",
+   "name": "__init__.py",
+   "filePath": "src/eruption_forecast/model/__init__.py",
+   "summary": "Empty package marker for the model subpackage containing the ForecastModel orchestrator and stage models; no re-exports, so classes are imported from their modules directly.",
+   "tags": [
+    "package-marker",
+    "model",
+    "python-package"
+   ],
+   "complexity": "simple"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:forecast-scenario.py",
+   "target": "function:forecast-scenario.py:main",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:main.py",
+   "target": "function:main.py:main",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1.0
+  },
+  {
+   "source": "file:forecast-scenario.py",
+   "target": "file:src/eruption_forecast/model/forecast_model_scenario.py",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:main.py",
+   "target": "file:src/eruption_forecast/model/forecast_model.py",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:main.py",
+   "target": "file:src/eruption_forecast/decorators/timer.py",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:main.py",
+   "target": "file:src/eruption_forecast/decorators/notify.py",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "function:main.py:main",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:main.py:main",
+   "target": "function:src/eruption_forecast/decorators/timer.py:timer",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:main.py:main",
+   "target": "function:src/eruption_forecast/decorators/notify.py:notify",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:forecast-scenario.py:main",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/model/forecast_model.py:ForecastModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/model/forecast_model_scenario.py:ForecastModelScenario",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/tremor/calculate_tremor.py:CalculateTremor",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/model/training_model.py:TrainingModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/model/prediction_model.py:PredictionModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/model/evaluation_model.py:EvaluationModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/model/explanation_model.py:ExplanationModel",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/ensemble/classifier_ensemble.py:ClassifierEnsemble",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/sources/sds.py:SDS",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "class:src/eruption_forecast/sources/fdsn.py:FDSN",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "file:main.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "document:README.md",
+   "target": "file:src/eruption_forecast/logger.py",
+   "type": "documents",
+   "direction": "forward",
+   "weight": 0.5
+  }
+ ]
+}

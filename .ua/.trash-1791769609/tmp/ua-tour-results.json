@@ -1,0 +1,1133 @@
+{
+ "scriptCompleted": true,
+ "entryPointCandidates": [
+  {
+   "id": "document:README.md",
+   "score": 5,
+   "name": "README.md",
+   "type": "document",
+   "summary": "Primary project documentation for eruption-forecast covering features, package architecture, the CalculateTremor-to-ExplanationModel pipeline, SDS/FDSN data sources, quick start, common patterns (scenario sweeps, cache reuse, config replay), supported classifiers, output directory layout, and development workflow."
+  },
+  {
+   "id": "file:main.py",
+   "score": 5,
+   "name": "main.py",
+   "type": "file",
+   "summary": "Reference end-to-end pipeline script that chains ForecastModel calculate, train, predict, evaluate and explain over a list of known eruption dates, wrapped with timer and Telegram notify decorators."
+  },
+  {
+   "id": "file:src/eruption_forecast/__init__.py",
+   "score": 2,
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package root that sets up logging and re-exports the public API: tremor calculation, label builders, feature builders, stage models, ForecastModel, decorators and TelegramNotification."
+  },
+  {
+   "id": "file:forecast-scenario.py",
+   "score": 2,
+   "name": "forecast-scenario.py",
+   "type": "file",
+   "summary": "End-to-end script that defines a list of Scenario dicts and runs a ForecastModelScenario sweep: tremor calculation once, then shared training/prediction/evaluation/explanation settings looped over each train/forecast date split."
+  },
+  {
+   "id": "file:src/eruption_forecast/dataclass/__init__.py",
+   "score": 1,
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package barrel for the dataclass subpackage, re-exporting StationData, SHAP explanation payloads and classifier-ensemble summary dataclasses."
+  }
+ ],
+ "fanInRanking": [
+  {
+   "id": "file:src/eruption_forecast/logger.py",
+   "fanIn": 41,
+   "name": "logger.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/pathutils.py",
+   "fanIn": 35,
+   "name": "pathutils.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/date_utils.py",
+   "fanIn": 19,
+   "name": "date_utils.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "fanIn": 15,
+   "name": "classifier_ensemble.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/formatting.py",
+   "fanIn": 12,
+   "name": "formatting.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/forecast_model.py",
+   "fanIn": 12,
+   "name": "forecast_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/training_model.py",
+   "fanIn": 11,
+   "name": "training_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/prediction_model.py",
+   "fanIn": 11,
+   "name": "prediction_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/ml.py",
+   "fanIn": 10,
+   "name": "ml.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/validation.py",
+   "fanIn": 10,
+   "name": "validation.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "fanIn": 9,
+   "name": "seed_ensemble.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/constants.py",
+   "fanIn": 9,
+   "name": "constants.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/base_config.py",
+   "fanIn": 8,
+   "name": "base_config.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/evaluation_model.py",
+   "fanIn": 8,
+   "name": "evaluation_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/plots/styles.py",
+   "fanIn": 8,
+   "name": "styles.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/explanation_model.py",
+   "fanIn": 7,
+   "name": "explanation_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/label_builder.py",
+   "fanIn": 7,
+   "name": "label_builder.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/notification/telegram.py",
+   "fanIn": 7,
+   "name": "telegram.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/tremor/calculate_tremor.py",
+   "fanIn": 7,
+   "name": "calculate_tremor.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/utils/window.py",
+   "fanIn": 7,
+   "name": "window.py"
+  }
+ ],
+ "fanOutRanking": [
+  {
+   "id": "document:wiki/API-Reference.md",
+   "fanOut": 28,
+   "name": "API-Reference.md"
+  },
+  {
+   "id": "document:wiki/Architecture.md",
+   "fanOut": 23,
+   "name": "Architecture.md"
+  },
+  {
+   "id": "file:src/eruption_forecast/__init__.py",
+   "fanOut": 16,
+   "name": "__init__.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/training_model.py",
+   "fanOut": 16,
+   "name": "training_model.py"
+  },
+  {
+   "id": "document:wiki/Configuration.md",
+   "fanOut": 15,
+   "name": "Configuration.md"
+  },
+  {
+   "id": "document:wiki/Home.md",
+   "fanOut": 15,
+   "name": "Home.md"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/evaluation_model.py",
+   "fanOut": 13,
+   "name": "evaluation_model.py"
+  },
+  {
+   "id": "document:wiki/Training-Workflow.md",
+   "fanOut": 13,
+   "name": "Training-Workflow.md"
+  },
+  {
+   "id": "file:src/eruption_forecast/tremor/calculate_tremor.py",
+   "fanOut": 12,
+   "name": "calculate_tremor.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/forecast_model.py",
+   "fanOut": 12,
+   "name": "forecast_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/prediction_model.py",
+   "fanOut": 12,
+   "name": "prediction_model.py"
+  },
+  {
+   "id": "document:README.md",
+   "fanOut": 12,
+   "name": "README.md"
+  },
+  {
+   "id": "document:wiki/Usage.md",
+   "fanOut": 11,
+   "name": "Usage.md"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/explanation_model.py",
+   "fanOut": 10,
+   "name": "explanation_model.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/label/label_builder.py",
+   "fanOut": 9,
+   "name": "label_builder.py"
+  },
+  {
+   "id": "file:src/eruption_forecast/model/base_model.py",
+   "fanOut": 9,
+   "name": "base_model.py"
+  },
+  {
+   "id": "document:wiki/Visualization.md",
+   "fanOut": 9,
+   "name": "Visualization.md"
+  },
+  {
+   "id": "file:src/eruption_forecast/config/__init__.py",
+   "fanOut": 8,
+   "name": "__init__.py"
+  },
+  {
+   "id": "document:wiki/Evaluation-Workflow.md",
+   "fanOut": 8,
+   "name": "Evaluation-Workflow.md"
+  },
+  {
+   "id": "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "fanOut": 7,
+   "name": "explainer_ensemble.py"
+  }
+ ],
+ "bfsTraversal": {
+  "startNode": "file:main.py",
+  "order": [
+   "file:main.py",
+   "file:src/eruption_forecast/model/forecast_model.py",
+   "file:src/eruption_forecast/decorators/timer.py",
+   "file:src/eruption_forecast/decorators/notify.py",
+   "file:src/eruption_forecast/decorators/__init__.py",
+   "file:src/eruption_forecast/config/forecast_config.py",
+   "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+   "file:src/eruption_forecast/logger.py",
+   "file:src/eruption_forecast/model/evaluation_model.py",
+   "file:src/eruption_forecast/model/explanation_model.py",
+   "file:src/eruption_forecast/model/prediction_model.py",
+   "file:src/eruption_forecast/model/training_model.py",
+   "file:src/eruption_forecast/tremor/calculate_tremor.py",
+   "file:src/eruption_forecast/tremor/tremor_data.py",
+   "file:src/eruption_forecast/utils/date_utils.py",
+   "file:src/eruption_forecast/utils/formatting.py",
+   "file:src/eruption_forecast/utils/pathutils.py",
+   "file:src/eruption_forecast/notification/telegram.py",
+   "file:src/eruption_forecast/config/base_config.py",
+   "file:src/eruption_forecast/ensemble/base_ensemble.py",
+   "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+   "file:src/eruption_forecast/utils/array.py",
+   "file:src/eruption_forecast/config/evaluation_config.py",
+   "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+   "file:src/eruption_forecast/label/label_builder.py",
+   "file:src/eruption_forecast/model/base_model.py",
+   "file:src/eruption_forecast/model/classifier_comparator.py",
+   "file:src/eruption_forecast/plots/__init__.py",
+   "file:src/eruption_forecast/plots/label_plots.py",
+   "file:src/eruption_forecast/config/explanation_config.py",
+   "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+   "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+   "file:src/eruption_forecast/config/prediction_config.py",
+   "file:src/eruption_forecast/utils/feature_utils.py",
+   "file:src/eruption_forecast/utils/validation.py",
+   "file:src/eruption_forecast/utils/window.py",
+   "file:src/eruption_forecast/config/training_config.py",
+   "file:src/eruption_forecast/features/feature_selector.py",
+   "file:src/eruption_forecast/label/dynamic_label_builder.py",
+   "file:src/eruption_forecast/model/classifier_model.py",
+   "file:src/eruption_forecast/utils/dataframe.py",
+   "file:src/eruption_forecast/utils/ml.py",
+   "file:src/eruption_forecast/__init__.py",
+   "file:src/eruption_forecast/config/constants.py",
+   "file:src/eruption_forecast/plots/tremor_plots.py",
+   "file:src/eruption_forecast/sources/fdsn.py",
+   "file:src/eruption_forecast/sources/sds.py",
+   "file:src/eruption_forecast/tremor/rsam.py",
+   "file:src/eruption_forecast/tremor/shannon_entropy.py",
+   "file:src/eruption_forecast/config/__init__.py",
+   "file:src/eruption_forecast/data_container.py",
+   "file:src/eruption_forecast/plots/evaluation_plots.py",
+   "file:src/eruption_forecast/config/label_config.py",
+   "file:src/eruption_forecast/label/constants.py",
+   "file:src/eruption_forecast/label/label_data.py",
+   "file:src/eruption_forecast/features/features_builder.py",
+   "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+   "file:src/eruption_forecast/utils/__init__.py",
+   "file:src/eruption_forecast/plots/styles.py",
+   "file:src/eruption_forecast/plots/feature_plots.py",
+   "file:src/eruption_forecast/plots/forecast_plots.py",
+   "file:src/eruption_forecast/plots/explanation_plots.py",
+   "file:src/eruption_forecast/model/constants.py",
+   "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+   "file:src/eruption_forecast/sources/base.py",
+   "file:src/eruption_forecast/features/constants.py",
+   "file:src/eruption_forecast/dataclass/__init__.py",
+   "file:src/eruption_forecast/ensemble/__init__.py",
+   "file:src/eruption_forecast/dataclass/station_data.py"
+  ],
+  "depthMap": {
+   "file:main.py": 0,
+   "file:src/eruption_forecast/model/forecast_model.py": 1,
+   "file:src/eruption_forecast/decorators/timer.py": 1,
+   "file:src/eruption_forecast/decorators/notify.py": 1,
+   "file:src/eruption_forecast/decorators/__init__.py": 1,
+   "file:src/eruption_forecast/config/forecast_config.py": 2,
+   "file:src/eruption_forecast/ensemble/classifier_ensemble.py": 2,
+   "file:src/eruption_forecast/logger.py": 2,
+   "file:src/eruption_forecast/model/evaluation_model.py": 2,
+   "file:src/eruption_forecast/model/explanation_model.py": 2,
+   "file:src/eruption_forecast/model/prediction_model.py": 2,
+   "file:src/eruption_forecast/model/training_model.py": 2,
+   "file:src/eruption_forecast/tremor/calculate_tremor.py": 2,
+   "file:src/eruption_forecast/tremor/tremor_data.py": 2,
+   "file:src/eruption_forecast/utils/date_utils.py": 2,
+   "file:src/eruption_forecast/utils/formatting.py": 2,
+   "file:src/eruption_forecast/utils/pathutils.py": 2,
+   "file:src/eruption_forecast/notification/telegram.py": 2,
+   "file:src/eruption_forecast/config/base_config.py": 3,
+   "file:src/eruption_forecast/ensemble/base_ensemble.py": 3,
+   "file:src/eruption_forecast/ensemble/seed_ensemble.py": 3,
+   "file:src/eruption_forecast/utils/array.py": 3,
+   "file:src/eruption_forecast/config/evaluation_config.py": 3,
+   "file:src/eruption_forecast/ensemble/metrics_ensemble.py": 3,
+   "file:src/eruption_forecast/label/label_builder.py": 3,
+   "file:src/eruption_forecast/model/base_model.py": 3,
+   "file:src/eruption_forecast/model/classifier_comparator.py": 3,
+   "file:src/eruption_forecast/plots/__init__.py": 3,
+   "file:src/eruption_forecast/plots/label_plots.py": 3,
+   "file:src/eruption_forecast/config/explanation_config.py": 3,
+   "file:src/eruption_forecast/dataclass/classifier_explanation.py": 3,
+   "file:src/eruption_forecast/ensemble/explainer_ensemble.py": 3,
+   "file:src/eruption_forecast/config/prediction_config.py": 3,
+   "file:src/eruption_forecast/utils/feature_utils.py": 3,
+   "file:src/eruption_forecast/utils/validation.py": 3,
+   "file:src/eruption_forecast/utils/window.py": 3,
+   "file:src/eruption_forecast/config/training_config.py": 3,
+   "file:src/eruption_forecast/features/feature_selector.py": 3,
+   "file:src/eruption_forecast/label/dynamic_label_builder.py": 3,
+   "file:src/eruption_forecast/model/classifier_model.py": 3,
+   "file:src/eruption_forecast/utils/dataframe.py": 3,
+   "file:src/eruption_forecast/utils/ml.py": 3,
+   "file:src/eruption_forecast/__init__.py": 3,
+   "file:src/eruption_forecast/config/constants.py": 3,
+   "file:src/eruption_forecast/plots/tremor_plots.py": 3,
+   "file:src/eruption_forecast/sources/fdsn.py": 3,
+   "file:src/eruption_forecast/sources/sds.py": 3,
+   "file:src/eruption_forecast/tremor/rsam.py": 3,
+   "file:src/eruption_forecast/tremor/shannon_entropy.py": 3,
+   "file:src/eruption_forecast/config/__init__.py": 3,
+   "file:src/eruption_forecast/data_container.py": 3,
+   "file:src/eruption_forecast/plots/evaluation_plots.py": 4,
+   "file:src/eruption_forecast/config/label_config.py": 4,
+   "file:src/eruption_forecast/label/constants.py": 4,
+   "file:src/eruption_forecast/label/label_data.py": 4,
+   "file:src/eruption_forecast/features/features_builder.py": 4,
+   "file:src/eruption_forecast/features/tremor_matrix_builder.py": 4,
+   "file:src/eruption_forecast/utils/__init__.py": 4,
+   "file:src/eruption_forecast/plots/styles.py": 4,
+   "file:src/eruption_forecast/plots/feature_plots.py": 4,
+   "file:src/eruption_forecast/plots/forecast_plots.py": 4,
+   "file:src/eruption_forecast/plots/explanation_plots.py": 4,
+   "file:src/eruption_forecast/model/constants.py": 4,
+   "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py": 4,
+   "file:src/eruption_forecast/sources/base.py": 4,
+   "file:src/eruption_forecast/features/constants.py": 5,
+   "file:src/eruption_forecast/dataclass/__init__.py": 5,
+   "file:src/eruption_forecast/ensemble/__init__.py": 5,
+   "file:src/eruption_forecast/dataclass/station_data.py": 6
+  },
+  "byDepth": {
+   "0": [
+    "file:main.py"
+   ],
+   "1": [
+    "file:src/eruption_forecast/model/forecast_model.py",
+    "file:src/eruption_forecast/decorators/timer.py",
+    "file:src/eruption_forecast/decorators/notify.py",
+    "file:src/eruption_forecast/decorators/__init__.py"
+   ],
+   "2": [
+    "file:src/eruption_forecast/config/forecast_config.py",
+    "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+    "file:src/eruption_forecast/logger.py",
+    "file:src/eruption_forecast/model/evaluation_model.py",
+    "file:src/eruption_forecast/model/explanation_model.py",
+    "file:src/eruption_forecast/model/prediction_model.py",
+    "file:src/eruption_forecast/model/training_model.py",
+    "file:src/eruption_forecast/tremor/calculate_tremor.py",
+    "file:src/eruption_forecast/tremor/tremor_data.py",
+    "file:src/eruption_forecast/utils/date_utils.py",
+    "file:src/eruption_forecast/utils/formatting.py",
+    "file:src/eruption_forecast/utils/pathutils.py",
+    "file:src/eruption_forecast/notification/telegram.py"
+   ],
+   "3": [
+    "file:src/eruption_forecast/config/base_config.py",
+    "file:src/eruption_forecast/ensemble/base_ensemble.py",
+    "file:src/eruption_forecast/ensemble/seed_ensemble.py",
+    "file:src/eruption_forecast/utils/array.py",
+    "file:src/eruption_forecast/config/evaluation_config.py",
+    "file:src/eruption_forecast/ensemble/metrics_ensemble.py",
+    "file:src/eruption_forecast/label/label_builder.py",
+    "file:src/eruption_forecast/model/base_model.py",
+    "file:src/eruption_forecast/model/classifier_comparator.py",
+    "file:src/eruption_forecast/plots/__init__.py",
+    "file:src/eruption_forecast/plots/label_plots.py",
+    "file:src/eruption_forecast/config/explanation_config.py",
+    "file:src/eruption_forecast/dataclass/classifier_explanation.py",
+    "file:src/eruption_forecast/ensemble/explainer_ensemble.py",
+    "file:src/eruption_forecast/config/prediction_config.py",
+    "file:src/eruption_forecast/utils/feature_utils.py",
+    "file:src/eruption_forecast/utils/validation.py",
+    "file:src/eruption_forecast/utils/window.py",
+    "file:src/eruption_forecast/config/training_config.py",
+    "file:src/eruption_forecast/features/feature_selector.py",
+    "file:src/eruption_forecast/label/dynamic_label_builder.py",
+    "file:src/eruption_forecast/model/classifier_model.py",
+    "file:src/eruption_forecast/utils/dataframe.py",
+    "file:src/eruption_forecast/utils/ml.py",
+    "file:src/eruption_forecast/__init__.py",
+    "file:src/eruption_forecast/config/constants.py",
+    "file:src/eruption_forecast/plots/tremor_plots.py",
+    "file:src/eruption_forecast/sources/fdsn.py",
+    "file:src/eruption_forecast/sources/sds.py",
+    "file:src/eruption_forecast/tremor/rsam.py",
+    "file:src/eruption_forecast/tremor/shannon_entropy.py",
+    "file:src/eruption_forecast/config/__init__.py",
+    "file:src/eruption_forecast/data_container.py"
+   ],
+   "4": [
+    "file:src/eruption_forecast/plots/evaluation_plots.py",
+    "file:src/eruption_forecast/config/label_config.py",
+    "file:src/eruption_forecast/label/constants.py",
+    "file:src/eruption_forecast/label/label_data.py",
+    "file:src/eruption_forecast/features/features_builder.py",
+    "file:src/eruption_forecast/features/tremor_matrix_builder.py",
+    "file:src/eruption_forecast/utils/__init__.py",
+    "file:src/eruption_forecast/plots/styles.py",
+    "file:src/eruption_forecast/plots/feature_plots.py",
+    "file:src/eruption_forecast/plots/forecast_plots.py",
+    "file:src/eruption_forecast/plots/explanation_plots.py",
+    "file:src/eruption_forecast/model/constants.py",
+    "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py",
+    "file:src/eruption_forecast/sources/base.py"
+   ],
+   "5": [
+    "file:src/eruption_forecast/features/constants.py",
+    "file:src/eruption_forecast/dataclass/__init__.py",
+    "file:src/eruption_forecast/ensemble/__init__.py"
+   ],
+   "6": [
+    "file:src/eruption_forecast/dataclass/station_data.py"
+   ]
+  }
+ },
+ "nonCodeFiles": {
+  "documentation": [
+   {
+    "id": "document:wiki/API-Reference.md",
+    "name": "API-Reference.md",
+    "type": "document",
+    "summary": "Exhaustive API reference for the public classes: ForecastModel, the four stage models, ensembles, SHAP dataclasses, StationData, CalculateTremor, label/feature builders, FeatureSelector, FeatureCountSweep and SeedEnsemble, with constructor signatures and method tables."
+   },
+   {
+    "id": "document:wiki/Architecture.md",
+    "name": "Architecture.md",
+    "type": "document",
+    "summary": "Architecture guide covering package layout, pipeline overview, component details, model class relationships (BaseModel hierarchy and ensemble stack), end-to-end data flow and the utility-module catalog."
+   },
+   {
+    "id": "document:wiki/Configuration.md",
+    "name": "Configuration.md",
+    "type": "document",
+    "summary": "Explains the ForecastConfig lifecycle and YAML schema, standalone per-stage configs, config.example.yaml, Telegram notification setup, logging categories, and where config files land on disk."
+   },
+   {
+    "id": "document:wiki/Data-Sources.md",
+    "name": "Data-Sources.md",
+    "type": "document",
+    "summary": "Describes the SeismicDataSource ABC and its SDS (local SeisComP archive) and FDSN (web service with local SDS cache) implementations, compares them, and lists the frequency bands CalculateTremor reads."
+   },
+   {
+    "id": "document:wiki/Evaluation-Workflow.md",
+    "name": "Evaluation-Workflow.md",
+    "type": "document",
+    "summary": "Guide to EvaluationModel: training-reuse vs prediction-reuse modes, how evaluate() drives MetricsEnsemble, cross-classifier comparison via ClassifierComparator, outputs, cache semantics and standalone use."
+   },
+   {
+    "id": "document:wiki/Explanation-Workflow.md",
+    "name": "Explanation-Workflow.md",
+    "type": "document",
+    "summary": "Guide to ExplanationModel and ExplainerEnsemble: the TreeExplainer-only constraint, operating modes, explain()/plot() phases, SHAP dataclass composition, plot inventory, per-eruption waterfall selection, outputs and caching."
+   },
+   {
+    "id": "document:wiki/Feature-Count-Sweep.md",
+    "name": "Feature-Count-Sweep.md",
+    "type": "document",
+    "summary": "Documents the experimental FeatureCountSweep / sweep_feature_count post-hoc recommender for top_n_features, including scoring modes, estimator_mode, picking N*, forecast-mode wiring, outputs and reference API."
+   },
+   {
+    "id": "document:wiki/Getting-Started.md",
+    "name": "Getting-Started.md",
+    "type": "document",
+    "summary": "Installation and setup guide covering prerequisites, uv-based install of runtime and dev dependencies, development commands, optional Telegram notification setup and next steps."
+   },
+   {
+    "id": "document:wiki/Home.md",
+    "name": "Home.md",
+    "type": "document",
+    "summary": "Wiki landing page with a research-use-only disclaimer, navigation to all wiki pages, a summary of what the package does, a repository map and key links."
+   },
+   {
+    "id": "document:wiki/Output-Structure.md",
+    "name": "Output-Structure.md",
+    "type": "document",
+    "summary": "Full reference of the on-disk output tree per station directory, classifier/CV slug mappings, filename conventions, content-addressed cache layout, scenarios layout and a cheat sheet of where artifacts live."
+   },
+   {
+    "id": "document:wiki/Pipeline-Walkthrough.md",
+    "name": "Pipeline-Walkthrough.md",
+    "type": "document",
+    "summary": "Walks through the two end-to-end workflows: the research pipeline in main.py using ForecastModel, and the multi-scenario sweep in forecast-scenario.py using ForecastModelScenario, with guidance on choosing between them."
+   },
+   {
+    "id": "document:wiki/Prediction-Workflow.md",
+    "name": "Prediction-Workflow.md",
+    "type": "document",
+    "summary": "Guide to PredictionModel: internal pipeline, accepted trained-model sources, forecast grid labelling, feature extraction and use_features_from scoping, forecast() outputs, caching and standalone use."
+   },
+   {
+    "id": "document:wiki/Training-Workflow.md",
+    "name": "Training-Workflow.md",
+    "type": "document",
+    "summary": "Guide to TrainingModel: label building, tsfresh feature pipeline and selection, multi-seed classifier fitting, classifier catalog, CV strategies, caching, outputs, standalone use and the experimental top_n_features sweep."
+   },
+   {
+    "id": "document:wiki/Usage.md",
+    "name": "Usage.md",
+    "type": "document",
+    "summary": "Usage guide with a quick start, stage cheat sheet, annotated main.py example, how to access per-stage results, and common pipeline variants."
+   },
+   {
+    "id": "document:wiki/Visualization.md",
+    "name": "Visualization.md",
+    "type": "document",
+    "summary": "Catalog of plotting utilities for tremor, features, forecasts, evaluation curves, label distributions and SHAP plots, plus the Nature-style default styling."
+   },
+   {
+    "id": "document:README.md",
+    "name": "README.md",
+    "type": "document",
+    "summary": "Primary project documentation for eruption-forecast covering features, package architecture, the CalculateTremor-to-ExplanationModel pipeline, SDS/FDSN data sources, quick start, common patterns (scenario sweeps, cache reuse, config replay), supported classifiers, output directory layout, and development workflow."
+   }
+  ],
+  "infrastructure": [],
+  "data": [],
+  "config": []
+ },
+ "clusters": [
+  {
+   "nodes": [
+    "file:src/eruption_forecast/logger.py",
+    "file:src/eruption_forecast/utils/pathutils.py",
+    "file:src/eruption_forecast/ensemble/base_ensemble.py",
+    "file:src/eruption_forecast/ensemble/classifier_ensemble.py",
+    "file:src/eruption_forecast/ensemble/explainer_ensemble.py"
+   ],
+   "edgeCount": 11
+  },
+  {
+   "nodes": [
+    "file:src/eruption_forecast/__init__.py",
+    "file:src/eruption_forecast/tremor/calculate_tremor.py",
+    "file:src/eruption_forecast/logger.py",
+    "file:src/eruption_forecast/model/training_model.py",
+    "file:src/eruption_forecast/utils/benchmark.py"
+   ],
+   "edgeCount": 9
+  }
+ ],
+ "layers": {
+  "count": 9,
+  "list": [
+   {
+    "id": "layer:entry",
+    "name": "Entry Points",
+    "description": "End-user pipeline scripts (main.py, forecast-scenario.py) and the package __init__ that re-exports the public ForecastModel/TremorData/LabelData API."
+   },
+   {
+    "id": "layer:model",
+    "name": "Pipeline Orchestration & Stage Models",
+    "description": "ForecastModel and ForecastModelScenario orchestrators plus the BaseModel-derived Training, Prediction, Evaluation and Explanation stage models with content-addressed caching, classifier definitions and cross-classifier comparison."
+   },
+   {
+    "id": "layer:ensemble",
+    "name": "Ensemble Engine",
+    "description": "Multi-seed SeedEnsemble and ClassifierEnsemble estimators plus the MetricsEnsemble and ExplainerEnsemble engines that compute per-seed metrics and SHAP explanations."
+   },
+   {
+    "id": "layer:seismic-ingestion",
+    "name": "Seismic Ingestion & Tremor",
+    "description": "SDS and FDSN seismic data sources and the CalculateTremor pipeline that computes RSAM, DSAR and Shannon entropy across frequency bands into tremor CSVs."
+   },
+   {
+    "id": "layer:labels-features",
+    "name": "Labelling & Feature Engineering",
+    "description": "Sliding-window eruption label builders and the tsfresh-based tremor matrix, feature extraction, feature selection and feature-count sweep components."
+   },
+   {
+    "id": "layer:config",
+    "name": "Configuration & Data Types",
+    "description": "ForecastConfig and per-stage config dataclasses, shared constants, and immutable data containers such as StationData, BaseDataContainer and SHAP/ensemble summary payloads."
+   },
+   {
+    "id": "layer:visualization",
+    "name": "Visualization",
+    "description": "Matplotlib/SHAP plotting modules for tremor, labels, features, forecasts, evaluation metrics and explanations with shared styling."
+   },
+   {
+    "id": "layer:utility",
+    "name": "Utilities & Cross-Cutting Services",
+    "description": "Focused helper modules (arrays, windows, dates, ML, validation, paths, dataframes, features, formatting) plus Loguru logging, timer/notify decorators and Telegram notification."
+   },
+   {
+    "id": "layer:documentation",
+    "name": "Documentation",
+    "description": "README and the 15-page GitHub wiki covering getting started, pipeline workflows, configuration, output structure, architecture and API reference."
+   }
+  ]
+ },
+ "nodeSummaryIndex": {
+  "file:src/eruption_forecast/dataclass/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package barrel for the dataclass subpackage, re-exporting StationData, SHAP explanation payloads and classifier-ensemble summary dataclasses."
+  },
+  "file:src/eruption_forecast/dataclass/classifier_ensemble_summary.py": {
+   "name": "classifier_ensemble_summary.py",
+   "type": "file",
+   "summary": "Defines frozen dataclasses (ProbabilityPick, SeedSummary, EruptionWindow, ClassifierEnsembleSummary) that describe per-eruption probability summaries across a classifier ensemble's seeds."
+  },
+  "file:src/eruption_forecast/dataclass/classifier_explanation.py": {
+   "name": "classifier_explanation.py",
+   "type": "file",
+   "summary": "Defines slotted dataclasses SeedExplanation and ClassifierExplanation holding per-seed and per-classifier SHAP explanation payloads."
+  },
+  "file:src/eruption_forecast/dataclass/station_data.py": {
+   "name": "station_data.py",
+   "type": "file",
+   "summary": "Defines the StationData dataclass, an uppercased seismic station identity (network, station, location, channel) with derived nslc/nslct strings."
+  },
+  "file:src/eruption_forecast/ensemble/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package barrel for the ensemble subpackage re-exporting SeedEnsemble and ClassifierEnsemble; other ensemble classes are deliberately not re-exported to avoid import cycles."
+  },
+  "file:src/eruption_forecast/ensemble/base_ensemble.py": {
+   "name": "base_ensemble.py",
+   "type": "file",
+   "summary": "Provides the BaseEnsemble mixin implementing joblib-based save/load persistence shared by the ensemble classes."
+  },
+  "file:src/eruption_forecast/ensemble/classifier_ensemble.py": {
+   "name": "classifier_ensemble.py",
+   "type": "file",
+   "summary": "Implements ClassifierEnsemble, a container of per-classifier SeedEnsembles with factory loaders (any/json/dict/seed ensembles) and consensus probability, prediction and uncertainty computation."
+  },
+  "file:src/eruption_forecast/ensemble/explainer_ensemble.py": {
+   "name": "explainer_ensemble.py",
+   "type": "file",
+   "summary": "Implements ExplainerEnsemble, the per-seed SHAP TreeExplainer engine that computes ClassifierExplanation payloads in parallel and renders per-seed, aggregate and per-eruption waterfall plots."
+  },
+  "file:src/eruption_forecast/ensemble/seed_ensemble.py": {
+   "name": "seed_ensemble.py",
+   "type": "file",
+   "summary": "Implements SeedEnsemble, an sklearn-compatible classifier bundling all seed models for one classifier, with registry loaders, probability/uncertainty prediction and Parquet matrix caching."
+  },
+  "file:src/eruption_forecast/model/explanation_model.py": {
+   "name": "explanation_model.py",
+   "type": "file",
+   "summary": "Implements ExplanationModel, the pipeline stage that reuses a TrainingModel or PredictionModel to produce cached per-seed SHAP explanations and plots via ExplainerEnsemble."
+  },
+  "file:src/eruption_forecast/plots/explanation_plots.py": {
+   "name": "explanation_plots.py",
+   "type": "file",
+   "summary": "SHAP visualisation utilities: per-seed waterfall/beeswarm/bar plots, NaN-padded aggregate bar and beeswarm plots across seeds, and per-eruption classifier waterfalls."
+  },
+  "file:src/eruption_forecast/utils/array.py": {
+   "name": "array.py",
+   "type": "file",
+   "summary": "Numerical array helpers for tremor cleaning (outlier, z-score anomaly, zero masking, NaN filtering, completeness) plus ensemble probability aggregation and per-seed forecast saving."
+  },
+  "file:src/eruption_forecast/utils/formatting.py": {
+   "name": "formatting.py",
+   "type": "file",
+   "summary": "String formatting helpers: slugify utilities, tsfresh feature-name shortening and humanising using frequency-band aliases, and classifier display labels."
+  },
+  "file:src/eruption_forecast/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package root that sets up logging and re-exports the public API: tremor calculation, label builders, feature builders, stage models, ForecastModel, decorators and TelegramNotification."
+  },
+  "file:src/eruption_forecast/data_container.py": {
+   "name": "data_container.py",
+   "type": "file",
+   "summary": "Defines BaseDataContainer, the abstract base for TremorData and LabelData providing cached filename/basename/filetype properties and abstract date/data accessors."
+  },
+  "file:src/eruption_forecast/decorators/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Barrel for the decorators subpackage, re-exporting the notify and timer decorators."
+  },
+  "file:src/eruption_forecast/decorators/notify.py": {
+   "name": "notify.py",
+   "type": "file",
+   "summary": "Implements the @notify decorator that times a wrapped task and sends MarkdownV2-formatted Telegram success or error messages including hostname, elapsed time and exception details."
+  },
+  "file:src/eruption_forecast/decorators/timer.py": {
+   "name": "timer.py",
+   "type": "file",
+   "summary": "Provides the @timer decorator that logs elapsed wall-clock time of a function and optionally forwards it to Telegram."
+  },
+  "file:src/eruption_forecast/label/constants.py": {
+   "name": "constants.py",
+   "type": "file",
+   "summary": "Constants for label filename prefixes, minimum date range, valid window step units, date format and an example label filename used in validation messages."
+  },
+  "file:src/eruption_forecast/label/label_builder.py": {
+   "name": "label_builder.py",
+   "type": "file",
+   "summary": "Implements LabelBuilder, which builds sliding-window binary eruption labels over a date range using day_to_forecast look-ahead, validates inputs, saves label CSVs and config snapshots, and plots label distributions."
+  },
+  "file:src/eruption_forecast/label/label_data.py": {
+   "name": "label_data.py",
+   "type": "file",
+   "summary": "Defines LabelData, a BaseDataContainer wrapper around a label CSV that parses window/forecast parameters from the filename and exposes cached dates, DataFrame and validation."
+  },
+  "file:src/eruption_forecast/model/forecast_model_scenario.py": {
+   "name": "forecast_model_scenario.py",
+   "type": "file",
+   "summary": "Defines the Scenario TypedDict and ForecastModelScenario, which runs tremor calculation once then loops train, predict, evaluate and explain over multiple scenarios with shared stage settings, a scenarios.json manifest and Telegram delivery of forecast plots."
+  },
+  "file:src/eruption_forecast/notification/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Barrel for the notification subpackage, re-exporting TelegramNotification."
+  },
+  "file:src/eruption_forecast/notification/telegram.py": {
+   "name": "telegram.py",
+   "type": "file",
+   "summary": "Implements TelegramNotification, a fluent Telegram Bot API client for sending messages, documents, photos and media groups with credentials from arguments or .env, logging and swallowing network failures."
+  },
+  "file:src/eruption_forecast/plots/label_plots.py": {
+   "name": "label_plots.py",
+   "type": "file",
+   "summary": "Plotting utilities for label class distributions, single and multi-scenario comparisons, with file-loading wrapper variants and TypedDict scenario entry specs."
+  },
+  "file:src/eruption_forecast/config/constants.py": {
+   "name": "constants.py",
+   "type": "file",
+   "summary": "Central module of package-wide constants: default tremor methods, frequency bands, 10-minute window duration and sampling frequency, completeness ratio, bandpass corners, under-sampling ratio and the eruption probability threshold."
+  },
+  "file:src/eruption_forecast/sources/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Barrel for the seismic data sources package, re-exporting the SDS archive reader and the FDSN web-service client."
+  },
+  "file:src/eruption_forecast/sources/base.py": {
+   "name": "base.py",
+   "type": "file",
+   "summary": "Defines the SeismicDataSource abstract base class that every waveform source implements via a get(date) method returning an ObsPy Stream."
+  },
+  "file:src/eruption_forecast/sources/fdsn.py": {
+   "name": "fdsn.py",
+   "type": "file",
+   "summary": "FDSN web-service data source that downloads daily waveforms via the ObsPy FDSN client and transparently caches them in a local SDS archive."
+  },
+  "file:src/eruption_forecast/sources/sds.py": {
+   "name": "sds.py",
+   "type": "file",
+   "summary": "Reader and writer for local SeisComP Data Structure (SDS) archives: resolves daily miniSEED paths, loads and merges streams, and saves downloaded data."
+  },
+  "file:src/eruption_forecast/tremor/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Barrel for the tremor package exposing DSAR, RSAM, ShannonEntropy, TremorData and the CalculateTremor orchestrator."
+  },
+  "file:src/eruption_forecast/tremor/calculate_tremor.py": {
+   "name": "calculate_tremor.py",
+   "type": "file",
+   "summary": "Core tremor orchestrator that reads seismic data day-by-day from SDS or FDSN, computes RSAM, DSAR and Shannon entropy across frequency bands in parallel, merges daily CSVs and plots results."
+  },
+  "file:src/eruption_forecast/tremor/dsar.py": {
+   "name": "dsar.py",
+   "type": "file",
+   "summary": "Implements the DSAR calculator computing ratios of windowed mean absolute amplitudes between two consecutive frequency-band filtered streams."
+  },
+  "file:src/eruption_forecast/tremor/rsam.py": {
+   "name": "rsam.py",
+   "type": "file",
+   "summary": "Implements the RSAM calculator that bandpass-filters a stream and computes windowed amplitude statistics (default mean) per frequency band."
+  },
+  "file:src/eruption_forecast/tremor/shannon_entropy.py": {
+   "name": "shannon_entropy.py",
+   "type": "file",
+   "summary": "Implements the ShannonEntropy calculator that filters a broadband stream and computes windowed Gaussian differential entropy as a signal-complexity metric."
+  },
+  "file:src/eruption_forecast/utils/window.py": {
+   "name": "window.py",
+   "type": "file",
+   "summary": "Windowing utilities for seismic traces: window statistics, daily chunking, per-window metric computation with outlier removal and completeness checks, entropy and sliding-window date construction."
+  },
+  "file:src/eruption_forecast/features/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package barrel for the features subpackage that re-exports the experimental FeatureCountSweep class and sweep_feature_count helper."
+  },
+  "file:src/eruption_forecast/features/feature_count_sweep.py": {
+   "name": "feature_count_sweep.py",
+   "type": "file",
+   "summary": "Experimental post-hoc recommender that sweeps top-N feature counts over persisted per-seed training artefacts, scoring each count with cross-validation to recommend an optimal top_n_features value."
+  },
+  "file:src/eruption_forecast/features/feature_selector.py": {
+   "name": "feature_selector.py",
+   "type": "file",
+   "summary": "Single-stage feature selector supporting tsfresh FDR p-value filtering or random-forest permutation importance, exposing an sklearn-style fit/transform API."
+  },
+  "file:src/eruption_forecast/label/dynamic_label_builder.py": {
+   "name": "dynamic_label_builder.py",
+   "type": "file",
+   "summary": "Label builder subclass that constructs per-eruption sliding-window labels in three phases: zero frames per eruption, concatenate and deduplicate, then mark positives."
+  },
+  "file:src/eruption_forecast/logger.py": {
+   "name": "logger.py",
+   "type": "file",
+   "summary": "Loguru-based logging wrapper providing console/file handlers, per-category error log routing, and enable/disable/level/directory controls for the package."
+  },
+  "file:src/eruption_forecast/model/classifier_model.py": {
+   "name": "classifier_model.py",
+   "type": "file",
+   "summary": "Defines ClassifierModel, an sklearn-compatible wrapper that builds one of 11 classifier estimators with its hyperparameter grid, CV splitter, and slugified output names."
+  },
+  "file:src/eruption_forecast/model/constants.py": {
+   "name": "constants.py",
+   "type": "file",
+   "summary": "Constants module defining evaluation metric keys, the list of supported classifier codes, and default GridSearchCV hyperparameter grids per classifier."
+  },
+  "file:src/eruption_forecast/model/training_model.py": {
+   "name": "training_model.py",
+   "type": "file",
+   "summary": "Core training stage model that builds labels, extracts tsfresh features, selects features per seed, and fits multi-seed GridSearchCV classifiers, bundling results into SeedEnsemble/ClassifierEnsemble artefacts with content-addressed caching."
+  },
+  "file:src/eruption_forecast/utils/benchmark.py": {
+   "name": "benchmark.py",
+   "type": "file",
+   "summary": "Benchmark utility comparing FeatureSelector methods side by side across seeds, measuring selection stability (Jaccard), runtime, and downstream CV scores with plots and CSV outputs."
+  },
+  "file:src/eruption_forecast/utils/dataframe.py": {
+   "name": "dataframe.py",
+   "type": "file",
+   "summary": "DataFrame helpers for loading label CSVs, datetime-indexed feature matrices, removing tremor anomalies, and computing envelope values."
+  },
+  "file:src/eruption_forecast/utils/ml.py": {
+   "name": "ml.py",
+   "type": "file",
+   "summary": "Machine-learning utility module covering resampling, temporal splits, tsfresh significance filtering, classifier factory, grid search, model registry JSON persistence, threshold metrics, and per-eruption ensemble summaries."
+  },
+  "file:src/eruption_forecast/features/constants.py": {
+   "name": "constants.py",
+   "type": "file",
+   "summary": "Defines shared column-name constants (id, datetime, is_erupted), seconds-per-day, and the default set of tsfresh calculators excluded from feature extraction."
+  },
+  "file:src/eruption_forecast/features/features_builder.py": {
+   "name": "features_builder.py",
+   "type": "file",
+   "summary": "Implements FeaturesBuilder, which runs per-column tsfresh feature extraction over windowed tremor matrices in training or prediction mode, caches Parquet outputs, and merges them into a unified features matrix."
+  },
+  "file:src/eruption_forecast/features/tremor_matrix_builder.py": {
+   "name": "tremor_matrix_builder.py",
+   "type": "file",
+   "summary": "Implements TremorMatrixBuilder, which slices tremor time-series into label-aligned windows, validates per-window sample counts, and concatenates them into a single id/datetime-indexed matrix (optionally saved per tremor column)."
+  },
+  "file:src/eruption_forecast/model/base_model.py": {
+   "name": "base_model.py",
+   "type": "file",
+   "summary": "Abstract base for all stage models (training, prediction, evaluation, explanation) providing tremor loading, date/directory resolution, label and feature building, config saving, and a content-addressable cache with hashed identities and dual-mode save/load."
+  },
+  "file:src/eruption_forecast/model/forecast_model.py": {
+   "name": "forecast_model.py",
+   "type": "file",
+   "summary": "Top-level ForecastModel orchestrator chaining calculate, train, predict, evaluate and explain stages, capturing each stage kwargs into a ForecastConfig for save_config/from_config/run replay with cache-aware stage reuse."
+  },
+  "file:src/eruption_forecast/model/prediction_model.py": {
+   "name": "prediction_model.py",
+   "type": "file",
+   "summary": "Implements PredictionModel, which loads a trained ClassifierEnsemble, builds an unlabelled forecast window grid, extracts (or loads) features, computes per-classifier and consensus eruption probabilities, and plots the forecast with cache identity tied to the training hash."
+  },
+  "file:src/eruption_forecast/tremor/tremor_data.py": {
+   "name": "tremor_data.py",
+   "type": "file",
+   "summary": "Defines TremorData, a BaseDataContainer wrapper around a tremor CSV exposing cached properties for the DataFrame, columns, date range and day count, plus sampling-rate consistency checks."
+  },
+  "file:src/eruption_forecast/utils/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Barrel module for the utils package re-exporting label-filename parsing and the core validation guard functions."
+  },
+  "file:src/eruption_forecast/utils/date_utils.py": {
+   "name": "date_utils.py",
+   "type": "file",
+   "summary": "Date helpers for converting values to datetime, normalizing and sorting date lists, parsing label CSV filenames into parameters, and coercing DataFrames to a DatetimeIndex."
+  },
+  "file:src/eruption_forecast/utils/feature_utils.py": {
+   "name": "feature_utils.py",
+   "type": "file",
+   "summary": "Feature-list utilities for loading curated or aliased feature sets, maintaining ranked top-features CSVs, concatenating per-seed significant features, finding common features, and merging tsfresh features matrices."
+  },
+  "file:src/eruption_forecast/utils/validation.py": {
+   "name": "validation.py",
+   "type": "file",
+   "summary": "Centralized guard functions validating random states, date ranges, window steps, required DataFrame columns, and time-series sampling consistency."
+  },
+  "file:src/eruption_forecast/config/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Package barrel for the config subpackage, re-exporting constants, BaseConfig, LabelConfig, the ForecastConfig family and the standalone per-stage configs (training, prediction, evaluation, explanation)."
+  },
+  "file:src/eruption_forecast/config/base_config.py": {
+   "name": "base_config.py",
+   "type": "file",
+   "summary": "Defines the BaseConfig dataclass mixin providing shared version/saved_at stamping plus dict round-tripping (to_dict, to_init_kwargs, from_dict) for every config dataclass."
+  },
+  "file:src/eruption_forecast/config/evaluation_config.py": {
+   "name": "evaluation_config.py",
+   "type": "file",
+   "summary": "EvaluationConfig dataclass snapshotting EvaluationModel constructor and evaluate() arguments, with YAML/JSON save and load for per-stage config files."
+  },
+  "file:src/eruption_forecast/config/explanation_config.py": {
+   "name": "explanation_config.py",
+   "type": "file",
+   "summary": "ExplanationConfig dataclass mirroring ExplanationModel settings (SHAP explain/plot options) with YAML/JSON persistence for explanation config files."
+  },
+  "file:src/eruption_forecast/config/forecast_config.py": {
+   "name": "forecast_config.py",
+   "type": "file",
+   "summary": "Hierarchical ForecastConfig for the ForecastModel orchestrator: base station settings plus per-stage calculate/train/predict/evaluate/explain sub-configs, serialised to YAML/JSON so pipelines can be replayed via from_config() and run()."
+  },
+  "file:src/eruption_forecast/config/label_config.py": {
+   "name": "label_config.py",
+   "type": "file",
+   "summary": "LabelConfig dataclass capturing LabelBuilder init arguments (window size/step, day_to_forecast, eruption dates) and saving them as label.config.yaml."
+  },
+  "file:src/eruption_forecast/config/prediction_config.py": {
+   "name": "prediction_config.py",
+   "type": "file",
+   "summary": "PredictionConfig dataclass mirroring PredictionModel constructor parameters with YAML/JSON save/load used by forecast() to write prediction config files."
+  },
+  "file:src/eruption_forecast/config/training_config.py": {
+   "name": "training_config.py",
+   "type": "file",
+   "summary": "TrainingConfig dataclass mirroring TrainingModel.__init__ fields and defaults (classifiers, CV, seeds, resampling, features) with YAML/JSON persistence written at the end of fit()."
+  },
+  "file:src/eruption_forecast/utils/pathutils.py": {
+   "name": "pathutils.py",
+   "type": "file",
+   "summary": "Filesystem and I/O helpers used throughout the package: output-directory resolution, NSLC directory setup, figure/PDF saving with metadata, generic data saving (CSV/Parquet), and JSON/pickle loading."
+  },
+  "file:src/eruption_forecast/ensemble/metrics_ensemble.py": {
+   "name": "metrics_ensemble.py",
+   "type": "file",
+   "summary": "Per-seed metric engine over a fitted ClassifierEnsemble: computes (n_samples, n_seeds) probability/prediction matrices, persists them as CSV, renders per-seed and aggregate evaluation plots in parallel, and round-trips via joblib."
+  },
+  "file:src/eruption_forecast/model/classifier_comparator.py": {
+   "name": "classifier_comparator.py",
+   "type": "file",
+   "summary": "Cross-classifier comparison utility that ranks classifiers by per-seed metrics and draws ROC, PR, metric-bar, seed-stability and grid comparison figures from a MetricsEnsemble."
+  },
+  "file:src/eruption_forecast/model/evaluation_model.py": {
+   "name": "evaluation_model.py",
+   "type": "file",
+   "summary": "EvaluationModel pipeline stage that scores a pre-trained ensemble against ground truth in training-reuse or prediction-reuse mode, with content-addressed caching, config snapshots and classifier comparison."
+  },
+  "file:src/eruption_forecast/plots/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Barrel module for the plots package that re-exports style helpers and the public tremor, label, feature, forecast and evaluation plotting functions."
+  },
+  "file:src/eruption_forecast/plots/evaluation_plots.py": {
+   "name": "evaluation_plots.py",
+   "type": "file",
+   "summary": "Evaluation plotting library producing per-seed and aggregate threshold, confusion matrix, ROC, PR, G-mean, MCC and feature-importance figures, plus dispatcher-based renderers for parallel workers."
+  },
+  "file:src/eruption_forecast/plots/feature_plots.py": {
+   "name": "feature_plots.py",
+   "type": "file",
+   "summary": "Feature visualisation module for significant-feature rankings, frequency-band contribution, feature correlations, feature-count curves, cross-run common-feature heatmaps and features-matrix time series."
+  },
+  "file:src/eruption_forecast/plots/forecast_plots.py": {
+   "name": "forecast_plots.py",
+   "type": "file",
+   "summary": "Forecast plotting module drawing eruption probability, uncertainty and per-classifier panels over time, with eruption markers and optional training/gap/prediction segment strips."
+  },
+  "file:src/eruption_forecast/plots/styles.py": {
+   "name": "styles.py",
+   "type": "file",
+   "summary": "Central Nature/Science-style matplotlib configuration: colorblind-safe palettes, rcParams setup, figure context managers, color lookup, spine configuration and journal figure sizing."
+  },
+  "file:src/eruption_forecast/plots/tremor_plots.py": {
+   "name": "tremor_plots.py",
+   "type": "file",
+   "summary": "Tremor plotting module rendering RSAM/DSAR/entropy time series per column with eruption markers, plus file-based replot and batch replot helpers."
+  },
+  "document:wiki/API-Reference.md": {
+   "name": "API-Reference.md",
+   "type": "document",
+   "summary": "Exhaustive API reference for the public classes: ForecastModel, the four stage models, ensembles, SHAP dataclasses, StationData, CalculateTremor, label/feature builders, FeatureSelector, FeatureCountSweep and SeedEnsemble, with constructor signatures and method tables."
+  },
+  "document:wiki/Architecture.md": {
+   "name": "Architecture.md",
+   "type": "document",
+   "summary": "Architecture guide covering package layout, pipeline overview, component details, model class relationships (BaseModel hierarchy and ensemble stack), end-to-end data flow and the utility-module catalog."
+  },
+  "document:wiki/Configuration.md": {
+   "name": "Configuration.md",
+   "type": "document",
+   "summary": "Explains the ForecastConfig lifecycle and YAML schema, standalone per-stage configs, config.example.yaml, Telegram notification setup, logging categories, and where config files land on disk."
+  },
+  "document:wiki/Data-Sources.md": {
+   "name": "Data-Sources.md",
+   "type": "document",
+   "summary": "Describes the SeismicDataSource ABC and its SDS (local SeisComP archive) and FDSN (web service with local SDS cache) implementations, compares them, and lists the frequency bands CalculateTremor reads."
+  },
+  "document:wiki/Evaluation-Workflow.md": {
+   "name": "Evaluation-Workflow.md",
+   "type": "document",
+   "summary": "Guide to EvaluationModel: training-reuse vs prediction-reuse modes, how evaluate() drives MetricsEnsemble, cross-classifier comparison via ClassifierComparator, outputs, cache semantics and standalone use."
+  },
+  "document:wiki/Explanation-Workflow.md": {
+   "name": "Explanation-Workflow.md",
+   "type": "document",
+   "summary": "Guide to ExplanationModel and ExplainerEnsemble: the TreeExplainer-only constraint, operating modes, explain()/plot() phases, SHAP dataclass composition, plot inventory, per-eruption waterfall selection, outputs and caching."
+  },
+  "document:wiki/Feature-Count-Sweep.md": {
+   "name": "Feature-Count-Sweep.md",
+   "type": "document",
+   "summary": "Documents the experimental FeatureCountSweep / sweep_feature_count post-hoc recommender for top_n_features, including scoring modes, estimator_mode, picking N*, forecast-mode wiring, outputs and reference API."
+  },
+  "document:wiki/Getting-Started.md": {
+   "name": "Getting-Started.md",
+   "type": "document",
+   "summary": "Installation and setup guide covering prerequisites, uv-based install of runtime and dev dependencies, development commands, optional Telegram notification setup and next steps."
+  },
+  "document:wiki/Home.md": {
+   "name": "Home.md",
+   "type": "document",
+   "summary": "Wiki landing page with a research-use-only disclaimer, navigation to all wiki pages, a summary of what the package does, a repository map and key links."
+  },
+  "document:wiki/Output-Structure.md": {
+   "name": "Output-Structure.md",
+   "type": "document",
+   "summary": "Full reference of the on-disk output tree per station directory, classifier/CV slug mappings, filename conventions, content-addressed cache layout, scenarios layout and a cheat sheet of where artifacts live."
+  },
+  "document:wiki/Pipeline-Walkthrough.md": {
+   "name": "Pipeline-Walkthrough.md",
+   "type": "document",
+   "summary": "Walks through the two end-to-end workflows: the research pipeline in main.py using ForecastModel, and the multi-scenario sweep in forecast-scenario.py using ForecastModelScenario, with guidance on choosing between them."
+  },
+  "document:wiki/Prediction-Workflow.md": {
+   "name": "Prediction-Workflow.md",
+   "type": "document",
+   "summary": "Guide to PredictionModel: internal pipeline, accepted trained-model sources, forecast grid labelling, feature extraction and use_features_from scoping, forecast() outputs, caching and standalone use."
+  },
+  "document:wiki/Training-Workflow.md": {
+   "name": "Training-Workflow.md",
+   "type": "document",
+   "summary": "Guide to TrainingModel: label building, tsfresh feature pipeline and selection, multi-seed classifier fitting, classifier catalog, CV strategies, caching, outputs, standalone use and the experimental top_n_features sweep."
+  },
+  "document:wiki/Usage.md": {
+   "name": "Usage.md",
+   "type": "document",
+   "summary": "Usage guide with a quick start, stage cheat sheet, annotated main.py example, how to access per-stage results, and common pipeline variants."
+  },
+  "document:wiki/Visualization.md": {
+   "name": "Visualization.md",
+   "type": "document",
+   "summary": "Catalog of plotting utilities for tremor, features, forecasts, evaluation curves, label distributions and SHAP plots, plus the Nature-style default styling."
+  },
+  "document:README.md": {
+   "name": "README.md",
+   "type": "document",
+   "summary": "Primary project documentation for eruption-forecast covering features, package architecture, the CalculateTremor-to-ExplanationModel pipeline, SDS/FDSN data sources, quick start, common patterns (scenario sweeps, cache reuse, config replay), supported classifiers, output directory layout, and development workflow."
+  },
+  "file:forecast-scenario.py": {
+   "name": "forecast-scenario.py",
+   "type": "file",
+   "summary": "End-to-end script that defines a list of Scenario dicts and runs a ForecastModelScenario sweep: tremor calculation once, then shared training/prediction/evaluation/explanation settings looped over each train/forecast date split."
+  },
+  "file:main.py": {
+   "name": "main.py",
+   "type": "file",
+   "summary": "Reference end-to-end pipeline script that chains ForecastModel calculate, train, predict, evaluate and explain over a list of known eruption dates, wrapped with timer and Telegram notify decorators."
+  },
+  "file:src/eruption_forecast/label/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Empty package marker for the label subpackage (LabelBuilder, DynamicLabelBuilder, LabelData); no re-exports."
+  },
+  "file:src/eruption_forecast/model/__init__.py": {
+   "name": "__init__.py",
+   "type": "file",
+   "summary": "Empty package marker for the model subpackage containing the ForecastModel orchestrator and stage models; no re-exports, so classes are imported from their modules directly."
+  }
+ },
+ "totalNodes": 96,
+ "totalEdges": 1107
+}

@@ -1,0 +1,2645 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 12,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 12,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 12,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/eruption_forecast/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 89,
+      "nonEmptyLines": 80,
+      "metrics": {
+        "importCount": 16,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/data_container.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 100,
+      "nonEmptyLines": 74,
+      "classes": [
+        {
+          "name": "BaseDataContainer",
+          "startLine": 10,
+          "endLine": 100,
+          "methods": [
+            "__init__",
+            "filename",
+            "basename",
+            "filetype",
+            "start_date_str",
+            "end_date_str",
+            "data"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "BaseDataContainer",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "filename",
+          "callee": "ValueError",
+          "lineNumber": 42
+        },
+        {
+          "caller": "filename",
+          "callee": "os.path.basename",
+          "lineNumber": 43
+        },
+        {
+          "caller": "basename",
+          "callee": "os.path.splitext",
+          "lineNumber": 55
+        },
+        {
+          "caller": "filetype",
+          "callee": "os.path.splitext(self.filename)[1].lstrip",
+          "lineNumber": 67
+        },
+        {
+          "caller": "filetype",
+          "callee": "os.path.splitext",
+          "lineNumber": 67
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/decorators/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 8,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/decorators/notify.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 244,
+      "nonEmptyLines": 201,
+      "functions": [
+        {
+          "name": "_format_elapsed",
+          "startLine": 27,
+          "endLine": 42,
+          "params": [
+            "seconds"
+          ]
+        },
+        {
+          "name": "_escape_md",
+          "startLine": 45,
+          "endLine": 60,
+          "params": [
+            "text"
+          ]
+        },
+        {
+          "name": "_escape_pre",
+          "startLine": 63,
+          "endLine": 77,
+          "params": [
+            "text"
+          ]
+        },
+        {
+          "name": "_error_message",
+          "startLine": 80,
+          "endLine": 111,
+          "params": [
+            "exception",
+            "task",
+            "timestamp",
+            "elapsed_time",
+            "message"
+          ]
+        },
+        {
+          "name": "_success_message",
+          "startLine": 114,
+          "endLine": 141,
+          "params": [
+            "task",
+            "timestamp",
+            "elapsed_time",
+            "message"
+          ]
+        },
+        {
+          "name": "_dispatch",
+          "startLine": 144,
+          "endLine": 167,
+          "params": [
+            "to",
+            "message",
+            "timeout",
+            "verbose"
+          ]
+        },
+        {
+          "name": "notify",
+          "startLine": 170,
+          "endLine": 244,
+          "params": [
+            "task",
+            "message",
+            "to",
+            "on_success",
+            "on_error",
+            "timeout",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "_format_elapsed",
+          "line": 27,
+          "isDefault": false
+        },
+        {
+          "name": "_escape_md",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "_escape_pre",
+          "line": 63,
+          "isDefault": false
+        },
+        {
+          "name": "_error_message",
+          "line": 80,
+          "isDefault": false
+        },
+        {
+          "name": "_success_message",
+          "line": 114,
+          "isDefault": false
+        },
+        {
+          "name": "_dispatch",
+          "line": 144,
+          "isDefault": false
+        },
+        {
+          "name": "notify",
+          "line": 170,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_format_elapsed",
+          "callee": "int",
+          "lineNumber": 39
+        },
+        {
+          "caller": "_format_elapsed",
+          "callee": "divmod",
+          "lineNumber": 40
+        },
+        {
+          "caller": "_format_elapsed",
+          "callee": "divmod",
+          "lineNumber": 41
+        },
+        {
+          "caller": "_escape_md",
+          "callee": "\"\".join",
+          "lineNumber": 60
+        },
+        {
+          "caller": "_escape_pre",
+          "callee": "text.replace(\"\\\\\", \"\\\\\\\\\").replace",
+          "lineNumber": 77
+        },
+        {
+          "caller": "_escape_pre",
+          "callee": "text.replace",
+          "lineNumber": 77
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_md",
+          "lineNumber": 100
+        },
+        {
+          "caller": "_error_message",
+          "callee": "socket.gethostname",
+          "lineNumber": 100
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_md",
+          "lineNumber": 101
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_md",
+          "lineNumber": 102
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_md",
+          "lineNumber": 103
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_md",
+          "lineNumber": 104
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_format_elapsed",
+          "lineNumber": 104
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_md",
+          "lineNumber": 105
+        },
+        {
+          "caller": "_error_message",
+          "callee": "type",
+          "lineNumber": 105
+        },
+        {
+          "caller": "_error_message",
+          "callee": "_escape_pre",
+          "lineNumber": 108
+        },
+        {
+          "caller": "_error_message",
+          "callee": "str",
+          "lineNumber": 108
+        },
+        {
+          "caller": "_error_message",
+          "callee": "\"\\n\".join",
+          "lineNumber": 111
+        },
+        {
+          "caller": "_success_message",
+          "callee": "_escape_md",
+          "lineNumber": 134
+        },
+        {
+          "caller": "_success_message",
+          "callee": "socket.gethostname",
+          "lineNumber": 134
+        },
+        {
+          "caller": "_success_message",
+          "callee": "_escape_md",
+          "lineNumber": 135
+        },
+        {
+          "caller": "_success_message",
+          "callee": "_escape_md",
+          "lineNumber": 136
+        },
+        {
+          "caller": "_success_message",
+          "callee": "_escape_md",
+          "lineNumber": 137
+        },
+        {
+          "caller": "_success_message",
+          "callee": "_escape_md",
+          "lineNumber": 138
+        },
+        {
+          "caller": "_success_message",
+          "callee": "_format_elapsed",
+          "lineNumber": 138
+        },
+        {
+          "caller": "_success_message",
+          "callee": "\"\\n\".join",
+          "lineNumber": 141
+        },
+        {
+          "caller": "_dispatch",
+          "callee": "TelegramNotification(verbose=verbose).send_message",
+          "lineNumber": 161
+        },
+        {
+          "caller": "_dispatch",
+          "callee": "TelegramNotification",
+          "lineNumber": 161
+        },
+        {
+          "caller": "_dispatch",
+          "callee": "logger.warning",
+          "lineNumber": 165
+        },
+        {
+          "caller": "_dispatch",
+          "callee": "logger.warning",
+          "lineNumber": 167
+        },
+        {
+          "caller": "decorator",
+          "callee": "functools.wraps",
+          "lineNumber": 210
+        },
+        {
+          "caller": "wrapper",
+          "callee": "time.perf_counter",
+          "lineNumber": 212
+        },
+        {
+          "caller": "wrapper",
+          "callee": "time.strftime",
+          "lineNumber": 213
+        },
+        {
+          "caller": "wrapper",
+          "callee": "func",
+          "lineNumber": 216
+        },
+        {
+          "caller": "wrapper",
+          "callee": "time.perf_counter",
+          "lineNumber": 218
+        },
+        {
+          "caller": "wrapper",
+          "callee": "_error_message",
+          "lineNumber": 220
+        },
+        {
+          "caller": "wrapper",
+          "callee": "_dispatch",
+          "lineNumber": 227
+        },
+        {
+          "caller": "wrapper",
+          "callee": "time.perf_counter",
+          "lineNumber": 230
+        },
+        {
+          "caller": "wrapper",
+          "callee": "_success_message",
+          "lineNumber": 232
+        },
+        {
+          "caller": "wrapper",
+          "callee": "_dispatch",
+          "lineNumber": 238
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/decorators/timer.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 68,
+      "nonEmptyLines": 51,
+      "functions": [
+        {
+          "name": "timer",
+          "startLine": 20,
+          "endLine": 68,
+          "params": [
+            "name",
+            "send_to"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "timer",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "decorator",
+          "callee": "functools.wraps",
+          "lineNumber": 48
+        },
+        {
+          "caller": "wrapper",
+          "callee": "time.perf_counter",
+          "lineNumber": 50
+        },
+        {
+          "caller": "wrapper",
+          "callee": "func",
+          "lineNumber": 51
+        },
+        {
+          "caller": "wrapper",
+          "callee": "time.perf_counter",
+          "lineNumber": 52
+        },
+        {
+          "caller": "wrapper",
+          "callee": "timedelta",
+          "lineNumber": 53
+        },
+        {
+          "caller": "wrapper",
+          "callee": "divmod",
+          "lineNumber": 55
+        },
+        {
+          "caller": "wrapper",
+          "callee": "divmod",
+          "lineNumber": 56
+        },
+        {
+          "caller": "wrapper",
+          "callee": "logger.info",
+          "lineNumber": 59
+        },
+        {
+          "caller": "wrapper",
+          "callee": "TelegramNotification().send_message",
+          "lineNumber": 62
+        },
+        {
+          "caller": "wrapper",
+          "callee": "TelegramNotification",
+          "lineNumber": 62
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/label/constants.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 19,
+      "nonEmptyLines": 15,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/label/label_builder.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1261,
+      "nonEmptyLines": 1061,
+      "classes": [
+        {
+          "name": "LabelBuilder",
+          "startLine": 26,
+          "endLine": 1261,
+          "methods": [
+            "__init__",
+            "__repr__",
+            "__str__",
+            "to_dict",
+            "describe",
+            "to_prompt",
+            "df",
+            "df",
+            "df_eruption",
+            "df_eruption",
+            "df_eruptions",
+            "df_eruptions",
+            "y",
+            "labels",
+            "update_df_eruptions",
+            "validate_columns",
+            "validate",
+            "create_directories",
+            "initiate_label",
+            "save_eruption_dates",
+            "from_csv",
+            "_init_config",
+            "save_config",
+            "build",
+            "save",
+            "plot_distribution"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "LabelBuilder",
+          "line": 26,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "self._init_config",
+          "lineNumber": 164
+        },
+        {
+          "caller": "__init__",
+          "callee": "normalize_dates",
+          "lineNumber": 182
+        },
+        {
+          "caller": "__init__",
+          "callee": "resolve_output_dir",
+          "lineNumber": 185
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 186
+        },
+        {
+          "caller": "__init__",
+          "callee": "int",
+          "lineNumber": 195
+        },
+        {
+          "caller": "__init__",
+          "callee": "int",
+          "lineNumber": 197
+        },
+        {
+          "caller": "__init__",
+          "callee": "sort_dates",
+          "lineNumber": 198
+        },
+        {
+          "caller": "__init__",
+          "callee": "str",
+          "lineNumber": 199
+        },
+        {
+          "caller": "__init__",
+          "callee": "bool",
+          "lineNumber": 201
+        },
+        {
+          "caller": "__init__",
+          "callee": "bool",
+          "lineNumber": 202
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 207
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 208
+        },
+        {
+          "caller": "__init__",
+          "callee": "int",
+          "lineNumber": 219
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 221
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 226
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.create_directories",
+          "lineNumber": 227
+        },
+        {
+          "caller": "__init__",
+          "callee": "logger.info",
+          "lineNumber": 233
+        },
+        {
+          "caller": "__init__",
+          "callee": "logger.info",
+          "lineNumber": 236
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.__repr__",
+          "lineNumber": 236
+        },
+        {
+          "caller": "__repr__",
+          "callee": "', '.join",
+          "lineNumber": 256
+        },
+        {
+          "caller": "__str__",
+          "callee": "len",
+          "lineNumber": 275
+        },
+        {
+          "caller": "to_dict",
+          "callee": "len",
+          "lineNumber": 327
+        },
+        {
+          "caller": "to_dict",
+          "callee": "len",
+          "lineNumber": 330
+        },
+        {
+          "caller": "to_dict",
+          "callee": "int",
+          "lineNumber": 331
+        },
+        {
+          "caller": "to_dict",
+          "callee": "self._df[\"is_erupted\"].sum",
+          "lineNumber": 331
+        },
+        {
+          "caller": "to_dict",
+          "callee": "int",
+          "lineNumber": 333
+        },
+        {
+          "caller": "to_dict",
+          "callee": "(self._df[\"is_erupted\"] == 0).sum",
+          "lineNumber": 333
+        },
+        {
+          "caller": "describe",
+          "callee": "self.to_dict",
+          "lineNumber": 353
+        },
+        {
+          "caller": "describe",
+          "callee": "\", \".join",
+          "lineNumber": 359
+        },
+        {
+          "caller": "describe",
+          "callee": "sentences.append",
+          "lineNumber": 372
+        },
+        {
+          "caller": "describe",
+          "callee": "os.path.basename",
+          "lineNumber": 375
+        },
+        {
+          "caller": "describe",
+          "callee": "sentences.append",
+          "lineNumber": 378
+        },
+        {
+          "caller": "describe",
+          "callee": "\" \".join",
+          "lineNumber": 380
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "self.to_dict",
+          "lineNumber": 397
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "\", \".join",
+          "lineNumber": 413
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "os.path.basename",
+          "lineNumber": 432
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "lines.append",
+          "lineNumber": 435
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "\"\\n\".join",
+          "lineNumber": 437
+        },
+        {
+          "caller": "df",
+          "callee": "ValueError",
+          "lineNumber": 459
+        },
+        {
+          "caller": "df",
+          "callee": "self.validate_columns",
+          "lineNumber": 486
+        },
+        {
+          "caller": "df_eruption",
+          "callee": "ValueError",
+          "lineNumber": 510
+        },
+        {
+          "caller": "df_eruption",
+          "callee": "self.validate_columns",
+          "lineNumber": 534
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "len",
+          "lineNumber": 561
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 562
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "isinstance",
+          "lineNumber": 592
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "TypeError",
+          "lineNumber": 593
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "df_dict.keys",
+          "lineNumber": 596
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "pd.to_datetime(key).strftime",
+          "lineNumber": 598
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "pd.to_datetime",
+          "lineNumber": 598
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 600
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 604
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "df_dict.items",
+          "lineNumber": 609
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "isinstance",
+          "lineNumber": 610
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 611
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "type",
+          "lineNumber": 613
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 617
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "value.columns.tolist",
+          "lineNumber": 619
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 623
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "value.columns.tolist",
+          "lineNumber": 625
+        },
+        {
+          "caller": "df_eruptions",
+          "callee": "self._df_eruptions.update",
+          "lineNumber": 628
+        },
+        {
+          "caller": "y",
+          "callee": "pd.Series",
+          "lineNumber": 653
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "logger.info",
+          "lineNumber": 692
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "len",
+          "lineNumber": 692
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "to_datetime",
+          "lineNumber": 696
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "timedelta",
+          "lineNumber": 700
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "timedelta",
+          "lineNumber": 706
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "normalize_dates",
+          "lineNumber": 710
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "logger.debug",
+          "lineNumber": 716
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "ValueError",
+          "lineNumber": 722
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "logger.debug",
+          "lineNumber": 730
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "start_eruption.strftime",
+          "lineNumber": 732
+        },
+        {
+          "caller": "update_df_eruptions",
+          "callee": "end_eruption.strftime",
+          "lineNumber": 733
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "isinstance",
+          "lineNumber": 770
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "TypeError",
+          "lineNumber": 771
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "type",
+          "lineNumber": 772
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "ValueError",
+          "lineNumber": 776
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "df.columns.tolist",
+          "lineNumber": 777
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "ValueError",
+          "lineNumber": 781
+        },
+        {
+          "caller": "validate_columns",
+          "callee": "df.columns.tolist",
+          "lineNumber": 782
+        },
+        {
+          "caller": "validate",
+          "callee": "timedelta",
+          "lineNumber": 827
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 830
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 836
+        },
+        {
+          "caller": "validate",
+          "callee": "minimal_end_date.strftime",
+          "lineNumber": 839
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 843
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 849
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 852
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 869
+        },
+        {
+          "caller": "initiate_label",
+          "callee": "construct_windows",
+          "lineNumber": 893
+        },
+        {
+          "caller": "save_eruption_dates",
+          "callee": "slugify",
+          "lineNumber": 919
+        },
+        {
+          "caller": "save_eruption_dates",
+          "callee": "os.path.join",
+          "lineNumber": 920
+        },
+        {
+          "caller": "save_eruption_dates",
+          "callee": "pd.DataFrame",
+          "lineNumber": 922
+        },
+        {
+          "caller": "save_eruption_dates",
+          "callee": "ensure_dir",
+          "lineNumber": 927
+        },
+        {
+          "caller": "save_eruption_dates",
+          "callee": "df.to_csv",
+          "lineNumber": 928
+        },
+        {
+          "caller": "save_eruption_dates",
+          "callee": "logger.info",
+          "lineNumber": 931
+        },
+        {
+          "caller": "from_csv",
+          "callee": "LabelData",
+          "lineNumber": 956
+        },
+        {
+          "caller": "from_csv",
+          "callee": "logger.info",
+          "lineNumber": 959
+        },
+        {
+          "caller": "_init_config",
+          "callee": "LabelConfig",
+          "lineNumber": 1007
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1009
+        },
+        {
+          "caller": "_init_config",
+          "callee": "start_date.isoformat",
+          "lineNumber": 1010
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1011
+        },
+        {
+          "caller": "_init_config",
+          "callee": "end_date.isoformat",
+          "lineNumber": 1011
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "_init_config",
+          "callee": "d.strftime",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "save_config",
+          "callee": "os.path.join",
+          "lineNumber": 1054
+        },
+        {
+          "caller": "save_config",
+          "callee": "self._config.save",
+          "lineNumber": 1055
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 1109
+        },
+        {
+          "caller": "build",
+          "callee": "os.path.isfile",
+          "lineNumber": 1116
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 1121
+        },
+        {
+          "caller": "build",
+          "callee": "self.from_csv",
+          "lineNumber": 1122
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 1125
+        },
+        {
+          "caller": "build",
+          "callee": "self.initiate_label",
+          "lineNumber": 1127
+        },
+        {
+          "caller": "build",
+          "callee": "self.update_df_eruptions",
+          "lineNumber": 1129
+        },
+        {
+          "caller": "build",
+          "callee": "ValueError",
+          "lineNumber": 1134
+        },
+        {
+          "caller": "build",
+          "callee": "len",
+          "lineNumber": 1140
+        },
+        {
+          "caller": "build",
+          "callee": "len",
+          "lineNumber": 1141
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 1145
+        },
+        {
+          "caller": "build",
+          "callee": "self.save",
+          "lineNumber": 1153
+        },
+        {
+          "caller": "build",
+          "callee": "self.save_config",
+          "lineNumber": 1156
+        },
+        {
+          "caller": "build",
+          "callee": "logger.warning",
+          "lineNumber": 1158
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 1200
+        },
+        {
+          "caller": "save",
+          "callee": "self.csv.replace",
+          "lineNumber": 1203
+        },
+        {
+          "caller": "save",
+          "callee": "df.to_excel",
+          "lineNumber": 1204
+        },
+        {
+          "caller": "save",
+          "callee": "df.to_csv",
+          "lineNumber": 1207
+        },
+        {
+          "caller": "save",
+          "callee": "logger.info",
+          "lineNumber": 1210
+        },
+        {
+          "caller": "save",
+          "callee": "self.save_eruption_dates",
+          "lineNumber": 1212
+        },
+        {
+          "caller": "save",
+          "callee": "self.plot_distribution",
+          "lineNumber": 1216
+        },
+        {
+          "caller": "save",
+          "callee": "logger.warning",
+          "lineNumber": 1218
+        },
+        {
+          "caller": "plot_distribution",
+          "callee": "os.path.splitext",
+          "lineNumber": 1251
+        },
+        {
+          "caller": "plot_distribution",
+          "callee": "plot_label_distribution",
+          "lineNumber": 1254
+        }
+      ],
+      "metrics": {
+        "importCount": 9,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/label/label_data.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 302,
+      "nonEmptyLines": 254,
+      "classes": [
+        {
+          "name": "LabelData",
+          "startLine": 19,
+          "endLine": 302,
+          "methods": [
+            "__init__",
+            "start_date_str",
+            "end_date_str",
+            "validate",
+            "df",
+            "parameters",
+            "data"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "LabelData",
+          "line": 19,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 48
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 48
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 51
+        },
+        {
+          "caller": "__init__",
+          "callee": "parse_label_filename",
+          "lineNumber": 53
+        },
+        {
+          "caller": "validate",
+          "callee": "os.path.exists",
+          "lineNumber": 116
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 117
+        },
+        {
+          "caller": "validate",
+          "callee": "self.basename.startswith",
+          "lineNumber": 119
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 120
+        },
+        {
+          "caller": "validate",
+          "callee": "self.filename.endswith",
+          "lineNumber": 125
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 126
+        },
+        {
+          "caller": "validate",
+          "callee": "self.basename.split",
+          "lineNumber": 128
+        },
+        {
+          "caller": "validate",
+          "callee": "len",
+          "lineNumber": 129
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 130
+        },
+        {
+          "caller": "validate",
+          "callee": "len",
+          "lineNumber": 138
+        },
+        {
+          "caller": "validate",
+          "callee": "include_eruption_date.startswith",
+          "lineNumber": 147
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 148
+        },
+        {
+          "caller": "validate",
+          "callee": "include_eruption_date.split",
+          "lineNumber": 153
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 157
+        },
+        {
+          "caller": "validate",
+          "callee": "datetime.strptime",
+          "lineNumber": 166
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 168
+        },
+        {
+          "caller": "validate",
+          "callee": "datetime.strptime",
+          "lineNumber": 173
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 175
+        },
+        {
+          "caller": "validate",
+          "callee": "window_step.split",
+          "lineNumber": 182
+        },
+        {
+          "caller": "validate",
+          "callee": "len",
+          "lineNumber": 184
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 185
+        },
+        {
+          "caller": "validate",
+          "callee": "len",
+          "lineNumber": 187
+        },
+        {
+          "caller": "validate",
+          "callee": "window_step.startswith",
+          "lineNumber": 194
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 195
+        },
+        {
+          "caller": "validate",
+          "callee": "step.isdigit",
+          "lineNumber": 200
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 201
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 207
+        },
+        {
+          "caller": "validate",
+          "callee": "day_to_forecast.startswith",
+          "lineNumber": 213
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 214
+        },
+        {
+          "caller": "validate",
+          "callee": "day_to_forecast.split(\"-\")[1].isdigit",
+          "lineNumber": 218
+        },
+        {
+          "caller": "validate",
+          "callee": "day_to_forecast.split",
+          "lineNumber": 218
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 219
+        },
+        {
+          "caller": "df",
+          "callee": "logger.debug",
+          "lineNumber": 245
+        },
+        {
+          "caller": "df",
+          "callee": "pd.read_csv",
+          "lineNumber": 246
+        },
+        {
+          "caller": "df",
+          "callee": "logger.debug",
+          "lineNumber": 247
+        },
+        {
+          "caller": "df",
+          "callee": "len",
+          "lineNumber": 247
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/forecast_model_scenario.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 927,
+      "nonEmptyLines": 839,
+      "classes": [
+        {
+          "name": "Scenario",
+          "startLine": 13,
+          "endLine": 56,
+          "methods": [],
+          "properties": [
+            "name",
+            "description",
+            "train_start_date",
+            "train_end_date",
+            "prediction_start_date",
+            "prediction_end_date",
+            "prediction_window_step",
+            "prediction_window_step_unit",
+            "prediction_plot_kwargs"
+          ]
+        },
+        {
+          "name": "ForecastModelScenario",
+          "startLine": 59,
+          "endLine": 927,
+          "methods": [
+            "__init__",
+            "build_plot_kwargs",
+            "validate",
+            "calculate",
+            "shared_training",
+            "shared_prediction",
+            "shared_evaluation",
+            "shared_explanation",
+            "run",
+            "_save_scenarios"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "Scenario",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "ForecastModelScenario",
+          "line": 59,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "os.path.abspath",
+          "lineNumber": 149
+        },
+        {
+          "caller": "__init__",
+          "callee": "setup_nslc_directories",
+          "lineNumber": 150
+        },
+        {
+          "caller": "__init__",
+          "callee": "station.upper",
+          "lineNumber": 154
+        },
+        {
+          "caller": "__init__",
+          "callee": "channel.upper",
+          "lineNumber": 155
+        },
+        {
+          "caller": "__init__",
+          "callee": "network.upper",
+          "lineNumber": 156
+        },
+        {
+          "caller": "__init__",
+          "callee": "location.upper",
+          "lineNumber": 157
+        },
+        {
+          "caller": "__init__",
+          "callee": "ForecastModel",
+          "lineNumber": 166
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 177
+        },
+        {
+          "caller": "__init__",
+          "callee": "logger.info",
+          "lineNumber": 185
+        },
+        {
+          "caller": "__init__",
+          "callee": "logger.info",
+          "lineNumber": 186
+        },
+        {
+          "caller": "build_plot_kwargs",
+          "callee": "dict",
+          "lineNumber": 209
+        },
+        {
+          "caller": "build_plot_kwargs",
+          "callee": "scenario.get",
+          "lineNumber": 209
+        },
+        {
+          "caller": "validate",
+          "callee": "slugify",
+          "lineNumber": 238
+        },
+        {
+          "caller": "validate",
+          "callee": "len",
+          "lineNumber": 239
+        },
+        {
+          "caller": "validate",
+          "callee": "scenario_names.append",
+          "lineNumber": 240
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 242
+        },
+        {
+          "caller": "validate",
+          "callee": "scenario_names.append",
+          "lineNumber": 247
+        },
+        {
+          "caller": "validate",
+          "callee": "RuntimeError",
+          "lineNumber": 250
+        },
+        {
+          "caller": "validate",
+          "callee": "RuntimeError",
+          "lineNumber": 253
+        },
+        {
+          "caller": "validate",
+          "callee": "RuntimeError",
+          "lineNumber": 256
+        },
+        {
+          "caller": "validate",
+          "callee": "os.makedirs",
+          "lineNumber": 258
+        },
+        {
+          "caller": "calculate",
+          "callee": "self.ForecastModel.calculate",
+          "lineNumber": 345
+        },
+        {
+          "caller": "run",
+          "callee": "RuntimeError",
+          "lineNumber": 815
+        },
+        {
+          "caller": "run",
+          "callee": "RuntimeError",
+          "lineNumber": 821
+        },
+        {
+          "caller": "run",
+          "callee": "self.validate()._save_scenarios",
+          "lineNumber": 826
+        },
+        {
+          "caller": "run",
+          "callee": "self.validate",
+          "lineNumber": 826
+        },
+        {
+          "caller": "run",
+          "callee": "enumerate",
+          "lineNumber": 833
+        },
+        {
+          "caller": "run",
+          "callee": "ForecastModelScenario.build_plot_kwargs",
+          "lineNumber": 836
+        },
+        {
+          "caller": "run",
+          "callee": "logger.info",
+          "lineNumber": 840
+        },
+        {
+          "caller": "run",
+          "callee": "os.path.join",
+          "lineNumber": 842
+        },
+        {
+          "caller": "run",
+          "callee": "slugify",
+          "lineNumber": 842
+        },
+        {
+          "caller": "run",
+          "callee": "slugify",
+          "lineNumber": 844
+        },
+        {
+          "caller": "run",
+          "callee": "fm.train",
+          "lineNumber": 846
+        },
+        {
+          "caller": "run",
+          "callee": "fm.predict",
+          "lineNumber": 858
+        },
+        {
+          "caller": "run",
+          "callee": "socket.gethostname",
+          "lineNumber": 889
+        },
+        {
+          "caller": "run",
+          "callee": "TelegramNotification",
+          "lineNumber": 893
+        },
+        {
+          "caller": "run",
+          "callee": "tn.send_document",
+          "lineNumber": 894
+        },
+        {
+          "caller": "run",
+          "callee": "caption.upper",
+          "lineNumber": 896
+        },
+        {
+          "caller": "run",
+          "callee": "fm.evaluate",
+          "lineNumber": 900
+        },
+        {
+          "caller": "run",
+          "callee": "fm.explain",
+          "lineNumber": 906
+        },
+        {
+          "caller": "_save_scenarios",
+          "callee": "os.path.join",
+          "lineNumber": 923
+        },
+        {
+          "caller": "_save_scenarios",
+          "callee": "open",
+          "lineNumber": 924
+        },
+        {
+          "caller": "_save_scenarios",
+          "callee": "json.dump",
+          "lineNumber": 925
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 2
+      }
+    },
+    {
+      "path": "src/eruption_forecast/notification/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/notification/telegram.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 452,
+      "nonEmptyLines": 386,
+      "functions": [
+        {
+          "name": "_escape_markdown_v2",
+          "startLine": 41,
+          "endLine": 60,
+          "params": [
+            "text"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "TelegramNotification",
+          "startLine": 63,
+          "endLine": 452,
+          "methods": [
+            "__init__",
+            "_has_credentials",
+            "send_message",
+            "send_document",
+            "send_photo",
+            "send_media_group",
+            "_send_file",
+            "_send_media_chunk"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "_escape_markdown_v2",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "TelegramNotification",
+          "line": 63,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_escape_markdown_v2",
+          "callee": "_MARKDOWN_V2_RESERVED.sub",
+          "lineNumber": 60
+        },
+        {
+          "caller": "__init__",
+          "callee": "load_dotenv",
+          "lineNumber": 100
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.environ.get",
+          "lineNumber": 102
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.environ.get",
+          "lineNumber": 103
+        },
+        {
+          "caller": "__init__",
+          "callee": "socket.gethostname",
+          "lineNumber": 104
+        },
+        {
+          "caller": "__init__",
+          "callee": "missing.append",
+          "lineNumber": 112
+        },
+        {
+          "caller": "__init__",
+          "callee": "missing.append",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 115
+        },
+        {
+          "caller": "__init__",
+          "callee": "', '.join",
+          "lineNumber": 116
+        },
+        {
+          "caller": "_has_credentials",
+          "callee": "bool",
+          "lineNumber": 123
+        },
+        {
+          "caller": "_has_credentials",
+          "callee": "bool",
+          "lineNumber": 123
+        },
+        {
+          "caller": "send_message",
+          "callee": "niquests.post",
+          "lineNumber": 148
+        },
+        {
+          "caller": "send_message",
+          "callee": "logger.info",
+          "lineNumber": 161
+        },
+        {
+          "caller": "send_message",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 163
+        },
+        {
+          "caller": "send_message",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 164
+        },
+        {
+          "caller": "send_message",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 168
+        },
+        {
+          "caller": "send_document",
+          "callee": "self._send_file",
+          "lineNumber": 195
+        },
+        {
+          "caller": "send_photo",
+          "callee": "Path(file).suffix.lower",
+          "lineNumber": 216
+        },
+        {
+          "caller": "send_photo",
+          "callee": "Path",
+          "lineNumber": 216
+        },
+        {
+          "caller": "send_photo",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 217
+        },
+        {
+          "caller": "send_photo",
+          "callee": "Path",
+          "lineNumber": 218
+        },
+        {
+          "caller": "send_photo",
+          "callee": "sorted",
+          "lineNumber": 219
+        },
+        {
+          "caller": "send_photo",
+          "callee": "self.send_document",
+          "lineNumber": 221
+        },
+        {
+          "caller": "send_photo",
+          "callee": "self._send_file",
+          "lineNumber": 225
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "isinstance",
+          "lineNumber": 268
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "Path(f).suffix.lower",
+          "lineNumber": 272
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "Path",
+          "lineNumber": 272
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 276
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "len",
+          "lineNumber": 277
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "Path",
+          "lineNumber": 278
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "range",
+          "lineNumber": 283
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "len",
+          "lineNumber": 283
+        },
+        {
+          "caller": "send_media_group",
+          "callee": "self._send_media_chunk",
+          "lineNumber": 285
+        },
+        {
+          "caller": "_send_file",
+          "callee": "Path",
+          "lineNumber": 326
+        },
+        {
+          "caller": "_send_file",
+          "callee": "file_path.is_file",
+          "lineNumber": 327
+        },
+        {
+          "caller": "_send_file",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 328
+        },
+        {
+          "caller": "_send_file",
+          "callee": "_escape_markdown_v2",
+          "lineNumber": 337
+        },
+        {
+          "caller": "_send_file",
+          "callee": "str",
+          "lineNumber": 337
+        },
+        {
+          "caller": "_send_file",
+          "callee": "file_path.open",
+          "lineNumber": 341
+        },
+        {
+          "caller": "_send_file",
+          "callee": "niquests.post",
+          "lineNumber": 342
+        },
+        {
+          "caller": "_send_file",
+          "callee": "logger.info",
+          "lineNumber": 352
+        },
+        {
+          "caller": "_send_file",
+          "callee": "field.title",
+          "lineNumber": 352
+        },
+        {
+          "caller": "_send_file",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 354
+        },
+        {
+          "caller": "_send_file",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 355
+        },
+        {
+          "caller": "_send_file",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 358
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "Path",
+          "lineNumber": 392
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "path.is_file",
+          "lineNumber": 393
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 394
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "paths.append",
+          "lineNumber": 396
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "len",
+          "lineNumber": 401
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "method",
+          "lineNumber": 406
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "str",
+          "lineNumber": 406
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "contextlib.ExitStack",
+          "lineNumber": 413
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "enumerate",
+          "lineNumber": 414
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "_escape_markdown_v2",
+          "lineNumber": 421
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "media.append",
+          "lineNumber": 425
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "stack.enter_context",
+          "lineNumber": 426
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "path.open",
+          "lineNumber": 426
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "niquests.post",
+          "lineNumber": 429
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "json.dumps",
+          "lineNumber": 433
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "logger.info",
+          "lineNumber": 443
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "len",
+          "lineNumber": 444
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 447
+        },
+        {
+          "caller": "_send_media_chunk",
+          "callee": "_tg_logger.warning",
+          "lineNumber": 452
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/plots/label_plots.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 437,
+      "nonEmptyLines": 377,
+      "functions": [
+        {
+          "name": "plot_label_distribution",
+          "startLine": 39,
+          "endLine": 129,
+          "params": [
+            "df",
+            "filepath",
+            "label_column",
+            "title",
+            "filetype",
+            "color_non_erupted",
+            "color_erupted",
+            "figure_size",
+            "dpi",
+            "verbose"
+          ]
+        },
+        {
+          "name": "plot_label_distribution_from_file",
+          "startLine": 132,
+          "endLine": 200,
+          "params": [
+            "label_csv",
+            "output_dir",
+            "label_column",
+            "title",
+            "filetype",
+            "color_non_erupted",
+            "color_erupted",
+            "figure_size",
+            "dpi",
+            "verbose"
+          ]
+        },
+        {
+          "name": "plot_label_distribution_comparison",
+          "startLine": 203,
+          "endLine": 349,
+          "params": [
+            "entries",
+            "filepath",
+            "label_column",
+            "title",
+            "filetype",
+            "color_non_erupted",
+            "color_erupted",
+            "figure_size",
+            "x_label_rotation",
+            "bar_width",
+            "group_gap",
+            "dpi",
+            "verbose"
+          ]
+        },
+        {
+          "name": "plot_label_distribution_comparison_from_files",
+          "startLine": 352,
+          "endLine": 437,
+          "params": [
+            "entries",
+            "filepath",
+            "label_column",
+            "title",
+            "filetype",
+            "color_non_erupted",
+            "color_erupted",
+            "figure_size",
+            "x_label_rotation",
+            "bar_width",
+            "group_gap",
+            "dpi",
+            "verbose"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "LabelScenarioEntry",
+          "startLine": 12,
+          "endLine": 22,
+          "methods": [],
+          "properties": [
+            "name",
+            "df"
+          ]
+        },
+        {
+          "name": "LabelScenarioFileEntry",
+          "startLine": 25,
+          "endLine": 36,
+          "methods": [],
+          "properties": [
+            "name",
+            "csv"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "LabelScenarioEntry",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "LabelScenarioFileEntry",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "plot_label_distribution",
+          "line": 39,
+          "isDefault": false
+        },
+        {
+          "name": "plot_label_distribution_from_file",
+          "line": 132,
+          "isDefault": false
+        },
+        {
+          "name": "plot_label_distribution_comparison",
+          "line": 203,
+          "isDefault": false
+        },
+        {
+          "name": "plot_label_distribution_comparison_from_files",
+          "line": 352,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "plot_label_distribution",
+          "callee": "df[label_column].value_counts().sort_index",
+          "lineNumber": 84
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "df[label_column].value_counts",
+          "lineNumber": 84
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "int",
+          "lineNumber": 85
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "counts.sum",
+          "lineNumber": 85
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "int",
+          "lineNumber": 89
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "counts.get",
+          "lineNumber": 89
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "int",
+          "lineNumber": 89
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "counts.get",
+          "lineNumber": 89
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "max",
+          "lineNumber": 90
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "plt.subplots",
+          "lineNumber": 92
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.bar",
+          "lineNumber": 94
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "zip",
+          "lineNumber": 103
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.text",
+          "lineNumber": 105
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "bar.get_x",
+          "lineNumber": 106
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "bar.get_width",
+          "lineNumber": 106
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "bar.get_height",
+          "lineNumber": 107
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.set_ylabel",
+          "lineNumber": 114
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.set_title",
+          "lineNumber": 115
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.tick_params",
+          "lineNumber": 116
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.set_ylim",
+          "lineNumber": 117
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.spines[\"top\"].set_visible",
+          "lineNumber": 120
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "ax.spines[\"right\"].set_visible",
+          "lineNumber": 121
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "save_figure",
+          "lineNumber": 123
+        },
+        {
+          "caller": "plot_label_distribution",
+          "callee": "logger.info",
+          "lineNumber": 127
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "os.path.isfile",
+          "lineNumber": 180
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "FileNotFoundError",
+          "lineNumber": 181
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "pd.read_csv",
+          "lineNumber": 183
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "os.path.splitext",
+          "lineNumber": 185
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "os.path.basename",
+          "lineNumber": 185
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "os.path.dirname",
+          "lineNumber": 186
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "os.path.join",
+          "lineNumber": 187
+        },
+        {
+          "caller": "plot_label_distribution_from_file",
+          "callee": "plot_label_distribution",
+          "lineNumber": 189
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ValueError",
+          "lineNumber": 270
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "entry[\"df\"][label_column].value_counts().sort_index",
+          "lineNumber": 278
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "entry[\"df\"][label_column].value_counts",
+          "lineNumber": 278
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "int",
+          "lineNumber": 279
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "counts.get",
+          "lineNumber": 279
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "int",
+          "lineNumber": 280
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "counts.get",
+          "lineNumber": 280
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "names.append",
+          "lineNumber": 281
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "non_erupted_counts.append",
+          "lineNumber": 282
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "erupted_counts.append",
+          "lineNumber": 283
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "totals.append",
+          "lineNumber": 284
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "np.arange",
+          "lineNumber": 286
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "len",
+          "lineNumber": 286
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "max",
+          "lineNumber": 287
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "plt.subplots",
+          "lineNumber": 289
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.bar",
+          "lineNumber": 291
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.bar",
+          "lineNumber": 300
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "zip",
+          "lineNumber": 314
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.text",
+          "lineNumber": 316
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "bar.get_x",
+          "lineNumber": 317
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "bar.get_width",
+          "lineNumber": 317
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "bar.get_height",
+          "lineNumber": 318
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.set_xticks",
+          "lineNumber": 325
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "plt.setp",
+          "lineNumber": 328
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.get_xticklabels",
+          "lineNumber": 328
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.set_ylabel",
+          "lineNumber": 329
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.set_title",
+          "lineNumber": 330
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.tick_params",
+          "lineNumber": 334
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.set_ylim",
+          "lineNumber": 335
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.spines[\"top\"].set_visible",
+          "lineNumber": 338
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.spines[\"right\"].set_visible",
+          "lineNumber": 339
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "ax.legend",
+          "lineNumber": 341
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "save_figure",
+          "lineNumber": 343
+        },
+        {
+          "caller": "plot_label_distribution_comparison",
+          "callee": "logger.info",
+          "lineNumber": 347
+        },
+        {
+          "caller": "plot_label_distribution_comparison_from_files",
+          "callee": "ValueError",
+          "lineNumber": 413
+        },
+        {
+          "caller": "plot_label_distribution_comparison_from_files",
+          "callee": "os.path.isfile",
+          "lineNumber": 417
+        },
+        {
+          "caller": "plot_label_distribution_comparison_from_files",
+          "callee": "FileNotFoundError",
+          "lineNumber": 418
+        },
+        {
+          "caller": "plot_label_distribution_comparison_from_files",
+          "callee": "df_entries.append",
+          "lineNumber": 419
+        },
+        {
+          "caller": "plot_label_distribution_comparison_from_files",
+          "callee": "pd.read_csv",
+          "lineNumber": 420
+        },
+        {
+          "caller": "plot_label_distribution_comparison_from_files",
+          "callee": "plot_label_distribution_comparison",
+          "lineNumber": 423
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 6,
+        "functionCount": 4,
+        "classCount": 2
+      }
+    }
+  ]
+}

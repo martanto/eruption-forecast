@@ -1,0 +1,5805 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 11,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 11,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 11,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/eruption_forecast/features/__init__.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 10,
+      "nonEmptyLines": 8,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/features/feature_count_sweep.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 1070,
+      "nonEmptyLines": 941,
+      "functions": [
+        {
+          "name": "_to_list",
+          "startLine": 527,
+          "endLine": 531,
+          "params": [
+            "ranking"
+          ]
+        },
+        {
+          "name": "_score_fold",
+          "startLine": 534,
+          "endLine": 565,
+          "params": [
+            "estimator",
+            "x_train",
+            "y_train",
+            "x_test",
+            "y_test",
+            "scoring",
+            "resample_method",
+            "minority_threshold",
+            "random_state"
+          ]
+        },
+        {
+          "name": "_pick_best",
+          "startLine": 568,
+          "endLine": 623,
+          "params": [
+            "cv_scores",
+            "parsimony",
+            "parsimony_tolerance"
+          ]
+        },
+        {
+          "name": "sweep_feature_count",
+          "startLine": 631,
+          "endLine": 816,
+          "params": [
+            "source",
+            "mode",
+            "evaluation_source",
+            "classifier_name",
+            "n_candidates",
+            "cv",
+            "scoring",
+            "parsimony",
+            "parsimony_tolerance",
+            "resample_method",
+            "minority_threshold",
+            "estimator_mode",
+            "n_jobs",
+            "random_state",
+            "output_dir",
+            "save",
+            "verbose"
+          ]
+        },
+        {
+          "name": "_resolve_training_context",
+          "startLine": 824,
+          "endLine": 850,
+          "params": [
+            "source"
+          ]
+        },
+        {
+          "name": "_discover_cv_dir",
+          "startLine": 853,
+          "endLine": 869,
+          "params": [
+            "training_dir"
+          ]
+        },
+        {
+          "name": "_load_features_matrix",
+          "startLine": 872,
+          "endLine": 880,
+          "params": [
+            "features_dir"
+          ]
+        },
+        {
+          "name": "_load_labels",
+          "startLine": 883,
+          "endLine": 891,
+          "params": [
+            "features_dir"
+          ]
+        },
+        {
+          "name": "_discover_trained_top_n",
+          "startLine": 894,
+          "endLine": 903,
+          "params": [
+            "features_seed_dir"
+          ]
+        },
+        {
+          "name": "_discover_classifier_names",
+          "startLine": 906,
+          "endLine": 922,
+          "params": [
+            "training_dir",
+            "cv_slug"
+          ]
+        },
+        {
+          "name": "_harvest_per_seed_inputs",
+          "startLine": 925,
+          "endLine": 984,
+          "params": [
+            "training_dir",
+            "cv_slug",
+            "classifier_name",
+            "features_seed_dir",
+            "features_resampled_dir",
+            "estimator_mode"
+          ]
+        },
+        {
+          "name": "_resolve_forecast_inputs",
+          "startLine": 987,
+          "endLine": 1027,
+          "params": [
+            "mode",
+            "evaluation_source"
+          ]
+        },
+        {
+          "name": "_persist_sweep",
+          "startLine": 1030,
+          "endLine": 1070,
+          "params": [
+            "sweep",
+            "output_dir"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "FeatureCountSweep",
+          "startLine": 68,
+          "endLine": 519,
+          "methods": [
+            "__init__",
+            "_validate_init",
+            "fit",
+            "_build_seed_iter",
+            "_resolve_cv",
+            "save",
+            "load"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "FeatureCountSweep",
+          "line": 68,
+          "isDefault": false
+        },
+        {
+          "name": "_to_list",
+          "line": 527,
+          "isDefault": false
+        },
+        {
+          "name": "_score_fold",
+          "line": 534,
+          "isDefault": false
+        },
+        {
+          "name": "_pick_best",
+          "line": 568,
+          "isDefault": false
+        },
+        {
+          "name": "sweep_feature_count",
+          "line": 631,
+          "isDefault": false
+        },
+        {
+          "name": "_resolve_training_context",
+          "line": 824,
+          "isDefault": false
+        },
+        {
+          "name": "_discover_cv_dir",
+          "line": 853,
+          "isDefault": false
+        },
+        {
+          "name": "_load_features_matrix",
+          "line": 872,
+          "isDefault": false
+        },
+        {
+          "name": "_load_labels",
+          "line": 883,
+          "isDefault": false
+        },
+        {
+          "name": "_discover_trained_top_n",
+          "line": 894,
+          "isDefault": false
+        },
+        {
+          "name": "_discover_classifier_names",
+          "line": 906,
+          "isDefault": false
+        },
+        {
+          "name": "_harvest_per_seed_inputs",
+          "line": 925,
+          "isDefault": false
+        },
+        {
+          "name": "_resolve_forecast_inputs",
+          "line": 987,
+          "isDefault": false
+        },
+        {
+          "name": "_persist_sweep",
+          "line": 1030,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "list",
+          "lineNumber": 184
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 200
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 201
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.Series",
+          "lineNumber": 203
+        },
+        {
+          "caller": "__init__",
+          "callee": "self._validate_init",
+          "lineNumber": 207
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "ValueError",
+          "lineNumber": 212
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "any",
+          "lineNumber": 213
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "ValueError",
+          "lineNumber": 214
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "ValueError",
+          "lineNumber": 217
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "ValueError",
+          "lineNumber": 222
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "ValueError",
+          "lineNumber": 227
+        },
+        {
+          "caller": "_validate_init",
+          "callee": "ValueError",
+          "lineNumber": 232
+        },
+        {
+          "caller": "fit",
+          "callee": "self._build_seed_iter",
+          "lineNumber": 301
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 308
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 314
+        },
+        {
+          "caller": "fit",
+          "callee": "min",
+          "lineNumber": 321
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 321
+        },
+        {
+          "caller": "fit",
+          "callee": "seed_iter.values",
+          "lineNumber": 321
+        },
+        {
+          "caller": "fit",
+          "callee": "sorted",
+          "lineNumber": 322
+        },
+        {
+          "caller": "fit",
+          "callee": "sorted",
+          "lineNumber": 323
+        },
+        {
+          "caller": "fit",
+          "callee": "set",
+          "lineNumber": 323
+        },
+        {
+          "caller": "fit",
+          "callee": "set",
+          "lineNumber": 323
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.warning",
+          "lineNumber": 325
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 330
+        },
+        {
+          "caller": "fit",
+          "callee": "pd.DataFrame",
+          "lineNumber": 336
+        },
+        {
+          "caller": "fit",
+          "callee": "list",
+          "lineNumber": 338
+        },
+        {
+          "caller": "fit",
+          "callee": "seed_iter.keys",
+          "lineNumber": 338
+        },
+        {
+          "caller": "fit",
+          "callee": "get_scorer",
+          "lineNumber": 343
+        },
+        {
+          "caller": "fit",
+          "callee": "seed_iter.items",
+          "lineNumber": 346
+        },
+        {
+          "caller": "fit",
+          "callee": "list",
+          "lineNumber": 351
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 359
+        },
+        {
+          "caller": "fit",
+          "callee": "KeyError",
+          "lineNumber": 366
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 368
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 370
+        },
+        {
+          "caller": "fit",
+          "callee": "clone(tuned_est).fit",
+          "lineNumber": 372
+        },
+        {
+          "caller": "fit",
+          "callee": "clone",
+          "lineNumber": 372
+        },
+        {
+          "caller": "fit",
+          "callee": "float",
+          "lineNumber": 373
+        },
+        {
+          "caller": "fit",
+          "callee": "scorer",
+          "lineNumber": 374
+        },
+        {
+          "caller": "fit",
+          "callee": "self._resolve_cv",
+          "lineNumber": 377
+        },
+        {
+          "caller": "fit",
+          "callee": "Parallel",
+          "lineNumber": 378
+        },
+        {
+          "caller": "fit",
+          "callee": "delayed",
+          "lineNumber": 379
+        },
+        {
+          "caller": "fit",
+          "callee": "clone",
+          "lineNumber": 380
+        },
+        {
+          "caller": "fit",
+          "callee": "cv_splitter.split",
+          "lineNumber": 390
+        },
+        {
+          "caller": "fit",
+          "callee": "float",
+          "lineNumber": 392
+        },
+        {
+          "caller": "fit",
+          "callee": "np.mean",
+          "lineNumber": 392
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 395
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.loc[n_val].mean",
+          "lineNumber": 397
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.loc[n_val].std",
+          "lineNumber": 398
+        },
+        {
+          "caller": "fit",
+          "callee": "pd.DataFrame",
+          "lineNumber": 403
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.mean",
+          "lineNumber": 405
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.std",
+          "lineNumber": 406
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.count",
+          "lineNumber": 407
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.idxmax(axis=0).astype",
+          "lineNumber": 410
+        },
+        {
+          "caller": "fit",
+          "callee": "raw.idxmax",
+          "lineNumber": 410
+        },
+        {
+          "caller": "fit",
+          "callee": "_pick_best",
+          "lineNumber": 411
+        },
+        {
+          "caller": "fit",
+          "callee": "list",
+          "lineNumber": 417
+        },
+        {
+          "caller": "fit",
+          "callee": "seed_iter.items",
+          "lineNumber": 418
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "sum",
+          "lineNumber": 434
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "ValueError",
+          "lineNumber": 439
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "ValueError",
+          "lineNumber": 444
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "int",
+          "lineNumber": 449
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "per_seed_inputs.items",
+          "lineNumber": 449
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "ValueError",
+          "lineNumber": 452
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "_to_list",
+          "lineNumber": 461
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "int",
+          "lineNumber": 469
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "_to_list",
+          "lineNumber": 470
+        },
+        {
+          "caller": "_build_seed_iter",
+          "callee": "per_seed_rankings.items",
+          "lineNumber": 474
+        },
+        {
+          "caller": "_resolve_cv",
+          "callee": "isinstance",
+          "lineNumber": 484
+        },
+        {
+          "caller": "_resolve_cv",
+          "callee": "len",
+          "lineNumber": 486
+        },
+        {
+          "caller": "_resolve_cv",
+          "callee": "y.unique",
+          "lineNumber": 486
+        },
+        {
+          "caller": "_resolve_cv",
+          "callee": "StratifiedKFold",
+          "lineNumber": 488
+        },
+        {
+          "caller": "_resolve_cv",
+          "callee": "KFold",
+          "lineNumber": 493
+        },
+        {
+          "caller": "save",
+          "callee": "ensure_dir",
+          "lineNumber": 510
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.dirname",
+          "lineNumber": 510
+        },
+        {
+          "caller": "save",
+          "callee": "os.path.abspath",
+          "lineNumber": 510
+        },
+        {
+          "caller": "save",
+          "callee": "joblib.dump",
+          "lineNumber": 511
+        },
+        {
+          "caller": "save",
+          "callee": "logger.info",
+          "lineNumber": 512
+        },
+        {
+          "caller": "load",
+          "callee": "load_pickle",
+          "lineNumber": 517
+        },
+        {
+          "caller": "load",
+          "callee": "logger.info",
+          "lineNumber": 518
+        },
+        {
+          "caller": "_to_list",
+          "callee": "isinstance",
+          "lineNumber": 529
+        },
+        {
+          "caller": "_to_list",
+          "callee": "str",
+          "lineNumber": 530
+        },
+        {
+          "caller": "_to_list",
+          "callee": "list",
+          "lineNumber": 531
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "y_train.value_counts(normalize=True).min",
+          "lineNumber": 552
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "y_train.value_counts",
+          "lineNumber": 552
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "_resample",
+          "lineNumber": 556
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "estimator.fit",
+          "lineNumber": 563
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "get_scorer",
+          "lineNumber": 564
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "float",
+          "lineNumber": 565
+        },
+        {
+          "caller": "_score_fold",
+          "callee": "scorer",
+          "lineNumber": 565
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "cv_scores[\"mean\"].to_numpy",
+          "lineNumber": 593
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "cv_scores[\"std\"].to_numpy",
+          "lineNumber": 594
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "cv_scores[\"n_seeds\"].to_numpy",
+          "lineNumber": 595
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "cv_scores.index.to_numpy",
+          "lineNumber": 596
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "int",
+          "lineNumber": 598
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "np.argmax",
+          "lineNumber": 598
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "int",
+          "lineNumber": 599
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "float",
+          "lineNumber": 603
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "float",
+          "lineNumber": 605
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "float",
+          "lineNumber": 606
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "np.isfinite",
+          "lineNumber": 609
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "np.sqrt",
+          "lineNumber": 610
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "ValueError",
+          "lineNumber": 616
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "int",
+          "lineNumber": 622
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "zip",
+          "lineNumber": 622
+        },
+        {
+          "caller": "_pick_best",
+          "callee": "min",
+          "lineNumber": 623
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_resolve_forecast_inputs",
+          "lineNumber": 735
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_resolve_training_context",
+          "lineNumber": 737
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_discover_cv_dir",
+          "lineNumber": 738
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_load_features_matrix",
+          "lineNumber": 741
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_load_labels",
+          "lineNumber": 743
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "os.path.join",
+          "lineNumber": 745
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "os.path.join",
+          "lineNumber": 746
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_discover_trained_top_n",
+          "lineNumber": 748
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_discover_classifier_names",
+          "lineNumber": 753
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "RuntimeError",
+          "lineNumber": 756
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "os.path.join",
+          "lineNumber": 757
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "list",
+          "lineNumber": 762
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "base_candidates.append",
+          "lineNumber": 764
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "sorted",
+          "lineNumber": 765
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "set",
+          "lineNumber": 765
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_harvest_per_seed_inputs",
+          "lineNumber": 769
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "logger.warning",
+          "lineNumber": 778
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "FeatureCountSweep",
+          "lineNumber": 783
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "sweep.fit",
+          "lineNumber": 798
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "os.path.join",
+          "lineNumber": 807
+        },
+        {
+          "caller": "sweep_feature_count",
+          "callee": "_persist_sweep",
+          "lineNumber": 810
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "isinstance",
+          "lineNumber": 836
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "isinstance",
+          "lineNumber": 842
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "os.fspath",
+          "lineNumber": 843
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "os.path.isdir",
+          "lineNumber": 844
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "FileNotFoundError",
+          "lineNumber": 845
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "TypeError",
+          "lineNumber": 848
+        },
+        {
+          "caller": "_resolve_training_context",
+          "callee": "type",
+          "lineNumber": 849
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "os.path.join",
+          "lineNumber": 859
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "os.path.isdir",
+          "lineNumber": 860
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "FileNotFoundError",
+          "lineNumber": 861
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "os.listdir",
+          "lineNumber": 862
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "os.path.isdir",
+          "lineNumber": 862
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "os.path.join",
+          "lineNumber": 862
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "len",
+          "lineNumber": 863
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "RuntimeError",
+          "lineNumber": 864
+        },
+        {
+          "caller": "_discover_cv_dir",
+          "callee": "os.path.join",
+          "lineNumber": 869
+        },
+        {
+          "caller": "_load_features_matrix",
+          "callee": "sorted",
+          "lineNumber": 874
+        },
+        {
+          "caller": "_load_features_matrix",
+          "callee": "glob.glob",
+          "lineNumber": 874
+        },
+        {
+          "caller": "_load_features_matrix",
+          "callee": "os.path.join",
+          "lineNumber": 874
+        },
+        {
+          "caller": "_load_features_matrix",
+          "callee": "len",
+          "lineNumber": 875
+        },
+        {
+          "caller": "_load_features_matrix",
+          "callee": "RuntimeError",
+          "lineNumber": 876
+        },
+        {
+          "caller": "_load_features_matrix",
+          "callee": "pd.read_parquet",
+          "lineNumber": 880
+        },
+        {
+          "caller": "_load_labels",
+          "callee": "sorted",
+          "lineNumber": 885
+        },
+        {
+          "caller": "_load_labels",
+          "callee": "glob.glob",
+          "lineNumber": 885
+        },
+        {
+          "caller": "_load_labels",
+          "callee": "os.path.join",
+          "lineNumber": 885
+        },
+        {
+          "caller": "_load_labels",
+          "callee": "len",
+          "lineNumber": 886
+        },
+        {
+          "caller": "_load_labels",
+          "callee": "RuntimeError",
+          "lineNumber": 887
+        },
+        {
+          "caller": "_load_labels",
+          "callee": "load_label_csv",
+          "lineNumber": 891
+        },
+        {
+          "caller": "_discover_trained_top_n",
+          "callee": "sorted",
+          "lineNumber": 900
+        },
+        {
+          "caller": "_discover_trained_top_n",
+          "callee": "glob.glob",
+          "lineNumber": 900
+        },
+        {
+          "caller": "_discover_trained_top_n",
+          "callee": "os.path.join",
+          "lineNumber": 900
+        },
+        {
+          "caller": "_discover_trained_top_n",
+          "callee": "len",
+          "lineNumber": 903
+        },
+        {
+          "caller": "_discover_trained_top_n",
+          "callee": "pd.read_csv",
+          "lineNumber": 903
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "os.path.join",
+          "lineNumber": 912
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "os.path.isdir",
+          "lineNumber": 913
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "sorted",
+          "lineNumber": 916
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "os.listdir",
+          "lineNumber": 916
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "os.path.join",
+          "lineNumber": 917
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "os.path.isdir",
+          "lineNumber": 918
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "any",
+          "lineNumber": 918
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "f.endswith",
+          "lineNumber": 919
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "os.listdir",
+          "lineNumber": 919
+        },
+        {
+          "caller": "_discover_classifier_names",
+          "callee": "names.append",
+          "lineNumber": 921
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.join",
+          "lineNumber": 946
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.isdir",
+          "lineNumber": 949
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "sorted",
+          "lineNumber": 953
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "glob.glob",
+          "lineNumber": 953
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.join",
+          "lineNumber": 953
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.splitext",
+          "lineNumber": 954
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.basename",
+          "lineNumber": 954
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "int",
+          "lineNumber": 956
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "logger.warning",
+          "lineNumber": 958
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.join",
+          "lineNumber": 961
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.join",
+          "lineNumber": 962
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.isfile",
+          "lineNumber": 963
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "logger.warning",
+          "lineNumber": 964
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "os.path.isfile",
+          "lineNumber": 968
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "logger.warning",
+          "lineNumber": 969
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "pd.read_csv(ranking_path, index_col=0).index.tolist",
+          "lineNumber": 974
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "pd.read_csv",
+          "lineNumber": 974
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "pd.read_csv",
+          "lineNumber": 975
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "joblib.load",
+          "lineNumber": 976
+        },
+        {
+          "caller": "_harvest_per_seed_inputs",
+          "callee": "estimator.__class__",
+          "lineNumber": 978
+        },
+        {
+          "caller": "_resolve_forecast_inputs",
+          "callee": "ValueError",
+          "lineNumber": 1004
+        },
+        {
+          "caller": "_resolve_forecast_inputs",
+          "callee": "ValueError",
+          "lineNumber": 1009
+        },
+        {
+          "caller": "_resolve_forecast_inputs",
+          "callee": "ValueError",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "_resolve_forecast_inputs",
+          "callee": "ValueError",
+          "lineNumber": 1022
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "ensure_dir",
+          "lineNumber": 1041
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "sweep.cv_scores_.to_csv",
+          "lineNumber": 1042
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "os.path.join",
+          "lineNumber": 1042
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "sweep.cv_scores_raw_.to_csv",
+          "lineNumber": 1043
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "os.path.join",
+          "lineNumber": 1043
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "sweep.seed_argmax_.rename(\"argmax_N\").to_csv",
+          "lineNumber": 1044
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "sweep.seed_argmax_.rename",
+          "lineNumber": 1044
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "os.path.join",
+          "lineNumber": 1045
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "str",
+          "lineNumber": 1049
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "sweep.support_.items",
+          "lineNumber": 1049
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "open",
+          "lineNumber": 1051
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "os.path.join",
+          "lineNumber": 1051
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "json.dump",
+          "lineNumber": 1052
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "plot_feature_count_curve",
+          "lineNumber": 1056
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "os.path.join",
+          "lineNumber": 1060
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "logger.warning",
+          "lineNumber": 1068
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "sweep.save",
+          "lineNumber": 1070
+        },
+        {
+          "caller": "_persist_sweep",
+          "callee": "os.path.join",
+          "lineNumber": 1070
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 14,
+        "functionCount": 13,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/features/feature_selector.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 551,
+      "nonEmptyLines": 467,
+      "classes": [
+        {
+          "name": "FeatureSelector",
+          "startLine": 13,
+          "endLine": 551,
+          "methods": [
+            "__init__",
+            "validate",
+            "set_random_state",
+            "_select_tsfresh",
+            "_select_random_forest",
+            "fit",
+            "transform",
+            "fit_transform",
+            "get_feature_scores"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "FeatureSelector",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 113
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.getcwd",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.Series",
+          "lineNumber": 129
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.Series",
+          "lineNumber": 130
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.Series",
+          "lineNumber": 131
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 140
+        },
+        {
+          "caller": "validate",
+          "callee": "ValueError",
+          "lineNumber": 151
+        },
+        {
+          "caller": "set_random_state",
+          "callee": "validate_random_state",
+          "lineNumber": 175
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.info",
+          "lineNumber": 212
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "get_significant_features",
+          "lineNumber": 217
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.error",
+          "lineNumber": 226
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.error",
+          "lineNumber": 229
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.error",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "len",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.error",
+          "lineNumber": 231
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.error",
+          "lineNumber": 232
+        },
+        {
+          "caller": "_select_tsfresh",
+          "callee": "logger.info",
+          "lineNumber": 235
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "logger.info",
+          "lineNumber": 294
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "RandomForestClassifier",
+          "lineNumber": 297
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "rf.fit",
+          "lineNumber": 305
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "permutation_importance",
+          "lineNumber": 308
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "pd.DataFrame(\n            {\n                \"feature\": X.columns,\n                \"importance_mean\": perm_importance.importances_mean,\n                \"importance_std\": perm_importance.importances_std,\n            }\n        ).sort_values",
+          "lineNumber": 319
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "pd.DataFrame",
+          "lineNumber": 319
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "importance_df.head(top_n)[\"feature\"].tolist",
+          "lineNumber": 328
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "importance_df.head",
+          "lineNumber": 328
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "pd.Series",
+          "lineNumber": 332
+        },
+        {
+          "caller": "_select_random_forest",
+          "callee": "logger.info",
+          "lineNumber": 344
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 397
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 400
+        },
+        {
+          "caller": "fit",
+          "callee": "self._select_tsfresh",
+          "lineNumber": 405
+        },
+        {
+          "caller": "fit",
+          "callee": "p_values.rename",
+          "lineNumber": 406
+        },
+        {
+          "caller": "fit",
+          "callee": "X_filtered.columns.tolist",
+          "lineNumber": 407
+        },
+        {
+          "caller": "fit",
+          "callee": "self._select_random_forest",
+          "lineNumber": 410
+        },
+        {
+          "caller": "fit",
+          "callee": "importance_scores.rename",
+          "lineNumber": 413
+        },
+        {
+          "caller": "fit",
+          "callee": "X_selected.columns.tolist",
+          "lineNumber": 414
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 417
+        },
+        {
+          "caller": "transform",
+          "callee": "len",
+          "lineNumber": 450
+        },
+        {
+          "caller": "transform",
+          "callee": "ValueError",
+          "lineNumber": 451
+        },
+        {
+          "caller": "transform",
+          "callee": "set",
+          "lineNumber": 456
+        },
+        {
+          "caller": "transform",
+          "callee": "set",
+          "lineNumber": 456
+        },
+        {
+          "caller": "transform",
+          "callee": "ValueError",
+          "lineNumber": 458
+        },
+        {
+          "caller": "fit_transform",
+          "callee": "self.fit",
+          "lineNumber": 500
+        },
+        {
+          "caller": "fit_transform",
+          "callee": "self.transform",
+          "lineNumber": 501
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "pd.DataFrame",
+          "lineNumber": 533
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "df.merge(\n                self.p_values_.reset_index(),\n                left_on=\"feature\",\n                right_on=\"features\",\n                how=\"left\",\n            ).drop",
+          "lineNumber": 536
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "df.merge",
+          "lineNumber": 536
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "self.p_values_.reset_index",
+          "lineNumber": 537
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "df.merge(\n                self.importance_scores_.reset_index(),\n                left_on=\"feature\",\n                right_on=\"features\",\n                how=\"left\",\n            ).drop",
+          "lineNumber": 544
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "df.merge",
+          "lineNumber": 544
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "self.importance_scores_.reset_index",
+          "lineNumber": 545
+        },
+        {
+          "caller": "get_feature_scores",
+          "callee": "df.set_index",
+          "lineNumber": 551
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/label/dynamic_label_builder.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 257,
+      "nonEmptyLines": 212,
+      "classes": [
+        {
+          "name": "DynamicLabelBuilder",
+          "startLine": 13,
+          "endLine": 257,
+          "methods": [
+            "__init__",
+            "_eruption_dates",
+            "_label_dates",
+            "build"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "DynamicLabelBuilder",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "sort_dates",
+          "lineNumber": 76
+        },
+        {
+          "caller": "__init__",
+          "callee": "to_datetime",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "timedelta",
+          "lineNumber": 80
+        },
+        {
+          "caller": "__init__",
+          "callee": "to_datetime",
+          "lineNumber": 83
+        },
+        {
+          "caller": "__init__",
+          "callee": "resolve_output_dir",
+          "lineNumber": 85
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 86
+        },
+        {
+          "caller": "__init__",
+          "callee": "overall_start.strftime",
+          "lineNumber": 88
+        },
+        {
+          "caller": "__init__",
+          "callee": "overall_end.strftime",
+          "lineNumber": 89
+        },
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 92
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 92
+        },
+        {
+          "caller": "__init__",
+          "callee": "int",
+          "lineNumber": 114
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.path.join",
+          "lineNumber": 116
+        },
+        {
+          "caller": "_eruption_dates",
+          "callee": "eruption_dates.append",
+          "lineNumber": 127
+        },
+        {
+          "caller": "_eruption_dates",
+          "callee": "to_datetime",
+          "lineNumber": 127
+        },
+        {
+          "caller": "_label_dates",
+          "callee": "timedelta",
+          "lineNumber": 144
+        },
+        {
+          "caller": "_label_dates",
+          "callee": "label_dates.append",
+          "lineNumber": 146
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 194
+        },
+        {
+          "caller": "build",
+          "callee": "os.path.isfile",
+          "lineNumber": 196
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 200
+        },
+        {
+          "caller": "build",
+          "callee": "self.from_csv",
+          "lineNumber": 201
+        },
+        {
+          "caller": "build",
+          "callee": "self.initiate_label",
+          "lineNumber": 210
+        },
+        {
+          "caller": "build",
+          "callee": "dfs.append",
+          "lineNumber": 211
+        },
+        {
+          "caller": "build",
+          "callee": "pd.concat",
+          "lineNumber": 214
+        },
+        {
+          "caller": "build",
+          "callee": "_df[~_df.index.duplicated(keep=\"first\")].sort_index",
+          "lineNumber": 215
+        },
+        {
+          "caller": "build",
+          "callee": "_df.index.duplicated",
+          "lineNumber": 215
+        },
+        {
+          "caller": "build",
+          "callee": "range",
+          "lineNumber": 218
+        },
+        {
+          "caller": "build",
+          "callee": "len",
+          "lineNumber": 218
+        },
+        {
+          "caller": "build",
+          "callee": "_df[[\"id\", \"is_erupted\"]].astype",
+          "lineNumber": 219
+        },
+        {
+          "caller": "build",
+          "callee": "timedelta",
+          "lineNumber": 227
+        },
+        {
+          "caller": "build",
+          "callee": "timedelta",
+          "lineNumber": 229
+        },
+        {
+          "caller": "build",
+          "callee": "start_eruption.replace",
+          "lineNumber": 230
+        },
+        {
+          "caller": "build",
+          "callee": "eruption_date.replace",
+          "lineNumber": 231
+        },
+        {
+          "caller": "build",
+          "callee": "eruption_date.strftime",
+          "lineNumber": 235
+        },
+        {
+          "caller": "build",
+          "callee": "len",
+          "lineNumber": 247
+        },
+        {
+          "caller": "build",
+          "callee": "len",
+          "lineNumber": 248
+        },
+        {
+          "caller": "build",
+          "callee": "logger.info",
+          "lineNumber": 249
+        },
+        {
+          "caller": "build",
+          "callee": "self.save",
+          "lineNumber": 255
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/logger.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 298,
+      "nonEmptyLines": 232,
+      "functions": [
+        {
+          "name": "_category_filter",
+          "startLine": 92,
+          "endLine": 108,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "_uncategorized_filter",
+          "startLine": 111,
+          "endLine": 124,
+          "params": [
+            "record"
+          ]
+        },
+        {
+          "name": "_configure_handlers",
+          "startLine": 127,
+          "endLine": 181,
+          "params": [
+            "log_dir",
+            "console_level"
+          ]
+        },
+        {
+          "name": "get_logger",
+          "startLine": 189,
+          "endLine": 195,
+          "params": []
+        },
+        {
+          "name": "get_category_logger",
+          "startLine": 198,
+          "endLine": 215,
+          "params": [
+            "category"
+          ]
+        },
+        {
+          "name": "register_error_category",
+          "startLine": 218,
+          "endLine": 243,
+          "params": [
+            "name",
+            "level",
+            "retention"
+          ]
+        },
+        {
+          "name": "set_log_level",
+          "startLine": 246,
+          "endLine": 257,
+          "params": [
+            "level"
+          ]
+        },
+        {
+          "name": "set_log_directory",
+          "startLine": 260,
+          "endLine": 273,
+          "params": [
+            "log_dir"
+          ]
+        },
+        {
+          "name": "disable_logging",
+          "startLine": 276,
+          "endLine": 285,
+          "params": []
+        },
+        {
+          "name": "enable_logging",
+          "startLine": 288,
+          "endLine": 298,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "_category_filter",
+          "line": 92,
+          "isDefault": false
+        },
+        {
+          "name": "_uncategorized_filter",
+          "line": 111,
+          "isDefault": false
+        },
+        {
+          "name": "_configure_handlers",
+          "line": 127,
+          "isDefault": false
+        },
+        {
+          "name": "get_logger",
+          "line": 189,
+          "isDefault": false
+        },
+        {
+          "name": "get_category_logger",
+          "line": 198,
+          "isDefault": false
+        },
+        {
+          "name": "register_error_category",
+          "line": 218,
+          "isDefault": false
+        },
+        {
+          "name": "set_log_level",
+          "line": 246,
+          "isDefault": false
+        },
+        {
+          "name": "set_log_directory",
+          "line": 260,
+          "isDefault": false
+        },
+        {
+          "name": "disable_logging",
+          "line": 276,
+          "isDefault": false
+        },
+        {
+          "name": "enable_logging",
+          "line": 288,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_accept",
+          "callee": "record[\"extra\"].get",
+          "lineNumber": 106
+        },
+        {
+          "caller": "_uncategorized_filter",
+          "callee": "record[\"extra\"].get",
+          "lineNumber": 124
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "ensure_dir",
+          "lineNumber": 139
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "logger.remove",
+          "lineNumber": 140
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "logger.add",
+          "lineNumber": 142
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "console_level.upper",
+          "lineNumber": 145
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "logger.add",
+          "lineNumber": 149
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "os.path.join",
+          "lineNumber": 150
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "logger.add",
+          "lineNumber": 160
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "os.path.join",
+          "lineNumber": 161
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "_ERROR_CATEGORIES.items",
+          "lineNumber": 171
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "logger.add",
+          "lineNumber": 172
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "os.path.join",
+          "lineNumber": 173
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "cfg[\"level\"].upper",
+          "lineNumber": 178
+        },
+        {
+          "caller": "_configure_handlers",
+          "callee": "_category_filter",
+          "lineNumber": 180
+        },
+        {
+          "caller": "get_category_logger",
+          "callee": "logger.bind",
+          "lineNumber": 215
+        },
+        {
+          "caller": "register_error_category",
+          "callee": "_configure_handlers",
+          "lineNumber": 243
+        },
+        {
+          "caller": "set_log_level",
+          "callee": "_configure_handlers",
+          "lineNumber": 257
+        },
+        {
+          "caller": "set_log_directory",
+          "callee": "os.path.abspath",
+          "lineNumber": 271
+        },
+        {
+          "caller": "set_log_directory",
+          "callee": "_configure_handlers",
+          "lineNumber": 272
+        },
+        {
+          "caller": "set_log_directory",
+          "callee": "logger.info",
+          "lineNumber": 273
+        },
+        {
+          "caller": "disable_logging",
+          "callee": "logger.remove",
+          "lineNumber": 285
+        },
+        {
+          "caller": "enable_logging",
+          "callee": "os.environ.pop",
+          "lineNumber": 297
+        },
+        {
+          "caller": "enable_logging",
+          "callee": "_configure_handlers",
+          "lineNumber": 298
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 10,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/classifier_model.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 630,
+      "nonEmptyLines": 539,
+      "classes": [
+        {
+          "name": "ClassifierModel",
+          "startLine": 31,
+          "endLine": 630,
+          "methods": [
+            "__init__",
+            "set_random_state",
+            "get_cv_splitter",
+            "slug_name",
+            "slug_cv_name",
+            "grid",
+            "grid",
+            "model",
+            "_build_model",
+            "model",
+            "name",
+            "model_and_grid",
+            "update_model_and_grid"
+          ],
+          "properties": [
+            "_GRID_REGISTRY"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ClassifierModel",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "type",
+          "lineNumber": 183
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.get_cv_splitter",
+          "lineNumber": 183
+        },
+        {
+          "caller": "set_random_state",
+          "callee": "validate_random_state",
+          "lineNumber": 203
+        },
+        {
+          "caller": "get_cv_splitter",
+          "callee": "ShuffleSplit",
+          "lineNumber": 252
+        },
+        {
+          "caller": "get_cv_splitter",
+          "callee": "StratifiedKFold",
+          "lineNumber": 259
+        },
+        {
+          "caller": "get_cv_splitter",
+          "callee": "StratifiedShuffleSplit",
+          "lineNumber": 264
+        },
+        {
+          "caller": "get_cv_splitter",
+          "callee": "TimeSeriesSplit",
+          "lineNumber": 271
+        },
+        {
+          "caller": "slug_name",
+          "callee": "slugify_class_name",
+          "lineNumber": 289
+        },
+        {
+          "caller": "slug_cv_name",
+          "callee": "slugify_class_name",
+          "lineNumber": 307
+        },
+        {
+          "caller": "grid",
+          "callee": "ValueError",
+          "lineNumber": 338
+        },
+        {
+          "caller": "grid",
+          "callee": "logger.info",
+          "lineNumber": 357
+        },
+        {
+          "caller": "model",
+          "callee": "self._build_model",
+          "lineNumber": 402
+        },
+        {
+          "caller": "_build_model",
+          "callee": "SVC",
+          "lineNumber": 439
+        },
+        {
+          "caller": "_build_model",
+          "callee": "KNeighborsClassifier",
+          "lineNumber": 444
+        },
+        {
+          "caller": "_build_model",
+          "callee": "DecisionTreeClassifier",
+          "lineNumber": 445
+        },
+        {
+          "caller": "_build_model",
+          "callee": "RandomForestClassifier",
+          "lineNumber": 448
+        },
+        {
+          "caller": "_build_model",
+          "callee": "RandomForestClassifier",
+          "lineNumber": 453
+        },
+        {
+          "caller": "_build_model",
+          "callee": "GradientBoostingClassifier",
+          "lineNumber": 458
+        },
+        {
+          "caller": "_build_model",
+          "callee": "XGBClassifier",
+          "lineNumber": 459
+        },
+        {
+          "caller": "_build_model",
+          "callee": "MLPClassifier",
+          "lineNumber": 465
+        },
+        {
+          "caller": "_build_model",
+          "callee": "GaussianNB",
+          "lineNumber": 468
+        },
+        {
+          "caller": "_build_model",
+          "callee": "LogisticRegression",
+          "lineNumber": 469
+        },
+        {
+          "caller": "_build_model",
+          "callee": "VotingClassifier",
+          "lineNumber": 474
+        },
+        {
+          "caller": "_build_model",
+          "callee": "RandomForestClassifier",
+          "lineNumber": 478
+        },
+        {
+          "caller": "_build_model",
+          "callee": "XGBClassifier",
+          "lineNumber": 486
+        },
+        {
+          "caller": "_build_model",
+          "callee": "ValueError",
+          "lineNumber": 499
+        },
+        {
+          "caller": "model",
+          "callee": "logger.info",
+          "lineNumber": 538
+        },
+        {
+          "caller": "name",
+          "callee": "type",
+          "lineNumber": 555
+        },
+        {
+          "caller": "update_model_and_grid",
+          "callee": "logger.info",
+          "lineNumber": 628
+        },
+        {
+          "caller": "update_model_and_grid",
+          "callee": "logger.info",
+          "lineNumber": 629
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/constants.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 116,
+      "nonEmptyLines": 112,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/model/training_model.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 2110,
+      "nonEmptyLines": 1863,
+      "classes": [
+        {
+          "name": "TrainingModel",
+          "startLine": 42,
+          "endLine": 2110,
+          "methods": [
+            "__init__",
+            "stage_dir",
+            "build_identity",
+            "set_directories",
+            "create_directories",
+            "validate",
+            "describe",
+            "to_dict",
+            "to_prompt",
+            "save_config",
+            "build_label",
+            "extract_features",
+            "fit",
+            "load_features",
+            "compute_learning_curve",
+            "_init_config",
+            "build_classifier_ensemble",
+            "build_seed_ensemble",
+            "_resolve_single_artefact",
+            "_train",
+            "_features_selection",
+            "_run_jobs",
+            "_collect_pending_train_jobs",
+            "_select_features",
+            "_run_compute_learning_curve"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "TrainingModel",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "self._init_config",
+          "lineNumber": 124
+        },
+        {
+          "caller": "__init__",
+          "callee": "super().__init__",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "super",
+          "lineNumber": 147
+        },
+        {
+          "caller": "__init__",
+          "callee": "isinstance",
+          "lineNumber": 160
+        },
+        {
+          "caller": "__init__",
+          "callee": "get_classifier_models",
+          "lineNumber": 181
+        },
+        {
+          "caller": "__init__",
+          "callee": "FeatureSelector",
+          "lineNumber": 188
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.set_directories",
+          "lineNumber": 204
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.DataFrame",
+          "lineNumber": 206
+        },
+        {
+          "caller": "__init__",
+          "callee": "pd.Series",
+          "lineNumber": 210
+        },
+        {
+          "caller": "__init__",
+          "callee": "logger.info",
+          "lineNumber": 222
+        },
+        {
+          "caller": "__init__",
+          "callee": "self.validate",
+          "lineNumber": 224
+        },
+        {
+          "caller": "build_identity",
+          "callee": "isinstance",
+          "lineNumber": 295
+        },
+        {
+          "caller": "build_identity",
+          "callee": "list",
+          "lineNumber": 295
+        },
+        {
+          "caller": "build_identity",
+          "callee": "dict",
+          "lineNumber": 303
+        },
+        {
+          "caller": "build_identity",
+          "callee": "extract_features_params.get",
+          "lineNumber": 304
+        },
+        {
+          "caller": "build_identity",
+          "callee": "sorted",
+          "lineNumber": 306
+        },
+        {
+          "caller": "build_identity",
+          "callee": "load_select_features",
+          "lineNumber": 307
+        },
+        {
+          "caller": "build_identity",
+          "callee": "cls.tremor_fingerprint",
+          "lineNumber": 315
+        },
+        {
+          "caller": "build_identity",
+          "callee": "cls.identity_date",
+          "lineNumber": 317
+        },
+        {
+          "caller": "build_identity",
+          "callee": "cls.identity_date",
+          "lineNumber": 318
+        },
+        {
+          "caller": "build_identity",
+          "callee": "sorted",
+          "lineNumber": 319
+        },
+        {
+          "caller": "build_identity",
+          "callee": "sorted",
+          "lineNumber": 320
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 356
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 357
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 358
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 359
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 360
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 361
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 369
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 372
+        },
+        {
+          "caller": "set_directories",
+          "callee": "os.path.join",
+          "lineNumber": 374
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 403
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 404
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 405
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 406
+        },
+        {
+          "caller": "create_directories",
+          "callee": "self.models_dir.keys",
+          "lineNumber": 408
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 409
+        },
+        {
+          "caller": "create_directories",
+          "callee": "ensure_dir",
+          "lineNumber": 412
+        },
+        {
+          "caller": "validate",
+          "callee": "np.clip",
+          "lineNumber": 440
+        },
+        {
+          "caller": "validate",
+          "callee": "max",
+          "lineNumber": 446
+        },
+        {
+          "caller": "validate",
+          "callee": "ensure_dir",
+          "lineNumber": 460
+        },
+        {
+          "caller": "describe",
+          "callee": "\", \".join",
+          "lineNumber": 474
+        },
+        {
+          "caller": "describe",
+          "callee": "len",
+          "lineNumber": 482
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "\", \".join",
+          "lineNumber": 539
+        },
+        {
+          "caller": "to_prompt",
+          "callee": "\", \".join",
+          "lineNumber": 541
+        },
+        {
+          "caller": "save_config",
+          "callee": "slugify",
+          "lineNumber": 599
+        },
+        {
+          "caller": "save_config",
+          "callee": "os.path.join",
+          "lineNumber": 602
+        },
+        {
+          "caller": "save_config",
+          "callee": "self._config.save",
+          "lineNumber": 603
+        },
+        {
+          "caller": "build_label",
+          "callee": "ValueError",
+          "lineNumber": 652
+        },
+        {
+          "caller": "build_label",
+          "callee": "self._sync_dates_to_tremor",
+          "lineNumber": 659
+        },
+        {
+          "caller": "build_label",
+          "callee": "to_datetime",
+          "lineNumber": 666
+        },
+        {
+          "caller": "build_label",
+          "callee": "len",
+          "lineNumber": 676
+        },
+        {
+          "caller": "build_label",
+          "callee": "len",
+          "lineNumber": 676
+        },
+        {
+          "caller": "build_label",
+          "callee": "logger.info",
+          "lineNumber": 678
+        },
+        {
+          "caller": "build_label",
+          "callee": "ValueError",
+          "lineNumber": 682
+        },
+        {
+          "caller": "build_label",
+          "callee": "DynamicLabelBuilder(\n                days_before_eruption=days_before_eruption,\n                window_step=window_step,\n                window_step_unit=window_step_unit,\n                day_to_forecast=self.window_size,\n                eruption_dates=filtered_eruption_dates,  # ty:ignore[invalid-argument-type]\n                output_dir=self.training_dir,\n                root_dir=self.root_dir,\n                verbose=verbose,\n            ).build",
+          "lineNumber": 686
+        },
+        {
+          "caller": "build_label",
+          "callee": "DynamicLabelBuilder",
+          "lineNumber": 686
+        },
+        {
+          "caller": "build_label",
+          "callee": "logger.info",
+          "lineNumber": 698
+        },
+        {
+          "caller": "build_label",
+          "callee": "LabelBuilder(\n                start_date=self.start_date,\n                end_date=self.end_date,\n                window_step=window_step,\n                window_step_unit=window_step_unit,\n                day_to_forecast=self.window_size,\n                eruption_dates=filtered_eruption_dates,  # ty:ignore[invalid-argument-type]\n                output_dir=self.training_dir,\n                root_dir=self.root_dir,\n                verbose=verbose,\n            ).build",
+          "lineNumber": 702
+        },
+        {
+          "caller": "build_label",
+          "callee": "LabelBuilder",
+          "lineNumber": 702
+        },
+        {
+          "caller": "build_label",
+          "callee": "os.path.basename(label_builder.csv).split(\"label_\")[1].split",
+          "lineNumber": 716
+        },
+        {
+          "caller": "build_label",
+          "callee": "os.path.basename(label_builder.csv).split",
+          "lineNumber": 716
+        },
+        {
+          "caller": "build_label",
+          "callee": "os.path.basename",
+          "lineNumber": 716
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.warning",
+          "lineNumber": 808
+        },
+        {
+          "caller": "extract_features",
+          "callee": "logger.info",
+          "lineNumber": 815
+        },
+        {
+          "caller": "extract_features",
+          "callee": "ValueError",
+          "lineNumber": 819
+        },
+        {
+          "caller": "extract_features",
+          "callee": "load_select_features",
+          "lineNumber": 824
+        },
+        {
+          "caller": "extract_features",
+          "callee": "self._build_features",
+          "lineNumber": 831
+        },
+        {
+          "caller": "extract_features",
+          "callee": "features_builder.extract_features",
+          "lineNumber": 846
+        },
+        {
+          "caller": "extract_features",
+          "callee": "labels.set_index",
+          "lineNumber": 857
+        },
+        {
+          "caller": "extract_features",
+          "callee": "labels.drop",
+          "lineNumber": 859
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 924
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 929
+        },
+        {
+          "caller": "fit",
+          "callee": "self.create_directories",
+          "lineNumber": 934
+        },
+        {
+          "caller": "fit",
+          "callee": "label_series.value_counts(normalize=True).min",
+          "lineNumber": 958
+        },
+        {
+          "caller": "fit",
+          "callee": "label_series.value_counts",
+          "lineNumber": 958
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 961
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 967
+        },
+        {
+          "caller": "fit",
+          "callee": "list",
+          "lineNumber": 972
+        },
+        {
+          "caller": "fit",
+          "callee": "range",
+          "lineNumber": 972
+        },
+        {
+          "caller": "fit",
+          "callee": "self._collect_pending_train_jobs",
+          "lineNumber": 978
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 986
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 987
+        },
+        {
+          "caller": "fit",
+          "callee": "self._run_jobs",
+          "lineNumber": 990
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 993
+        },
+        {
+          "caller": "fit",
+          "callee": "zip",
+          "lineNumber": 998
+        },
+        {
+          "caller": "fit",
+          "callee": "new_training_model_jobs.append",
+          "lineNumber": 1005
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 1010
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 1011
+        },
+        {
+          "caller": "fit",
+          "callee": "self._run_jobs",
+          "lineNumber": 1014
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 1017
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 1021
+        },
+        {
+          "caller": "fit",
+          "callee": "len",
+          "lineNumber": 1021
+        },
+        {
+          "caller": "fit",
+          "callee": "self.features_csvs.append",
+          "lineNumber": 1039
+        },
+        {
+          "caller": "fit",
+          "callee": "records_per_classifier[classifier_name].append",
+          "lineNumber": 1041
+        },
+        {
+          "caller": "fit",
+          "callee": "self.features_csvs.append",
+          "lineNumber": 1051
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 1054
+        },
+        {
+          "caller": "fit",
+          "callee": "concat_significant_features",
+          "lineNumber": 1056
+        },
+        {
+          "caller": "fit",
+          "callee": "plot_significant_features",
+          "lineNumber": 1063
+        },
+        {
+          "caller": "fit",
+          "callee": "self.features_selected_df.reset_index",
+          "lineNumber": 1064
+        },
+        {
+          "caller": "fit",
+          "callee": "os.path.join",
+          "lineNumber": 1065
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.info",
+          "lineNumber": 1079
+        },
+        {
+          "caller": "fit",
+          "callee": "save_model_json",
+          "lineNumber": 1087
+        },
+        {
+          "caller": "fit",
+          "callee": "self.build_seed_ensemble",
+          "lineNumber": 1097
+        },
+        {
+          "caller": "fit",
+          "callee": "os.path.join",
+          "lineNumber": 1110
+        },
+        {
+          "caller": "fit",
+          "callee": "open",
+          "lineNumber": 1111
+        },
+        {
+          "caller": "fit",
+          "callee": "json.dump",
+          "lineNumber": 1112
+        },
+        {
+          "caller": "fit",
+          "callee": "self.build_classifier_ensemble",
+          "lineNumber": 1117
+        },
+        {
+          "caller": "fit",
+          "callee": "ValueError",
+          "lineNumber": 1124
+        },
+        {
+          "caller": "fit",
+          "callee": "type(self).build_identity",
+          "lineNumber": 1126
+        },
+        {
+          "caller": "fit",
+          "callee": "type",
+          "lineNumber": 1126
+        },
+        {
+          "caller": "fit",
+          "callee": "dict",
+          "lineNumber": 1145
+        },
+        {
+          "caller": "fit",
+          "callee": "dict",
+          "lineNumber": 1146
+        },
+        {
+          "caller": "fit",
+          "callee": "type(self).compute_hash",
+          "lineNumber": 1148
+        },
+        {
+          "caller": "fit",
+          "callee": "type",
+          "lineNumber": 1148
+        },
+        {
+          "caller": "fit",
+          "callee": "self.save",
+          "lineNumber": 1151
+        },
+        {
+          "caller": "fit",
+          "callee": "self.save_config",
+          "lineNumber": 1154
+        },
+        {
+          "caller": "fit",
+          "callee": "logger.warning",
+          "lineNumber": 1156
+        },
+        {
+          "caller": "fit",
+          "callee": "self.compute_learning_curve",
+          "lineNumber": 1159
+        },
+        {
+          "caller": "load_features",
+          "callee": "self._resolve_single_artefact",
+          "lineNumber": 1223
+        },
+        {
+          "caller": "load_features",
+          "callee": "os.path.isfile",
+          "lineNumber": 1226
+        },
+        {
+          "caller": "load_features",
+          "callee": "FileNotFoundError",
+          "lineNumber": 1227
+        },
+        {
+          "caller": "load_features",
+          "callee": "self._resolve_single_artefact",
+          "lineNumber": 1232
+        },
+        {
+          "caller": "load_features",
+          "callee": "os.path.isfile",
+          "lineNumber": 1235
+        },
+        {
+          "caller": "load_features",
+          "callee": "FileNotFoundError",
+          "lineNumber": 1236
+        },
+        {
+          "caller": "load_features",
+          "callee": "logger.info",
+          "lineNumber": 1241
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.read_csv",
+          "lineNumber": 1246
+        },
+        {
+          "caller": "load_features",
+          "callee": "label_datetimes.min",
+          "lineNumber": 1249
+        },
+        {
+          "caller": "load_features",
+          "callee": "label_datetimes.max",
+          "lineNumber": 1250
+        },
+        {
+          "caller": "load_features",
+          "callee": "self.start_date.date",
+          "lineNumber": 1252
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_start.date",
+          "lineNumber": 1252
+        },
+        {
+          "caller": "load_features",
+          "callee": "self.end_date.date",
+          "lineNumber": 1253
+        },
+        {
+          "caller": "load_features",
+          "callee": "loaded_end.date",
+          "lineNumber": 1253
+        },
+        {
+          "caller": "load_features",
+          "callee": "ValueError",
+          "lineNumber": 1255
+        },
+        {
+          "caller": "load_features",
+          "callee": "pd.read_parquet",
+          "lineNumber": 1263
+        },
+        {
+          "caller": "load_features",
+          "callee": "load_label_csv",
+          "lineNumber": 1264
+        },
+        {
+          "caller": "load_features",
+          "callee": "load_select_features",
+          "lineNumber": 1268
+        },
+        {
+          "caller": "load_features",
+          "callee": "set",
+          "lineNumber": 1271
+        },
+        {
+          "caller": "load_features",
+          "callee": "logger.warning",
+          "lineNumber": 1275
+        },
+        {
+          "caller": "load_features",
+          "callee": "len",
+          "lineNumber": 1276
+        },
+        {
+          "caller": "load_features",
+          "callee": "len",
+          "lineNumber": 1276
+        },
+        {
+          "caller": "load_features",
+          "callee": "len",
+          "lineNumber": 1278
+        },
+        {
+          "caller": "load_features",
+          "callee": "ValueError",
+          "lineNumber": 1281
+        },
+        {
+          "caller": "load_features",
+          "callee": "logger.info",
+          "lineNumber": 1287
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "ValueError",
+          "lineNumber": 1337
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "ValueError",
+          "lineNumber": 1340
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "list",
+          "lineNumber": 1346
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "np.asarray",
+          "lineNumber": 1349
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "np.linspace",
+          "lineNumber": 1351
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "self.learning_curve_dirs.values",
+          "lineNumber": 1355
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "ensure_dir",
+          "lineNumber": 1356
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "ensemble.ensembles.get",
+          "lineNumber": 1361
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "os.path.join",
+          "lineNumber": 1367
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "os.path.isfile",
+          "lineNumber": 1368
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "logger.info",
+          "lineNumber": 1370
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "jobs.append",
+          "lineNumber": 1375
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "logger.info",
+          "lineNumber": 1378
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "logger.info",
+          "lineNumber": 1381
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "len",
+          "lineNumber": 1381
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "partial",
+          "lineNumber": 1383
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "self._run_jobs",
+          "lineNumber": 1390
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "sum",
+          "lineNumber": 1397
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "logger.info",
+          "lineNumber": 1398
+        },
+        {
+          "caller": "compute_learning_curve",
+          "callee": "len",
+          "lineNumber": 1398
+        },
+        {
+          "caller": "_init_config",
+          "callee": "TrainingConfig",
+          "lineNumber": 1456
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1457
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1459
+        },
+        {
+          "caller": "_init_config",
+          "callee": "start_date.isoformat",
+          "lineNumber": 1460
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1461
+        },
+        {
+          "caller": "_init_config",
+          "callee": "end_date.isoformat",
+          "lineNumber": 1461
+        },
+        {
+          "caller": "_init_config",
+          "callee": "isinstance",
+          "lineNumber": 1462
+        },
+        {
+          "caller": "_init_config",
+          "callee": "list",
+          "lineNumber": 1463
+        },
+        {
+          "caller": "build_classifier_ensemble",
+          "callee": "os.path.join",
+          "lineNumber": 1502
+        },
+        {
+          "caller": "build_classifier_ensemble",
+          "callee": "ClassifierEnsemble.from_seed_ensembles",
+          "lineNumber": 1503
+        },
+        {
+          "caller": "build_classifier_ensemble",
+          "callee": "classifier_ensemble.save",
+          "lineNumber": 1506
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "os.path.splitext(os.path.basename(registry_path))[0].split",
+          "lineNumber": 1551
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "os.path.splitext",
+          "lineNumber": 1551
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "os.path.basename",
+          "lineNumber": 1551
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "ensure_dir",
+          "lineNumber": 1553
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "os.path.join",
+          "lineNumber": 1554
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "SeedEnsemble.from_any",
+          "lineNumber": 1555
+        },
+        {
+          "caller": "build_seed_ensemble",
+          "callee": "seed_ensemble.save",
+          "lineNumber": 1558
+        },
+        {
+          "caller": "_resolve_single_artefact",
+          "callee": "sorted",
+          "lineNumber": 1577
+        },
+        {
+          "caller": "_resolve_single_artefact",
+          "callee": "glob.glob",
+          "lineNumber": 1577
+        },
+        {
+          "caller": "_resolve_single_artefact",
+          "callee": "os.path.join",
+          "lineNumber": 1577
+        },
+        {
+          "caller": "_resolve_single_artefact",
+          "callee": "len",
+          "lineNumber": 1578
+        },
+        {
+          "caller": "_resolve_single_artefact",
+          "callee": "ValueError",
+          "lineNumber": 1581
+        },
+        {
+          "caller": "_resolve_single_artefact",
+          "callee": "ValueError",
+          "lineNumber": 1585
+        },
+        {
+          "caller": "_train",
+          "callee": "os.path.join",
+          "lineNumber": 1618
+        },
+        {
+          "caller": "_train",
+          "callee": "os.path.join",
+          "lineNumber": 1619
+        },
+        {
+          "caller": "_train",
+          "callee": "os.path.isfile",
+          "lineNumber": 1623
+        },
+        {
+          "caller": "_train",
+          "callee": "logger.warning",
+          "lineNumber": 1624
+        },
+        {
+          "caller": "_train",
+          "callee": "pd.read_csv(features_seed_path, index_col=0).index.tolist",
+          "lineNumber": 1629
+        },
+        {
+          "caller": "_train",
+          "callee": "pd.read_csv",
+          "lineNumber": 1629
+        },
+        {
+          "caller": "_train",
+          "callee": "next",
+          "lineNumber": 1633
+        },
+        {
+          "caller": "_train",
+          "callee": "os.path.join",
+          "lineNumber": 1637
+        },
+        {
+          "caller": "_train",
+          "callee": "os.path.isfile",
+          "lineNumber": 1642
+        },
+        {
+          "caller": "_train",
+          "callee": "logger.info",
+          "lineNumber": 1643
+        },
+        {
+          "caller": "_train",
+          "callee": "load_features_resampled",
+          "lineNumber": 1654
+        },
+        {
+          "caller": "_train",
+          "callee": "logger.info",
+          "lineNumber": 1661
+        },
+        {
+          "caller": "_train",
+          "callee": "grid_search_cv",
+          "lineNumber": 1663
+        },
+        {
+          "caller": "_train",
+          "callee": "joblib.dump",
+          "lineNumber": 1673
+        },
+        {
+          "caller": "_train",
+          "callee": "logger.info",
+          "lineNumber": 1676
+        },
+        {
+          "caller": "_features_selection",
+          "callee": "resample",
+          "lineNumber": 1727
+        },
+        {
+          "caller": "_features_selection",
+          "callee": "labels_resampled.to_frame(name=\"is_erupted\").to_csv",
+          "lineNumber": 1740
+        },
+        {
+          "caller": "_features_selection",
+          "callee": "labels_resampled.to_frame",
+          "lineNumber": 1740
+        },
+        {
+          "caller": "_features_selection",
+          "callee": "self._select_features",
+          "lineNumber": 1742
+        },
+        {
+          "caller": "_run_jobs",
+          "callee": "logger.info",
+          "lineNumber": 1781
+        },
+        {
+          "caller": "_run_jobs",
+          "callee": "Parallel",
+          "lineNumber": 1784
+        },
+        {
+          "caller": "_run_jobs",
+          "callee": "delayed",
+          "lineNumber": 1785
+        },
+        {
+          "caller": "_run_jobs",
+          "callee": "method",
+          "lineNumber": 1787
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "generate_features_filepaths",
+          "lineNumber": 1845
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "existing_feature_paths.append",
+          "lineNumber": 1855
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "pd.read_csv(\n                    features_seed_path, index_col=0\n                ).index.tolist",
+          "lineNumber": 1857
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "pd.read_csv",
+          "lineNumber": 1857
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "os.path.join",
+          "lineNumber": 1862
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "os.path.isfile",
+          "lineNumber": 1869
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "records_per_classifier[classifier_name].append",
+          "lineNumber": 1870
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "pending_training_model_jobs.append",
+          "lineNumber": 1878
+        },
+        {
+          "caller": "_collect_pending_train_jobs",
+          "callee": "pending_feature_selection_jobs.append",
+          "lineNumber": 1883
+        },
+        {
+          "caller": "_select_features",
+          "callee": "self.FeatureSelector.set_random_state",
+          "lineNumber": 1941
+        },
+        {
+          "caller": "_select_features",
+          "callee": "features_selector.fit_transform",
+          "lineNumber": 1943
+        },
+        {
+          "caller": "_select_features",
+          "callee": "logger.warning",
+          "lineNumber": 1948
+        },
+        {
+          "caller": "_select_features",
+          "callee": "len",
+          "lineNumber": 1956
+        },
+        {
+          "caller": "_select_features",
+          "callee": "logger.warning",
+          "lineNumber": 1958
+        },
+        {
+          "caller": "_select_features",
+          "callee": "selected_features.head",
+          "lineNumber": 1964
+        },
+        {
+          "caller": "_select_features",
+          "callee": "top_selected_features.to_csv",
+          "lineNumber": 1967
+        },
+        {
+          "caller": "_select_features",
+          "callee": "plot_significant_features",
+          "lineNumber": 1970
+        },
+        {
+          "caller": "_select_features",
+          "callee": "pd.DataFrame(selected_features).reset_index",
+          "lineNumber": 1971
+        },
+        {
+          "caller": "_select_features",
+          "callee": "pd.DataFrame",
+          "lineNumber": 1971
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "os.path.join",
+          "lineNumber": 2021
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "os.path.isfile",
+          "lineNumber": 2025
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "logger.warning",
+          "lineNumber": 2026
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "next",
+          "lineNumber": 2032
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "classifier_ensemble.ensembles.get",
+          "lineNumber": 2035
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "logger.warning",
+          "lineNumber": 2037
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "next",
+          "lineNumber": 2043
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "logger.warning",
+          "lineNumber": 2048
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "list",
+          "lineNumber": 2055
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "load_features_resampled",
+          "lineNumber": 2059
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "classifier_model.set_random_state(random_state).get_cv_splitter",
+          "lineNumber": 2065
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "classifier_model.set_random_state",
+          "lineNumber": 2065
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "learning_curve",
+          "lineNumber": 2071
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "train_scores.mean(axis=1).tolist",
+          "lineNumber": 2084
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "train_scores.mean",
+          "lineNumber": 2084
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "train_scores.std(axis=1).tolist",
+          "lineNumber": 2085
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "train_scores.std",
+          "lineNumber": 2085
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "test_scores.mean(axis=1).tolist",
+          "lineNumber": 2086
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "test_scores.mean",
+          "lineNumber": 2086
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "test_scores.std(axis=1).tolist",
+          "lineNumber": 2087
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "test_scores.std",
+          "lineNumber": 2087
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "train_sizes_abs.tolist",
+          "lineNumber": 2093
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "os.path.join",
+          "lineNumber": 2099
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "open",
+          "lineNumber": 2102
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "json.dump",
+          "lineNumber": 2103
+        },
+        {
+          "caller": "_run_compute_learning_curve",
+          "callee": "logger.info",
+          "lineNumber": 2106
+        }
+      ],
+      "metrics": {
+        "importCount": 16,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/benchmark.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 493,
+      "nonEmptyLines": 445,
+      "functions": [
+        {
+          "name": "_jaccard",
+          "startLine": 39,
+          "endLine": 42,
+          "params": [
+            "left",
+            "right"
+          ]
+        },
+        {
+          "name": "_build_training_model",
+          "startLine": 45,
+          "endLine": 83,
+          "params": [
+            "tremor_csv",
+            "start_date",
+            "end_date",
+            "eruption_dates",
+            "select_tremor_columns",
+            "exclude_features",
+            "top_n_features",
+            "output_dir",
+            "root_dir",
+            "n_jobs",
+            "n_grids",
+            "verbose"
+          ]
+        },
+        {
+          "name": "_run_seed",
+          "startLine": 86,
+          "endLine": 158,
+          "params": [
+            "seed",
+            "method",
+            "features_df",
+            "labels",
+            "top_n_features",
+            "resample_method",
+            "sampling_strategy",
+            "n_grids",
+            "verbose"
+          ]
+        },
+        {
+          "name": "_mean_pairwise_jaccard",
+          "startLine": 161,
+          "endLine": 185,
+          "params": [
+            "selected_per_method",
+            "methods"
+          ]
+        },
+        {
+          "name": "_write_outputs",
+          "startLine": 188,
+          "endLine": 248,
+          "params": [
+            "bench_dir",
+            "methods",
+            "runtime_rows",
+            "selected_per_method",
+            "metrics_per_method"
+          ]
+        },
+        {
+          "name": "_render_plots",
+          "startLine": 251,
+          "endLine": 297,
+          "params": [
+            "bench_dir",
+            "methods",
+            "runtime_df",
+            "summary_df"
+          ]
+        },
+        {
+          "name": "benchmark_feature_selection",
+          "startLine": 300,
+          "endLine": 493,
+          "params": [
+            "tremor_csv",
+            "training_start_date",
+            "training_end_date",
+            "eruption_dates",
+            "select_tremor_columns",
+            "exclude_features",
+            "output_dir",
+            "root_dir",
+            "seeds",
+            "top_n_features",
+            "n_jobs",
+            "n_grids",
+            "methods",
+            "resample_method",
+            "sampling_strategy",
+            "verbose"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "_jaccard",
+          "line": 39,
+          "isDefault": false
+        },
+        {
+          "name": "_build_training_model",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "_run_seed",
+          "line": 86,
+          "isDefault": false
+        },
+        {
+          "name": "_mean_pairwise_jaccard",
+          "line": 161,
+          "isDefault": false
+        },
+        {
+          "name": "_write_outputs",
+          "line": 188,
+          "isDefault": false
+        },
+        {
+          "name": "_render_plots",
+          "line": 251,
+          "isDefault": false
+        },
+        {
+          "name": "benchmark_feature_selection",
+          "line": 300,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_jaccard",
+          "callee": "len",
+          "lineNumber": 42
+        },
+        {
+          "caller": "_jaccard",
+          "callee": "len",
+          "lineNumber": 42
+        },
+        {
+          "caller": "_build_training_model",
+          "callee": "TrainingModel(\n            tremor_data=tremor_csv,\n            start_date=start_date,\n            end_date=end_date,\n            classifiers=[\"rf\"],\n            eruption_dates=eruption_dates,\n            window_size=2,\n            cv_strategy=\"shuffle-stratified\",\n            cv_splits=5,\n            top_n_features=top_n_features,\n            output_dir=output_dir,\n            root_dir=root_dir,\n            n_jobs=n_jobs,\n            n_grids=n_grids,\n            verbose=verbose,\n        )\n        .build_label(window_step=6, window_step_unit=\"hours\", builder=\"standard\")\n        .extract_features",
+          "lineNumber": 60
+        },
+        {
+          "caller": "_build_training_model",
+          "callee": "TrainingModel(\n            tremor_data=tremor_csv,\n            start_date=start_date,\n            end_date=end_date,\n            classifiers=[\"rf\"],\n            eruption_dates=eruption_dates,\n            window_size=2,\n            cv_strategy=\"shuffle-stratified\",\n            cv_splits=5,\n            top_n_features=top_n_features,\n            output_dir=output_dir,\n            root_dir=root_dir,\n            n_jobs=n_jobs,\n            n_grids=n_grids,\n            verbose=verbose,\n        )\n        .build_label",
+          "lineNumber": 60
+        },
+        {
+          "caller": "_build_training_model",
+          "callee": "TrainingModel",
+          "lineNumber": 60
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "resample",
+          "lineNumber": 98
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "FeatureSelector",
+          "lineNumber": 107
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "time.perf_counter",
+          "lineNumber": 114
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "selector.fit_transform",
+          "lineNumber": 115
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "time.perf_counter",
+          "lineNumber": 118
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "list",
+          "lineNumber": 119
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "ClassifierModel(\n        classifier=\"rf\",\n        cv_strategy=\"shuffle-stratified\",\n        n_splits=5,\n        verbose=False,\n    ).set_random_state",
+          "lineNumber": 121
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "ClassifierModel",
+          "lineNumber": 121
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "classifier.get_cv_splitter",
+          "lineNumber": 129
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "time.perf_counter",
+          "lineNumber": 131
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "cross_val_score",
+          "lineNumber": 132
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "cross_val_score",
+          "lineNumber": 140
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "time.perf_counter",
+          "lineNumber": 148
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "float",
+          "lineNumber": 154
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "np.mean",
+          "lineNumber": 154
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "float",
+          "lineNumber": 155
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "np.std",
+          "lineNumber": 155
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "float",
+          "lineNumber": 156
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "np.mean",
+          "lineNumber": 156
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "float",
+          "lineNumber": 157
+        },
+        {
+          "caller": "_run_seed",
+          "callee": "np.std",
+          "lineNumber": 157
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "len",
+          "lineNumber": 169
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "combinations",
+          "lineNumber": 173
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "sorted",
+          "lineNumber": 174
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "set",
+          "lineNumber": 175
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "set",
+          "lineNumber": 175
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "pair_overlaps.append",
+          "lineNumber": 178
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "_jaccard",
+          "lineNumber": 179
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "set",
+          "lineNumber": 180
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "set",
+          "lineNumber": 181
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "float",
+          "lineNumber": 185
+        },
+        {
+          "caller": "_mean_pairwise_jaccard",
+          "callee": "np.mean",
+          "lineNumber": 185
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame",
+          "lineNumber": 195
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "runtime_df.to_csv",
+          "lineNumber": 196
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "os.path.join",
+          "lineNumber": 196
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "sorted",
+          "lineNumber": 201
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "selected_per_method[method].items",
+          "lineNumber": 201
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "enumerate",
+          "lineNumber": 202
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame(sel_rows, columns=[\"seed\", \"rank\", \"feature\"]).to_csv",
+          "lineNumber": 204
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame",
+          "lineNumber": 204
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "os.path.join",
+          "lineNumber": 205
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame(metrics_per_method[method]).to_csv",
+          "lineNumber": 208
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame",
+          "lineNumber": 208
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "os.path.join",
+          "lineNumber": 209
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "selected_per_method[method].values",
+          "lineNumber": 214
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.Series(flat_features).value_counts",
+          "lineNumber": 217
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.Series",
+          "lineNumber": 217
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "frequency.to_csv",
+          "lineNumber": 220
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "os.path.join",
+          "lineNumber": 220
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame",
+          "lineNumber": 225
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "summary_rows.append",
+          "lineNumber": 226
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_runtime[\"selection_seconds\"].mean",
+          "lineNumber": 229
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_runtime[\"selection_seconds\"].std",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_runtime[\"train_seconds\"].mean",
+          "lineNumber": 231
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_metrics[\n                    \"balanced_accuracy_mean\"\n                ].mean",
+          "lineNumber": 232
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_metrics[\n                    \"balanced_accuracy_mean\"\n                ].std",
+          "lineNumber": 235
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_metrics[\"roc_auc_mean\"].mean",
+          "lineNumber": 238
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "method_metrics[\"roc_auc_mean\"].std",
+          "lineNumber": 239
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "_mean_pairwise_jaccard",
+          "lineNumber": 243
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "pd.DataFrame",
+          "lineNumber": 244
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "summary_df.to_csv",
+          "lineNumber": 246
+        },
+        {
+          "caller": "_write_outputs",
+          "callee": "os.path.join",
+          "lineNumber": 246
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "plt.subplots",
+          "lineNumber": 257
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "runtime_df.boxplot",
+          "lineNumber": 258
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_title",
+          "lineNumber": 259
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_ylabel",
+          "lineNumber": 260
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "plt.suptitle",
+          "lineNumber": 261
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "fig.tight_layout",
+          "lineNumber": 262
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "fig.savefig",
+          "lineNumber": 263
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "os.path.join",
+          "lineNumber": 263
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "plt.close",
+          "lineNumber": 264
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "plt.subplots",
+          "lineNumber": 266
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "np.arange",
+          "lineNumber": 267
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "len",
+          "lineNumber": 267
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "summary_df[\"balanced_accuracy_mean\"].to_numpy",
+          "lineNumber": 269
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "summary_df[\"balanced_accuracy_std\"].to_numpy",
+          "lineNumber": 270
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "summary_df[\"roc_auc_mean\"].to_numpy",
+          "lineNumber": 271
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "summary_df[\"roc_auc_std\"].to_numpy",
+          "lineNumber": 272
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.bar",
+          "lineNumber": 273
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.bar",
+          "lineNumber": 281
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_xticks",
+          "lineNumber": 289
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_xticklabels",
+          "lineNumber": 290
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "list",
+          "lineNumber": 290
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_ylim",
+          "lineNumber": 291
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_ylabel",
+          "lineNumber": 292
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.set_title",
+          "lineNumber": 293
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "ax.legend",
+          "lineNumber": 294
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "fig.tight_layout",
+          "lineNumber": 295
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "fig.savefig",
+          "lineNumber": 296
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "os.path.join",
+          "lineNumber": 296
+        },
+        {
+          "caller": "_render_plots",
+          "callee": "plt.close",
+          "lineNumber": 297
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "os.path.isfile",
+          "lineNumber": 375
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "FileNotFoundError",
+          "lineNumber": 376
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "list",
+          "lineNumber": 385
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "list",
+          "lineNumber": 390
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "_build_training_model",
+          "lineNumber": 393
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "os.path.join",
+          "lineNumber": 407
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "os.makedirs",
+          "lineNumber": 410
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "logger.info",
+          "lineNumber": 412
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "range",
+          "lineNumber": 423
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "logger.info",
+          "lineNumber": 425
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "_run_seed",
+          "lineNumber": 434
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "runtime_rows.append",
+          "lineNumber": 447
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "len",
+          "lineNumber": 453
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "metrics_per_method[method].append",
+          "lineNumber": 456
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "_write_outputs",
+          "lineNumber": 466
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "_render_plots",
+          "lineNumber": 473
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "pd.DataFrame",
+          "lineNumber": 476
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "logger.info",
+          "lineNumber": 480
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "summary_df.iterrows",
+          "lineNumber": 481
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "logger.info",
+          "lineNumber": 482
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "logger.info",
+          "lineNumber": 490
+        },
+        {
+          "caller": "benchmark_feature_selection",
+          "callee": "logger.info",
+          "lineNumber": 493
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/dataframe.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 352,
+      "nonEmptyLines": 289,
+      "functions": [
+        {
+          "name": "remove_anomalies",
+          "startLine": 11,
+          "endLine": 88,
+          "params": [
+            "df",
+            "columns",
+            "interpolate",
+            "threshold",
+            "inplace",
+            "debug"
+          ]
+        },
+        {
+          "name": "to_series",
+          "startLine": 91,
+          "endLine": 131,
+          "params": [
+            "df",
+            "column_value",
+            "column_index"
+          ]
+        },
+        {
+          "name": "load_label_csv",
+          "startLine": 134,
+          "endLine": 163,
+          "params": [
+            "label_features_csv"
+          ]
+        },
+        {
+          "name": "load_datetime_indexed",
+          "startLine": 166,
+          "endLine": 222,
+          "params": [
+            "label_csv",
+            "features_path"
+          ]
+        },
+        {
+          "name": "load_features_matrix",
+          "startLine": 225,
+          "endLine": 261,
+          "params": [
+            "label_csv",
+            "features_path"
+          ]
+        },
+        {
+          "name": "get_envelope_values",
+          "startLine": 264,
+          "endLine": 352,
+          "params": [
+            "df"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "remove_anomalies",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "to_series",
+          "line": 91,
+          "isDefault": false
+        },
+        {
+          "name": "load_label_csv",
+          "line": 134,
+          "isDefault": false
+        },
+        {
+          "name": "load_datetime_indexed",
+          "line": 166,
+          "isDefault": false
+        },
+        {
+          "name": "load_features_matrix",
+          "line": 225,
+          "isDefault": false
+        },
+        {
+          "name": "get_envelope_values",
+          "line": 264,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "remove_anomalies",
+          "callee": "isinstance",
+          "lineNumber": 54
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "TypeError",
+          "lineNumber": 55
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "ValueError",
+          "lineNumber": 58
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "df.copy",
+          "lineNumber": 60
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "_df.columns.tolist",
+          "lineNumber": 63
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "ValueError",
+          "lineNumber": 68
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "detect_anomalies_zscore",
+          "lineNumber": 73
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "_df[column].to_numpy",
+          "lineNumber": 73
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "anomalies.sum",
+          "lineNumber": 74
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "logger.info",
+          "lineNumber": 81
+        },
+        {
+          "caller": "remove_anomalies",
+          "callee": "_df[column].interpolate",
+          "lineNumber": 87
+        },
+        {
+          "caller": "to_series",
+          "callee": "ValueError",
+          "lineNumber": 120
+        },
+        {
+          "caller": "to_series",
+          "callee": "ValueError",
+          "lineNumber": 125
+        },
+        {
+          "caller": "to_series",
+          "callee": "pd.Series",
+          "lineNumber": 129
+        },
+        {
+          "caller": "load_label_csv",
+          "callee": "pd.read_csv",
+          "lineNumber": 158
+        },
+        {
+          "caller": "load_label_csv",
+          "callee": "df.set_index",
+          "lineNumber": 160
+        },
+        {
+          "caller": "load_label_csv",
+          "callee": "df.drop",
+          "lineNumber": 162
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "pd.read_csv",
+          "lineNumber": 209
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "os.path.splitext(features_path)[1].lower",
+          "lineNumber": 211
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "os.path.splitext",
+          "lineNumber": 211
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "pd.read_parquet",
+          "lineNumber": 213
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "pd.read_csv",
+          "lineNumber": 215
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "ValueError",
+          "lineNumber": 217
+        },
+        {
+          "caller": "load_datetime_indexed",
+          "callee": "to_datetime_index",
+          "lineNumber": 222
+        },
+        {
+          "caller": "load_features_matrix",
+          "callee": "load_datetime_indexed",
+          "lineNumber": 261
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "col.endswith",
+          "lineNumber": 304
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "col.startswith",
+          "lineNumber": 304
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "col.endswith",
+          "lineNumber": 310
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "col.startswith",
+          "lineNumber": 310
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "ValueError",
+          "lineNumber": 315
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "ValueError",
+          "lineNumber": 321
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[prob_cols].max",
+          "lineNumber": 326
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[prob_cols].min",
+          "lineNumber": 327
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_probability_min\"]\n        .rolling(window=6, center=True, min_periods=1)\n        .min",
+          "lineNumber": 329
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_probability_min\"]\n        .rolling",
+          "lineNumber": 329
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_probability_max\"]\n        .rolling(window=6, center=True, min_periods=1)\n        .max",
+          "lineNumber": 334
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_probability_max\"]\n        .rolling",
+          "lineNumber": 334
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[pred_cols].max",
+          "lineNumber": 339
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[pred_cols].min",
+          "lineNumber": 340
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_prediction_min\"]\n        .rolling(window=6, center=True, min_periods=1)\n        .min",
+          "lineNumber": 342
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_prediction_min\"]\n        .rolling",
+          "lineNumber": 342
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_prediction_max\"]\n        .rolling(window=6, center=True, min_periods=1)\n        .max",
+          "lineNumber": 347
+        },
+        {
+          "caller": "get_envelope_values",
+          "callee": "df[\"consensus_prediction_max\"]\n        .rolling",
+          "lineNumber": 347
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 6,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/eruption_forecast/utils/ml.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 955,
+      "nonEmptyLines": 806,
+      "functions": [
+        {
+          "name": "build_y_true",
+          "startLine": 45,
+          "endLine": 114,
+          "params": [
+            "features_label_csv",
+            "eruption_dates",
+            "datetime_column"
+          ]
+        },
+        {
+          "name": "temporal_train_test_split",
+          "startLine": 117,
+          "endLine": 171,
+          "params": [
+            "eruption_dates",
+            "test_size"
+          ]
+        },
+        {
+          "name": "compute_threshold_metrics",
+          "startLine": 174,
+          "endLine": 227,
+          "params": [
+            "y_true",
+            "y_proba",
+            "resolution"
+          ]
+        },
+        {
+          "name": "compute_aggregate_threshold_metrics",
+          "startLine": 230,
+          "endLine": 315,
+          "params": [
+            "y_trues",
+            "y_probas",
+            "resolution"
+          ]
+        },
+        {
+          "name": "random_under_sampler",
+          "startLine": 318,
+          "endLine": 357,
+          "params": [
+            "features",
+            "labels",
+            "sampling_strategy",
+            "random_state"
+          ]
+        },
+        {
+          "name": "resample",
+          "startLine": 360,
+          "endLine": 424,
+          "params": [
+            "features",
+            "labels",
+            "method",
+            "sampling_strategy",
+            "random_state",
+            "verbose"
+          ]
+        },
+        {
+          "name": "load_features_resampled",
+          "startLine": 427,
+          "endLine": 488,
+          "params": [
+            "features",
+            "resampled",
+            "columns"
+          ]
+        },
+        {
+          "name": "get_significant_features",
+          "startLine": 491,
+          "endLine": 566,
+          "params": [
+            "features",
+            "labels",
+            "fdr_level",
+            "top_n",
+            "n_jobs"
+          ]
+        },
+        {
+          "name": "get_classifier_models",
+          "startLine": 569,
+          "endLine": 603,
+          "params": [
+            "classifiers",
+            "cv_strategy",
+            "cv_splits",
+            "verbose"
+          ]
+        },
+        {
+          "name": "grid_search_cv",
+          "startLine": 606,
+          "endLine": 659,
+          "params": [
+            "random_state",
+            "features",
+            "labels",
+            "top_n_features",
+            "classifier_model",
+            "n_grids",
+            "scoring"
+          ]
+        },
+        {
+          "name": "save_model_json",
+          "startLine": 662,
+          "endLine": 720,
+          "params": [
+            "seeds",
+            "records",
+            "classifier_dir",
+            "classifier_model",
+            "number_of_features",
+            "prefix_filename",
+            "verbose"
+          ]
+        },
+        {
+          "name": "compute_seed",
+          "startLine": 723,
+          "endLine": 832,
+          "params": [
+            "seed_ensemble",
+            "X",
+            "y_true",
+            "output_dir",
+            "verbose"
+          ]
+        },
+        {
+          "name": "build_classifier_ensemble_summary",
+          "startLine": 835,
+          "endLine": 955,
+          "params": [
+            "seed_ensemble",
+            "labels",
+            "eruption_dates"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "build_y_true",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "temporal_train_test_split",
+          "line": 117,
+          "isDefault": false
+        },
+        {
+          "name": "compute_threshold_metrics",
+          "line": 174,
+          "isDefault": false
+        },
+        {
+          "name": "compute_aggregate_threshold_metrics",
+          "line": 230,
+          "isDefault": false
+        },
+        {
+          "name": "random_under_sampler",
+          "line": 318,
+          "isDefault": false
+        },
+        {
+          "name": "resample",
+          "line": 360,
+          "isDefault": false
+        },
+        {
+          "name": "load_features_resampled",
+          "line": 427,
+          "isDefault": false
+        },
+        {
+          "name": "get_significant_features",
+          "line": 491,
+          "isDefault": false
+        },
+        {
+          "name": "get_classifier_models",
+          "line": 569,
+          "isDefault": false
+        },
+        {
+          "name": "grid_search_cv",
+          "line": 606,
+          "isDefault": false
+        },
+        {
+          "name": "save_model_json",
+          "line": 662,
+          "isDefault": false
+        },
+        {
+          "name": "compute_seed",
+          "line": 723,
+          "isDefault": false
+        },
+        {
+          "name": "build_classifier_ensemble_summary",
+          "line": 835,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "build_y_true",
+          "callee": "pd.read_csv",
+          "lineNumber": 86
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "isinstance",
+          "lineNumber": 88
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "TypeError",
+          "lineNumber": 89
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "type",
+          "lineNumber": 91
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "set",
+          "lineNumber": 96
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "KeyError",
+          "lineNumber": 98
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "sorted",
+          "lineNumber": 99
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "list",
+          "lineNumber": 100
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "df[\"is_erupted\"].fillna(0).astype",
+          "lineNumber": 103
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "df[\"is_erupted\"].fillna",
+          "lineNumber": 103
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "sort_dates",
+          "lineNumber": 105
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "eruption_date.replace",
+          "lineNumber": 107
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "eruption_date.replace",
+          "lineNumber": 108
+        },
+        {
+          "caller": "build_y_true",
+          "callee": "df.set_index",
+          "lineNumber": 111
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "ValueError",
+          "lineNumber": 156
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "sort_dates",
+          "lineNumber": 158
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "np.clip(\n        np.ceil(len(eruption_dates) * test_size),\n        a_min=1,\n        a_max=len(eruption_dates) - 1,\n    ).astype",
+          "lineNumber": 163
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "np.clip",
+          "lineNumber": 163
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "np.ceil",
+          "lineNumber": 164
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "len",
+          "lineNumber": 164
+        },
+        {
+          "caller": "temporal_train_test_split",
+          "callee": "len",
+          "lineNumber": 166
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "np.linspace",
+          "lineNumber": 198
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "(y_proba >= threshold).astype",
+          "lineNumber": 210
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "recall_score",
+          "lineNumber": 211
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "confusion_matrix(y_true, y_pred_thresh, labels=[0, 1]).ravel",
+          "lineNumber": 212
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "confusion_matrix",
+          "lineNumber": 212
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"f1\"].append",
+          "lineNumber": 215
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "f1_score",
+          "lineNumber": 215
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"recall\"].append",
+          "lineNumber": 216
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"precision\"].append",
+          "lineNumber": 217
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "precision_score",
+          "lineNumber": 218
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"balanced_accuracy\"].append",
+          "lineNumber": 220
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "balanced_accuracy_score",
+          "lineNumber": 221
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"specificity\"].append",
+          "lineNumber": 223
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"mcc\"].append",
+          "lineNumber": 224
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "matthews_corrcoef",
+          "lineNumber": 224
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "metrics[\"g_mean\"].append",
+          "lineNumber": 225
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "float",
+          "lineNumber": 225
+        },
+        {
+          "caller": "compute_threshold_metrics",
+          "callee": "np.sqrt",
+          "lineNumber": 225
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "len",
+          "lineNumber": 277
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "ValueError",
+          "lineNumber": 278
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "isinstance",
+          "lineNumber": 280
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "len",
+          "lineNumber": 281
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "list",
+          "lineNumber": 283
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "len",
+          "lineNumber": 285
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "len",
+          "lineNumber": 285
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "ValueError",
+          "lineNumber": 286
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "len",
+          "lineNumber": 287
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "len",
+          "lineNumber": 288
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "zip",
+          "lineNumber": 294
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "compute_threshold_metrics",
+          "lineNumber": 295
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "metrics.items",
+          "lineNumber": 298
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "all_curves.setdefault(key, []).append",
+          "lineNumber": 301
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "all_curves.setdefault",
+          "lineNumber": 301
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "np.array",
+          "lineNumber": 301
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "np.stack",
+          "lineNumber": 306
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "all_curves.items",
+          "lineNumber": 306
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "matrix.mean",
+          "lineNumber": 309
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "per_seed_curves.items",
+          "lineNumber": 309
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "matrix.std",
+          "lineNumber": 312
+        },
+        {
+          "caller": "compute_aggregate_threshold_metrics",
+          "callee": "per_seed_curves.items",
+          "lineNumber": 312
+        },
+        {
+          "caller": "random_under_sampler",
+          "callee": "RandomUnderSampler",
+          "lineNumber": 351
+        },
+        {
+          "caller": "random_under_sampler",
+          "callee": "sampler.fit_resample",
+          "lineNumber": 355
+        },
+        {
+          "caller": "resample",
+          "callee": "logger.info",
+          "lineNumber": 397
+        },
+        {
+          "caller": "resample",
+          "callee": "logger.info",
+          "lineNumber": 404
+        },
+        {
+          "caller": "resample",
+          "callee": "random_under_sampler",
+          "lineNumber": 408
+        },
+        {
+          "caller": "resample",
+          "callee": "logger.info",
+          "lineNumber": 416
+        },
+        {
+          "caller": "resample",
+          "callee": "RandomOverSampler",
+          "lineNumber": 420
+        },
+        {
+          "caller": "resample",
+          "callee": "sampler.fit_resample",
+          "lineNumber": 423
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "isinstance",
+          "lineNumber": 472
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "pd.read_parquet",
+          "lineNumber": 473
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "isinstance",
+          "lineNumber": 475
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "pd.read_csv",
+          "lineNumber": 476
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "isinstance",
+          "lineNumber": 477
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "isinstance",
+          "lineNumber": 482
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "pd.read_csv(columns, index_col=0).index.tolist",
+          "lineNumber": 483
+        },
+        {
+          "caller": "load_features_resampled",
+          "callee": "pd.read_csv",
+          "lineNumber": 483
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "isinstance",
+          "lineNumber": 528
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "to_series",
+          "lineNumber": 529
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "FeatureSelector",
+          "lineNumber": 531
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "selector.fit_transform",
+          "lineNumber": 536
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "pd.Series",
+          "lineNumber": 538
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "_significant_features.sort_values",
+          "lineNumber": 541
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "len",
+          "lineNumber": 547
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "_significant_features.head(top_n).index.tolist",
+          "lineNumber": 548
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "_significant_features.head",
+          "lineNumber": 548
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "ValueError",
+          "lineNumber": 551
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "dict",
+          "lineNumber": 556
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "labels.value_counts",
+          "lineNumber": 556
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "logger.warning",
+          "lineNumber": 559
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "len",
+          "lineNumber": 560
+        },
+        {
+          "caller": "get_significant_features",
+          "callee": "len",
+          "lineNumber": 561
+        },
+        {
+          "caller": "get_classifier_models",
+          "callee": "ClassifierModel",
+          "lineNumber": 594
+        },
+        {
+          "caller": "grid_search_cv",
+          "callee": "classifier_model.set_random_state",
+          "lineNumber": 643
+        },
+        {
+          "caller": "grid_search_cv",
+          "callee": "GridSearchCV",
+          "lineNumber": 647
+        },
+        {
+          "caller": "grid_search_cv",
+          "callee": "classifier.get_cv_splitter",
+          "lineNumber": 650
+        },
+        {
+          "caller": "grid_search_cv",
+          "callee": "joblib.parallel_backend",
+          "lineNumber": 656
+        },
+        {
+          "caller": "grid_search_cv",
+          "callee": "grid_search.fit",
+          "lineNumber": 657
+        },
+        {
+          "caller": "save_model_json",
+          "callee": "ValueError",
+          "lineNumber": 706
+        },
+        {
+          "caller": "save_model_json",
+          "callee": "ensure_dir",
+          "lineNumber": 712
+        },
+        {
+          "caller": "save_model_json",
+          "callee": "os.path.join",
+          "lineNumber": 713
+        },
+        {
+          "caller": "save_model_json",
+          "callee": "open",
+          "lineNumber": 714
+        },
+        {
+          "caller": "save_model_json",
+          "callee": "json.dump",
+          "lineNumber": 715
+        },
+        {
+          "caller": "save_model_json",
+          "callee": "logger.info",
+          "lineNumber": 718
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "os.path.join",
+          "lineNumber": 772
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "os.path.join",
+          "lineNumber": 778
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "len",
+          "lineNumber": 780
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "np.asarray",
+          "lineNumber": 783
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "ValueError",
+          "lineNumber": 785
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "seed_ensemble.compute_probabilities_and_predictions",
+          "lineNumber": 789
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "enumerate",
+          "lineNumber": 792
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel",
+          "lineNumber": 796
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "confusion_matrix",
+          "lineNumber": 796
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "float",
+          "lineNumber": 797
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 798
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "recall_score",
+          "lineNumber": 798
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 799
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "precision_score",
+          "lineNumber": 799
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "precision_recall_curve",
+          "lineNumber": 801
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "float",
+          "lineNumber": 802
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "auc",
+          "lineNumber": 802
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "int",
+          "lineNumber": 805
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 806
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "accuracy_score",
+          "lineNumber": 806
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 807
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "balanced_accuracy_score",
+          "lineNumber": 807
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 809
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "average_precision_score",
+          "lineNumber": 809
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 810
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 812
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 813
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "f1_score",
+          "lineNumber": 813
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 814
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "roc_auc_score",
+          "lineNumber": 814
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 815
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "matthews_corrcoef",
+          "lineNumber": 815
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "round",
+          "lineNumber": 816
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "float",
+          "lineNumber": 816
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "np.sqrt",
+          "lineNumber": 816
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "int",
+          "lineNumber": 817
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "int",
+          "lineNumber": 818
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "int",
+          "lineNumber": 819
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "int",
+          "lineNumber": 820
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "rows.append",
+          "lineNumber": 823
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "pd.DataFrame(rows).set_index",
+          "lineNumber": 825
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "pd.DataFrame",
+          "lineNumber": 825
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "ensure_dir",
+          "lineNumber": 827
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "df.to_csv",
+          "lineNumber": 828
+        },
+        {
+          "caller": "compute_seed",
+          "callee": "logger.info",
+          "lineNumber": 830
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "RuntimeError",
+          "lineNumber": 869
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "to_datetime_index(\n        datetime_map=labels.sort_index(),\n        df=seed_ensemble.probabilities,\n    ).reset_index",
+          "lineNumber": 874
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "to_datetime_index",
+          "lineNumber": 874
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "labels.sort_index",
+          "lineNumber": 875
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "ClassifierEnsembleSummary",
+          "lineNumber": 879
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "to_datetime(eruption_date).replace",
+          "lineNumber": 882
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "to_datetime",
+          "lineNumber": 882
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "start_date.replace",
+          "lineNumber": 883
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "int",
+          "lineNumber": 894
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "window.sort_values",
+          "lineNumber": 897
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "SeedSummary",
+          "lineNumber": 901
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "ProbabilityPick",
+          "lineNumber": 903
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "int",
+          "lineNumber": 905
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "float",
+          "lineNumber": 907
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "ProbabilityPick",
+          "lineNumber": 909
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "int",
+          "lineNumber": 911
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "float",
+          "lineNumber": 913
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "seed_summaries.append",
+          "lineNumber": 916
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "RuntimeError",
+          "lineNumber": 940
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "summary.eruption_windows.append",
+          "lineNumber": 946
+        },
+        {
+          "caller": "build_classifier_ensemble_summary",
+          "callee": "EruptionWindow",
+          "lineNumber": 947
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 13,
+        "functionCount": 13,
+        "classCount": 0
+      }
+    }
+  ]
+}

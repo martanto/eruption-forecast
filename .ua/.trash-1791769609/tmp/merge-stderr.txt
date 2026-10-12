@@ -1,0 +1,24 @@
+Found 14 batch files (9 logical batches, 5 multi-part):
+  batch-1-part-1.json: 16 nodes, 31 edges
+  batch-1-part-2.json: 36 nodes, 101 edges
+  batch-2.json: 33 nodes, 97 edges
+  batch-3.json: 24 nodes, 88 edges
+  batch-4-part-1.json: 29 nodes, 74 edges
+  batch-4-part-2.json: 31 nodes, 109 edges
+  batch-5-part-1.json: 11 nodes, 87 edges
+  batch-5-part-2.json: 25 nodes, 61 edges
+  batch-6.json: 33 nodes, 87 edges
+  batch-7-part-1.json: 23 nodes, 97 edges
+  batch-7-part-2.json: 33 nodes, 82 edges
+  batch-8-part-1.json: 8 nodes, 103 edges
+  batch-8-part-2.json: 7 nodes, 66 edges
+  batch-9.json: 7 nodes, 22 edges
+
+Input: 316 nodes, 1105 edges
+
+Output: 316 nodes, 1105 edges
+
+Imports edge recovery:
+  Recovered 0 `imports` edges from importMap (96 entries scanned)
+
+Written to D:\Projects\eruption-forecast\.ua\intermediate\assembled-graph.json (430 KB)
