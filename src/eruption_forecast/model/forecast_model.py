@@ -673,6 +673,7 @@ class ForecastModel:
                 minority_threshold=minority_threshold,
                 sampling_strategy=sampling_strategy,
                 plot_features=plot_features,
+                scoring=scoring,
             )
         )
 
