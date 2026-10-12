@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from tests.conftest import seed_tremor_csv, eruption_ramp_tremor_df
+from eruption_forecast.model.training_model import TrainingModel
 from eruption_forecast.model.prediction_model import PredictionModel
 from eruption_forecast.model.forecast_model_scenario import (
     Scenario,
@@ -124,6 +125,39 @@ class TestValidation:
         scenario = {**SCENARIOS[0], "prediction_plot_kwargs": {"legend_n_cols": 2}}
         kwargs = ForecastModelScenario.build_plot_kwargs(scenario, ERUPTION_DATES)
         assert kwargs == {"legend_n_cols": 2, "eruption_dates": ERUPTION_DATES}
+
+
+class _StopAfterFit(Exception):
+    """Short-circuits the scenario loop once ``TrainingModel.fit`` is reached."""
+
+
+def test_scoring_reaches_training_fit(seeded, monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    def _fake_fit(self, *args, **kwargs):
+        captured["scoring"] = kwargs.get("scoring", "<default>")
+        raise _StopAfterFit
+
+    # Labelling and tsfresh are irrelevant to the kwarg plumbing under test.
+    monkeypatch.setattr(TrainingModel, "build_label", lambda self, **kw: self)
+    monkeypatch.setattr(TrainingModel, "extract_features", lambda self, **kw: self)
+    monkeypatch.setattr(TrainingModel, "fit", _fake_fit)
+
+    runner = (
+        _calculated(seeded)
+        .shared_training(
+            window_step=6,
+            window_step_unit="hours",
+            scoring="roc_auc",
+            use_cache=False,
+        )
+        .shared_prediction()
+    )
+
+    with pytest.raises(_StopAfterFit):
+        runner.run(evaluate_model=False, explain_model=False)
+
+    assert captured["scoring"] == "roc_auc"
 
 
 @pytest.mark.slow
