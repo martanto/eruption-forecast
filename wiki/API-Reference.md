@@ -317,7 +317,7 @@ tm.fit(
 | `TrainingModel.load(stage_dir, identity)` | Classmethod; returns the instance on cache hit or `None` |
 | `tm.save_config(path=None, fmt="yaml")` | `{training_dir}/training.config.{yaml,json}` — auto-called at end of `fit()` |
 
-Populated attributes after `fit()`: `tm.results` (per-classifier trained-model JSON registry paths written by `save_model_json`), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels`.
+Populated attributes after `fit()`: `tm.results` (per-classifier trained-model JSON registry paths written by `save_model_json`), `tm.ClassifierEnsemble`, `tm.classifier_ensemble_path`, `tm.features_df`, `tm.labels` (`is_erupted` indexed by window `id`), `tm.window_ids` (window `id` indexed by datetime — same shape as `PredictionModel.labels`; set by `extract_features()` and `load_features()`).
 
 ---
 
@@ -493,7 +493,7 @@ em.plot(
 )
 ```
 
-`explain()` delegates to `ExplainerEnsemble.explain()` and caches the result via `BaseModel.save(identity)`. On a cache hit the stored `self.explanations` is restored without re-running SHAP. `plot()` renders the per-eruption waterfall (only when `eruption_dates` is available) and, optionally, per-seed bar + beeswarm plots.
+`explain()` delegates to `ExplainerEnsemble.explain()` and caches the result via `BaseModel.save(identity)`. On a cache hit the stored `self.explanations` is restored without re-running SHAP. `plot()` renders the per-eruption waterfall (only when `eruption_dates` is available) and, optionally, per-seed bar + beeswarm plots. Waterfall labels come from `PredictionModel.labels` in prediction reuse and `TrainingModel.window_ids` in training reuse (falling back to `LabelBuilder.df` for older cached training pickles).
 
 ```python
 ExplanationModel.from_file(
@@ -560,6 +560,8 @@ ee.plot_waterfall(
     dpi: int = 150,
 )   # per-eruption waterfall under {explanation_dir}/eruptions/{date}/
 ```
+
+`plot_waterfall()` expects `labels` as window ids indexed by datetime (`PredictionModel.labels` / `TrainingModel.window_ids`). Before plotting each classifier it recomputes that classifier's cached `SeedEnsemble.probabilities` in memory when they are not aligned with `features_df`.
 
 ### Static helpers
 
