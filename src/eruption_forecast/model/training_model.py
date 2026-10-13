@@ -208,6 +208,11 @@ class TrainingModel(BaseModel):
         # Will be set after build_label() called
         self.LabelBuilder: LabelBuilder | None = None
         self.labels: pd.Series = pd.Series()
+        # ``labels`` is ``id``-indexed for fitting, which drops the window
+        # datetimes; keep them here in the same shape as
+        # ``PredictionModel.labels`` so datetime-aware consumers (e.g. SHAP
+        # waterfalls) work in training-reuse mode.
+        self.window_ids: pd.Series = pd.Series()
         self.builder: Literal["standard", "dynamic"] = "standard"
         self.days_before_eruption: int | None = None
 
@@ -853,6 +858,9 @@ class TrainingModel(BaseModel):
 
         labels: pd.DataFrame = features_builder.label_df
 
+        if isinstance(labels.index, pd.DatetimeIndex) and "id" in labels.columns:
+            self.window_ids = labels["id"]
+
         if "id" in labels.columns:
             labels = labels.set_index("id")
         if "datetime" in labels.columns:
@@ -1262,6 +1270,9 @@ class TrainingModel(BaseModel):
 
         self.features_df = pd.read_parquet(features_matrix_path)
         self.labels = load_label_csv(label_features_csv)
+        self.window_ids = pd.read_csv(
+            label_features_csv, index_col=0, parse_dates=True
+        )["id"]
         self.features_path = features_matrix_path
 
         if select_features is not None:

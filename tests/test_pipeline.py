@@ -150,6 +150,11 @@ class TestTrainingModel:
         assert len(tm.features_df) == len(tm.labels)
         assert set(tm.labels.unique()) == {0, 1}
 
+    def test_window_ids_carry_datetimes(self, fm: ForecastModel) -> None:
+        window_ids = fm.TrainingModel.window_ids
+        assert isinstance(window_ids.index, pd.DatetimeIndex)
+        assert sorted(window_ids) == sorted(fm.TrainingModel.labels.index)
+
     def test_writes_config_and_cache(self, fm: ForecastModel) -> None:
         tm = fm.TrainingModel
         assert os.path.isfile(os.path.join(tm.training_dir, "training.config.yaml"))
@@ -177,6 +182,7 @@ class TestTrainingModel:
         )
 
         assert fresh.features_df.shape == tm.features_df.shape
+        assert fresh.window_ids.sort_index().equals(tm.window_ids.sort_index())
 
 
 # ---------------------------------------------------------------------------
@@ -337,6 +343,27 @@ class TestExplanationModel:
         assert [e.classifier_name for e in xm.explanations] == [
             "LiteRandomForestClassifier"
         ]
+
+    def test_training_mode_waterfall_per_eruption(
+        self, fm: ForecastModel, tmp_path
+    ) -> None:
+        ExplanationModel(fm.TrainingModel, output_dir=str(tmp_path)).explain().plot(
+            max_display=5, dpi=50, plot_per_seed=False, plot_aggregate=False
+        )
+        eruption_dir = tmp_path / "explanation" / "training" / "eruptions" / "2025-01-20"
+        assert any(name.endswith(".png") for name in os.listdir(eruption_dir))
+
+    def test_training_mode_waterfall_labels_fallback(
+        self, fm: ForecastModel, tmp_path, monkeypatch
+    ) -> None:
+        # Training pickles cached before ``window_ids`` existed lack it, so
+        # the datetimes must come from the ``LabelBuilder`` grid instead.
+        expected = fm.TrainingModel.window_ids
+        monkeypatch.setattr(fm.TrainingModel, "window_ids", pd.Series())
+        xm = ExplanationModel(fm.TrainingModel, output_dir=str(tmp_path))
+        labels = xm._waterfall_labels()
+        assert isinstance(labels.index, pd.DatetimeIndex)
+        assert labels.sort_index().tolist() == expected.sort_index().tolist()
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 import os
 from typing import Self, Literal
 
+import pandas as pd
+
 from eruption_forecast.logger import logger
 from eruption_forecast.utils.pathutils import ensure_dir, load_pickle
 from eruption_forecast.model.base_model import BaseModel
@@ -542,7 +544,7 @@ class ExplanationModel(BaseModel):
             )
         else:
             explainer_ensemble.plot_waterfall(
-                labels=self.model.labels,
+                labels=self._waterfall_labels(),
                 eruption_dates=self.eruption_dates,
                 figsize=figsize,
                 max_display=max_display,
@@ -569,6 +571,39 @@ class ExplanationModel(BaseModel):
             )
 
         return self
+
+    def _waterfall_labels(self) -> pd.Series:
+        """Return the ``id`` Series indexed by window datetime for waterfalls.
+
+        ``PredictionModel.labels`` already has this shape. ``TrainingModel.labels``
+        is ``id``-indexed ``is_erupted`` values, so training reuse reads
+        ``TrainingModel.window_ids`` instead. Training pickles cached before
+        ``window_ids`` existed fall back to the ``LabelBuilder`` grid narrowed
+        to the ids that survived feature extraction.
+
+        Returns:
+            pd.Series: Window ids named ``"id"`` with a ``DatetimeIndex``.
+
+        Raises:
+            ValueError: If a training-reuse model carries neither
+                ``window_ids`` nor a ``LabelBuilder``.
+        """
+        if isinstance(self.model, PredictionModel):
+            return self.model.labels
+
+        window_ids: pd.Series = getattr(self.model, "window_ids", pd.Series())
+        if not window_ids.empty:
+            return window_ids
+
+        label_builder = self.model.LabelBuilder
+        if label_builder is None:
+            raise ValueError(
+                "TrainingModel has no window datetimes. Re-run train() with "
+                "use_cache=False to rebuild them."
+            )
+
+        label_df = label_builder.df
+        return label_df.loc[label_df["id"].isin(self.model.labels.index), "id"]
 
     def _upstream_hash(self) -> str:
         """Hash the upstream-model fingerprint so the explanation cache invalidates

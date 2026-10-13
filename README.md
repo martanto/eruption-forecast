@@ -115,7 +115,7 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 - **Feature Alias Utilities** — the aggregated `top_features.csv` / `top_{N}_features.csv` / `common_top_features.csv` now carry `frequency` (per-seed selection count; renamed from `score`), a rank-based `alias` (`ft_1`, `ft_2`, …), and a plain-English `description` for every row. Helpers: `humanize_feature_name(name, freq_bands=None)`, `load_feature_aliases(source)`, `update_top_features_csv(csv_path)` for legacy backfill; the cross-scenario heatmaps accept `label_style="alias"`.
 - **Content-Addressable Caching** — `TrainingModel`, `PredictionModel`, `EvaluationModel`, and `ExplanationModel` cache their state next to each stage's other outputs (`{stage_dir}/{hash}.{ClassName}.pkl` + `.params.json` sidecar) so repeated runs with identical kwargs short-circuit. Every `fm.<stage>(..., use_cache=True)` call is on by default.
 - **Config Round-Trip** — `fm.save_config()` → YAML → `ForecastModel.from_config(path).run()` replays a full pipeline. Every stage model (`TrainingModel`, `PredictionModel`, `EvaluationModel`, `ExplanationModel`) also auto-saves its own per-stage `*.config.yaml` at the end of `fit()` / `forecast()` / `evaluate()` / `explain()`, and `LabelBuilder.build()` writes a `label.config.yaml` (`LabelConfig`) next to its label CSV. Set `prefix_config="scenario 1"` to namespace every config file (`training.scenario-1.config.yaml`, …) when several runs share one directory.
-- **Multi-Scenario Sweeps** — `ForecastModelScenario` runs `calculate()` once, then loops `train → predict → evaluate → explain` over a list of `Scenario` dicts, writing each into its own `scenarios/{slug}/` directory.
+- **Multi-Scenario Sweeps** — `ForecastModelScenario` runs `calculate()` once, then loops `train → predict → evaluate → explain` over a list of `Scenario` dicts, writing each into its own `scenarios/{slug}/` directory. Evaluation and explanation can cover the training and prediction models in the same sweep (`model=["prediction", "training"]`).
 - **Telegram Notifications** — `@notify` / `@timer` decorators + fluent `TelegramNotification` client (`send_message` / `send_document` / `send_photo` / `send_media_group`) for success/error messages and file attachments.
 - **Multi-processing** — `n_jobs` (outer seed workers) × `n_grids` (inner `GridSearchCV` workers) parallelism, capped so the product never exceeds `total_cpu` (which is `cpu_count() - 2` with a floor of 1, so the OS keeps 2 free cores). tsfresh's `FeatureSelector` is pinned to `n_jobs=1` whenever the outer loop is parallel to avoid `multiprocessing.Pool` oversubscription.
 
@@ -519,11 +519,13 @@ fms = ForecastModelScenario(
        .shared_training(window_step=6, window_step_unit="hours",
                         classifiers=["lite-rf", "rf"], seeds=25)
        .shared_prediction(use_features_from="files", plot_threshold=0.7)
-       .shared_evaluation(model="prediction", plot_aggregate=True)
-       .shared_explanation(model="prediction", max_display=20)
+       .shared_evaluation(model=["prediction", "training"], plot_aggregate=True)
+       .shared_explanation(model=["prediction", "training"], max_display=20)
 )
 fms.run()   # loops the sweep, ships a Telegram document per scenario
 ```
+
+`shared_evaluation` / `shared_explanation` take `model="prediction"`, `model="training"`, or a list of both. With a list, a single `run()` evaluates / explains every listed model per scenario, in order, writing each to its own `evaluation/{mode}/` / `explanation/{mode}/` directory.
 
 `use_features_from="files"` extracts features once on scenario 1 and reuses the resulting matrix + labels CSV on scenarios 2..N — so **scenario 1's prediction window must span every datetime any later scenario predicts over**. Full walkthrough: [wiki/Pipeline-Walkthrough.md#forecastmodelscenario-workflow-forecast-scenariopy](wiki/Pipeline-Walkthrough.md#forecastmodelscenario-workflow-forecast-scenariopy).
 
@@ -788,4 +790,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 **Version:** 0.5.0
 **Status:** Active Development
-**Last Updated:** 2026-10-11
+**Last Updated:** 2026-10-13

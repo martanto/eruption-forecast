@@ -496,6 +496,7 @@ class ExplainerEnsemble:
         eruption_dir = os.path.join(self.explanation_dir, "eruptions")
 
         for classifier_explanation in self.explanations:
+            self._align_probabilities(classifier_explanation.classifier_name)
             plot_classifier_waterfall(
                 classifier_explanation=classifier_explanation,
                 classifier_ensemble=self.ClassifierEnsemble,
@@ -507,6 +508,39 @@ class ExplainerEnsemble:
                 dpi=dpi,
                 verbose=self.verbose,
             )
+
+    def _align_probabilities(self, classifier_name: str) -> None:
+        """Make the cached per-seed probabilities match ``self.features_df``.
+
+        Training and prediction share one ``ClassifierEnsemble``, so
+        ``SeedEnsemble.probabilities`` holds whichever window grid was
+        predicted last. Waterfalls index SHAP rows by position in
+        ``self.features_df``, so a stale matrix (e.g. prediction-grid
+        probabilities during training reuse) is recomputed in memory here.
+
+        Args:
+            classifier_name (str): Key into ``self.ClassifierEnsemble.ensembles``.
+        """
+        seed_ensemble = self.ClassifierEnsemble.ensembles[classifier_name]
+        cached = seed_ensemble.probabilities
+        if cached is not None and cached.index.equals(self.features_df.index):
+            return None
+
+        probabilities, predictions = (
+            seed_ensemble.compute_probabilities_and_predictions(self.features_df)
+        )
+        seed_columns = [
+            f"seed_{seed['random_state']:05d}" for seed in seed_ensemble.seeds
+        ]
+        seed_ensemble.probabilities = pd.DataFrame(
+            probabilities, index=self.features_df.index, columns=seed_columns
+        )
+        seed_ensemble.predictions = pd.DataFrame(
+            predictions.astype(np.int8),
+            index=self.features_df.index,
+            columns=seed_columns,
+        )
+        return None
 
     def plot_aggregate(
         self,
