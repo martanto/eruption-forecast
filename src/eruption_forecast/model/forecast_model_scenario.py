@@ -10,6 +10,9 @@ from eruption_forecast.utils.pathutils import setup_nslc_directories
 from eruption_forecast.utils.formatting import slugify
 
 
+ModelKind = Literal["training", "prediction"]
+
+
 class Scenario(TypedDict):
     """Specification for a single scenario in a ``ForecastModelScenario`` sweep.
 
@@ -209,6 +212,36 @@ class ForecastModelScenario:
         plot_kwargs = dict(scenario.get("prediction_plot_kwargs", {}))
         plot_kwargs["eruption_dates"] = eruption_dates
         return plot_kwargs
+
+    @staticmethod
+    def normalize_models(model: ModelKind | list[ModelKind]) -> list[ModelKind]:
+        """Coerce a ``model`` argument into an ordered, de-duplicated list.
+
+        Args:
+            model (ModelKind | list[ModelKind]): ``"training"``,
+                ``"prediction"``, or a list of both.
+
+        Returns:
+            list[ModelKind]: Upstream models in the caller's order, each
+                listed once.
+
+        Raises:
+            ValueError: If the list is empty or contains a value other than
+                ``"training"`` / ``"prediction"``.
+        """
+        models = [model] if isinstance(model, str) else list(model)
+        if not models:
+            raise ValueError(
+                "model must name at least one of 'training', 'prediction'."
+            )
+
+        invalid = [m for m in models if m not in ("training", "prediction")]
+        if invalid:
+            raise ValueError(
+                f"Unknown model {invalid!r}. Expected 'training' and/or 'prediction'."
+            )
+
+        return list(dict.fromkeys(models))
 
     def validate(self) -> Self:
         """Enforce always-required preconditions before :meth:`run` begins.
@@ -595,7 +628,7 @@ class ForecastModelScenario:
 
     def shared_evaluation(
         self,
-        model: Literal["training", "prediction"] = "prediction",
+        model: ModelKind | list[ModelKind] = "prediction",
         plot_per_seed: bool = False,
         plot_aggregate: bool = True,
         overwrite: bool | None = None,
@@ -615,8 +648,11 @@ class ForecastModelScenario:
         not need to call this method at all.
 
         Args:
-            model (Literal["training", "prediction"]): Which pipeline
-                stage to evaluate against. Defaults to ``"prediction"``.
+            model (ModelKind | list[ModelKind]): Which upstream model(s) to
+                evaluate. Pass ``["prediction", "training"]`` to run both
+                modes in a single :meth:`run`, in the given order; each mode
+                writes to its own ``evaluation/{training|prediction}/``
+                directory. Defaults to ``"prediction"``.
             plot_per_seed (bool): Render per-seed evaluation plots.
                 Defaults to ``False``.
             plot_aggregate (bool): Render aggregate cross-seed
@@ -634,9 +670,12 @@ class ForecastModelScenario:
 
         Returns:
             Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If ``model`` is empty or names an unknown model.
         """
         shared_evaluation_params = {
-            "model": model,
+            "model": ForecastModelScenario.normalize_models(model),
             "eruption_dates": self.eruption_dates,
             "plot_per_seed": plot_per_seed,
             "plot_aggregate": plot_aggregate,
@@ -652,7 +691,7 @@ class ForecastModelScenario:
 
     def shared_explanation(
         self,
-        model: Literal["training", "prediction"] = "prediction",
+        model: ModelKind | list[ModelKind] = "prediction",
         save_per_seed: bool = True,
         plot_per_seed: bool = True,
         plot_aggregate: bool = True,
@@ -679,8 +718,11 @@ class ForecastModelScenario:
         not need to call this method at all.
 
         Args:
-            model (Literal["training", "prediction"]): Which upstream
-                stage to explain. Defaults to ``"prediction"``.
+            model (ModelKind | list[ModelKind]): Which upstream model(s) to
+                explain. Pass ``["prediction", "training"]`` to run both
+                modes in a single :meth:`run`, in the given order; each mode
+                writes to its own ``explanation/{training|prediction}/``
+                directory. Defaults to ``"prediction"``.
             save_per_seed (bool): Persist per-seed SHAP payloads under
                 ``shap_values/{seed:05d}.pkl``. Defaults to ``True``.
             plot_per_seed (bool): Render per-seed bar + beeswarm plots.
@@ -712,9 +754,12 @@ class ForecastModelScenario:
 
         Returns:
             Self: The current instance, enabling method chaining.
+
+        Raises:
+            ValueError: If ``model`` is empty or names an unknown model.
         """
         shared_explanation_params = {
-            "model": model,
+            "model": ForecastModelScenario.normalize_models(model),
             "eruption_dates": self.eruption_dates,
             "save_per_seed": save_per_seed,
             "plot_per_seed": plot_per_seed,
@@ -760,9 +805,15 @@ class ForecastModelScenario:
         4. Ships the forecast plot to Telegram via
            :class:`TelegramNotification` when the plot file is present.
         5. Calls :meth:`ForecastModel.evaluate` with
-           ``self.shared_evaluation_params`` when ``evaluate_model=True``.
+           ``self.shared_evaluation_params`` once per model listed in
+           :meth:`shared_evaluation` when ``evaluate_model=True``.
         6. Calls :meth:`ForecastModel.explain` with
-           ``self.shared_explanation_params`` when ``explain_model=True``.
+           ``self.shared_explanation_params`` once per model listed in
+           :meth:`shared_explanation` when ``explain_model=True``.
+
+        With several models, ``fm.EvaluationModel`` / ``fm.ExplanationModel``
+        hold the last one run, and the scenario's ``forecast.config.yaml``
+        records only that last mode.
 
         Conditional preconditions: when ``evaluate_model=True``,
         :meth:`shared_evaluation` must have been called; when
@@ -897,16 +948,22 @@ class ForecastModelScenario:
                 )
 
             if evaluate_model:
-                fm.evaluate(
-                    output_dir=output_dir,
-                    **self.shared_evaluation_params,
-                )
+                evaluation_params = dict(self.shared_evaluation_params)
+                for model in evaluation_params.pop("model"):
+                    fm.evaluate(
+                        model=model,
+                        output_dir=output_dir,
+                        **evaluation_params,
+                    )
 
             if explain_model:
-                fm.explain(
-                    output_dir=output_dir,
-                    **self.shared_explanation_params,
-                )
+                explanation_params = dict(self.shared_explanation_params)
+                for model in explanation_params.pop("model"):
+                    fm.explain(
+                        model=model,
+                        output_dir=output_dir,
+                        **explanation_params,
+                    )
 
         return None
 

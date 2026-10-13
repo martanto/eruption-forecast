@@ -121,6 +121,66 @@ class TestValidation:
         with pytest.raises(ValueError):
             runner.validate()
 
+    def test_normalize_models(self) -> None:
+        normalize = ForecastModelScenario.normalize_models
+        assert normalize("training") == ["training"]
+        assert normalize(["prediction", "training", "prediction"]) == [
+            "prediction",
+            "training",
+        ]
+
+    @pytest.mark.parametrize("model", [[], ["evaluation"], "both"])
+    def test_invalid_models_raise(self, seeded, model) -> None:
+        runner = _scenario_runner(seeded["output_dir"])
+        with pytest.raises(ValueError):
+            runner.shared_evaluation(model=model)
+        with pytest.raises(ValueError):
+            runner.shared_explanation(model=model)
+
+    def test_run_loops_every_model(self, seeded, monkeypatch) -> None:
+        calls: list[tuple[str, str, str]] = []
+        fm_cls = type(_calculated(seeded).ForecastModel)
+
+        # Only the per-model dispatch is under test, so every stage is a stub.
+        monkeypatch.setattr(fm_cls, "train", lambda self, **kw: self)
+        monkeypatch.setattr(fm_cls, "predict", lambda self, **kw: self)
+        monkeypatch.setattr(
+            fm_cls,
+            "evaluate",
+            lambda self, model, **kw: calls.append(
+                ("evaluate", model, self.prefix_config)
+            ),
+        )
+        monkeypatch.setattr(
+            fm_cls,
+            "explain",
+            lambda self, model, **kw: calls.append(
+                ("explain", model, self.prefix_config)
+            ),
+        )
+
+        runner = (
+            _calculated(seeded)
+            .shared_training(window_step=6, window_step_unit="hours")
+            .shared_prediction()
+            .shared_evaluation(model=["prediction", "training"])
+            .shared_explanation(model=["training", "prediction"])
+        )
+        runner.run()
+
+        assert calls == [
+            ("evaluate", "prediction", "scenario-1"),
+            ("evaluate", "training", "scenario-1"),
+            ("explain", "training", "scenario-1"),
+            ("explain", "prediction", "scenario-1"),
+            ("evaluate", "prediction", "scenario-2"),
+            ("evaluate", "training", "scenario-2"),
+            ("explain", "training", "scenario-2"),
+            ("explain", "prediction", "scenario-2"),
+        ]
+        # ``run()`` must not consume the stored list, so a second sweep repeats it.
+        assert runner.shared_evaluation_params["model"] == ["prediction", "training"]
+
     def test_plot_kwargs_always_carry_eruption_dates(self) -> None:
         scenario = {**SCENARIOS[0], "prediction_plot_kwargs": {"legend_n_cols": 2}}
         kwargs = ForecastModelScenario.build_plot_kwargs(scenario, ERUPTION_DATES)
@@ -188,7 +248,7 @@ def test_run_two_scenarios(seeded, tiny_grids, monkeypatch) -> None:
             plot_features=False,
         )
         .shared_prediction(use_features_from="files", plot_pdf=False)
-        .shared_evaluation(model="prediction", plot_aggregate=False)
+        .shared_evaluation(model=["prediction", "training"], plot_aggregate=False)
     )
 
     runner.run(evaluate_model=True, explain_model=False, notification_message="ci")
@@ -201,6 +261,8 @@ def test_run_two_scenarios(seeded, tiny_grids, monkeypatch) -> None:
         scenario_dir = os.path.join(runner.scenarios_dir, slug)
         for stage in ("training", "prediction", "evaluation"):
             assert os.path.isdir(os.path.join(scenario_dir, stage)), (slug, stage)
+        for mode in ("prediction", "training"):
+            assert os.path.isdir(os.path.join(scenario_dir, "evaluation", mode))
         assert os.path.isfile(
             os.path.join(scenario_dir, "training", f"training.{slug}.config.yaml")
         )
