@@ -47,7 +47,7 @@ output for whichever classifiers qualify.
    │ features_df ← Training    │  │ features_df ← PredictionModel   │
    │   Model.features_df       │  │   .features_df                  │
    │ labels ← TrainingModel    │  │ labels ← PredictionModel.labels │
-   │   .labels                 │  │                                 │
+   │   .window_ids             │  │                                 │
    │                           │  │ eruption_dates: required for    │
    │ eruption_dates: optional  │  │   waterfall plot rendering      │
    └──────────────┬────────────┘  └───────────────┬─────────────────┘
@@ -59,6 +59,13 @@ output for whichever classifiers qualify.
 Both modes share the same per-seed SHAP engine
 (`ExplainerEnsemble.explain_seed`) and per-classifier
 `ClassifierExplanation` payload.
+
+The waterfall needs window ids indexed by datetime. `PredictionModel.labels`
+already has that shape; `TrainingModel.labels` is `is_erupted` indexed by
+`id`, so training reuse reads `TrainingModel.window_ids` instead (resolved by
+`ExplanationModel._waterfall_labels()`). Training pickles cached before
+`window_ids` existed fall back to `TrainingModel.LabelBuilder.df`, narrowed to
+the ids that survived feature extraction.
 
 | Mode | When to use | `eruption_dates` |
 |------|-------------|------------------|
@@ -346,12 +353,15 @@ grids, seed-agreement diagnostics, etc.) can iterate without rerunning
 the scan.
 
 **Precondition.** `build_classifier_ensemble_summary` requires
-`SeedEnsemble.probabilities` to be populated — i.e. a prediction has
-already run. Both operating modes satisfy this: prediction-reuse pulls
-straight from `PredictionModel.forecast()`; training-reuse relies on
-`TrainingModel.fit()` scoring the training samples during the ensemble
-build. Calling the builder against an unpopulated ensemble raises
-`RuntimeError`.
+`SeedEnsemble.probabilities` to be populated and row-aligned with the
+features being explained. Training and prediction share one
+`ClassifierEnsemble`, so the cached matrix belongs to whichever grid was
+predicted last. `ExplainerEnsemble.plot_waterfall()` therefore calls
+`_align_probabilities()` per classifier first: when the cached matrix is
+missing or its index differs from `features_df.index`, the per-seed
+probabilities are recomputed in memory (nothing is written to disk).
+Calling `build_classifier_ensemble_summary` directly against an
+unpopulated ensemble still raises `RuntimeError`.
 
 **Recovering the matrices without re-predicting.** After a bare pickle
 reload (`SeedEnsemble.from_any(...)` on a training-time
@@ -469,7 +479,7 @@ for classifier_explanation in em.explanations:
     plot_classifier_waterfall(
         classifier_explanation=classifier_explanation,
         classifier_ensemble=em.ClassifierEnsemble,
-        labels=em.model.labels,
+        labels=em.model.labels,   # training reuse: em.model.window_ids
         eruption_dates=["2025-08-02", "2025-08-18"],
         output_dir=em.explanation_dir + "/eruptions",
         max_display=20,

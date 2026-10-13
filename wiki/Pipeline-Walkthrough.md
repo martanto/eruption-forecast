@@ -187,8 +187,10 @@ The class wraps **one** `ForecastModel` instance. `calculate()` runs **once** be
 │                     │                     **plot_kwargs, start, end)   │─┤ inner
 │                     │          TelegramNotification.send_document(     │  │ loop
 │                     │              forecast_plot_path, caption=name)   │  │ (per
-│                     │          fm.evaluate(**shared_evaluation_params) │  │ scenario)
-│                     │          fm.explain(**shared_explanation_params) ┘
+│                     │          for model in shared_evaluation model:   │  │ scenario)
+│                     │              fm.evaluate(model, **params)        │
+│                     │          for model in shared_explanation model:  │
+│                     │              fm.explain(model, **params)         ┘
 │                     │
 └─────────────────────┘
 ```
@@ -224,6 +226,7 @@ Each `fms.*` method below is a thin wrapper over its counterpart on the wrapped 
 
 #### `fms.shared_evaluation(...)` &nbsp;— mirrors [`ForecastModel.evaluate(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L997)
 - **Same arguments** as `ForecastModel.evaluate(...)`; captured into `self.shared_evaluation_params` and splatted into `fm.evaluate(**shared_evaluation_params)` per scenario inside `run()`.
+- **`model` also accepts a list** — `"prediction"`, `"training"`, or `["prediction", "training"]`. `run()` calls `fm.evaluate(model=...)` once per listed model, in the given order, so one sweep can write both `evaluation/prediction/` and `evaluation/training/`. The value is normalised by `ForecastModelScenario.normalize_models()` (duplicates dropped; an empty list or any other value raises `ValueError` at `shared_evaluation(...)` time).
 - **Injected per scenario by `run()` (do not pass):** `output_dir`.
 - **Injected once by the wrapper (do not pass):** `eruption_dates` — filled from `self.eruption_dates`.
 - **Wrapper fallbacks:** `overwrite=None` → `self.overwrite`; `verbose=None` → `self.verbose`.
@@ -231,12 +234,14 @@ Each `fms.*` method below is a thin wrapper over its counterpart on the wrapped 
 
 #### `fms.shared_explanation(...)` &nbsp;— mirrors [`ForecastModel.explain(...)`](https://github.com/martanto/eruption-forecast/blob/master/src/eruption_forecast/model/forecast_model.py#L1121)
 - **Same arguments** as `ForecastModel.explain(...)`; captured into `self.shared_explanation_params` and splatted into `fm.explain(**shared_explanation_params)` per scenario inside `run()`.
+- **`model` also accepts a list** — same rules as `shared_evaluation`: `run()` calls `fm.explain(model=...)` once per listed model, in the given order, writing `explanation/prediction/` and/or `explanation/training/`.
 - **Injected per scenario by `run()` (do not pass):** `output_dir`.
 - **Injected once by the wrapper (do not pass):** `eruption_dates` — filled from `self.eruption_dates`.
 - **Wrapper fallbacks:** `overwrite=None` → `self.overwrite`; `verbose=None` → `self.verbose`.
 - **Conditionally required** — `run(explain_model=True)` (the default) raises `RuntimeError("Please run \`shared_explanation(...)\` first, or pass \`explain_model=False\` to \`run(...)\`.")` if the params dict is empty. `run(explain_model=False)` waives the requirement and skips the explain step for that sweep.
 
 #### `fms.run(evaluate_model=True, explain_model=True, notification_message=None)`
+- With several models listed, `fm.EvaluationModel` / `fm.ExplanationModel` and the scenario's `forecast.{slug}.config.yaml` reflect the last model run; every model's artefacts stay on disk.
 - Runs the `evaluate_model` / `explain_model` conditional preconditions first (raises `RuntimeError` if the corresponding `shared_*` params dict is empty when the flag is `True`), then calls `validate()` (unique slugs, `calculate()` ran, `shared_training` + `shared_prediction` populated), then writes `scenarios.json`.
 - Per scenario: builds `output_dir = scenarios_dir/{slugify(name)}`, calls `fm.train`, `fm.predict`, ships the forecast PNG to Telegram via `TelegramNotification.send_document(...)`, then optionally `fm.evaluate` and `fm.explain`.
 - **`use_features_from="files"` first-scenario coercion.** The loop captures the caller's original `use_features_from` value up-front, then force-sets the dict entry to `"all"` for `index == 0` so scenario 1 always extracts a fresh features matrix. When the caller *asked* for `"files"`, the loop captures scenario 1's `features_matrix_path` / `label_features_csv` on `fm.PredictionModel` and threads them into every later `fm.predict(...)` call - so scenarios 2..N never re-extract, they just read the scenario-1 parquet + label CSV.
