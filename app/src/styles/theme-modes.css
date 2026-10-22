@@ -1,0 +1,50 @@
+/* Light mode preserves the approved warm palette; dark uses the original Rim tokens. */
+:root[data-mode="light"] {
+  color-scheme: light;
+  --color-paper: #faf6f1;
+  --color-paper-2: #fffdfa;
+  --color-paper-3: #faf6f1;
+  --color-ink: #382b2a;
+  --color-ink-2: #382b2a;
+  --color-muted: #71605b;
+  --color-muted-2: #71605b;
+  --color-rule: #dfd2c8;
+  --color-rule-2: #dfd2c8;
+  --color-accent: #a63d30;
+  --color-accent-ink: #fffdfa;
+  --color-accent-2: #8f2430;
+  --color-focus: #a63d30;
+  --color-terracotta-soft: #f8e8df;
+  --color-amber: #85501f;
+  --color-amber-soft: #faedda;
+  --color-burgundy-soft: #f7e5e8;
+  --color-rose: #993548;
+  --color-rose-soft: #f8e8ed;
+  --color-caution: #85501f;
+  --color-caution-soft: #faedda;
+  --color-ember: #8f2430;
+  --color-overlay: rgb(56 43 42 / 30%);
+  --minimap-mask: rgb(250 246 241 / 65%);
+}
+.explorer-heading > .heading-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.theme-toggle { flex-shrink: 0; }
+.theme-toggle:active { background: var(--color-terracotta-soft); }
+.react-flow {
+  --xy-edge-label-background-color: var(--color-paper-3);
+  --xy-edge-label-color: var(--color-muted);
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-border-color: var(--color-line);
+  --xy-controls-button-background-color-hover: var(--color-rule-2);
+  --xy-controls-button-color-hover: var(--color-ink);
+  --xy-attribution-background-color: var(--color-paper-3);
+}
+@media (max-width: 600px) {
+  .explorer-heading > .heading-actions { width: 100%; gap: var(--space-sm); }
+  .heading-actions .scenario-select { flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--space-xs); }
+  .heading-actions .scenario-select select { max-width: 100%; }
+}

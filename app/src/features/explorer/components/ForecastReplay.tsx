@@ -32,6 +32,7 @@ function ReplayChart() {
   useEffect(() => {
     const chart = instance.current;
     if (!chart) return;
+    const update = () => {
     const points = forecastValues(model, count);
     const styles = getComputedStyle(document.documentElement);
     const color = (role: string) => styles.getPropertyValue(`--color-${role}`).trim();
@@ -40,9 +41,9 @@ function ReplayChart() {
       textStyle: { fontFamily: styles.getPropertyValue('--font-sans').trim(), color: color('ink') },
       aria: { enabled: true, description: 'Recorded OJN scenario 5 eruption probabilities. Threshold 0.7. Eruptions on 2 and 18 August 2025. Shading shows mean plus or minus one standard deviation, clipped to zero and one.' },
       grid: { left: 48, right: 24, top: 48, bottom: 88 },
-      tooltip: { trigger: 'axis', confine: true, valueFormatter: (value: unknown) => typeof value === 'number' ? value.toFixed(3) : String(value) },
-      xAxis: { type: 'time', min: FORECAST_ROWS[0]!.time, max: FORECAST_ROWS.at(-1)!.time, axisLabel: { formatter: '{dd} {MMM}' } },
-      yAxis: { type: 'value', min: 0, max: 1, name: 'Probability', splitLine: { lineStyle: { color: color('line') } } },
+      tooltip: { backgroundColor: color('surface'), borderColor: color('line'), textStyle: { color: color('ink') }, trigger: 'axis', confine: true, valueFormatter: (value: unknown) => typeof value === 'number' ? value.toFixed(3) : String(value) },
+      xAxis: { type: 'time', min: FORECAST_ROWS[0]!.time, max: FORECAST_ROWS.at(-1)!.time, axisLabel: { color: color('muted'), formatter: '{dd} {MMM}' }, axisLine: { lineStyle: { color: color('line') } } },
+      yAxis: { type: 'value', min: 0, max: 1, name: 'Probability', nameTextStyle: { color: color('muted') }, axisLabel: { color: color('muted') }, splitLine: { lineStyle: { color: color('line') } } },
       dataZoom: [{ type: 'slider', bottom: 20, height: 24, borderColor: color('line'), fillerColor: color('terracotta-soft') }],
       series: [
         { type: 'line', stack: 'band', data: points.map((p) => [p.time, p.lower]), symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { opacity: 0 }, silent: true, tooltip: { show: false } },
@@ -56,6 +57,11 @@ function ReplayChart() {
       ],
     };
     chart.setOption(option);
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode"] });
+    return () => observer.disconnect();
   }, [model, count]);
   const ended = count === FORECAST_ROWS.length;
   return <>
