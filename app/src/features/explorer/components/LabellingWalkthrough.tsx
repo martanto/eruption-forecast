@@ -599,6 +599,113 @@ export function LabellingWalkthrough() {
           )}
         </div>
       </section>
+      {chapter === 2 && (
+        <section className="lab-selection" aria-label="Stacked tremor matrix example">
+          <h2>Stack the windows by label</h2>
+          <p>
+            Each row below summarises one 288-row window in the long-format
+            tremor matrix. Move the selected label above to compare consecutive
+            windows. All timestamps are UTC.
+          </p>
+          <div className="lab-table-scroll">
+            <table>
+              <caption>Window summary · complete ten-minute tremor data assumed</caption>
+              <thead>
+                <tr>
+                  <th>Label timestamp</th>
+                  <th>Tremor data · first → last measurement</th>
+                  <th>Eruption target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {labels.slice(selectedIndex, selectedIndex + 4).map((row) => (
+                  <tr key={row.id}>
+                    <th scope="row">
+                      {new Date(row.time).toISOString().slice(0, 16).replace("T", " ")}
+                      <br />
+                      <small>id {row.id}</small>
+                    </th>
+                    <td>
+                      {new Date(row.time - 2 * DAY).toISOString().slice(0, 16).replace("T", " ")}
+                      {" → "}
+                      {new Date(row.time - 600_000).toISOString().slice(0, 16).replace("T", " ")}
+                    </td>
+                    <td>{row.positive}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The target is shown alongside each window for explanation; it stays
+            in the separate label table used for training. Consecutive labels
+            six hours apart share 252 measurements (42 hours, or 87.5%).
+          </p>
+        </section>
+      )}
+      {chapter === 2 && (
+        <section className="lab-selection" aria-label="Construction of the tremor matrix">
+          <h2>Construction of the tremor matrix</h2>
+          <h3>1. Generate labels</h3>
+          <p>
+            Generate a timestamp every 6 hours across the study period: for
+            example, 2026-04-20 00:00:00 followed by 2026-04-20 06:00:00 UTC.
+            Each timestamp identifies one sample. In the implementation, a
+            numeric id links that timestamp to its tremor rows and binary target.
+            The target is 1 for the pre-eruptive class and 0 otherwise.
+          </p>
+          <p>
+            This walkthrough uses three inclusive calendar dates: the two dates
+            before an eruption and the eruption date itself. This matches the
+            builders’ calendar-day rule, rather than a rolling 72-hour interval
+            before an exact onset time. The eruption class represents the period
+            the model is trained to recognise.
+          </p>
+          <h3>2. Extract the preceding tremor window</h3>
+          <p>
+            For each label, extract the 2 days immediately before its timestamp
+            at 10-minute resolution: 2 × 24 × 6 = 288 measurements per tremor
+            column. For label 2026-04-20 00:00:00, the first measurement is
+            2026-04-18 00:00:00 and the last is 2026-04-19 23:50:00 UTC.
+            The label timestamp is excluded, so the sample contains only earlier
+            measurements.
+          </p>
+          <p>
+            The next label advances by 6 hours while the window stays 48 hours
+            long. Its measurements run from 2026-04-18 06:00:00 through
+            2026-04-20 05:50:00 UTC. Consecutive windows therefore overlap by
+            42 hours: 252 measurements, or 87.5% of each window. These densely
+            spaced samples track how tremor evolves toward an eruption.
+          </p>
+          <h3>3. Stack windows into the tremor matrix</h3>
+          <p>
+            Stack accepted windows vertically into a long-format table. Each row
+            contains the sample id, measurement timestamp and tremor values;
+            each complete id occupies 288 rows. Shared measurements repeat under
+            different ids. A separate target vector links each id to its binary
+            eruption class. Time-series feature extraction, such as tsfresh,
+            computes features for each id; those features are then paired with
+            the target to train the classifier.
+          </p>
+          <h3>Overlap and validation</h3>
+          <p>
+            Adjacent samples share most of their measurements and are strongly
+            correlated. Randomly splitting these windows can place nearly
+            identical samples in training and validation sets and inflate
+            performance. For independent evaluation, use a chronological holdout
+            or hold out eruption episodes, and keep overlapping windows across
+            the split apart. Earlier-only inputs prevent future measurements
+            entering a sample; they do not by themselves prevent leakage between
+            datasets.
+          </p>
+          <p>
+            The package currently uses randomized internal cross-validation
+            strategies, including the default shuffle-stratified strategy.
+            A separate future-period or eruption-episode evaluation is therefore
+            needed to assess generalisation beyond those internal scores.
+          </p>
+        </section>
+      )}
       <footer className="lab-footer">
         <p>
           Teaching fixture with synthetic tremor. This walkthrough reproduces
