@@ -600,6 +600,50 @@ export function LabellingWalkthrough() {
         </div>
       </section>
       {chapter === 2 && (
+        <section className="lab-selection" aria-label="Stacked tremor matrix example">
+          <h2>Stack the windows by label</h2>
+          <p>
+            Each row below summarises one 288-row window in the long-format
+            tremor matrix. Move the selected label above to compare consecutive
+            windows. All timestamps are UTC.
+          </p>
+          <div className="lab-table-scroll">
+            <table>
+              <caption>Window summary · complete ten-minute tremor data assumed</caption>
+              <thead>
+                <tr>
+                  <th>Label timestamp</th>
+                  <th>Tremor data · first → last measurement</th>
+                  <th>Eruption target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {labels.slice(selectedIndex, selectedIndex + 4).map((row) => (
+                  <tr key={row.id}>
+                    <th scope="row">
+                      {new Date(row.time).toISOString().slice(0, 16).replace("T", " ")}
+                      <br />
+                      <small>id {row.id}</small>
+                    </th>
+                    <td>
+                      {new Date(row.time - 2 * DAY).toISOString().slice(0, 16).replace("T", " ")}
+                      {" → "}
+                      {new Date(row.time - 600_000).toISOString().slice(0, 16).replace("T", " ")}
+                    </td>
+                    <td>{row.positive}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The target is shown alongside each window for explanation; it stays
+            in the separate label table used for training. Consecutive labels
+            six hours apart share 252 measurements (42 hours, or 87.5%).
+          </p>
+        </section>
+      )}
+      {chapter === 2 && (
         <section className="lab-selection" aria-label="Construction of the tremor matrix">
           <h2>Construction of the tremor matrix</h2>
           <h3>1. Generate labels</h3>
