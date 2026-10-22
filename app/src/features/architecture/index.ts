@@ -14,6 +14,7 @@ export {
   EXAMPLE_CONSENSUS,
 } from "./consensus";
 export { default as SOURCE_SNAPSHOT } from "./sources.json";
+export { WIKI_GUIDES } from "./wiki";
 export type {
   Stage,
   ArchitectureNode,

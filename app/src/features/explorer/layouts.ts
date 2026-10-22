@@ -8,12 +8,12 @@ export function pipelineLayout(
 ): { nodes: Node[]; edges: Edge[] } {
   const positions = [
     { x: 0, y: 0 },
-    { x: 395, y: 0 },
-    { x: 790, y: 0 },
-    { x: 790, y: 255 },
-    { x: 395, y: 255 },
-    { x: 0, y: 255 },
-    { x: 0, y: 510 },
+    { x: 500, y: 0 },
+    { x: 1000, y: 0 },
+    { x: 1000, y: 320 },
+    { x: 500, y: 320 },
+    { x: 0, y: 320 },
+    { x: 0, y: 640 },
   ];
   const visible = NODES.filter(
     (item) =>
@@ -34,7 +34,7 @@ export function pipelineLayout(
       type: "atlas",
       position: item.overview
         ? positions[stageIndex]!
-        : { x: 1200 + childIndex * 395, y: stageIndex * 200 },
+        : { x: 1500 + childIndex * 500, y: stageIndex * 280 },
       sourcePosition: item.overview
         ? [
             Position.Right,
@@ -85,7 +85,8 @@ export function pipelineLayout(
           edge.source === selected || edge.target === selected ? 2 : 1,
       },
       markerEnd: { type: "arrowclosed" as const },
-      labelBgPadding: [7, 4] as [number, number],
+      label: edge.id.endsWith("-next") ? edge.label : undefined,
+      labelBgPadding: [10, 7] as [number, number],
       labelBgBorderRadius: 4,
     })),
   };

@@ -72,6 +72,80 @@ Vite writes the deployable files to `app/dist/`. You can preview that production
 
 See [Architecture Explorer](wiki/Architecture-Explorer.md) for navigation, validation commands and the source-review workflow. `npm run validate:sources` flags stale fingerprints; content updates still require human review.
 
+### Deploy Pipeline Atlas to GitHub Pages
+
+To publish at **https://martanto.github.io/eruption-forecast/**, deploy the complete `app/dist/` directory, including the generated `index.html` and assets. The source `app/index.html` needs Vite's build step before it can be served.
+
+1. Add `base: "/eruption-forecast/"` to the existing `defineConfig` object in `app/vite.config.ts`:
+
+   ```ts
+   export default defineConfig({
+     base: "/eruption-forecast/",
+     // Keep the existing plugins, aliases and other configuration.
+   });
+   ```
+
+   The router already uses Vite's `BASE_URL` as its basename. Query links such as `/eruption-forecast/?view=pipeline&node=tremor` use the same page.
+
+2. In the GitHub repository, open **Settings → Pages → Build and deployment** and set **Source** to **GitHub Actions**.
+
+3. Create `.github/workflows/pages.yml` with the following content. Replace `main` with the branch you want to publish if it has a different name. That branch must contain `app/`, `wiki/` and the referenced `assets/` files.
+
+   ```yaml
+   name: Deploy Pipeline Atlas
+
+   on:
+     push:
+       branches: [main]
+     workflow_dispatch:
+
+   permissions:
+     contents: read
+     pages: write
+     id-token: write
+
+   concurrency:
+     group: pages
+     cancel-in-progress: true
+
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       environment:
+         name: github-pages
+         url: ${{ steps.deployment.outputs.page_url }}
+       steps:
+         - uses: actions/checkout@v4
+
+         - uses: actions/setup-node@v4
+           with:
+             node-version: 22
+             cache: npm
+             cache-dependency-path: app/package-lock.json
+
+         - run: npm ci --legacy-peer-deps
+           working-directory: app
+
+         - run: npm run build
+           working-directory: app
+
+         - uses: actions/configure-pages@v5
+
+         - uses: actions/upload-pages-artifact@v3
+           with:
+             path: app/dist
+
+         - name: Deploy
+           id: deployment
+           uses: actions/deploy-pages@v4
+   ```
+
+4. Commit and push the configuration and workflow to the publishing branch. Check the **Actions** tab for the deployment result, then open **https://martanto.github.io/eruption-forecast/**.
+
+For a local preview with the deployment base path, run `npm run build` followed by `npx vite preview` from `app/`, then open the printed local URL with `/eruption-forecast/` appended. If the deployed page cannot load JavaScript or CSS, confirm that `base` matches the repository path and that the workflow uploads all of `app/dist/`.
+
+References: [Vite: GitHub Pages deployment](https://vite.dev/guide/static-deploy.html#github-pages) and [GitHub: configuring a publishing source](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+
 ## Important Disclaimers
 
 **This software is intended for research purposes only.**
@@ -92,6 +166,8 @@ See [Architecture Explorer](wiki/Architecture-Explorer.md) for navigation, valid
 
 ## Table of Contents
 - [References and Acknowledgments](#references-and-acknowledgments)
+- [Interactive architecture guide](#interactive-architecture-guide)
+  - [Deploy Pipeline Atlas to GitHub Pages](#deploy-pipeline-atlas-to-github-pages)
 - [Features](#features)
 - [Package Architecture](#package-architecture)
 - [Pipeline Overview](#pipeline-overview)

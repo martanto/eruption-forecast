@@ -41,9 +41,6 @@ function Canvas({
   const [initialViewport] = useState(
     () => useInteractionStore.getState().viewports[view],
   );
-  const [smallScreen] = useState(
-    () => window.matchMedia("(max-width: 600px)").matches,
-  );
   const [measurements, setMeasurements] = useState<
     Record<string, { width: number; height: number }>
   >({});
@@ -143,6 +140,15 @@ function Canvas({
         }
       }}
     >
+      {view === "pipeline" && (
+        <div className="canvas-caption">
+          <strong>From signal to explanation</strong>
+          <span>
+            Select a stage to read its transformations. Fit all for the
+            complete pipeline
+          </span>
+        </div>
+      )}
       <ReactFlow
         nodes={measuredNodes}
         onNodesChange={onNodesChange}
@@ -153,9 +159,7 @@ function Canvas({
         fitViewOptions={{
           padding: 0.13,
           maxZoom: 1,
-          ...(smallScreen && view === "pipeline"
-            ? { nodes: [{ id: selected }] }
-            : {}),
+          ...(view === "pipeline" ? { nodes: [{ id: selected }] } : {}),
         }}
         minZoom={0.2}
         maxZoom={1.8}
@@ -175,22 +179,6 @@ function Canvas({
         aria-label={`${view === "pipeline" ? "Pipeline" : "Timeline"} canvas`}
       >
         <Background gap={22} size={1} />
-        {view === "pipeline" && (
-          <Panel position="top-left">
-            <div className="canvas-caption">
-              <strong>
-                {view === "pipeline"
-                  ? "From signal to explanation"
-                  : "Time, windows & scenarios"}
-              </strong>
-              <span>
-                {view === "pipeline"
-                  ? "Select a stage. Follow its transformations."
-                  : "Calendar time above · execution order below"}
-              </span>
-            </div>
-          </Panel>
-        )}
         <Controls showInteractive={false} position="bottom-left" />
         <Panel position="bottom-center">
           <div className="canvas-actions">

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { useInteractionStore } from "@/stores/interactionStore";
 import { NodeInspector } from "./NodeInspector";
+import atlasLogo from "../../../../../assets/logo.svg";
 import { ExplorerCanvas } from "./ExplorerCanvas";
 import type { ExplorerLocation } from "../explorer.types";
 
@@ -133,6 +134,7 @@ export function Explorer({
       <header className="explorer-heading">
         <div>
           <h1>
+            <img className="atlas-logo" src={atlasLogo} alt="" />
             Pipeline Atlas<span>Eruption Forecast</span>
           </h1>
           <p>A field guide to the code, from seismic signal to explanation.</p>

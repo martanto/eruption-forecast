@@ -8,6 +8,7 @@ import {
   SOURCE_SNAPSHOT,
 } from "@/features/architecture";
 import { Button } from "@/components/ui/button";
+import { WikiExplanation } from "./WikiExplanation";
 import { ConsensusExample } from "./ConsensusExample";
 import historicalForecast from "@/assets/historical-forecast.png";
 
@@ -25,7 +26,10 @@ export function NodeInspector({
     (edge) => edge.source === selected || edge.target === selected,
   );
   return (
-    <section className="inspector" aria-label="Node details">
+    <section
+      className={`inspector tone-${stage.tone}`}
+      aria-label="Node details"
+    >
       <h2 className={`inspector-title tone-${stage.tone}`}>
         <span className="stage-number">
           {String(stage.number).padStart(2, "0")}
@@ -61,19 +65,29 @@ export function NodeInspector({
           {item.behavior.map((text) => (
             <p key={text}>{text}</p>
           ))}
-          {item.gaps.map((id) => {
-            const gap = GAPS.find((entry) => entry.id === id)!;
-            return (
-              <div className="gap-note" key={id}>
-                <h4>
-                  <AlertCircle size={16} />
-                  {gap.title}
-                </h4>
-                <p>{gap.detail}</p>
-              </div>
-            );
-          })}
           {item.stage === "consensus" && <ConsensusExample />}
+          <WikiExplanation item={item} />
+          <details className="caveats" open key={item.id}>
+            <summary>Implementation caveats ({GAPS.length})</summary>
+            {[...GAPS]
+              .sort(
+                (a, b) =>
+                  Number(item.gaps.includes(b.id)) -
+                  Number(item.gaps.includes(a.id)),
+              )
+              .map((gap) => {
+                const id = gap.id;
+                return (
+                  <div className="gap-note" key={id}>
+                    <h4>
+                      <AlertCircle size={16} />
+                      {gap.title}
+                    </h4>
+                    <p>{gap.detail}</p>
+                  </div>
+                );
+              })}
+          </details>
           <h3>Parameters & settings</h3>
           <ul>
             {item.parameters.map((text) => (
