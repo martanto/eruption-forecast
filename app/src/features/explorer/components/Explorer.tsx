@@ -6,6 +6,7 @@ import {
   Info,
   GitBranch,
   CalendarRange,
+  Tags,
   AlertCircle,
   X,
   Plus,
@@ -150,7 +151,6 @@ export function Explorer({
       </header>
       <div className="explorer-toolbar">
         <div className="view-switch" role="group" aria-label="Canvas view">
-          <Link className="button" to="/labelling">Labelling walkthrough</Link>
           <Button
             variant="ghost"
             aria-pressed={location.view === "pipeline"}
@@ -167,6 +167,10 @@ export function Explorer({
             <CalendarRange size={16} />
             Timeline
           </Button>
+          <Link className="button button-ghost" to="/labelling">
+            <Tags size={16} aria-hidden="true" />
+            Labelling walkthrough
+          </Link>
         </div>
         <div className="search-box">
           <Search size={17} />
