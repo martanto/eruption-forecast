@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ArrowUpRight, BookOpen, FileCode2, AlertCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowUpRight, BookOpen, FileCode2, AlertCircle, Tags } from "lucide-react";
 import {
   NODES,
   STAGES,
@@ -38,6 +39,12 @@ export function NodeInspector({
         <span>{item.title}</span>
       </h2>
       <p className="inspector-summary">{item.summary}</p>
+      {item.stage === "labels" && (
+        <Link className="button button-outline" to="/labelling">
+          <Tags size={16} aria-hidden="true" />
+          Labelling walkthrough
+        </Link>
+      )}
       <div
         className="inspector-tabs"
         role="group"
