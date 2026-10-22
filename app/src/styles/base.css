@@ -32,21 +32,21 @@ summary {
   outline-offset: 4px;
 }
 :focus-visible {
-  outline: 2px solid var(--color-sage);
+  outline: 2px solid var(--color-terracotta);
 }
 ::selection {
-  background: var(--color-sage-soft);
+  background: var(--color-terracotta-soft);
   color: var(--color-ink);
 }
 input {
-  caret-color: var(--color-sage);
+  caret-color: var(--color-terracotta);
 }
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line) transparent;
 }
 a {
-  color: var(--color-sage);
+  color: var(--color-terracotta);
   text-underline-offset: 0.2em;
 }
 h1,
@@ -82,7 +82,7 @@ pre {
   color: var(--color-surface);
 }
 .button-default:hover {
-  background: var(--color-sage);
+  background: var(--color-terracotta);
 }
 .button-outline {
   border-color: var(--color-line);
@@ -90,14 +90,14 @@ pre {
 }
 .button-outline:hover,
 .button-ghost:hover {
-  background: var(--color-sage-soft);
+  background: var(--color-terracotta-soft);
 }
 .button-ghost {
   background: transparent;
   color: var(--color-muted);
 }
 .button-ghost[aria-pressed="true"] {
-  background: var(--color-sage-soft);
+  background: var(--color-terracotta-soft);
   color: var(--color-ink);
 }
 .button-icon {
@@ -238,20 +238,20 @@ h1 span {
   align-items: center;
 }
 .tone-sage {
-  --stage-color: var(--color-sage);
-  --stage-bg: var(--color-sage-soft);
+  --stage-color: var(--color-terracotta);
+  --stage-bg: var(--color-terracotta-soft);
 }
 .tone-ochre {
-  --stage-color: var(--color-ochre);
-  --stage-bg: var(--color-ochre-soft);
+  --stage-color: var(--color-amber);
+  --stage-bg: var(--color-amber-soft);
 }
 .tone-blue {
-  --stage-color: var(--color-blue);
-  --stage-bg: var(--color-blue-soft);
+  --stage-color: var(--color-burgundy);
+  --stage-bg: var(--color-burgundy-soft);
 }
 .tone-plum {
-  --stage-color: var(--color-plum);
-  --stage-bg: var(--color-plum-soft);
+  --stage-color: var(--color-rose);
+  --stage-bg: var(--color-rose-soft);
 }
 .stage-link {
   display: flex;
@@ -314,7 +314,7 @@ h1 span {
 }
 .stage-children button:hover,
 .stage-children button[aria-current] {
-  color: var(--color-sage);
+  color: var(--color-terracotta);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -442,7 +442,7 @@ h1 span {
   border: none;
 }
 .react-flow__node:focus-visible {
-  outline: 3px solid var(--color-sage);
+  outline: 3px solid var(--color-terracotta);
   outline-offset: 6px;
   border-radius: var(--radius);
 }
@@ -451,7 +451,7 @@ h1 span {
   font-size: 14px;
 }
 .edge-active .react-flow__edge-path {
-  stroke: var(--color-sage);
+  stroke: var(--color-terracotta);
 }
 .react-flow__controls {
   box-shadow: none;
@@ -601,7 +601,7 @@ h1 span {
   font-size: 14px;
 }
 .connection-list button:hover {
-  color: var(--color-sage);
+  color: var(--color-terracotta);
 }
 .connection-list small {
   display: block;
@@ -719,7 +719,7 @@ h1 span {
 }
 .scenario-rows button:hover,
 .scenario-rows button[aria-pressed="true"] {
-  background: var(--color-sage-soft);
+  background: var(--color-terracotta-soft);
 }
 .scenario-rows strong {
   font-size: 14px;
@@ -794,13 +794,13 @@ h1 span {
   font-weight: 700;
 }
 .training-bar {
-  fill: var(--color-sage);
-  background: var(--color-sage);
+  fill: var(--color-terracotta);
+  background: var(--color-terracotta);
 }
 .prediction-bar {
-  fill: var(--color-blue-soft);
-  background: var(--color-blue-soft);
-  stroke: var(--color-blue);
+  fill: var(--color-burgundy-soft);
+  background: var(--color-burgundy-soft);
+  stroke: var(--color-burgundy);
 }
 .eruption-line {
   stroke: var(--color-ember);
@@ -862,12 +862,12 @@ h1 span {
 .lookback,
 .lookahead {
   padding: 9px 18px;
-  background: var(--color-sage-soft);
-  color: var(--color-sage);
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta);
 }
 .lookahead {
-  background: var(--color-ochre-soft);
-  color: var(--color-ochre);
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
   border-left: 1px solid var(--color-ink);
 }
 .window-ruler span {
@@ -906,7 +906,7 @@ h1 span {
   background: var(--color-paper);
 }
 .search-results button:hover {
-  background: var(--color-sage-soft);
+  background: var(--color-terracotta-soft);
 }
 .explorer-footer {
   display: flex;
@@ -1128,10 +1128,6 @@ h1 span {
   border-color: var(--stage-color);
   background: var(--stage-bg);
 }
-.atlas-node.is-selected {
-  outline: 2px solid var(--stage-color);
-  outline-offset: 4px;
-}
 .atlas-node .stage-number {
   background: var(--stage-color);
   color: var(--color-surface);
@@ -1338,5 +1334,29 @@ h1 span {
 .forecast-controls select { max-width: 100%; padding: 8px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); color: var(--color-ink); }
 .forecast-chart { width: 100%; height: 400px; }
 .forecast-scrubber { display: grid; gap: 8px; font-variant-numeric: tabular-nums; }
-.forecast-scrubber input { width: 100%; accent-color: var(--color-sage); }
+.forecast-scrubber input { width: 100%; accent-color: var(--color-terracotta); }
 @media (max-width: 600px) { .forecast-chart { height: 330px; } }
+
+/* Keep touch targets generous while preserving the compact desktop tools. */
+@media (pointer: coarse), (max-width: 600px) {
+  .button,
+  .button-small,
+  .canvas-actions .button,
+  .stage-expand,
+  .node-expand,
+  .stage-children button {
+    min-height: 44px;
+  }
+  .button-icon,
+  .canvas-actions .button,
+  .stage-expand {
+    min-width: 44px;
+  }
+  .stage-nav-group { grid-template-columns: 1fr 44px; }
+  .react-flow__controls-button { width: 44px; height: 44px; }
+}
+
+.react-flow__attribution a {
+  color: var(--color-muted);
+  font-size: 12px;
+}

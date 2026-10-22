@@ -16,7 +16,7 @@ export function ExplorerPage() {
       scenarioComparison={
         <ScenarioComparison
           selected={location.scenario}
-          onSelect={(scenario) => navigate({ scenario })}
+          onSelect={(scenario) => navigate({ scenario, view: "timeline" })}
         />
       }
       tour={(onSelect) => <GuidedTour onSelect={onSelect} />}

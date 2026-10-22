@@ -224,7 +224,7 @@ function Canvas({
             void setCenter(position.x, position.y, { zoom: getViewport().zoom })
           }
           position="bottom-right"
-          nodeColor="var(--color-sage-soft)"
+          nodeColor="var(--color-terracotta-soft)"
           maskColor="var(--minimap-mask)"
           ariaLabel="Canvas minimap"
         />

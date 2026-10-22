@@ -7,28 +7,28 @@
 @theme {
   --font-sans: "DM Sans", sans-serif;
   --font-editorial: "Newsreader", Georgia, serif;
-  --color-paper: #f6f5ef;
-  --color-surface: #fffefa;
-  --color-ink: #253a35;
-  --color-muted: #5b6961;
-  --color-line: #d8ddd3;
-  --color-sage: #3d6959;
-  --color-sage-soft: #e8eee6;
-  --color-ochre: #806029;
-  --color-ochre-soft: #f5eddb;
-  --color-blue: #3b6479;
-  --color-blue-soft: #e6eff2;
-  --color-plum: #765b70;
-  --color-plum-soft: #f0e9ee;
-  --color-caution: #835029;
-  --color-caution-soft: #fbf1e4;
-  --color-ember: #9d4633;
+  --color-paper: #faf6f1;
+  --color-surface: #fffdfa;
+  --color-ink: #382b2a;
+  --color-muted: #71605b;
+  --color-line: #dfd2c8;
+  --color-terracotta: #a63d30;
+  --color-terracotta-soft: #f8e8df;
+  --color-amber: #85501f;
+  --color-amber-soft: #faedda;
+  --color-burgundy: #8f2430;
+  --color-burgundy-soft: #f7e5e8;
+  --color-rose: #993548;
+  --color-rose-soft: #f8e8ed;
+  --color-caution: #85501f;
+  --color-caution-soft: #faedda;
+  --color-ember: #8f2430;
 }
 :root {
   --radius: 12px;
-  --drawer-shadow: -12px 0 48px rgb(37 58 53 / 15%);
-  --minimap-mask: rgb(246 245 239 / 65%);
-  --color-overlay: rgb(37 58 53 / 30%);
+  --drawer-shadow: -12px 0 48px rgb(56 43 42 / 15%);
+  --minimap-mask: rgb(250 246 241 / 65%);
+  --color-overlay: rgb(56 43 42 / 30%);
   color: var(--color-ink);
   background: var(--color-paper);
   font-family: var(--font-sans);

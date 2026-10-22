@@ -33,20 +33,22 @@ function ReplayChart() {
     const chart = instance.current;
     if (!chart) return;
     const points = forecastValues(model, count);
+    const styles = getComputedStyle(document.documentElement);
+    const color = (role: string) => styles.getPropertyValue(`--color-${role}`).trim();
     const option: EChartsCoreOption = {
       animation: false, useUTC: true,
-      textStyle: { fontFamily: 'DM Sans, sans-serif', color: '#253a35' },
+      textStyle: { fontFamily: 'DM Sans, sans-serif', color: color('ink') },
       aria: { enabled: true, description: 'Recorded OJN scenario 5 eruption probabilities. Threshold 0.7. Eruptions on 2 and 18 August 2025. Shading shows mean plus or minus one standard deviation, clipped to zero and one.' },
       grid: { left: 48, right: 24, top: 48, bottom: 88 },
       tooltip: { trigger: 'axis', confine: true, valueFormatter: (value: unknown) => typeof value === 'number' ? value.toFixed(3) : String(value) },
       xAxis: { type: 'time', min: FORECAST_ROWS[0]!.time, max: FORECAST_ROWS.at(-1)!.time, axisLabel: { formatter: '{dd} {MMM}' } },
-      yAxis: { type: 'value', min: 0, max: 1, name: 'Probability', splitLine: { lineStyle: { color: '#d8ddd3' } } },
-      dataZoom: [{ type: 'slider', bottom: 20, height: 24, borderColor: '#d8ddd3', fillerColor: 'rgba(61,105,89,0.15)' }],
+      yAxis: { type: 'value', min: 0, max: 1, name: 'Probability', splitLine: { lineStyle: { color: color('line') } } },
+      dataZoom: [{ type: 'slider', bottom: 20, height: 24, borderColor: color('line'), fillerColor: color('terracotta-soft') }],
       series: [
         { type: 'line', stack: 'band', data: points.map((p) => [p.time, p.lower]), symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { opacity: 0 }, silent: true, tooltip: { show: false } },
-        { type: 'line', stack: 'band', data: points.map((p) => [p.time, p.width]), symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: '#3d6959', opacity: 0.18 }, silent: true, tooltip: { show: false } },
-        { name: 'Mean probability', type: 'line', data: points.map((p) => [p.time, p.mean]), symbol: 'none', lineStyle: { color: '#3d6959', width: 2 }, itemStyle: { color: '#3d6959' },
-          markLine: { symbol: 'none', lineStyle: { color: '#9d4633', type: 'dashed' }, label: { color: '#9d4633', fontSize: 12 }, data: [
+        { type: 'line', stack: 'band', data: points.map((p) => [p.time, p.width]), symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: color('terracotta'), opacity: 0.18 }, silent: true, tooltip: { show: false } },
+        { name: 'Mean probability', type: 'line', data: points.map((p) => [p.time, p.mean]), symbol: 'none', lineStyle: { color: color('terracotta'), width: 2 }, itemStyle: { color: color('terracotta') },
+          markLine: { symbol: 'none', lineStyle: { color: color('ember'), type: 'dashed' }, label: { color: color('ember'), fontSize: 12 }, data: [
             { yAxis: THRESHOLD, label: { formatter: 'Threshold 0.7', position: 'insideEndTop' } },
             ...ERUPTIONS.map((date) => ({ xAxis: Date.parse(`${date}T00:00:00Z`), label: { formatter: `Eruption · ${date.slice(8)} Aug`, position: 'insideEndTop' } })),
           ] },
@@ -68,7 +70,7 @@ function ReplayChart() {
     <label className="forecast-scrubber">Replay position · {new Date(FORECAST_ROWS[count - 1]!.time).toISOString().slice(0, 16).replace('T', ' ')} UTC
       <input type="range" min={1} max={FORECAST_ROWS.length} value={count} onChange={(event) => { setPlaying(false); setCount(Number(event.target.value)); }} />
     </label>
-    <p>Green line: mean probability. Shading: ±1 standard deviation, clipped to [0, 1]; this is not a calibrated confidence interval. Dashed red lines: eruption dates and the 0.7 threshold. Drag the chart’s lower handles to zoom. Replay advances 12 hours per step.</p>
+    <p>Terracotta line: mean probability. Shading: ±1 standard deviation, clipped to [0, 1]; this is not a calibrated confidence interval. Dashed burgundy lines: eruption dates and the 0.7 threshold. Drag the chart’s lower handles to zoom. Replay advances 12 hours per step.</p>
     <p>Source: forecast-results_2025-08-01_2025-08-22_ws-2.csv. Eruption dates: scenarios_OJN.py. This example always shows scenario 5, independently of the scenario selected in the atlas.</p>
   </>;
 }
