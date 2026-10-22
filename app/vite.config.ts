@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
+    watch: {
+      ignored: ["**/tests/results/**", "**/tests/reports/**", "**/tests/hallmark-runtime/**"],
+    },
     fs: {
       allow: [
         fileURLToPath(new URL(".", import.meta.url)),

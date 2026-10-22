@@ -13,6 +13,7 @@ import {
 import { STAGES, NODES, GAPS, SOURCE_SNAPSHOT } from "@/features/architecture";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useInteractionStore } from "@/stores/interactionStore";
 import { NodeInspector } from "./NodeInspector";
 import atlasLogo from "../../../../../assets/logo.svg";
@@ -37,6 +38,7 @@ export function Explorer({
   const [gapsOnly, setGapsOnly] = useState(false);
   const [drawer, setDrawer] = useState<"stages" | "details" | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
   const expand = useInteractionStore((state) => state.expand);
   const expanded = useInteractionStore((state) => state.expanded);
   const toggleExpanded = useInteractionStore((state) => state.toggleExpanded);
@@ -53,7 +55,10 @@ export function Explorer({
     const item = NODES.find((entry) => entry.id === id)!;
     if (!item.overview) expand(item.stage);
     navigate({ node: id });
-    if (focus) setFocusRequest((value) => value + 1);
+    if (focus) {
+      setFocusTarget(id);
+      setFocusRequest((value) => value + 1);
+    }
   }
   const navigation = (
     <nav className="stage-navigation" aria-label="Pipeline stages">
@@ -135,11 +140,12 @@ export function Explorer({
         <div>
           <h1>
             <img className="atlas-logo" src={atlasLogo} alt="" />
-            Pipeline Atlas<span>Eruption Forecast</span>
+            Pipeline Atlas
           </h1>
+          <span className="product-name">Eruption Forecast</span>
           <p>A field guide to the code, from seismic signal to explanation.</p>
         </div>
-        {scenarioSelector}
+        <div className="heading-actions">{scenarioSelector}<ThemeToggle /></div>
       </header>
       <div className="explorer-toolbar">
         <div className="view-switch" role="group" aria-label="Canvas view">
@@ -239,6 +245,7 @@ export function Explorer({
             scenario={location.scenario}
             gapsOnly={gapsOnly}
             focusRequest={focusRequest}
+            focusTarget={focusTarget}
             onSelect={(id) => select(id)}
           />
           <div className="tour-slot">{tour((id) => select(id, true))}</div>
@@ -247,10 +254,10 @@ export function Explorer({
       </div>
       <footer className="explorer-footer">
         <span>
-          Read-only guide · source snapshot{" "}
+          Read-only guide. Source snapshot{" "}
           {SOURCE_SNAPSHOT.revision.slice(0, 8)} + local edits
         </span>
-        <span>Example settings ≠ package defaults · UTC</span>
+        <span>Example settings ≠ package defaults. UTC</span>
       </footer>
       <Sheet
         open={drawer !== null}

@@ -69,7 +69,7 @@ export function NodeInspector({
           {item.stage === "consensus" && <ConsensusExample />}
           {item.id === "prediction" && <ForecastReplay />}
           <WikiExplanation item={item} />
-          <details className="caveats" key={item.id}>
+          <details className="caveats" key={item.id} open={item.gaps.length > 0}>
             <summary>Implementation caveats ({GAPS.length})</summary>
             {[...GAPS]
               .sort(
@@ -113,7 +113,7 @@ export function NodeInspector({
                 <button key={edge.id} onClick={() => onSelect(other.id)}>
                   <span>
                     <small>
-                      {incoming ? "INPUT" : "OUTPUT"} · {edge.label}
+                      {incoming ? "Input" : "Output"}: {edge.label}
                     </small>
                     {other.title}
                   </span>

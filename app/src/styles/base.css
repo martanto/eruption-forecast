@@ -61,15 +61,15 @@ img {
 }
 code,
 pre {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-outlier);
 }
 .button {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-xs);
   min-height: 38px;
-  padding: 8px 12px;
+  padding: var(--space-xs) var(--space-sm);
   border: 1px solid transparent;
   border-radius: 7px;
   font-size: 15px;
@@ -102,18 +102,18 @@ pre {
 }
 .button-icon {
   width: 38px;
-  padding: 8px;
+  padding: var(--space-xs);
 }
 .button-small {
   min-height: 34px;
-  padding: 6px 9px;
+  padding: var(--space-xs) var(--space-xs);
   font-size: 14px;
 }
 .skip-link {
   position: fixed;
   top: -100px;
   z-index: 100;
-  padding: 12px;
+  padding: var(--space-sm);
   background: var(--color-surface);
 }
 .skip-link:focus {
@@ -132,14 +132,14 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 25px 0 22px;
+  gap: var(--space-lg);
+  padding: var(--space-lg) 0 var(--space-lg);
 }
 h1 {
   font: 400 38px/1.1 var(--font-editorial);
   letter-spacing: -0.025em;
 }
-h1 span {
+.legacy-product-name {
   margin-left: 20px;
   padding-left: 20px;
   border-left: 1px solid var(--color-line);
@@ -149,14 +149,14 @@ h1 span {
   color: var(--color-muted);
 }
 .explorer-heading p {
-  margin-top: 7px;
+  margin-top: var(--space-xs);
   color: var(--color-muted);
   font-size: 15px;
 }
 .scenario-select {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
   font-size: 14px;
   color: var(--color-muted);
 }
@@ -164,32 +164,32 @@ h1 span {
   min-height: 40px;
   border: 1px solid var(--color-line);
   border-radius: 7px;
-  padding: 7px 30px 7px 12px;
+  padding: var(--space-xs) 32px var(--space-xs) var(--space-sm);
   color: var(--color-ink);
   background: var(--color-surface);
 }
 .explorer-toolbar {
   display: flex;
   align-items: center;
-  gap: 22px;
-  padding: 12px 0;
+  gap: var(--space-lg);
+  padding: var(--space-sm) 0;
   border-block: 1px solid var(--color-line);
 }
 .view-switch {
   display: flex;
-  gap: 3px;
+  gap: var(--space-2xs);
 }
 .search-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   flex: 1;
   color: var(--color-muted);
 }
 .search-box input {
   width: 100%;
   border: 0;
-  padding: 9px 0;
+  padding: var(--space-xs) 0;
   background: transparent;
   font-size: 15px;
   color: var(--color-ink);
@@ -203,7 +203,7 @@ h1 span {
   border: 0;
 }
 .count {
-  padding: 1px 6px;
+  padding: 0 var(--space-xs);
   background: var(--color-caution-soft);
   color: var(--color-caution);
   border-radius: 4px;
@@ -218,23 +218,23 @@ h1 span {
 .desktop-navigation {
   border-right: 1px solid var(--color-line);
   overflow: auto;
-  padding: 22px 16px 20px 0;
+  padding: var(--space-lg) var(--space-md) 20px 0;
 }
 .desktop-inspector {
   overflow: auto;
   border-left: 1px solid var(--color-line);
-  padding: 23px 0 25px 22px;
+  padding: var(--space-lg) 0 var(--space-lg) var(--space-lg);
 }
 .stage-navigation h2 {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-muted);
-  margin: 0 0 16px 7px;
+  margin: 0 0 var(--space-md) var(--space-xs);
 }
 .stage-nav-group {
   display: grid;
   grid-template-columns: 1fr 22px;
-  margin-bottom: 5px;
+  margin-bottom: var(--space-2xs);
   align-items: center;
 }
 .tone-sage {
@@ -256,12 +256,12 @@ h1 span {
 .stage-link {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   text-align: left;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  padding: 9px 7px;
+  padding: var(--space-xs) var(--space-xs);
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
@@ -282,7 +282,7 @@ h1 span {
   background: var(--stage-bg);
   color: var(--stage-color);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .stage-expand {
@@ -298,15 +298,15 @@ h1 span {
 }
 .stage-children {
   grid-column: 1 / -1;
-  margin: 2px 0 10px 20px;
-  padding-left: 16px;
+  margin: var(--space-2xs) 0 var(--space-sm) 20px;
+  padding-left: var(--space-md);
   border-left: 1px solid var(--color-line);
 }
 .stage-children button {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 8px 0;
+  padding: var(--space-xs) 0;
   border: 0;
   background: none;
   font-size: 14px;
@@ -320,8 +320,8 @@ h1 span {
 }
 .reading-key {
   border-top: 1px solid var(--color-line);
-  margin-top: 22px;
-  padding-top: 17px;
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
   color: var(--color-muted);
   font-size: 14px;
   line-height: 1.7;
@@ -329,15 +329,15 @@ h1 span {
 .reading-key h3 {
   font-size: 14px;
   color: var(--color-ink);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-xs);
 }
 .reading-key p {
-  margin-top: 7px;
+  margin-top: var(--space-xs);
 }
 .reading-key p:first-of-type {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 .canvas-column {
   display: flex;
@@ -349,10 +349,10 @@ h1 span {
   min-height: 380px;
 }
 .canvas-caption {
-  padding: 8px 6px;
+  padding: var(--space-xs) var(--space-xs);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--space-2xs);
   pointer-events: none;
 }
 .canvas-caption strong {
@@ -369,12 +369,12 @@ h1 span {
   min-height: 190px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
-  padding: 15px 17px 10px;
+  padding: var(--space-md) var(--space-md) var(--space-sm);
   color: var(--color-ink);
 }
 .atlas-node.is-selected {
   border: 2px solid var(--stage-color);
-  padding: 14px 16px 9px;
+  padding: var(--space-md) var(--space-md) var(--space-xs);
   background: var(--stage-bg);
 }
 .atlas-node.is-related {
@@ -386,20 +386,20 @@ h1 span {
 .node-heading {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: var(--space-xs);
   color: var(--stage-color);
 }
 .node-heading > svg {
   flex-shrink: 0;
   margin-left: auto;
-  margin-top: 5px;
+  margin-top: var(--space-2xs);
 }
 .atlas-node h3 {
   flex: 1;
   color: var(--color-ink);
   font-size: 20px;
   line-height: 1.25;
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
   letter-spacing: 0;
   font-weight: 600;
 }
@@ -407,14 +407,14 @@ h1 span {
   font-size: 14px;
   color: var(--color-muted);
   line-height: 1.5;
-  margin-top: 6px;
+  margin-top: var(--space-xs);
 }
 .node-expand {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 7px 0 2px;
-  margin-top: 6px;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) 0 var(--space-2xs);
+  margin-top: var(--space-xs);
   font-size: 13px;
   font-weight: 600;
   background: none;
@@ -477,13 +477,13 @@ h1 span {
 }
 .canvas-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--space-2xs);
   background: var(--color-paper);
-  padding: 4px;
+  padding: var(--space-2xs);
   border-radius: 8px;
 }
 .tour-slot {
-  padding: 14px 18px;
+  padding: var(--space-md) 20px;
   border-top: 1px solid var(--color-line);
   min-height: 67px;
 }
@@ -491,12 +491,12 @@ h1 span {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-md);
   font-size: 14px;
 }
 .guided-tour h3 {
   font-weight: 600;
-  margin: 3px 0 5px;
+  margin: var(--space-2xs) 0 var(--space-2xs);
 }
 .guided-tour p {
   line-height: 1.5;
@@ -510,13 +510,13 @@ h1 span {
 }
 .tour-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--space-2xs);
   flex-shrink: 0;
 }
 .inspector-title {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: var(--space-xs);
   color: var(--color-ink);
 }
 .inspector h2 {
@@ -524,40 +524,40 @@ h1 span {
   margin-top: 0;
 }
 .inspector-title .stage-number {
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 .inspector p {
   font-size: 14px;
   line-height: 1.7;
-  margin-top: 10px;
+  margin-top: var(--space-sm);
   color: var(--color-muted);
 }
 .inspector .inspector-summary {
   font-size: 15px;
   line-height: 1.65;
-  margin-top: 10px;
+  margin-top: var(--space-sm);
 }
 .inspector-tabs {
   display: flex;
-  gap: 10px;
-  padding: 17px 0 12px;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0 var(--space-sm);
   border-bottom: 1px solid var(--color-line);
 }
 .inspector h3 {
   font-size: 14px;
-  font-weight: 700;
-  margin-top: 24px;
-  margin-bottom: 8px;
+  font-weight: 600;
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-xs);
 }
 .inspector ul {
-  margin: 8px 0 0;
-  padding-left: 17px;
+  margin: var(--space-xs) 0 0;
+  padding-left: var(--space-md);
   font-size: 14px;
   color: var(--color-muted);
   line-height: 1.7;
 }
 .inspector li {
-  margin-top: 7px;
+  margin-top: var(--space-xs);
 }
 .artifacts {
   overflow-wrap: anywhere;
@@ -566,13 +566,13 @@ h1 span {
   background: var(--color-caution-soft);
   border: 1px solid var(--color-line);
   border-radius: 9px;
-  padding: 12px;
-  margin-top: 17px;
+  padding: var(--space-sm);
+  margin-top: var(--space-md);
 }
 .gap-note h4 {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: var(--space-xs);
   color: var(--color-caution);
   font-size: 14px;
   font-weight: 600;
@@ -580,24 +580,24 @@ h1 span {
 }
 .gap-note svg {
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 .gap-note p {
   color: var(--color-caution);
   font-size: 14px;
-  margin-top: 7px;
+  margin-top: var(--space-xs);
 }
 .connection-list button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-sm);
   width: 100%;
   text-align: left;
   border: 0;
   border-bottom: 1px solid var(--color-line);
   background: none;
-  padding: 10px 0;
+  padding: var(--space-sm) 0;
   font-size: 14px;
 }
 .connection-list button:hover {
@@ -607,25 +607,25 @@ h1 span {
   display: block;
   color: var(--color-muted);
   font-size: 12px;
-  margin-bottom: 5px;
+  margin-bottom: var(--space-2xs);
 }
 .source-list details {
   border-bottom: 1px solid var(--color-line);
-  padding: 13px 0;
+  padding: var(--space-sm) 0;
 }
 .source-list summary {
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
   font-size: 14px;
   overflow-wrap: anywhere;
 }
 .source-list summary svg {
   flex-shrink: 0;
-  margin-top: 3px;
+  margin-top: var(--space-2xs);
 }
 .source-list small {
   display: block;
-  margin-top: 5px;
+  margin-top: var(--space-2xs);
   color: var(--color-muted);
 }
 .source-list pre {
@@ -633,8 +633,8 @@ h1 span {
   overflow-wrap: anywhere;
   font-size: 13px;
   line-height: 1.6;
-  padding: 10px;
-  margin-top: 14px;
+  padding: var(--space-sm);
+  margin-top: var(--space-md);
   background: var(--color-paper);
   max-height: 420px;
   overflow: auto;
@@ -644,10 +644,10 @@ h1 span {
   overflow-wrap: anywhere;
 }
 .snapshot-note {
-  padding-top: 14px;
+  padding-top: var(--space-md);
 }
 .historical-example {
-  margin: 24px 0 0;
+  margin: var(--space-lg) 0 0;
 }
 .historical-example img {
   display: block;
@@ -657,16 +657,16 @@ h1 span {
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
-  margin-top: 8px;
+  margin-top: var(--space-xs);
 }
 .calculation {
   border-block: 1px solid var(--color-line);
-  padding-bottom: 15px;
+  padding-bottom: var(--space-md);
   margin-top: 20px;
 }
 .table-scroll {
   overflow-x: auto;
-  margin-top: 13px;
+  margin-top: var(--space-sm);
 }
 .calculation table {
   border-collapse: collapse;
@@ -678,11 +678,11 @@ h1 span {
   text-align: left;
   font-size: 13px;
   color: var(--color-muted);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-xs);
 }
 .calculation th,
 .calculation td {
-  padding: 7px 4px;
+  padding: var(--space-xs) var(--space-2xs);
   border-bottom: 1px solid var(--color-line);
   text-align: right;
 }
@@ -691,26 +691,26 @@ h1 span {
 }
 .scenario-comparison {
   border-top: 1px solid var(--color-line);
-  margin-top: 22px;
+  margin-top: var(--space-lg);
   padding-top: 20px;
   font-size: 14px;
   line-height: 1.6;
 }
 .scenario-comparison h3 {
   font-size: 14px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-xs);
 }
 .scenario-comparison p {
   color: var(--color-muted);
-  margin: 10px 0;
+  margin: var(--space-sm) 0;
 }
 .scenario-rows {
-  margin: 14px 0;
+  margin: var(--space-md) 0;
 }
 .scenario-rows button {
   display: block;
   width: 100%;
-  padding: 9px;
+  padding: var(--space-xs);
   text-align: left;
   border: none;
   border-bottom: 1px solid var(--color-line);
@@ -729,14 +729,14 @@ h1 span {
   display: block;
   font-size: 13px;
   color: var(--color-muted);
-  margin-top: 4px;
+  margin-top: var(--space-2xs);
 }
 .scenario-comparison dt {
   font-weight: 600;
-  margin-top: 14px;
+  margin-top: var(--space-md);
 }
 .scenario-comparison dd {
-  margin: 4px 0 0;
+  margin: var(--space-2xs) 0 0;
   color: var(--color-muted);
 }
 .scenario-comparison code {
@@ -745,19 +745,19 @@ h1 span {
 }
 .scenario-comparison small {
   display: block;
-  margin-top: 6px;
+  margin-top: var(--space-xs);
 }
 .scenario-comparison details {
   border-top: 1px solid var(--color-line);
-  padding-top: 12px;
-  margin-top: 15px;
+  padding-top: var(--space-sm);
+  margin-top: var(--space-md);
 }
 .scenario-comparison summary {
   font-weight: 500;
 }
 .timeline-periods {
   width: 1050px;
-  padding: 24px;
+  padding: var(--space-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
@@ -768,11 +768,11 @@ h1 span {
 .timeline-periods > p {
   color: var(--color-muted);
   font-size: 14px;
-  margin-top: 10px;
+  margin-top: var(--space-sm);
 }
 .timeline-periods svg {
   width: 100%;
-  margin-top: 16px;
+  margin-top: var(--space-md);
   overflow: visible;
 }
 .timeline-periods text {
@@ -791,7 +791,7 @@ h1 span {
 }
 .timeline-selected text {
   fill: var(--color-ink);
-  font-weight: 700;
+  font-weight: 600;
 }
 .training-bar {
   fill: var(--color-terracotta);
@@ -823,7 +823,7 @@ h1 span {
 .timeline-legend span {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--space-xs);
 }
 .timeline-legend i {
   width: 13px;
@@ -834,9 +834,9 @@ h1 span {
 .window-detail {
   display: flex;
   align-items: center;
-  gap: 40px;
-  margin-top: 24px;
-  padding-top: 18px;
+  gap: var(--space-xl);
+  margin-top: var(--space-lg);
+  padding-top: 20px;
   border-top: 1px solid var(--color-line);
 }
 .window-detail > div:first-child {
@@ -844,7 +844,7 @@ h1 span {
 }
 .window-detail h3 {
   font-size: 20px;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-xs);
 }
 .window-detail p {
   font-size: 20px;
@@ -861,7 +861,7 @@ h1 span {
 }
 .lookback,
 .lookahead {
-  padding: 9px 18px;
+  padding: var(--space-xs) 20px;
   background: var(--color-terracotta-soft);
   color: var(--color-terracotta);
 }
@@ -873,34 +873,34 @@ h1 span {
 .window-ruler span {
   grid-column: 1 / -1;
   font-size: 16px;
-  margin-top: 7px;
+  margin-top: var(--space-xs);
   color: var(--color-muted);
 }
 .timeline-periods .execution-label {
-  margin-top: 23px;
-  padding-top: 17px;
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
   border-top: 1px solid var(--color-line);
   font-size: 17px;
 }
 .search-results {
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
-  padding: 12px;
+  padding: var(--space-sm);
   max-height: 190px;
   overflow-y: auto;
   font-size: 14px;
 }
 .search-results strong {
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: var(--space-xs);
 }
 .search-results > div {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 .search-results button {
-  padding: 8px 12px;
+  padding: var(--space-xs) var(--space-sm);
   border: 1px solid var(--color-line);
   border-radius: 5px;
   background: var(--color-paper);
@@ -911,9 +911,9 @@ h1 span {
 .explorer-footer {
   display: flex;
   justify-content: space-between;
-  gap: 15px;
+  gap: var(--space-md);
   border-top: 1px solid var(--color-line);
-  padding: 12px 0;
+  padding: var(--space-sm) 0;
   color: var(--color-muted);
   font-size: 13px;
 }
@@ -942,8 +942,8 @@ h1 span {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
-  margin-bottom: 25px;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 .sheet-heading h2 {
   font-size: 16px;
@@ -952,7 +952,7 @@ h1 span {
 .route-error {
   max-width: 600px;
   margin: 15vh auto;
-  padding: 25px;
+  padding: var(--space-lg);
 }
 .route-error p {
   margin: 20px 0;
@@ -962,7 +962,7 @@ h1 span {
     grid-template-columns: 250px minmax(0, 1fr) 440px;
   }
   .atlas-shell {
-    padding-inline: 40px;
+    padding-inline: var(--space-xl);
   }
 }
 @media (max-width: 1200px) {
@@ -970,10 +970,10 @@ h1 span {
     grid-template-columns: 205px minmax(0, 1fr) 350px;
   }
   .atlas-shell {
-    padding-inline: 18px;
+    padding-inline: 20px;
   }
   .desktop-inspector {
-    padding-left: 16px;
+    padding-left: var(--space-md);
   }
   .canvas-actions .button {
     font-size: 0;
@@ -994,12 +994,12 @@ h1 span {
   .mobile-tools {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding: 10px 0;
+    gap: var(--space-xs);
+    padding: var(--space-sm) 0;
   }
   .canvas-actions .button {
     font-size: 14px;
-    gap: 6px;
+    gap: var(--space-xs);
   }
   .canvas {
     border: 1px solid var(--color-line);
@@ -1016,7 +1016,7 @@ h1 span {
 }
 @media (max-width: 600px) {
   .atlas-shell {
-    padding-inline: 14px;
+    padding-inline: var(--space-md);
   }
   #atlas-content {
     min-height: 780px;
@@ -1024,8 +1024,8 @@ h1 span {
   }
   .explorer-heading {
     align-items: flex-start;
-    gap: 12px;
-    padding-block: 20px 15px;
+    gap: var(--space-sm);
+    padding-block: 20px var(--space-md);
     flex-wrap: wrap;
   }
   h1 {
@@ -1033,12 +1033,12 @@ h1 span {
   }
   h1 span {
     font-size: 13px;
-    margin-left: 10px;
-    padding-left: 10px;
+    margin-left: var(--space-sm);
+    padding-left: var(--space-sm);
   }
   .explorer-heading p {
     font-size: 14px;
-    max-width: 40ch;
+    max-width: 45ch;
   }
   .scenario-select {
     width: 100%;
@@ -1046,12 +1046,12 @@ h1 span {
   }
   .scenario-select select {
     min-height: 36px;
-    padding-block: 4px;
+    padding-block: var(--space-2xs);
   }
   .explorer-toolbar {
-    gap: 8px;
+    gap: var(--space-xs);
     flex-wrap: wrap;
-    padding-block: 8px;
+    padding-block: var(--space-xs);
   }
   .explorer-toolbar > .button {
     margin-left: auto;
@@ -1060,7 +1060,7 @@ h1 span {
     flex-basis: 100%;
     order: 3;
     border-top: 1px solid var(--color-line);
-    padding-top: 5px;
+    padding-top: var(--space-2xs);
   }
   .search-box input {
     font-size: 14px;
@@ -1091,7 +1091,7 @@ h1 span {
   .guided-tour {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: var(--space-sm);
   }
   .guided-tour p {
     font-size: 14px;
@@ -1102,8 +1102,8 @@ h1 span {
   .explorer-footer {
     font-size: 12px;
     flex-direction: column;
-    gap: 4px;
-    padding-block: 8px;
+    gap: var(--space-2xs);
+    padding-block: var(--space-xs);
   }
   .search-results {
     max-height: 140px;
@@ -1142,7 +1142,7 @@ h1 span {
   font-size: 16px;
 }
 .stage-link[aria-current] {
-  font-weight: 700;
+  font-weight: 600;
 }
 .inspector p,
 .inspector ul,
@@ -1159,7 +1159,7 @@ h1 span {
   line-height: 1.4;
 }
 .inspector-title {
-  padding-bottom: 18px;
+  padding-bottom: 20px;
   border-bottom: 2px solid var(--stage-color);
 }
 .inspector-title > span:last-child {
@@ -1170,12 +1170,12 @@ h1 span {
   font-size: 15px;
 }
 .caveats {
-  margin-top: 24px;
+  margin-top: var(--space-lg);
 }
 .caveats > summary {
   color: var(--color-caution);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 .wiki-guide {
@@ -1183,11 +1183,11 @@ h1 span {
 }
 .wiki-guide .wiki-attribution {
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: var(--space-2xs);
 }
 .wiki-guide pre {
   overflow: auto;
-  padding: 14px;
+  padding: var(--space-md);
   background: var(--color-paper);
   font-size: 13px;
   line-height: 1.6;
@@ -1201,11 +1201,11 @@ h1 span {
   border-collapse: collapse;
   font-size: 14px;
   line-height: 1.6;
-  margin-block: 16px;
+  margin-block: var(--space-md);
 }
 .wiki-guide th,
 .wiki-guide td {
-  padding: 10px;
+  padding: var(--space-sm);
   border: 1px solid var(--color-line);
   text-align: left;
   min-width: 100px;
@@ -1217,10 +1217,10 @@ h1 span {
 .wiki-guide hr {
   border: 0;
   border-top: 1px solid var(--color-line);
-  margin-block: 24px;
+  margin-block: var(--space-lg);
 }
 .canvas-caption {
-  padding: 14px 18px;
+  padding: var(--space-md) 20px;
   border-bottom: 1px solid var(--color-line);
 }
 .canvas {
@@ -1249,11 +1249,11 @@ h1 span {
     font-size: 14px;
   }
   .canvas-caption {
-    padding: 10px;
+    padding: var(--space-sm);
   }
 }
 .expand-explanation {
-  margin-top: 24px;
+  margin-top: var(--space-lg);
   width: 100%;
 }
 .wiki-guide pre code {
@@ -1267,7 +1267,7 @@ h1 span {
 }
 .explanation-dialog {
   position: fixed;
-  inset: 4vh max(20px, calc((100vw - 1200px) / 2));
+  inset: 4vh max(20px, calc((100% - 1200px) / 2));
   z-index: 52;
   display: flex;
   flex-direction: column;
@@ -1281,7 +1281,7 @@ h1 span {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 22px 28px;
+  padding: var(--space-lg) 28px;
   border-bottom: 1px solid var(--color-line);
 }
 .explanation-dialog-heading h2 {
@@ -1289,7 +1289,7 @@ h1 span {
 }
 .explanation-dialog-body {
   overflow-y: auto;
-  padding: 4px 28px 32px;
+  padding: var(--space-2xs) 28px 32px;
   min-height: 0;
 }
 .explanation-dialog-body p,
@@ -1305,21 +1305,21 @@ h1 span {
     inset: 12px;
   }
   .explanation-dialog-heading {
-    padding: 16px;
+    padding: var(--space-md);
   }
   .explanation-dialog-heading h2 {
     font-size: 26px;
   }
   .explanation-dialog-body {
-    padding-inline: 16px;
+    padding-inline: var(--space-md);
   }
 }
-.explorer-heading h1 { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.explorer-heading h1 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); }
 .atlas-logo { width: 54px; height: 48px; object-fit: contain; flex-shrink: 0; }
-.explorer-heading h1 span { margin-left: 8px; }
+.explorer-heading h1 span { margin-left: var(--space-xs); }
 @media (max-width: 600px) {
   .atlas-logo { width: 42px; height: 38px; }
-  .explorer-heading h1 { column-gap: 9px; }
+  .explorer-heading h1 { column-gap: var(--space-xs); }
   .explorer-heading h1 span { margin-left: 0; }
 }
 @media (max-width: 600px) {
@@ -1327,13 +1327,13 @@ h1 span {
   .explorer-workspace { flex: none; }
   .canvas { flex: none; height: 420px; }
 }
-.forecast-example { margin-block: 24px; }
+.forecast-example { margin-block: var(--space-lg); }
 .forecast-body { font-size: 14px; line-height: 1.65; }
-.forecast-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-block: 20px; }
-.forecast-controls label { display: flex; align-items: center; gap: 8px; }
-.forecast-controls select { max-width: 100%; padding: 8px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); color: var(--color-ink); }
+.forecast-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); margin-block: 20px; }
+.forecast-controls label { display: flex; align-items: center; gap: var(--space-xs); }
+.forecast-controls select { max-width: 100%; padding: var(--space-xs); border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); color: var(--color-ink); }
 .forecast-chart { width: 100%; height: 400px; }
-.forecast-scrubber { display: grid; gap: 8px; font-variant-numeric: tabular-nums; }
+.forecast-scrubber { display: grid; gap: var(--space-xs); font-variant-numeric: tabular-nums; }
 .forecast-scrubber input { width: 100%; accent-color: var(--color-terracotta); }
 @media (max-width: 600px) { .forecast-chart { height: 330px; } }
 
