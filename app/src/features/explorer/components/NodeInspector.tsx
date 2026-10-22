@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { WikiExplanation } from "./WikiExplanation";
 import { ConsensusExample } from "./ConsensusExample";
+import { ForecastReplay } from "./ForecastReplay";
 import historicalForecast from "@/assets/historical-forecast.png";
 
 export function NodeInspector({
@@ -66,8 +67,9 @@ export function NodeInspector({
             <p key={text}>{text}</p>
           ))}
           {item.stage === "consensus" && <ConsensusExample />}
+          {item.id === "prediction" && <ForecastReplay />}
           <WikiExplanation item={item} />
-          <details className="caveats" open key={item.id}>
+          <details className="caveats" key={item.id}>
             <summary>Implementation caveats ({GAPS.length})</summary>
             {[...GAPS]
               .sort(

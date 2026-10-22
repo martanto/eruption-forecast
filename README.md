@@ -50,6 +50,60 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 > This model implements a time series feature engineering and classification workflow that issues eruption
 > alerts based on real-time tremor data. https://github.com/ddempsey/puia
 
+## Important Disclaimers
+
+**This software is intended for research purposes only.**
+
+1. **Probabilistic Predictions**: This eruption forecast model provides probabilistic predictions of future volcanic activity, NOT deterministic guarantees. Predictions should be interpreted as likelihood estimates based on historical seismic patterns.
+
+2. **No Guarantee of Accuracy**: This model is **not guaranteed to predict every future eruption**. Volcanic systems are complex and can exhibit unexpected behavior. False negatives (missed eruptions) and false positives (false alarms) are possible.
+
+3. **Software Limitations**: This software is **not guaranteed to be free of bugs or errors**. Users should validate results independently and use this tool as one component of a comprehensive volcano monitoring strategy.
+
+4. **Not for Operational Use**: This package is a research tool and should not be used as the sole basis for public safety decisions, evacuation orders, or emergency response without expert volcanological assessment.
+
+5. **Expert Interpretation Required**: Results should always be interpreted by qualified volcanologists familiar with the specific volcano being monitored.
+
+**Always consult with local volcano observatories and follow official warnings from government agencies.**
+
+---
+
+## Table of Contents
+- [References and Acknowledgments](#references-and-acknowledgments)
+- [Features](#features)
+- [Package Architecture](#package-architecture)
+- [Pipeline Overview](#pipeline-overview)
+- [Installation](#installation)
+- [Data Sources](#data-sources)
+- [Quick Start](#quick-start)
+- [Common Patterns](#common-patterns)
+- [Supported Classifiers](#supported-classifiers)
+- [Cross-Validation Strategies](#cross-validation-strategies)
+- [Output Directory Structure](#output-directory-structure)
+- [Requirements](#requirements)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+**Detailed documentation** — the wiki at https://github.com/martanto/eruption-forecast/wiki is the single source of truth (also mirrored under [`wiki/`](wiki/)):
+
+- [Getting Started](wiki/Getting-Started.md) — Prerequisites, install, dev commands
+- [Pipeline Walkthrough](wiki/Pipeline-Walkthrough.md) — Research (`main.py`) + Scenarios (`forecast-scenario.py`) workflows
+- [Training Workflow](wiki/Training-Workflow.md) — Classifiers, CV strategies, imbalance handling
+- [Prediction Workflow](wiki/Prediction-Workflow.md) — Forecast outputs and consensus probabilities
+- [Evaluation Workflow](wiki/Evaluation-Workflow.md) — `MetricsEnsemble`, `ClassifierComparator`
+- [Explanation Workflow](wiki/Explanation-Workflow.md) — `ExplanationModel`, `ExplainerEnsemble`, per-seed SHAP
+- [Configuration](wiki/Configuration.md) — YAML save/replay, Telegram notifications, logging
+- [Visualization](wiki/Visualization.md) — Plot catalog and output paths
+- [Output Structure](wiki/Output-Structure.md) — Full directory tree
+- [Architecture](wiki/Architecture.md) — Package layout and class relationships
+- [API Reference](wiki/API-Reference.md) — Every public class with parameter tables
+- [Interactive architecture guide](#interactive-architecture-guide)
+  - [Deploy Pipeline Atlas to GitHub Pages](#deploy-pipeline-atlas-to-github-pages)
+- [Feature Count Sweep](wiki/Feature-Count-Sweep.md) — ⚠ Experimental — post-hoc `top_n_features` diagnostic (`FeatureCountSweep`, `sweep_feature_count`)
+
+---
+
 ## Interactive architecture guide
 
 Pipeline Atlas in `app/` is a local, read-only React + TypeScript guide to the implemented pipeline. Explore numbered stages, inspect bundled source excerpts and caveats, compare five scenario timelines, or follow a guided tour. The guide does not run the forecasting pipeline.
@@ -145,60 +199,6 @@ To publish at **https://martanto.github.io/eruption-forecast/**, deploy the comp
 For a local preview with the deployment base path, run `npm run build` followed by `npx vite preview` from `app/`, then open the printed local URL with `/eruption-forecast/` appended. If the deployed page cannot load JavaScript or CSS, confirm that `base` matches the repository path and that the workflow uploads all of `app/dist/`.
 
 References: [Vite: GitHub Pages deployment](https://vite.dev/guide/static-deploy.html#github-pages) and [GitHub: configuring a publishing source](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
-
-## Important Disclaimers
-
-**This software is intended for research purposes only.**
-
-1. **Probabilistic Predictions**: This eruption forecast model provides probabilistic predictions of future volcanic activity, NOT deterministic guarantees. Predictions should be interpreted as likelihood estimates based on historical seismic patterns.
-
-2. **No Guarantee of Accuracy**: This model is **not guaranteed to predict every future eruption**. Volcanic systems are complex and can exhibit unexpected behavior. False negatives (missed eruptions) and false positives (false alarms) are possible.
-
-3. **Software Limitations**: This software is **not guaranteed to be free of bugs or errors**. Users should validate results independently and use this tool as one component of a comprehensive volcano monitoring strategy.
-
-4. **Not for Operational Use**: This package is a research tool and should not be used as the sole basis for public safety decisions, evacuation orders, or emergency response without expert volcanological assessment.
-
-5. **Expert Interpretation Required**: Results should always be interpreted by qualified volcanologists familiar with the specific volcano being monitored.
-
-**Always consult with local volcano observatories and follow official warnings from government agencies.**
-
----
-
-## Table of Contents
-- [References and Acknowledgments](#references-and-acknowledgments)
-- [Interactive architecture guide](#interactive-architecture-guide)
-  - [Deploy Pipeline Atlas to GitHub Pages](#deploy-pipeline-atlas-to-github-pages)
-- [Features](#features)
-- [Package Architecture](#package-architecture)
-- [Pipeline Overview](#pipeline-overview)
-- [Installation](#installation)
-- [Data Sources](#data-sources)
-- [Quick Start](#quick-start)
-- [Common Patterns](#common-patterns)
-- [Supported Classifiers](#supported-classifiers)
-- [Cross-Validation Strategies](#cross-validation-strategies)
-- [Output Directory Structure](#output-directory-structure)
-- [Requirements](#requirements)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
-
-**Detailed documentation** — the wiki at https://github.com/martanto/eruption-forecast/wiki is the single source of truth (also mirrored under [`wiki/`](wiki/)):
-
-- [Getting Started](wiki/Getting-Started.md) — Prerequisites, install, dev commands
-- [Pipeline Walkthrough](wiki/Pipeline-Walkthrough.md) — Research (`main.py`) + Scenarios (`forecast-scenario.py`) workflows
-- [Training Workflow](wiki/Training-Workflow.md) — Classifiers, CV strategies, imbalance handling
-- [Prediction Workflow](wiki/Prediction-Workflow.md) — Forecast outputs and consensus probabilities
-- [Evaluation Workflow](wiki/Evaluation-Workflow.md) — `MetricsEnsemble`, `ClassifierComparator`
-- [Explanation Workflow](wiki/Explanation-Workflow.md) — `ExplanationModel`, `ExplainerEnsemble`, per-seed SHAP
-- [Configuration](wiki/Configuration.md) — YAML save/replay, Telegram notifications, logging
-- [Visualization](wiki/Visualization.md) — Plot catalog and output paths
-- [Output Structure](wiki/Output-Structure.md) — Full directory tree
-- [Architecture](wiki/Architecture.md) — Package layout and class relationships
-- [API Reference](wiki/API-Reference.md) — Every public class with parameter tables
-- [Feature Count Sweep](wiki/Feature-Count-Sweep.md) — ⚠ Experimental — post-hoc `top_n_features` diagnostic (`FeatureCountSweep`, `sweep_feature_count`)
-
----
 
 ## Features
 
