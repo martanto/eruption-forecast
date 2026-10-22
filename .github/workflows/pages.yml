@@ -32,7 +32,8 @@ jobs:
       - run: npm ci --legacy-peer-deps
         working-directory: app
 
-      - run: npm run build
+      # Project Pages serves the app below the repository name.
+      - run: npm run build -- --base=/${{ github.event.repository.name }}/
         working-directory: app
 
       - uses: actions/configure-pages@v5
