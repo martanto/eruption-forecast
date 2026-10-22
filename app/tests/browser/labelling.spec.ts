@@ -58,7 +58,7 @@ test("walk through both label builders and validate a tremor slice", async ({
     page.getByText(/216 \/ 288 samples = 75% completeness. Skipped/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next step", exact: true }).click();
-  await expect(page.getByRole("table")).toContainText("Rejected slice");
+  await expect(page.getByRole("table", { name: "Rejected slice · preview only" })).toBeVisible();
   await page.getByLabel("Remove every fourth sample").uncheck();
   await expect(
     page.getByRole("columnheader", { name: "id", exact: true }),

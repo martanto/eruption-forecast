@@ -5,6 +5,8 @@ reuses for inference and the [Evaluation Workflow](Evaluation-Workflow) scores a
 
 Driver: `TrainingModel` (`src/eruption_forecast/model/training_model.py`). Wrapped by `ForecastModel.train(...)`.
 
+For interactive class-imbalance, per-seed fitting and family-aggregation examples, see [Training walkthroughs](Training-Walkthroughs.md). The pages distinguish the supplied illustrations from the current resampling-before-CV implementation.
+
 ---
 
 ## Workflow

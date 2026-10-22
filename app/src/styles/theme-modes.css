@@ -32,6 +32,8 @@
   gap: var(--space-md);
 }
 .theme-toggle { flex-shrink: 0; }
+.view-switch { flex-wrap: wrap; }
+.skip-link:not(:focus) { clip-path: inset(50%); }
 .theme-toggle:active { background: var(--color-terracotta-soft); }
 .react-flow {
   --xy-edge-label-background-color: var(--color-paper-3);

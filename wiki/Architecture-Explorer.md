@@ -16,6 +16,8 @@ Open the local URL printed by Vite. `npm run build` writes the static applicatio
 
 ## Explore
 
+The toolbar links to **Training walkthroughs**. Continue from `/labelling` through `/random-under-sampler`, `/seed-ensemble` and `/classifier-ensemble`. Each page uses four steps, synthetic fixtures, light/dark controls and the supplied illustration. Sampling seeds and family controls update examples locally. See [Training walkthroughs](Training-Walkthroughs.md) for calculations and implementation caveats.
+
 Select a numbered stage to inspect its purpose, actual behavior, parameters, artifacts, implementation caveats and source excerpts. Expand stages to reveal internal steps. Search includes node text, parameters, artifacts and referenced source paths. **Caveats** filters the searchable steps and dims unaffected nodes.
 
 **Pipeline** shows transformations. **Timeline** shows the five scenarios from the reviewed `forecast-scenario.py`, training/prediction periods and all eight dated eruptions. Historical feature lookback and label lookahead are illustrated separately from execution order. Scenario descriptions are not used to infer event counts.
