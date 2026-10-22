@@ -35,11 +35,11 @@ export function ScenarioComparison({
       <dl>
         <dt>Training</dt>
         <dd>
-          {formatDate(scenario.trainStart)} – {formatDate(scenario.trainEnd)}
+          {formatDate(scenario.trainStart)}  to  {formatDate(scenario.trainEnd)}
         </dd>
         <dt>Prediction</dt>
         <dd>
-          {formatDate(scenario.predictionStart)} –{" "}
+          {formatDate(scenario.predictionStart)}  to {" "}
           {formatDate(scenario.predictionEnd)}
         </dd>
         <dt>Output directory</dt>
@@ -53,8 +53,8 @@ export function ScenarioComparison({
       <details>
         <summary>Shared example settings</summary>
         <p>
-          RF + Lite-RF · 2 seeds · 20 features · recall · 5 shuffle-stratified
-          splits · under-sampling. Training every 6 h; prediction every 10 min.
+          RF + Lite-RF, 2 seeds, 20 features, recall, 5 shuffle-stratified
+          splits, under-sampling. Training every 6 h; prediction every 10 min.
           Two-day horizon / lookback.
         </p>
         <p>

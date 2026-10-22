@@ -12,7 +12,7 @@ export function TimelinePeriods({ data }: NodeProps) {
     <section className="timeline-periods" aria-label="Scenario periods in UTC">
       <h2>One seismic record. Five training boundaries.</h2>
       <p>
-        Calendar time · 2025 · UTC. Bars use the dates in forecast-scenario.py,
+        Calendar time, 2025, UTC. Bars use the dates in forecast-scenario.py,
         including the end day.
       </p>
       <svg
@@ -125,11 +125,11 @@ export function TimelinePeriods({ data }: NodeProps) {
             <br />
             <strong>t → t + 2 days</strong>
           </div>
-          <span>Stride: training 6 h · prediction 10 min</span>
+          <span>Stride: training 6 h, prediction 10 min</span>
         </div>
       </div>
       <p className="execution-label">
-        Execution order below · calculate once; train → predict → evaluate →
+        Execution order below, calculate once; train → predict → evaluate →
         explain per scenario. Separate from calendar time.
       </p>
     </section>
