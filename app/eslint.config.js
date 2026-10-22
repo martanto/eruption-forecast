@@ -87,6 +87,7 @@ export default tseslint.config(
       "tests/results/**",
       "tests/reports/**",
       "tests/coverage/**",
+      "tests/pages-build/**",
       "tests/.playwright-cli/**",
     ],
   },

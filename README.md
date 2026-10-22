@@ -10,7 +10,12 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 
 ![Forecast example — Scenario 8, rolling 6h window, prediction 2025-07-27 to 2025-08-22](https://raw.githubusercontent.com/martanto/eruption-forecast/master/assets/forecast_2025-07-27_2025-08-22.png)
 
+## Interactive training guides
+
+Pipeline Atlas in `app/` includes four linked teaching routes: `/labelling`, `/random-under-sampler`, `/seed-ensemble` and `/classifier-ensemble`. Follow a majority-class draw, per-seed fitting and equal-weight classifier consensus using synthetic examples. The pages include the supplied reference images and distinguish their illustrations from the current implementation. See [Training walkthroughs](wiki/Training-Walkthroughs.md) and [Architecture Explorer](wiki/Architecture-Explorer.md) for content and local launch instructions.
+
 ## References and Acknowledgments
+
 > Dempsey, D. E., Cronin, S. J., Mei, S., & Kempa-Liehr, A. W. (2020). Automatic precursor recognition and real-time forecasting
 > of sudden explosive volcanic eruptions at Whakaari, New Zealand. Nature Communications, 11(1), 1–8. https://doi.org/10.1038/s41467-020-17375-2
 > This model implements a time series feature engineering and classification workflow that issues eruption alerts

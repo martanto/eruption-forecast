@@ -1,0 +1,176 @@
+.training-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding: 16px 0;
+  border-block: 1px solid var(--color-line);
+}
+.training-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: var(--color-muted);
+  text-underline-offset: 6px;
+}
+.training-links a:hover,
+.training-links a[aria-current] {
+  color: var(--color-terracotta);
+  text-decoration: underline;
+}
+.training-why {
+  padding: 28px 0 10px;
+}
+.training-sample-grid {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: 8px;
+  margin-block: 24px;
+}
+.training-sample-grid > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 2px;
+  border: 1px solid var(--color-muted);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.training-sample-grid small {
+  font-size: 12px;
+}
+.training-sample-grid strong {
+  font-size: 20px;
+  font-weight: 500;
+}
+.training-sample-grid .sample-positive {
+  background: var(--color-terracotta-soft);
+  border-color: var(--color-terracotta);
+  color: var(--color-terracotta);
+}
+.training-sample-grid .sample-discarded {
+  border-style: dashed;
+  color: var(--color-muted);
+  background: var(--color-paper);
+  text-decoration: line-through;
+}
+.training-result {
+  display: block;
+  border-top: 1px solid var(--color-line);
+  padding: 20px 0 12px;
+  font-size: 20px;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.training-equation {
+  font-variant-numeric: tabular-nums;
+}
+.training-table-scroll {
+  overflow-x: auto;
+  margin: 24px 0;
+}
+.training-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+.training-table caption {
+  text-align: left;
+  color: var(--color-muted);
+  padding-bottom: 16px;
+}
+.training-table th,
+.training-table td {
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--color-line);
+  vertical-align: top;
+}
+.training-table th {
+  font-weight: 600;
+}
+.training-family-list {
+  margin-block: 20px;
+}
+.training-family {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.training-family > span:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-weight: 600;
+}
+.training-family input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-terracotta);
+}
+.training-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  margin-block: 40px;
+}
+.training-notes code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.training-notes ul {
+  padding-left: 20px;
+  color: var(--color-muted);
+}
+.training-reference {
+  border-block: 1px solid var(--color-line);
+  padding-block: 20px;
+}
+.training-reference summary {
+  cursor: pointer;
+  min-height: 32px;
+}
+.training-reference p {
+  margin-top: 16px;
+}
+.training-reference img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.training-footer {
+  margin-top: 40px;
+}
+.training-lab :is(a, input, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 4px;
+}
+@media (max-width: 800px) {
+  .training-sample-grid {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+  .training-notes {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+@media (max-width: 600px) {
+  .training-sample-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .training-family {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .training-links a,
+  .training-reference summary {
+    min-height: 44px;
+  }
+  .training-lab .lab-step-nav button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

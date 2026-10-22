@@ -1,5 +1,7 @@
 # eruption-forecast Wiki
 
+Explore the interactive [Training walkthroughs](Training-Walkthroughs.md): Random Under Sampler, Seed Ensemble and Classifier Ensemble, following the Atlas Labelling page.
+
 A Python package for volcanic eruption forecasting from continuous seismic tremor and machine-learning ensembles.
 
 ---
