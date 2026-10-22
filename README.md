@@ -878,6 +878,10 @@ uv run python main.py
 
 ---
 
+## Interactive labelling guide
+
+The static [Pipeline Atlas](wiki/Architecture-Explorer.md#labelling-walkthrough) includes a **Labelling walkthrough** in its toolbar (`/labelling`). Step through Continuous labels, dynamic per-eruption labels and tremor-matrix construction using a two-day look-back, six-hour slide and three forecast calendar days including eruption day. Select timestamps to inspect labels and tremor slices, compare overlapping event histories, and simulate incomplete windows. All tremor values in this guide are synthetic; it does not run the Python pipeline.
+
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.

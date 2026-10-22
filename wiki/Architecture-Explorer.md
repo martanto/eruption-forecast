@@ -54,7 +54,17 @@ When Python source, the scenario script, README or the referenced wiki pages cha
 3. Run `npm run snapshot:sources` to capture the reviewed tree, then inspect the generated diff.
 4. Run the checks below. Never refresh hashes simply to silence a failure: the drift check does **not** synchronize semantics.
 
-## Checks
+## Labelling walkthrough
+
+Open **Labelling walkthrough** in the Atlas toolbar (`/labelling`) to follow Continuous standard labels, dynamic per-eruption labels, and the tremor matrix. Each chapter has four selectable steps, previous/next controls and a restart action. Select a six-hour label cell or move between windows to inspect its timestamp and id.
+
+The shared example uses a two-day tremor look-back, a six-hour slide and three positive calendar days including eruption day (`day_to_forecast=3`, `include_eruption_date=True`). Synthetic eruptions occur on 20 and 25 March 2025. Continuous covers 9–28 March, producing 80 labels, 24 positive. Dynamic history defaults to seven days before each eruption: 64 event-grid rows merge into 52 unique timestamps, retaining the same 24 positives. Choose three days to see separated event slices, or ten days for longer overlap. Missing dates are absent labels, not zero labels.
+
+The matrix chapter accepts either label source. A timestamp t selects `[t − 2 days, t)`: 288 ten-minute tremor samples. The completeness demonstration removes every fourth sample from the selected slice (216/288, 75%), so the example’s 100% threshold rejects it. This is a per-window teaching fixture; other windows are assumed complete. Accepted rows carry the label id, datetime and metric columns; `is_erupted` stays in the separate labels table. Neighbouring six-hour windows share 252 samples. Synthetic tremor extends two days before the first label.
+
+Source logic lives in `app/src/features/explorer/labelling.ts`, with the UI in `components/LabellingWalkthrough.tsx`. The reference PDF, `assets/How Eruption Forecasting Works.pdf`, pages 8–13, shows two forecast days plus an extra eruption day; the requested settings instead count that eruption day inside three days, producing the same positive dates. The UI is a static teaching fixture, not a Python execution surface. Tests cover date boundaries, deduplication, omitted gaps, matrix endpoints, overlap, missing samples and desktop/mobile chapter navigation.
+
+## Validation commands
 
 Run all commands from `app/`:
 

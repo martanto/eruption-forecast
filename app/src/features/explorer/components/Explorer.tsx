@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   Search,
   List,
@@ -149,6 +150,7 @@ export function Explorer({
       </header>
       <div className="explorer-toolbar">
         <div className="view-switch" role="group" aria-label="Canvas view">
+          <Link className="button" to="/labelling">Labelling walkthrough</Link>
           <Button
             variant="ghost"
             aria-pressed={location.view === "pipeline"}
