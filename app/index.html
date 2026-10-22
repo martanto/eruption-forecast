@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        let mode;
+        try { mode = localStorage.getItem("atlas-theme"); } catch {}
+        document.documentElement.dataset.mode = mode === "light" || mode === "dark"
+          ? mode : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      })();
+    </script>
+    <meta name="theme-color" content="#f6f5ef" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23f6f5ef'/%3E%3Cpath d='M3 18h7l3-9 5 17 3-8h8' fill='none' stroke='%233d6959' stroke-width='2'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="Explore the eruption forecasting pipeline, its source code, scenarios, and implementation gaps."
+    />
+    <title>Pipeline Atlas · Eruption Forecast</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -13,6 +13,8 @@ It is a research tool and must not be used as the sole basis for public safety d
 
 ## Navigation
 
+[Pipeline Atlas: interactive architecture explorer](Architecture-Explorer) offers Pipeline and Timeline views, source excerpts, scenario comparisons and implementation caveats. Run it locally from `app/`; it does not execute Python models.
+
 | # | Page | Description |
 |---|------|-------------|
 | 1 | [Getting Started](Getting-Started) | Prerequisites, installation, dev commands |

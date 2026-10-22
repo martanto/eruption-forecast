@@ -1,5 +1,7 @@
 # Pipeline Walkthrough
 
+Explore this workflow in [Pipeline Atlas](Architecture-Explorer), the local read-only application in `app/`. Its Timeline view uses the five scenario date ranges in the reviewed script and distinguishes calendar periods from execution order. The guide highlights the difference between randomized internal CV and future validation, and between constituent SHAP explanations and consensus statistics.
+
 This page is the annotated tour of the two bundled entry-point scripts:
 
 - **[Research Workflow](#research-workflow-mainpy)** - `main.py` - one-shot calculate → train → predict → evaluate → explain on a fixed date split.

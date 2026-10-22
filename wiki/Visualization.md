@@ -1,5 +1,7 @@
 # Visualization
 
+For interactive pipeline and scenario diagrams, see [Architecture Explorer](Architecture-Explorer). The static app bundles the existing forecast image as a labelled historical example, independently of scenario selection. This page documents plots produced by the Python package.
+
 All plots are produced by the modules under `src/eruption_forecast/plots/`.
 The pipeline auto-renders the most useful plots; you can also invoke each helper directly for ad-hoc figures.
 

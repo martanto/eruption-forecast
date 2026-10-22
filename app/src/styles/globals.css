@@ -1,0 +1,18 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Rim (deal 2/3, DM Sans offline adaptation) · redesign: full
+ * nav: kept stage index · signature: source-backed seismic pipeline · states: selection, search, empty results, expansion, dialogs
+ * axes: dark/grotesk-sans/warm · posture: committed · rim: night · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: H, widened the canvas and separated reading surfaces */
+/* Hallmark · reworded "Pipeline Atlas Eruption Forecast" to "Pipeline Atlas" · the product name remains adjacent outside the heading to keep its hierarchy clear */
+/* Hallmark · waive 39b · graph nodes and connection buttons contain multiple lines · the pipeline is a diagram with selectable surfaces, not a collection of single-line controls */
+/* Hallmark · answered F4 · only button-default is a filled primary; the outline and selected ghost controls remain distinct navigation states */
+/* Hallmark · answered F25 · the same stage navigation and inspector content are available in labelled mobile drawers, verified by browser tests */
+/* Hallmark · user override: full-width workspace · user requested removal of empty left and right space; canvas grows while reading columns retain their measures */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@xyflow/react/dist/style.css";
+@import "./theme.css";
+@import "./tokens.css";
+@import "./hallmark-base.css";
+@import "./base.css";
+@import "./redesign.css";
+@import "./theme-modes.css";

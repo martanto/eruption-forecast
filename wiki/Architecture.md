@@ -1,5 +1,9 @@
 # Architecture
 
+## Interactive companion
+
+[Pipeline Atlas](Architecture-Explorer) is a separate static application in `app/`. It uses React, TypeScript, Vite and React Flow to explain the Python pipeline without executing it. `app/src/features/architecture/` owns shared typed content and bundled source excerpts; explorer, scenarios and guided-tour features consume its public API. URL parameters own view, scenario and node selection; Zustand holds only expansion and per-view viewport state. Source fingerprints flag drift and require a manual semantic review before refreshing.
+
 This page is the structural reference for `eruption_forecast`: every module under `src/`, 
 the top-level pipeline, how the model and ensemble classes relate, what flows between 
 stages on disk, and the utility surface that holds the rest together.
