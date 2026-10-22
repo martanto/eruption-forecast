@@ -32,15 +32,20 @@ jobs:
       - run: npm ci --legacy-peer-deps
         working-directory: app
 
-      - run: npm run build
+      # Project Pages serves the app below the repository name.
+      - run: npm run build -- --base=/${{ github.event.repository.name }}/
         working-directory: app
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
+          # Reruns keep the run ID but increment the attempt number.
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: app/dist
 
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
