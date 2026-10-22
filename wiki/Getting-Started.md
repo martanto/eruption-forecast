@@ -1,5 +1,7 @@
 # Getting Started
 
+For the standalone visual guide, see [Architecture Explorer](Architecture-Explorer). From `app/`, run `npm ci --legacy-peer-deps` and `npm run dev` with Node.js 22.12+. The explorer needs no Python backend; the installation below is for the forecasting package.
+
 This page covers everything needed to install `eruption-forecast` and run the bundled examples. 
 For per-stage detail jump to [Pipeline Walkthrough](Pipeline-Walkthrough); for an end-to-end snippet see [Usage](Usage).
 

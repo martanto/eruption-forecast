@@ -1,0 +1,45 @@
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/600.css";
+@import "@fontsource/dm-sans/700.css";
+@import "@fontsource/newsreader/400.css";
+
+@theme {
+  --font-sans: "DM Sans", sans-serif;
+  --font-editorial: "Newsreader", Georgia, serif;
+  --color-paper: #f6f5ef;
+  --color-surface: #fffefa;
+  --color-ink: #253a35;
+  --color-muted: #5b6961;
+  --color-line: #d8ddd3;
+  --color-sage: #3d6959;
+  --color-sage-soft: #e8eee6;
+  --color-ochre: #806029;
+  --color-ochre-soft: #f5eddb;
+  --color-blue: #3b6479;
+  --color-blue-soft: #e6eff2;
+  --color-plum: #765b70;
+  --color-plum-soft: #f0e9ee;
+  --color-caution: #835029;
+  --color-caution-soft: #fbf1e4;
+  --color-ember: #9d4633;
+}
+:root {
+  --radius: 12px;
+  --drawer-shadow: -12px 0 48px rgb(37 58 53 / 15%);
+  --minimap-mask: rgb(246 245 239 / 65%);
+  --color-overlay: rgb(37 58 53 / 30%);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --xy-background-color: var(--color-paper);
+  --xy-background-pattern-dots-color-default: var(--color-line);
+  --xy-edge-stroke-default: var(--color-muted);
+  --xy-edge-label-background-color-default: var(--color-paper);
+  --xy-edge-label-color-default: var(--color-muted);
+  --xy-controls-button-background-color-default: var(--color-surface);
+  --xy-controls-button-color-default: var(--color-ink);
+  --xy-controls-button-border-color-default: var(--color-line);
+}

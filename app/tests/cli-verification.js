@@ -1,0 +1,33 @@
+async (page) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('http://127.0.0.1:5179/');
+  const viewport = page.locator('.react-flow__viewport');
+  await page.locator('.react-flow__minimap-node').first().waitFor();
+  const beforeZoom = await viewport.getAttribute('style');
+  await page.getByRole('button', { name: 'Zoom In', exact: true }).click();
+  await page.waitForFunction((previous) => document.querySelector('.react-flow__viewport')?.getAttribute('style') !== previous, beforeZoom);
+  const pane = await page.locator('.react-flow__pane').boundingBox();
+  if (!pane) throw new Error('Canvas pane missing');
+  const beforePan = await viewport.getAttribute('style');
+  await page.mouse.move(pane.x + pane.width / 2, pane.y + 95);
+  await page.mouse.down();
+  await page.mouse.move(pane.x + pane.width / 2 + 60, pane.y + 125, { steps: 6 });
+  await page.mouse.up();
+  if (await viewport.getAttribute('style') === beforePan) throw new Error('Pan did not change the viewport');
+  const beforeMinimap = await viewport.getAttribute('style');
+  await page.locator('.react-flow__minimap').click({ position: { x: 15, y: 15 } });
+  await page.waitForFunction((previous) => document.querySelector('.react-flow__viewport')?.getAttribute('style') !== previous, beforeMinimap);
+  await page.locator('.react-flow__node[data-id="labels"]').focus();
+  await page.keyboard.press('Enter');
+  if (!(await page.url()).includes('node=labels')) throw new Error('Keyboard selection did not update the URL');
+  await page.locator('.desktop-inspector').getByRole('button', { name: /Sources/ }).click();
+  await page.locator('.desktop-inspector details').first().click();
+  if (!(await page.locator('.desktop-inspector pre').first().textContent())?.length) throw new Error('Source excerpt missing');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Inspect selection', exact: true }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.keyboard.press('Escape');
+  if (!(await page.getByRole('button', { name: 'Inspect selection', exact: true }).evaluate((element) => element === document.activeElement))) throw new Error('Drawer focus was not restored');
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Mobile page overflows');
+  return { pan: 'pass', zoom: 'pass', minimap: 'pass', keyboard: 'pass', inspector: 'pass', mobileLayout: 'pass', drawerFocus: 'pass' };
+}

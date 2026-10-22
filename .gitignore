@@ -43,3 +43,6 @@ output*
 .coverage
 .coverage.*
 htmlcov/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+/.playwright

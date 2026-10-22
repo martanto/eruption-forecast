@@ -50,6 +50,28 @@ Process raw seismic tremor, extract time-series features, train multi-seed class
 > This model implements a time series feature engineering and classification workflow that issues eruption
 > alerts based on real-time tremor data. https://github.com/ddempsey/puia
 
+## Interactive architecture guide
+
+Pipeline Atlas in `app/` is a local, read-only React + TypeScript guide to the implemented pipeline. Explore numbered stages, inspect bundled source excerpts and caveats, compare five scenario timelines, or follow a guided tour. The guide does not run the forecasting pipeline.
+
+With Node.js 22.12+ installed:
+
+```sh
+cd app
+npm ci --legacy-peer-deps
+npm run dev
+```
+
+To build the static site for deployment, run from `app/`:
+
+```sh
+npm run build
+```
+
+Vite writes the deployable files to `app/dist/`. You can preview that production build locally with `npx vite preview` (also from `app/`). Deploy the contents of `app/dist/` to any static host; the guide does not need the Python forecasting backend.
+
+See [Architecture Explorer](wiki/Architecture-Explorer.md) for navigation, validation commands and the source-review workflow. `npm run validate:sources` flags stale fingerprints; content updates still require human review.
+
 ## Important Disclaimers
 
 **This software is intended for research purposes only.**
