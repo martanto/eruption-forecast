@@ -10,12 +10,10 @@ import {
   TRAINING_LESSONS,
   type TrainingLesson,
 } from "../trainingLessons";
-import seedReference from "../../../../../assets/seed-ensemble.jpg";
 import classifierReference from "../../../../../assets/classifier-ensemble.jpg";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
 const references = {
-  "seed-ensemble": seedReference,
   "classifier-ensemble": classifierReference,
 };
 export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
@@ -209,10 +207,42 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
                 </select>
               </label>
             </div>
-            <p>
-              Scroll the table horizontally on smaller screens to compare
-              selected features and model outputs.
-            </p>
+            <div className="seed-flow" aria-label="Shared history to seed ensemble">
+              <div className="seed-history">
+                <h3>Shared training history</h3>
+                <p>48 negative + 6 positive windows · one feature matrix. Select a seed below to trace its draw.</p>
+                <div className="seed-history-cells" aria-hidden="true">
+                  {Array.from({ length: 54 }, (_, i) => (
+                    <span key={i} className={`${i >= 48 ? "sample-positive" : ""} ${step >= 1 && i < 48 && !selectedIds.includes(i + 1) ? "seed-omitted" : ""}`} title={`Window ${i + 1}`}>{i >= 48 ? 1 : 0}</span>
+                  ))}
+                </div>
+              </div>
+              <p className="seed-flow-caption">Same history → a different reproducible draw for each seed</p>
+              <div className="seed-lanes">
+                {selectedFamily.probabilities.map((p, i) => (
+                  <section className="seed-lane" data-selected={seed === i} key={i} aria-label={`Seed ${i} training path`}>
+                    <button className="seed-select" aria-pressed={seed === i} onClick={() => setSeed(i)}>Trace seed {i}</button>
+                    <p>{step === 0 ? "Starts with all 54 windows" : "8 negatives + all 6 positives"}</p>
+                    <div className="seed-draw" aria-label={step === 0 ? "Sampling pending" : "Retained window ids"}>
+                      {step === 0 ? <span>Shared rows and labels</span> : [...retainedNegatives(i), 49, 50, 51, 52, 53, 54].map((id) => (
+                        <span key={id} className={id >= 49 ? "sample-positive" : ""} title={`Window ${id} · label ${id >= 49 ? 1 : 0}`}>#{id}</span>
+                      ))}
+                    </div>
+                    <div className="seed-model">
+                      <ArrowRight size={18} aria-hidden="true" />
+                      <strong>{step >= 2 ? `${selectedFamily.name} · fitted model ${i}` : step === 1 ? "Select features → fit" : "Awaiting sampling"}</strong>
+                    </div>
+                    {step === 3 && <div className="seed-probability"><span>P(positive)</span><strong>{(p * 100).toFixed(0)}%</strong><meter min={0} max={1} value={p} aria-label={`Seed ${i} positive probability`} /></div>}
+                  </section>
+                ))}
+              </div>
+              <div className="seed-merge">
+                <strong>{selectedFamily.name} SeedEnsemble</strong>
+                <span>{step === 3 ? `Same future window → mean ${(summarize(selectedFamily.probabilities).mean * 100).toFixed(1)}%` : "Bundle three estimators with their own feature lists"}</span>
+              </div>
+            </div>
+            <details className="seed-details">
+              <summary>Inspect retained ids and selected features</summary>
             <div
               className="training-table-scroll"
               tabIndex={0}
@@ -261,6 +291,7 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
                 </tbody>
               </table>
             </div>
+            </details>
             <output className="training-result" aria-live="polite">
               {step < 3
                 ? `${selectedFamily.name}: 3 seed models → 1 SeedEnsemble`
@@ -407,7 +438,7 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
             positives and 8 negatives.
           </p>
         </section>
-      ) : (
+      ) : topic === "classifier-ensemble" ? (
         <details className="training-reference">
           <summary>View the supplied {lesson.title} reference</summary>
           <p>
@@ -423,7 +454,7 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
             height="720"
           />
         </details>
-      )}
+      ) : null}
       <footer className="training-footer">
         <p>Continue through the training pipeline</p>
         <nav className="training-links" aria-label="Continue learning">
