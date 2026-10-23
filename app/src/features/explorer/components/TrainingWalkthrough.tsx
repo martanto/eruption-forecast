@@ -10,18 +10,14 @@ import {
   TRAINING_LESSONS,
   type TrainingLesson,
 } from "../trainingLessons";
-import rusReference from "../../../../../assets/random-under-sampler.jpg";
 import seedReference from "../../../../../assets/seed-ensemble.jpg";
 import classifierReference from "../../../../../assets/classifier-ensemble.jpg";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
-
 const references = {
-  "random-under-sampler": rusReference,
   "seed-ensemble": seedReference,
   "classifier-ensemble": classifierReference,
 };
-
 export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
   const lesson = TRAINING_LESSONS[topic];
   const [step, setStep] = useState(0);
@@ -358,21 +354,76 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
           </ul>
         </div>
       </section>
-      <details className="training-reference">
-        <summary>View the supplied {lesson.title} reference</summary>
-        <p>
-          Original project illustration. The interactive example above uses
-          corrected, internally consistent synthetic counts and follows the
-          implementation notes.
-        </p>
-        <img
-          src={references[topic]}
-          alt={`Original ${lesson.title} reference showing the training and ensemble stages`}
-          loading="lazy"
-          width="1280"
-          height="720"
-        />
-      </details>
+      {topic === "random-under-sampler" ? (
+        <section
+          className="training-why"
+          aria-labelledby="sampling-ratio-heading"
+        >
+          <h2 id="sampling-ratio-heading">
+            What does sampling_strategy = 0.75 mean?
+          </h2>
+          <p>
+            In imbalanced-learn’s RandomUnderSampler, the ratio is the minority
+            count divided by the majority count after resampling. Keep every
+            eruption-positive window and randomly select fewer non-eruption
+            windows. A value of 0.75 describes the ratio between those counts;
+            it does not mean a 75/25 class split or a train/test split.
+          </p>
+          <div className="training-table-scroll">
+            <table className="training-table">
+              <caption>
+                Example training data · sampling_strategy = 0.75
+              </caption>
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Before</th>
+                  <th>After</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>Eruption-positive (minority)</th>
+                  <td>300</td>
+                  <td>All 300 retained</td>
+                </tr>
+                <tr>
+                  <th>Non-eruption (majority)</th>
+                  <td>2,000</td>
+                  <td>400 randomly selected</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="training-equation">
+            Majority target = 300 ÷ 0.75 = 400 · Ratio = 300 ÷ 400 = 0.75
+          </p>
+          <p>
+            The 700 retained windows are 42.9% positive and 57.1% negative.
+            Sampling the minority too would discard already scarce positive
+            examples. Different seeds can change the negative selection while
+            keeping all positives. These are labelled windows, not separate
+            eruption events. The interactive grid above uses the same ratio: 6
+            positives and 8 negatives.
+          </p>
+        </section>
+      ) : (
+        <details className="training-reference">
+          <summary>View the supplied {lesson.title} reference</summary>
+          <p>
+            Original project illustration. The interactive example above uses
+            corrected, internally consistent synthetic counts and follows the
+            implementation notes.
+          </p>
+          <img
+            src={references[topic]}
+            alt={`Original ${lesson.title} reference showing the training and ensemble stages`}
+            loading="lazy"
+            width="1280"
+            height="720"
+          />
+        </details>
+      )}
       <footer className="training-footer">
         <p>Continue through the training pipeline</p>
         <nav className="training-links" aria-label="Continue learning">

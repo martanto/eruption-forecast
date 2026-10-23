@@ -24,7 +24,7 @@ export const TRAINING_LESSONS = {
     caveat:
       "Under-sampling discards useful majority examples and changes the training class prior. It does not create new eruption evidence or guarantee calibrated probabilities. Here auto uses RUS only when the minority share is below 0.15; explicit under always requests it.",
     implementation:
-      "TrainingModel.fit → resample → per-seed feature selection → GridSearchCV. The supplied image shows a split-first teaching example. Current code resamples and selects features before CV, so internal CV is not an untouched holdout and can be optimistic. Evaluate separately on later, unresampled data.",
+      "TrainingModel.fit → resample → per-seed feature selection → GridSearchCV. Current code resamples and selects features before CV, so internal CV is not an untouched holdout and can be optimistic. Evaluate separately on later, unresampled data.",
     sources: [
       "model/training_model.py · fit, _run_feature_selection_job",
       "utils/ml.py · resample",
