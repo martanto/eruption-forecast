@@ -7,6 +7,7 @@ import {
   GitBranch,
   CalendarRange,
   Tags,
+  GraduationCap,
   AlertCircle,
   X,
   Plus,
@@ -171,7 +172,10 @@ export function Explorer({
             <Tags size={16} aria-hidden="true" />
             Labelling walkthrough
           </Link>
-          <Link className="button button-ghost" to="/random-under-sampler">Training walkthroughs</Link>
+          <Link className="button button-ghost" to="/random-under-sampler">
+            <GraduationCap size={16} aria-hidden="true" />
+            Training walkthroughs
+          </Link>
         </div>
         <div className="search-box">
           <Search size={17} />
