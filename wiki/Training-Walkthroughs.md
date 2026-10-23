@@ -19,7 +19,9 @@ Historical windows outside positive forecast days usually outnumber positive win
 
 `TrainingModel.fit` with `resample_method="auto"` chooses under-sampling when the minority share is strictly below `minority_threshold=0.15`; otherwise it leaves the sample unchanged. Explicit `"under"` requests under-sampling.
 
-The supplied [RUS illustration](../assets/random-under-sampler.jpg) shows a split-first teaching example. Current implementation order is **resample → feature selection → GridSearchCV**. Internal CV is not an untouched holdout: pre-CV selection and overlapping windows can produce optimistic scores. Evaluate later, unresampled data separately. Under-sampling discards majority information and changes the training prior; it does not guarantee calibrated probabilities.
+The RUS page replaces its reference image with a worked example: retain all 300 positive windows and randomly select 400 of 2,000 negative windows. Thus `300 / 400 = 0.75`, giving 42.9% positive and 57.1% negative windows, rather than a 75/25 split.
+
+Current implementation order is **resample → feature selection → GridSearchCV**. Internal CV is not an untouched holdout: pre-CV selection and overlapping windows can produce optimistic scores. Evaluate later, unresampled data separately. Under-sampling discards majority information and changes the training prior; it does not guarantee calibrated probabilities.
 
 ## Seed ensembles, step by step
 
@@ -45,4 +47,4 @@ Reference: [Classifier Ensemble illustration](../assets/classifier-ensemble.jpg)
 
 ## Maintenance
 
-The fixture and copy live in `app/src/features/explorer/trainingLessons.ts`, rendered by `TrainingWalkthrough.tsx`. Vite bundles the supplied JPEGs directly from repository `assets/`; keep these files available when building. `app/tests/training-lessons.test.ts` checks sampling and aggregation. `app/tests/browser/training-walkthroughs.spec.ts` verifies routes, controls, image loading, reset and mobile overflow. Screenshots stay under `app/tests/review/training/`. See [Architecture Explorer](Architecture-Explorer.md) for launch commands.
+The fixture and copy live in `app/src/features/explorer/trainingLessons.ts`, rendered by `TrainingWalkthrough.tsx`. Vite bundles the seed and classifier ensemble JPEGs directly from repository `assets/`; keep these files available when building. `app/tests/training-lessons.test.ts` checks sampling and aggregation. `app/tests/browser/training-walkthroughs.spec.ts` verifies routes, controls, image loading, reset and mobile overflow. Screenshots stay under `app/tests/review/training/`. See [Architecture Explorer](Architecture-Explorer.md) for launch commands.
