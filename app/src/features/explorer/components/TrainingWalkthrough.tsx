@@ -10,12 +10,8 @@ import {
   TRAINING_LESSONS,
   type TrainingLesson,
 } from "../trainingLessons";
-import classifierReference from "../../../../../assets/classifier-ensemble.jpg";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
-const references = {
-  "classifier-ensemble": classifierReference,
-};
 export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
   const lesson = TRAINING_LESSONS[topic];
   const [step, setStep] = useState(0);
@@ -207,90 +203,157 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
                 </select>
               </label>
             </div>
-            <div className="seed-flow" aria-label="Shared history to seed ensemble">
+            <div
+              className="seed-flow"
+              aria-label="Shared history to seed ensemble"
+            >
               <div className="seed-history">
                 <h3>Shared training history</h3>
-                <p>48 negative + 6 positive windows · one feature matrix. Select a seed below to trace its draw.</p>
+                <p>
+                  48 negative + 6 positive windows · one feature matrix. Select
+                  a seed below to trace its draw.
+                </p>
                 <div className="seed-history-cells" aria-hidden="true">
                   {Array.from({ length: 54 }, (_, i) => (
-                    <span key={i} className={`${i >= 48 ? "sample-positive" : ""} ${step >= 1 && i < 48 && !selectedIds.includes(i + 1) ? "seed-omitted" : ""}`} title={`Window ${i + 1}`}>{i >= 48 ? 1 : 0}</span>
+                    <span
+                      key={i}
+                      className={`${i >= 48 ? "sample-positive" : ""} ${step >= 1 && i < 48 && !selectedIds.includes(i + 1) ? "seed-omitted" : ""}`}
+                      title={`Window ${i + 1}`}
+                    >
+                      {i >= 48 ? 1 : 0}
+                    </span>
                   ))}
                 </div>
               </div>
-              <p className="seed-flow-caption">Same history → a different reproducible draw for each seed</p>
+              <p className="seed-flow-caption">
+                Same history → a different reproducible draw for each seed
+              </p>
               <div className="seed-lanes">
                 {selectedFamily.probabilities.map((p, i) => (
-                  <section className="seed-lane" data-selected={seed === i} key={i} aria-label={`Seed ${i} training path`}>
-                    <button className="seed-select" aria-pressed={seed === i} onClick={() => setSeed(i)}>Trace seed {i}</button>
-                    <p>{step === 0 ? "Starts with all 54 windows" : "8 negatives + all 6 positives"}</p>
-                    <div className="seed-draw" aria-label={step === 0 ? "Sampling pending" : "Retained window ids"}>
-                      {step === 0 ? <span>Shared rows and labels</span> : [...retainedNegatives(i), 49, 50, 51, 52, 53, 54].map((id) => (
-                        <span key={id} className={id >= 49 ? "sample-positive" : ""} title={`Window ${id} · label ${id >= 49 ? 1 : 0}`}>#{id}</span>
-                      ))}
+                  <section
+                    className="seed-lane"
+                    data-selected={seed === i}
+                    key={i}
+                    aria-label={`Seed ${i} training path`}
+                  >
+                    <button
+                      className="seed-select"
+                      aria-pressed={seed === i}
+                      onClick={() => setSeed(i)}
+                    >
+                      Trace seed {i}
+                    </button>
+                    <p>
+                      {step === 0
+                        ? "Starts with all 54 windows"
+                        : "8 negatives + all 6 positives"}
+                    </p>
+                    <div
+                      className="seed-draw"
+                      aria-label={
+                        step === 0 ? "Sampling pending" : "Retained window ids"
+                      }
+                    >
+                      {step === 0 ? (
+                        <span>Shared rows and labels</span>
+                      ) : (
+                        [...retainedNegatives(i), 49, 50, 51, 52, 53, 54].map(
+                          (id) => (
+                            <span
+                              key={id}
+                              className={id >= 49 ? "sample-positive" : ""}
+                              title={`Window ${id} · label ${id >= 49 ? 1 : 0}`}
+                            >
+                              #{id}
+                            </span>
+                          ),
+                        )
+                      )}
                     </div>
                     <div className="seed-model">
                       <ArrowRight size={18} aria-hidden="true" />
-                      <strong>{step >= 2 ? `${selectedFamily.name} · fitted model ${i}` : step === 1 ? "Select features → fit" : "Awaiting sampling"}</strong>
+                      <strong>
+                        {step >= 2
+                          ? `${selectedFamily.name} · fitted model ${i}`
+                          : step === 1
+                            ? "Select features → fit"
+                            : "Awaiting sampling"}
+                      </strong>
                     </div>
-                    {step === 3 && <div className="seed-probability"><span>P(positive)</span><strong>{(p * 100).toFixed(0)}%</strong><meter min={0} max={1} value={p} aria-label={`Seed ${i} positive probability`} /></div>}
+                    {step === 3 && (
+                      <div className="seed-probability">
+                        <span>P(positive)</span>
+                        <strong>{(p * 100).toFixed(0)}%</strong>
+                        <meter
+                          min={0}
+                          max={1}
+                          value={p}
+                          aria-label={`Seed ${i} positive probability`}
+                        />
+                      </div>
+                    )}
                   </section>
                 ))}
               </div>
               <div className="seed-merge">
                 <strong>{selectedFamily.name} SeedEnsemble</strong>
-                <span>{step === 3 ? `Same future window → mean ${(summarize(selectedFamily.probabilities).mean * 100).toFixed(1)}%` : "Bundle three estimators with their own feature lists"}</span>
+                <span>
+                  {step === 3
+                    ? `Same future window → mean ${(summarize(selectedFamily.probabilities).mean * 100).toFixed(1)}%`
+                    : "Bundle three estimators with their own feature lists"}
+                </span>
               </div>
             </div>
             <details className="seed-details">
               <summary>Inspect retained ids and selected features</summary>
-            <div
-              className="training-table-scroll"
-              tabIndex={0}
-              role="region"
-              aria-label="Seed model details"
-            >
-              <table className="training-table">
-                <caption>
-                  Synthetic per-seed example · 6 shared positive windows
-                </caption>
-                <thead>
-                  <tr>
-                    <th>Seed</th>
-                    <th>Negative ids retained</th>
-                    <th>Selected features</th>
-                    <th>{step < 3 ? "Model" : "P(positive)"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedFamily.probabilities.map((p, i) => (
-                    <tr key={i}>
-                      <th>{i}</th>
-                      <td>
-                        {step >= 1
-                          ? retainedNegatives(i).join(", ")
-                          : "48 available"}
-                      </td>
-                      <td>
-                        {step >= 1
-                          ? [
-                              ["RSAM mean", "DSAR variance"],
-                              ["RSAM mean", "entropy mean"],
-                              ["DSAR variance", "entropy mean"],
-                            ][i]!.join(" + ")
-                          : "Shared feature matrix"}
-                      </td>
-                      <td>
-                        {step >= 3
-                          ? `${(p * 100).toFixed(0)}%`
-                          : step === 2
-                            ? `${selectedFamily.name} · fitted seed ${i}`
-                            : "Awaiting fit"}
-                      </td>
+              <div
+                className="training-table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Seed model details"
+              >
+                <table className="training-table">
+                  <caption>
+                    Synthetic per-seed example · 6 shared positive windows
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>Seed</th>
+                      <th>Negative ids retained</th>
+                      <th>Selected features</th>
+                      <th>{step < 3 ? "Model" : "P(positive)"}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {selectedFamily.probabilities.map((p, i) => (
+                      <tr key={i}>
+                        <th>{i}</th>
+                        <td>
+                          {step >= 1
+                            ? retainedNegatives(i).join(", ")
+                            : "48 available"}
+                        </td>
+                        <td>
+                          {step >= 1
+                            ? [
+                                ["RSAM mean", "DSAR variance"],
+                                ["RSAM mean", "entropy mean"],
+                                ["DSAR variance", "entropy mean"],
+                              ][i]!.join(" + ")
+                            : "Shared feature matrix"}
+                        </td>
+                        <td>
+                          {step >= 3
+                            ? `${(p * 100).toFixed(0)}%`
+                            : step === 2
+                              ? `${selectedFamily.name} · fitted seed ${i}`
+                              : "Awaiting fit"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </details>
             <output className="training-result" aria-live="polite">
               {step < 3
@@ -318,6 +381,10 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
               </h2>
               <span>3 seeds per family · equal family weight</span>
             </div>
+            <p>
+              Each family keeps its fitted seed models and selected feature
+              lists. Toggle a family to trace what enters the shared container.
+            </p>
             <div className="training-family-list">
               {FAMILIES.map((item, i) => (
                 <label key={item.name} className="training-family">
@@ -343,6 +410,100 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
                 </label>
               ))}
             </div>
+            <div
+              className="seed-merge"
+              aria-label="Bundled classifier families"
+            >
+              <strong>ClassifierEnsemble</strong>
+              <span>
+                {activeFamilies.map((item) => item.name).join(" + ")} /{" "}
+                {activeFamilies.length * 3} fitted seed models
+              </span>
+              <span>
+                {step === 0
+                  ? "Collect the family objects before bundling."
+                  : "One container, with each family identity preserved. No additional model is fitted."}
+              </span>
+            </div>
+            <section
+              className="classifier-prediction"
+              aria-labelledby="future-prediction-heading"
+            >
+              <h3 id="future-prediction-heading">Model prediction</h3>
+              <p>
+                Future windows stay outside the training sample. Extract their
+                features, then apply the fitted ClassifierEnsemble to each
+                window.
+              </p>
+              <ol className="classifier-prediction-stages">
+                <li>
+                  <strong>Future feature rows</strong>
+                  <span>One row per forecast window</span>
+                  <div
+                    className="classifier-window-rows"
+                    aria-label="Example future window ids"
+                  >
+                    {[55, 56, 57, 58].map((id) => (
+                      <span key={id}>#{id}</span>
+                    ))}
+                  </div>
+                </li>
+                <li>
+                  <strong>Apply ClassifierEnsemble</strong>
+                  <span>
+                    {step < 2
+                      ? "Ready for future features"
+                      : "Each seed reads its own feature columns"}
+                  </span>
+                  {step >= 2 && (
+                    <ul>
+                      {activeFamilies.map((item) => (
+                        <li key={item.name}>
+                          {item.name}:{" "}
+                          {item.probabilities
+                            .map((p) => `${(p * 100).toFixed(0)}%`)
+                            .join(" + ")}{" "}
+                          / 3 ={" "}
+                          {(summarize(item.probabilities).mean * 100).toFixed(
+                            1,
+                          )}
+                          %
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+                <li>
+                  <strong>Forecast results</strong>
+                  <span>
+                    {step < 3
+                      ? "Advance to step 4 to read consensus for window #55."
+                      : `Window #55  /  probability ${(consensus.mean * 100).toFixed(1)}%`}
+                  </span>
+                  {step === 3 && (
+                    <span>
+                      Prediction vote fraction:{" "}
+                      {(
+                        summarize(
+                          activeFamilies.map(
+                            (item) =>
+                              item.probabilities.filter((p) => p >= 0.5)
+                                .length / item.probabilities.length,
+                          ),
+                        ).mean * 100
+                      ).toFixed(1)}
+                      %
+                    </span>
+                  )}
+                  <span>Keep per-family results alongside consensus.</span>
+                </li>
+              </ol>
+              <p>
+                Probabilities above are synthetic examples for window #55. The
+                prediction vote fraction averages seed votes within each family,
+                then averages across families, using a 0.5 vote threshold here.
+              </p>
+            </section>
             <p>
               At least one family stays enabled. Selection changes only this
               synthetic calculation.
@@ -438,22 +599,6 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
             positives and 8 negatives.
           </p>
         </section>
-      ) : topic === "classifier-ensemble" ? (
-        <details className="training-reference">
-          <summary>View the supplied {lesson.title} reference</summary>
-          <p>
-            Original project illustration. The interactive example above uses
-            corrected, internally consistent synthetic counts and follows the
-            implementation notes.
-          </p>
-          <img
-            src={references[topic]}
-            alt={`Original ${lesson.title} reference showing the training and ensemble stages`}
-            loading="lazy"
-            width="1280"
-            height="720"
-          />
-        </details>
       ) : null}
       <footer className="training-footer">
         <p>Continue through the training pipeline</p>

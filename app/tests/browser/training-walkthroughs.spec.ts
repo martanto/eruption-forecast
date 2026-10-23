@@ -45,10 +45,18 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
   await page.getByRole("button", { name: /Step 4:/ }).click();
   await expect(page.locator(".seed-lane")).toHaveCount(3);
   await page.getByRole("button", { name: "Trace seed 1" }).click();
-  await expect(page.getByRole("button", { name: "Trace seed 1" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".seed-history-cells .seed-omitted")).toHaveCount(40);
-  await expect(page.locator(".seed-lane").first().locator(".sample-positive")).toHaveCount(6);
-  await expect(page.getByRole("img", { name: /Original Seed Ensemble/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Trace seed 1" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".seed-history-cells .seed-omitted")).toHaveCount(
+    40,
+  );
+  await expect(
+    page.locator(".seed-lane").first().locator(".sample-positive"),
+  ).toHaveCount(6);
+  await expect(
+    page.getByRole("img", { name: /Original Seed Ensemble/ }),
+  ).toHaveCount(0);
   await expect(page.locator("output")).toContainText("68.0%");
   await page.getByLabel("Classifier family").selectOption("1");
   await expect(page.locator("output")).toContainText("54.0%");
@@ -81,16 +89,23 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
     path: `tests/review/training/classifiers-${testInfo.project.name}.png`,
     fullPage: true,
   });
-  await page
-    .getByText("View the supplied Classifier Ensemble reference", {
-      exact: true,
-    })
-    .click();
-  const image = page.getByRole("img", { name: /Original Classifier Ensemble/ });
-  await expect(image).toBeVisible();
-  await expect
-    .poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth))
-    .toBeGreaterThan(0);
+  await expect(
+    page.getByRole("img", { name: /Original Classifier Ensemble/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Model prediction", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Step 4:/ }).click();
+  await expect(page.locator(".classifier-prediction-stages")).toContainText(
+    "Window #55  /  probability 64.3%",
+  );
+  await expect(page.locator(".classifier-prediction-stages")).toContainText(
+    "Prediction vote fraction: 88.9%",
+  );
+  await page.screenshot({
+    path: `tests/review/training/classifier-flow-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
