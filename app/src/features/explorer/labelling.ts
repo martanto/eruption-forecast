@@ -84,7 +84,7 @@ export const LESSONS = [
       ],
       [
         "Keep every timestamp",
-        "Continuous retains quiet periods as well as positive periods. The label table has datetime, id and is_erupted. The two-day look-back is applied later by TremorMatrixBuilder, not by LabelBuilder.",
+        "Continuous retains non-eruptive periods as well as positive periods. The label table has datetime, id and is_erupted. The two-day look-back is applied later by TremorMatrixBuilder, not by LabelBuilder.",
       ],
     ],
   },

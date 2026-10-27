@@ -172,7 +172,7 @@ export function Explorer({
             <Tags size={16} aria-hidden="true" />
             Labelling walkthrough
           </Link>
-          <Link className="button button-ghost" to="/random-under-sampler">
+          <Link className="button button-ghost" to="/seed-ensemble">
             <GraduationCap size={16} aria-hidden="true" />
             Training walkthroughs
           </Link>

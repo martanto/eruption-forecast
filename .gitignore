@@ -47,3 +47,4 @@ htmlcov/
 .playwright-cli/
 /.playwright
 /.impeccable
+/.worktrees

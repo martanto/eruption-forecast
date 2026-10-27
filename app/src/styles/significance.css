@@ -1,0 +1,766 @@
+/*
+ * Features Selection explainer: labelled data, KS, Fisher / C(n, r), BY.
+ *
+ * Type roles (DM Sans throughout, system mono for data):
+ *   step headline 29/1.15 · title (h3) 20/1.25 · prose 16/1.65 · caption 14/1.6
+ *   answer numeral 38/1 (the system's display size) · chart text 12 mono
+ * Radii come from DESIGN.md: 7px controls, 12px surfaces, 50% numerals.
+ */
+.sig {
+  /* em, not ch: DM Sans digits are wide, so 66ch would run to about 90 letters. */
+  --sig-measure: 34em;
+  --sig-rule: var(--color-ink);
+  margin-block: 48px;
+}
+.sig :is(p, li, figcaption, td, th, dd, dt, label) {
+  text-wrap: pretty;
+}
+.sig :is(h2, h3, h4) {
+  text-wrap: balance;
+}
+.sig code {
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Reading prose */
+.sig p {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--color-ink-2);
+}
+.sig .sig-section > p,
+.sig .sig-intro p {
+  max-width: var(--sig-measure);
+}
+.sig .sig-caption,
+.sig .sig-figure figcaption,
+.sig .sig-note,
+.sig .sig-hint,
+.sig .sig-axis-caption {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.sig .sig-caption,
+.sig .sig-figure figcaption,
+.sig .sig-note {
+  max-width: 38em;
+}
+.sig .sig-caption,
+.sig .sig-figure figcaption {
+  margin: 12px 0 0;
+}
+.sig .sig-note {
+  margin-top: 20px;
+}
+.sig-caption b,
+.sig-figure figcaption b {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.sig-axis-caption {
+  text-align: center;
+}
+
+/* Page-level tiers */
+/* Two classes deep so the shared .label-lab h2 rule does not flatten the tier. */
+.sig .sig-intro h2,
+.sig .sig-step-heading {
+  font-size: 29px;
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.sig .sig-intro h2 {
+  margin: 0 0 16px;
+}
+.sig-intro {
+  padding-top: 0;
+}
+.sig-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 24px;
+}
+.sig-index a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 14px 6px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  color: var(--color-ink);
+  font-size: 14px;
+  text-decoration: none;
+  transition:
+    border-color 200ms,
+    background-color 200ms;
+}
+.sig-index a span {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sig-index a:hover {
+  border-color: var(--color-terracotta);
+  background: var(--color-terracotta-soft);
+}
+
+/* Steps: each one opens with a rule, a numeral and a headline. */
+.sig-section {
+  margin-top: 80px;
+  padding-top: 28px;
+  border-top: 1px solid var(--sig-rule);
+  scroll-margin-top: 24px;
+}
+.sig-step-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 4px 18px;
+  align-items: start;
+  max-width: 30em;
+  margin: 0 0 16px;
+  scroll-margin-top: 24px;
+}
+.sig-step-no {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.sig-step-heading .sr-only + * {
+  grid-column: 2;
+}
+.sig-demo {
+  margin-top: 24px;
+}
+
+/* Layout */
+.sig-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  margin-top: 24px;
+}
+.sig-grid-even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+/* The BY chart and table each take a full row: the table has seven columns. */
+.sig-stack {
+  display: grid;
+  gap: 28px;
+  margin-top: 24px;
+}
+.sig-by-chart {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.sig-by-chart .sig-formula {
+  margin-top: 0;
+}
+.sig-grid-minor {
+  stroke: var(--color-line);
+  stroke-width: 0.5;
+  opacity: 0.6;
+}
+.sig .sig-caption + .lab-options {
+  margin-top: 16px;
+}
+.sig-card,
+.sig-side,
+.sig-comb-grid > div {
+  min-width: 0;
+}
+.sig-card {
+  padding: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+.sig .sig-card h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sig .sig-comb h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.sig-side {
+  display: grid;
+  gap: 24px;
+}
+.sig-figure {
+  margin: 24px 0 0;
+}
+
+/* Answer cards: the peak of each step. The numeral is the system's display size. */
+.sig-result,
+.sig-why {
+  border-radius: 12px;
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+.sig-result {
+  padding: 24px;
+}
+.sig-result dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0 0 16px;
+}
+.sig-result dt {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  opacity: 0.85;
+}
+.sig-result dd {
+  margin: 6px 0 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 38px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.sig-result p,
+.sig-why p {
+  margin: 12px 0 0;
+  color: var(--color-paper);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+.sig-result .sig-chip {
+  color: var(--color-ink);
+}
+.sig-chip {
+  display: inline-block;
+  margin: 0;
+  padding: 3px 12px;
+  border-radius: 7px;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.sig-result[data-tone="strong"] .sig-chip {
+  background: var(--color-terracotta);
+  color: var(--color-accent-ink, #fff);
+}
+.sig-result[data-tone="maybe"] .sig-chip {
+  background: var(--color-caution);
+  color: var(--color-accent-ink);
+}
+.sig-total {
+  font-family: var(--font-mono, monospace);
+  font-size: 29px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.sig-why {
+  padding: 24px;
+}
+.sig-why h3 {
+  color: inherit;
+}
+.sig-steps {
+  margin: 0;
+  padding-left: 22px;
+  list-style: decimal;
+  color: var(--color-ink-2);
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 52ch;
+}
+.sig-steps li + li {
+  margin-top: 10px;
+}
+
+/* Legends and chart chrome */
+.sig-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+.sig-legend i {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 3px solid currentColor;
+}
+.sig-legend [data-group="quiet"] i,
+.sig-legend [data-line="raw"] i,
+.sig-legend [data-line="bh"] i {
+  color: var(--color-ink-2);
+}
+.sig-legend [data-group="pre"] i,
+.sig-legend [data-line="by"] i,
+.sig-legend [data-bar="in"] i {
+  color: var(--color-terracotta);
+}
+.sig-legend [data-bar="out"] i {
+  color: var(--color-muted);
+  opacity: 0.5;
+}
+.sig-legend [data-line="raw"] i {
+  border-top-style: dashed;
+}
+.sig-legend [data-dot] i {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--color-ink);
+  border-radius: 50%;
+}
+.sig-legend [data-dot="kept"] i {
+  background: var(--color-ink);
+}
+.sig-scroll {
+  overflow-x: auto;
+}
+.sig-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.sig-axis {
+  fill: var(--color-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+.sig-tiny {
+  font-size: 12px;
+}
+.sig-grid-line {
+  stroke: var(--color-line);
+}
+.sig-dot[data-group="quiet"],
+.sig-marker[data-group="quiet"],
+.sig-bar-data[data-group="quiet"] {
+  fill: var(--color-ink-2);
+}
+.sig-dot[data-group="pre"],
+.sig-marker[data-group="pre"],
+.sig-bar-data[data-group="pre"] {
+  fill: var(--color-terracotta);
+}
+.sig-step {
+  fill: none;
+  stroke-width: 2.5;
+}
+.sig-step[data-group="quiet"] {
+  stroke: var(--color-ink-2);
+}
+.sig-step[data-group="pre"] {
+  stroke: var(--color-terracotta);
+}
+.sig-sweep {
+  stroke: var(--color-muted);
+  stroke-dasharray: 4 4;
+}
+.sig-gap {
+  stroke: var(--color-ink);
+  stroke-width: 3;
+}
+.sig-gap-label {
+  fill: var(--color-ink);
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 4px;
+}
+.sig-labelnum {
+  font-family: var(--font-mono, monospace);
+  font-size: 20px;
+  font-weight: 700;
+}
+.sig-labelnum[data-group="quiet"] {
+  fill: var(--color-ink-2);
+}
+.sig-labelnum[data-group="pre"] {
+  fill: var(--color-terracotta);
+}
+.sig-eruption-mark {
+  fill: none;
+  stroke: var(--color-ink);
+  stroke-width: 1.5;
+}
+.sig-bar {
+  fill: var(--color-muted);
+  opacity: 0.4;
+}
+.sig-bar[data-in="true"] {
+  fill: var(--color-terracotta);
+  opacity: 1;
+}
+.sig-bar[data-observed] {
+  stroke: var(--color-ink);
+  stroke-width: 2.5;
+}
+.sig-ours,
+.sig-zone-label {
+  fill: var(--color-terracotta);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sig-keep-zone {
+  fill: var(--color-terracotta-soft);
+}
+.sig-line {
+  fill: none;
+  stroke-width: 2;
+}
+.sig-line[data-line="raw"] {
+  stroke: var(--color-muted);
+  stroke-dasharray: 5 4;
+}
+.sig-line[data-line="bh"] {
+  stroke: var(--color-ink-2);
+}
+.sig-line[data-line="by"] {
+  stroke: var(--color-terracotta);
+  stroke-width: 3;
+}
+.sig-point {
+  fill: var(--color-surface);
+  stroke: var(--color-ink);
+  stroke-width: 2;
+  transition: fill 300ms;
+}
+.sig-point[data-kept="true"] {
+  fill: var(--color-ink);
+}
+
+/* Controls */
+.sig-sweep-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 8px;
+}
+.sig-sweep-control label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 260px;
+}
+.sig-sweep-control input[type="range"],
+.sig-demo input[type="range"] {
+  accent-color: var(--color-terracotta);
+}
+.sig-demo select {
+  min-height: 32px;
+}
+.sig-readout {
+  margin-top: 12px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.sig :is(a, button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 3px;
+}
+
+/* Tables */
+.sig-table {
+  min-width: 0;
+}
+.sig-table td,
+.sig-table th {
+  font-variant-numeric: tabular-nums;
+}
+.sig-table th[data-group="pre"] {
+  color: var(--color-terracotta);
+}
+.sig-table .sig-focus {
+  background: var(--color-terracotta-soft);
+  font-weight: 600;
+}
+.sig-mini {
+  font-size: 13px;
+}
+.sig-mini th,
+.sig-mini td {
+  padding: 8px 6px;
+}
+.sig-mini code {
+  font-size: 12px;
+}
+.sig-mini th {
+  overflow-wrap: anywhere;
+}
+.sig-mini tbody th:first-child {
+  white-space: nowrap;
+}
+.sig-mini tr[data-observed] td,
+.sig-mini tr[data-observed] th,
+.sig-mini tr[data-kept="true"] td,
+.sig-mini tr[data-kept="true"] th {
+  background: var(--color-terracotta-soft);
+}
+.sig-mini td[data-group="pre"] {
+  color: var(--color-terracotta);
+}
+.sig-mini td[data-group="quiet"] {
+  color: var(--color-ink-2);
+}
+
+/* Formulas and worked examples: ruled, not boxed. */
+.sig-formula {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line);
+}
+.sig-formula code {
+  font-size: 14px;
+}
+.sig-formula p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-muted);
+  max-width: var(--sig-measure);
+}
+.sig-comb {
+  margin-top: 40px;
+  padding: 28px 0 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
+  background: none;
+}
+.sig-comb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 16px;
+}
+.sig-comb-grid > div:nth-child(3) {
+  grid-column: 1 / -1;
+  padding-top: 28px;
+  border-top: 1px solid var(--color-line);
+}
+.sig-multiply {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.sig-multiply .sig-result {
+  margin-top: 24px;
+}
+.sig-letters,
+.sig-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 10px;
+}
+.sig-letters span,
+.sig-picks span {
+  padding: 6px 12px;
+  border: 1px solid var(--color-muted);
+  border-radius: 7px;
+  font-family: var(--font-mono, monospace);
+  animation: sig-pop 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.sig-picks span {
+  color: var(--color-ink);
+  border-color: var(--color-terracotta);
+  background: var(--color-terracotta-soft);
+}
+@keyframes sig-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.sig-threec {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sig-threec li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.sig-threec li:first-child {
+  padding-top: 0;
+}
+.sig-threec b {
+  font-family: var(--font-mono, monospace);
+}
+.sig-threec strong {
+  font-family: var(--font-mono, monospace);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.sig-threec strong[data-group="pre"] {
+  color: var(--color-terracotta);
+}
+.sig-threec span,
+.sig-threec small {
+  grid-column: 1 / -1;
+  color: var(--color-muted);
+}
+.sig-threec span {
+  font-size: 14px;
+  line-height: 1.55;
+}
+.sig-threec small {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+/* FDR cards: BY, the rule tsfresh uses, is the peak; the others recede. */
+.sig-cards {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-block: 24px 0;
+}
+.sig-count {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.sig-count span {
+  color: var(--color-muted);
+  font-size: 14px;
+}
+.sig-count b {
+  font-family: var(--font-mono, monospace);
+  font-size: 38px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-ink-2);
+}
+.sig-count[data-focus="true"] {
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 1px var(--color-terracotta);
+}
+.sig-count[data-focus="true"] b {
+  color: var(--color-terracotta);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sig-point,
+  .sig-index a,
+  .sig-letters span,
+  .sig-picks span {
+    animation: none;
+    transition: none;
+  }
+}
+@media (max-width: 1000px) {
+  .sig-grid,
+  .sig-grid-even,
+  .sig-by-chart,
+  .sig-comb-grid,
+  .sig-multiply {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sig-multiply .sig-result {
+    margin-top: 0;
+  }
+  .sig-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sig-why {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 600px) {
+  .sig .sig-step-heading {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 4px 12px;
+    font-size: 20px;
+    line-height: 1.25;
+  }
+  .sig-step-no {
+    width: 36px;
+    height: 36px;
+  }
+  .sig-demo .lab-options[role="group"] .seed-select {
+    width: 100%;
+    text-align: left;
+  }
+  .sig-demo .seed-select code {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .sig-table th,
+  .sig-table td {
+    padding: 10px 6px;
+    font-size: 14px;
+  }
+  /* Fixed layout lets the 2x2 table's long row labels wrap instead of pushing columns off-screen. */
+  .sig-table:not(.sig-mini) {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .sig-table:not(.sig-mini) th:first-child {
+    width: 34%;
+  }
+  .sig-card,
+  .sig-why,
+  .sig-result {
+    padding: 18px;
+  }
+  /* Keep axis labels legible: the chart scrolls sideways inside its own focusable region. */
+  .sig-scroll svg {
+    min-width: 520px;
+  }
+  .sig-comb {
+    padding-top: 20px;
+  }
+}

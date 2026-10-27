@@ -1,0 +1,6 @@
+<svg fill="#ffffff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Eruption Forecast</title>
+<g fill="#ffffff">
+<rect x="22" y="188" width="20" height="40" rx="10"/><rect x="54" y="156" width="20" height="72" rx="10"/><rect x="86" y="120" width="20" height="108" rx="10"/>
+<rect x="118" y="96" width="20" height="132" rx="10"/>
+<rect x="150" y="120" width="20" height="108" rx="10"/><rect x="182" y="156" width="20" height="72" rx="10"/><rect x="214" y="188" width="20" height="40" rx="10"/></g>
+<rect x="118" y="28" width="20" height="56" rx="10" fill="#ffffff"/></svg>

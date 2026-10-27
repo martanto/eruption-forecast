@@ -19,6 +19,18 @@ export const router = createBrowserRouter(
           element: <TrainingPage topic="random-under-sampler" />,
         },
         {
+          path: "features-matrix",
+          element: <TrainingPage topic="features-matrix" />,
+        },
+        {
+          path: "feature-selection",
+          element: <TrainingPage topic="feature-selection" />,
+        },
+        {
+          path: "grid-cv",
+          element: <TrainingPage topic="grid-cv" />,
+        },
+        {
           path: "seed-ensemble",
           element: <TrainingPage topic="seed-ensemble" />,
         },

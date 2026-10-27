@@ -4,8 +4,14 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
   page,
 }, testInfo) => {
   await page.goto("/labelling");
+  await page.getByRole("link", { name: /Continue: Training Guideline/ }).click();
+  // The training guideline opens on the Seed Ensemble tab first.
+  await expect(
+    page.getByRole("heading", { name: "Seed Ensemble", exact: true }),
+  ).toBeVisible();
   await page
-    .getByRole("link", { name: /Continue: Random Under Sampler/ })
+    .getByRole("navigation", { name: "Pipeline walkthroughs" })
+    .getByRole("link", { name: "Random Under Sampler", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Random Under Sampler", exact: true }),

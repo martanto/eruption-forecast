@@ -10,6 +10,11 @@ import {
   TRAINING_LESSONS,
   type TrainingLesson,
 } from "../trainingLessons";
+import { FeatureSelectionLesson } from "./FeatureSelectionLesson";
+import { FeaturesMatrixLesson } from "./FeaturesMatrixLesson";
+import { GridCvLesson } from "./GridCvLesson";
+import { SignificanceExplainer } from "./SignificanceExplainer";
+import { SeedWorkflowDiagram } from "./SeedWorkflowDiagram";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
 export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
@@ -68,7 +73,7 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
           <strong>1 = positive forecast window · 0 = negative</strong>
         </span>
         <span>
-          Pipeline<strong>Resample → fit seeds → bundle families</strong>
+          Pipeline<strong>Matrix → resample → select → grid CV → bundle</strong>
         </span>
       </div>
       <section className="lab-operation" aria-label="Walkthrough controls">
@@ -114,7 +119,13 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
         </div>
       </section>
       <section className="lab-visual" aria-label="Interactive training example">
-        {topic === "random-under-sampler" ? (
+        {topic === "features-matrix" ? (
+          <FeaturesMatrixLesson step={step} onStepChange={setStep} />
+        ) : topic === "feature-selection" ? (
+          <FeatureSelectionLesson step={step} seed={seed} setSeed={setSeed} />
+        ) : topic === "grid-cv" ? (
+          <GridCvLesson step={step} seed={seed} setSeed={setSeed} />
+        ) : topic === "random-under-sampler" ? (
           <>
             <div className="lab-section-title">
               <h2>
@@ -203,6 +214,7 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
                 </select>
               </label>
             </div>
+            <SeedWorkflowDiagram step={step} onStepChange={setStep} />
             <div
               className="seed-flow"
               aria-label="Shared history to seed ensemble"
@@ -546,6 +558,7 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
           </ul>
         </div>
       </section>
+      {topic === "feature-selection" ? <SignificanceExplainer /> : null}
       {topic === "random-under-sampler" ? (
         <section
           className="training-why"
