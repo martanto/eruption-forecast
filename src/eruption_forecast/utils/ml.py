@@ -497,9 +497,12 @@ def get_significant_features(
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Get significant features ranked by p-value using tsfresh FeatureSelector.
 
-    Uses tsfresh's FeatureSelector with Benjamini-Hochberg FDR correction to identify
-    features with statistically significant correlation to the target labels. This is
-    the first stage of feature selection in the pipeline.
+    Uses tsfresh's FeatureSelector with Benjamini-Yekutieli FDR correction to identify
+    features with statistically significant correlation to the target labels. tsfresh
+    applies Benjamini-Yekutieli because ``hypotheses_independent`` defaults to
+    ``False``, which keeps FDR control valid for the strongly dependent features
+    extracted from the same window. This is the first stage of feature selection in
+    the pipeline.
 
     Args:
         features (pd.DataFrame): Extracted features DataFrame from tsfresh.
