@@ -192,7 +192,7 @@ function Canvas({
     >
       {view === "pipeline" && (
         <div className="canvas-caption">
-          <strong>From signal to explanation</strong>
+          <strong>From seismic data to explanation</strong>
           <span>
             Select a stage to read its transformations. Fit all for the
             complete pipeline

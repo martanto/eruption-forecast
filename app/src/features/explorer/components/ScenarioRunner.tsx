@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pause, Play, Plus, RotateCcw, StepForward } from "lucide-react";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { DataTable } from "@/components/lab/DataTable";
 import { ResultOutput } from "@/components/lab/ResultOutput";
 import { SelectField } from "@/components/lab/SelectField";
@@ -249,27 +250,25 @@ export function ScenarioRunner({ scenarios, onScenariosChange, selectedId, onSel
       <div className="psr-detail">
         <section aria-label={`${selected.name} definition`}>
           <h3>{selected.name} as a Scenario</h3>
-          <pre className="psr-code">
-            <code>{scenarioDict(selected)}</code>
-          </pre>
+          <CodeSnippet code={scenarioDict(selected)} />
         </section>
         <section aria-label={`${selected.name} facts`}>
           <h3>What this scenario forecasts</h3>
           <ul>
             <li>
-              Trains on {daysBetween(selected.trainStart, selected.trainEnd)} days holding{" "}
+              The training period spans {daysBetween(selected.trainStart, selected.trainEnd)} days and contains{" "}
               {eruptionsBetween(selected.trainStart, selected.trainEnd).length} eruption date
               {eruptionsBetween(selected.trainStart, selected.trainEnd).length === 1 ? "" : "s"}.
             </li>
             <li>
-              Forecasts {daysBetween(selected.predictionStart, selected.predictionEnd)} days, about{" "}
-              {windowEstimate(selected).toLocaleString()} windows, containing{" "}
+              The forecast period spans {daysBetween(selected.predictionStart, selected.predictionEnd)} days
+              (about {windowEstimate(selected).toLocaleString()} windows) and contains{" "}
               {eruptionsBetween(selected.predictionStart, selected.predictionEnd).join(", ") || "no eruption dates"}.
             </li>
             <li>
               {selected.id === RECORDED_SCENARIO_ID
-                ? "Its recorded probabilities are the ones you scrubbed in step 4."
-                : "No recorded probabilities ship for this scenario, so the atlas shows its periods, not a curve."}
+                ? "Its recorded probabilities are those inspected in step 4."
+                : "No recorded probabilities are bundled for this scenario; the atlas therefore shows its periods only, not a probability curve."}
             </li>
           </ul>
         </section>

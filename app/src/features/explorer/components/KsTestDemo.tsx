@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
 import { XAxis, YAxis } from "@/components/lab/ChartAxes";
 import { ChartFrame } from "@/components/lab/ChartFrame";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { Button } from "@/components/ui/button";
 import { linearScale } from "@/lib/scale";
 import {
@@ -57,7 +58,7 @@ export function KsTestDemo() {
   return (
     <div className="sig-demo">
       <ChoiceButtons
-        label="Pick a feature"
+        label="Select a feature"
         options={PICK_FEATURES}
         value={name}
         onChange={(pick) => {
@@ -155,8 +156,8 @@ export function KsTestDemo() {
             <p className="sig-chip">{v.label}</p>
             <p>
               {feature.p >= 0.05
-                ? `The two samples overlap. Under the null hypothesis, a statistic this large occurs about ${Math.round(feature.p * 100)} times in 100. The feature does not discriminate the classes.`
-                : `Under the null hypothesis (feature independent of label), a statistic this large occurs about 1 time in ${odds.toLocaleString("en-US")}.`}
+                ? `The two samples overlap. Under the null hypothesis, a statistic at least this large has a probability of about ${Math.round(feature.p * 100)}%. The feature does not discriminate between the classes.`
+                : `Under the null hypothesis (feature independent of label), a statistic at least this large has a probability of about 1 in ${odds.toLocaleString("en-US")}.`}
             </p>
           </div>
           <ol className="sig-steps">
@@ -166,8 +167,10 @@ export function KsTestDemo() {
               observation (1/14 for non-eruptive, 1/10 for pre-eruptive).
             </li>
             <li>
-              D = max |F₁(x) − F₀(x)|. D = 0 means identical samples; D = 1
-              means no overlap.
+              <MathExpr
+                tex={String.raw`D = \max_x \left\lvert F_1(x) - F_0(x) \right\rvert`}
+              />
+              . D = 0 means identical samples; D = 1 means no overlap.
             </li>
             <li>
               The p-value is the probability, under the null hypothesis, of a D

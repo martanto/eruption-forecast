@@ -1,5 +1,6 @@
 import { DataTable } from "@/components/lab/DataTable";
 import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { ResultOutput } from "@/components/lab/ResultOutput";
 import { SeedSelect } from "@/components/lab/SelectField";
 import { WhySection } from "@/components/lab/WalkthroughNotes";
@@ -19,7 +20,7 @@ export function UnderSamplerLesson({
   return (
     <>
       <LabSectionTitle
-        title={step < 2 ? "History before sampling" : "One reproducible draw"}
+        title={step < 2 ? "Training record before resampling" : "One reproducible random draw"}
         aside="54 original windows · 11.1% positive"
       />
       <div className="lab-options">
@@ -52,10 +53,11 @@ export function UnderSamplerLesson({
           : "8 negative + 6 positive = 14 retained windows · 40 negatives omitted"}
       </ResultOutput>
       {step >= 1 && (
-        <p className="training-equation">
-          Target majority = 6 ÷ 0.75 = 8 · Positive share after RUS = 6 ÷ 14 =
-          42.9%
-        </p>
+        <MathExpr
+          display
+          className="training-equation"
+          tex={String.raw`\begin{aligned} n_{\mathrm{maj}} &= \frac{6}{0.75} = 8 \\ \text{positive share after RUS} &= \frac{6}{14} \approx 42.9\% \end{aligned}`}
+        />
       )}
       {step >= 2 && (
         <p>
@@ -97,9 +99,11 @@ export function SamplingRatioExplainer() {
           <td>400 randomly selected</td>
         </tr>
       </DataTable>
-      <p className="training-equation">
-        Majority target = 300 ÷ 0.75 = 400 · Ratio = 300 ÷ 400 = 0.75
-      </p>
+      <MathExpr
+        display
+        className="training-equation"
+        tex={String.raw`\begin{aligned} n_{\mathrm{maj}} &= \frac{300}{0.75} = 400 \\ \frac{n_{\mathrm{min}}}{n_{\mathrm{maj}}} &= \frac{300}{400} = 0.75 \end{aligned}`}
+      />
       <p>
         The 700 retained windows are 42.9% positive and 57.1% negative. Sampling
         the minority too would discard already scarce positive examples.

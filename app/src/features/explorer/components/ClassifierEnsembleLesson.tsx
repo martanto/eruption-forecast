@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { ResultOutput } from "@/components/lab/ResultOutput";
 import { fixed, percent } from "@/lib/format";
 import { FAMILIES, summarize } from "../trainingLessons";
@@ -18,13 +19,14 @@ export function ClassifierEnsembleLesson({ step }: { step: number }) {
         title={
           step < 2
             ? "A container of classifier families"
-            : "The same future window, seen by each family"
+            : "The same future window, evaluated by each classifier family"
         }
         aside="3 seeds per family · equal family weight"
       />
       <p>
         Each family keeps its fitted seed models and selected feature lists.
-        Toggle a family to trace what enters the shared container.
+        Enable or disable a family to observe its contribution to the shared
+        container.
       </p>
       <div className="training-family-list">
         {FAMILIES.map((item, i) => (
@@ -108,7 +110,7 @@ export function ClassifierEnsembleLesson({ step }: { step: number }) {
             <strong>Forecast results</strong>
             <span>
               {step < 3
-                ? "Advance to step 4 to read consensus for window #55."
+                ? "Advance to step 4 to view the consensus for window #55."
                 : `Window #55  /  probability ${percent(consensus.mean)}`}
             </span>
             {step === 3 && (
@@ -141,17 +143,20 @@ export function ClassifierEnsembleLesson({ step }: { step: number }) {
       <ResultOutput>
         {step < 3
           ? `${activeFamilies.length} seed ensembles → 1 ClassifierEnsemble`
-          : `Consensus probability = ${percent(consensus.mean)} · family disagreement (SD) = ${fixed(consensus.std * 100, 1)} percentage points`}
+          : `Consensus probability = ${percent(consensus.mean)} · inter-family standard deviation (SD) = ${fixed(consensus.std * 100, 1)} percentage points`}
       </ResultOutput>
       {step === 3 && (
         <p className="training-equation">
-          (
-          {activeFamilies
-            .map((item) => percent(summarize(item.probabilities).mean))
-            .join(" + ")}
-          ) ÷ {activeFamilies.length} families.{" "}
+          <MathExpr
+            tex={String.raw`\bar{P} = \frac{${activeFamilies
+              .map((item) =>
+                percent(summarize(item.probabilities).mean).replace("%", String.raw`\%`),
+              )
+              .join(" + ")}}{${activeFamilies.length}}`}
+          />{" "}
+          (mean over {activeFamilies.length} families).{" "}
           {activeFamilies.length === 1 &&
-            "With one family, cross-family SD is zero; this does not imply certainty."}
+            "With one family, the inter-family SD is zero; this does not imply certainty."}
         </p>
       )}
     </>

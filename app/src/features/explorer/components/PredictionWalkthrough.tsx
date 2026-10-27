@@ -121,7 +121,7 @@ export function PredictionWalkthrough() {
             {step === 0 && (
               <>
                 <LabSectionTitle
-                  title="A grid of windows nobody has labelled"
+                  title="A grid of unlabelled windows"
                   aside={`${selected.name} · ${selected.predictionStart} to ${selected.predictionEnd}`}
                 />
                 <div className="lab-options">
@@ -143,8 +143,8 @@ export function PredictionWalkthrough() {
                     </span>
                   ))}
                   <small>
-                    Each window slides 10 minutes and shares all but 10 minutes
-                    with the one before. Not to scale.
+                    Each window advances by 10 minutes and overlaps the preceding
+                    window except for its final 10 minutes. Not to scale.
                   </small>
                 </div>
                 <ResultOutput>
@@ -173,7 +173,7 @@ export function PredictionWalkthrough() {
             {step === 1 && (
               <>
                 <LabSectionTitle
-                  title="Same features, no verdict"
+                  title="Same features, no target labels"
                   aside="Prediction mode"
                 />
                 <div className="pw-compare">
@@ -212,7 +212,7 @@ export function PredictionWalkthrough() {
             {step === 2 && (
               <>
                 <LabSectionTitle
-                  title="Whatever you saved, one container"
+                  title="Any saved model format, one container"
                   aside="ClassifierEnsemble.from_any"
                 />
                 <RadioCards
@@ -232,8 +232,8 @@ export function PredictionWalkthrough() {
                 <p>
                   Each seed model keeps its own feature list, so the window
                   features are subset per seed at inference. The cache identity
-                  includes the training hash: retrain, and every forecast built
-                  on the old ensemble is stale.
+                  includes the training hash: after retraining, every forecast
+                  derived from the previous ensemble is invalidated.
                 </p>
               </>
             )}
@@ -243,8 +243,8 @@ export function PredictionWalkthrough() {
                 <LabSectionTitle
                   title={
                     step === 3
-                      ? "Read one window of the recorded forecast"
-                      : "The curve forecast() leaves behind"
+                      ? "Inspect one window of the recorded forecast"
+                      : "The probability curve produced by forecast()"
                   }
                   aside="OJN scenario 5.2 · eruptions 2 and 18 Aug"
                 />
@@ -310,8 +310,8 @@ export function PredictionWalkthrough() {
           <p>
             One ForecastModel calculates tremor once. Each scenario then trains
             on its own period, predicts the next, evaluates and explains. Later
-            training periods include more eruptions, so scenarios show how the
-            forecast changes as history grows.
+            training periods include more eruptions, so the scenarios show how the
+            forecast changes as the training record grows.
           </p>
           <ScenarioRunner
             scenarios={scenarios}

@@ -1,0 +1,10 @@
+/* Display equations scroll inside their column instead of being clipped on narrow screens. */
+[data-math="display"] {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+[data-math="display"] .katex-display {
+  margin: 0.4em 0;
+}

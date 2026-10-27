@@ -1,0 +1,51 @@
+/* Python snippets: a dark card with a line-number gutter; token colours come from CodeSnippet.tsx. */
+:root {
+  --code-bg: oklch(20% 0.03 262);
+  --code-gutter: oklch(52% 0.025 262);
+  --code-shadow: 0 6px 18px oklch(10% 0.02 262 / 28%);
+}
+.code-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  /* A long line scrolls inside the card instead of widening a grid column. */
+  contain: inline-size;
+  margin-block: var(--space-sm);
+  border-radius: 12px;
+  background: var(--code-bg);
+  box-shadow: var(--code-shadow);
+}
+.code-snippet {
+  margin: 0;
+  padding: var(--space-md) var(--space-lg);
+  background: transparent;
+  font-family: var(--font-mono, monospace);
+  font-size: 13.5px;
+  line-height: 1.75;
+  white-space: pre;
+  tab-size: 4;
+  width: max-content;
+  min-width: 100%;
+  display: table;
+}
+.code-line {
+  display: table-row;
+}
+.code-line-number {
+  display: table-cell;
+  padding-right: var(--space-md);
+  color: var(--code-gutter);
+  font-size: 0.9em;
+  text-align: right;
+  user-select: none;
+}
+.code-line-content {
+  display: table-cell;
+}
+.code-inline {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--code-bg);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.88em;
+  white-space: nowrap;
+}

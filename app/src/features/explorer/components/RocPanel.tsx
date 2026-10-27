@@ -43,7 +43,7 @@ export function RocPanel({ dataset, model, title, threshold }: RocPanelProps) {
   const fpr = ratio(counts.fp, counts.fp + counts.tn);
   const tpr = ratio(counts.tp, counts.tp + counts.fn);
   const color = rocColor(dataset, model);
-  // Thin the curve for drawing; every distinct score still counts toward the AUC.
+  // Thin the curve for drawing; every distinct probability still counts toward the AUC.
   const stride = Math.max(1, Math.floor(roc.points.length / 400));
   const line = linePoints(
     roc.points

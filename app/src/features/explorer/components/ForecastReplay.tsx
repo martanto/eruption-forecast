@@ -84,7 +84,7 @@ function ReplayChart() {
 export function ForecastReplay() {
   return <section className="forecast-example">
     <h3>OJN, recorded prediction replay</h3>
-    <p>Explore real scenario 5 probabilities with the 0.7 eruption threshold and eruption dates on 2 and 18 August.</p>
+    <p>Explore the recorded scenario 5 probabilities with the 0.7 probability threshold and the eruption dates of 2 and 18 August.</p>
     <ExplanationDialog
       triggerLabel="Open prediction replay"
       title="OJN · scenario 5 prediction"

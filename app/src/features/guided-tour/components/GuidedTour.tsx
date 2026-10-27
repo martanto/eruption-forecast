@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Play, X } from "lucide-react";
 import { TOUR } from "@/features/architecture";
+import { MathText } from "@/components/lab/MathText";
 import { Button } from "@/components/ui/button";
 import { useGuidedTour } from "../useGuidedTour";
 
@@ -20,7 +21,9 @@ export function GuidedTour({ onSelect }: { onSelect: (id: string) => void }) {
           {step + 1} / {TOUR.length}
         </span>
         <h3>{current.title}</h3>
-        <p>{current.text}</p>
+        <p>
+          <MathText>{current.text}</MathText>
+        </p>
       </div>
       <div className="tour-actions">
         <Button

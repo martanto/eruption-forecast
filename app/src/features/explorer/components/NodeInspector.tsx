@@ -8,6 +8,8 @@ import {
   GAPS,
   SOURCE_SNAPSHOT,
 } from "@/features/architecture";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
+import { MathText } from "@/components/lab/MathText";
 import { Button } from "@/components/ui/button";
 import { NodeArtifacts, NodeBehavior, NodeParameters } from "./NodeSections";
 import { StageNumber } from "./StageNumber";
@@ -91,14 +93,16 @@ export function NodeInspector({
                       <AlertCircle size={16} />
                       {gap.title}
                     </h4>
-                    <p>{gap.detail}</p>
+                    <p>
+                      <MathText>{gap.detail}</MathText>
+                    </p>
                   </div>
                 );
               })}
           </details>
           <NodeParameters item={item} />
           <NodeArtifacts item={item} className="artifacts" />
-          <h3>Follow the connections</h3>
+          <h3>Connected steps</h3>
           <div className="connection-list">
             {neighbors.map((edge) => {
               const incoming = edge.target === selected;
@@ -155,9 +159,10 @@ export function NodeInspector({
                     </small>
                   </span>
                 </summary>
-                <pre>
-                  <code>{source.excerpt}</code>
-                </pre>
+                <CodeSnippet
+                  code={source.excerpt}
+                  label={`${source.path} excerpt, scrolls sideways when wide`}
+                />
                 <p className="fingerprint">SHA-256 {source.sha256}</p>
               </details>
             );

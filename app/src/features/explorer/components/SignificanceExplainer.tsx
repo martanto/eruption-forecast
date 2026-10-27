@@ -66,9 +66,9 @@ export function SignificanceExplainer() {
           tsfresh summarizes each time window of the seismic tremor record
           (for example RSAM, the real-time seismic amplitude measurement) as
           hundreds of statistical features. Each window also carries a class
-          label. Before training a classifier, we discard features whose
-          distribution is the same in pre-eruptive and non-eruptive windows,
-          because they carry no precursory signal.
+          label. Before training a classifier, features whose distributions
+          do not differ between pre-eruptive and non-eruptive windows are
+          discarded, because they carry no precursory information.
         </p>
         <LabelledDataDemo />
       </section>

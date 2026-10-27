@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { TraceToolbar } from "@/components/lab/TraceToolbar";
 import { goToStepLabel } from "@/lib/format";
 import {
@@ -215,9 +216,11 @@ export function PredictionWorkflowDiagram({
       </ol>
       <figcaption>
         Green boxes are code; purple boxes are files or objects. The model
-        branch joins from above: <code>from_any</code> turns whatever you saved
-        into a ClassifierEnsemble, and <code>forecast()</code> hands it the
-        window features. Results fan out to the CSV, the plot and the cache.
+        branch joins from above: <CodeSnippet inline code="from_any()" />{" "}
+        converts any supported saved format into a ClassifierEnsemble, and{" "}
+        <CodeSnippet inline code="forecast()" />{" "}
+        passes it the window features. Results are written to the CSV, the plot
+        and the cache.
       </figcaption>
     </figure>
   );

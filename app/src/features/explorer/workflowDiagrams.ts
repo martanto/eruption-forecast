@@ -42,7 +42,7 @@ export const FEATURES_MATRIX_EDGES: readonly WorkflowEdge[] = [
   { from: "validate", to: "dispatch", fromSide: "right", toSide: "left", label: "columns" },
   { from: "dispatch", to: "params", fromSide: "right", toSide: "left", label: "excludes" },
   { from: "params", to: "cache", fromSide: "right", toSide: "left", label: "kwargs" },
-  { from: "cache", to: "loop", fromSide: "bottom", toSide: "top", label: "miss" },
+  { from: "cache", to: "loop", fromSide: "bottom", toSide: "top", label: "cache miss" },
   { from: "loop", to: "tsfresh", fromSide: "left", toSide: "right", label: "extract" },
   { from: "loop", to: "files", fromSide: "right", toSide: "left", label: "Parquet" },
   { from: "loop", to: "concat", fromSide: "bottom", toSide: "top", label: "frames" },

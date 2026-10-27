@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
 import { ChartFrame } from "@/components/lab/ChartFrame";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { DataTable } from "@/components/lab/DataTable";
 import { Legend } from "@/components/lab/Legend";
 import { integer, probabilityLabel } from "@/lib/format";
@@ -8,7 +9,9 @@ import { DUMMY_FEATURES, PRE_COUNT, QUIET_COUNT } from "../dummyDataset";
 import { fisherRows, fisherTable, formatP, verdict } from "../significance";
 import { CombinationsLesson } from "./CombinationsLesson";
 
-const BINARY = DUMMY_FEATURES.filter((feature) => feature.kind === "binary");
+// Thousands separators wrapped in braces so TeX does not add space after them.
+const texInt = (value: number) => integer(value).replace(/,/g, "{,}");
+const BINARY =DUMMY_FEATURES.filter((feature) => feature.kind === "binary");
 const MEANING: Record<string, string> = {
   "rsam_f2__has_duplicate_max": "Indicator: 1 if the window's maximum amplitude occurs more than once, else 0.",
   "rsam_f2__symmetry_looking__r_0.05": "Indicator: 1 if the amplitude distribution in the window is symmetric about its mean, else 0.",
@@ -27,7 +30,7 @@ export function FisherDemo() {
   return (
     <div className="sig-demo">
       <ChoiceButtons
-        label="Pick a yes/no feature"
+        label="Select a binary feature"
         options={BINARY.map((item) => item.name)}
         value={name}
         onChange={setName}
@@ -90,7 +93,7 @@ export function FisherDemo() {
             width={rows.length * 52 + 20}
             height={190}
             className="sig-bars"
-            label={`Chance of each possible count. Observed count ${table.preYes}; p = ${formatP(p)}.`}
+            label={`Probability of each possible count. Observed count ${table.preYes}; p = ${formatP(p)}.`}
           >
             {rows.map((row, i) => {
               const height = Math.max(2, (row.probability / peak) * 120);
@@ -136,15 +139,19 @@ export function FisherDemo() {
             observed one (orange).
           </p>
           <div className="sig-formula">
-            <code>
-              P(x) = C({PRE_COUNT}, x) × C({QUIET_COUNT}, {yes} − x) / C({total}, {yes})
-            </code>
+            <MathExpr
+              display
+              tex={String.raw`P(x) = \frac{\binom{${PRE_COUNT}}{x}\binom{${QUIET_COUNT}}{${yes} - x}}{\binom{${total}}{${yes}}}`}
+            />
             <p>
-              For the observed table: P({table.preYes}) = {integer(observed.top)} ×{" "}
-              {integer(observed.bottom)} / {integer(ways)} ={" "}
-              {observed.probability.toFixed(5)}. Two-sided p-value: the sum of
-              P(x) over every outcome with P(x) ≤ P(observed), in both tails:{" "}
-              <b>{formatP(p)}</b>.
+              For the observed table:{" "}
+              <MathExpr
+                tex={String.raw`P(${table.preYes}) = \frac{${texInt(observed.top)} \times ${texInt(observed.bottom)}}{${texInt(ways)}} = ${observed.probability.toFixed(5)}`}
+              />
+              . Two-sided p-value: the sum of{" "}
+              <MathExpr tex="P(x)" /> over every outcome with{" "}
+              <MathExpr tex={String.raw`P(x) \le P(x_{\mathrm{obs}})`} />, in
+              both tails: <b>{formatP(p)}</b>.
             </p>
           </div>
         </div>
