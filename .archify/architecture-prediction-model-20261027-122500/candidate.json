@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PredictionModel Forecast Pipeline",
+    "output": ".archify/architecture-prediction-model-20261027-122500/prediction-model.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "trained", "type": "database", "label": "Trained Model", "sublabel": "json, pkl or object", "pos": [420, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 179, "end_line": 182 }] },
+    { "id": "ensemble", "type": "backend", "label": "ClassifierEnsemble", "sublabel": "seed votes, uncertainty", "pos": [610, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 15 }, { "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 387 }] },
+    { "id": "plot", "type": "backend", "label": "plot_forecast", "sublabel": "PNG, optional PDF", "pos": [800, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 1139 }, { "path": "src/eruption_forecast/plots/forecast_plots.py", "line": 20 }] },
+    { "id": "tremor", "type": "database", "label": "Tremor CSV", "sublabel": "forecast period", "pos": [40, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/tremor/tremor_data.py", "line": 27 }] },
+    { "id": "windows", "type": "backend", "label": "Window Grid", "sublabel": "unlabelled windows", "pos": [230, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 502 }, { "path": "src/eruption_forecast/utils/window.py", "line": 1 }] },
+    { "id": "features", "type": "backend", "label": "FeaturesBuilder", "sublabel": "tsfresh, no filtering", "pos": [420, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 582 }, { "path": "src/eruption_forecast/model/base_model.py", "line": 677 }] },
+    { "id": "forecast", "type": "backend", "label": "forecast()", "sublabel": "PredictionModel", "pos": [610, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 21 }, { "path": "src/eruption_forecast/model/prediction_model.py", "line": 716 }] },
+    { "id": "results", "type": "database", "label": "Forecast CSV", "sublabel": "consensus + per clf", "pos": [800, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 782, "end_line": 798 }] },
+    { "id": "cache", "type": "database", "label": "Cache + Config", "sublabel": "keyed by training hash", "pos": [610, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/prediction_model.py", "line": 811, "end_line": 832 }] }
+  ],
+  "connections": [
+    { "id": "trained-to-ensemble", "from": "trained", "to": "ensemble", "label": "from_any" },
+    { "id": "tremor-to-windows", "from": "tremor", "to": "windows" },
+    { "id": "windows-to-features", "from": "windows", "to": "features" },
+    { "id": "features-to-forecast", "from": "features", "to": "forecast" },
+    { "id": "forecast-to-ensemble", "from": "forecast", "to": "ensemble", "label": "features", "fromSide": "top", "toSide": "bottom" },
+    { "id": "forecast-to-results", "from": "forecast", "to": "results" },
+    { "id": "forecast-to-plot", "from": "forecast", "to": "plot" },
+    { "id": "forecast-to-cache", "from": "forecast", "to": "cache" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entry points", "items": ["build_label, extract_features, forecast chain as Self", "load_features() skips the tsfresh step"] },
+    { "dot": "emerald", "title": "Output and cache", "items": ["Per-seed CSVs only when save_seed_result is set", "A retrained ensemble changes the training hash and invalidates the cache"] }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\candidate.json",
+    "sha256": "ac9e84f818b1090b141f1e9670109d4a5c047422c43917eca684365f18a74179",
+    "bytes": 4132
+  },
+  "artifact": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\eruption-forecast.html",
+    "sha256": "7dca2fccde83db5afce16ddb3a6166de7e0df6976978f651d9247f6e01426378",
+    "bytes": 822505
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\eruption-forecast.finalize.json",
+    "summaryReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\eruption-forecast.finalize-summary.json",
+    "browserCheckReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\eruption-forecast.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-27T07:49:27.529Z",
+    "source": "network",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 4365,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

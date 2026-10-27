@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "edefe652-3371-49ac-bf46-d7b768e71035",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-seed-training-chain-20261027-141500\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-seed-training-chain-20261027-141500\\seed-training-chain.html",
+  "specification": {
+    "sha256": "0f56a5de15d9ec11272b6287ea904caa16ff4fbb1ab7f4df915e495a34154bff",
+    "bytes": 4554
+  },
+  "artifact": {
+    "sha256": "bb047d2f7315f5dad56c7b67f4161172ce157fec8397bd716225f97eb36f7608",
+    "bytes": 824810
+  }
+}

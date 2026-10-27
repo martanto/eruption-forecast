@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "b35b719f-c66d-4e25-b61f-e0c1e176aea4",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\training-model.html",
+  "specification": {
+    "sha256": "9fc0cf1d84abd6865e71d481e7e502e839b43e59e3d6a1621edd3e60634dd202",
+    "bytes": 4772
+  },
+  "artifact": {
+    "sha256": "658fd670038750aa0850facd32641c46ca729b9915e470e337935fad62208140",
+    "bytes": 826879
+  }
+}

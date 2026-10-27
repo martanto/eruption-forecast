@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "EvaluationModel Pipeline",
+    "output": ".archify/architecture-evaluation-model-20261027-130000/evaluation-model.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "lb", "type": "backend", "label": "LabelBuilder", "sublabel": "prediction reuse only", "pos": [230, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 515, "end_line": 527 }] },
+    { "id": "upstream", "type": "external", "label": "Upstream Model", "sublabel": "Training or Prediction", "pos": [40, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 135, "end_line": 141 }] },
+    { "id": "ytrue", "type": "backend", "label": "Ground Truth", "sublabel": "y_true by window id", "pos": [230, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 183, "end_line": 186 }, { "path": "src/eruption_forecast/model/evaluation_model.py", "line": 482 }, { "path": "src/eruption_forecast/model/evaluation_model.py", "line": 609 }] },
+    { "id": "gate", "type": "security", "label": "Cache Check", "sublabel": "use_cache, no overwrite", "pos": [420, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 635 }] },
+    { "id": "cached", "type": "database", "label": "Cached Result", "sublabel": "EvaluationModel.pkl", "pos": [420, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 635, "end_line": 641 }] },
+    { "id": "me", "type": "backend", "label": "MetricsEnsemble", "sublabel": "per-seed, no refit", "pos": [610, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/metrics_ensemble.py", "line": 26 }, { "path": "src/eruption_forecast/ensemble/metrics_ensemble.py", "line": 257 }, { "path": "src/eruption_forecast/model/evaluation_model.py", "line": 707 }] },
+    { "id": "preds", "type": "database", "label": "Prediction CSVs", "sublabel": "y_proba, y_pred", "pos": [610, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/metrics_ensemble.py", "line": 257 }] },
+    { "id": "plots", "type": "backend", "label": "Metric Plots", "sublabel": "aggregate, per seed", "pos": [800, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 646, "end_line": 649 }] },
+    { "id": "comparator", "type": "backend", "label": "Comparator", "sublabel": "ranking + plots", "pos": [800, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 654 }, { "path": "src/eruption_forecast/model/classifier_comparator.py", "line": 44 }] },
+    { "id": "persist", "type": "database", "label": "Cache + Config", "sublabel": "hash pkl, yaml", "pos": [800, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/evaluation_model.py", "line": 662, "end_line": 667 }] }
+  ],
+  "connections": [
+    { "id": "upstream-to-ytrue", "from": "upstream", "to": "ytrue", "label": "labels" },
+    { "id": "lb-to-ytrue", "from": "lb", "to": "ytrue", "label": "rebuild", "variant": "dashed" },
+    { "id": "ytrue-to-gate", "from": "ytrue", "to": "gate" },
+    { "id": "gate-to-cached", "from": "gate", "to": "cached", "label": "hit", "variant": "dashed" },
+    { "id": "gate-to-me", "from": "gate", "to": "me", "label": "miss" },
+    { "id": "me-to-preds", "from": "me", "to": "preds" },
+    { "id": "me-to-plots", "from": "me", "to": "plots" },
+    { "id": "me-to-comparator", "from": "me", "to": "comparator" },
+    { "id": "me-to-persist", "from": "me", "to": "persist" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Reuse modes", "items": ["Training reuse takes y_true from TrainingModel.labels", "Prediction reuse requires eruption_dates and rebuilds labels"] },
+    { "dot": "emerald", "title": "Inputs and outputs", "items": ["MetricsEnsemble also reads the upstream ClassifierEnsemble and features_df", "Results land under evaluation/training or evaluation/prediction"] }
+  ]
+}

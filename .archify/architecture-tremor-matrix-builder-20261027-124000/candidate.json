@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TremorMatrixBuilder",
+    "output": ".archify/architecture-tremor-matrix-builder-20261027-124000/tremor-matrix-builder.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "labels", "type": "database", "label": "Label windows", "sublabel": "datetime, id, is_erupted", "pos": [420, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 541 }] },
+    { "id": "tremor", "type": "database", "label": "Tremor DataFrame", "sublabel": "10-min samples", "pos": [40, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 19 }] },
+    { "id": "select", "type": "backend", "label": "Select Columns", "sublabel": "validate_columns", "pos": [230, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 538 }] },
+    { "id": "slice", "type": "backend", "label": "Slice Window", "sublabel": "dt minus window_size", "pos": [420, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 375 }] },
+    { "id": "gate", "type": "security", "label": "Completeness Gate", "sublabel": "min_completion", "pos": [610, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 381 }] },
+    { "id": "concat", "type": "backend", "label": "Concat Windows", "sublabel": "id, datetime, columns", "pos": [800, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 429 }] },
+    { "id": "matrix", "type": "database", "label": "Tremor Matrix CSV", "sublabel": "tremor-matrix_*.csv", "pos": [990, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 556 }] },
+    { "id": "skipped", "type": "external", "label": "Skipped Window", "sublabel": "warning logged", "pos": [610, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 416 }] },
+    { "id": "permethod", "type": "database", "label": "per_method CSVs", "sublabel": "one per column", "pos": [800, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 560 }] }
+  ],
+  "connections": [
+    { "id": "tremor-to-select", "from": "tremor", "to": "select" },
+    { "id": "select-to-slice", "from": "select", "to": "slice" },
+    { "id": "labels-to-slice", "from": "labels", "to": "slice" },
+    { "id": "slice-to-gate", "from": "slice", "to": "gate" },
+    { "id": "gate-to-concat", "from": "gate", "to": "concat", "label": "pass" },
+    { "id": "gate-to-skipped", "from": "gate", "to": "skipped", "label": "below min", "variant": "dashed" },
+    { "id": "concat-to-matrix", "from": "concat", "to": "matrix" },
+    { "id": "concat-to-permethod", "from": "concat", "to": "permethod", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Behaviour", "items": ["An existing matrix CSV is reused unless overwrite is set", "Zero accepted windows raises ValueError"] },
+    { "dot": "emerald", "title": "Optional outputs", "items": ["per_method CSVs when save_matrix_per_method is set", "Per-id CSVs are opt-in and generate many files"] }
+  ]
+}

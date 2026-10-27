@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "81f9d050-6255-41db-b6fc-c7cdccacb0b6",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-feature-selector-20261027-133000\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-feature-selector-20261027-133000\\feature-selector.html",
+  "specification": {
+    "sha256": "dc4e9df4a5441a146fe4cfc127e95daee3c9b67e0113b5de52808182f9ba21c9",
+    "bytes": 3612
+  },
+  "artifact": {
+    "sha256": "f68b1ed1638f1db9779cdc009aa8e0708f54e7a1bb31842a199f5c157693c65e",
+    "bytes": 820879
+  }
+}

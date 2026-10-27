@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "8c9bfbac-cd39-4d00-818b-0f6aab896bc2",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-eruption-forecast-20261027-120000\\eruption-forecast.html",
+  "specification": {
+    "sha256": "ac9e84f818b1090b141f1e9670109d4a5c047422c43917eca684365f18a74179",
+    "bytes": 4132
+  },
+  "artifact": {
+    "sha256": "7dca2fccde83db5afce16ddb3a6166de7e0df6976978f651d9247f6e01426378",
+    "bytes": 822505
+  }
+}

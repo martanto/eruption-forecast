@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TrainingModel Fit Pipeline",
+    "output": ".archify/architecture-training-model-20261027-121500/training-model.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "tremor", "type": "database", "label": "Tremor CSV", "sublabel": "10-min samples", "pos": [40, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/tremor/tremor_data.py", "line": 27 }] },
+    { "id": "labels", "type": "backend", "label": "Label Builder", "sublabel": "build_label()", "pos": [230, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 610 }, { "path": "src/eruption_forecast/label/label_builder.py", "line": 26 }, { "path": "src/eruption_forecast/label/dynamic_label_builder.py", "line": 13 }] },
+    { "id": "matrix", "type": "backend", "label": "TremorMatrix", "sublabel": "windows by id", "pos": [230, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/base_model.py", "line": 741 }, { "path": "src/eruption_forecast/features/tremor_matrix_builder.py", "line": 19 }] },
+    { "id": "features", "type": "backend", "label": "FeaturesBuilder", "sublabel": "tsfresh to Parquet", "pos": [420, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/base_model.py", "line": 758 }, { "path": "src/eruption_forecast/features/features_builder.py", "line": 28 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 726 }] },
+    { "id": "resample", "type": "backend", "label": "Resample", "sublabel": "under, over or auto", "pos": [610, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1738, "end_line": 1745 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 360 }] },
+    { "id": "selector", "type": "backend", "label": "FeatureSelector", "sublabel": "tsfresh or RF probe", "pos": [800, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 13 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 1912 }] },
+    { "id": "train", "type": "backend", "label": "GridSearchCV", "sublabel": "fit per classifier", "pos": [990, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1601, "end_line": 1684 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 609 }] },
+    { "id": "registry", "type": "database", "label": "Seed Registry", "sublabel": "models + JSON", "pos": [990, 320], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1095, "end_line": 1111 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 665 }] },
+    { "id": "ensemble", "type": "backend", "label": "ClassifierEnsemble", "sublabel": "SeedEnsemble per clf", "pos": [800, 320], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1121, "end_line": 1132 }, { "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 15 }] },
+    { "id": "cache", "type": "database", "label": "Cache + Config", "sublabel": "hash pkl, yaml", "pos": [610, 320], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1148, "end_line": 1156 }] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Per-seed jobs (joblib, n_jobs)", "wraps": ["resample", "selector", "train"] }
+  ],
+  "connections": [
+    { "id": "tremor-to-matrix", "from": "tremor", "to": "matrix" },
+    { "id": "labels-to-matrix", "from": "labels", "to": "matrix" },
+    { "id": "matrix-to-features", "from": "matrix", "to": "features" },
+    { "id": "features-to-resample", "from": "features", "to": "resample" },
+    { "id": "resample-to-selector", "from": "resample", "to": "selector" },
+    { "id": "selector-to-train", "from": "selector", "to": "train", "label": "top-N" },
+    { "id": "train-to-registry", "from": "train", "to": "registry", "label": "seed pkl" },
+    { "id": "registry-to-ensemble", "from": "registry", "to": "ensemble" },
+    { "id": "ensemble-to-cache", "from": "ensemble", "to": "cache" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entry points", "items": ["build_label, extract_features, fit chain as Self", "load_features() skips the tsfresh step"] },
+    { "dot": "emerald", "title": "Leakage and cache", "items": ["Resampling and selection run inside each seed job", "Cache writes only when save_model is set"] }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "0be0f129-a073-4383-92ce-0d7e5d473757",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-tremor-matrix-builder-20261027-124000\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-tremor-matrix-builder-20261027-124000\\tremor-matrix-builder.html",
+  "specification": {
+    "sha256": "341d34321d7e028d53e1d35b550a5513aed178d717316c5b2b2043abf1ff7a2e",
+    "bytes": 3648
+  },
+  "artifact": {
+    "sha256": "684b5b4798a669622b1c9b9e48208b11471231e67fe7818a5bec7ec860aca072",
+    "bytes": 823046
+  }
+}

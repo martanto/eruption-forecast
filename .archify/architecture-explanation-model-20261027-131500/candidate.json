@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ExplanationModel SHAP Pipeline",
+    "output": ".archify/architecture-explanation-model-20261027-131500/explanation-model.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "upstream", "type": "external", "label": "Upstream Model", "sublabel": "Training or Prediction", "pos": [40, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/explanation_model.py", "line": 89, "end_line": 104 }] },
+    { "id": "cache", "type": "security", "label": "Cache Check", "sublabel": "use_cache, no overwrite", "pos": [230, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/explanation_model.py", "line": 464 }] },
+    { "id": "hit", "type": "database", "label": "Cached Result", "sublabel": "ExplanationModel.pkl", "pos": [230, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/explanation_model.py", "line": 464, "end_line": 474 }] },
+    { "id": "explainer", "type": "backend", "label": "ExplainerEnsemble", "sublabel": "per-classifier loop", "pos": [420, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 42 }, { "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 306, "end_line": 365 }, { "path": "src/eruption_forecast/model/explanation_model.py", "line": 475 }] },
+    { "id": "skipped", "type": "external", "label": "Non-tree Classifier", "sublabel": "skipped with warning", "pos": [420, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 357, "end_line": 365 }] },
+    { "id": "shap", "type": "backend", "label": "TreeExplainer", "sublabel": "per seed, joblib loky", "pos": [610, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 138 }, { "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 179 }, { "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 277, "end_line": 298 }] },
+    { "id": "payload", "type": "database", "label": "SHAP Payload", "sublabel": "ClassifierExplanation pkl", "pos": [800, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 202 }, { "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 382 }] },
+    { "id": "persist", "type": "database", "label": "Cache + Config", "sublabel": "hash pkl, yaml", "pos": [800, 300], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/explanation_model.py", "line": 484, "end_line": 489 }] },
+    { "id": "plots", "type": "backend", "label": "plot()", "sublabel": "bar, beeswarm, aggregate", "pos": [990, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/explanation_model.py", "line": 494, "end_line": 573 }, { "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 393 }, { "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 545 }] },
+    { "id": "waterfall", "type": "backend", "label": "Waterfalls", "sublabel": "per eruption date", "pos": [990, 20], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/explainer_ensemble.py", "line": 460 }, { "path": "src/eruption_forecast/model/explanation_model.py", "line": 575 }] }
+  ],
+  "connections": [
+    { "id": "upstream-to-cache", "from": "upstream", "to": "cache" },
+    { "id": "cache-to-hit", "from": "cache", "to": "hit", "label": "hit", "variant": "dashed" },
+    { "id": "cache-to-explainer", "from": "cache", "to": "explainer", "label": "miss" },
+    { "id": "explainer-to-skipped", "from": "explainer", "to": "skipped", "variant": "dashed" },
+    { "id": "explainer-to-shap", "from": "explainer", "to": "shap", "label": "tree" },
+    { "id": "shap-to-payload", "from": "shap", "to": "payload" },
+    { "id": "payload-to-persist", "from": "payload", "to": "persist" },
+    { "id": "payload-to-plots", "from": "payload", "to": "plots" },
+    { "id": "payload-to-waterfall", "from": "payload", "to": "waterfall", "label": "dates", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Reuse modes", "items": ["Training reuse works without eruption_dates", "Prediction reuse requires eruption_dates for waterfalls"] },
+    { "dot": "emerald", "title": "Scope", "items": ["Only tree classifiers are explained: rf, lite-rf, gb, xgb", "explain() computes SHAP; plot() renders figures from it"] }
+  ]
+}

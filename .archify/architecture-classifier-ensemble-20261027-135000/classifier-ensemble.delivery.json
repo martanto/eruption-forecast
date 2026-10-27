@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "0aa6a2ef-aee5-4d3e-9685-7fdbf2edb262",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\classifier-ensemble.html",
+  "specification": {
+    "sha256": "fe7fa72c00db839eae363e4a91e453e12adf2dd5b544393f0b4e9ea5b660a9db",
+    "bytes": 4056
+  },
+  "artifact": {
+    "sha256": "2df081bed5b18e4b7b83dfc9c2f34751b1cebb99008291a9c406fb5d09e97655",
+    "bytes": 822598
+  }
+}

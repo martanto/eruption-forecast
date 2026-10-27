@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "fbb76c36-c74f-40e0-992e-dc1c4b39ff23",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-evaluation-model-20261027-130000\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-evaluation-model-20261027-130000\\evaluation-model.html",
+  "specification": {
+    "sha256": "21f552d470b14629ba16b62d6845142c5eac58d3dc532d69558299606aeb7d69",
+    "bytes": 4405
+  },
+  "artifact": {
+    "sha256": "2aa3b3b7740fa7022825e90f472a3476b23259e59e7988be989f9e9f42d87606",
+    "bytes": 826965
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "FeatureSelector",
+    "output": ".archify/architecture-feature-selector-20261027-133000/feature-selector.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "inputs", "type": "external", "label": "Features + Labels", "sublabel": "X, y per seed", "pos": [40, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1912 }, { "path": "src/eruption_forecast/features/feature_selector.py", "line": 153 }] },
+    { "id": "check", "type": "security", "label": "Input Check", "sublabel": "non-empty, same length", "pos": [230, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 396, "end_line": 402 }] },
+    { "id": "gate", "type": "backend", "label": "fit()", "sublabel": "dispatch on method", "pos": [420, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 350 }, { "path": "src/eruption_forecast/features/feature_selector.py", "line": 404, "end_line": 418 }] },
+    { "id": "tsfresh", "type": "backend", "label": "tsfresh FDR", "sublabel": "p-value filter, top_n", "pos": [610, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 179 }, { "path": "src/eruption_forecast/features/feature_selector.py", "line": 217, "end_line": 219 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 491 }] },
+    { "id": "rf", "type": "backend", "label": "RF Probe", "sublabel": "permutation importance", "pos": [610, 280], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 242 }, { "path": "src/eruption_forecast/features/feature_selector.py", "line": 297, "end_line": 316 }] },
+    { "id": "selected", "type": "database", "label": "Selected Features", "sublabel": "selected_features_ score", "pos": [800, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 406, "end_line": 413 }] },
+    { "id": "transform", "type": "backend", "label": "transform()", "sublabel": "X[feature_names_]", "pos": [990, 160], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/features/feature_selector.py", "line": 423 }, { "path": "src/eruption_forecast/features/feature_selector.py", "line": 465 }] }
+  ],
+  "connections": [
+    { "id": "inputs-to-check", "from": "inputs", "to": "check" },
+    { "id": "check-to-gate", "from": "check", "to": "gate" },
+    { "id": "gate-to-tsfresh", "from": "gate", "to": "tsfresh", "label": "tsfresh" },
+    { "id": "gate-to-rf", "from": "gate", "to": "rf", "label": "rf" },
+    { "id": "tsfresh-to-selected", "from": "tsfresh", "to": "selected", "fromSide": "right", "toSide": "top" },
+    { "id": "rf-to-selected", "from": "rf", "to": "selected", "fromSide": "right", "toSide": "bottom" },
+    { "id": "selected-to-transform", "from": "selected", "to": "transform" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Methods", "items": ["tsfresh (default) filters by FDR p-value", "random_forest ranks by permutation importance and keeps top_n"] },
+    { "dot": "emerald", "title": "Failure modes", "items": ["Empty or mismatched X and y raise ValueError", "transform() raises if fit() has not run or columns are missing"] }
+  ]
+}

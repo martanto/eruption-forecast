@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ClassifierEnsemble",
+    "output": ".archify/architecture-classifier-ensemble-20261027-135000/classifier-ensemble.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "sources", "type": "database", "label": "Model Sources", "sublabel": "json, pkl, csv, object", "pos": [40, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 94, "end_line": 100 }] },
+    { "id": "loader", "type": "backend", "label": "from_any()", "sublabel": "dispatch on extension", "pos": [230, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 94 }, { "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 177 }, { "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 248 }] },
+    { "id": "joblib", "type": "backend", "label": "BaseEnsemble", "sublabel": "joblib save, load", "pos": [230, 180], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/base_ensemble.py", "line": 10 }, { "path": "src/eruption_forecast/ensemble/base_ensemble.py", "line": 19 }, { "path": "src/eruption_forecast/ensemble/base_ensemble.py", "line": 34 }] },
+    { "id": "ensemble", "type": "backend", "label": "ClassifierEnsemble", "sublabel": "one SeedEnsemble per clf", "pos": [420, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 15 }, { "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 503 }] },
+    { "id": "seeds", "type": "backend", "label": "SeedEnsemble", "sublabel": "all seeds of one clf", "pos": [420, 180], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/seed_ensemble.py", "line": 18 }, { "path": "src/eruption_forecast/ensemble/seed_ensemble.py", "line": 416 }] },
+    { "id": "predict", "type": "backend", "label": "Per-classifier", "sublabel": "predict_per_classifier", "pos": [610, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 317, "end_line": 386 }] },
+    { "id": "consensus", "type": "backend", "label": "Consensus", "sublabel": "mean, spread, vote", "pos": [800, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 387 }, { "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 453 }] },
+    { "id": "results", "type": "database", "label": "Results Dict", "sublabel": "4 columns per clf + consensus", "pos": [990, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/classifier_ensemble.py", "line": 456, "end_line": 470 }] }
+  ],
+  "connections": [
+    { "id": "sources-to-loader", "from": "sources", "to": "loader" },
+    { "id": "loader-to-joblib", "from": "loader", "to": "joblib", "label": "pkl", "variant": "dashed" },
+    { "id": "loader-to-ensemble", "from": "loader", "to": "ensemble" },
+    { "id": "ensemble-to-seeds", "from": "ensemble", "to": "seeds", "label": "holds" },
+    { "id": "ensemble-to-predict", "from": "ensemble", "to": "predict" },
+    { "id": "predict-to-seeds", "from": "predict", "to": "seeds", "label": "X", "fromSide": "bottom", "toSide": "right" },
+    { "id": "predict-to-consensus", "from": "predict", "to": "consensus" },
+    { "id": "consensus-to-results", "from": "consensus", "to": "results" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Features", "items": ["features is the sorted union across every classifier", "Each SeedEnsemble selects its own columns per seed"] },
+    { "dot": "emerald", "title": "Output", "items": ["Per-seed CSVs only when save is set", "predict_with_uncertainty feeds PredictionModel and ExplanationModel"] }
+  ]
+}

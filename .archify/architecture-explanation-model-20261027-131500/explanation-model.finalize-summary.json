@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\candidate.json",
+    "sha256": "8e22f5744ad84a40a63954520168765d820ae6b52ebb7706c90c6a1e82e3b091",
+    "bytes": 4777
+  },
+  "artifact": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\explanation-model.html",
+    "sha256": "8d24e10c6f7fe98dfb32b1bfaac234cd628a5fa3c5f675fd183fffb1d2796467",
+    "bytes": 827870
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\explanation-model.finalize.json",
+    "summaryReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\explanation-model.finalize-summary.json",
+    "browserCheckReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\explanation-model.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-27T07:49:27.529Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3958,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

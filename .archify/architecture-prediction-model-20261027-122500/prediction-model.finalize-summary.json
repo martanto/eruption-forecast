@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-prediction-model-20261027-122500\\candidate.json",
+    "sha256": "75a1900b869ef39d7b3c5ee3d995ac4459d0fdea7d937bb2052b39fe6bbaf604",
+    "bytes": 4065
+  },
+  "artifact": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-prediction-model-20261027-122500\\prediction-model.html",
+    "sha256": "7a6fe843b12773e584caf0c55cf519318c7604c12ac68c40f5da7d765f599459",
+    "bytes": 823324
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-prediction-model-20261027-122500\\prediction-model.finalize.json",
+    "summaryReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-prediction-model-20261027-122500\\prediction-model.finalize-summary.json",
+    "browserCheckReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-prediction-model-20261027-122500\\prediction-model.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-27T07:49:27.529Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3589,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

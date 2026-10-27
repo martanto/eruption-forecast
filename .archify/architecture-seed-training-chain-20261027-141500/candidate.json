@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Per-Seed Training Chain",
+    "output": ".archify/architecture-seed-training-chain-20261027-141500/seed-training-chain.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/martanto/eruption-forecast.git",
+      "provider": "github",
+      "revision": "ef1d74758a8640a2f29f3443ed8b9c12d3dd1c11"
+    }
+  },
+  "components": [
+    { "id": "matrix", "type": "database", "label": "Features Matrix", "sublabel": "tsfresh, all windows", "pos": [40, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 726 }] },
+    { "id": "sampler", "type": "backend", "label": "Under Sampler", "sublabel": "auto: under if <15%", "pos": [230, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/utils/ml.py", "line": 318 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 351 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 1738, "end_line": 1745 }] },
+    { "id": "selector", "type": "backend", "label": "Top-20 Selector", "sublabel": "FDR or RF probe", "pos": [420, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1912 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 1975 }, { "path": "src/eruption_forecast/features/feature_selector.py", "line": 13 }] },
+    { "id": "top20", "type": "database", "label": "Top-20 CSV", "sublabel": "per-seed features", "pos": [610, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1975, "end_line": 1977 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 112 }] },
+    { "id": "grid", "type": "backend", "label": "GridSearchCV", "sublabel": "CV splitter + grid", "pos": [800, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/utils/ml.py", "line": 609 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 650 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 1665, "end_line": 1682 }] },
+    { "id": "model", "type": "database", "label": "Seed Model", "sublabel": "best estimator pkl", "pos": [990, 40], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1684 }] },
+    { "id": "registry", "type": "database", "label": "Seed Registry", "sublabel": "trained-model JSON", "pos": [990, 180], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/model/training_model.py", "line": 1095, "end_line": 1103 }, { "path": "src/eruption_forecast/utils/ml.py", "line": 665 }] },
+    { "id": "seedens", "type": "backend", "label": "SeedEnsemble", "sublabel": "all seeds, 1 clf", "pos": [800, 180], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/seed_ensemble.py", "line": 18 }, { "path": "src/eruption_forecast/ensemble/seed_ensemble.py", "line": 180 }, { "path": "src/eruption_forecast/model/training_model.py", "line": 1105 }] },
+    { "id": "mean", "type": "backend", "label": "Mean Probability", "sublabel": "avg across seeds", "pos": [610, 180], "size": [120, 60],
+      "sources": [{ "path": "src/eruption_forecast/ensemble/seed_ensemble.py", "line": 335 }, { "path": "src/eruption_forecast/ensemble/seed_ensemble.py", "line": 386, "end_line": 398 }] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "One job per seed (random_state)", "wraps": ["sampler", "selector", "top20", "grid", "model"] }
+  ],
+  "connections": [
+    { "id": "matrix-to-sampler", "from": "matrix", "to": "sampler" },
+    { "id": "sampler-to-selector", "from": "sampler", "to": "selector" },
+    { "id": "selector-to-top20", "from": "selector", "to": "top20", "label": "top_n" },
+    { "id": "top20-to-grid", "from": "top20", "to": "grid" },
+    { "id": "grid-to-model", "from": "grid", "to": "model" },
+    { "id": "model-to-registry", "from": "model", "to": "registry" },
+    { "id": "registry-to-seedens", "from": "registry", "to": "seedens" },
+    { "id": "seedens-to-mean", "from": "seedens", "to": "mean" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Per-seed steps", "items": ["Resampling runs before selection, inside each seed job", "Selection and grid search both use the resampled rows", "top_n_features defaults to 20"] },
+    { "dot": "emerald", "title": "Ensemble", "items": ["SeedEnsemble loads every seed model and its own feature list", "predict_proba averages P(eruption) across seeds"] }
+  ]
+}

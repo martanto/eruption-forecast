@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\candidate.json",
+    "sha256": "9fc0cf1d84abd6865e71d481e7e502e839b43e59e3d6a1621edd3e60634dd202",
+    "bytes": 4772
+  },
+  "artifact": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\training-model.html",
+    "sha256": "658fd670038750aa0850facd32641c46ca729b9915e470e337935fad62208140",
+    "bytes": 826879
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\training-model.finalize.json",
+    "summaryReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\training-model.finalize-summary.json",
+    "browserCheckReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-training-model-20261027-121500\\training-model.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-27T07:49:27.529Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3836,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

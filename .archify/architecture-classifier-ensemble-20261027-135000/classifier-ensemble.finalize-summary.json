@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\candidate.json",
+    "sha256": "0588b716b5a8902b89e0ca128c17587682949f22998ce95554e8b4dc9f3d54a7",
+    "bytes": 4062
+  },
+  "artifact": {
+    "path": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\classifier-ensemble.html",
+    "sha256": "5d1285d2ba7ca7182e790aa7e9ebf03b3b49a3021305e1cdc75a5d4a999ec4de",
+    "bytes": 822658
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\classifier-ensemble.finalize.json",
+    "summaryReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\classifier-ensemble.finalize-summary.json",
+    "browserCheckReceipt": "D:\\Projects\\eruption-forecast\\.archify\\architecture-classifier-ensemble-20261027-135000\\classifier-ensemble.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-27T07:49:27.529Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 4073,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "layoutReviewRecommendation": {
+    "action": "inspect-leading-space",
+    "evidence": {
+      "measured": true,
+      "emptyTopPx": 160,
+      "emptyTopRatio": 0.374,
+      "occupiedTop": 160,
+      "viewBoxTop": 0,
+      "canvasHeight": 428,
+      "typicalNodeHeight": 60,
+      "reviewSuggested": true
+    },
+    "reason": "Measured content, including routes and labels, leaves a large empty area above the diagram. This is a composition suggestion, not a failed gate.",
+    "repair": "Check whether that leading space is intentional. If not, reposition the connected scene nearer the canvas origin while retaining room for its actual boundaries, labels and return routes. Preserve all meaning and user-fixed geometry, then rerun finalize. No screenshot is required."
+  }
+}

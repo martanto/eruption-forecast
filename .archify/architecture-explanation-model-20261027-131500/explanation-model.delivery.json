@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "926d861e-211f-4dcb-8546-67b3b39b3db0",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\candidate.json",
+  "output": "D:\\Projects\\eruption-forecast\\.archify\\architecture-explanation-model-20261027-131500\\explanation-model.html",
+  "specification": {
+    "sha256": "8e22f5744ad84a40a63954520168765d820ae6b52ebb7706c90c6a1e82e3b091",
+    "bytes": 4777
+  },
+  "artifact": {
+    "sha256": "8d24e10c6f7fe98dfb32b1bfaac234cd628a5fa3c5f675fd183fffb1d2796467",
+    "bytes": 827870
+  }
+}
