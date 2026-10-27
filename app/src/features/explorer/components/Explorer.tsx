@@ -8,6 +8,7 @@ import {
   CalendarRange,
   Tags,
   GraduationCap,
+  TrendingUp,
   AlertCircle,
   X,
   Plus,
@@ -170,11 +171,15 @@ export function Explorer({
           </Button>
           <Link className="button button-ghost" to="/labelling">
             <Tags size={16} aria-hidden="true" />
-            Labelling walkthrough
+            Labelling
           </Link>
           <Link className="button button-ghost" to="/seed-ensemble">
             <GraduationCap size={16} aria-hidden="true" />
-            Training walkthroughs
+            Training
+          </Link>
+          <Link className="button button-ghost" to="/prediction">
+            <TrendingUp size={16} aria-hidden="true" />
+            Prediction
           </Link>
         </div>
         <div className="search-box">

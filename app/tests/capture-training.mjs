@@ -29,9 +29,9 @@ try {
         await page.evaluate(() => document.fonts.ready);
         await page.screenshot({ path: `${output}/incumbent-labelling-${device}.png`, fullPage: true });
         await page.goto('http://127.0.0.1:5178/');
-        await page.getByRole('link', { name: 'Training walkthroughs' }).waitFor();
+        await page.getByRole('link', { name: 'Training', exact: true }).waitFor();
         if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Atlas toolbar overflows');
-        await page.getByRole('link', { name: 'Training walkthroughs' }).click();
+        await page.getByRole('link', { name: 'Training', exact: true }).click();
         if (!page.url().endsWith('/random-under-sampler')) throw new Error('Atlas training link failed');
       }
       await context.close();

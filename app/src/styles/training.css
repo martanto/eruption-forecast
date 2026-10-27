@@ -1030,3 +1030,30 @@
     border-bottom: 0;
   }
 }
+
+/* Previous / next walkthrough links shared by Training and Prediction. */
+.walkthrough-pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 14px 0 0;
+}
+.walkthrough-pager a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--color-terracotta);
+  font-weight: 500;
+  text-underline-offset: 5px;
+}
+.walkthrough-pager a:hover {
+  text-decoration: underline;
+}
+/* Second-level menu under the pipeline menu: lessons belong to Training only. */
+.training-lessons {
+  padding-top: 10px;
+  border-top: 0;
+  font-size: 13px;
+}

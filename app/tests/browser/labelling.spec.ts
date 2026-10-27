@@ -4,7 +4,7 @@ test("walk through both label builders and validate a tremor slice", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Labelling walkthrough" }).click();
+  await page.getByRole("link", { name: "Labelling", exact: true }).click();
   await expect(
     page.getByRole("heading", {
       name: "From eruption dates to learning windows",

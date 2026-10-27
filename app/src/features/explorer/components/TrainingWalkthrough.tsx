@@ -15,6 +15,7 @@ import { FeaturesMatrixLesson } from "./FeaturesMatrixLesson";
 import { GridCvLesson } from "./GridCvLesson";
 import { SignificanceExplainer } from "./SignificanceExplainer";
 import { SeedWorkflowDiagram } from "./SeedWorkflowDiagram";
+import { WalkthroughMenu, WalkthroughPager } from "./WalkthroughNav";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
 export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
@@ -48,8 +49,11 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
         </div>
         <ThemeToggle />
       </header>
-      <nav className="training-links" aria-label="Pipeline walkthroughs">
-        <Link to="/labelling">Labelling</Link>
+      <WalkthroughMenu current="training" />
+      <nav
+        className="training-links training-lessons"
+        aria-label="Training lessons"
+      >
         {(Object.keys(TRAINING_LESSONS) as TrainingLesson[]).map((key) => (
           <Link
             key={key}
@@ -60,6 +64,11 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
           </Link>
         ))}
       </nav>
+      <WalkthroughPager
+        previous="labelling"
+        next="prediction"
+        label="Previous and next walkthrough"
+      />
       <section className="training-why">
         <h2>Why use it?</h2>
         <p>{lesson.why}</p>
@@ -614,9 +623,13 @@ export function TrainingWalkthrough({ topic }: { topic: TrainingLesson }) {
         </section>
       ) : null}
       <footer className="training-footer">
+        <WalkthroughPager
+          previous="labelling"
+          next="prediction"
+          label="Previous and next walkthrough, bottom"
+        />
         <p>Continue through the training pipeline</p>
         <nav className="training-links" aria-label="Continue learning">
-          <Link to="/labelling">Labelling</Link>
           {(Object.keys(TRAINING_LESSONS) as TrainingLesson[])
             .filter((key) => key !== topic)
             .map((key) => (

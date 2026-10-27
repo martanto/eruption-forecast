@@ -4,7 +4,7 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
   page,
 }, testInfo) => {
   await page.goto("/labelling");
-  await page.getByRole("link", { name: /Continue: Training Guideline/ }).click();
+  await page.getByRole("link", { name: /Continue to Training/ }).click();
   // The training guideline opens on the Seed Ensemble tab first.
   await expect(
     page.getByRole("heading", { name: "Seed Ensemble", exact: true }),
