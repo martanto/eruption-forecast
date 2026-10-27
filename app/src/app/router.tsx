@@ -3,6 +3,7 @@ import { ExplorerLayout } from "@/layouts/ExplorerLayout";
 import { ExplorerPage } from "@/routes/ExplorerPage";
 import { LabellingPage } from "@/routes/LabellingPage";
 import { TrainingPage } from "@/routes/TrainingPage";
+import { PredictionPage } from "@/routes/PredictionPage";
 import { RouteError } from "@/components/common/RouteError";
 import { ENV } from "@/config/env";
 export const router = createBrowserRouter(
@@ -38,6 +39,7 @@ export const router = createBrowserRouter(
           path: "classifier-ensemble",
           element: <TrainingPage topic="classifier-ensemble" />,
         },
+        { path: "prediction", element: <PredictionPage /> },
       ],
     },
   ],

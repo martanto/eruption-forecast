@@ -16,7 +16,7 @@ Open the local URL printed by Vite. `npm run build` writes the static applicatio
 
 ## Explore
 
-The toolbar links to **Training walkthroughs**. Continue from `/labelling` (its link reads **Continue: Training Guideline**) to `/seed-ensemble` (the Training Guideline opens here), `/features-matrix`, `/random-under-sampler`, `/feature-selection`, `/grid-cv` and `/classifier-ensemble`. Each page uses four steps, synthetic fixtures, light/dark controls and the supplied illustration. Sampling seeds and family controls update examples locally. See [Training walkthroughs](Training-Walkthroughs.md) for calculations and implementation caveats.
+The toolbar links to **Labelling**, **Training** and **Prediction**. Continue from `/labelling` (its link reads **Continue to Training**) to `/seed-ensemble` (the Training Guideline opens here), `/features-matrix`, `/random-under-sampler`, `/feature-selection`, `/grid-cv` and `/classifier-ensemble`. Each page uses four steps, synthetic fixtures, light/dark controls and the supplied illustration. Sampling seeds and family controls update examples locally. See [Training walkthroughs](Training-Walkthroughs.md) for calculations and implementation caveats.
 
 Select a numbered stage to inspect its purpose, actual behavior, parameters, artifacts, implementation caveats and source excerpts. Expand stages to reveal internal steps. Search includes node text, parameters, artifacts and referenced source paths. **Caveats** filters the searchable steps and dims unaffected nodes.
 
@@ -58,7 +58,7 @@ When Python source, the scenario script, README or the referenced wiki pages cha
 
 ## Labelling walkthrough
 
-Open **Labelling walkthrough** in the Atlas toolbar (`/labelling`) to follow Continuous standard labels, dynamic per-eruption labels, and the tremor matrix. Each chapter has four selectable steps, previous/next controls and a restart action. Select a six-hour label cell or move between windows to inspect its timestamp and id.
+Open **Labelling** in the Atlas toolbar (`/labelling`) to follow Continuous standard labels, dynamic per-eruption labels, and the tremor matrix. Each chapter has four selectable steps, previous/next controls and a restart action. Select a six-hour label cell or move between windows to inspect its timestamp and id.
 
 The shared example uses a two-day tremor look-back, a six-hour slide and three positive calendar days including eruption day (`day_to_forecast=3`, `include_eruption_date=True`). Synthetic eruptions occur on 20 and 25 March 2025. Continuous covers 9–28 March, producing 80 labels, 24 positive. Dynamic history defaults to seven days before each eruption: 64 event-grid rows merge into 52 unique timestamps, retaining the same 24 positives. Choose three days to see separated event slices, or ten days for longer overlap. Missing dates are absent labels, not zero labels.
 
@@ -84,3 +84,26 @@ If Chromium is missing, run `npx playwright install chromium` before the browser
 Lint enforces filenames and dependency direction, rejects cross-feature deep imports and upward imports, and runs negative fixtures for both aliases and relative paths. The rule also resolves relative paths to catch normalization bypasses. Fixed lowercase entrypoints and direct imports inside one feature remain valid.
 
 The required `eslint-plugin-check-file` currently has an unpatched development-only `micromatch → braces` advisory chain. The test runner was upgraded to remove its reported advisories. Recheck with `npm audit`; do not expose development tooling to untrusted input.
+
+## Prediction walkthrough
+
+Open **Prediction** in the Atlas toolbar (`/prediction`). Chapter 1, *One forecast*, has five steps over a branching workflow diagram (Tremor CSV, Window Grid, FeaturesBuilder, Trained Model, ClassifierEnsemble, `forecast()`, Forecast CSV, `plot_forecast`, Cache + Config): choose the window grid, extract features without labels (`use_features_from`), load the ensemble via `from_any`, run `forecast()`, then list the outputs. Step 4 scrubs the **recorded** OJN scenario 5.2 forecast (`assets/forecast-results_2025-08-01_2025-08-22_ws-2.csv`, via `forecastReplay.ts`) with a live threshold and a per-classifier row table.
+
+Step 5 adds an **ROC simulation** below the forecast figure: one ROC panel per classifier plus the consensus, computed in the browser from the recorded CSV (`rocAnalysis.ts`). Windows are labelled at 10 minutes with the Labelling rule (the eruption day and the two days before it, for 2025-08-02 and 2025-08-18). A threshold slider, shared with the forecast figure, moves a dot along each curve and updates the confusion counts, TPR, FPR, precision and specificity. The shaded band shifts every probability by plus or minus its SD; the file has no per-seed columns, so it is not the per-seed range of the evaluation plots. Only two eruptions are present, so AUC is a weak estimate.
+
+Chapter 2, *Several scenarios* (`?part=scenarios`), mirrors `forecast-scenario.py`: `calculate()` once, then train, predict, evaluate and explain per selected scenario. Reader can toggle `use_features_from`, step or play the run, inspect a scenario's `Scenario` dict, and add a custom scenario (validated: forecast starts after training ends, dates inside the calculated range). Only scenario 5.2 has recorded probabilities; other scenarios show periods and derived eruption counts. Window counts are calendar days times windows per day. `?scenario=<id>` selects a scenario.
+
+Source: `features/explorer/predictionLessons.ts`, `components/{PredictionWalkthrough,PredictionWorkflowDiagram,PredictionReader,ScenarioRunner}.tsx`, `styles/prediction.css`. Tests: `app/tests/prediction.test.ts`; captures via `node tests/capture-prediction.mjs`.
+
+### Reusable forecast components
+
+The forecast figure and ROC panels are data-driven, so another page (for example an Evaluation walkthrough) can reuse them by passing a `ForecastDataset` (`features/explorer/forecastDataset.ts`): `rows` (`time` plus `{model}_probability`, `_uncertainty`, `_confidence`, `_prediction` values), `eruptionDates`, `models` (first entry is the primary series, normally the consensus), `lookaheadDays`, `stepMinutes`, optional `downloadUrl`. Exported from the explorer's `index.ts`:
+
+| Component | Use |
+|-----------|-----|
+| `ForecastChart` | The curve alone: threshold line, green/ember fills, eruption-day bands, optional scrub cursor and overlay model |
+| `ForecastExplorer` | Chart plus window scrubber, threshold and overlay controls, per-model table, threshold read-outs |
+| `RocPanel` | One ROC curve with AUC, SD band and a threshold dot |
+| `RocSimulation` | All ROC panels, shared threshold slider and confusion counts |
+
+`RECORDED_FORECAST` is the bundled OJN scenario 5.2 dataset. `rocAnalysis.ts` holds the label, ROC and confusion maths and caches per dataset.

@@ -1,0 +1,637 @@
+/* Prediction walkthrough. Inherits labelling.css and training.css; tokens only. */
+
+/* ---- workflow diagram ---- */
+.pwf {
+  margin: 0 0 32px;
+  isolation: isolate;
+}
+.pwf-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+  color: var(--color-muted);
+}
+.pwf-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.pwf-list {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pwf-edge {
+  stroke: var(--color-muted);
+  stroke-width: 1.6;
+  opacity: 0.55;
+  transition: stroke 300ms, opacity 300ms;
+}
+[data-lit="true"] > .pwf-edge {
+  stroke: var(--color-terracotta);
+  opacity: 1;
+}
+.pwf-head-idle {
+  fill: var(--color-muted);
+  opacity: 0.55;
+}
+.pwf-head-lit {
+  fill: var(--color-terracotta);
+}
+.pwf-pill {
+  fill: var(--color-surface);
+  stroke: var(--color-line);
+}
+.pwf-pill-text {
+  fill: var(--color-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+.pwf-node {
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 300ms;
+}
+.pwf-box {
+  fill: var(--color-burgundy-soft);
+  stroke: var(--color-accent-2);
+  stroke-width: 1.5;
+  transition: stroke 300ms, stroke-width 300ms;
+}
+.pwf-node[data-kind="code"] .pwf-box {
+  fill: color-mix(in oklch, var(--color-success) 14%, var(--color-paper));
+  stroke: var(--color-success);
+}
+.pwf-node[data-kind="code"] .pwf-icon {
+  stroke: var(--color-success);
+}
+.pwf-node[data-kind="data"] .pwf-icon {
+  stroke: var(--color-accent-2);
+}
+.pwf-title {
+  fill: var(--color-ink);
+  font-family: var(--font-mono, monospace);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.pwf-detail {
+  fill: var(--color-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+}
+.pwf-node:hover,
+.pwf-node[data-state="done"] {
+  opacity: 0.95;
+}
+.pwf-node[data-state="current"] {
+  opacity: 1;
+}
+.pwf-node[data-state="current"] .pwf-box {
+  stroke: var(--color-terracotta);
+  stroke-width: 3;
+}
+.pwf-node:focus-visible {
+  outline: none;
+}
+.pwf-node:focus-visible .pwf-box {
+  stroke: var(--color-terracotta);
+  stroke-width: 3;
+  stroke-dasharray: 5 3;
+}
+.pwf figcaption {
+  margin-top: 16px;
+  color: var(--color-muted);
+}
+
+/* ---- window grid and comparison ---- */
+.pw-grid {
+  display: grid;
+  gap: 6px;
+  margin: 20px 0;
+}
+.pw-grid > span {
+  width: 78%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-burgundy);
+  background: var(--color-burgundy-soft);
+  color: var(--color-burgundy);
+  font-variant-numeric: tabular-nums;
+}
+.pw-grid small {
+  color: var(--color-muted);
+}
+.pw-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin: 20px 0;
+}
+.pw-compare section {
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line);
+}
+.pw-compare h3,
+.psr h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.pw-radios {
+  display: grid;
+  gap: 0;
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+.pw-radios legend {
+  padding: 0 0 8px;
+  font-family: var(--font-mono, monospace);
+  color: var(--color-muted);
+}
+.pw-radios label {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 14px 12px;
+  border-top: 1px solid var(--color-line);
+  cursor: pointer;
+}
+.pw-radios label[data-on="true"] {
+  background: var(--color-terracotta-soft);
+}
+.pw-radios input {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  accent-color: var(--color-terracotta);
+}
+.pw-radios strong {
+  display: block;
+  font-family: var(--font-mono, monospace);
+}
+.pw-outputs {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 32px;
+}
+
+/* ---- recorded forecast reader ---- */
+.pwr-chart {
+  width: 100%;
+  min-width: 0;
+  touch-action: pan-y;
+}
+.pwr-chart svg {
+  display: block;
+  cursor: ew-resize;
+}
+.pwr-grid {
+  stroke: var(--color-line);
+}
+.pwr-axis {
+  fill: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.pwr-line {
+  fill: none;
+  stroke: var(--color-terracotta);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.pwr-eruption-day {
+  fill: var(--color-ember);
+  fill-opacity: 0.12;
+}
+.pwr-area {
+  fill: var(--color-success);
+  fill-opacity: 0.18;
+}
+.pwr-area-hot {
+  fill: var(--color-ember);
+  fill-opacity: 0.3;
+}
+.pwr-focus {
+  fill: none;
+  stroke: var(--color-burgundy);
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+.pwr-threshold,
+.pwr-eruption {
+  stroke: var(--color-ember);
+  stroke-dasharray: 5 4;
+}
+.pwr-threshold-text,
+.pwr-eruption-text {
+  fill: var(--color-ember);
+  font-size: 12px;
+}
+.pwr-cursor {
+  stroke: var(--color-ink);
+  stroke-width: 1;
+}
+.pwr-dot {
+  fill: var(--color-terracotta);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+.pwr-scrub {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 18px;
+  color: var(--color-muted);
+}
+.pwr-scrub strong {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pwr input[type="range"] {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--color-terracotta);
+}
+.lab-options input[type="range"] {
+  width: 180px;
+}
+.pwr-table {
+  min-width: 560px;
+  font-variant-numeric: tabular-nums;
+}
+.pwr-table tr[data-consensus="true"] > * {
+  background: var(--color-terracotta-soft);
+  font-weight: 600;
+}
+.pwr-eruptions {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pwr-eruptions strong {
+  color: var(--color-ember);
+}
+.pwr a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-terracotta);
+  text-underline-offset: 4px;
+}
+
+/* ---- scenario runner ---- */
+.psr-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+.psr-pick legend {
+  padding: 0 0 8px;
+  color: var(--color-muted);
+}
+.psr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.psr-chip[data-on="true"] {
+  border-color: var(--color-terracotta);
+  background: var(--color-terracotta-soft);
+}
+.psr-chip input {
+  accent-color: var(--color-terracotta);
+}
+.psr-axis {
+  margin: 0 0 24px;
+}
+.psr-axis-head {
+  position: relative;
+  height: 20px;
+  margin-left: 88px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.psr-axis-body {
+  position: relative;
+  margin-left: 88px;
+  border-left: 1px solid var(--color-line);
+}
+.psr-axis-head span {
+  position: absolute;
+  top: 0;
+}
+.psr-month {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--color-line);
+  pointer-events: none;
+}
+.psr-track {
+  position: relative;
+  height: 30px;
+  transition: opacity 200ms;
+}
+.psr-track[data-off="true"] {
+  opacity: 0.4;
+}
+.psr-track-name {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  width: 84px;
+  height: 30px;
+  padding-right: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  text-align: right;
+  cursor: pointer;
+}
+.psr-track[data-selected="true"] .psr-track-name {
+  color: var(--color-terracotta);
+  font-weight: 600;
+}
+.psr-train,
+.psr-predict {
+  position: absolute;
+  top: 8px;
+  height: 14px;
+}
+.psr-train {
+  background: var(--color-terracotta);
+}
+.psr-predict {
+  border: 1.5px solid var(--color-burgundy);
+  background: var(--color-burgundy-soft);
+}
+.psr-eruption {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  border-left: 1.5px dashed var(--color-ember);
+  pointer-events: none;
+}
+.psr-axis figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 12px;
+  color: var(--color-muted);
+}
+.psr-key::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  margin-right: 6px;
+}
+.psr-key-train::before {
+  background: var(--color-terracotta);
+}
+.psr-key-predict::before {
+  border: 1.5px solid var(--color-burgundy);
+  background: var(--color-burgundy-soft);
+}
+.psr-key-eruption::before {
+  height: 12px;
+  width: 0;
+  border-left: 1.5px dashed var(--color-ember);
+}
+.psr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.psr-note {
+  margin: 0 0 8px;
+}
+.psr-status {
+  min-height: 3.4em;
+  font-size: 17px;
+}
+.psr-table {
+  min-width: 760px;
+  font-variant-numeric: tabular-nums;
+}
+.psr-table tr[data-selected="true"] > * {
+  background: var(--color-terracotta-soft);
+}
+.psr-link {
+  padding: 0;
+  color: var(--color-terracotta);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.psr-phase {
+  color: var(--color-muted);
+}
+.psr-phase[data-state="current"] {
+  color: var(--color-terracotta);
+  font-weight: 600;
+}
+.psr-phase[data-state="done"] {
+  color: var(--color-success);
+}
+.psr-warn,
+.psr-error {
+  color: var(--color-caution);
+}
+.psr-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  margin-block: 12px 28px;
+}
+.psr-code {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  background: var(--color-paper);
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.psr-detail ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-muted);
+}
+.psr-form {
+  padding-top: 20px;
+  border-top: 1px solid var(--color-line);
+}
+.psr-form input[type="date"] {
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.psr-form .lab-options {
+  align-items: flex-end;
+}
+.psr-form label {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* ---- focus, motion, small screens ---- */
+.pwr input:focus-visible,
+.psr input:focus-visible,
+.psr button:focus-visible,
+.pw-radios input:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 4px;
+}
+.psr-chip:has(input:focus-visible) {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pwf *,
+  .psr * {
+    transition: none !important;
+  }
+}
+@media (max-width: 800px) {
+  .pwf-svg {
+    display: none;
+  }
+  .pwf-list {
+    display: grid;
+    gap: 10px;
+  }
+  .pwf-list-node {
+    display: flex;
+    border: 1px solid var(--color-accent-2);
+    border-radius: 7px;
+    background: var(--color-burgundy-soft);
+    opacity: 0.75;
+  }
+  .pwf-list-node[data-kind="code"] {
+    border-color: var(--color-success);
+    background: color-mix(in oklch, var(--color-success) 14%, var(--color-paper));
+  }
+  .pwf-list-node[data-state="current"] {
+    opacity: 1;
+    box-shadow: 0 0 0 2px var(--color-terracotta);
+  }
+  .pwf-list-node button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 44px;
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .pwf-list-node span {
+    color: var(--color-muted);
+    font-size: 13px;
+  }
+  .pw-compare,
+  .pw-outputs,
+  .psr-detail {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .psr-axis-head,
+  .psr-axis-body {
+    margin-left: 64px;
+  }
+  .psr-track-name {
+    width: 60px;
+  }
+}
+
+/* ---- ROC simulation ---- */
+.roc {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
+}
+.roc-grid-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 12px 20px;
+  margin: 8px 0 20px;
+}
+.roc-panel {
+  margin: 0;
+  min-width: 0;
+}
+.roc-panel svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.roc-title {
+  fill: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.roc-grid {
+  stroke: var(--color-line);
+  stroke-dasharray: 2 3;
+}
+.roc-axis {
+  fill: var(--color-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.roc-axis-label {
+  fill: var(--color-muted);
+  font-size: 11px;
+}
+.roc-chance {
+  stroke: var(--color-muted);
+  stroke-dasharray: 4 3;
+}
+.roc-guide {
+  stroke: var(--color-ink);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.6;
+}
+.roc-dot {
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+.roc-legend {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.roc-table {
+  min-width: 460px;
+  font-variant-numeric: tabular-nums;
+}
+.roc input:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 4px;
+}
+.roc input[type="range"] {
+  accent-color: var(--color-terracotta);
+}

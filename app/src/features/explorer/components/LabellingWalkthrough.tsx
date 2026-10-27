@@ -16,7 +16,9 @@ import {
   tremorValue,
   type LabelMode,
 } from "../labelling";
+import { WalkthroughMenu, WalkthroughPager } from "./WalkthroughNav";
 import "@/styles/labelling.css";
+import "@/styles/training.css";
 
 export function LabellingWalkthrough() {
   const [chapter, setChapter] = useState(0);
@@ -88,9 +90,8 @@ export function LabellingWalkthrough() {
         </div>
         <ThemeToggle />
       </header>
-      <nav className="lab-back" aria-label="Continue to training walkthroughs">
-        <Link to="/seed-ensemble">Continue: Training Guideline →</Link>
-      </nav>
+      <WalkthroughMenu current="labelling" />
+      <WalkthroughPager next="training" label="Next walkthrough" />
       <nav className="lab-chapters" aria-label="Labelling walkthrough chapters">
         {LESSONS.map((item, index) => (
           <button
@@ -603,7 +604,10 @@ export function LabellingWalkthrough() {
         </div>
       </section>
       {chapter === 2 && (
-        <section className="lab-selection" aria-label="Stacked tremor matrix example">
+        <section
+          className="lab-selection"
+          aria-label="Stacked tremor matrix example"
+        >
           <h2>Stack the windows by label</h2>
           <p>
             Each row below summarises one 288-row window in the long-format
@@ -612,7 +616,9 @@ export function LabellingWalkthrough() {
           </p>
           <div className="lab-table-scroll">
             <table>
-              <caption>Window summary · complete ten-minute tremor data assumed</caption>
+              <caption>
+                Window summary · complete ten-minute tremor data assumed
+              </caption>
               <thead>
                 <tr>
                   <th>Label timestamp</th>
@@ -624,14 +630,23 @@ export function LabellingWalkthrough() {
                 {labels.slice(selectedIndex, selectedIndex + 4).map((row) => (
                   <tr key={row.id}>
                     <th scope="row">
-                      {new Date(row.time).toISOString().slice(0, 16).replace("T", " ")}
+                      {new Date(row.time)
+                        .toISOString()
+                        .slice(0, 16)
+                        .replace("T", " ")}
                       <br />
                       <small>id {row.id}</small>
                     </th>
                     <td>
-                      {new Date(row.time - 2 * DAY).toISOString().slice(0, 16).replace("T", " ")}
+                      {new Date(row.time - 2 * DAY)
+                        .toISOString()
+                        .slice(0, 16)
+                        .replace("T", " ")}
                       {" → "}
-                      {new Date(row.time - 600_000).toISOString().slice(0, 16).replace("T", " ")}
+                      {new Date(row.time - 600_000)
+                        .toISOString()
+                        .slice(0, 16)
+                        .replace("T", " ")}
                     </td>
                     <td>{row.positive}</td>
                   </tr>
@@ -647,15 +662,18 @@ export function LabellingWalkthrough() {
         </section>
       )}
       {chapter === 2 && (
-        <section className="lab-selection" aria-label="Construction of the tremor matrix">
+        <section
+          className="lab-selection"
+          aria-label="Construction of the tremor matrix"
+        >
           <h2>Construction of the tremor matrix</h2>
           <h3>1. Generate labels</h3>
           <p>
             Generate a timestamp every 6 hours across the study period: for
             example, 2026-04-20 00:00:00 followed by 2026-04-20 06:00:00 UTC.
             Each timestamp identifies one sample. In the implementation, a
-            numeric id links that timestamp to its tremor rows and binary target.
-            The target is 1 for the pre-eruptive class and 0 otherwise.
+            numeric id links that timestamp to its tremor rows and binary
+            target. The target is 1 for the pre-eruptive class and 0 otherwise.
           </p>
           <p>
             This walkthrough uses three inclusive calendar dates: the two dates
@@ -669,15 +687,15 @@ export function LabellingWalkthrough() {
             For each label, extract the 2 days immediately before its timestamp
             at 10-minute resolution: 2 × 24 × 6 = 288 measurements per tremor
             column. For label 2026-04-20 00:00:00, the first measurement is
-            2026-04-18 00:00:00 and the last is 2026-04-19 23:50:00 UTC.
-            The label timestamp is excluded, so the sample contains only earlier
+            2026-04-18 00:00:00 and the last is 2026-04-19 23:50:00 UTC. The
+            label timestamp is excluded, so the sample contains only earlier
             measurements.
           </p>
           <p>
             The next label advances by 6 hours while the window stays 48 hours
             long. Its measurements run from 2026-04-18 06:00:00 through
-            2026-04-20 05:50:00 UTC. Consecutive windows therefore overlap by
-            42 hours: 252 measurements, or 87.5% of each window. These densely
+            2026-04-20 05:50:00 UTC. Consecutive windows therefore overlap by 42
+            hours: 252 measurements, or 87.5% of each window. These densely
             spaced samples track how tremor evolves toward an eruption.
           </p>
           <h3>3. Stack windows into the tremor matrix</h3>
@@ -703,8 +721,8 @@ export function LabellingWalkthrough() {
           </p>
           <p>
             The package currently uses randomized internal cross-validation
-            strategies, including the default shuffle-stratified strategy.
-            A separate future-period or eruption-episode evaluation is therefore
+            strategies, including the default shuffle-stratified strategy. A
+            separate future-period or eruption-episode evaluation is therefore
             needed to assess generalisation beyond those internal scores.
           </p>
         </section>

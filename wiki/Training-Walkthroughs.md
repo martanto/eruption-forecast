@@ -1,6 +1,6 @@
 # Training walkthroughs
 
-Pipeline Atlas provides interactive, static teaching pages after Labelling, grouped as the **Training Guideline**. Open **Training walkthroughs** from the Atlas toolbar, or continue from Labelling. These routes use synthetic data and do not execute Python.
+Pipeline Atlas provides interactive, static teaching pages after Labelling, grouped as the **Training Guideline**. Open **Training** from the Atlas toolbar, or continue from Labelling. These routes use synthetic data and do not execute Python.
 
 | Route | What to explore |
 |---|---|
