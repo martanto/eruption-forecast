@@ -5,6 +5,16 @@ import {
   type DummyFeature,
 } from "./dummyDataset";
 
+export function formatP(p: number) {
+  return p < 0.001 ? p.toExponential(1) : p.toFixed(3);
+}
+
+export function verdict(p: number) {
+  if (p < 0.001) return { label: "Strong evidence of a difference", tone: "strong" };
+  if (p < 0.05) return { label: "Moderate evidence of a difference", tone: "maybe" };
+  return { label: "No evidence of a difference", tone: "none" };
+}
+
 export function split(feature: DummyFeature) {
   return {
     quiet: feature.values.slice(0, QUIET_COUNT),

@@ -132,12 +132,3 @@ export function thresholdSummary(
     });
   return { above, total: dataset.rows.length, eruptions };
 }
-
-export const shortDate = (time: number | string) =>
-  new Date(
-    typeof time === "string" ? `${time}T00:00:00Z` : time,
-  ).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });

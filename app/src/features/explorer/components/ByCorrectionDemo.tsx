@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { correct } from "../significance";
-import { formatP } from "./KsTestDemo";
+import { DataTable } from "@/components/lab/DataTable";
+import { Legend } from "@/components/lab/Legend";
+import { ChartScroll } from "@/components/lab/ScrollRegion";
+import { correct, formatP } from "../significance";
 
 const W = 760;
 const H = 360;
@@ -90,14 +92,16 @@ export function ByCorrectionDemo() {
           <h3>Ordered p-values against three rejection thresholds</h3>
           <div className="sig-by-chart">
           <div>
-          <ul className="sig-legend" aria-label="Legend">
-            <li data-line="raw"><i aria-hidden="true" /> uncorrected level q</li>
-            <li data-line="bh"><i aria-hidden="true" /> BH threshold</li>
-            <li data-line="by"><i aria-hidden="true" /> BY threshold</li>
-            <li data-dot="kept"><i aria-hidden="true" /> kept by BY</li>
-            <li data-dot="dropped"><i aria-hidden="true" /> dropped</li>
-          </ul>
-          <div className="sig-scroll" tabIndex={0} role="region" aria-label="Chart, scrolls sideways on narrow screens">
+          <Legend
+            items={[
+              { swatch: ["line", "raw"], label: "uncorrected level q" },
+              { swatch: ["line", "bh"], label: "BH threshold" },
+              { swatch: ["line", "by"], label: "BY threshold" },
+              { swatch: ["dot", "kept"], label: "kept by BY" },
+              { swatch: ["dot", "dropped"], label: "dropped" },
+            ]}
+          />
+          <ChartScroll>
           <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`BY keeps the first ${lastBy} of ${m} features at q = ${q}.`}>
             {lastBy > 0 && (
               <rect
@@ -154,7 +158,7 @@ export function ByCorrectionDemo() {
               </text>
             )}
           </svg>
-          </div>
+          </ChartScroll>
           </div>
           <div>
           <div className="sig-formula">
@@ -187,34 +191,23 @@ export function ByCorrectionDemo() {
             threshold, then retain that feature and every feature ranked above
             it.
           </p>
-          <div className="training-table-scroll" tabIndex={0} role="region" aria-label="BY procedure table">
-            <table className="training-table sig-table sig-mini">
-              <thead>
-                <tr>
-                  <th>k</th>
-                  <th>feature</th>
-                  <th>test</th>
-                  <th>p</th>
-                  <th>BH thr.</th>
-                  <th>BY thr.</th>
-                  <th>BY</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.name} data-kept={row.keptBy}>
-                    <th>{row.rank}</th>
-                    <td><code>{row.name}</code></td>
-                    <td>{row.test}</td>
-                    <td>{formatP(row.p)}</td>
-                    <td>{row.bh.toFixed(4)}</td>
-                    <td>{row.by.toFixed(4)}</td>
-                    <td><b>{row.keptBy ? "keep" : "drop"}</b></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            label="BY procedure table"
+            className="sig-table sig-mini"
+            headers={["k", "feature", "test", "p", "BH thr.", "BY thr.", "BY"]}
+          >
+            {rows.map((row) => (
+              <tr key={row.name} data-kept={row.keptBy}>
+                <th>{row.rank}</th>
+                <td><code>{row.name}</code></td>
+                <td>{row.test}</td>
+                <td>{formatP(row.p)}</td>
+                <td>{row.bh.toFixed(4)}</td>
+                <td>{row.by.toFixed(4)}</td>
+                <td><b>{row.keptBy ? "keep" : "drop"}</b></td>
+              </tr>
+            ))}
+          </DataTable>
           <p className="sig-caption">
             <b>Table 5.</b> The same procedure in numbers: each p-value beside
             its BH and BY thresholds (thr.). Shaded rows are retained by BY.

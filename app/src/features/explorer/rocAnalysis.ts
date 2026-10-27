@@ -25,6 +25,10 @@ export interface RocLabels {
   negatives: number;
 }
 
+/** `num / den`, or NaN when the denominator is zero so read-outs show "n/a". */
+export const ratio = (num: number, den: number) =>
+  den === 0 ? Number.NaN : num / den;
+
 const labelCache = new WeakMap<ForecastDataset, RocLabels>();
 // Same rule as the labelling walkthrough: the eruption day and the days before it.
 export function buildLabels(dataset: ForecastDataset): RocLabels {

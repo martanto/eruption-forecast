@@ -13,6 +13,7 @@ import {
   X,
   Plus,
   Minus,
+  type LucideIcon,
 } from "lucide-react";
 import { STAGES, NODES, GAPS, SOURCE_SNAPSHOT } from "@/features/architecture";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,19 @@ import { useInteractionStore } from "@/stores/interactionStore";
 import { NodeInspector } from "./NodeInspector";
 import atlasLogo from "../../../../../assets/logo.svg";
 import { ExplorerCanvas } from "./ExplorerCanvas";
-import type { ExplorerLocation } from "../explorer.types";
+import { StageNumber } from "./StageNumber";
+import { WALKTHROUGHS, type Walkthrough } from "./WalkthroughNav";
+import type { ExplorerLocation, ExplorerView } from "../explorer.types";
+
+const VIEWS: readonly { view: ExplorerView; label: string; Icon: LucideIcon }[] = [
+  { view: "pipeline", label: "Pipeline", Icon: GitBranch },
+  { view: "timeline", label: "Timeline", Icon: CalendarRange },
+];
+const WALKTHROUGH_ICONS: Record<Walkthrough, LucideIcon> = {
+  labelling: Tags,
+  training: GraduationCap,
+  prediction: TrendingUp,
+};
 
 interface ExplorerProps {
   location: ExplorerLocation;
@@ -77,9 +90,7 @@ export function Explorer({
               setDrawer(null);
             }}
           >
-            <span className="stage-number">
-              {String(stage.number).padStart(2, "0")}
-            </span>
+            <StageNumber number={stage.number} />
             <span>{stage.title}</span>
           </button>
           <button
@@ -153,34 +164,28 @@ export function Explorer({
       </header>
       <div className="explorer-toolbar">
         <div className="view-switch" role="group" aria-label="Canvas view">
-          <Button
-            variant="ghost"
-            aria-pressed={location.view === "pipeline"}
-            onClick={() => navigate({ view: "pipeline" })}
-          >
-            <GitBranch size={16} />
-            Pipeline
-          </Button>
-          <Button
-            variant="ghost"
-            aria-pressed={location.view === "timeline"}
-            onClick={() => navigate({ view: "timeline" })}
-          >
-            <CalendarRange size={16} />
-            Timeline
-          </Button>
-          <Link className="button button-ghost" to="/labelling">
-            <Tags size={16} aria-hidden="true" />
-            Labelling
-          </Link>
-          <Link className="button button-ghost" to="/seed-ensemble">
-            <GraduationCap size={16} aria-hidden="true" />
-            Training
-          </Link>
-          <Link className="button button-ghost" to="/prediction">
-            <TrendingUp size={16} aria-hidden="true" />
-            Prediction
-          </Link>
+          {VIEWS.map(({ view, label, Icon }) => (
+            <Button
+              key={view}
+              variant="ghost"
+              aria-pressed={location.view === view}
+              onClick={() => navigate({ view })}
+            >
+              <Icon size={16} />
+              {label}
+            </Button>
+          ))}
+          {WALKTHROUGHS.map(({ id, to, label }) => {
+            const Icon = WALKTHROUGH_ICONS[id];
+            return (
+              <Button key={id} asChild variant="ghost">
+                <Link to={to}>
+                  <Icon size={16} aria-hidden="true" />
+                  {label}
+                </Link>
+              </Button>
+            );
+          })}
         </div>
         <div className="search-box">
           <Search size={17} />

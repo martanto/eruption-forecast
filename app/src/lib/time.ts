@@ -10,12 +10,17 @@ export function formatDate(date: string): string {
     timeZone: "UTC",
   }).format(epochSeconds(date) * 1000);
 }
-export function shortDate(date: string): string {
+// Accepts either a YYYY-MM-DD string or an epoch in milliseconds.
+export function shortDate(date: string | number): string {
+  const time = typeof date === "string" ? epochSeconds(date) * 1000 : date;
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     timeZone: "UTC",
-  }).format(epochSeconds(date) * 1000);
+  }).format(time);
+}
+export function utcStamp(time: number): string {
+  return new Date(time).toISOString().slice(0, 16).replace("T", " ");
 }
 export function dateOffset(date: string, origin: string): number {
   return (epochSeconds(date) - epochSeconds(origin)) / DAY_SECONDS;

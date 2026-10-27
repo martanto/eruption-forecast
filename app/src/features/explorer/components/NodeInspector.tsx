@@ -9,6 +9,8 @@ import {
   SOURCE_SNAPSHOT,
 } from "@/features/architecture";
 import { Button } from "@/components/ui/button";
+import { NodeArtifacts, NodeBehavior, NodeParameters } from "./NodeSections";
+import { StageNumber } from "./StageNumber";
 import { WikiExplanation } from "./WikiExplanation";
 import { ConsensusExample } from "./ConsensusExample";
 import { ForecastReplay } from "./ForecastReplay";
@@ -33,17 +35,17 @@ export function NodeInspector({
       aria-label="Node details"
     >
       <h2 className={`inspector-title tone-${stage.tone}`}>
-        <span className="stage-number">
-          {String(stage.number).padStart(2, "0")}
-        </span>
+        <StageNumber number={stage.number} />
         <span>{item.title}</span>
       </h2>
       <p className="inspector-summary">{item.summary}</p>
       {item.stage === "labels" && (
-        <Link className="button button-outline" to="/labelling">
-          <Tags size={16} aria-hidden="true" />
-          Labelling walkthrough
-        </Link>
+        <Button asChild variant="outline">
+          <Link to="/labelling">
+            <Tags size={16} aria-hidden="true" />
+            Labelling walkthrough
+          </Link>
+        </Button>
       )}
       <div
         className="inspector-tabs"
@@ -69,10 +71,7 @@ export function NodeInspector({
       </div>
       {tab === "details" ? (
         <>
-          <h3>What actually happens</h3>
-          {item.behavior.map((text) => (
-            <p key={text}>{text}</p>
-          ))}
+          <NodeBehavior item={item} />
           {item.stage === "consensus" && <ConsensusExample />}
           {item.id === "prediction" && <ForecastReplay />}
           <WikiExplanation item={item} />
@@ -97,18 +96,8 @@ export function NodeInspector({
                 );
               })}
           </details>
-          <h3>Parameters & settings</h3>
-          <ul>
-            {item.parameters.map((text) => (
-              <li key={text}>{text}</li>
-            ))}
-          </ul>
-          <h3>Artifacts</h3>
-          <ul className="artifacts">
-            {item.artifacts.map((text) => (
-              <li key={text}>{text}</li>
-            ))}
-          </ul>
+          <NodeParameters item={item} />
+          <NodeArtifacts item={item} className="artifacts" />
           <h3>Follow the connections</h3>
           <div className="connection-list">
             {neighbors.map((edge) => {

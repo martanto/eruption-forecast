@@ -1,12 +1,17 @@
 import { useMemo, useState } from "react";
-import { DUMMY_FEATURES, PRE_COUNT, QUIET_COUNT } from "../dummyDataset";
+import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
+import { DataTable } from "@/components/lab/DataTable";
+import { Legend } from "@/components/lab/Legend";
+import { ChartScroll } from "@/components/lab/ScrollRegion";
+import {
+  DUMMY_FEATURES,
+  PICK_FEATURES,
+  PRE_COUNT,
+  QUIET_COUNT,
+} from "../dummyDataset";
 import { split } from "../significance";
 
-const PICKS = [
-  "rsam_f2__mean",
-  "rsam_f2__standard_deviation",
-  "rsam_f4__count_above_mean",
-];
+const PICKS = PICK_FEATURES;
 // Time order: 5 non-eruptive, 5 pre-eruption, eruption, 6 non-eruptive, 5 pre-eruption, eruption, 3 non-eruptive.
 const PATTERN = [
   0, 0, 0, 0, 0, 1, 1, 1, 1, 1, "E", 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, "E", 0, 0, 0,
@@ -53,7 +58,7 @@ function buildTimeline() {
 const TIMELINE = buildTimeline();
 
 export function LabelledDataDemo() {
-  const [name, setName] = useState(PICKS[0]!);
+  const [name, setName] = useState<string>(PICKS[0]);
   const { windows, eruptions, width } = TIMELINE;
   const max = useMemo(
     () => Math.max(...windows.map((w) => w.values[name]!)),
@@ -64,28 +69,20 @@ export function LabelledDataDemo() {
 
   return (
     <div className="sig-demo">
-      <div className="lab-options" role="group" aria-label="Pick a feature">
-        {PICKS.map((pick) => (
-          <button
-            key={pick}
-            className="seed-select"
-            aria-pressed={pick === name}
-            onClick={() => setName(pick)}
-          >
-            <code>{pick}</code>
-          </button>
-        ))}
-      </div>
+      <ChoiceButtons
+        label="Pick a feature"
+        options={PICKS}
+        value={name}
+        onChange={setName}
+      />
       <figure className="sig-card sig-figure">
-        <ul className="sig-legend" aria-label="Legend">
-          <li data-group="quiet">
-            <i aria-hidden="true" /> label 0 · non-eruptive
-          </li>
-          <li data-group="pre">
-            <i aria-hidden="true" /> label 1 · pre-eruptive
-          </li>
-        </ul>
-        <div className="sig-scroll" tabIndex={0} role="region" aria-label="Chart, scrolls sideways on narrow screens">
+        <Legend
+          items={[
+            { swatch: ["group", "quiet"], label: "label 0 · non-eruptive" },
+            { swatch: ["group", "pre"], label: "label 1 · pre-eruptive" },
+          ]}
+        />
+        <ChartScroll>
         <svg
           viewBox={`0 0 ${width} ${H}`}
           role="img"
@@ -135,7 +132,7 @@ export function LabelledDataDemo() {
             );
           })}
         </svg>
-        </div>
+        </ChartScroll>
         <figcaption>
           <b>Figure 1.</b> Value of <code>{name}</code> in each of 24 consecutive
           time windows. Upper row of digits: the class label. Lower row: the
@@ -150,32 +147,23 @@ export function LabelledDataDemo() {
       <div className="sig-grid sig-grid-even">
         <figure className="sig-card sig-figure">
           <h3>Feature matrix: one row per time window</h3>
-          <div className="training-table-scroll" tabIndex={0} role="region" aria-label="Labelled feature rows">
-            <table className="training-table sig-table sig-mini">
-              <thead>
-                <tr>
-                  <th>window</th>
-                  {PICKS.map((pick) => (
-                    <th key={pick}>{pick.split("__")[1]}</th>
-                  ))}
-                  <th>is_erupted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((w) => (
-                  <tr key={w.id}>
-                    <th>{w.id}</th>
-                    {PICKS.map((pick) => (
-                      <td key={pick}>{w.values[pick]!.toFixed(1)}</td>
-                    ))}
-                    <td data-group={w.label === 1 ? "pre" : "quiet"}>
-                      <b>{w.label}</b>
-                    </td>
-                  </tr>
+          <DataTable
+            label="Labelled feature rows"
+            className="sig-table sig-mini"
+            headers={["window", ...PICKS.map((pick) => pick.split("__")[1]), "is_erupted"]}
+          >
+            {rows.map((w) => (
+              <tr key={w.id}>
+                <th>{w.id}</th>
+                {PICKS.map((pick) => (
+                  <td key={pick}>{w.values[pick]!.toFixed(1)}</td>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                <td data-group={w.label === 1 ? "pre" : "quiet"}>
+                  <b>{w.label}</b>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
           <figcaption>
             <b>Table 1.</b> Windows 4–8 of the synthetic feature matrix: 24 rows
             (samples) and {DUMMY_FEATURES.length} feature columns, three shown,

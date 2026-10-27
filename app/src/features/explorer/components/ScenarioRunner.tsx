@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Pause, Play, Plus, RotateCcw, StepForward } from "lucide-react";
+import { DataTable } from "@/components/lab/DataTable";
+import { ResultOutput } from "@/components/lab/ResultOutput";
+import { SelectField } from "@/components/lab/SelectField";
 import { Button } from "@/components/ui/button";
 import { ERUPTIONS } from "@/features/architecture";
+import { shortDate } from "@/lib/time";
 import {
   coveredByFirst,
   daysBetween,
@@ -26,12 +30,6 @@ const pctOf = (date: string) =>
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"].map(
   (label, i) => [label, `2025-0${i + 1}-01`] as const,
 );
-const short = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
 
 interface Props {
   scenarios: RunScenario[];
@@ -167,22 +165,15 @@ export function ScenarioRunner({ scenarios, onScenariosChange, selectedId, onSel
       </figure>
 
       <div className="lab-options">
-        <label>
-          use_features_from
-          <select
-            value={featuresFrom}
-            onChange={(event) => {
-              reset();
-              setFeaturesFrom(event.target.value as FeatureSource);
-            }}
-          >
-            {FEATURE_SOURCES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="use_features_from"
+          value={featuresFrom}
+          options={FEATURE_SOURCES.map((item) => ({ value: item.value, label: item.label }))}
+          onChange={(next: FeatureSource) => {
+            reset();
+            setFeaturesFrom(next);
+          }}
+        />
         <div className="psr-actions">
           <Button
             variant="outline"
@@ -216,59 +207,44 @@ export function ScenarioRunner({ scenarios, onScenariosChange, selectedId, onSel
         {FEATURE_SOURCES.find((item) => item.value === featuresFrom)!.cost}
       </p>
 
-      <output className="training-result psr-status" aria-live="polite">
-        {status}
-      </output>
+      <ResultOutput className="psr-status">{status}</ResultOutput>
 
-      <div className="training-table-scroll" tabIndex={0} role="region" aria-label="Scenario run table">
-        <table className="training-table psr-table">
-          <caption>
-            One ForecastModel, {run.length} scenario{run.length === 1 ? "" : "s"}, same calculated tremor
-          </caption>
-          <thead>
-            <tr>
-              <th>Scenario</th>
-              <th>Train → forecast</th>
-              <th>Eruptions</th>
-              <th>≈ windows</th>
-              {PHASES.map((phase) => (
-                <th key={phase}>{phase}</th>
+      <DataTable
+        label="Scenario run table"
+        className="psr-table"
+        caption={`One ForecastModel, ${run.length} scenario${run.length === 1 ? "" : "s"}, same calculated tremor`}
+        headers={["Scenario", "Train → forecast", "Eruptions", "≈ windows", ...PHASES]}
+      >
+        {run.map((s, i) => {
+          const inTrain = eruptionsBetween(s.trainStart, s.trainEnd);
+          const inForecast = eruptionsBetween(s.predictionStart, s.predictionEnd);
+          const reuseProblem = first && featuresFrom === "files" && s !== first && !coveredByFirst(first, s);
+          return (
+            <tr key={s.id} data-selected={s.id === selectedId}>
+              <th>
+                <button type="button" className="psr-link" onClick={() => onSelect(s.id)}>
+                  {s.name}
+                </button>
+              </th>
+              <td>
+                {shortDate(s.trainStart)}–{shortDate(s.trainEnd)} → {shortDate(s.predictionStart)}–{shortDate(s.predictionEnd)}
+                {reuseProblem && <span className="psr-warn"> · outside the first scenario's feature window</span>}
+              </td>
+              <td>
+                {inTrain.length} in training · {inForecast.length} to forecast
+              </td>
+              <td>{windowEstimate(s).toLocaleString()}</td>
+              {PHASES.map((phase, p) => (
+                <td key={phase}>
+                  <span className="psr-phase" data-state={phaseState(i, p)}>
+                    {phaseState(i, p) === "done" ? "done" : phaseState(i, p) === "current" ? "running" : "waiting"}
+                  </span>
+                </td>
               ))}
             </tr>
-          </thead>
-          <tbody>
-            {run.map((s, i) => {
-              const inTrain = eruptionsBetween(s.trainStart, s.trainEnd);
-              const inForecast = eruptionsBetween(s.predictionStart, s.predictionEnd);
-              const reuseProblem = first && featuresFrom === "files" && s !== first && !coveredByFirst(first, s);
-              return (
-                <tr key={s.id} data-selected={s.id === selectedId}>
-                  <th>
-                    <button type="button" className="psr-link" onClick={() => onSelect(s.id)}>
-                      {s.name}
-                    </button>
-                  </th>
-                  <td>
-                    {short(s.trainStart)}–{short(s.trainEnd)} → {short(s.predictionStart)}–{short(s.predictionEnd)}
-                    {reuseProblem && <span className="psr-warn"> · outside the first scenario's feature window</span>}
-                  </td>
-                  <td>
-                    {inTrain.length} in training · {inForecast.length} to forecast
-                  </td>
-                  <td>{windowEstimate(s).toLocaleString()}</td>
-                  {PHASES.map((phase, p) => (
-                    <td key={phase}>
-                      <span className="psr-phase" data-state={phaseState(i, p)}>
-                        {phaseState(i, p) === "done" ? "done" : phaseState(i, p) === "current" ? "running" : "waiting"}
-                      </span>
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+          );
+        })}
+      </DataTable>
 
       <div className="psr-detail">
         <section aria-label={`${selected.name} definition`}>
@@ -336,7 +312,7 @@ export function ScenarioRunner({ scenarios, onScenariosChange, selectedId, onSel
           </p>
         )}
         <p>
-          Training always starts {short(TREMOR_START)}, as in the example file. A real run must also stay
+          Training always starts {shortDate(TREMOR_START)}, as in the example file. A real run must also stay
           inside the dates passed to calculate().
         </p>
       </form>

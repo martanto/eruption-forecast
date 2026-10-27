@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
+import { DataTable } from "@/components/lab/DataTable";
+import { Legend } from "@/components/lab/Legend";
+import { ChartScroll } from "@/components/lab/ScrollRegion";
+import { SelectField } from "@/components/lab/SelectField";
 import { DUMMY_FEATURES, PRE_COUNT, QUIET_COUNT } from "../dummyDataset";
-import { comb, fisherRows, fisherTable } from "../significance";
-import { formatP, verdict } from "./KsTestDemo";
+import { comb, fisherRows, fisherTable, formatP, verdict } from "../significance";
 
 const BINARY = DUMMY_FEATURES.filter((feature) => feature.kind === "binary");
 const MEANING: Record<string, string> = {
@@ -48,54 +52,40 @@ export function FisherDemo() {
 
   return (
     <div className="sig-demo">
-      <div className="lab-options" role="group" aria-label="Pick a yes/no feature">
-        {BINARY.map((item) => (
-          <button
-            key={item.name}
-            className="seed-select"
-            aria-pressed={item.name === name}
-            onClick={() => setName(item.name)}
-          >
-            <code>{item.name}</code>
-          </button>
-        ))}
-      </div>
+      <ChoiceButtons
+        label="Pick a yes/no feature"
+        options={BINARY.map((item) => item.name)}
+        value={name}
+        onChange={setName}
+      />
       <div className="sig-grid sig-grid-even">
         <div className="sig-card">
           <h3>3a · Tabulate the windows in a 2×2 contingency table</h3>
           <p>{MEANING[name]}</p>
-          <div className="training-table-scroll">
-            <table className="training-table sig-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>feature = 1</th>
-                  <th>feature = 0</th>
-                  <th>total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th data-group="pre">label 1 · pre-eruptive</th>
-                  <td className="sig-focus">{table.preYes}</td>
-                  <td>{table.preNo}</td>
-                  <td>{PRE_COUNT}</td>
-                </tr>
-                <tr>
-                  <th data-group="quiet">label 0 · non-eruptive</th>
-                  <td>{table.quietYes}</td>
-                  <td>{table.quietNo}</td>
-                  <td>{QUIET_COUNT}</td>
-                </tr>
-                <tr>
-                  <th>total</th>
-                  <td>{yes}</td>
-                  <td>{total - yes}</td>
-                  <td>{total}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            label="Contingency table"
+            className="sig-table"
+            headers={[null, "feature = 1", "feature = 0", "total"]}
+          >
+            <tr>
+              <th data-group="pre">label 1 · pre-eruptive</th>
+              <td className="sig-focus">{table.preYes}</td>
+              <td>{table.preNo}</td>
+              <td>{PRE_COUNT}</td>
+            </tr>
+            <tr>
+              <th data-group="quiet">label 0 · non-eruptive</th>
+              <td>{table.quietYes}</td>
+              <td>{table.quietNo}</td>
+              <td>{QUIET_COUNT}</td>
+            </tr>
+            <tr>
+              <th>total</th>
+              <td>{yes}</td>
+              <td>{total - yes}</td>
+              <td>{total}</td>
+            </tr>
+          </DataTable>
           <p className="sig-caption">
             <b>Table 2.</b> The 24 synthetic windows cross-tabulated by class
             label and feature value. The highlighted cell drives the test:{" "}
@@ -122,7 +112,7 @@ export function FisherDemo() {
             windows then follows a hypergeometric distribution. Each bar is
             P(X = x).
           </p>
-          <div className="sig-scroll" tabIndex={0} role="region" aria-label="Chart, scrolls sideways on narrow screens">
+          <ChartScroll>
           <svg
             className="sig-bars"
             viewBox={`0 0 ${rows.length * 52 + 20} 190`}
@@ -156,15 +146,17 @@ export function FisherDemo() {
               );
             })}
           </svg>
-          </div>
+          </ChartScroll>
           <p className="sig-axis-caption">
             x = number of pre-eruptive windows with feature = 1, under the null
             hypothesis
           </p>
-          <ul className="sig-legend" aria-label="Legend">
-            <li data-bar="in"><i aria-hidden="true" /> as extreme as observed, or more</li>
-            <li data-bar="out"><i aria-hidden="true" /> less extreme</li>
-          </ul>
+          <Legend
+            items={[
+              { swatch: ["bar", "in"], label: "as extreme as observed, or more" },
+              { swatch: ["bar", "out"], label: "less extreme" },
+            ]}
+          />
           <p className="sig-caption">
             <b>Figure 3.</b> The null distribution of the count x. The bar
             outlined in black is the observed count. The two-sided p-value sums
@@ -197,29 +189,21 @@ export function FisherDemo() {
           <div>
             <h4>First, a tiny example</h4>
             <div className="lab-options">
-              <label>
-                n (windows){" "}
-                <select
-                  value={n}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setN(next);
-                    setR(Math.min(r, next));
-                  }}
-                >
-                  {[3, 4, 5].map((i) => (
-                    <option key={i}>{i}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                r (to pick){" "}
-                <select value={r} onChange={(e) => setR(Number(e.target.value))}>
-                  {Array.from({ length: n }, (_, i) => i + 1).map((i) => (
-                    <option key={i}>{i}</option>
-                  ))}
-                </select>
-              </label>
+              <SelectField
+                label="n (windows)"
+                value={n}
+                options={[3, 4, 5].map((i) => ({ value: i, label: i }))}
+                onChange={(next) => {
+                  setN(next);
+                  setR(Math.min(r, next));
+                }}
+              />
+              <SelectField
+                label="r (to pick)"
+                value={r}
+                options={Array.from({ length: n }, (_, i) => ({ value: i + 1, label: i + 1 }))}
+                onChange={setR}
+              />
             </div>
             <div className="sig-letters" aria-label={`${n} windows`}>
               {LETTERS.slice(0, n)
@@ -292,31 +276,28 @@ export function FisherDemo() {
             </p>
             <div className="sig-multiply">
             <div>
-            <div className="training-table-scroll" tabIndex={0} role="region" aria-label="Fisher probability table">
-              <table className="training-table sig-table sig-mini">
-                <thead>
-                  <tr>
-                    <th>x</th>
-                    <th>C({PRE_COUNT}, x) × C({QUIET_COUNT}, {yes} − x)</th>
-                    <th>P(x)</th>
-                    <th>in p?</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.x} data-observed={row.x === table.preYes || undefined}>
-                      <th>{row.x}</th>
-                      <td>
-                        {row.top.toLocaleString("en-US")} × {row.bottom.toLocaleString("en-US")} ={" "}
-                        {row.count.toLocaleString("en-US")}
-                      </td>
-                      <td>{row.probability < 0.001 ? row.probability.toExponential(1) : row.probability.toFixed(4)}</td>
-                      <td>{row.inP ? <b>yes</b> : "no"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              label="Fisher probability table"
+              className="sig-table sig-mini"
+              headers={[
+                "x",
+                `C(${PRE_COUNT}, x) × C(${QUIET_COUNT}, ${yes} − x)`,
+                "P(x)",
+                "in p?",
+              ]}
+            >
+              {rows.map((row) => (
+                <tr key={row.x} data-observed={row.x === table.preYes || undefined}>
+                  <th>{row.x}</th>
+                  <td>
+                    {row.top.toLocaleString("en-US")} × {row.bottom.toLocaleString("en-US")} ={" "}
+                    {row.count.toLocaleString("en-US")}
+                  </td>
+                  <td>{row.probability < 0.001 ? row.probability.toExponential(1) : row.probability.toFixed(4)}</td>
+                  <td>{row.inP ? <b>yes</b> : "no"}</td>
+                </tr>
+              ))}
+            </DataTable>
             <p className="sig-caption">
               <b>Table 4.</b> Each possible count x, the number of arrangements
               that produce it, and its probability P(x). Rows marked “yes” are

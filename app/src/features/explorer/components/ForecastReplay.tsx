@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Maximize2, X } from 'lucide-react';
 import { init, use as registerCharts, type EChartsCoreOption } from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, MarkLineComponent, DataZoomComponent, AriaComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { ExplanationDialog } from '@/components/common/ExplanationDialog';
 import { Button } from '@/components/ui/button';
+import { utcStamp } from '@/lib/time';
 import { ERUPTIONS, THRESHOLD, FORECAST_MODELS, FORECAST_ROWS, forecastValues } from '../forecastReplay';
 
 registerCharts([LineChart, GridComponent, TooltipComponent, MarkLineComponent, DataZoomComponent, AriaComponent, CanvasRenderer]);
@@ -73,7 +73,7 @@ function ReplayChart() {
       <a href={new URL('../../../../../assets/forecast-results_2025-08-01_2025-08-22_ws-2.csv', import.meta.url).href} download>Download CSV</a>
     </div>
     <div ref={host} className="forecast-chart" role="img" aria-label="OJN probability chart with 0.7 threshold and August 2 and 18 eruption markers" />
-    <label className="forecast-scrubber">Replay position, {new Date(FORECAST_ROWS[count - 1]!.time).toISOString().slice(0, 16).replace('T', ' ')} UTC
+    <label className="forecast-scrubber">Replay position, {utcStamp(FORECAST_ROWS[count - 1]!.time)} UTC
       <input type="range" min={1} max={FORECAST_ROWS.length} value={count} onChange={(event) => { setPlaying(false); setCount(Number(event.target.value)); }} />
     </label>
     <p>Orange line: mean probability. Shading: ±1 standard deviation, clipped to [0, 1]; this is not a calibrated confidence interval. Dashed coral lines: eruption dates and the 0.7 threshold. Drag the chart’s lower handles to zoom. Replay advances 12 hours per step.</p>
@@ -85,16 +85,14 @@ export function ForecastReplay() {
   return <section className="forecast-example">
     <h3>OJN, recorded prediction replay</h3>
     <p>Explore real scenario 5 probabilities with the 0.7 eruption threshold and eruption dates on 2 and 18 August.</p>
-    <Dialog.Root>
-      <Dialog.Trigger asChild><Button variant="outline"><Maximize2 size={16} /> Open prediction replay</Button></Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="sheet-overlay" />
-        <Dialog.Content className="explanation-dialog" aria-describedby={undefined}>
-          <header className="explanation-dialog-heading"><Dialog.Title>OJN · scenario 5 prediction</Dialog.Title><Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close prediction replay"><X size={20} /></Button></Dialog.Close></header>
-          <div className="explanation-dialog-body forecast-body"><ReplayChart /></div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <ExplanationDialog
+      triggerLabel="Open prediction replay"
+      title="OJN · scenario 5 prediction"
+      closeLabel="Close prediction replay"
+      bodyClassName="forecast-body"
+    >
+      <ReplayChart />
+    </ExplanationDialog>
   </section>;
 }
 

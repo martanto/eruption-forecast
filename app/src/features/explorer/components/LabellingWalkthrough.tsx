@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { ChapterNav } from "@/components/lab/ChapterNav";
+import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { ParameterStrip } from "@/components/lab/ParameterStrip";
+import { SelectField } from "@/components/lab/SelectField";
+import { StepControls } from "@/components/lab/StepControls";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { utcStamp } from "@/lib/time";
 import {
   buildLabels,
   DAY,
@@ -16,9 +20,27 @@ import {
   tremorValue,
   type LabelMode,
 } from "../labelling";
+import { WalkthroughHeader } from "./WalkthroughHeader";
 import { WalkthroughMenu, WalkthroughPager } from "./WalkthroughNav";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
+
+const PARAMETERS = [
+  ["Look-back", "2 days"],
+  ["Slide", "6 hours"],
+  ["Forecast", "3 calendar days, including eruption day"],
+  ["Tremor", "10-minute samples"],
+  ["Time", "UTC"],
+] as const;
+const LABEL_SOURCES = [
+  { value: "continuous", label: "Continuous" },
+  { value: "dynamic", label: "Dynamic" },
+] as const;
+const HISTORY_OPTIONS = [
+  { value: 3, label: "3 days · separated slices" },
+  { value: 7, label: "7 days · overlapping slices" },
+  { value: 10, label: "10 days · longer overlap" },
+] as const;
 
 export function LabellingWalkthrough() {
   const [chapter, setChapter] = useState(0);
@@ -37,7 +59,6 @@ export function LabellingWalkthrough() {
     labels.find((row) => row.time === selectedTime) ?? labels[0]!;
   const selectedIndex = labels.indexOf(selected);
   const lesson = LESSONS[chapter]!;
-  const operation = lesson.steps[step]!;
   const labelled = chapter === 0 ? step >= 1 : chapter === 1 ? step >= 2 : true;
   const showSlice =
     chapter === 2 ? step >= 1 : chapter === 0 ? step >= 2 : step >= 3;
@@ -77,117 +98,42 @@ export function LabellingWalkthrough() {
   }
   return (
     <main className="label-lab">
-      <header className="lab-heading">
-        <div>
-          <Link className="lab-back" to="/">
-            <ArrowLeft size={16} /> Back to Pipeline Atlas
-          </Link>
-          <h1>From eruption dates to learning windows</h1>
-          <p>
-            Follow the clock, mark the answers, then collect the tremor behind
-            each answer.
-          </p>
-        </div>
-        <ThemeToggle />
-      </header>
+      <WalkthroughHeader
+        title="From eruption dates to learning windows"
+        intro="Follow the clock, mark the answers, then collect the tremor behind each answer."
+      />
       <WalkthroughMenu current="labelling" />
       <WalkthroughPager next="training" label="Next walkthrough" />
-      <nav className="lab-chapters" aria-label="Labelling walkthrough chapters">
-        {LESSONS.map((item, index) => (
-          <button
-            key={item.title}
-            aria-current={chapter === index ? "step" : undefined}
-            onClick={() => changeChapter(index)}
-          >
-            <span>{index + 1}</span>
-            {item.title}
-          </button>
-        ))}
-      </nav>
-      <div className="lab-parameters">
-        <span>
-          Look-back <strong>2 days</strong>
-        </span>
-        <span>
-          Slide <strong>6 hours</strong>
-        </span>
-        <span>
-          Forecast <strong>3 calendar days, including eruption day</strong>
-        </span>
-        <span>
-          Tremor <strong>10-minute samples</strong>
-        </span>
-        <span>
-          Time <strong>UTC</strong>
-        </span>
-      </div>
-      <section className="lab-operation" aria-label="Walkthrough controls">
-        <div className="lab-step-nav" role="group" aria-label="Build steps">
-          {lesson.steps.map((item, index) => (
-            <button
-              key={item[0]}
-              aria-label={`Step ${index + 1}: ${item[0]}`}
-              aria-pressed={step === index}
-              onClick={() => setStep(index)}
-            >
-              {index + 1}
-            </button>
-          ))}
-        </div>
-        <div className="lab-operation-copy" aria-live="polite">
-          <h2>{operation[0]}</h2>
-          <p>{operation[1]}</p>
-        </div>
-        <div className="lab-step-actions">
-          <Button
-            variant="ghost"
-            disabled={step === 0}
-            onClick={() => setStep(step - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            disabled={step === 3}
-            onClick={() => setStep(step + 1)}
-          >
-            Next step <ArrowRight size={15} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Restart chapter"
-            onClick={() => setStep(0)}
-          >
-            <RotateCcw size={16} />
-          </Button>
-        </div>
-      </section>
+      <ChapterNav
+        titles={LESSONS.map((item) => item.title)}
+        current={chapter}
+        onSelect={changeChapter}
+        label="Labelling walkthrough chapters"
+      />
+      <ParameterStrip items={PARAMETERS} />
+      <StepControls
+        steps={lesson.steps}
+        step={step}
+        onStepChange={setStep}
+        groupLabel="Build steps"
+        restartLabel="Restart chapter"
+      />
       <div className="lab-options">
         {chapter === 2 && (
-          <label>
-            Label source{" "}
-            <select
-              value={source}
-              onChange={(event) => setSource(event.target.value as LabelMode)}
-            >
-              <option value="continuous">Continuous</option>
-              <option value="dynamic">Dynamic</option>
-            </select>
-          </label>
+          <SelectField
+            label="Label source"
+            value={source}
+            options={LABEL_SOURCES}
+            onChange={setSource}
+          />
         )}
         {mode === "dynamic" && (
-          <label>
-            History before each eruption{" "}
-            <select
-              value={daysBefore}
-              onChange={(event) => setDaysBefore(Number(event.target.value))}
-            >
-              <option value={3}>3 days · separated slices</option>
-              <option value={7}>7 days · overlapping slices</option>
-              <option value={10}>10 days · longer overlap</option>
-            </select>
-          </label>
+          <SelectField
+            label="History before each eruption"
+            value={daysBefore}
+            options={HISTORY_OPTIONS}
+            onChange={setDaysBefore}
+          />
         )}
         {chapter === 2 && step >= 2 && (
           <label className="lab-checkbox">
@@ -201,14 +147,14 @@ export function LabellingWalkthrough() {
         )}
       </div>
       <section className="lab-visual" aria-label="Shared time ruler">
-        <div className="lab-section-title">
-          <h2>
-            {chapter === 2
+        <LabSectionTitle
+          title={
+            chapter === 2
               ? "Read the history behind one label"
-              : "One clock, two ways to choose timestamps"}
-          </h2>
-          <span>Illustrative dates · March 2025</span>
-        </div>
+              : "One clock, two ways to choose timestamps"
+          }
+          aside="Illustrative dates · March 2025"
+        />
         <p className="lab-ruler-hint" id="ruler-help">
           The ruler follows your selected timestamp. Scroll horizontally to
           explore other dates; focus the ruler and use Left/Right arrow keys.
@@ -357,19 +303,18 @@ export function LabellingWalkthrough() {
         </div>
       </section>
       <section className="lab-selection" aria-label="Select a label timestamp">
-        <div className="lab-section-title">
-          <h2>
-            {beforeMerge
+        <LabSectionTitle
+          title={
+            beforeMerge
               ? "Two event grids before merging"
-              : "Select a label timestamp"}
-          </h2>
-          <span>
-            {beforeMerge ? `${rawCount} event rows` : `${labels.length} labels`}
-            {labelled
+              : "Select a label timestamp"
+          }
+          aside={`${beforeMerge ? `${rawCount} event rows` : `${labels.length} labels`}${
+            labelled
               ? ` · ${positive} positive · ${labels.length - positive} negative`
-              : " · all initialised to 0"}
-          </span>
-        </div>
+              : " · all initialised to 0"
+          }`}
+        />
         <p>
           {beforeMerge
             ? "Each event starts its own ids at 0. Shared dates appear in both grids; the next step keeps each date once."
@@ -630,23 +575,14 @@ export function LabellingWalkthrough() {
                 {labels.slice(selectedIndex, selectedIndex + 4).map((row) => (
                   <tr key={row.id}>
                     <th scope="row">
-                      {new Date(row.time)
-                        .toISOString()
-                        .slice(0, 16)
-                        .replace("T", " ")}
+                      {utcStamp(row.time)}
                       <br />
                       <small>id {row.id}</small>
                     </th>
                     <td>
-                      {new Date(row.time - 2 * DAY)
-                        .toISOString()
-                        .slice(0, 16)
-                        .replace("T", " ")}
+                      {utcStamp(row.time - 2 * DAY)}
                       {" → "}
-                      {new Date(row.time - 600_000)
-                        .toISOString()
-                        .slice(0, 16)
-                        .replace("T", " ")}
+                      {utcStamp(row.time - 600_000)}
                     </td>
                     <td>{row.positive}</td>
                   </tr>

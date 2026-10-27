@@ -107,3 +107,17 @@ The forecast figure and ROC panels are data-driven, so another page (for example
 | `RocSimulation` | All ROC panels, shared threshold slider and confusion counts |
 
 `RECORDED_FORECAST` is the bundled OJN scenario 5.2 dataset. `rocAnalysis.ts` holds the label, ROC and confusion maths and caches per dataset.
+
+## Shared walkthrough components
+
+The Labelling, Training and Prediction pages share one set of building blocks, so a change to a heading, table, select or step control lands on every page. Do not copy their markup into a new lesson; import them. The class names are unchanged, so the stylesheets in `styles/` still apply.
+
+| Module | Provides |
+|--------|----------|
+| `components/lab/` | `LabSectionTitle`, `ResultOutput`, `SelectField` / `SeedSelect`, `ChoiceButtons`, `DataTable`, `ScrollRegion` / `ChartScroll`, `Legend`, `StepControls` / `StepButtons`, `ChapterNav`, `ParameterStrip`, `WhySection` / `ImplementationNotes`, `TraceToolbar` |
+| `components/common/ExplanationDialog.tsx` | The "open in a full dialog" button and Radix dialog used by the wiki explanation and the prediction replay |
+| `hooks/useTrace.ts` | The cursor-driven "Trace one run" state shared by `WorkflowDiagram` and `SeedWorkflowDiagram` |
+| `lib/format.ts`, `lib/time.ts` | `percent`, `fixed`, `goToStepLabel`; `shortDate` (string or epoch), `utcStamp` |
+| `features/explorer/components/` | Page chrome that needs routes or fixtures: `WalkthroughHeader`, `WalkthroughMenu` / `WalkthroughPager` / `WalkthroughFooter` (and the `WALKTHROUGHS` route list), `SampleCell`, `RadioCards`, `StageNumber`, `NodeBehavior` / `NodeParameters` / `NodeArtifacts` |
+
+Each Training lesson is its own component (`UnderSamplerLesson`, `SeedEnsembleLesson`, `ClassifierEnsembleLesson`, plus the existing feature-matrix, feature-selection and grid-CV lessons); `TrainingWalkthrough` only dispatches on the topic and owns the shared `step` and `seed`. Restart remounts the lesson, so a lesson's own controls reset with it. Shared modules cannot import from `features/` (enforced by `npm run lint`).

@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 export type Walkthrough = "labelling" | "training" | "prediction";
 
 // Training opens on its first lesson; the other two have one page each.
-const WALKTHROUGHS: readonly { id: Walkthrough; to: string; label: string }[] =
+export const WALKTHROUGHS: readonly { id: Walkthrough; to: string; label: string }[] =
   [
     { id: "labelling", to: "/labelling", label: "Labelling" },
     { id: "training", to: "/seed-ensemble", label: "Training" },
@@ -58,5 +58,37 @@ export function WalkthroughPager({
         </Link>
       )}
     </nav>
+  );
+}
+
+/** Closing block: pager plus a row of links to the walkthrough's sibling pages. */
+export function WalkthroughFooter({
+  previous,
+  next,
+  prompt,
+  links,
+}: {
+  previous?: Walkthrough;
+  next?: Walkthrough;
+  prompt: string;
+  links: readonly { to: string; label: string }[];
+}) {
+  const direction = previous && next ? "Previous and next" : next ? "Next" : "Previous";
+  return (
+    <footer className="training-footer">
+      <WalkthroughPager
+        previous={previous}
+        next={next}
+        label={`${direction} walkthrough, bottom`}
+      />
+      <p>{prompt}</p>
+      <nav className="training-links" aria-label="Continue learning">
+        {links.map(({ to, label }) => (
+          <Link key={to} to={to}>
+            {label} <ArrowRight size={14} />
+          </Link>
+        ))}
+      </nav>
+    </footer>
   );
 }

@@ -1,8 +1,13 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { useSearchParams } from "react-router-dom";
+import { ChapterNav } from "@/components/lab/ChapterNav";
+import { DataTable } from "@/components/lab/DataTable";
+import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { ParameterStrip } from "@/components/lab/ParameterStrip";
+import { ResultOutput } from "@/components/lab/ResultOutput";
+import { SelectField } from "@/components/lab/SelectField";
+import { StepControls } from "@/components/lab/StepControls";
+import { ImplementationNotes, WhySection } from "@/components/lab/WalkthroughNotes";
 import { RECORDED_FORECAST } from "../forecastDataset";
 import { TRAINING_LESSONS, type TrainingLesson } from "../trainingLessons";
 import {
@@ -23,8 +28,14 @@ import {
 import { ForecastExplorer } from "./ForecastExplorer";
 import { RocSimulation } from "./RocSimulation";
 import { PredictionWorkflowDiagram } from "./PredictionWorkflowDiagram";
+import { RadioCards } from "./RadioCards";
 import { ScenarioRunner } from "./ScenarioRunner";
-import { WalkthroughMenu, WalkthroughPager } from "./WalkthroughNav";
+import { WalkthroughHeader } from "./WalkthroughHeader";
+import {
+  WalkthroughFooter,
+  WalkthroughMenu,
+  WalkthroughPager,
+} from "./WalkthroughNav";
 import "@/styles/labelling.css";
 import "@/styles/training.css";
 import "@/styles/prediction.css";
@@ -59,7 +70,6 @@ export function PredictionWalkthrough() {
   const chapter = params.get("part") === "scenarios" ? 1 : 0;
   const selectedId = params.get("scenario") ?? scenarios.at(-1)!.id;
   const selected = scenarios.find((s) => s.id === selectedId) ?? scenarios[0]!;
-  const [heading, copy] = PREDICTION_STEPS[step]!;
   const lessons = Object.keys(TRAINING_LESSONS) as TrainingLesson[];
 
   function update(next: Record<string, string>) {
@@ -70,102 +80,38 @@ export function PredictionWalkthrough() {
 
   return (
     <main className="label-lab training-lab prediction-lab">
-      <header className="lab-heading">
-        <div>
-          <Link className="lab-back" to="/">
-            <ArrowLeft size={16} /> Back to Pipeline Atlas
-          </Link>
-          <h1>{PREDICTION_COPY.title}</h1>
-          <p>{PREDICTION_COPY.intro}</p>
-        </div>
-        <ThemeToggle />
-      </header>
+      <WalkthroughHeader
+        title={PREDICTION_COPY.title}
+        intro={PREDICTION_COPY.intro}
+      />
       <WalkthroughMenu current="prediction" />
       <WalkthroughPager previous="training" label="Previous walkthrough" />
-      <section className="training-why">
-        <h2>Why use it?</h2>
+      <WhySection>
         <p>{PREDICTION_COPY.why}</p>
-      </section>
-      <div className="lab-parameters">
-        <span>
-          Window size<strong>{DAY_TO_FORECAST} days (day_to_forecast)</strong>
-        </span>
-        <span>
-          Window step<strong>10 minutes</strong>
-        </span>
-        <span>
-          Alert threshold<strong>0.7, drawn on the plot</strong>
-        </span>
-        <span>
-          Recorded data<strong>OJN scenario 5.2, 1–22 Aug 2025 · UTC</strong>
-        </span>
-      </div>
-      <nav
-        className="lab-chapters"
-        aria-label="Prediction walkthrough chapters"
-      >
-        {CHAPTERS.map((title, index) => (
-          <button
-            key={title}
-            aria-current={chapter === index ? "step" : undefined}
-            onClick={() =>
-              update({ part: index === 1 ? "scenarios" : "forecast" })
-            }
-          >
-            <span>{index + 1}</span>
-            {title}
-          </button>
-        ))}
-      </nav>
+      </WhySection>
+      <ParameterStrip
+        items={[
+          ["Window size", `${DAY_TO_FORECAST} days (day_to_forecast)`],
+          ["Window step", "10 minutes"],
+          ["Alert threshold", "0.7, drawn on the plot"],
+          ["Recorded data", "OJN scenario 5.2, 1–22 Aug 2025 · UTC"],
+        ]}
+      />
+      <ChapterNav
+        titles={CHAPTERS}
+        current={chapter}
+        onSelect={(index) => update({ part: index === 1 ? "scenarios" : "forecast" })}
+        label="Prediction walkthrough chapters"
+      />
 
       {chapter === 0 ? (
         <>
-          <section className="lab-operation" aria-label="Walkthrough controls">
-            <div
-              className="lab-step-nav"
-              role="group"
-              aria-label="Prediction steps"
-            >
-              {PREDICTION_STEPS.map(([title], i) => (
-                <button
-                  key={title}
-                  aria-label={`Step ${i + 1}: ${title}`}
-                  aria-pressed={step === i}
-                  onClick={() => setStep(i)}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-            <div className="lab-operation-copy" aria-live="polite">
-              <h2>{heading}</h2>
-              <p>{copy}</p>
-            </div>
-            <div className="lab-step-actions">
-              <Button
-                variant="ghost"
-                disabled={step === 0}
-                onClick={() => setStep(step - 1)}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                disabled={step === PREDICTION_STEPS.length - 1}
-                onClick={() => setStep(step + 1)}
-              >
-                Next step
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Restart walkthrough"
-                onClick={() => setStep(0)}
-              >
-                <RotateCcw size={16} />
-              </Button>
-            </div>
-          </section>
+          <StepControls
+            steps={PREDICTION_STEPS}
+            step={step}
+            onStepChange={setStep}
+            groupLabel="Prediction steps"
+          />
           <section
             className="lab-visual"
             aria-label="Interactive prediction example"
@@ -174,29 +120,17 @@ export function PredictionWalkthrough() {
 
             {step === 0 && (
               <>
-                <div className="lab-section-title">
-                  <h2>A grid of windows nobody has labelled</h2>
-                  <span>
-                    {selected.name} · {selected.predictionStart} to{" "}
-                    {selected.predictionEnd}
-                  </span>
-                </div>
+                <LabSectionTitle
+                  title="A grid of windows nobody has labelled"
+                  aside={`${selected.name} · ${selected.predictionStart} to ${selected.predictionEnd}`}
+                />
                 <div className="lab-options">
-                  <label>
-                    Scenario{" "}
-                    <select
-                      value={selected.id}
-                      onChange={(event) =>
-                        update({ scenario: event.target.value })
-                      }
-                    >
-                      {scenarios.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <SelectField
+                    label="Scenario"
+                    value={selected.id}
+                    options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
+                    onChange={(id) => update({ scenario: id })}
+                  />
                 </div>
                 <div
                   className="pw-grid"
@@ -213,14 +147,14 @@ export function PredictionWalkthrough() {
                     with the one before. Not to scale.
                   </small>
                 </div>
-                <output className="training-result" aria-live="polite">
+                <ResultOutput>
                   {daysBetween(
                     selected.predictionStart,
                     selected.predictionEnd,
                   )}{" "}
                   days × 144 per day ≈{" "}
                   {windowEstimate(selected).toLocaleString()} windows
-                </output>
+                </ResultOutput>
                 <p>
                   {
                     eruptionsBetween(
@@ -238,10 +172,10 @@ export function PredictionWalkthrough() {
 
             {step === 1 && (
               <>
-                <div className="lab-section-title">
-                  <h2>Same features, no verdict</h2>
-                  <span>Prediction mode</span>
-                </div>
+                <LabSectionTitle
+                  title="Same features, no verdict"
+                  aside="Prediction mode"
+                />
                 <div className="pw-compare">
                   <section>
                     <h3>Training</h3>
@@ -258,55 +192,43 @@ export function PredictionWalkthrough() {
                     </p>
                   </section>
                 </div>
-                <fieldset className="pw-radios">
-                  <legend>use_features_from</legend>
-                  {FEATURE_SOURCES.map((item) => (
-                    <label key={item.value} data-on={source === item.value}>
-                      <input
-                        type="radio"
-                        name="features-source"
-                        checked={source === item.value}
-                        onChange={() => setSource(item.value)}
-                      />
-                      <span>
-                        <strong>{item.label}</strong>
-                        {item.effect}
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-                <output className="training-result" aria-live="polite">
+                <RadioCards
+                  legend="use_features_from"
+                  name="features-source"
+                  options={FEATURE_SOURCES.map((item) => ({
+                    value: item.value,
+                    title: item.label,
+                    detail: item.effect,
+                  }))}
+                  value={source}
+                  onChange={setSource}
+                />
+                <ResultOutput>
                   {FEATURE_SOURCES.find((item) => item.value === source)!.cost}
-                </output>
+                </ResultOutput>
               </>
             )}
 
             {step === 2 && (
               <>
-                <div className="lab-section-title">
-                  <h2>Whatever you saved, one container</h2>
-                  <span>ClassifierEnsemble.from_any</span>
-                </div>
-                <fieldset className="pw-radios">
-                  <legend>The model argument</legend>
-                  {MODEL_INPUTS.map(([name, detail], i) => (
-                    <label key={name} data-on={modelInput === i}>
-                      <input
-                        type="radio"
-                        name="model-input"
-                        checked={modelInput === i}
-                        onChange={() => setModelInput(i)}
-                      />
-                      <span>
-                        <strong>{name}</strong>
-                        {detail}
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-                <output className="training-result" aria-live="polite">
+                <LabSectionTitle
+                  title="Whatever you saved, one container"
+                  aside="ClassifierEnsemble.from_any"
+                />
+                <RadioCards
+                  legend="The model argument"
+                  name="model-input"
+                  options={MODEL_INPUTS.map(([name, detail], i) => ({
+                    value: i,
+                    title: name,
+                    detail,
+                  }))}
+                  value={modelInput}
+                  onChange={setModelInput}
+                />
+                <ResultOutput>
                   {MODEL_INPUTS[modelInput]![0]} → ClassifierEnsemble
-                </output>
+                </ResultOutput>
                 <p>
                   Each seed model keeps its own feature list, so the window
                   features are subset per seed at inference. The cache identity
@@ -318,14 +240,14 @@ export function PredictionWalkthrough() {
 
             {step >= 3 && (
               <>
-                <div className="lab-section-title">
-                  <h2>
-                    {step === 3
+                <LabSectionTitle
+                  title={
+                    step === 3
                       ? "Read one window of the recorded forecast"
-                      : "The curve forecast() leaves behind"}
-                  </h2>
-                  <span>OJN scenario 5.2 · eruptions 2 and 18 Aug</span>
-                </div>
+                      : "The curve forecast() leaves behind"
+                  }
+                  aside="OJN scenario 5.2 · eruptions 2 and 18 Aug"
+                />
                 <ForecastExplorer
                   dataset={RECORDED_FORECAST}
                   revealRows={step === 3}
@@ -344,58 +266,34 @@ export function PredictionWalkthrough() {
 
             {step === 4 && (
               <div className="pw-outputs">
-                <div
-                  className="training-table-scroll"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Files written by a prediction run"
+                <DataTable
+                  label="Files written by a prediction run"
+                  caption={<>Files under {"{output_dir}/{nslc}/"}</>}
+                  headers={["Path", "Holds"]}
                 >
-                  <table className="training-table">
-                    <caption>Files under {"{output_dir}/{nslc}/"}</caption>
-                    <thead>
-                      <tr>
-                        <th>Path</th>
-                        <th>Holds</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {OUTPUT_FILES.map(([path, holds]) => (
-                        <tr key={path}>
-                          <th>
-                            <code>{path}</code>
-                          </th>
-                          <td>{holds}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div
-                  className="training-table-scroll"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Forecast CSV columns"
+                  {OUTPUT_FILES.map(([path, holds]) => (
+                    <tr key={path}>
+                      <th>
+                        <code>{path}</code>
+                      </th>
+                      <td>{holds}</td>
+                    </tr>
+                  ))}
+                </DataTable>
+                <DataTable
+                  label="Forecast CSV columns"
+                  caption="Columns in the forecast CSV"
+                  headers={["Column", "Meaning"]}
                 >
-                  <table className="training-table">
-                    <caption>Columns in the forecast CSV</caption>
-                    <thead>
-                      <tr>
-                        <th>Column</th>
-                        <th>Meaning</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {CSV_FIELDS.map(([field, meaning]) => (
-                        <tr key={field}>
-                          <th>
-                            <code>{field}</code>
-                          </th>
-                          <td>{meaning}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                  {CSV_FIELDS.map(([field, meaning]) => (
+                    <tr key={field}>
+                      <th>
+                        <code>{field}</code>
+                      </th>
+                      <td>{meaning}</td>
+                    </tr>
+                  ))}
+                </DataTable>
               </div>
             )}
           </section>
@@ -405,10 +303,10 @@ export function PredictionWalkthrough() {
           className="lab-visual"
           aria-label="Interactive scenario runner"
         >
-          <div className="lab-section-title">
-            <h2>Run the same forecast under several scenarios</h2>
-            <span>ForecastModelScenario · forecast-scenario.py</span>
-          </div>
+          <LabSectionTitle
+            title="Run the same forecast under several scenarios"
+            aside="ForecastModelScenario · forecast-scenario.py"
+          />
           <p>
             One ForecastModel calculates tremor once. Each scenario then trains
             on its own period, predicts the next, evaluates and explains. Later
@@ -424,34 +322,19 @@ export function PredictionWalkthrough() {
         </section>
       )}
 
-      <section className="training-notes">
-        <div>
-          <h2>What this does—and what it cannot fix</h2>
-          <p>{PREDICTION_COPY.caveat}</p>
-        </div>
-        <div>
-          <h2>How this repository builds it</h2>
-          <p>{PREDICTION_COPY.implementation}</p>
-          <ul>
-            {PREDICTION_COPY.sources.map((item) => (
-              <li key={item}>
-                <code>{item}</code>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-      <footer className="training-footer">
-        <WalkthroughPager
-          previous="training"
-          label="Previous walkthrough, bottom"
-        />
-        <p>Walk the pipeline again</p>
-        <nav className="training-links" aria-label="Continue learning">
-          <Link to="/labelling">Labelling</Link>
-          <Link to={`/${lessons[0]}`}>Training</Link>
-        </nav>
-      </footer>
+      <ImplementationNotes
+        caveat={PREDICTION_COPY.caveat}
+        implementation={PREDICTION_COPY.implementation}
+        sources={PREDICTION_COPY.sources}
+      />
+      <WalkthroughFooter
+        previous="training"
+        prompt="Walk the pipeline again"
+        links={[
+          { to: "/labelling", label: "Labelling" },
+          { to: `/${lessons[0]}`, label: "Training" },
+        ]}
+      />
     </main>
   );
 }

@@ -21,6 +21,8 @@ import { AtlasNode } from "./AtlasNode";
 import { TimelinePeriods } from "./TimelinePeriods";
 
 const NODE_TYPES = { atlas: AtlasNode, periods: TimelinePeriods };
+// Framing shared by every fit-to-view call so zoom behaviour stays consistent.
+const FIT = { padding: 0.13, maxZoom: 1 } as const;
 interface CanvasProps {
   view: ExplorerView;
   selected: string;
@@ -108,7 +110,7 @@ function Canvas({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (view === "pipeline" || selected === focusTarget) focus();
-        else void fitView({ padding: 0.13, maxZoom: 1 });
+        else void fitView(FIT);
       });
     });
     observer.observe(host);
@@ -125,7 +127,7 @@ function Canvas({
       if (view === "pipeline") initialFramed.current = focus();
       else {
         initialFramed.current = true;
-        void fitView({ padding: 0.13, maxZoom: 1 });
+        void fitView(FIT);
       }
     });
     return () => cancelAnimationFrame(frame);
@@ -205,8 +207,7 @@ function Canvas({
         fitView={false}
         defaultViewport={initialViewport}
         fitViewOptions={{
-          padding: 0.13,
-          maxZoom: 1,
+          ...FIT,
           ...(view === "pipeline" ? { nodes: [{ id: selected }] } : {}),
         }}
         minZoom={0.2}

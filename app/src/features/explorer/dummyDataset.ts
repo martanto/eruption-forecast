@@ -6,6 +6,13 @@ export const QUIET_COUNT = 14;
 export const PRE_COUNT = 10;
 export const DUMMY_DATA_SEED = 365;
 
+// The continuous features the KS and labelled-data demos let the reader switch between.
+export const PICK_FEATURES = [
+  "rsam_f2__mean",
+  "rsam_f2__standard_deviation",
+  "rsam_f4__count_above_mean",
+] as const;
+
 export interface DummyFeature {
   name: string;
   kind: "real" | "binary";
