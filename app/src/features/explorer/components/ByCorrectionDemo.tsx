@@ -1,13 +1,15 @@
 import { useState } from "react";
+import { AxisTitle, XAxis, YAxis } from "@/components/lab/ChartAxes";
+import { ChartFrame } from "@/components/lab/ChartFrame";
 import { DataTable } from "@/components/lab/DataTable";
-import { Legend } from "@/components/lab/Legend";
-import { ChartScroll } from "@/components/lab/ScrollRegion";
+import { linearScale, linePath, logScale } from "@/lib/scale";
 import { correct, formatP } from "../significance";
 
 const W = 760;
 const H = 360;
 const LEFT = 64;
 const TOP = 16;
+const RIGHT = 12;
 const BOTTOM = 40;
 const LOG_MIN = -7;
 // Minor gridlines at 2..9 x 10^e make the logarithmic spacing visible.
@@ -16,22 +18,29 @@ const MINOR = [-6, -5, -4, -3, -2, -1].flatMap((e) =>
 );
 
 // p-values span many orders of magnitude, so the chart is logarithmic.
-const sy = (p: number) => {
-  const t = (Math.log10(Math.max(p, 10 ** LOG_MIN)) - LOG_MIN) / -LOG_MIN;
-  return H - BOTTOM - t * (H - BOTTOM - TOP);
-};
+const sy = logScale([10 ** LOG_MIN, 1], [H - BOTTOM, TOP]);
+const LEGEND = [
+  { swatch: ["line", "raw"], label: "uncorrected level q" },
+  { swatch: ["line", "bh"], label: "BH threshold" },
+  { swatch: ["line", "by"], label: "BY threshold" },
+  { swatch: ["dot", "kept"], label: "kept by BY" },
+  { swatch: ["dot", "dropped"], label: "dropped" },
+] as const;
+const MAJOR = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6];
+const pLabel = (tick: number) =>
+  tick === 1 ? "1" : tick.toExponential(0).replace("e-", "e−");
 
 export function ByCorrectionDemo() {
   const [q, setQ] = useState(0.05);
   const { rows, m, c } = correct(q);
-  const sx = (rank: number) => LEFT + ((rank - 0.5) / m) * (W - LEFT - 12);
+  const sx = linearScale([0.5, m + 0.5], [LEFT, W - RIGHT]);
   const counts = {
     raw: rows.filter((row) => row.keptRaw).length,
     bh: rows.filter((row) => row.keptBh).length,
     by: rows.filter((row) => row.keptBy).length,
   };
   const line = (key: "bh" | "by") =>
-    rows.map((row, i) => `${i === 0 ? "M" : "L"}${sx(row.rank)},${sy(row[key])}`).join(" ");
+    linePath(rows.map((row) => [sx(row.rank), sy(row[key])] as const));
   const lastBy = rows.filter((row) => row.keptBy).length;
   const rank5 = rows[4]!;
 
@@ -92,17 +101,12 @@ export function ByCorrectionDemo() {
           <h3>Ordered p-values against three rejection thresholds</h3>
           <div className="sig-by-chart">
           <div>
-          <Legend
-            items={[
-              { swatch: ["line", "raw"], label: "uncorrected level q" },
-              { swatch: ["line", "bh"], label: "BH threshold" },
-              { swatch: ["line", "by"], label: "BY threshold" },
-              { swatch: ["dot", "kept"], label: "kept by BY" },
-              { swatch: ["dot", "dropped"], label: "dropped" },
-            ]}
-          />
-          <ChartScroll>
-          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`BY keeps the first ${lastBy} of ${m} features at q = ${q}.`}>
+          <ChartFrame
+            width={W}
+            height={H}
+            label={`BY keeps the first ${lastBy} of ${m} features at q = ${q}.`}
+            legend={LEGEND}
+          >
             {lastBy > 0 && (
               <rect
                 x={LEFT}
@@ -112,53 +116,34 @@ export function ByCorrectionDemo() {
                 className="sig-keep-zone"
               />
             )}
-            {MINOR.map((tick) => (
-              <line key={tick} x1={LEFT} x2={W - 12} y1={sy(tick)} y2={sy(tick)} className="sig-grid-minor" />
-            ))}
-            {[1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6].map((tick) => (
-              <g key={tick}>
-                <line x1={LEFT} x2={W - 12} y1={sy(tick)} y2={sy(tick)} className="sig-grid-line" />
-                <text x={LEFT - 6} y={sy(tick) + 4} textAnchor="end" className="sig-axis">
-                  {tick === 1 ? "1" : tick.toExponential(0).replace("e-", "e−")}
-                </text>
-              </g>
-            ))}
-            <line x1={LEFT} x2={W - 12} y1={sy(q)} y2={sy(q)} className="sig-line" data-line="raw" />
+            <YAxis ticks={MINOR} scale={sy} left={LEFT} right={W - RIGHT} grid="minor" labels={false} />
+            <YAxis ticks={MAJOR} scale={sy} left={LEFT} right={W - RIGHT} format={pLabel} />
+            <XAxis ticks={rows.map((row) => row.rank)} scale={sx} labelY={H - BOTTOM + 18} />
+            <line x1={LEFT} x2={W - RIGHT} y1={sy(q)} y2={sy(q)} className="sig-line" data-line="raw" />
             <path d={line("bh")} className="sig-line" data-line="bh" />
             <path d={line("by")} className="sig-line" data-line="by" />
             {rows.map((row) => (
-              <g key={row.name}>
-                <circle
-                  cx={sx(row.rank)}
-                  cy={sy(row.p)}
-                  r={5.5}
-                  className="sig-point"
-                  data-kept={row.keptBy}
-                />
-                <text x={sx(row.rank)} y={H - BOTTOM + 18} textAnchor="middle" className="sig-axis">
-                  {row.rank}
-                </text>
-              </g>
+              <circle
+                key={row.name}
+                cx={sx(row.rank)}
+                cy={sy(row.p)}
+                r={5.5}
+                className="sig-point"
+                data-kept={row.keptBy}
+              />
             ))}
-            <text x={(LEFT + W) / 2} y={H - 6} textAnchor="middle" className="sig-axis">
+            <AxisTitle x={(LEFT + W) / 2} y={H - 6}>
               rank k of the ordered p-values (1 = smallest)
-            </text>
-            <text
-              transform={`rotate(-90 14 ${(TOP + H - BOTTOM) / 2})`}
-              x={14}
-              y={(TOP + H - BOTTOM) / 2}
-              textAnchor="middle"
-              className="sig-axis"
-            >
+            </AxisTitle>
+            <AxisTitle x={14} y={(TOP + H - BOTTOM) / 2} rotate>
               p-value (log scale)
-            </text>
+            </AxisTitle>
             {lastBy > 0 && (
               <text x={LEFT + 8} y={TOP + 16} className="sig-zone-label">
                 BY keeps ranks 1–{lastBy}
               </text>
             )}
-          </svg>
-          </ChartScroll>
+          </ChartFrame>
           </div>
           <div>
           <div className="sig-formula">

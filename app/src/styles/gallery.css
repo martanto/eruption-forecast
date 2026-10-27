@@ -1,0 +1,37 @@
+.label-lab .gallery-group {
+  max-width: none;
+  margin: 40px 0 8px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
+  font-family: Newsreader, Georgia, serif;
+  font-size: 29px;
+}
+.gallery-entry {
+  padding: 20px 0 8px;
+  border-bottom: 1px solid var(--color-line);
+}
+.gallery-entry header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+.label-lab .gallery-entry h2 {
+  margin: 0;
+}
+.gallery-source {
+  color: var(--color-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.gallery-stage {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+}

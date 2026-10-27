@@ -1,4 +1,6 @@
+import { AxisTitle, XAxis, YAxis } from "@/components/lab/ChartAxes";
 import { fixed } from "@/lib/format";
+import { linearScale, linePoints } from "@/lib/scale";
 import { confusionAt, ratio, rocFor } from "../rocAnalysis";
 import type { ForecastDataset } from "../forecastDataset";
 import "@/styles/prediction.css";
@@ -21,8 +23,10 @@ export const rocColor = (dataset: ForecastDataset, model: string) => {
     : PALETTE[(index - 1) % PALETTE.length]!;
 };
 
-const x = (value: number) => PAD.left + value * (W - PAD.left - PAD.right);
-const y = (value: number) => PAD.top + (1 - value) * (H - PAD.top - PAD.bottom);
+const x = linearScale([0, 1], [PAD.left, W - PAD.right]);
+const y = linearScale([0, 1], [H - PAD.bottom, PAD.top]);
+const TICKS = [0, 0.2, 0.4, 0.6, 0.8, 1];
+const tickLabel = (tick: number) => tick.toFixed(1);
 
 export interface RocPanelProps {
   dataset: ForecastDataset;
@@ -41,19 +45,18 @@ export function RocPanel({ dataset, model, title, threshold }: RocPanelProps) {
   const color = rocColor(dataset, model);
   // Thin the curve for drawing; every distinct score still counts toward the AUC.
   const stride = Math.max(1, Math.floor(roc.points.length / 400));
-  const line = roc.points
-    .filter((_, i) => i % stride === 0 || i === roc.points.length - 1)
-    .map((p) => `${x(p.fpr).toFixed(1)},${y(p.tpr).toFixed(1)}`)
-    .join(" ");
+  const line = linePoints(
+    roc.points
+      .filter((_, i) => i % stride === 0 || i === roc.points.length - 1)
+      .map((p) => [x(p.fpr), y(p.tpr)] as const),
+  );
   const lowerReversed = [...roc.lower].reverse();
-  const band = [
-    ...roc.grid.map(
-      (g, i) => `${x(g).toFixed(1)},${y(roc.upper[i]!).toFixed(1)}`,
-    ),
+  const band = linePoints([
+    ...roc.grid.map((g, i) => [x(g), y(roc.upper[i]!)] as const),
     ...[...roc.grid]
       .reverse()
-      .map((g, i) => `${x(g).toFixed(1)},${y(lowerReversed[i]!).toFixed(1)}`),
-  ].join(" ");
+      .map((g, i) => [x(g), y(lowerReversed[i]!)] as const),
+  ]);
   return (
     <figure className="roc-panel">
       <svg
@@ -64,55 +67,32 @@ export function RocPanel({ dataset, model, title, threshold }: RocPanelProps) {
         <text className="roc-title" x={W / 2} y="14" textAnchor="middle">
           {title}
         </text>
-        {[0, 0.2, 0.4, 0.6, 0.8, 1].map((tick) => (
-          <g key={tick}>
-            <line
-              className="roc-grid"
-              x1={x(0)}
-              x2={x(1)}
-              y1={y(tick)}
-              y2={y(tick)}
-            />
-            <line
-              className="roc-grid"
-              x1={x(tick)}
-              x2={x(tick)}
-              y1={y(0)}
-              y2={y(1)}
-            />
-            <text
-              className="roc-axis"
-              x={x(0) - 5}
-              y={y(tick) + 4}
-              textAnchor="end"
-            >
-              {tick.toFixed(1)}
-            </text>
-            <text
-              className="roc-axis"
-              x={x(tick)}
-              y={y(0) + 14}
-              textAnchor="middle"
-            >
-              {tick.toFixed(1)}
-            </text>
-          </g>
-        ))}
-        <text
-          className="roc-axis-label"
-          x={x(0.5)}
-          y={H - 6}
-          textAnchor="middle"
-        >
+        <YAxis
+          ticks={TICKS}
+          scale={y}
+          left={x(0)}
+          right={x(1)}
+          format={tickLabel}
+          grid="dashed"
+          labelGap={5}
+          size="small"
+        />
+        <XAxis
+          ticks={TICKS}
+          scale={x}
+          labelY={y(0) + 14}
+          format={tickLabel}
+          gridFrom={y(0)}
+          gridTo={y(1)}
+          grid="dashed"
+          size="small"
+        />
+        <AxisTitle x={x(0.5)} y={H - 6}>
           False positive rate
-        </text>
-        <text
-          className="roc-axis-label"
-          transform={`translate(10 ${y(0.5)}) rotate(-90)`}
-          textAnchor="middle"
-        >
+        </AxisTitle>
+        <AxisTitle x={10} y={y(0.5)} rotate>
           True positive rate
-        </text>
+        </AxisTitle>
         <line className="roc-chance" x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} />
         <polygon points={band} fill={color} fillOpacity="0.16" />
         <polyline

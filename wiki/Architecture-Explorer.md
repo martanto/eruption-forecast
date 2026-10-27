@@ -114,10 +114,20 @@ The Labelling, Training and Prediction pages share one set of building blocks, s
 
 | Module | Provides |
 |--------|----------|
-| `components/lab/` | `LabSectionTitle`, `ResultOutput`, `SelectField` / `SeedSelect`, `ChoiceButtons`, `DataTable`, `ScrollRegion` / `ChartScroll`, `Legend`, `StepControls` / `StepButtons`, `ChapterNav`, `ParameterStrip`, `WhySection` / `ImplementationNotes`, `TraceToolbar` |
+| `components/lab/` | `LabSectionTitle`, `ResultOutput`, `SelectField` / `SeedSelect`, `ChoiceButtons`, `DataTable`, `ScrollRegion` / `ChartScroll`, `Legend`, `StepControls` / `StepButtons`, `ChapterNav`, `ParameterStrip`, `WhySection` / `ImplementationNotes`, `TraceToolbar`, `ChartFrame`, `YAxis` / `XAxis` / `AxisTitle` |
 | `components/common/ExplanationDialog.tsx` | The "open in a full dialog" button and Radix dialog used by the wiki explanation and the prediction replay |
+| `lib/scale.ts` | `linearScale`, `logScale`, `linePoints`, `linePath`: the domain-to-pixel maths and SVG point strings every chart uses |
+| `hooks/useElementWidth.ts` | Container width for charts that redraw to fit instead of scrolling (`ForecastChart`) |
 | `hooks/useTrace.ts` | The cursor-driven "Trace one run" state shared by `WorkflowDiagram` and `SeedWorkflowDiagram` |
 | `lib/format.ts`, `lib/time.ts` | `percent`, `fixed`, `goToStepLabel`; `shortDate` (string or epoch), `utcStamp` |
 | `features/explorer/components/` | Page chrome that needs routes or fixtures: `WalkthroughHeader`, `WalkthroughMenu` / `WalkthroughPager` / `WalkthroughFooter` (and the `WALKTHROUGHS` route list), `SampleCell`, `RadioCards`, `StageNumber`, `NodeBehavior` / `NodeParameters` / `NodeArtifacts` |
 
 Each Training lesson is its own component (`UnderSamplerLesson`, `SeedEnsembleLesson`, `ClassifierEnsembleLesson`, plus the existing feature-matrix, feature-selection and grid-CV lessons); `TrainingWalkthrough` only dispatches on the topic and owns the shared `step` and `seed`. Restart remounts the lesson, so a lesson's own controls reset with it. Shared modules cannot import from `features/` (enforced by `npm run lint`).
+
+### Charts
+
+Draw SVG charts from `ChartFrame` (legend, scrolling `<svg role="img">`, required text label), `YAxis` / `XAxis` / `AxisTitle` (gridlines and ticks; one `chart-grid` / `chart-axis` stylesheet in `styles/charts.css`) and `lib/scale.ts`. Do not hand-roll `sx`/`sy` functions, point strings or axis text. `ForecastChart`, `RocPanel`, `ByCorrectionDemo`, `KsTestDemo`, `FisherDemo` and `LabelledDataDemo` already use them. `FisherDemo`'s "How C(n, r) works" section lives in `CombinationsLesson.tsx` to stay under the file-size limit.
+
+### Component gallery
+
+`/gallery` (`features/gallery/`, route `routes/GalleryPage.tsx`) renders every `components/lab/` and `components/common/` component, plus `Button`, with live demos and its source path. Check it before building a new component. When you add a shared component or change its props, add or update its `GallerySection` in `LabGallery.tsx` or `CommonGallery.tsx` in the same change. `tests/browser/gallery.spec.ts` checks the page lists the components and fits the viewport.
