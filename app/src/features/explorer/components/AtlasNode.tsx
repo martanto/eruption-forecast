@@ -2,6 +2,7 @@ import { Handle, Position, useViewport, type NodeProps } from "@xyflow/react";
 import { ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 import { STAGES, type ArchitectureNode } from "@/features/architecture";
 import { useInteractionStore } from "@/stores/interactionStore";
+import { StageNumber } from "./StageNumber";
 
 export function AtlasNode({
   data,
@@ -23,9 +24,7 @@ export function AtlasNode({
         isConnectable={false}
       />
       <div className="node-heading">
-        <span className="stage-number">
-          {String(stage.number).padStart(2, "0")}
-        </span>
+        <StageNumber number={stage.number} />
         <h3>{item.title}</h3>
         {item.gaps.length > 0 && (
           <AlertCircle size={16} aria-label="Has implementation caveats" />

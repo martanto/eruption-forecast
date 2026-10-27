@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { ResultOutput } from "@/components/lab/ResultOutput";
+import { SeedSelect, SelectField } from "@/components/lab/SelectField";
 import {
   FDR_ILLUSTRATIVE_CUTOFF,
   FEATURE_CANDIDATES,
@@ -7,6 +10,10 @@ import {
 import { retainedNegatives } from "../trainingLessons";
 
 type Method = "tsfresh" | "random_forest";
+const METHODS: readonly { value: Method; label: string }[] = [
+  { value: "tsfresh", label: "tsfresh (BY-corrected p-values)" },
+  { value: "random_forest", label: "random_forest (permutation importance)" },
+];
 
 export function FeatureSelectionLesson({
   step,
@@ -27,42 +34,26 @@ export function FeatureSelectionLesson({
   const kept = ranked.filter((feature) => feature.rank <= topN);
   return (
     <>
-      <div className="lab-section-title">
-        <h2>
-          {step === 0
+      <LabSectionTitle
+        title={
+          step === 0
             ? "Candidate features from the resampled rows"
             : step === 1
               ? "Score each feature against the label"
               : step === 2
                 ? `Keep the top ${topN}`
-                : "This seed's saved feature list"}
-        </h2>
-        <span>8 teaching features · a real matrix has thousands</span>
-      </div>
+                : "This seed's saved feature list"
+        }
+        aside="8 teaching features · a real matrix has thousands"
+      />
       <div className="lab-options">
-        <label>
-          Seed{" "}
-          <select
-            value={seed}
-            onChange={(e) => setSeed(Number(e.target.value))}
-          >
-            {[0, 1, 2].map((i) => (
-              <option key={i} value={i}>
-                Seed {i}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Method{" "}
-          <select
-            value={method}
-            onChange={(e) => setMethod(e.target.value as Method)}
-          >
-            <option value="tsfresh">tsfresh (BY-corrected p-values)</option>
-            <option value="random_forest">random_forest (permutation importance)</option>
-          </select>
-        </label>
+        <SeedSelect value={seed} onChange={setSeed} />
+        <SelectField
+          label="Method"
+          value={method}
+          options={METHODS}
+          onChange={setMethod}
+        />
         <label>
           top_n{" "}
           <input
@@ -122,11 +113,11 @@ export function FeatureSelectionLesson({
           {kept.map((feature) => feature.name).join(", ")}
         </p>
       )}
-      <output className="training-result" aria-live="polite">
+      <ResultOutput>
         {step < 2
           ? "8 candidates → no list yet"
           : `${kept.length} of 8 features kept for seed ${seed}`}
-      </output>
+      </ResultOutput>
       <p>
         {method === "tsfresh"
           ? "Illustrative p-values; “(> 0.05)” marks features above the 0.05 significance level. tsfresh applies the Benjamini–Yekutieli correction, which is stricter than this uncorrected cut."

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Pause, Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { TraceToolbar } from "@/components/lab/TraceToolbar";
+import { useTrace, type TraceState } from "@/hooks/useTrace";
+import { goToStepLabel } from "@/lib/format";
 import {
   SEED_INPUT_NODE,
   SEED_JOB_NODES,
@@ -9,32 +9,16 @@ import {
 } from "../trainingLessons";
 
 const ORDER = [SEED_INPUT_NODE, ...SEED_JOB_NODES, ...SEED_MERGE_NODES];
-const TICK_MS = 900;
 
 function Node({
   node,
-  step,
-  cursor,
+  state,
   onSelect,
 }: {
   node: SeedWorkflowNode;
-  step: number;
-  cursor: number;
+  state: TraceState;
   onSelect: (step: number) => void;
 }) {
-  const index = ORDER.indexOf(node);
-  // While a trace is running the cursor owns the highlight; otherwise the
-  // walkthrough step does.
-  const state =
-    cursor < 0
-      ? node.step === step
-        ? "current"
-        : "idle"
-      : index < cursor
-        ? "done"
-        : index === cursor
-          ? "current"
-          : "idle";
   return (
     <li
       className="swf-node"
@@ -45,7 +29,7 @@ function Node({
       <button
         type="button"
         onClick={() => onSelect(node.step)}
-        aria-label={`${node.title}: ${node.detail}. Go to step ${node.step + 1}`}
+        aria-label={goToStepLabel(node)}
       >
         <strong>{node.title}</strong>
         <span>{node.detail}</span>
@@ -61,76 +45,39 @@ export function SeedWorkflowDiagram({
   step: number;
   onStepChange: (step: number) => void;
 }) {
-  const [cursor, setCursor] = useState(-1);
-  const [playing, setPlaying] = useState(false);
-
-  useEffect(() => {
-    if (!playing) return;
-    const id = window.setInterval(() => {
-      setCursor((current) => {
-        if (current + 1 >= ORDER.length) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [playing]);
-
-  useEffect(() => {
-    if (cursor >= 0) onStepChange(ORDER[cursor]!.step);
-  }, [cursor, onStepChange]);
-
-  function togglePlay() {
-    if (playing) {
-      setPlaying(false);
-      return;
-    }
-    // Replay from the start once a run has finished.
-    setCursor((current) => (current + 1 >= ORDER.length ? 0 : current < 0 ? 0 : current));
-    setPlaying(true);
-  }
-
-  function select(next: number) {
-    setPlaying(false);
-    setCursor(-1);
-    onStepChange(next);
-  }
-
+  const trace = useTrace(ORDER, step, onStepChange);
+  const { cursor } = trace;
   const inJob = cursor >= 1 && cursor <= SEED_JOB_NODES.length;
+  const node = (item: SeedWorkflowNode) => (
+    <Node
+      key={item.id}
+      node={item}
+      state={trace.stateOf(ORDER.indexOf(item))}
+      onSelect={trace.select}
+    />
+  );
   return (
     <figure className="swf" aria-label="Seed ensemble workflow">
-      <div className="swf-toolbar">
-        <Button variant="outline" size="small" onClick={togglePlay}>
-          {playing ? <Pause size={15} /> : <Play size={15} />}
-          {playing ? "Pause" : cursor >= ORDER.length - 1 ? "Replay" : "Trace one run"}
-        </Button>
-        <span aria-live="polite">
-          {cursor < 0
-            ? "Select a box to jump to its step, or trace the whole run."
-            : `${ORDER[cursor]!.title}: ${ORDER[cursor]!.detail}`}
-        </span>
-      </div>
+      <TraceToolbar
+        className="swf-toolbar"
+        playing={trace.playing}
+        finished={trace.finished}
+        onToggle={trace.togglePlay}
+        status={
+          trace.current
+            ? `${trace.current.title}: ${trace.current.detail}`
+            : "Select a box to jump to its step, or trace the whole run."
+        }
+      />
       <div className="swf-row">
-        <ol className="swf-list swf-input">
-          <Node node={SEED_INPUT_NODE} step={step} cursor={cursor} onSelect={select} />
-        </ol>
+        <ol className="swf-list swf-input">{node(SEED_INPUT_NODE)}</ol>
         <div className="swf-group" data-running={inJob}>
           <p className="swf-group-label">One job per seed (random_state)</p>
-          <ol className="swf-list">
-            {SEED_JOB_NODES.map((node) => (
-              <Node key={node.id} node={node} step={step} cursor={cursor} onSelect={select} />
-            ))}
-          </ol>
+          <ol className="swf-list">{SEED_JOB_NODES.map(node)}</ol>
         </div>
       </div>
       <div className="swf-drop" aria-hidden="true" data-lit={cursor >= SEED_JOB_NODES.length} />
-      <ol className="swf-list swf-merge">
-        {SEED_MERGE_NODES.map((node) => (
-          <Node key={node.id} node={node} step={step} cursor={cursor} onSelect={select} />
-        ))}
-      </ol>
+      <ol className="swf-list swf-merge">{SEED_MERGE_NODES.map(node)}</ol>
       <figcaption>
         Every seed repeats the boxed steps independently, so seeds can run in
         parallel (<code>n_jobs</code>). The stacked outlines behind the box are

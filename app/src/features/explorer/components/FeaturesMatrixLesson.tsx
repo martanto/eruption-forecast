@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { ResultOutput } from "@/components/lab/ResultOutput";
+import { ScrollRegion } from "@/components/lab/ScrollRegion";
+import { SelectField } from "@/components/lab/SelectField";
 import {
   FEATURES_MATRIX_EDGES,
   FEATURES_MATRIX_NODES,
@@ -34,37 +38,27 @@ export function FeaturesMatrixLesson({
         onStepChange={onStepChange}
         caption="FeaturesBuilder.extract_features validates the tremor matrix, picks training or prediction mode, then extracts each tremor column separately. A cache hit reuses the per-column Parquet file instead of calling tsfresh, and all columns are concatenated side by side. Dashed lines are optional or cached paths."
       />
-      <div className="lab-section-title">
-        <h2>
-          {step === 0
+      <LabSectionTitle
+        title={
+          step === 0
             ? "Raw tremor samples inside each window"
             : step === 3
               ? "One row per window, one column per feature"
-              : `Features computed from ${column}`}
-        </h2>
-        <span>3 example windows · 4 samples each (real windows hold hundreds)</span>
-      </div>
+              : `Features computed from ${column}`
+        }
+        aside="3 example windows · 4 samples each (real windows hold hundreds)"
+      />
       {step > 0 && step < 3 && (
         <div className="lab-options">
-          <label>
-            Tremor column{" "}
-            <select
-              value={column}
-              onChange={(e) => setColumn(e.target.value as Column)}
-            >
-              {TREMOR_COLUMNS.map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Tremor column"
+            value={column}
+            options={TREMOR_COLUMNS.map((name) => ({ value: name, label: name }))}
+            onChange={setColumn}
+          />
         </div>
       )}
-      <div
-        className="training-table-scroll"
-        tabIndex={0}
-        role="region"
-        aria-label="Features matrix example"
-      >
+      <ScrollRegion label="Features matrix example">
         <table className="training-table fm-table" data-step={step}>
           <caption>
             {step === 0
@@ -106,8 +100,8 @@ export function FeaturesMatrixLesson({
             ))}
           </tbody>
         </table>
-      </div>
-      <output className="training-result" aria-live="polite">
+      </ScrollRegion>
+      <ResultOutput>
         {step === 0
           ? "3 windows × 3 tremor columns of raw samples"
           : step === 1
@@ -115,7 +109,7 @@ export function FeaturesMatrixLesson({
             : step === 2
               ? `${column}__mean = average of that window's ${column} samples`
               : `3 windows × ${featureCount} features, joined on id`}
-      </output>
+      </ResultOutput>
       {step === 3 && (
         <p>
           The real matrix has the same shape with hundreds of calculators per

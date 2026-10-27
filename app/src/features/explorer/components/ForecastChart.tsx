@@ -1,9 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { percent } from "@/lib/format";
+import { shortDate, utcStamp } from "@/lib/time";
 import {
   DAY_MS,
   primarySeries,
   readRow,
-  shortDate,
   type ForecastDataset,
 } from "../forecastDataset";
 import "@/styles/prediction.css";
@@ -25,11 +26,6 @@ function useWidth() {
   }, []);
   return [host, width] as const;
 }
-
-export const stamp = (time: number) =>
-  new Date(time).toISOString().slice(0, 16).replace("T", " ");
-export const pct = (value: number) =>
-  Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "n/a";
 
 export interface ForecastChartProps {
   dataset: ForecastDataset;
@@ -111,7 +107,7 @@ export function ForecastChart({
         data-scrub={onCursorChange ? "true" : undefined}
         aria-label={`${dataset.label} ${dataset.models[0]![1].toLowerCase()} probability, ${shortDate(first)} to ${shortDate(lastTime)}.${
           row && current
-            ? ` Selected window ${stamp(row.time)} UTC, ${pct(current.probability)}.`
+            ? ` Selected window ${utcStamp(row.time)} UTC, ${percent(current.probability)}.`
             : ""
         }`}
         onPointerDown={(event) => {

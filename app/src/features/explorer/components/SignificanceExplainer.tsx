@@ -1,3 +1,4 @@
+import { WhySection } from "@/components/lab/WalkthroughNotes";
 import { ByCorrectionDemo } from "./ByCorrectionDemo";
 import { FisherDemo } from "./FisherDemo";
 import { KsTestDemo } from "./KsTestDemo";
@@ -25,8 +26,11 @@ function StepHeading({ id, n, children }: { id: string; n: number; children: str
 export function SignificanceExplainer() {
   return (
     <div className="sig">
-      <section className="training-why sig-intro" aria-labelledby="sig-intro">
-        <h2 id="sig-intro">Where do the p-values come from?</h2>
+      <WhySection
+        id="sig-intro"
+        className="sig-intro"
+        title="Where do the p-values come from?"
+      >
         <p>
           The ranking above starts with one p-value per feature. Under the null
           hypothesis that a feature is independent of the eruption label, the
@@ -52,7 +56,7 @@ export function SignificanceExplainer() {
             </a>
           ))}
         </nav>
-      </section>
+      </WhySection>
 
       <section className="sig-section" aria-labelledby="sig-data">
         <StepHeading id="sig-data" n={1}>

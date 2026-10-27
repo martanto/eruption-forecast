@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Code2, Database, ExternalLink, Pause, Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Code2, Database, ExternalLink } from "lucide-react";
+import { Legend } from "@/components/lab/Legend";
+import { TraceToolbar } from "@/components/lab/TraceToolbar";
+import { useTrace } from "@/hooks/useTrace";
+import { goToStepLabel } from "@/lib/format";
 import type {
   WorkflowEdge,
   WorkflowKind,
@@ -8,7 +11,6 @@ import type {
   WorkflowSide,
 } from "../workflowDiagrams";
 
-const TICK_MS = 900;
 const KIND_LABEL: Record<WorkflowKind, string> = {
   backend: "Backend",
   database: "Database",
@@ -85,8 +87,8 @@ export function WorkflowDiagram({
   onStepChange: (step: number) => void;
   caption: string;
 }) {
-  const [cursor, setCursor] = useState(-1);
-  const [playing, setPlaying] = useState(false);
+  const trace = useTrace(nodes, step, onStepChange);
+  const { cursor } = trace;
   const [routes, setRoutes] = useState<Route[]>([]);
   const canvas = useRef<HTMLDivElement>(null);
   const refs = useRef(new Map<string, HTMLLIElement>());
@@ -122,43 +124,6 @@ export function WorkflowDiagram({
     return () => observer.disconnect();
   }, [measure]);
 
-  useEffect(() => {
-    if (!playing) return;
-    const id = window.setInterval(() => {
-      setCursor((current) => {
-        if (current + 1 >= nodes.length) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [playing, nodes.length]);
-
-  useEffect(() => {
-    if (cursor >= 0) onStepChange(nodes[cursor]!.step);
-  }, [cursor, nodes, onStepChange]);
-
-  function togglePlay() {
-    if (playing) {
-      setPlaying(false);
-      return;
-    }
-    setCursor((current) => (current + 1 >= nodes.length || current < 0 ? 0 : current));
-    setPlaying(true);
-  }
-  function select(next: number) {
-    setPlaying(false);
-    setCursor(-1);
-    onStepChange(next);
-  }
-
-  const stateOf = (index: number) => {
-    const node = nodes[index]!;
-    if (cursor < 0) return node.step === step ? "current" : "idle";
-    return index < cursor ? "done" : index === cursor ? "current" : "idle";
-  };
   const edgeLit = (edge: WorkflowEdge) => {
     const to = indexOf(edge.to);
     return cursor < 0 ? nodes[to]!.step === step : to <= cursor;
@@ -170,17 +135,17 @@ export function WorkflowDiagram({
 
   return (
     <figure className="wf" aria-label={title}>
-      <div className="swf-toolbar">
-        <Button variant="outline" size="small" onClick={togglePlay}>
-          {playing ? <Pause size={15} /> : <Play size={15} />}
-          {playing ? "Pause" : cursor >= nodes.length - 1 ? "Replay" : "Trace one run"}
-        </Button>
-        <span aria-live="polite">
-          {cursor < 0
-            ? "Select a box to jump to its step, or trace the whole run."
-            : `${nodes[cursor]!.title}: ${nodes[cursor]!.detail}`}
-        </span>
-      </div>
+      <TraceToolbar
+        className="swf-toolbar"
+        playing={trace.playing}
+        finished={trace.finished}
+        onToggle={trace.togglePlay}
+        status={
+          trace.current
+            ? `${trace.current.title}: ${trace.current.detail}`
+            : "Select a box to jump to its step, or trace the whole run."
+        }
+      />
       <div className="wf-scroll">
         <div className="wf-canvas" ref={canvas}>
           <svg className="wf-edges" aria-hidden="true">
@@ -224,14 +189,14 @@ export function WorkflowDiagram({
                   }}
                   className="wf-node"
                   data-kind={node.kind}
-                  data-state={stateOf(index)}
+                  data-state={trace.stateOf(index)}
                   data-out={out?.label}
                   style={{ gridColumn: node.col, gridRow: node.row }}
                 >
                   <button
                     type="button"
-                    onClick={() => select(node.step)}
-                    aria-label={`${node.title}: ${node.detail}. Go to step ${node.step + 1}`}
+                    onClick={() => trace.select(node.step)}
+                    aria-label={goToStepLabel(node)}
                   >
                     <Icon size={14} aria-hidden="true" />
                     <strong>{node.title}</strong>
@@ -253,13 +218,17 @@ export function WorkflowDiagram({
           ))}
         </div>
       </div>
-      <ul className="wf-legend" aria-label="Legend">
-        {counts.map(({ kind, count }) => (
-          <li key={kind} data-kind={kind}>
-            <i aria-hidden="true" /> {KIND_LABEL[kind]} <b>{count}</b>
-          </li>
-        ))}
-      </ul>
+      <Legend
+        className="wf-legend"
+        items={counts.map(({ kind, count }) => ({
+          swatch: ["kind", kind],
+          label: (
+            <>
+              {KIND_LABEL[kind]} <b>{count}</b>
+            </>
+          ),
+        }))}
+      />
       <figcaption>{caption}</figcaption>
     </figure>
   );

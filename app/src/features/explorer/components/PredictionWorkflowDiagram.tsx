@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Pause, Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { TraceToolbar } from "@/components/lab/TraceToolbar";
+import { goToStepLabel } from "@/lib/format";
 import {
   PREDICTION_EDGES,
   PREDICTION_NODES,
@@ -104,22 +104,16 @@ export function PredictionWorkflowDiagram({
 
   return (
     <figure className="pwf" aria-label="Prediction workflow">
-      <div className="pwf-toolbar">
-        <Button
-          variant="outline"
-          size="small"
-          onClick={() => {
-            if (!playing && step >= last) onStepChange(0);
-            setPlaying(!playing);
-          }}
-        >
-          {playing ? <Pause size={15} /> : <Play size={15} />}
-          {playing ? "Pause" : "Trace one forecast"}
-        </Button>
-        <span aria-live="polite">
-          Step {step + 1} of {PREDICTION_STEPS.length}: {PREDICTION_STEPS[step]![0]}
-        </span>
-      </div>
+      <TraceToolbar
+        className="pwf-toolbar"
+        playing={playing}
+        idleLabel="Trace one forecast"
+        onToggle={() => {
+          if (!playing && step >= last) onStepChange(0);
+          setPlaying(!playing);
+        }}
+        status={`Step ${step + 1} of ${PREDICTION_STEPS.length}: ${PREDICTION_STEPS[step]![0]}`}
+      />
       <svg
         className="pwf-svg"
         viewBox="0 0 1000 444"
@@ -183,7 +177,7 @@ export function PredictionWorkflowDiagram({
             transform={`translate(${left(node)} ${top(node)})`}
             role="button"
             tabIndex={0}
-            aria-label={`${node.title}: ${node.detail}. Go to step ${node.step + 1}`}
+            aria-label={goToStepLabel(node)}
             aria-current={node.step === step ? "step" : undefined}
             onClick={() => select(node.step)}
             onKeyDown={(event) => {

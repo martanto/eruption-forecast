@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
+import { DataTable } from "@/components/lab/DataTable";
+import { ResultOutput } from "@/components/lab/ResultOutput";
+import { SelectField } from "@/components/lab/SelectField";
+import { fixed, percent } from "@/lib/format";
+import { utcStamp } from "@/lib/time";
 import {
   readRow,
   thresholdSummary,
   type ForecastDataset,
 } from "../forecastDataset";
-import { ForecastChart, pct, stamp } from "./ForecastChart";
+import { ForecastChart } from "./ForecastChart";
 import "@/styles/prediction.css";
-
-const fixed = (value: number) =>
-  Number.isFinite(value) ? value.toFixed(3) : "n/a";
 
 export interface ForecastExplorerProps {
   dataset: ForecastDataset;
@@ -59,7 +61,7 @@ export function ForecastExplorer({
       />
       <label className="pwr-scrub">
         <span>
-          Window <strong>{stamp(row.time)} UTC</strong> · row {index + 1} of{" "}
+          Window <strong>{utcStamp(row.time)} UTC</strong> · row {index + 1} of{" "}
           {rows.length}
         </span>
         <input
@@ -84,67 +86,43 @@ export function ForecastExplorer({
             aria-label="Alert threshold"
           />
         </label>
-        <label>
-          Overlay
-          <select
-            value={overlay}
-            onChange={(event) => setOverlay(event.target.value)}
-          >
-            {models.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Overlay"
+          value={overlay}
+          options={models.map(([value, label]) => ({ value, label }))}
+          onChange={setOverlay}
+        />
       </div>
       {revealRows && (
-        <div
-          className="training-table-scroll"
-          tabIndex={0}
-          role="region"
-          aria-label="Values for the selected window"
+        <DataTable
+          label="Values for the selected window"
+          className="pwr-table"
+          caption={`Recorded row at ${utcStamp(row.time)} UTC · every classifier and the consensus`}
+          headers={["Model", "probability", "uncertainty (SD)", "confidence", "prediction"]}
         >
-          <table className="training-table pwr-table">
-            <caption>
-              Recorded row at {stamp(row.time)} UTC · every classifier and the
-              consensus
-            </caption>
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>probability</th>
-                <th>uncertainty (SD)</th>
-                <th>confidence</th>
-                <th>prediction</th>
+          {models.map(([key, label]) => {
+            const value = readRow(dataset, index, key);
+            return (
+              <tr
+                key={key}
+                data-consensus={key === primary}
+                data-above={value.probability >= threshold}
+              >
+                <th>{label}</th>
+                <td>{percent(value.probability)}</td>
+                <td>{fixed(value.uncertainty)}</td>
+                <td>{fixed(value.confidence)}</td>
+                <td>{fixed(value.prediction)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {models.map(([key, label]) => {
-                const value = readRow(dataset, index, key);
-                return (
-                  <tr
-                    key={key}
-                    data-consensus={key === primary}
-                    data-above={value.probability >= threshold}
-                  >
-                    <th>{label}</th>
-                    <td>{pct(value.probability)}</td>
-                    <td>{fixed(value.uncertainty)}</td>
-                    <td>{fixed(value.confidence)}</td>
-                    <td>{fixed(value.prediction)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+            );
+          })}
+        </DataTable>
       )}
-      <output className="training-result" aria-live="polite">
+      <ResultOutput>
         {summary.above.toLocaleString()} of {summary.total.toLocaleString()}{" "}
-        windows ({((summary.above / summary.total) * 100).toFixed(1)}%) reach{" "}
+        windows ({percent(summary.above / summary.total)}) reach{" "}
         {threshold.toFixed(2)}
-      </output>
+      </ResultOutput>
       <ul className="pwr-eruptions">
         {summary.eruptions.map((item) => (
           <li key={item.date}>

@@ -1,29 +1,23 @@
 import { useMemo, useState } from "react";
+import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
+import { Legend } from "@/components/lab/Legend";
+import { ChartScroll } from "@/components/lab/ScrollRegion";
 import { Button } from "@/components/ui/button";
-import { DUMMY_FEATURES, PRE_COUNT, QUIET_COUNT } from "../dummyDataset";
-import { ecdf, ksGap, split } from "../significance";
+import {
+  DUMMY_FEATURES,
+  PICK_FEATURES,
+  PRE_COUNT,
+  QUIET_COUNT,
+} from "../dummyDataset";
+import { ecdf, formatP, ksGap, split, verdict } from "../significance";
 
 const REAL = DUMMY_FEATURES.filter((feature) => feature.kind === "real");
-const PICKS = [
-  "rsam_f2__mean",
-  "rsam_f2__standard_deviation",
-  "rsam_f4__count_above_mean",
-];
 const W = 640;
 const H = 380;
 const LEFT = 44;
 const RIGHT = 16;
 const STRIP = { quiet: 28, pre: 58 };
 const PLOT = { top: 112, bottom: 340 };
-
-export function formatP(p: number) {
-  return p < 0.001 ? p.toExponential(1) : p.toFixed(3);
-}
-export function verdict(p: number) {
-  if (p < 0.001) return { label: "Strong evidence of a difference", tone: "strong" };
-  if (p < 0.05) return { label: "Moderate evidence of a difference", tone: "maybe" };
-  return { label: "No evidence of a difference", tone: "none" };
-}
 
 // Staircase path: climbs 1/n each time it passes a sorted value.
 function staircase(
@@ -42,7 +36,7 @@ function staircase(
 }
 
 export function KsTestDemo() {
-  const [name, setName] = useState(PICKS[0]!);
+  const [name, setName] = useState<string>(PICK_FEATURES[0]);
   const feature = REAL.find((item) => item.name === name)!;
   const { quiet, pre } = useMemo(() => split(feature), [feature]);
   const gap = useMemo(() => ksGap(quiet, pre), [quiet, pre]);
@@ -60,32 +54,24 @@ export function KsTestDemo() {
 
   return (
     <div className="sig-demo">
-      <div className="lab-options" role="group" aria-label="Pick a feature">
-        {PICKS.map((pick) => (
-          <button
-            key={pick}
-            className="seed-select"
-            aria-pressed={pick === name}
-            onClick={() => {
-              setName(pick);
-              setSweepAt(null);
-            }}
-          >
-            <code>{pick}</code>
-          </button>
-        ))}
-      </div>
+      <ChoiceButtons
+        label="Pick a feature"
+        options={PICK_FEATURES}
+        value={name}
+        onChange={(pick) => {
+          setName(pick);
+          setSweepAt(null);
+        }}
+      />
       <div className="sig-grid">
         <div className="sig-card sig-chart">
-          <ul className="sig-legend" aria-label="Legend">
-            <li data-group="quiet">
-              <i aria-hidden="true" /> label 0 · non-eruptive (n = {QUIET_COUNT})
-            </li>
-            <li data-group="pre">
-              <i aria-hidden="true" /> label 1 · pre-eruptive (n = {PRE_COUNT})
-            </li>
-          </ul>
-          <div className="sig-scroll" tabIndex={0} role="region" aria-label="Chart, scrolls sideways on narrow screens">
+          <Legend
+            items={[
+              { swatch: ["group", "quiet"], label: `label 0 · non-eruptive (n = ${QUIET_COUNT})` },
+              { swatch: ["group", "pre"], label: `label 1 · pre-eruptive (n = ${PRE_COUNT})` },
+            ]}
+          />
+          <ChartScroll>
           <svg
             viewBox={`0 0 ${W} ${H}`}
             role="img"
@@ -138,7 +124,7 @@ export function KsTestDemo() {
               gap = {Math.abs(f1 - f0).toFixed(2)}
             </text>
           </svg>
-          </div>
+          </ChartScroll>
           <div className="sig-sweep-control">
             <label>
               Move x along the feature axis

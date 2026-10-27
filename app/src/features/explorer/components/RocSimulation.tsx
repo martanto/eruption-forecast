@@ -1,7 +1,12 @@
 import { useState } from "react";
+import { DataTable } from "@/components/lab/DataTable";
+import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { ResultOutput } from "@/components/lab/ResultOutput";
+import { SelectField } from "@/components/lab/SelectField";
+import { fixed } from "@/lib/format";
 import type { ForecastDataset } from "../forecastDataset";
-import { buildLabels, confusionAt } from "../rocAnalysis";
-import { RocPanel, ratio, show } from "./RocPanel";
+import { buildLabels, confusionAt, ratio } from "../rocAnalysis";
+import { RocPanel } from "./RocPanel";
 import "@/styles/prediction.css";
 
 export interface RocSimulationProps {
@@ -27,13 +32,11 @@ export function RocSimulation({
 
   return (
     <section className="roc" aria-labelledby={`roc-heading-${dataset.id}`}>
-      <div className="lab-section-title">
-        <h2 id={`roc-heading-${dataset.id}`}>ROC curve and the threshold</h2>
-        <span>
-          {positives.toLocaleString()} positive · {negatives.toLocaleString()}{" "}
-          negative windows
-        </span>
-      </div>
+      <LabSectionTitle
+        id={`roc-heading-${dataset.id}`}
+        title="ROC curve and the threshold"
+        aside={`${positives.toLocaleString()} positive · ${negatives.toLocaleString()} negative windows`}
+      />
       <p>
         Each recorded window is labelled like a training window: positive on the{" "}
         {dataset.lookaheadDays} days before an eruption and on the eruption day
@@ -56,19 +59,12 @@ export function RocSimulation({
             aria-label="Classification threshold for the ROC curves"
           />
         </label>
-        <label>
-          Read counts for
-          <select
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-          >
-            {dataset.models.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Read counts for"
+          value={model}
+          options={dataset.models.map(([value, label]) => ({ value, label }))}
+          onChange={setModel}
+        />
       </div>
       <div className="roc-grid-panels">
         {dataset.models.map(([value, label]) => (
@@ -81,42 +77,27 @@ export function RocSimulation({
           />
         ))}
       </div>
-      <div
-        className="training-table-scroll"
-        tabIndex={0}
-        role="region"
-        aria-label="Confusion counts at the threshold"
+      <DataTable
+        label="Confusion counts at the threshold"
+        className="roc-table"
+        caption={`${dataset.models.find(([value]) => value === model)![1]} at threshold ${threshold.toFixed(2)}`}
+        headers={[null, "Predicted positive", "Predicted negative"]}
       >
-        <table className="training-table roc-table">
-          <caption>
-            {dataset.models.find(([value]) => value === model)![1]} at threshold{" "}
-            {threshold.toFixed(2)}
-          </caption>
-          <thead>
-            <tr>
-              <th />
-              <th>Predicted positive</th>
-              <th>Predicted negative</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th>Positive window</th>
-              <td>{c.tp.toLocaleString()} true positives</td>
-              <td>{c.fn.toLocaleString()} missed</td>
-            </tr>
-            <tr>
-              <th>Negative window</th>
-              <td>{c.fp.toLocaleString()} false alarms</td>
-              <td>{c.tn.toLocaleString()} true negatives</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <output className="training-result" aria-live="polite">
-        TPR (recall) {show(recall)} · FPR {show(fpr)} · precision{" "}
-        {show(precision)} · specificity {show(specificity)}
-      </output>
+        <tr>
+          <th>Positive window</th>
+          <td>{c.tp.toLocaleString()} true positives</td>
+          <td>{c.fn.toLocaleString()} missed</td>
+        </tr>
+        <tr>
+          <th>Negative window</th>
+          <td>{c.fp.toLocaleString()} false alarms</td>
+          <td>{c.tn.toLocaleString()} true negatives</td>
+        </tr>
+      </DataTable>
+      <ResultOutput>
+        TPR (recall) {fixed(recall)} · FPR {fixed(fpr)} · precision{" "}
+        {fixed(precision)} · specificity {fixed(specificity)}
+      </ResultOutput>
       <p>
         Lowering the threshold moves the dot up and right: more positive windows
         are caught, and more quiet windows raise an alarm. Shaded bands show the

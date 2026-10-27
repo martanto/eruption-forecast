@@ -1,4 +1,5 @@
-import { confusionAt, rocFor } from "../rocAnalysis";
+import { fixed } from "@/lib/format";
+import { confusionAt, ratio, rocFor } from "../rocAnalysis";
 import type { ForecastDataset } from "../forecastDataset";
 import "@/styles/prediction.css";
 
@@ -22,10 +23,6 @@ export const rocColor = (dataset: ForecastDataset, model: string) => {
 
 const x = (value: number) => PAD.left + value * (W - PAD.left - PAD.right);
 const y = (value: number) => PAD.top + (1 - value) * (H - PAD.top - PAD.bottom);
-export const ratio = (num: number, den: number) =>
-  den === 0 ? Number.NaN : num / den;
-export const show = (value: number) =>
-  Number.isFinite(value) ? value.toFixed(3) : "n/a";
 
 export interface RocPanelProps {
   dataset: ForecastDataset;
@@ -62,7 +59,7 @@ export function RocPanel({ dataset, model, title, threshold }: RocPanelProps) {
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label={`${title} ROC curve, AUC ${roc.auc.toFixed(3)}. At threshold ${threshold.toFixed(2)}: false positive rate ${show(fpr)}, true positive rate ${show(tpr)}.`}
+        aria-label={`${title} ROC curve, AUC ${roc.auc.toFixed(3)}. At threshold ${threshold.toFixed(2)}: false positive rate ${fixed(fpr)}, true positive rate ${fixed(tpr)}.`}
       >
         <text className="roc-title" x={W / 2} y="14" textAnchor="middle">
           {title}
