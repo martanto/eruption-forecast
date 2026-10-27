@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Rising Signal</title>
+<path d="M28,228 L92,128 H164 L228,228 Z" fill="#1B2A3A" stroke="#1B2A3A" stroke-width="12" stroke-linejoin="round"/>
+<path d="M92,96 A48,48 0 0 1 164,96" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M68,70 A80,80 0 0 1 188,70" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M44,44 A112,112 0 0 1 212,44" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/></svg>

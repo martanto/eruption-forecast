@@ -1,11 +1,14 @@
 # Training walkthroughs
 
-Pipeline Atlas provides three interactive, static teaching pages after Labelling. Open **Training walkthroughs** from the Atlas toolbar, or continue from Labelling. These routes use synthetic data and do not execute Python.
+Pipeline Atlas provides interactive, static teaching pages after Labelling, grouped as the **Training Guideline**. Open **Training walkthroughs** from the Atlas toolbar, or continue from Labelling. These routes use synthetic data and do not execute Python.
 
 | Route | What to explore |
 |---|---|
+| `/features-matrix` | Features Matrix Builder. A workflow diagram traces `FeaturesBuilder` (validate, mode dispatch, cache check, per-column tsfresh, concat). See raw tremor windows become tsfresh features, named `{column}__{calculator}`, then merge by window id. |
 | `/random-under-sampler` | Count classes, interpret the sampling ratio, change a seeded majority draw, and follow retained rows into training. |
-| `/seed-ensemble` | Follow one classifier family through per-seed resampling, feature selection, fitting and probability aggregation. |
+| `/seed-ensemble` | Opens the guideline. A workflow diagram boxes the per-seed job ("One job per seed") and a trace animates it. Follow one classifier family through per-seed resampling, feature selection, fitting and probability aggregation. |
+| `/feature-selection` | Score features with tsfresh FDR p-values or random-forest permutation importance, change the seed and `top_n`, and see the saved list. Below it, a four-step dummy-data explainer shows where the p-values come from: (1) the labelled data, 24 windows in time order with two eruptions; (2) the KS staircase test; (3) Fisher's exact test with a worked C(n, r) calculation; and (4) the Benjamini–Yekutieli correction at FDR 0.05 (compared with BH and no correction). tsfresh's own default for number-valued features is Mann–Whitney U; KS is its alternative option. |
+| `/grid-cv` | Compare CV splitters, fold membership and a hyperparameter grid, then refit the best setting as the seed model. |
 | `/classifier-ensemble` | Bundle seed ensembles, predict a common future window and inspect equal-weight family consensus. |
 
 ## Random under-sampling, step by step
@@ -31,6 +34,8 @@ Current implementation order is **resample → feature selection → GridSearchC
 4. Build one `SeedEnsemble` per classifier from the fitted registry. At inference each model reads its own feature columns. Aggregate probabilities with a mean and population standard deviation.
 
 The synthetic RF probabilities 62%, 74% and 68% produce a 68% mean and 4.9 percentage-point SD. Multiple seeds can reduce dependence on an unlucky draw and reduce variance when errors differ. Shared data makes errors correlated; averaging does not automatically remove bias, leakage or missing event types. SD measures disagreement, not a calibrated prediction interval.
+
+The route opens with `SeedWorkflowDiagram`: Features Matrix, then a dashed "One job per seed (random_state)" boundary around Under Sampler, Top-20 Selector, Top-20 CSV, GridSearchCV and Seed Model, then Seed Registry, SeedEnsemble and Mean Probability. Boxes jump to their step; "Trace one run" animates the flow (disabled transitions under `prefers-reduced-motion`). Data lives in `trainingLessons.ts`.
 
 Reference: [Seed Ensemble illustration](../assets/seed-ensemble.jpg). Implementation: `TrainingModel.fit`, `build_seed_ensemble`, `SeedEnsemble.compute_probabilities_and_predictions` and `utils/array.py:compute_model_probabilities`.
 

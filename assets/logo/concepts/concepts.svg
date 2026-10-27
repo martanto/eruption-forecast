@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="840" viewBox="0 0 1600 840"><rect width="1600" height="840" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">Logo concepts</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Concepts for review — pick a direction (or tell me what you like in each).</text><rect x="60" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet"><title>Spectrum Peak</title>
+<g fill="#1B2A3A">
+<rect x="22" y="188" width="20" height="40" rx="10"/><rect x="54" y="156" width="20" height="72" rx="10"/><rect x="86" y="120" width="20" height="108" rx="10"/>
+<rect x="118" y="96" width="20" height="132" rx="10"/>
+<rect x="150" y="120" width="20" height="108" rx="10"/><rect x="182" y="156" width="20" height="72" rx="10"/><rect x="214" y="188" width="20" height="40" rx="10"/></g>
+<rect x="118" y="28" width="20" height="56" rx="10" fill="#F26A2E"/></svg>
+</g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="90" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet"><title>Spectrum Peak</title>
+<g fill="#1B2A3A">
+<rect x="22" y="188" width="20" height="40" rx="10"/><rect x="54" y="156" width="20" height="72" rx="10"/><rect x="86" y="120" width="20" height="108" rx="10"/>
+<rect x="118" y="96" width="20" height="132" rx="10"/>
+<rect x="150" y="120" width="20" height="108" rx="10"/><rect x="182" y="156" width="20" height="72" rx="10"/><rect x="214" y="188" width="20" height="40" rx="10"/></g>
+<rect x="118" y="28" width="20" height="56" rx="10" fill="#F26A2E"/></svg>
+</g><text x="122" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="180" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet"><title>Spectrum Peak</title>
+<g fill="#1B2A3A">
+<rect x="22" y="188" width="20" height="40" rx="10"/><rect x="54" y="156" width="20" height="72" rx="10"/><rect x="86" y="120" width="20" height="108" rx="10"/>
+<rect x="118" y="96" width="20" height="132" rx="10"/>
+<rect x="150" y="120" width="20" height="108" rx="10"/><rect x="182" y="156" width="20" height="72" rx="10"/><rect x="214" y="188" width="20" height="40" rx="10"/></g>
+<rect x="118" y="28" width="20" height="56" rx="10" fill="#F26A2E"/></svg>
+</g><text x="196" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="238" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet"><title>Spectrum Peak</title>
+<g fill="#1B2A3A">
+<rect x="22" y="188" width="20" height="40" rx="10"/><rect x="54" y="156" width="20" height="72" rx="10"/><rect x="86" y="120" width="20" height="108" rx="10"/>
+<rect x="118" y="96" width="20" height="132" rx="10"/>
+<rect x="150" y="120" width="20" height="108" rx="10"/><rect x="182" y="156" width="20" height="72" rx="10"/><rect x="214" y="188" width="20" height="40" rx="10"/></g>
+<rect x="118" y="28" width="20" height="56" rx="10" fill="#F26A2E"/></svg>
+</g><text x="246" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · Spectrum Peak</text><text x="90.0" y="664" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="698" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Seismic amplitude bars form a volcano; the</text><text x="90.0" y="724" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">centre bar launches an ember.</text><rect x="562.667" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet"><title>Trace Ridge</title>
+<polyline points="24,204 62,204 74,178 88,222 106,138 136,52 232,204" fill="none" stroke="#1B2A3A" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="190" cy="62" r="14" fill="#F26A2E"/></svg>
+</g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="592.667" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet"><title>Trace Ridge</title>
+<polyline points="24,204 62,204 74,178 88,222 106,138 136,52 232,204" fill="none" stroke="#1B2A3A" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="190" cy="62" r="14" fill="#F26A2E"/></svg>
+</g><text x="624.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="682.667" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet"><title>Trace Ridge</title>
+<polyline points="24,204 62,204 74,178 88,222 106,138 136,52 232,204" fill="none" stroke="#1B2A3A" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="190" cy="62" r="14" fill="#F26A2E"/></svg>
+</g><text x="698.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="740.667" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet"><title>Trace Ridge</title>
+<polyline points="24,204 62,204 74,178 88,222 106,138 136,52 232,204" fill="none" stroke="#1B2A3A" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="190" cy="62" r="14" fill="#F26A2E"/></svg>
+</g><text x="748.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · Trace Ridge</text><text x="592.6666666666667" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">One seismogram line grows into a ridge.</text><rect x="1065.33" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet"><title>Rising Signal</title>
+<path d="M28,228 L92,128 H164 L228,228 Z" fill="#1B2A3A" stroke="#1B2A3A" stroke-width="12" stroke-linejoin="round"/>
+<path d="M92,96 A48,48 0 0 1 164,96" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M68,70 A80,80 0 0 1 188,70" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M44,44 A112,112 0 0 1 212,44" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/></svg>
+</g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1095.33" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet"><title>Rising Signal</title>
+<path d="M28,228 L92,128 H164 L228,228 Z" fill="#1B2A3A" stroke="#1B2A3A" stroke-width="12" stroke-linejoin="round"/>
+<path d="M92,96 A48,48 0 0 1 164,96" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M68,70 A80,80 0 0 1 188,70" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M44,44 A112,112 0 0 1 212,44" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/></svg>
+</g><text x="1127.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1185.33" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet"><title>Rising Signal</title>
+<path d="M28,228 L92,128 H164 L228,228 Z" fill="#1B2A3A" stroke="#1B2A3A" stroke-width="12" stroke-linejoin="round"/>
+<path d="M92,96 A48,48 0 0 1 164,96" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M68,70 A80,80 0 0 1 188,70" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M44,44 A112,112 0 0 1 212,44" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/></svg>
+</g><text x="1201.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1243.33" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet"><title>Rising Signal</title>
+<path d="M28,228 L92,128 H164 L228,228 Z" fill="#1B2A3A" stroke="#1B2A3A" stroke-width="12" stroke-linejoin="round"/>
+<path d="M92,96 A48,48 0 0 1 164,96" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M68,70 A80,80 0 0 1 188,70" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/>
+<path d="M44,44 A112,112 0 0 1 212,44" fill="none" stroke="#F26A2E" stroke-width="16" stroke-linecap="round"/></svg>
+</g><text x="1251.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · Rising Signal</text><text x="1095.3333333333335" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">A crater sending out widening signal arcs.</text></svg>

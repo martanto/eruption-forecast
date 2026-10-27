@@ -89,7 +89,7 @@ export function LabellingWalkthrough() {
         <ThemeToggle />
       </header>
       <nav className="lab-back" aria-label="Continue to training walkthroughs">
-        <Link to="/random-under-sampler">Continue: Random Under Sampler →</Link>
+        <Link to="/seed-ensemble">Continue: Training Guideline →</Link>
       </nav>
       <nav className="lab-chapters" aria-label="Labelling walkthrough chapters">
         {LESSONS.map((item, index) => (
