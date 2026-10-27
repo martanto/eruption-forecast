@@ -100,7 +100,7 @@ export const GAPS: Gap[] = [
     id: "confidence",
     title: "“Confidence” is a vote-based calculation",
     detail:
-      "The implemented value is 1.96 × sqrt(v × (1 − v) / n), using mean votes v. It is CI-like, not a calibrated confidence probability or a guarantee of coverage.",
+      "The implemented value is $1.96\\sqrt{v(1-v)/n}$, using mean votes $v$. It is CI-like, not a calibrated confidence probability or a guarantee of coverage.",
   },
 ];
 
@@ -163,7 +163,7 @@ export const NODES: ArchitectureNode[] = [
     "preprocessing",
     "tremor",
     "Preprocess & check completeness",
-    "Only sufficiently complete signals enter the measurement path.",
+    "Only sufficiently complete seismic records enter the measurement path.",
     [
       "Anomaly removal and interpolation are configurable. Days below minimum_completion_ratio after anomaly removal are skipped.",
       "Band-specific processing and outlier handling precede aggregation. Missing data handling changes which windows remain available.",
@@ -172,7 +172,7 @@ export const NODES: ArchitectureNode[] = [
       "Example minimum_completion_ratio=0.3",
       "Example interpolate=True; remove_tremor_anomalies=False",
     ],
-    ["Cleaned daily signal; completeness decisions"],
+    ["Cleaned daily seismic record; completeness decisions"],
     ["tremor", "rsam"],
   ),
   node(
@@ -182,7 +182,7 @@ export const NODES: ArchitectureNode[] = [
     "Measure amplitude, frequency relationships and complexity.",
     [
       "RSAM summarizes amplitude in each frequency band.",
-      "DSAR compares displacement amplitudes in consecutive bands. Shannon entropy supplies one broadband signal-complexity column.",
+      "DSAR compares displacement amplitudes in consecutive bands. Shannon entropy supplies one broadband seismic-signal complexity column.",
     ],
     ["rsam_f0…f4; dsar_f0-f1…f3-f4; entropy"],
     ["Time-indexed tremor columns"],
@@ -449,7 +449,7 @@ export const NODES: ArchitectureNode[] = [
     [
       "Mean probability averages seed probabilities within each classifier, then averages those classifier means.",
       "Mean binary votes are averaged separately; consensus_prediction can be fractional. Uncertainty is population standard deviation: over seeds within a classifier, over classifier means at consensus level.",
-      "Confidence uses vote fraction v: 1.96 × sqrt(v × (1 − v) / n). At consensus level n is the number of classifiers.",
+      "Confidence uses vote fraction $v$: $1.96\\sqrt{v(1-v)/n}$. At consensus level $n$ is the number of classifiers.",
     ],
     [
       "Example below is illustrative, not a model run",

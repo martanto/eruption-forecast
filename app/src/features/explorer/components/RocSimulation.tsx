@@ -60,7 +60,7 @@ export function RocSimulation({
           />
         </label>
         <SelectField
-          label="Read counts for"
+          label="Show counts for"
           value={model}
           options={dataset.models.map(([value, label]) => ({ value, label }))}
           onChange={setModel}
@@ -86,11 +86,11 @@ export function RocSimulation({
         <tr>
           <th>Positive window</th>
           <td>{c.tp.toLocaleString()} true positives</td>
-          <td>{c.fn.toLocaleString()} missed</td>
+          <td>{c.fn.toLocaleString()} false negatives</td>
         </tr>
         <tr>
           <th>Negative window</th>
-          <td>{c.fp.toLocaleString()} false alarms</td>
+          <td>{c.fp.toLocaleString()} false positives</td>
           <td>{c.tn.toLocaleString()} true negatives</td>
         </tr>
       </DataTable>
@@ -99,19 +99,21 @@ export function RocSimulation({
         {fixed(precision)} · specificity {fixed(specificity)}
       </ResultOutput>
       <p>
-        Lowering the threshold moves the dot up and right: more positive windows
-        are caught, and more quiet windows raise an alarm. Shaded bands show the
-        curve when every probability is shifted down or up by its own
-        uncertainty (±1 SD of seed disagreement). The recorded file keeps seed
-        means and SDs, not the individual seeds, so this band is not the
-        per-seed range drawn by the evaluation plots.
+        Lowering the threshold moves the dot up and to the right: more positive
+        windows are detected (higher recall), and more negative windows are
+        misclassified as positive. Shaded bands show the curve when every
+        probability is shifted down or up by its own uncertainty (±1 SD across
+        seeds). The recorded file keeps seed means and SDs, not the individual
+        seeds, so this band is not the per-seed range drawn by the evaluation
+        plots.
       </p>
       <p>
-        Treat these numbers with care. Only {dataset.eruptionDates.length}{" "}
-        eruptions fall in this period, neighbouring windows overlap, and the
-        positive windows come in blocks, so AUC and the counts can swing with a
-        single eruption. Precision depends on how rare positives are and is the
-        figure most affected.
+        These estimates should be interpreted with caution. Only{" "}
+        {dataset.eruptionDates.length} eruptions fall in this period,
+        neighbouring windows overlap, and the positive windows occur in
+        contiguous blocks, so AUC and the counts can vary substantially with a
+        single eruption. Precision depends on the class prevalence (the rarity
+        of positives) and is the metric most affected.
       </p>
     </section>
   );

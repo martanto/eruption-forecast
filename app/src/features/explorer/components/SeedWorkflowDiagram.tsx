@@ -1,3 +1,4 @@
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { TraceToolbar } from "@/components/lab/TraceToolbar";
 import { useTrace, type TraceState } from "@/hooks/useTrace";
 import { goToStepLabel } from "@/lib/format";
@@ -80,7 +81,7 @@ export function SeedWorkflowDiagram({
       <ol className="swf-list swf-merge">{SEED_MERGE_NODES.map(node)}</ol>
       <figcaption>
         Every seed repeats the boxed steps independently, so seeds can run in
-        parallel (<code>n_jobs</code>). The stacked outlines behind the box are
+        parallel (<CodeSnippet inline code="n_jobs" />). The stacked outlines behind the box are
         the other seeds. Only after all jobs finish are their models
         registered and bundled. Green boxes are code steps; the other boxes are files or artifacts.
       </figcaption>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { DataTable } from "@/components/lab/DataTable";
 import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { ResultOutput } from "@/components/lab/ResultOutput";
 import { SelectField } from "@/components/lab/SelectField";
 import { fixed, percent } from "@/lib/format";
@@ -35,10 +36,10 @@ export function SeedEnsembleLesson({
       <LabSectionTitle
         title={
           step === 0
-            ? "One history, three possible training runs"
+            ? "One training record, three random seeds"
             : step < 3
-              ? "Follow each seed into its model"
-              : "One family, three voices"
+              ? "Trace each seed to its fitted model"
+              : "One classifier family, three seed models"
         }
         aside="Same classifier family throughout"
       />
@@ -184,14 +185,18 @@ export function SeedEnsembleLesson({
       <ResultOutput>
         {step < 3
           ? `${selectedFamily.name}: 3 seed models → 1 SeedEnsemble`
-          : `${selectedFamily.name} mean = ${percent(mean)} · seed disagreement (SD) = ${fixed(std * 100, 1)} percentage points`}
+          : `${selectedFamily.name} mean = ${percent(mean)} · inter-seed standard deviation (SD) = ${fixed(std * 100, 1)} percentage points`}
       </ResultOutput>
       {step === 3 && (
         <p>
-          For {selectedFamily.name}: (
-          {selectedFamily.probabilities.map((p) => percent(p, 0)).join(" + ")})
-          ÷ 3. These example probabilities describe the same future window,
-          after fitting.
+          For {selectedFamily.name}:{" "}
+          <MathExpr
+            tex={String.raw`\bar{P} = \frac{${selectedFamily.probabilities
+              .map((p) => percent(p, 0).replace("%", String.raw`\%`))
+              .join(" + ")}}{3}`}
+          />
+          . These example probabilities describe the same future window, after
+          model fitting.
         </p>
       )}
     </>

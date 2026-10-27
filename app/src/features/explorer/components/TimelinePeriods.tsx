@@ -10,7 +10,7 @@ export function TimelinePeriods({ data }: NodeProps) {
   const scenario = SCENARIOS.find((item) => item.id === data.scenario)!;
   return (
     <section className="timeline-periods" aria-label="Scenario periods in UTC">
-      <h2>One seismic record. Five training boundaries.</h2>
+      <h2>One seismic record, five training end dates</h2>
       <p>
         Calendar time, 2025, UTC. Bars use the dates in forecast-scenario.py,
         including the end day.
@@ -110,8 +110,10 @@ export function TimelinePeriods({ data }: NodeProps) {
         <div>
           <h3>Inside one window</h3>
           <p>
-            Illustrative window at time t. Look back for features; look ahead
-            for the target. The eruption-day flag affects positive labels.
+            Illustrative window at time t. Features are computed over a
+            look-back interval; the target is defined over a look-ahead
+            interval. The eruption-day flag affects which windows are labelled
+            positive.
           </p>
         </div>
         <div className="window-ruler">
@@ -125,12 +127,13 @@ export function TimelinePeriods({ data }: NodeProps) {
             <br />
             <strong>t → t + 2 days</strong>
           </div>
-          <span>Stride: training 6 h, prediction 10 min</span>
+          <span>Window step: training 6 h, prediction 10 min</span>
         </div>
       </div>
       <p className="execution-label">
-        Execution order below, calculate once; train → predict → evaluate →
-        explain per scenario. Separate from calendar time.
+        Execution order below: calculate once, then train → predict → evaluate
+        → explain for each scenario. This order is independent of calendar
+        time.
       </p>
     </section>
   );

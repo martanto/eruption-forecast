@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AxisTitle, XAxis, YAxis } from "@/components/lab/ChartAxes";
 import { ChartFrame } from "@/components/lab/ChartFrame";
 import { DataTable } from "@/components/lab/DataTable";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { linearScale, linePath, logScale } from "@/lib/scale";
 import { correct, formatP } from "../significance";
 
@@ -58,7 +59,7 @@ export function ByCorrectionDemo() {
         <div className="sig-card sig-why">
           <h3>Why correct for multiple testing?</h3>
           <p>
-            At a significance level of 0.05, a feature with no signal still
+            At a significance level of 0.05, a feature with no true association with the label still
             passes with probability 0.05 (a Type I error). Among {m} null
             features, expect about {(m * 0.05).toFixed(1)} false positives.
             Among 700 null features, expect about 35 to pass by chance.
@@ -147,10 +148,15 @@ export function ByCorrectionDemo() {
           </div>
           <div>
           <div className="sig-formula">
-            <code>BY threshold for rank k = k × q / (m × c(m))</code>
+            <MathExpr
+              display
+              tex={String.raw`\tau^{\mathrm{BY}}_k = \frac{k\,q}{m\,c(m)}`}
+            />
             <p>
-              m = {m} tests; c(m) = 1 + 1/2 + … + 1/{m} = {c.toFixed(2)}, the
-              m-th harmonic number. Seismic features are correlated:{" "}
+              <MathExpr
+                tex={String.raw`m = ${m},\; c(m) = \sum_{i=1}^{m}\frac{1}{i} = ${c.toFixed(2)}`}
+              />
+              , the m-th harmonic number. Seismic features are correlated:{" "}
               <code>rsam_f2__mean</code> and <code>rsam_f3__maximum</code>, for
               example, rise and fall together. BH assumes independent or
               positively dependent tests. Dividing by c(m) keeps BY valid under
@@ -162,8 +168,8 @@ export function ByCorrectionDemo() {
             (each labelled tick is 10 times the one below it). BY
             finds the largest rank k with p(k) below the red BY threshold, and
             rejects the null hypothesis for that feature and every feature of
-            smaller rank (filled dots). The dashed line is the uncorrected cut
-            p ≤ {q}; the grey line is the less strict BH threshold.
+            smaller rank (filled dots). The dashed line is the uncorrected
+            threshold p ≤ {q}; the grey line is the less conservative BH threshold.
           </p>
           </div>
           </div>
@@ -198,7 +204,7 @@ export function ByCorrectionDemo() {
             its BH and BY thresholds (thr.). Shaded rows are retained by BY.
           </p>
           <p className="sig-note">
-            Take <code>{rank5.name}</code>. On its own, p = {formatP(rank5.p)}{" "}
+            Consider <code>{rank5.name}</code>. Tested individually, p = {formatP(rank5.p)}{" "}
             {rank5.p <= q ? "is below the uncorrected level" : "already exceeds the uncorrected level"}.
             Its BY threshold at rank {rank5.rank} is {rank5.by.toFixed(4)}, so
             BY <b>{rank5.keptBy ? "retains" : "rejects"}</b> it.

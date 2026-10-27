@@ -107,7 +107,7 @@ export function FeaturesMatrixLesson({
           : step === 1
             ? `${column}: raw samples → ${CALCULATORS.length} statistics per window`
             : step === 2
-              ? `${column}__mean = average of that window's ${column} samples`
+              ? `${column}__mean = arithmetic mean of that window's ${column} samples`
               : `3 windows × ${featureCount} features, joined on id`}
       </ResultOutput>
       {step === 3 && (

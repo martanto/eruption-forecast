@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
 import { ChartFrame } from "@/components/lab/ChartFrame";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { DataTable } from "@/components/lab/DataTable";
 import {
   DUMMY_FEATURES,
@@ -69,7 +70,7 @@ export function LabelledDataDemo() {
   return (
     <div className="sig-demo">
       <ChoiceButtons
-        label="Pick a feature"
+        label="Select a feature"
         options={PICKS}
         value={name}
         onChange={setName}
@@ -79,7 +80,7 @@ export function LabelledDataDemo() {
           width={width}
           height={H}
           minWidth={640}
-          label={`Bar chart of ${name} for 24 windows in time order. Windows right before each of the two eruptions are labelled 1.`}
+          label={`Bar chart of ${name} for 24 windows in time order. Windows immediately preceding each of the two eruptions are labelled 1.`}
           legend={[
             { swatch: ["group", "quiet"], label: "label 0 · non-eruptive" },
             { swatch: ["group", "pre"], label: "label 1 · pre-eruptive" },
@@ -162,7 +163,7 @@ export function LabelledDataDemo() {
           <figcaption>
             <b>Table 1.</b> Windows 4–8 of the synthetic feature matrix: 24 rows
             (samples) and {DUMMY_FEATURES.length} feature columns, three shown,
-            plus the target <code>is_erupted</code>. Real runs have hundreds of
+            plus the target <CodeSnippet inline code="is_erupted" />. Real runs have hundreds of
             feature columns per tremor channel.
           </figcaption>
         </figure>
@@ -174,8 +175,8 @@ export function LabelledDataDemo() {
           </p>
           <p>
             If the data are consistent with it, the feature carries no
-            precursory signal and is dropped. If they are not, it is a candidate
-            predictor.
+            precursory information and is discarded. If they are not, it is a
+            candidate feature.
           </p>
           <p>
             <b>Steps 2 and 3</b> test one feature at a time and return a
@@ -184,7 +185,8 @@ export function LabelledDataDemo() {
           </p>
           <p>
             <b>Step 4</b> applies the BY correction, because testing hundreds of
-            features at once inflates the number of false positives.
+            features at once increases the expected number of false positives
+            (Type I errors).
           </p>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DataTable } from "@/components/lab/DataTable";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { SelectField } from "@/components/lab/SelectField";
 import { integer } from "@/lib/format";
 import { PRE_COUNT, QUIET_COUNT } from "../dummyDataset";
@@ -58,7 +59,7 @@ export function CombinationsLesson({
                 }}
               />
               <SelectField
-                label="r (to pick)"
+                label="r (to select)"
                 value={r}
                 options={Array.from({ length: n }, (_, i) => ({ value: i + 1, label: i + 1 }))}
                 onChange={setR}
@@ -84,14 +85,18 @@ export function CombinationsLesson({
               combination.
             </p>
             <div className="sig-formula">
-              <code>C(n, r) = n! / (r! × (n − r)!)</code>
+              <MathExpr
+                display
+                tex={String.raw`\binom{n}{r} = \frac{n!}{r!\,(n-r)!}`}
+              />
               <p>
                 Shortcut: multiply r factors counting down from n, then divide
-                by r! = r × (r − 1) × … × 1.
+                by <MathExpr tex={String.raw`r! = r(r-1)\cdots 1`} />.
               </p>
-              <code>
-                C({n}, {r}) = {comb(n, r)}
-              </code>
+              <MathExpr
+                display
+                tex={String.raw`\binom{${n}}{${r}} = ${comb(n, r)}`}
+              />
               <p>In Python: <code>math.comb({n}, {r})</code></p>
             </div>
           </div>
@@ -124,14 +129,15 @@ export function CombinationsLesson({
             </p>
           </div>
           <div>
-            <h4>Finally, multiply, divide, add up</h4>
+            <h4>Finally, multiply, divide and sum</h4>
             <p>
               <b>Multiply</b> by the multiplication principle: each combination
               of pre-eruptive windows pairs with each combination of
               non-eruptive windows. <b>Divide</b> by C({total}, {yes}): under
               the null hypothesis every arrangement is equally likely, so
-              probability = favorable count / total count. <b>Add up</b> the
-              outcomes as extreme as observed.
+              probability = number of favourable arrangements / total number of
+              arrangements. <b>Sum</b> the probabilities of all outcomes at
+              least as extreme as the one observed.
             </p>
             <div className="sig-multiply">
             <div>

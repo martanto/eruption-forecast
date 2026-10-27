@@ -41,7 +41,7 @@ export function FeatureSelectionLesson({
             : step === 1
               ? "Score each feature against the label"
               : step === 2
-                ? `Keep the top ${topN}`
+                ? `Retain the top ${topN}`
                 : "This seed's saved feature list"
         }
         aside="8 teaching features · a real matrix has thousands"
@@ -101,7 +101,7 @@ export function FeatureSelectionLesson({
                     : feature.importance.toFixed(3)}
               </span>
               <span className="fs-status">
-                {step >= 2 ? (isKept ? "kept" : "dropped") : ""}
+                {step >= 2 ? (isKept ? "retained" : "discarded") : ""}
               </span>
             </li>
           );
@@ -120,12 +120,12 @@ export function FeatureSelectionLesson({
       </ResultOutput>
       <p>
         {method === "tsfresh"
-          ? "Illustrative p-values; “(> 0.05)” marks features above the 0.05 significance level. tsfresh applies the Benjamini–Yekutieli correction, which is stricter than this uncorrected cut."
+          ? "Illustrative p-values; “(> 0.05)” marks features above the 0.05 significance level. tsfresh applies the Benjamini–Yekutieli correction, which is more conservative than this uncorrected threshold."
           : "Illustrative permutation importances: the decrease in the probe classifier’s score when that feature’s values are shuffled."}{" "}
         The ranking changes with the seed because each seed selects features
-        on a different undersampled training set. The values here are set by
-        hand and exaggerated so the difference is visible; a strong feature in
-        real data usually moves less.
+        on a different undersampled training set. The values here are specified
+        manually and deliberately exaggerated so that the difference is visible;
+        the rank of a strong feature in real data usually varies less.
       </p>
     </>
   );

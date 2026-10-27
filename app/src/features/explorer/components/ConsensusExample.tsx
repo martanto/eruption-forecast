@@ -3,12 +3,13 @@ import {
   EXAMPLE_CONSENSUS,
   EXAMPLE_INPUTS,
 } from "@/features/architecture";
+import { MathExpr } from "@/components/lab/MathExpr";
 
 export function ConsensusExample() {
   return (
     <section className="calculation">
       <h3>Illustrative calculation</h3>
-      <p>Invented inputs for one window; these are not run results.</p>
+      <p>Hypothetical inputs for one window; these are not model outputs.</p>
       {EXAMPLE_INPUTS.map((item) => (
         <p key={item.name}>
           <strong>{item.name}</strong>: probabilities [
@@ -26,7 +27,7 @@ export function ConsensusExample() {
               <th>Group</th>
               <th>Mean P</th>
               <th>Vote</th>
-              <th>Std</th>
+              <th>SD</th>
               <th>CI-like</th>
             </tr>
           </thead>
@@ -46,13 +47,14 @@ export function ConsensusExample() {
           </tbody>
         </table>
       </div>
-      <p>
-        Consensus mean P = (0.60 + 0.80) / 2 = 0.70.
-        <br />
-        Vote = (0.50 + 1.00) / 2 = 0.75.
-        <br />
-        CI-like = 1.96 × √(0.75 × 0.25 / 2) ≈ 0.600.
-      </p>
+      <MathExpr
+        display
+        tex={String.raw`\begin{aligned}
+          \bar{P}_{\mathrm{consensus}} &= \tfrac{0.60 + 0.80}{2} = 0.70 \\
+          \bar{v} &= \tfrac{0.50 + 1.00}{2} = 0.75 \\
+          \mathrm{CI\text{-}like} &= 1.96\sqrt{\tfrac{0.75 \times 0.25}{2}} \approx 0.600
+        \end{aligned}`}
+      />
     </section>
   );
 }

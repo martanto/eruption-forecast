@@ -18,7 +18,7 @@ Open the local URL printed by Vite. `npm run build` writes the static applicatio
 
 The toolbar links to **Labelling**, **Training** and **Prediction**. Continue from `/labelling` (its link reads **Continue to Training**) to `/seed-ensemble` (the Training Guideline opens here), `/features-matrix`, `/random-under-sampler`, `/feature-selection`, `/grid-cv` and `/classifier-ensemble`. Each page uses four steps, synthetic fixtures, light/dark controls and the supplied illustration. Sampling seeds and family controls update examples locally. See [Training walkthroughs](Training-Walkthroughs.md) for calculations and implementation caveats.
 
-Select a numbered stage to inspect its purpose, actual behavior, parameters, artifacts, implementation caveats and source excerpts. Expand stages to reveal internal steps. Search includes node text, parameters, artifacts and referenced source paths. **Caveats** filters the searchable steps and dims unaffected nodes.
+Select a numbered stage to inspect its purpose, implemented behaviour, parameters, artifacts, implementation caveats and source excerpts. Expand stages to reveal internal steps. Search includes node text, parameters, artifacts and referenced source paths. **Caveats** filters the searchable steps and dims unaffected nodes.
 
 **Pipeline** shows transformations. **Timeline** shows the five scenarios from the reviewed `forecast-scenario.py`, training/prediction periods and all eight dated eruptions. Historical feature lookback and label lookahead are illustrated separately from execution order. Scenario descriptions are not used to infer event counts.
 
@@ -41,7 +41,7 @@ Drag or pinch the canvas, use the zoom controls, navigate the minimap, fit all n
 - Training-reuse evaluation reports fitted-model performance. Per-seed SHAP and aggregate plots explain constituent classifiers, not a separate consensus model.
 - The consensus inspector labels its numerical calculation as illustrative. Mean probabilities, mean votes, population standard deviations and vote-based CI-like values are shown separately.
 
-The script's RF/Lite-RF selection, two seeds, six-hour training stride and ten-minute prediction stride are **example settings**, not package defaults. The bundled July–August forecast image is a historical example and is not assigned to the selected scenario.
+The script's RF/Lite-RF selection, two seeds, six-hour training window step and ten-minute prediction window step are **example settings**, not package defaults. The bundled July–August forecast image is a historical example and is not assigned to the selected scenario.
 
 ## Maintain the content
 
@@ -60,7 +60,7 @@ When Python source, the scenario script, README or the referenced wiki pages cha
 
 Open **Labelling** in the Atlas toolbar (`/labelling`) to follow Continuous standard labels, dynamic per-eruption labels, and the tremor matrix. Each chapter has four selectable steps, previous/next controls and a restart action. Select a six-hour label cell or move between windows to inspect its timestamp and id.
 
-The shared example uses a two-day tremor look-back, a six-hour slide and three positive calendar days including eruption day (`day_to_forecast=3`, `include_eruption_date=True`). Synthetic eruptions occur on 20 and 25 March 2025. Continuous covers 9–28 March, producing 80 labels, 24 positive. Dynamic history defaults to seven days before each eruption: 64 event-grid rows merge into 52 unique timestamps, retaining the same 24 positives. Choose three days to see separated event slices, or ten days for longer overlap. Missing dates are absent labels, not zero labels.
+The shared example uses a two-day tremor look-back, a six-hour window step and three positive calendar days including eruption day (`day_to_forecast=3`, `include_eruption_date=True`). Synthetic eruptions occur on 20 and 25 March 2025. Continuous covers 9–28 March, producing 80 labels, 24 positive. Dynamic history defaults to seven days before each eruption: 64 event-grid rows merge into 52 unique timestamps, retaining the same 24 positives. Choose three days to see separated event slices, or ten days for longer overlap. Missing dates are absent labels, not zero labels.
 
 The matrix chapter accepts either label source. A timestamp t selects `[t − 2 days, t)`: 288 ten-minute tremor samples. The completeness demonstration removes every fourth sample from the selected slice (216/288, 75%), so the example’s 100% threshold rejects it. This is a per-window teaching fixture; other windows are assumed complete. Accepted rows carry the label id, datetime and metric columns; `is_erupted` stays in the separate labels table. Neighbouring six-hour windows share 252 samples. Synthetic tremor extends two days before the first label.
 
@@ -79,6 +79,8 @@ npm run validate:sources
 npm run test:e2e
 ```
 
+To check KaTeX output, start the dev server (`npm run dev -- --port 5199`) and run `node tests/capture-math.mjs` from `app/`. It loads every page that typesets formulas at desktop and mobile width, reports `.katex-error` nodes, console errors, page overflow and clipped formulas, and saves screenshots under `app/tests/review/math/`. Set `BASE_URL` to use another port.
+
 If Chromium is missing, run `npx playwright install chromium` before the browser tests. All tests, outputs, traces and reports live under `app/tests/`. Browser tests cover desktop and mobile, URL history, selection, search, caveats, expansion, tour navigation, keyboard use, zoom, pan, minimap navigation, viewport restoration and drawer focus.
 
 Lint enforces filenames and dependency direction, rejects cross-feature deep imports and upward imports, and runs negative fixtures for both aliases and relative paths. The rule also resolves relative paths to catch normalization bypasses. Fixed lowercase entrypoints and direct imports inside one feature remain valid.
@@ -93,7 +95,7 @@ Step 5 adds an **ROC simulation** below the forecast figure: one ROC panel per c
 
 Chapter 2, *Several scenarios* (`?part=scenarios`), mirrors `forecast-scenario.py`: `calculate()` once, then train, predict, evaluate and explain per selected scenario. Reader can toggle `use_features_from`, step or play the run, inspect a scenario's `Scenario` dict, and add a custom scenario (validated: forecast starts after training ends, dates inside the calculated range). Only scenario 5.2 has recorded probabilities; other scenarios show periods and derived eruption counts. Window counts are calendar days times windows per day. `?scenario=<id>` selects a scenario.
 
-Source: `features/explorer/predictionLessons.ts`, `components/{PredictionWalkthrough,PredictionWorkflowDiagram,PredictionReader,ScenarioRunner}.tsx`, `styles/prediction.css`. Tests: `app/tests/prediction.test.ts`; captures via `node tests/capture-prediction.mjs`.
+Source: `features/explorer/predictionLessons.ts`, `components/{PredictionWalkthrough,PredictionWorkflowDiagram,ForecastExplorer,ScenarioRunner}.tsx`, `styles/prediction.css`. Tests: `app/tests/prediction.test.ts`; captures via `node tests/capture-prediction.mjs`.
 
 ### Reusable forecast components
 
@@ -114,7 +116,7 @@ The Labelling, Training and Prediction pages share one set of building blocks, s
 
 | Module | Provides |
 |--------|----------|
-| `components/lab/` | `LabSectionTitle`, `ResultOutput`, `SelectField` / `SeedSelect`, `ChoiceButtons`, `DataTable`, `ScrollRegion` / `ChartScroll`, `Legend`, `StepControls` / `StepButtons`, `ChapterNav`, `ParameterStrip`, `WhySection` / `ImplementationNotes`, `TraceToolbar`, `ChartFrame`, `YAxis` / `XAxis` / `AxisTitle` |
+| `components/lab/` | `LabSectionTitle`, `ResultOutput`, `SelectField` / `SeedSelect`, `ChoiceButtons`, `DataTable`, `ScrollRegion` / `ChartScroll`, `Legend`, `StepControls` / `StepButtons`, `ChapterNav`, `ParameterStrip`, `WhySection` / `ImplementationNotes`, `TraceToolbar`, `ChartFrame`, `YAxis` / `XAxis` / `AxisTitle`, `CodeSnippet` (Python snippet via `react-code-block` + `prism-react-renderer`; props `code`, `inline`, `lineNumbers`, `label`; dark VS Code Dark+ card with a line-number gutter), `MathExpr` (KaTeX-typeset LaTeX; pass `tex`, add `display` for a centred block), `MathText` (prose with inline `$…$` LaTeX, used by the architecture dataset) |
 | `components/common/ExplanationDialog.tsx` | The "open in a full dialog" button and Radix dialog used by the wiki explanation and the prediction replay |
 | `lib/scale.ts` | `linearScale`, `logScale`, `linePoints`, `linePath`: the domain-to-pixel maths and SVG point strings every chart uses |
 | `hooks/useElementWidth.ts` | Container width for charts that redraw to fit instead of scrolling (`ForecastChart`) |
@@ -127,6 +129,16 @@ Each Training lesson is its own component (`UnderSamplerLesson`, `SeedEnsembleLe
 ### Charts
 
 Draw SVG charts from `ChartFrame` (legend, scrolling `<svg role="img">`, required text label), `YAxis` / `XAxis` / `AxisTitle` (gridlines and ticks; one `chart-grid` / `chart-axis` stylesheet in `styles/charts.css`) and `lib/scale.ts`. Do not hand-roll `sx`/`sy` functions, point strings or axis text. `ForecastChart`, `RocPanel`, `ByCorrectionDemo`, `KsTestDemo`, `FisherDemo` and `LabelledDataDemo` already use them. `FisherDemo`'s "How C(n, r) works" section lives in `CombinationsLesson.tsx` to stay under the file-size limit.
+
+### Formulas and terminology
+
+Typeset every formula with [KaTeX](https://katex.org/) instead of plain text such as `1.96 × sqrt(v × (1 − v) / n)`:
+
+- `MathExpr` (`components/lab/MathExpr.tsx`) renders one LaTeX string. Inline by default; pass `display` for a centred block. Write the string with `String.raw` so backslashes survive, and use `\begin{aligned}…\end{aligned}` to stack long equations. `styles/math.css` lets a display equation scroll inside its column rather than clip on narrow screens. A parse error renders the source text instead of throwing (`throwOnError: false`).
+- `MathText` (`components/lab/MathText.tsx`) renders prose with inline LaTeX between `$…$` delimiters. Use it for strings held in data, such as the `behavior` and gap `detail` records in `features/architecture/content.ts` and the tour text, where each backslash is doubled: `"$1.96\\sqrt{v(1-v)/n}$"`. `NodeBehavior`, the caveat notes and `GuidedTour` already render through it. A literal dollar sign in such a string is not supported.
+- Format numbers inside TeX deliberately: escape `%` as `\%` and wrap thousands separators as `{,}` so TeX does not add space after them.
+
+Copy follows standard terminology. Prefer *false positive* / *false negative* to "false alarm" / "miss", *non-eruptive / pre-eruptive window* (negative / positive class) to "quiet window", *window step* to "slide" or "stride", *inter-seed standard deviation* or *dispersion* to "disagreement" or "spread", *probability* to "chance", *held-out rows* and *hyperparameter combination* to "test rows" and "setting", and *retained* / *discarded* to "kept" / "dropped". Label the confidence output "CI-like", not a calibrated confidence interval. Strings asserted by tests (for example "Take the guided tour", "Inspect selection", "Node details", "Example scenario", "Illustrative calculation") change only together with the test.
 
 ### Component gallery
 

@@ -55,10 +55,10 @@ export function buildLabels(dataset: ForecastDataset): RocLabels {
 const GRID = Array.from({ length: 101 }, (_, i) => i / 100);
 
 export function rocCurve(
-  scores: readonly number[],
+  probabilities: readonly number[],
   { labels, positives, negatives }: RocLabels,
 ): { points: RocPoint[]; auc: number } {
-  const order = scores.map((_, i) => i).sort((a, b) => scores[b]! - scores[a]!);
+  const order = probabilities.map((_, i) => i).sort((a, b) => probabilities[b]! - probabilities[a]!);
   const points: RocPoint[] = [{ threshold: Infinity, fpr: 0, tpr: 0 }];
   let tp = 0;
   let fp = 0;
@@ -66,10 +66,10 @@ export function rocCurve(
     const i = order[k]!;
     if (labels[i]) tp++;
     else fp++;
-    // Emit one point per distinct score so ties move diagonally, as scikit-learn does.
-    if (k === order.length - 1 || scores[order[k + 1]!] !== scores[i]) {
+    // Emit one point per distinct probability so ties move diagonally, as scikit-learn does.
+    if (k === order.length - 1 || probabilities[order[k + 1]!] !== probabilities[i]) {
       points.push({
-        threshold: scores[i]!,
+        threshold: probabilities[i]!,
         fpr: fp / negatives,
         tpr: tp / positives,
       });

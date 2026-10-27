@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { ChapterNav } from "@/components/lab/ChapterNav";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
 import { ParameterStrip } from "@/components/lab/ParameterStrip";
 import { SelectField } from "@/components/lab/SelectField";
@@ -27,7 +28,7 @@ import "@/styles/training.css";
 
 const PARAMETERS = [
   ["Look-back", "2 days"],
-  ["Slide", "6 hours"],
+  ["Window step", "6 hours"],
   ["Forecast", "3 calendar days, including eruption day"],
   ["Tremor", "10-minute samples"],
   ["Time", "UTC"],
@@ -100,7 +101,7 @@ export function LabellingWalkthrough() {
     <main className="label-lab">
       <WalkthroughHeader
         title="From eruption dates to learning windows"
-        intro="Follow the clock, mark the answers, then collect the tremor behind each answer."
+        intro="Generate timestamps, assign the binary labels, then extract the tremor window preceding each label."
       />
       <WalkthroughMenu current="labelling" />
       <WalkthroughPager next="training" label="Next walkthrough" />
@@ -150,8 +151,8 @@ export function LabellingWalkthrough() {
         <LabSectionTitle
           title={
             chapter === 2
-              ? "Read the history behind one label"
-              : "One clock, two ways to choose timestamps"
+              ? "Inspect the tremor window preceding one label"
+              : "One time axis, two ways to generate timestamps"
           }
           aside="Illustrative dates · March 2025"
         />
@@ -290,10 +291,10 @@ export function LabellingWalkthrough() {
         </div>
         <div className="lab-legend">
           <span>
-            <i className="lab-key-zero" />0 · outside positive days
+            <i className="lab-key-zero" />0 · negative class
           </span>
           <span>
-            <i className="lab-key-one" />1 · positive days
+            <i className="lab-key-one" />1 · positive class (pre-eruptive)
           </span>
           <span>
             <i className="lab-key-history" />
@@ -434,13 +435,11 @@ export function LabellingWalkthrough() {
                 The label timestamp is the right edge of its preceding tremor
                 slice. It is not the start of a two-day block.
               </p>
-              <p>
-                <code>day_to_forecast=3</code>
-                <br />
-                <code>include_eruption_date=True</code>
-                <br />
-                <code>window_step=6, window_step_unit="hours"</code>
-              </p>
+              <CodeSnippet
+                code={`day_to_forecast=3
+include_eruption_date=True
+window_step=6, window_step_unit="hours"`}
+              />
               <p>
                 For 20 March: positives run from 18 March 00:00 through 20 March
                 18:00 on this grid. On 21 March 00:00 the label returns to 0.
@@ -689,11 +688,13 @@ export function LabellingWalkthrough() {
           </p>
           <p>
             Implementation: <code>label/label_builder.py</code> →{" "}
-            <code>update_df_eruptions</code>;{" "}
-            <code>label/dynamic_label_builder.py</code> → <code>build</code>;{" "}
-            <code>utils/window.py</code> → <code>construct_windows</code>;{" "}
+            <CodeSnippet inline code="update_df_eruptions()" />;{" "}
+            <code>label/dynamic_label_builder.py</code> →{" "}
+            <CodeSnippet inline code="build()" />;{" "}
+            <code>utils/window.py</code> →{" "}
+            <CodeSnippet inline code="construct_windows()" />;{" "}
             <code>features/tremor_matrix_builder.py</code> →{" "}
-            <code>_build_tremor_matrices</code>. Relative to{" "}
+            <CodeSnippet inline code="_build_tremor_matrices()" />. Relative to{" "}
             <code>src/eruption_forecast/</code>. The example includes two days
             of tremor before the first label.
           </p>

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { ChapterNav } from "@/components/lab/ChapterNav";
 import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { DataTable } from "@/components/lab/DataTable";
 import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
 import { Legend } from "@/components/lab/Legend";
+import { MathExpr } from "@/components/lab/MathExpr";
 import { ParameterStrip } from "@/components/lab/ParameterStrip";
 import { ResultOutput } from "@/components/lab/ResultOutput";
 import { ScrollRegion } from "@/components/lab/ScrollRegion";
@@ -29,8 +31,8 @@ const STEPS = [
   ["Deduplicate", "Overlapping timestamps are kept once."],
 ] as const;
 const LEGEND = [
-  { swatch: ["group", "quiet"], label: "Quiet windows" },
-  { swatch: ["group", "pre"], label: "Pre-eruption windows" },
+  { swatch: ["group", "quiet"], label: "Non-eruptive windows" },
+  { swatch: ["group", "pre"], label: "Pre-eruptive windows" },
 ] as const;
 
 const SOURCE = "src/components/lab";
@@ -178,7 +180,7 @@ export function LabGallery() {
           headers={["Class", "Windows", "Share"]}
         >
           <tr>
-            <td>Quiet</td>
+            <td>Non-eruptive</td>
             <td>48</td>
             <td>0.89</td>
           </tr>
@@ -222,6 +224,35 @@ export function LabGallery() {
           caveat="Undersampling discards majority rows, so it cannot add information."
           implementation="Applied per seed, before the cross-validation split."
           sources={["src/eruption_forecast/utils/ml.py"]}
+        />
+      </GallerySection>
+
+      <GallerySection
+        name="CodeSnippet"
+        source={`${SOURCE}/CodeSnippet.tsx`}
+        purpose="Python source with syntax highlighting, built on react-code-block and prism-react-renderer. Block form scrolls sideways; inline renders within prose."
+      >
+        <CodeSnippet
+          code={`day_to_forecast=3
+include_eruption_date=True
+window_step=6, window_step_unit="hours"  # step size`}
+        />
+        <p>
+          Inline: <CodeSnippet inline code="fit(seeds=25, resample_method='auto')" />
+        </p>
+      </GallerySection>
+
+      <GallerySection
+        name="MathExpr"
+        source={`${SOURCE}/MathExpr.tsx`}
+        purpose="KaTeX-typeset LaTeX; inline by default, centred on its own line with display."
+      >
+        <p>
+          Inline: <MathExpr tex={String.raw`p_{(k)} \le \frac{k\,q}{m}`} />
+        </p>
+        <MathExpr
+          display
+          tex={String.raw`\binom{n}{r} = \frac{n!}{r!\,(n-r)!}`}
         />
       </GallerySection>
     </>

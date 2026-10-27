@@ -120,7 +120,7 @@ export const CV_ROWS = 14; // 8 negatives (ids 1-8) + 6 positives (ids 9-14)
 export const CV_STRATEGIES = {
   shuffle: {
     name: "ShuffleSplit",
-    note: "Random test rows. Fold 1 can hold no positives at all.",
+    note: "Randomly drawn test rows; fold 1 may contain no positive samples.",
     folds: [
       [1, 3, 6, 8],
       [2, 4, 9, 10],
@@ -129,7 +129,7 @@ export const CV_STRATEGIES = {
   },
   stratified: {
     name: "StratifiedKFold",
-    note: "Each row is tested exactly once, and every fold keeps positives.",
+    note: "Each row is used for testing exactly once, and every fold contains positive samples.",
     folds: [
       [1, 2, 3, 9, 10],
       [4, 5, 6, 11, 12],
@@ -138,7 +138,7 @@ export const CV_STRATEGIES = {
   },
   "shuffle-stratified": {
     name: "StratifiedShuffleSplit",
-    note: "Random draws that keep the class mix; a row can reappear across folds.",
+    note: "Random draws that preserve the class proportions; a row may reappear in several test folds.",
     folds: [
       [2, 6, 10, 13],
       [1, 7, 9, 14],

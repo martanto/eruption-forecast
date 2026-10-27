@@ -1,8 +1,8 @@
 export const TRAINING_LESSONS = {
   "seed-ensemble": {
     title: "Seed Ensemble",
-    intro: "Train one classifier several ways, then listen to the group.",
-    why: "One majority draw or random initialization can be unlucky. Repeating the same classifier family with different seeds reduces dependence on a single run and can reduce variance when the models make different errors. Averaging does not automatically remove systematic bias.",
+    intro: "Train one classifier under several random seeds, then aggregate the results.",
+    why: "One majority-class draw or random initialization may be unrepresentative. Repeating the same classifier family with different seeds reduces dependence on a single run and can reduce variance when the models make different errors. Averaging does not automatically remove systematic bias.",
     steps: [
       [
         "Start from shared history",
@@ -65,12 +65,12 @@ export const TRAINING_LESSONS = {
   },
   "random-under-sampler": {
     title: "Random Under Sampler",
-    intro: "Give rare positive windows a stronger voice in training.",
-    why: "Most historical windows are outside the pre-eruption period. A model can appear accurate by always predicting 0. Random under-sampling keeps the minority class and draws fewer majority rows, changing the balance the classifier learns from.",
+    intro: "Reduce class imbalance so that the rare positive windows influence training.",
+    why: "Most historical windows lie outside the pre-eruptive period. A model can attain high accuracy by always predicting the negative class. Random under-sampling keeps the minority class and draws fewer majority rows, changing the balance the classifier learns from.",
     steps: [
       [
         "Count the classes",
-        "Our synthetic history has 48 negative windows and 6 positive windows. Always predicting 0 gives 88.9% accuracy, but detects none of the positives. A positive window is a forecast label, not a separate eruption.",
+        "The synthetic history contains 48 negative windows and 6 positive windows. Always predicting the negative class yields 88.9% accuracy but a recall of zero. A positive window is a forecast label, not a separate eruption.",
       ],
       [
         "Set the target ratio",
@@ -129,7 +129,7 @@ export const TRAINING_LESSONS = {
   "grid-cv": {
     title: "Grid CV",
     intro: "Try every hyperparameter combination, then keep the best for this seed.",
-    why: "A forest's depth or tree count changes how it fits. Instead of guessing, GridSearchCV scores every combination on held-out folds and refits the winner on all retained rows.",
+    why: "A forest's depth or tree count changes how it fits. Rather than choosing hyperparameters arbitrarily, GridSearchCV scores every combination on held-out folds and refits the winner on all retained rows.",
     steps: [
       [
         "Define the grid and splitter",
@@ -149,7 +149,7 @@ export const TRAINING_LESSONS = {
       ],
     ],
     caveat:
-      "Fold scores from a small sample are noisy, and resampling and selection already used these rows, so they flatter the model. Grid search picks the best of the combinations offered, not the best possible model. Overlapping windows can leak across folds. Judge on later, unresampled data.",
+      "Fold scores from a small sample have high variance, and resampling and feature selection have already used these rows, so the scores are optimistically biased. Grid search picks the best of the combinations offered, not the best possible model. Overlapping windows can leak across folds. Judge on later, unresampled data.",
     implementation:
       "utils/ml.py grid_search_cv builds GridSearchCV(estimator, param_grid, cv=get_cv_splitter(), scoring, n_jobs=n_grids), fits it on features[top_n_features] and returns best_estimator_. TrainingModel.fit runs one such job per seed.",
     sources: [
@@ -161,7 +161,7 @@ export const TRAINING_LESSONS = {
   "classifier-ensemble": {
     title: "Classifier Ensemble",
     intro: "Bring the seed ensembles together without losing their identities.",
-    why: "Different classifier families can respond differently to the same features. ClassifierEnsemble bundles one SeedEnsemble per family, preserves each result for comparison, and provides a shared prediction interface. Consensus can soften dependence on one family, but improvement must be measured.",
+    why: "Different classifier families can respond differently to the same features. ClassifierEnsemble bundles one SeedEnsemble per family, preserves each result for comparison, and provides a shared prediction interface. Consensus can reduce dependence on a single family, but any improvement must be measured empirically.",
     steps: [
       [
         "Collect the seed ensembles",

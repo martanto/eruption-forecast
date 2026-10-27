@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CodeSnippet } from "@/components/lab/CodeSnippet";
 import { DataTable } from "@/components/lab/DataTable";
 import { LabSectionTitle } from "@/components/lab/LabSectionTitle";
 import { ResultOutput } from "@/components/lab/ResultOutput";
@@ -34,12 +35,12 @@ export function GridCvLesson({
       <LabSectionTitle
         title={
           step === 0
-            ? "Fourteen retained rows, six candidate settings"
+            ? "Fourteen retained rows, six candidate hyperparameter combinations"
             : step === 1
-              ? "Hold some rows out in each fold"
+              ? "Hold out a subset of rows in each fold"
               : step === 2
-                ? "Score each setting across the folds"
-                : "Refit the winner on every retained row"
+                ? "Score each combination across the folds"
+                : "Refit the best combination on all retained rows"
         }
         aside="8 negative + 6 positive rows · 3 folds · illustrative scores"
       />
@@ -81,7 +82,7 @@ export function GridCvLesson({
             groupLabel="CV fold"
           />
           <p>
-            <strong>{cv.name}</strong> · fold {fold + 1}: {test.length} test
+            <strong>{cv.name}</strong> · fold {fold + 1}: {test.length} held-out
             rows, {testPositives} positive. {cv.note}
           </p>
         </div>
@@ -117,7 +118,7 @@ export function GridCvLesson({
       {step === 3 && (
         <p>
           GridSearchCV refits that setting on all {CV_ROWS} rows. The fitted{" "}
-          <code>best_estimator_</code> is this seed&apos;s model; the other five
+          <CodeSnippet inline code="best_estimator_" /> is this seed&apos;s model; the other five
           settings are discarded.
         </p>
       )}

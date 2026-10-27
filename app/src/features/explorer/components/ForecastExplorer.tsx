@@ -120,7 +120,7 @@ export function ForecastExplorer({
       )}
       <ResultOutput>
         {summary.above.toLocaleString()} of {summary.total.toLocaleString()}{" "}
-        windows ({percent(summary.above / summary.total)}) reach{" "}
+        windows ({percent(summary.above / summary.total)}) meet or exceed{" "}
         {threshold.toFixed(2)}
       </ResultOutput>
       <ul className="pwr-eruptions">
@@ -128,7 +128,7 @@ export function ForecastExplorer({
           <li key={item.date}>
             <strong>{item.date}</strong>
             {item.crossings === 0
-              ? ` · no window reached ${threshold.toFixed(2)} in the ${lookaheadHours} h before`
+              ? ` · no window met or exceeded ${threshold.toFixed(2)} in the ${lookaheadHours} h before`
               : ` · ${item.crossings} windows at or above, first ${item.leadHours!.toFixed(1)} h before`}
           </li>
         ))}

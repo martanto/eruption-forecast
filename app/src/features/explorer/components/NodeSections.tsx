@@ -1,12 +1,15 @@
+import { MathText } from "@/components/lab/MathText";
 import type { ArchitectureNode } from "@/features/architecture";
 
 /** The node's behaviour paragraphs, shared by the inspector and the expanded dialog. */
 export function NodeBehavior({ item }: { item: ArchitectureNode }) {
   return (
     <>
-      <h3>What actually happens</h3>
+      <h3>Implemented behaviour</h3>
       {item.behavior.map((text) => (
-        <p key={text}>{text}</p>
+        <p key={text}>
+          <MathText>{text}</MathText>
+        </p>
       ))}
     </>
   );

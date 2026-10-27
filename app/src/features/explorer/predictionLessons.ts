@@ -12,7 +12,7 @@ export const DEFAULT_THRESHOLD = THRESHOLD;
 export const PREDICTION_STEPS = [
   [
     "Choose the forecast period",
-    "PredictionModel is given a start and an end date. Its tremor is cut into a grid of windows with the same window_size the model trained on (day_to_forecast days) and a fine window_step, 10 minutes in the example scenarios. These windows carry no labels: nothing here knows whether an eruption follows.",
+    "PredictionModel is given a start and an end date. Its tremor is segmented into a grid of windows with the same window_size the model was trained on (day_to_forecast days) and a fine window_step, 10 minutes in the example scenarios. These windows carry no labels: no information about whether an eruption follows is used.",
   ],
   [
     "Extract features without labels",
@@ -24,7 +24,7 @@ export const PREDICTION_STEPS = [
   ],
   [
     "Run forecast()",
-    "Every seed reads its own feature columns for every window and returns a probability. Seeds average into a family mean, families average into the consensus, and the spread between them is the uncertainty. Drag across the recorded forecast to read one window.",
+    "Every seed reads its own feature columns for every window and returns a probability. Seeds average into a family mean, families average into the consensus, and the dispersion among them is the uncertainty. Drag across the recorded forecast to read one window.",
   ],
   [
     "Write results and cache",
@@ -34,10 +34,10 @@ export const PREDICTION_STEPS = [
 
 export const PREDICTION_COPY = {
   title: "Prediction",
-  intro: "Read the trained ensemble across windows it has never seen.",
-  why: "Training answers which windows looked like the run-up to an eruption. Prediction applies that answer to new tremor, window after window, every ten minutes. The output is a probability curve with a measure of disagreement, not a yes or no, so a reader can see when the models agree and when they do not.",
+  intro: "Apply the trained ensemble to windows not seen during training.",
+  why: "Training answers which windows looked like the run-up to an eruption. Prediction applies that answer to new tremor, window after window, every ten minutes. The output is a probability curve with a measure of inter-model disagreement, not a binary decision, so a reader can see when the models agree and when they diverge.",
   caveat:
-    "A probability here is a score from a model fitted on past eruptions, not a calibrated chance. Uncertainty is disagreement between seeds and families, not a confidence interval. Neighbouring windows overlap heavily, so a run of high values is one signal seen many times. The 0.7 line is a plotting and alert choice; evaluate false alarms and misses on later data before acting on it.",
+    "A probability here comes from a model fitted on past eruptions and is not calibrated. Uncertainty is the dispersion between seeds and classifier families, not a confidence interval. Neighbouring windows overlap heavily and are therefore autocorrelated, so a run of high values is one episode counted repeatedly. The 0.7 threshold is a plotting and alerting choice; evaluate false positives and false negatives on later data before acting on it.",
   implementation:
     "PredictionModel.build_label and extract_features prepare the window grid and features; forecast() calls ClassifierEnsemble.predict_with_uncertainty and writes forecast-results_{basename}.csv. ForecastModelScenario.shared_prediction wraps this once per Scenario.",
   sources: [

@@ -80,7 +80,7 @@ export const LESSONS = [
       ],
       [
         "Slide a two-day look-back",
-        "Select a timestamp below. Its input is the preceding 48 hours of tremor. Move forward 6 hours: neighbouring inputs overlap by 42 hours (87.5%). The label belongs to the timestamp at the right edge.",
+        "Select a timestamp below. Its input is the preceding 48 hours of tremor. Advancing by 6 hours, neighbouring inputs overlap by 42 hours (87.5%). The label belongs to the timestamp at the right edge.",
       ],
       [
         "Keep every timestamp",
@@ -92,8 +92,8 @@ export const LESSONS = [
     title: "Dynamic labelling",
     steps: [
       [
-        "Build a clock for each eruption",
-        "Create a separate six-hour grid from E − days_before_eruption through the end of eruption day. All labels start at 0. This extra history setting is independent of the two-day tremor look-back.",
+        "Build a time grid for each eruption",
+        "Create a separate six-hour grid from E − days_before_eruption through the end of eruption day. All labels start at 0. This history-length setting is independent of the two-day tremor look-back.",
       ],
       [
         "Merge, deduplicate, reassign ids",
@@ -118,7 +118,7 @@ export const LESSONS = [
       ],
       [
         "Slice the preceding 48 hours",
-        "Read tremor from t − 2 days through t − 1 millisecond. The left edge is included and t itself is excluded. At one sample every 10 minutes, a complete slice has 2 × 24 × 6 = 288 rows.",
+        "Extract tremor from t − 2 days through t − 1 millisecond. The left edge is included and t itself is excluded. At one sample every 10 minutes, a complete slice has 2 × 24 × 6 = 288 rows.",
       ],
       [
         "Check data completeness",
