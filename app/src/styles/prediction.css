@@ -190,14 +190,6 @@
   display: block;
   cursor: ew-resize;
 }
-.pwr-grid {
-  stroke: var(--color-line);
-}
-.pwr-axis {
-  fill: var(--color-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
 .pwr-line {
   fill: none;
   stroke: var(--color-terracotta);
@@ -591,19 +583,6 @@
   fill: var(--color-ink);
   font-size: 13px;
   font-weight: 600;
-}
-.roc-grid {
-  stroke: var(--color-line);
-  stroke-dasharray: 2 3;
-}
-.roc-axis {
-  fill: var(--color-muted);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-.roc-axis-label {
-  fill: var(--color-muted);
-  font-size: 11px;
 }
 .roc-chance {
   stroke: var(--color-muted);

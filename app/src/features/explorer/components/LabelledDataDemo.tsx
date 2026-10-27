@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
+import { ChartFrame } from "@/components/lab/ChartFrame";
 import { DataTable } from "@/components/lab/DataTable";
-import { Legend } from "@/components/lab/Legend";
-import { ChartScroll } from "@/components/lab/ScrollRegion";
 import {
   DUMMY_FEATURES,
   PICK_FEATURES,
@@ -76,25 +75,22 @@ export function LabelledDataDemo() {
         onChange={setName}
       />
       <figure className="sig-card sig-figure">
-        <Legend
-          items={[
+        <ChartFrame
+          width={width}
+          height={H}
+          minWidth={640}
+          label={`Bar chart of ${name} for 24 windows in time order. Windows right before each of the two eruptions are labelled 1.`}
+          legend={[
             { swatch: ["group", "quiet"], label: "label 0 · non-eruptive" },
             { swatch: ["group", "pre"], label: "label 1 · pre-eruptive" },
           ]}
-        />
-        <ChartScroll>
-        <svg
-          viewBox={`0 0 ${width} ${H}`}
-          role="img"
-          aria-label={`Bar chart of ${name} for 24 windows in time order. Windows right before each of the two eruptions are labelled 1.`}
-          style={{ minWidth: 640 }}
         >
-          <line x1={LEFT - 6} x2={width - 4} y1={BASE} y2={BASE} className="sig-grid-line" />
+          <line x1={LEFT - 6} x2={width - 4} y1={BASE} y2={BASE} className="chart-grid" />
           {eruptions.map((ex) => (
             <g key={ex}>
               <line x1={ex} x2={ex} y1={46} y2={BASE} className="sig-sweep" />
               <path d={`M${ex},22 l-7,12 h14 z`} className="sig-eruption-mark" />
-              <text x={ex} y={14} textAnchor="middle" className="sig-axis">
+              <text x={ex} y={14} textAnchor="middle" className="chart-axis">
                 ERUPTION
               </text>
             </g>
@@ -113,7 +109,7 @@ export function LabelledDataDemo() {
                   className="sig-bar-data"
                   data-group={w.label === 1 ? "pre" : "quiet"}
                 />
-                <text x={w.x + 11} y={BASE - height - 5} textAnchor="middle" className="sig-axis sig-tiny">
+                <text x={w.x + 11} y={BASE - height - 5} textAnchor="middle" className="chart-axis">
                   {Math.round(value)}
                 </text>
                 <text
@@ -125,14 +121,13 @@ export function LabelledDataDemo() {
                 >
                   {w.label}
                 </text>
-                <text x={w.x + 11} y={BASE + 44} textAnchor="middle" className="sig-axis sig-tiny">
+                <text x={w.x + 11} y={BASE + 44} textAnchor="middle" className="chart-axis">
                   {w.id}
                 </text>
               </g>
             );
           })}
-        </svg>
-        </ChartScroll>
+        </ChartFrame>
         <figcaption>
           <b>Figure 1.</b> Value of <code>{name}</code> in each of 24 consecutive
           time windows. Upper row of digits: the class label. Lower row: the

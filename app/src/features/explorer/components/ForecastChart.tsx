@@ -1,5 +1,8 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo } from "react";
+import { XAxis, YAxis } from "@/components/lab/ChartAxes";
+import { useElementWidth } from "@/hooks/useElementWidth";
 import { percent } from "@/lib/format";
+import { linearScale, linePoints } from "@/lib/scale";
 import { shortDate, utcStamp } from "@/lib/time";
 import {
   DAY_MS,
@@ -11,21 +14,6 @@ import "@/styles/prediction.css";
 
 const HEIGHT = 230;
 const PAD = { left: 40, right: 12, top: 14, bottom: 28 };
-
-function useWidth() {
-  const host = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(720);
-  useEffect(() => {
-    const el = host.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(280, Math.floor(entry.contentRect.width)));
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return [host, width] as const;
-}
 
 export interface ForecastChartProps {
   dataset: ForecastDataset;
@@ -45,7 +33,7 @@ export function ForecastChart({
   onCursorChange,
   overlayModel,
 }: ForecastChartProps) {
-  const [host, width] = useWidth();
+  const [host, width] = useElementWidth();
   // Unique per chart, so several charts can share a page without clipping each other.
   const uid = useId().replace(/:/g, "");
   const { rows } = dataset;
@@ -53,26 +41,31 @@ export function ForecastChart({
   const lastTime = rows.at(-1)!.time;
   const plotW = width - PAD.left - PAD.right;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
-  const x = (time: number) =>
-    PAD.left + ((time - first) / (lastTime - first)) * plotW;
-  const y = (value: number) => PAD.top + (1 - value) * plotH;
+  const x = linearScale([first, lastTime], [PAD.left, width - PAD.right]);
+  const y = linearScale([0, 1], [HEIGHT - PAD.bottom, PAD.top]);
 
   const series = useMemo(
     () => primarySeries(dataset, Math.min(480, Math.floor(plotW))),
     [dataset, plotW],
   );
-  const line = series
-    .map((p) => `${x(p.time).toFixed(1)},${y(p.value).toFixed(1)}`)
-    .join(" ");
-  const area = `${x(series[0]!.time).toFixed(1)},${y(0)} ${line} ${x(series.at(-1)!.time).toFixed(1)},${y(0)}`;
+  const curve = series.map((p) => [x(p.time), y(p.value)] as const);
+  const line = linePoints(curve);
+  const area = linePoints([
+    [x(series[0]!.time), y(0)],
+    ...curve,
+    [x(series.at(-1)!.time), y(0)],
+  ]);
   const overlay =
     overlayModel && overlayModel !== dataset.models[0]![0]
-      ? series
-          .map(
+      ? linePoints(
+          series.map(
             (p) =>
-              `${x(p.time).toFixed(1)},${y(readRow(dataset, p.index, overlayModel).probability || 0).toFixed(1)}`,
-          )
-          .join(" ")
+              [
+                x(p.time),
+                y(readRow(dataset, p.index, overlayModel).probability || 0),
+              ] as const,
+          ),
+        )
       : null;
   const dates = dataset.eruptionDates.filter((date) => {
     const at = Date.parse(`${date}T00:00:00Z`);
@@ -119,36 +112,13 @@ export function ForecastChart({
           if (event.buttons) scrub(event);
         }}
       >
-        {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
-          <g key={tick}>
-            <line
-              className="pwr-grid"
-              x1={PAD.left}
-              x2={width - PAD.right}
-              y1={y(tick)}
-              y2={y(tick)}
-            />
-            <text
-              className="pwr-axis"
-              x={PAD.left - 6}
-              y={y(tick) + 4}
-              textAnchor="end"
-            >
-              {tick}
-            </text>
-          </g>
-        ))}
-        {days.map((time) => (
-          <text
-            key={time}
-            className="pwr-axis"
-            x={x(time)}
-            y={HEIGHT - 8}
-            textAnchor="middle"
-          >
-            {shortDate(time)}
-          </text>
-        ))}
+        <YAxis
+          ticks={[0, 0.25, 0.5, 0.75, 1]}
+          scale={y}
+          left={PAD.left}
+          right={width - PAD.right}
+        />
+        <XAxis ticks={days} scale={x} labelY={HEIGHT - 8} format={shortDate} />
         {dates.map((date) => {
           const px = x(Date.parse(`${date}T00:00:00Z`));
           return (

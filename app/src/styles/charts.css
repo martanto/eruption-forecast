@@ -1,0 +1,23 @@
+/* Shared SVG chart chrome: `components/lab/ChartAxes.tsx` and `ChartFrame.tsx`. */
+.chart-grid {
+  stroke: var(--color-line);
+}
+.chart-grid[data-variant="dashed"] {
+  stroke-dasharray: 2 3;
+}
+.chart-grid[data-variant="minor"] {
+  stroke-width: 0.5;
+  opacity: 0.6;
+}
+.chart-axis {
+  fill: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-axis[data-size="small"] {
+  font-size: 10px;
+}
+.chart-axis-title {
+  fill: var(--color-muted);
+  font-size: 11px;
+}

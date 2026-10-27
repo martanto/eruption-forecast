@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { ChoiceButtons } from "@/components/lab/ChoiceButtons";
-import { Legend } from "@/components/lab/Legend";
-import { ChartScroll } from "@/components/lab/ScrollRegion";
+import { XAxis, YAxis } from "@/components/lab/ChartAxes";
+import { ChartFrame } from "@/components/lab/ChartFrame";
 import { Button } from "@/components/ui/button";
+import { linearScale } from "@/lib/scale";
 import {
   DUMMY_FEATURES,
   PICK_FEATURES,
@@ -45,8 +46,9 @@ export function KsTestDemo() {
   const hi = Math.ceil(Math.max(...all) + 6);
   const [sweepAt, setSweepAt] = useState<number | null>(null);
   const sweep = sweepAt ?? gap.at;
-  const sx = (x: number) => LEFT + ((x - lo) / (hi - lo)) * (W - LEFT - RIGHT);
-  const sy = (y: number) => PLOT.bottom - y * (PLOT.bottom - PLOT.top);
+  const sx = linearScale([lo, hi], [LEFT, W - RIGHT]);
+  const sy = linearScale([0, 1], [PLOT.bottom, PLOT.top]);
+  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(lo + t * (hi - lo)));
   const f0 = ecdf(quiet, sweep);
   const f1 = ecdf(pre, sweep);
   const v = verdict(feature.p);
@@ -65,21 +67,18 @@ export function KsTestDemo() {
       />
       <div className="sig-grid">
         <div className="sig-card sig-chart">
-          <Legend
-            items={[
+          <ChartFrame
+            width={W}
+            height={H}
+            label={`Empirical CDFs of ${feature.name} for the two classes. KS statistic D = ${gap.d.toFixed(2)}.`}
+            legend={[
               { swatch: ["group", "quiet"], label: `label 0 · non-eruptive (n = ${QUIET_COUNT})` },
               { swatch: ["group", "pre"], label: `label 1 · pre-eruptive (n = ${PRE_COUNT})` },
             ]}
-          />
-          <ChartScroll>
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            role="img"
-            aria-label={`Empirical CDFs of ${feature.name} for the two classes. KS statistic D = ${gap.d.toFixed(2)}.`}
           >
-            <text x={4} y={STRIP.quiet + 4} className="sig-axis">0</text>
-            <text x={4} y={STRIP.pre + 4} className="sig-axis">1</text>
-            <line x1={LEFT} x2={W - RIGHT} y1={STRIP.pre + 18} y2={STRIP.pre + 18} className="sig-grid-line" />
+            <text x={4} y={STRIP.quiet + 4} className="chart-axis">0</text>
+            <text x={4} y={STRIP.pre + 4} className="chart-axis">1</text>
+            <line x1={LEFT} x2={W - RIGHT} y1={STRIP.pre + 18} y2={STRIP.pre + 18} className="chart-grid" />
             {quiet.map((value, i) => (
               <circle key={i} cx={sx(value)} cy={STRIP.quiet} r={5} className="sig-dot" data-group="quiet" />
             ))}
@@ -95,21 +94,9 @@ export function KsTestDemo() {
                 data-group="pre"
               />
             ))}
-            <text x={LEFT} y={PLOT.top - 12} className="sig-axis">ECDF: share of windows with value ≤ x</text>
-            {[0, 0.5, 1].map((tick) => (
-              <g key={tick}>
-                <line x1={LEFT} x2={W - RIGHT} y1={sy(tick)} y2={sy(tick)} className="sig-grid-line" />
-                <text x={LEFT - 8} y={sy(tick) + 4} textAnchor="end" className="sig-axis">{tick}</text>
-              </g>
-            ))}
-            {[0, 0.25, 0.5, 0.75, 1].map((t) => {
-              const value = Math.round(lo + t * (hi - lo));
-              return (
-                <text key={t} x={sx(value)} y={PLOT.bottom + 20} textAnchor="middle" className="sig-axis">
-                  {value}
-                </text>
-              );
-            })}
+            <text x={LEFT} y={PLOT.top - 12} className="chart-axis">ECDF: share of windows with value ≤ x</text>
+            <YAxis ticks={[0, 0.5, 1]} scale={sy} left={LEFT} right={W - RIGHT} />
+            <XAxis ticks={xTicks} scale={sx} labelY={PLOT.bottom + 20} />
             <path d={staircase(quiet, sx, sy, lo, hi)} className="sig-step" data-group="quiet" />
             <path d={staircase(pre, sx, sy, lo, hi)} className="sig-step" data-group="pre" />
             <line x1={sx(sweep)} x2={sx(sweep)} y1={STRIP.quiet - 14} y2={PLOT.bottom} className="sig-sweep" />
@@ -123,8 +110,7 @@ export function KsTestDemo() {
             >
               gap = {Math.abs(f1 - f0).toFixed(2)}
             </text>
-          </svg>
-          </ChartScroll>
+          </ChartFrame>
           <div className="sig-sweep-control">
             <label>
               Move x along the feature axis

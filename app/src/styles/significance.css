@@ -187,11 +187,6 @@
 .sig-by-chart .sig-formula {
   margin-top: 0;
 }
-.sig-grid-minor {
-  stroke: var(--color-line);
-  stroke-width: 0.5;
-  opacity: 0.6;
-}
 .sig .sig-caption + .lab-options {
   margin-top: 16px;
 }
@@ -363,17 +358,6 @@
   display: block;
   width: 100%;
   height: auto;
-}
-.sig-axis {
-  fill: var(--color-muted);
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-}
-.sig-tiny {
-  font-size: 12px;
-}
-.sig-grid-line {
-  stroke: var(--color-line);
 }
 .sig-dot[data-group="quiet"],
 .sig-marker[data-group="quiet"],

@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { ExplorerLayout } from "@/layouts/ExplorerLayout";
 import { ExplorerPage } from "@/routes/ExplorerPage";
 import { LabellingPage } from "@/routes/LabellingPage";
+import { GalleryPage } from "@/routes/GalleryPage";
 import { TrainingPage } from "@/routes/TrainingPage";
 import { PredictionPage } from "@/routes/PredictionPage";
 import { RouteError } from "@/components/common/RouteError";
@@ -15,6 +16,7 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <ExplorerPage /> },
         { path: "labelling", element: <LabellingPage /> },
+        { path: "gallery", element: <GalleryPage /> },
         {
           path: "random-under-sampler",
           element: <TrainingPage topic="random-under-sampler" />,

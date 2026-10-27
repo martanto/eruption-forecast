@@ -10,7 +10,7 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
     page.getByRole("heading", { name: "Seed Ensemble", exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("navigation", { name: "Pipeline walkthroughs" })
+    .getByRole("navigation", { name: "Training lessons" })
     .getByRole("link", { name: "Random Under Sampler", exact: true })
     .click();
   await expect(
@@ -42,7 +42,7 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
   });
 
   await page
-    .getByRole("navigation", { name: "Pipeline walkthroughs" })
+    .getByRole("navigation", { name: "Training lessons" })
     .getByRole("link", { name: "Seed Ensemble", exact: true })
     .click();
   await expect(
@@ -72,7 +72,7 @@ test("training walkthroughs explain sampling, seed models and consensus", async 
   });
 
   await page
-    .getByRole("navigation", { name: "Pipeline walkthroughs" })
+    .getByRole("navigation", { name: "Training lessons" })
     .getByRole("link", { name: "Classifier Ensemble", exact: true })
     .click();
   await page.getByRole("button", { name: /Step 4:/ }).click();

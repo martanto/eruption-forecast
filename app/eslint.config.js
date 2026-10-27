@@ -7,7 +7,13 @@ import checkFile from "eslint-plugin-check-file";
 import reactHooks from "eslint-plugin-react-hooks";
 
 const SOURCE_ROOT = fileURLToPath(new URL("./src/", import.meta.url));
-const FEATURES = ["architecture", "explorer", "scenarios", "guided-tour"];
+const FEATURES = [
+  "architecture",
+  "explorer",
+  "scenarios",
+  "guided-tour",
+  "gallery",
+];
 const boundaryRule = {
   meta: {
     type: "problem",
